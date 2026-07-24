@@ -92,3 +92,5 @@ deliberately not OSI-approved. See the
   </a>
   &nbsp;&middot;&nbsp;<a href="https://discord.gg/daQmY23ym"><img alt="Discord" src=".github/discord.svg" height="20"></a>
 </p>
+
+<!-- ci verify -->
