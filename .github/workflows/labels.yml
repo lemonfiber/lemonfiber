@@ -5,8 +5,10 @@ on:
   schedule:
     - cron: "0 4 * * 1"
 permissions:
-  issues: write
   contents: read
 jobs:
   sync:
-    uses: lemonfiber/spec/.github/workflows/label-sync.yml@main
+    permissions:
+      contents: read
+      issues: write
+    uses: lemonfiber/spec/.github/workflows/label-sync.yml@4eb85bd0ffafb9ed804bd78b23221a2bdb99db91 # main
