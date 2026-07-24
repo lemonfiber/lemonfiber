@@ -13,6 +13,14 @@
   CLI, TUI and a local web UI over one core. Rust.
 </p>
 
+<p align="center">
+  <a href="https://github.com/lemonfiber/lemonfiber/actions/workflows/build.yml"><img alt="build" src="https://github.com/lemonfiber/lemonfiber/actions/workflows/build.yml/badge.svg"></a>
+  <a href="https://github.com/lemonfiber/lemonfiber/actions/workflows/codeql.yml"><img alt="codeql" src="https://github.com/lemonfiber/lemonfiber/actions/workflows/codeql.yml/badge.svg"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=lemonfiber_lemonfiber"><img alt="quality gate" src="https://sonarcloud.io/api/project_badges/measure?project=lemonfiber_lemonfiber&metric=alert_status"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=lemonfiber_lemonfiber"><img alt="coverage" src="https://sonarcloud.io/api/project_badges/measure?project=lemonfiber_lemonfiber&metric=coverage"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/lemonfiber/lemonfiber"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/lemonfiber/lemonfiber/badge"></a>
+</p>
+
 ---
 
 > **Status: pre-implementation.** This is a scaffold. The specification is
