@@ -2,6 +2,13 @@ name: stale
 on:
   schedule:
     - cron: "30 1 * * *"
+permissions:
+  contents: read
+
 jobs:
   stale:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     uses: lemonfiber/spec/.github/workflows/stale.yml@main

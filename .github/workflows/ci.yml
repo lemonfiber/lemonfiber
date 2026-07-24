@@ -1,6 +1,9 @@
 # Calls the reusable workflows defined once in lemonfiber/spec (Q-R56).
 name: ci
 on: [pull_request]
+permissions:
+  contents: read
+
 jobs:
   spec-check:
     uses: lemonfiber/spec/.github/workflows/spec-check.yml@main

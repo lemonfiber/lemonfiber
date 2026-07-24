@@ -1,3 +1,6 @@
+# CodeQL static analysis: the Rust crates and the Actions workflows. Rust
+# catches memory/logic classes the linters don't; actions catches workflow
+# injection and supply-chain flaws. Q-R53.
 name: codeql
 on:
   push:
@@ -12,12 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [rust, actions]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - uses: github/codeql-action/init@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
         with:
-          languages: rust
+          languages: ${{ matrix.language }}
       - uses: github/codeql-action/autobuild@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        if: matrix.language == 'rust'
       - uses: github/codeql-action/analyze@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
