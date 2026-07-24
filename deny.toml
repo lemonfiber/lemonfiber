@@ -13,6 +13,9 @@ version = 2
 # (license-file), which does not constrain what deps may use.
 allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
 confidence-threshold = 0.9
+# Our own workspace crates are Hippocratic (license-file); cargo-deny's
+# licence gate is for third-party deps, not first-party code.
+private = { ignore = true }
 
 [sources]
 unknown-registry = "deny"

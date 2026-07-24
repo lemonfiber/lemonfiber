@@ -2,6 +2,7 @@
 name = "lemonfiber"
 version = "0.0.0"
 license-file = "../../LICENSE"
+publish = false
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
