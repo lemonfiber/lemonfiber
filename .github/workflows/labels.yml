@@ -1,0 +1,12 @@
+# Keep this repo's labels in sync with the canonical set in the spec (OPS-R12).
+name: labels
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+permissions:
+  issues: write
+  contents: read
+jobs:
+  sync:
+    uses: lemonfiber/spec/.github/workflows/label-sync.yml@main

@@ -1,0 +1,57 @@
+# A PR that passes CI with no review, from a non-maintainer, is flagged for a
+# maintainer; the flag clears when a review lands. OPS-R26, OPS-R27.
+name: awaiting-maintainer
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+  pull_request_review:
+    types: [submitted]
+permissions:
+  pull-requests: write
+  contents: read
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    outputs:
+      flagged: ${{ steps.act.outputs.flagged }}
+      pr: ${{ steps.act.outputs.pr }}
+    steps:
+      - name: Toggle label
+        id: act
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$EVENT" = "pull_request_review" ]; then
+            case "$REVIEW_STATE" in
+              approved|changes_requested)
+                gh pr edit "$REVIEW_PR" --remove-label awaiting-maintainer 2>/dev/null || true ;;
+            esac
+            exit 0
+          fi
+          [ "$CONCLUSION" = "success" ] || exit 0
+          pr=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number' 2>/dev/null || true)
+          [ -n "$pr" ] && [ "$pr" != "null" ] || exit 0
+          assoc=$(gh api "repos/$GH_REPO/pulls/$pr" --jq '.author_association' 2>/dev/null || echo "")
+          case "$assoc" in OWNER|MEMBER|COLLABORATOR) echo "maintainer-authored; skip"; exit 0 ;; esac
+          approved=$(gh api "repos/$GH_REPO/pulls/$pr/reviews" --jq '[.[] | select(.state=="APPROVED")] | length' 2>/dev/null || echo 0)
+          [ "${approved:-0}" -gt 0 ] && exit 0
+          gh pr edit "$pr" --add-label awaiting-maintainer 2>/dev/null || true
+          { echo "flagged=true"; echo "pr=$pr"; } >> "$GITHUB_OUTPUT"
+  notify:
+    needs: toggle
+    if: needs.toggle.outputs.flagged == 'true'
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@main
+    with:
+      title: "🔔 Awaiting review · ${{ github.event.repository.name }} #${{ needs.toggle.outputs.pr }}"
+      body: "Passed CI with no review — a maintainer needs to take a look."
+      url: "https://github.com/${{ github.repository }}/pull/${{ needs.toggle.outputs.pr }}"
+      color: "14235678"
+    secrets:
+      webhook: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}

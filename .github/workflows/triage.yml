@@ -1,0 +1,34 @@
+# New issues: label needs-triage, assign the covering maintainer from the
+# generated CODEOWNERS, and post to the private maintainer channel.
+# OPS-R25, OPS-R27.
+name: triage
+on:
+  issues:
+    types: [opened, reopened]
+permissions:
+  issues: write
+  contents: read
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Label and assign
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number }}
+        run: |
+          gh issue edit "$NUM" --add-label needs-triage || true
+          owners=$(awk '/^\* /{for (i=2; i<=NF; i++) print $i}' .github/CODEOWNERS | tr -d '@' | paste -sd, -)
+          if [ -n "$owners" ]; then gh issue edit "$NUM" --add-assignee "$owners" || true; fi
+  notify:
+    needs: triage
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@main
+    with:
+      title: "📥 Needs triage · ${{ github.event.repository.name }} #${{ github.event.issue.number }}"
+      body: ${{ github.event.issue.title }}
+      url: ${{ github.event.issue.html_url }}
+      color: "15105570"
+    secrets:
+      webhook: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
