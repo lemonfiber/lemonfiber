@@ -6,11 +6,13 @@ on:
   issues:
     types: [opened, reopened]
 permissions:
-  issues: write
   contents: read
 jobs:
   triage:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Label and assign
@@ -24,7 +26,7 @@ jobs:
           if [ -n "$owners" ]; then gh issue edit "$NUM" --add-assignee "$owners" || true; fi
   notify:
     needs: triage
-    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@main
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@4eb85bd0ffafb9ed804bd78b23221a2bdb99db91 # main
     with:
       title: "📥 Needs triage · ${{ github.event.repository.name }} #${{ github.event.issue.number }}"
       body: ${{ github.event.issue.title }}
