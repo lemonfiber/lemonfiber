@@ -1,0 +1,5 @@
+# GENERATED from lemonfiber/spec 70-operations/maintainers.toml — do not edit by hand.
+# Regenerate: python3 scripts/gen_codeowners.py <repo>
+
+* @lessevv
+

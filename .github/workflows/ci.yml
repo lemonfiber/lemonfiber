@@ -8,3 +8,5 @@ jobs:
     uses: lemonfiber/spec/.github/workflows/hygiene.yml@main
   security:
     uses: lemonfiber/spec/.github/workflows/security.yml@main
+  dco:
+    uses: lemonfiber/spec/.github/workflows/dco.yml@main
