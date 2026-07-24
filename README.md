@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h1 align="center">lemonfiber &mdash; cli</h1>
+<h1 align="center">Lemonfiber &mdash; cli</h1>
 
 <p align="center">
   The <code>lemonfiber</code> binary: one tool that sets up your media stack,
