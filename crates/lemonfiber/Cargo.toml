@@ -1,0 +1,17 @@
+[package]
+name = "lemonfiber"
+version = "0.0.0"
+license-file = "../../LICENSE"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "lemonfiber"
+path = "src/main.rs"
+
+[dependencies]
+lemonfiber-core = { path = "../lemonfiber-core" }
+
+[lints]
+workspace = true

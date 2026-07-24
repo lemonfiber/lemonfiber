@@ -1,0 +1,10 @@
+# Calls the reusable workflows defined once in lemonfiber/spec (Q-R56).
+name: ci
+on: [pull_request]
+jobs:
+  spec-check:
+    uses: lemonfiber/spec/.github/workflows/spec-check.yml@main
+  hygiene:
+    uses: lemonfiber/spec/.github/workflows/hygiene.yml@main
+  security:
+    uses: lemonfiber/spec/.github/workflows/security.yml@main

@@ -1,0 +1,15 @@
+# Local hooks mirroring CI (Q-R57). Install: `lefthook install`.
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.rs"
+      run: cargo fmt --check
+    typos:
+      run: typos
+pre-push:
+  commands:
+    clippy:
+      run: cargo clippy --all-targets -- -D warnings
+    test:
+      run: cargo test

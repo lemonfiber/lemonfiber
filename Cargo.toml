@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.82"
+repository = "https://github.com/lemonfiber/cli"
+authors = ["NightWorks.io"]
+
+# Strict, zero-suppression posture — see spec 40-quality/code-standards.md (Q-R11, Q-R12).
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+todo = "deny"
+unimplemented = "deny"
+pedantic = { level = "warn", priority = -1 }

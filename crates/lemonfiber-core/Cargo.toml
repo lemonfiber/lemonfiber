@@ -1,0 +1,13 @@
+[package]
+name = "lemonfiber-core"
+version = "0.0.0"
+license-file = "../../LICENSE"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+
+[lints]
+workspace = true

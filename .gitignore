@@ -1,0 +1,9 @@
+/target
+**/*.rs.bk
+Cargo.lock.orig
+.DS_Store
+# web-ui build output (embedded at release)
+crates/lemonfiber/web-ui/dist/
+node_modules/
+.planning/
+.DS_Store

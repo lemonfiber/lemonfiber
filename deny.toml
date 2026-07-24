@@ -1,0 +1,19 @@
+[advisories]
+version = 2
+yanked = "deny"
+
+[bans]
+multiple-versions = "warn"
+# Dependencies introducing telemetry are banned (G8-R11); add offenders here.
+deny = []
+
+[licenses]
+version = 2
+# Permissive licences we accept for dependencies. Our own crate is Hippocratic
+# (license-file), which does not constrain what deps may use.
+allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
+confidence-threshold = 0.9
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
