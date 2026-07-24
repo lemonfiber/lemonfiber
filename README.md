@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h1 align="center">Lemonfiber &mdash; cli</h1>
+<h1 align="center">Lemonfiber</h1>
 
 <p align="center">
   The <code>lemonfiber</code> binary: one tool that sets up your media stack,
@@ -82,5 +82,5 @@ deliberately not OSI-approved. See the
       <img alt="NightWorks.io" src=".github/nightworks-dark.png" height="20">
     </picture>
   </a>
-  &nbsp;&middot;&nbsp;<a href="https://discord.gg/daQmY23ym">Discord</a>
+  &nbsp;&middot;&nbsp;<a href="https://discord.gg/daQmY23ym"><img alt="Discord" src=".github/discord.svg" height="20"></a>
 </p>

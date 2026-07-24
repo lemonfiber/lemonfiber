@@ -1,18 +1,18 @@
-# AGENTS.md — cli
+# AGENTS.md — lemonfiber
 
 Guidance for any AI agent (Cursor, Codex, Aider, Claude Code, …) working in this
 repo.
 
 > **Common rules for every lemonfiber repo are canonical in the spec:**
 > [50-governance/ai-contributors.md](https://github.com/lemonfiber/spec/blob/main/50-governance/ai-contributors.md).
-> Read them. This file is the `cli`-specific header only.
+> Read them. This file is the `lemonfiber`-specific header only.
 
 ## What this repo is
 
 The `lemonfiber` binary — CLI, TUI and web UI over one core. Rust workspace. See
-the spec: [`30-repos/cli.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/cli.md),
-[`30-repos/cli-tui.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/cli-tui.md),
-[`30-repos/cli-reference.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/cli-reference.md).
+the spec: [`30-repos/lemonfiber.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/lemonfiber.md),
+[`30-repos/lemonfiber-tui.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/lemonfiber-tui.md),
+[`30-repos/lemonfiber-reference.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/lemonfiber-reference.md).
 
 ## The one rule you cannot break here
 
@@ -23,7 +23,7 @@ the logic and the rendering must stay separate.
 
 ## Where to start
 
-1. The three `30-repos/cli*.md` specs above.
+1. The three `30-repos/lemonfiber*.md` specs above.
 2. [`20-architecture/component-model.md`](https://github.com/lemonfiber/spec/blob/main/20-architecture/component-model.md) — the crate boundaries and async model.
 3. The feature you're implementing under `10-functional/features/`.
 4. Find the requirement your change serves **before** editing. Cite it.
