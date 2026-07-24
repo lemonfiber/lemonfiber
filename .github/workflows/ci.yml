@@ -10,3 +10,10 @@ jobs:
     uses: lemonfiber/spec/.github/workflows/security.yml@main
   dco:
     uses: lemonfiber/spec/.github/workflows/dco.yml@main
+  commitlint:
+    uses: lemonfiber/spec/.github/workflows/commitlint.yml@main
+  labeler:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: lemonfiber/spec/.github/workflows/labeler.yml@main

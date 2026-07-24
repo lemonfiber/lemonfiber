@@ -15,18 +15,18 @@ jobs:
   changelog:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Generate changelog (git-cliff)
         id: cliff
-        uses: orhun/git-cliff-action@v4
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
         with:
           config: cliff.toml
           args: --latest --strip header
       - name: Draft the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           body: ${{ steps.cliff.outputs.content }}
           draft: true
