@@ -60,12 +60,12 @@ harness and the first check landed before the wizard.
 |-------------|------|--------|-----------------|
 | `doctor` — Check trait, remedy per finding | `C1-R1..R12` | ✅ | #22, [`doctor.rs`](crates/lemonfiber-core/src/doctor.rs) |
 | VPN leak test (`exec` gluetun + client, compare IPs) | `C2`, `VPN-1..3` | ✅ | #22, [`doctor/vpn.rs`](crates/lemonfiber-core/src/doctor/vpn.rs) |
-| Preflight / Environment check (Docker present vs unreachable, Compose ≥ min) | `A2-R9`, `C1-R13` | ☐ | `Category::Environment` declared, no check |
+| Preflight / Environment check (Docker present vs unreachable, Compose ≥ min) | `A2-R9`, `C1-R13` | ✅ | [`doctor/environment.rs`](crates/lemonfiber-core/src/doctor/environment.rs) |
 | Empirical hardlink test (create / `stat` / inode + link-count) | `C5-R1`, `A2-R8` | ☐ | needs a filesystem port + adapter |
 | Storage-mode detection (fs type, network mount, exFAT, WSL2) | `C5-R2`, `C5-R14` | ☐ | `Category::Storage` declared, no check |
 | Credential validation against live services | `A3-R1..R4`, `A3-R10` | ☐ | `service::Client` port defined; no adapter/check |
 | VPN port-forward validation + ProtonVPN NAT-PMP guidance | `A3-R8` | ☐ | — |
-| Prerequisites / account guidance (dependency map before credentials) | `A1-R1..R13` | ☐ | pure core derivation from protocols |
+| Prerequisites / account guidance (dependency map before credentials) | `A1-R1..R13` | ◐ | [`prerequisites.rs`](crates/lemonfiber-core/src/prerequisites.rs) derives the map; the wizard renders it (A1-R7/R8/R10 arrive with A2/A3) |
 | Wizard state machine (resumable, review-before-write, non-interactive guard) | `A2-R1..R15` | ☐ | core exposes steps; surface drives prompting |
 | Jellyfin native-mode + PUID/PGID offers (platform-aware) | `A2-R6`, `A2-R7` | ☐ | — |
 

@@ -23,6 +23,7 @@
 //! | [`docker`] | Making sense of what the engine reports |
 //! | [`config`] | What the operator chose, and where it is kept |
 //! | [`doctor`] | Checks that prove things rather than assuming them |
+//! | [`prerequisites`] | What the operator must obtain, from what they chose |
 //! | [`seed`] | Wiring the services to each other |
 //! | [`journal`] | What was changed, so it can be undone |
 //!
@@ -39,6 +40,7 @@ pub mod journal;
 pub mod model;
 pub mod platform;
 pub mod ports;
+pub mod prerequisites;
 pub mod seed;
 pub mod stack;
 
