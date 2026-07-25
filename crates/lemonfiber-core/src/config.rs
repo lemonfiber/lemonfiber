@@ -43,6 +43,17 @@ pub const USENET_KEY: &str = "LEMONFIBER_USENET";
 /// The setting recording that a VPN and torrent client are configured.
 pub const TORRENT_KEY: &str = "LEMONFIBER_TORRENT";
 
+/// The IP-echo service the leak check asks each container for its public
+/// address.
+///
+/// A plain endpoint that answers with the caller's address and nothing else, so
+/// the check runs `wget` against it from inside the containers rather than
+/// lemonfiber reaching the network on their behalf.
+pub const DEFAULT_IP_ECHO: &str = "https://ifconfig.me";
+
+/// The setting naming the IP-echo service, or switching leak detection off.
+pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
+
 /// Whether a recorded setting reads as switched on.
 ///
 /// Generous about spelling because this is a file people edit by hand, and a
@@ -54,6 +65,36 @@ pub fn reads_as_on(value: &str) -> bool {
         value.trim().to_ascii_lowercase().as_str(),
         "on" | "true" | "yes" | "1"
     )
+}
+
+/// Whether a recorded setting reads as switched off.
+///
+/// The counterpart to [`reads_as_on`] for a setting that also accepts a value:
+/// an explicit off switches the feature off, where absence or an affirmative
+/// would leave it on.
+#[must_use]
+pub fn reads_as_off(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "off" | "false" | "no" | "0" | ""
+    )
+}
+
+/// The IP-echo service to verify egress against, or `None` where the operator
+/// has switched leak detection off.
+///
+/// Absent or affirmative leaves the default in place; an explicit off disables
+/// it, at the stated cost of losing leak detection; any other value replaces the
+/// default with the operator's own endpoint — so the one third-party dependency
+/// the check has is replaceable as well as disableable.
+#[must_use]
+pub fn ip_echo_from_env(file: &env::EnvFile) -> Option<String> {
+    match file.get(IP_ECHO_KEY) {
+        None => Some(DEFAULT_IP_ECHO.to_owned()),
+        Some(value) if reads_as_on(value) => Some(DEFAULT_IP_ECHO.to_owned()),
+        Some(value) if reads_as_off(value) => None,
+        Some(value) => Some(value.trim().to_owned()),
+    }
 }
 
 impl Protocols {
@@ -100,7 +141,8 @@ impl Protocols {
     }
 }
 
-/// The settings the compose driver reads.
+/// What the operator chose: enough for the compose driver to know what runs,
+/// and the answers other subsystems act on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     /// The Compose project name, which is also how containers are correlated
@@ -117,6 +159,12 @@ pub struct Settings {
     pub stack_dir: Option<PathBuf>,
     /// Which download protocols are configured.
     pub protocols: Protocols,
+    /// The IP-echo service the VPN leak check compares egress against, or `None`
+    /// where the operator has switched leak detection off.
+    ///
+    /// On by default, because the failure it catches is the one whose
+    /// consequences reach outside the machine.
+    pub ip_echo: Option<String>,
 }
 
 impl Default for Settings {
@@ -127,13 +175,14 @@ impl Default for Settings {
             overlays: Vec::new(),
             stack_dir: None,
             protocols: Protocols::none(),
+            ip_echo: Some(DEFAULT_IP_ECHO.to_owned()),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{env, Protocol, Protocols, Settings};
+    use super::{env, ip_echo_from_env, Protocol, Protocols, Settings, DEFAULT_IP_ECHO};
 
     #[test]
     fn a_fresh_install_has_no_way_to_download_yet() {
@@ -205,5 +254,48 @@ mod tests {
         assert_eq!(settings.env_file, None);
         assert_eq!(settings.stack_dir, None);
         assert!(settings.overlays.is_empty());
+    }
+
+    #[test]
+    fn leak_detection_is_on_by_default() {
+        // The failure it catches reaches outside the machine, so a fresh install
+        // is protected without the operator having to ask.
+        assert_eq!(
+            ip_echo_from_env(&env::EnvFile::parse("")).as_deref(),
+            Some(DEFAULT_IP_ECHO)
+        );
+        assert_eq!(
+            Settings::default().ip_echo.as_deref(),
+            Some(DEFAULT_IP_ECHO)
+        );
+    }
+
+    #[test]
+    fn an_operator_can_switch_leak_detection_off() {
+        for off in ["off", "OFF", "no", "false", "0", ""] {
+            let file = env::EnvFile::parse(&format!("LEMONFIBER_IP_ECHO={off}\n"));
+            assert_eq!(ip_echo_from_env(&file), None, "{off:?} should disable it");
+        }
+    }
+
+    #[test]
+    fn an_affirmative_value_leaves_the_default_in_place() {
+        for on in ["on", "yes", "true", "1"] {
+            let file = env::EnvFile::parse(&format!("LEMONFIBER_IP_ECHO={on}\n"));
+            assert_eq!(
+                ip_echo_from_env(&file).as_deref(),
+                Some(DEFAULT_IP_ECHO),
+                "{on:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn any_other_value_replaces_the_default_endpoint() {
+        let file = env::EnvFile::parse("LEMONFIBER_IP_ECHO=https://ip.example\n");
+        assert_eq!(
+            ip_echo_from_env(&file).as_deref(),
+            Some("https://ip.example")
+        );
     }
 }
