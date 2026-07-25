@@ -64,6 +64,26 @@ pub struct VersionReport {
     pub compose: Option<String>,
 }
 
+/// One setting, as it is safe to show.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SettingReport {
+    /// The setting's name.
+    pub key: String,
+    /// Its value, or a note that it is set and withheld.
+    pub value: String,
+    /// Whether the value was withheld.
+    pub secret: bool,
+}
+
+/// The answer to a configuration command.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConfigReport {
+    /// The settings asked about — one for a lookup, all of them for a listing.
+    pub settings: Vec<SettingReport>,
+    /// Whether this command changed anything.
+    pub changed: bool,
+}
+
 /// What a lifecycle command did, or would have done.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LifecycleReport {

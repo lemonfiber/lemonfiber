@@ -12,6 +12,7 @@
 
 pub mod env;
 pub mod paths;
+pub mod store;
 
 use std::path::PathBuf;
 
@@ -29,6 +30,30 @@ pub struct Protocols {
     pub usenet: bool,
     /// A VPN and torrent client are configured.
     pub torrent: bool,
+}
+
+/// The setting recording that a Usenet provider is configured.
+///
+/// lemonfiber's own answers live in the same file as the stack's settings,
+/// under a prefix of its own. Compose is handed the file and will pass these to
+/// containers that ask for them, which nothing does — the alternative, a second
+/// configuration file, would mean an operator keeping two things in step.
+pub const USENET_KEY: &str = "LEMONFIBER_USENET";
+
+/// The setting recording that a VPN and torrent client are configured.
+pub const TORRENT_KEY: &str = "LEMONFIBER_TORRENT";
+
+/// Whether a recorded setting reads as switched on.
+///
+/// Generous about spelling because this is a file people edit by hand, and a
+/// setting that silently means "no" because it says `yes` rather than `on`
+/// would be indistinguishable from lemonfiber ignoring it.
+#[must_use]
+pub fn reads_as_on(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "on" | "true" | "yes" | "1"
+    )
 }
 
 impl Protocols {
@@ -54,6 +79,15 @@ impl Protocols {
     #[must_use]
     pub const fn any(self) -> bool {
         self.usenet || self.torrent
+    }
+
+    /// What the operator has recorded about their providers.
+    #[must_use]
+    pub fn from_env(file: &env::EnvFile) -> Self {
+        Self {
+            usenet: file.get(USENET_KEY).is_some_and(reads_as_on),
+            torrent: file.get(TORRENT_KEY).is_some_and(reads_as_on),
+        }
     }
 
     /// Whether the provider a profile declared is one the operator configured.
@@ -99,7 +133,7 @@ impl Default for Settings {
 
 #[cfg(test)]
 mod tests {
-    use super::{Protocol, Protocols, Settings};
+    use super::{env, Protocol, Protocols, Settings};
 
     #[test]
     fn a_fresh_install_has_no_way_to_download_yet() {
@@ -132,6 +166,36 @@ mod tests {
         assert!(!usenet_only.has(Protocol::Torrent));
         assert!(Protocols::both().has(Protocol::Torrent));
         assert!(!Protocols::none().has(Protocol::Usenet));
+    }
+
+    #[test]
+    fn a_provider_is_configured_only_when_it_says_so() {
+        let file = env::EnvFile::parse("LEMONFIBER_USENET=on\nLEMONFIBER_TORRENT=off\n");
+        assert_eq!(
+            Protocols::from_env(&file),
+            Protocols {
+                usenet: true,
+                torrent: false
+            }
+        );
+    }
+
+    #[test]
+    fn nothing_recorded_means_nothing_configured() {
+        assert_eq!(
+            Protocols::from_env(&env::EnvFile::parse("")),
+            Protocols::none()
+        );
+    }
+
+    #[test]
+    fn a_setting_may_be_spelled_the_ways_people_spell_it() {
+        for on in ["on", "ON", "true", "yes", "1", " on "] {
+            assert!(super::reads_as_on(on), "{on:?} should read as on");
+        }
+        for off in ["off", "false", "no", "0", "", "maybe"] {
+            assert!(!super::reads_as_on(off), "{off:?} should not read as on");
+        }
     }
 
     #[test]

@@ -14,7 +14,7 @@ use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::{Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::Settings;
+use lemonfiber_core::config::{store, Protocols, Settings};
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
@@ -76,6 +76,30 @@ enum Request {
         #[arg(required = true)]
         forms: Vec<String>,
     },
+    /// Read or change one setting.
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+}
+
+/// What to do with settings.
+#[derive(Debug, Subcommand)]
+enum ConfigAction {
+    /// Read one setting.
+    Get {
+        /// The setting to read.
+        key: String,
+    },
+    /// Change one setting.
+    Set {
+        /// The setting to change.
+        key: String,
+        /// What to change it to.
+        value: String,
+    },
+    /// Show every setting, with credentials withheld.
+    Show,
 }
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
@@ -98,8 +122,18 @@ async fn main() -> ExitCode {
         None => Source::Embedded(&STACK),
     };
 
+    // Settings come from the operator's own file, so what runs reflects what
+    // they configured rather than what a default happened to be.
+    let env_file = configuration_file();
+    let recorded = env_file
+        .as_deref()
+        .and_then(|path| store::read(path).ok())
+        .unwrap_or_default();
+
     let settings = Settings {
-        env_file: environment_file(),
+        protocols: Protocols::from_env(&recorded),
+        env_file,
+        stack_dir: stack_directory(),
         ..Settings::default()
     };
 
@@ -128,6 +162,11 @@ async fn main() -> ExitCode {
             services,
         },
         Request::Pull { forms } => Command::Pull { forms },
+        Request::Config { action } => match action {
+            ConfigAction::Get { key } => Command::ConfigGet { key },
+            ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
+            ConfigAction::Show => Command::ConfigShow,
+        },
     };
 
     match dispatch(command, &ctx).await {
@@ -157,19 +196,31 @@ async fn main() -> ExitCode {
     }
 }
 
-/// The operator's environment file, when they have one.
+/// Where this machine keeps lemonfiber's files.
 ///
 /// Finding the platform's base directories is the surface's job: it means asking
 /// the operating system, and there is nothing about it a test could catch that
 /// running it would not. The layout beneath those bases is the core's, and is
 /// tested there.
-fn environment_file() -> Option<PathBuf> {
+fn here() -> Option<Paths> {
     use etcetera::BaseStrategy as _;
 
     let strategy = etcetera::choose_base_strategy().ok()?;
-    let paths = Paths::rooted(&strategy.config_dir(), &strategy.data_dir());
-    let env = paths.env_file();
-    env.is_file().then_some(env)
+    Some(Paths::rooted(&strategy.config_dir(), &strategy.data_dir()))
+}
+
+/// The operator's settings file, whether or not it exists yet.
+///
+/// Named even when absent, because `config set` has to be able to create it —
+/// refusing to name a file until it exists would make setting the first setting
+/// impossible.
+fn configuration_file() -> Option<PathBuf> {
+    here().map(|paths| paths.env_file())
+}
+
+/// Where an embedded stack is written so Compose can read it.
+fn stack_directory() -> Option<PathBuf> {
+    here().map(|paths| paths.stack())
 }
 
 /// Render an outcome, for a person or for a script.
@@ -190,6 +241,14 @@ fn render(outcome: &Outcome, json: bool) {
             match &report.compose {
                 Some(version) => println!("compose {version}"),
                 None => println!("compose not reachable"),
+            }
+        }
+        Outcome::Config(report) => {
+            for setting in &report.settings {
+                println!("{}={}", setting.key, setting.value);
+            }
+            if report.changed {
+                println!("saved");
             }
         }
         Outcome::Lifecycle(report) => {
