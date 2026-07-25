@@ -25,25 +25,28 @@ The order is load-bearing and there is a test that says so by name. `tv` needs
 `search`, `subs` and `tv` regardless of protocol; narrowing first would have
 nothing to narrow against and would drop them.
 
-## The one piece of service knowledge
+## Which profiles are guarded is the manifest's answer
 
-```rust
-pub const USENET: &str = "usenet";
-pub const TORRENT: &str = "torrent";
+```toml
+[[profile]]
+id       = "torrent"
+protocol = "torrent"
 ```
 
-Two profile ids, hardcoded. Everywhere else the manifest is the only source of
-per-service knowledge, and this is the exception.
+Narrowing reads the field. Nothing in this crate knows that a profile called
+`torrent` is special, so a stack that renames its download profiles keeps
+working.
 
-It exists because nothing in the contract marks a profile as a download
-protocol. `[[profile]]` has `id`, `name` and `description`, and none of them say
-"this one needs an account". So lemonfiber has to know these two names, and a
-fork that renamed them would silently stop being narrowed.
+That was not true when this was first written. The contract had no way to say
+which profiles need a provider, so the two ids were constants in this module —
+the only per-service knowledge in Rust anywhere. A fork renaming either would
+have kept parsing, kept resolving, and quietly stopped being narrowed: a torrent
+profile starting on a machine with no VPN configured.
 
-**This is worth fixing in the contract** — a `protocol = true` flag on
-`[[profile]]`, or a `requires` field — but that is a schema change and therefore
-a spec change first. Recorded here rather than worked around, so it is not
-rediscovered as a novel problem.
+It is worth knowing *why* it was worth a spec change rather than a comment. The
+failure was silent and pointed the dangerous way — an unguarded tunnel rather
+than a missing service — and silent failures that fail unsafely are the ones to
+spend a contract change on.
 
 ## Why `--project-directory` and `--file` are both passed
 

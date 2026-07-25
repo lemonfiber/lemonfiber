@@ -12,7 +12,7 @@ mod schema;
 pub use error::Error;
 pub use schema::{
     Api, ApiKind, Bind, Criticality, Form, Health, HealthKind, KeySource, Manifest, Profile,
-    Service,
+    Protocol, Service,
 };
 
 /// The manifest schema version this crate prefers.

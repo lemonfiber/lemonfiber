@@ -18,16 +18,6 @@ use thiserror::Error;
 use crate::config::Protocols;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
-/// The profile carrying Usenet downloading.
-///
-/// Named here rather than read from the manifest because nothing in the
-/// contract marks a profile as a download protocol. See
-/// `.docs/architecture/form-closure.md`.
-pub const USENET: &str = "usenet";
-
-/// The profile carrying torrent downloading.
-pub const TORRENT: &str = "torrent";
-
 /// What will be run, and what was left out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
@@ -85,13 +75,16 @@ pub fn resolve(
         .flat_map(|form| form.profiles.iter().cloned())
         .collect();
 
-    let mut dropped = BTreeSet::new();
-    if !protocols.usenet {
-        dropped.extend(closure.get(USENET).cloned());
-    }
-    if !protocols.torrent {
-        dropped.extend(closure.get(TORRENT).cloned());
-    }
+    // Which profiles are guarded is the manifest's answer, not one this code
+    // remembers. A stack that renames its download profiles keeps working.
+    let dropped: BTreeSet<String> = manifest
+        .profiles
+        .iter()
+        .filter(|profile| closure.contains(&profile.id))
+        .filter_map(|profile| profile.protocol.map(|needed| (profile, needed)))
+        .filter(|(_, needed)| !protocols.has(*needed))
+        .map(|(profile, _)| profile.id.clone())
+        .collect();
 
     let profiles: BTreeSet<String> = closure.difference(&dropped).cloned().collect();
     if profiles.is_empty() {
