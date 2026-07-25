@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
-use lemonfiber_core::adapters::Local;
+use lemonfiber_core::adapters::{Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
@@ -108,7 +108,13 @@ async fn main() -> ExitCode {
     // here, and nothing yet depends on the difference.
     let environment = Environment::resolve(HOST_OS, false);
 
-    let mut ctx = Ctx::new(Arc::new(Local), stack, settings, environment);
+    let mut ctx = Ctx::new(
+        Arc::new(Local),
+        Arc::new(System),
+        stack,
+        settings,
+        environment,
+    );
     if cli.dry_run {
         ctx = ctx.rehearsing();
     }
@@ -134,6 +140,17 @@ async fn main() -> ExitCode {
             eprintln!("\n  {}\n", problem.meaning);
             for remedy in &problem.remedies {
                 eprintln!("  → {}", remedy.action);
+                if let Some(detail) = &remedy.detail {
+                    eprintln!("    {detail}");
+                }
+            }
+            // Last, and indented: available to whoever wants it, and never the
+            // first thing the operator has to read.
+            if let Some(detail) = &problem.detail {
+                eprintln!();
+                for line in detail.lines() {
+                    eprintln!("  {line}");
+                }
             }
             ExitCode::from(FAILURE)
         }

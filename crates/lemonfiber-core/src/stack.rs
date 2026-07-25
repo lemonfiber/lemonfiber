@@ -27,7 +27,7 @@ pub mod compose;
 use std::path::{Path, PathBuf};
 
 use include_dir::Dir;
-use lemonfiber_manifest::Manifest;
+use lemonfiber_manifest::{validate, Date, Manifest};
 use thiserror::Error;
 
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
@@ -69,6 +69,29 @@ impl Source {
                 })
             }
         }
+    }
+
+    /// The parsed manifest, checked against the contract.
+    ///
+    /// Contents are validated here rather than only when something needs them,
+    /// so a stack that contradicts itself is refused before anything acts on
+    /// it. `today` is passed in because one rule is about a date having not yet
+    /// happened, and a validator that read the clock would accept a file on one
+    /// day and refuse it on another.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the manifest cannot be read or used, and
+    /// [`Failure::Invalid`] when it parses and breaks the contract.
+    pub fn checked_manifest(self, today: Date) -> Result<Manifest, Failure> {
+        let manifest = self.manifest()?;
+        let violations = validate(&manifest, today);
+        if violations.is_empty() {
+            return Ok(manifest);
+        }
+        Err(Failure::Invalid {
+            violations: violations.iter().map(ToString::to_string).collect(),
+        })
     }
 
     /// Write the stack somewhere Compose can read it, and say where that is.
@@ -140,6 +163,12 @@ pub enum Failure {
     /// The embedded stack has to be written somewhere, and nowhere was named.
     #[error("no directory was named to write the stack into")]
     NowhereToWrite,
+    /// The manifest parsed and contradicts itself.
+    #[error("the stack manifest breaks the contract in {} places", violations.len())]
+    Invalid {
+        /// Every violation, each naming where it is.
+        violations: Vec<String>,
+    },
     /// The stack could not be written where it was asked to go.
     #[error("the stack could not be written to {path}: {reason}")]
     NotWritten {
@@ -158,6 +187,9 @@ pub const STACK_UNUSABLE: Code = Code::new("STACK-2");
 
 /// Raised when the embedded stack is not intact.
 pub const STACK_NOT_EMBEDDED: Code = Code::new("STACK-3");
+
+/// Raised when a manifest parses and breaks the contract.
+pub const STACK_INVALID: Code = Code::new("STACK-6");
 
 /// Raised when lemonfiber has nowhere to write the stack.
 pub const STACK_NOT_SET_UP: Code = Code::new("STACK-4");
@@ -190,6 +222,17 @@ impl Diagnose for Failure {
             )
             .in_state(State::Guided)
             .with_detail(reason.clone()),
+            // Every fault at once, because fixing them one run at a time is a
+            // guessing game — and the whole list was knowable in one pass.
+            Self::Invalid { violations } => Problem::new(
+                STACK_INVALID,
+                Severity::Error,
+                format!("This stack describes {} things that cannot work", violations.len()),
+                "The file is well-formed, so this is not a typo — it says things about itself that contradict each other, and starting it would fail somewhere unrelated.",
+                Remedy::new("Fix the faults listed below, all of which were found in one pass"),
+            )
+            .in_state(State::Guided)
+            .with_detail(violations.join("\n")),
             Self::NowhereToWrite => Problem::new(
                 STACK_NOT_SET_UP,
                 Severity::Error,

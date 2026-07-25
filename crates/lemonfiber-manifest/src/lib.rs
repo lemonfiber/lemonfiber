@@ -8,12 +8,14 @@
 
 mod error;
 mod schema;
+mod validate;
 
 pub use error::Error;
 pub use schema::{
     Api, ApiKind, Bind, Criticality, Form, Health, HealthKind, KeySource, Manifest, Profile,
     Protocol, Service,
 };
+pub use validate::{validate, Date, Violation};
 
 /// The manifest schema version this crate prefers.
 pub const SCHEMA_VERSION: u32 = 1;
