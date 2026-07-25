@@ -2,7 +2,7 @@
 header = "# Changelog\n\n"
 body = """
 {% for group, commits in commits | group_by(attribute="group") %}
-### {{ group | upper_first }}
+### {{ group | striptags | upper_first }}
 {% for commit in commits %}
 - {{ commit.message | split(pat="\n") | first | upper_first }}
 {% endfor %}
@@ -14,11 +14,14 @@ trim = true
 conventional_commits = true
 filter_unconventional = false
 commit_parsers = [
-  { message = "^feat", group = "Features" },
-  { message = "^fix", group = "Fixes" },
-  { message = "^docs", group = "Documentation" },
-  { message = "^perf", group = "Performance" },
-  { message = "^refactor", group = "Refactor" },
-  { message = "^test", group = "Tests" },
-  { message = "^chore", group = "Chores" },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^refactor", group = "<!-- 3 -->Refactor" },
+  { message = "^docs", group = "<!-- 4 -->Documentation" },
+  { message = "^test", group = "<!-- 5 -->Tests" },
+  { message = "^ci", group = "<!-- 6 -->Continuous integration" },
+  { message = "^build", group = "<!-- 7 -->Build system" },
+  { message = "^chore", group = "<!-- 8 -->Chores" },
+  { message = ".*", group = "<!-- 9 -->Other" },
 ]
