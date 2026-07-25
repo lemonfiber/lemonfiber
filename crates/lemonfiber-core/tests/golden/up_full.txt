@@ -1,0 +1,1 @@
+docker compose --project-name lemonfiber --project-directory /opt/lemonfiber/stack --file /opt/lemonfiber/stack/compose.yml --profile books --profile dash --profile media --profile movies --profile music --profile search --profile subs --profile torrent --profile tuning --profile tv --profile usenet up --detach

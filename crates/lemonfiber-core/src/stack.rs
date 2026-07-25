@@ -21,6 +21,9 @@
 //! Construction and lifecycle arrive with the compose driver. See
 //! `.docs/architecture/module-layout.md`.
 
+pub mod closure;
+pub mod compose;
+
 use std::path::{Path, PathBuf};
 
 use include_dir::Dir;
