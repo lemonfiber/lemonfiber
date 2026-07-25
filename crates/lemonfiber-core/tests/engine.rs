@@ -12,7 +12,7 @@
 //! line coverage grows tests about the scaffolding.
 
 use lemonfiber_core::adapters::Daemon;
-use lemonfiber_core::ports::docker::{Engine as _, Failure, Health, Lifecycle};
+use lemonfiber_core::ports::docker::{Engine as _, Failure, Health, Lifecycle, LogQuery};
 
 /// An engine of our own, answering only what the adapter asks.
 ///
@@ -598,6 +598,60 @@ async fn a_sampler_nobody_is_reading_stops_as_well() {
     engine.stop().await;
 }
 
+#[tokio::test]
+async fn resource_use_cannot_be_sampled_from_an_engine_that_is_not_there() {
+    // Sampling starts by finding the containers, so an absent engine refuses
+    // here as surely as it refuses a listing — a dashboard must be told the
+    // telemetry is gone rather than shown a panel that never fills in.
+    let nowhere = std::path::PathBuf::from("/tmp/lemonfiber-no-such-engine.sock");
+    let outcome = Daemon::at(&nowhere).stats("lemonfiber").await;
+    assert!(
+        matches!(outcome, Err(Failure::Unreachable { .. })),
+        "{:?}",
+        outcome.err()
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn naming_services_opens_no_stream_for_the_ones_nobody_asked_about() {
+    let mut engine = fake::engine(
+        "narrowed",
+        vec![
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
+            (
+                "/logs",
+                fake::Reply::Multiplexed(vec![(1, "2026-07-25T18:40:55Z hello\n".to_owned())]),
+            ),
+        ],
+    );
+
+    let daemon = Daemon::at(&engine.socket);
+    let wanted = ["sonarr".to_owned()];
+    let mut seen = Vec::new();
+    if let Ok(mut lines) = daemon
+        .logs("lemonfiber", &wanted, LogQuery::recent(10))
+        .await
+    {
+        while let Some(line) = lines.recv().await {
+            seen.push(line.service);
+        }
+    }
+
+    assert_eq!(seen, vec!["sonarr".to_owned()]);
+    assert!(
+        !engine
+            .asked_for()
+            .iter()
+            .any(|path| path.contains("id-gluetun/logs")),
+        "narrowing means the stream is never opened, not that its lines are dropped"
+    );
+    engine.stop().await;
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn a_command_run_inside_a_container_reports_what_it_wrote() {
@@ -648,4 +702,260 @@ async fn a_command_aimed_at_a_container_that_is_not_there_says_which() {
         "{outcome:?}"
     );
     engine.stop().await;
+}
+
+/// Every state and verdict the engine can report, in one listing.
+///
+/// Driven through `list` rather than against the mapping functions directly.
+/// The mapping is not the behaviour; what an operator gets when the engine says
+/// `stopping` is, and a test that reaches past the port cannot tell the
+/// difference between the two being wrong.
+#[cfg(unix)]
+const STATES: &str = concat!(
+    r#"[{"Id":"id-created","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"created"},"State":"created","Status":"Created"},"#,
+    r#"{"Id":"id-paused","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"paused"},"State":"paused","Status":"Up (Paused)"},"#,
+    r#"{"Id":"id-looping","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"looping"},"State":"restarting","#,
+    r#""Status":"Restarting (1) 2 seconds ago"},"#,
+    r#"{"Id":"id-removing","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"removing"},"State":"removing","#,
+    r#""Status":"Removal In Progress"},"#,
+    r#"{"Id":"id-stopping","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"stopping"},"State":"stopping","Status":"Stopping"},"#,
+    r#"{"Id":"id-dead","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"dead"},"State":"dead","Status":"Dead"},"#,
+    r#"{"Id":"id-blank","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"blank"},"State":"","Status":""},"#,
+    r#"{"Id":"id-silent","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"silent"}},"#,
+    r#"{"Id":"id-warming","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"warming"},"State":"running","#,
+    r#""Status":"Up 1 second (health: starting)","Health":{"Status":"starting"}},"#,
+    r#"{"Id":"id-failing","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"failing"},"State":"running","#,
+    r#""Status":"Up 1 minute (unhealthy)","Health":{"Status":"unhealthy"}},"#,
+    r#"{"Id":"id-unprobed","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"unprobed"},"State":"running","#,
+    r#""Status":"Up 3 hours","Health":{"Status":"none"}},"#,
+    r#"{"Id":"id-killed","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"killed"},"State":"exited","#,
+    r#""Status":"Exited (137) 2 hours ago","Health":{"Status":""}},"#,
+    r#"{"Id":"id-odd","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"odd"},"State":"exited","Status":"Exited )backwards("}]"#
+);
+
+#[cfg(unix)]
+#[tokio::test]
+async fn every_state_and_verdict_the_engine_reports_arrives_intact() {
+    let engine = fake::engine(
+        "states",
+        vec![("containers/json", fake::Reply::Body(200, STATES.to_owned()))],
+    );
+
+    let listed = Daemon::at(&engine.socket)
+        .list("lemonfiber")
+        .await
+        .unwrap_or_default();
+    let seen: Vec<(String, Lifecycle, Health, Option<i32>)> = listed
+        .into_iter()
+        .map(|found| (found.service, found.lifecycle, found.health, found.exit))
+        .collect();
+
+    assert_eq!(
+        seen,
+        vec![
+            ("created".to_owned(), Lifecycle::Created, Health::None, None),
+            ("paused".to_owned(), Lifecycle::Paused, Health::None, None),
+            (
+                "looping".to_owned(),
+                Lifecycle::Restarting,
+                Health::None,
+                Some(1)
+            ),
+            (
+                "removing".to_owned(),
+                Lifecycle::Removing,
+                Health::None,
+                None
+            ),
+            (
+                "stopping".to_owned(),
+                Lifecycle::Removing,
+                Health::None,
+                None
+            ),
+            ("dead".to_owned(), Lifecycle::Dead, Health::None, None),
+            // A state the engine will not name, and a state it did not send at
+            // all. Silence reads as dead rather than as running: the honest
+            // reading is that nothing is known to be up.
+            ("blank".to_owned(), Lifecycle::Dead, Health::None, None),
+            ("silent".to_owned(), Lifecycle::Dead, Health::None, None),
+            (
+                "warming".to_owned(),
+                Lifecycle::Running,
+                Health::Starting,
+                None
+            ),
+            (
+                "failing".to_owned(),
+                Lifecycle::Running,
+                Health::Unhealthy,
+                None
+            ),
+            (
+                "unprobed".to_owned(),
+                Lifecycle::Running,
+                Health::None,
+                None
+            ),
+            (
+                "killed".to_owned(),
+                Lifecycle::Exited,
+                Health::None,
+                Some(137)
+            ),
+            // Parentheses in the wrong order are not an exit code, and guessing
+            // one would invent a fault that never happened.
+            ("odd".to_owned(), Lifecycle::Exited, Health::None, None),
+        ]
+    );
+    engine.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_line_the_container_did_not_timestamp_is_passed_through_whole() {
+    let engine = fake::engine(
+        "stamps",
+        vec![
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
+            (
+                "id-sonarr/logs",
+                fake::Reply::Multiplexed(vec![(
+                    1,
+                    concat!(
+                        "2026-07-25T18:40:55.123456789Z import complete\n",
+                        "no timestamp here\n",
+                        "single\n",
+                        "2026-07-25 not-a-stamp\n"
+                    )
+                    .to_owned(),
+                )]),
+            ),
+            ("id-gluetun/logs", fake::Reply::Multiplexed(Vec::new())),
+        ],
+    );
+
+    let daemon = Daemon::at(&engine.socket);
+    let mut seen = Vec::new();
+    if let Ok(mut lines) = daemon.logs("lemonfiber", &[], LogQuery::recent(10)).await {
+        while let Some(line) = lines.recv().await {
+            seen.push((line.at, line.line));
+        }
+    }
+
+    assert_eq!(
+        seen,
+        vec![
+            (
+                Some("2026-07-25T18:40:55.123456789Z".to_owned()),
+                "import complete".to_owned()
+            ),
+            (None, "no timestamp here".to_owned()),
+            (None, "single".to_owned()),
+            // A date is not an instant. Half a message rendered as a timestamp
+            // is worse than no timestamp at all.
+            (None, "2026-07-25 not-a-stamp".to_owned()),
+        ]
+    );
+    engine.stop().await;
+}
+
+/// A listing of three running containers, for sampling each differently.
+#[cfg(unix)]
+const SAMPLED: &str = concat!(
+    r#"[{"Id":"id-busy","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"busy"},"State":"running"},"#,
+    r#"{"Id":"id-first","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"first"},"State":"running"},"#,
+    r#"{"Id":"id-quiet","Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"quiet"},"State":"running"}]"#
+);
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_rate_is_only_reported_where_there_are_two_samples_to_compute_it_from() {
+    let busy = concat!(
+        r#"{"cpu_stats":{"cpu_usage":{"total_usage":500},"system_cpu_usage":1000,"#,
+        r#""online_cpus":1},"precpu_stats":{"cpu_usage":{"total_usage":0},"#,
+        r#""system_cpu_usage":0},"memory_stats":{"usage":4096}}"#,
+        "\n"
+    );
+    // The very first sample of a container: no time has passed between the two
+    // readings, so any rate would be invented rather than measured.
+    let first = concat!(
+        r#"{"cpu_stats":{"cpu_usage":{"total_usage":500},"system_cpu_usage":1000},"#,
+        r#""precpu_stats":{"cpu_usage":{"total_usage":0},"system_cpu_usage":1000},"#,
+        r#""memory_stats":{"usage":8}}"#,
+        "\n"
+    );
+    let quiet = "{}\n";
+
+    let engine = fake::engine(
+        "rates",
+        vec![
+            (
+                "containers/json",
+                fake::Reply::Body(200, SAMPLED.to_owned()),
+            ),
+            ("id-busy/stats", fake::Reply::Body(200, busy.to_owned())),
+            ("id-first/stats", fake::Reply::Body(200, first.to_owned())),
+            ("id-quiet/stats", fake::Reply::Body(200, quiet.to_owned())),
+        ],
+    );
+
+    let daemon = Daemon::at(&engine.socket);
+    let mut seen = Vec::new();
+    if let Ok(mut samples) = daemon.stats("lemonfiber").await {
+        while let Some((service, stats)) = samples.recv().await {
+            seen.push((service, format!("{:.2}", stats.cpu), stats.memory_bytes));
+        }
+    }
+    seen.sort();
+
+    assert_eq!(
+        seen,
+        vec![
+            ("busy".to_owned(), "0.50".to_owned(), 4096),
+            ("first".to_owned(), "0.00".to_owned(), 8),
+            // An engine that said nothing is not a container using nothing, but
+            // zero is the only number that is not a guess.
+            ("quiet".to_owned(), "0.00".to_owned(), 0),
+        ]
+    );
+    engine.stop().await;
+}
+
+#[tokio::test]
+async fn the_engine_this_machine_is_configured_for_is_reachable_or_reported_absent() {
+    // Whether a daemon is running here is not this test's business. Either
+    // answer is correct; what must never happen is the local address going
+    // unexercised, or an absent daemon being reported as something an operator
+    // would go looking for a container about.
+    let daemon = Daemon::local();
+    assert!(
+        format!("{daemon:?}").contains("Local"),
+        "an adapter has to say which engine it is pointed at, for a bundle to be worth reading"
+    );
+
+    let outcome = daemon.list("lemonfiber-no-such-project").await;
+    assert!(
+        matches!(outcome, Ok(_) | Err(Failure::Unreachable { .. })),
+        "{outcome:?}"
+    );
 }

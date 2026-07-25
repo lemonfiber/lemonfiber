@@ -230,11 +230,15 @@ pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 /// the whole set rather than about any one container, and re-reading nineteen
 /// summaries twice a second costs less than the machinery for correlating an
 /// event stream back into the same answer.
-async fn settle(ctx: &Ctx, profiles: &[String]) -> Result<Vec<Service>, Problem> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
+/// The manifest is handed in rather than read again. Whoever is waiting has
+/// already resolved and validated it to know what to start, and reading it a
+/// second time would add a way for this to fail that cannot happen — a failure
+/// no test can reach is a failure nobody has checked the wording of.
+async fn settle(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    profiles: &[String],
+) -> Result<Vec<Service>, Problem> {
     let deadline = ctx.clock.now() + ctx.patience;
 
     loop {
@@ -243,7 +247,7 @@ async fn settle(ctx: &Ctx, profiles: &[String]) -> Result<Vec<Service>, Problem>
             .list(&ctx.settings.project)
             .await
             .map_err(|err| err.problem())?;
-        let services = survey(&manifest, profiles, &containers);
+        let services = survey(manifest, profiles, &containers);
 
         let waiting: Vec<String> = unsettled(&services)
             .into_iter()
@@ -281,21 +285,26 @@ async fn never_settled(ctx: &Ctx, waiting: &[String]) -> Problem {
     )
     .in_state(State::Guided);
 
+    // An engine that will not open the stream falls back to one that is already
+    // finished, so the reading below has no second shape. There is nothing
+    // useful to say about a service whose output cannot be read that the
+    // problem does not already say.
+    let (closed, silent) = tokio::sync::mpsc::channel(1);
+    drop(closed);
+
     let query = LogQuery::recent(LAST_WORDS);
-    let opened = ctx
+    let mut lines = ctx
         .engine
         .logs(&ctx.settings.project, waiting, query)
         .await
-        .ok();
+        .unwrap_or(silent);
 
     let mut said = String::new();
-    if let Some(mut lines) = opened {
-        while let Some(line) = lines.recv().await {
-            said.push_str(&line.service);
-            said.push_str(": ");
-            said.push_str(&line.line);
-            said.push('\n');
-        }
+    while let Some(line) = lines.recv().await {
+        said.push_str(&line.service);
+        said.push_str(": ");
+        said.push_str(&line.line);
+        said.push('\n');
     }
 
     if said.is_empty() {
@@ -506,7 +515,7 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outco
     // means "a process exists" is a claim the operator will disprove by opening
     // a browser. Nothing else waits: stopping is done when Compose says so.
     if action == &Action::Up && output.succeeded() {
-        let settled = settle(ctx, &report.profiles).await?;
+        let settled = settle(ctx, &manifest, &report.profiles).await?;
         report.condition = Some(condition(&settled));
         report.services = settled;
     }
@@ -570,6 +579,13 @@ mod tests {
         containers: Vec<crate::ports::docker::Container>,
         said: Vec<crate::ports::docker::LogLine>,
         reachable: bool,
+        /// How many listings to answer before every container reports healthy.
+        ///
+        /// Absent means the engine never changes its mind. A stack that is
+        /// genuinely starting does not answer the same way twice, and an engine
+        /// that always did would make the waiting itself untestable.
+        settles_after: Option<usize>,
+        asked: std::sync::atomic::AtomicUsize,
     }
 
     impl Reporting {
@@ -589,7 +605,15 @@ mod tests {
                     .collect(),
                 said: Vec::new(),
                 reachable: true,
+                settles_after: None,
+                asked: std::sync::atomic::AtomicUsize::new(0),
             }
+        }
+
+        /// The same engine, unsettled until it has been asked `listings` times.
+        fn settling_after(mut self, listings: usize) -> Self {
+            self.settles_after = Some(listings);
+            self
         }
 
         /// The same engine, with something to say about a service.
@@ -604,11 +628,13 @@ mod tests {
         }
 
         /// An engine that is not there.
-        const fn absent() -> Self {
+        fn absent() -> Self {
             Self {
                 containers: Vec::new(),
                 said: Vec::new(),
                 reachable: false,
+                settles_after: None,
+                asked: std::sync::atomic::AtomicUsize::new(0),
             }
         }
     }
@@ -619,12 +645,29 @@ mod tests {
             &self,
             _project: &str,
         ) -> Result<Vec<crate::ports::docker::Container>, EngineFailure> {
-            if self.reachable {
-                return Ok(self.containers.clone());
+            if !self.reachable {
+                return Err(EngineFailure::Unreachable {
+                    reason: "no daemon here".to_owned(),
+                });
             }
-            Err(EngineFailure::Unreachable {
-                reason: "no daemon here".to_owned(),
-            })
+
+            let asked = self
+                .asked
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let settled = self.settles_after.is_some_and(|after| asked >= after);
+
+            Ok(self
+                .containers
+                .iter()
+                .map(|container| crate::ports::docker::Container {
+                    health: if settled {
+                        Health::Healthy
+                    } else {
+                        container.health
+                    },
+                    ..container.clone()
+                })
+                .collect())
         }
 
         async fn exec(
@@ -1333,6 +1376,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn starting_keeps_asking_until_the_services_are_ready() {
+        // Unsettled on the first two listings and healthy on the third, which
+        // is what a stack that is genuinely starting looks like. A gate that
+        // only ever read the engine once would pass this test by luck and fail
+        // every real start.
+        let engine =
+            Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting).settling_after(2);
+        let ctx = watching(engine);
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced.map(|report| report.condition),
+            Some(Some(Condition::Active)),
+            "waiting is the point: the answer changed while it waited"
+        );
+    }
+
+    #[tokio::test]
     async fn a_service_that_never_becomes_usable_stops_the_start_and_says_which() {
         // A container that is running but still inside its start period is
         // exactly the case a process check would have called success.
@@ -1471,6 +1535,12 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_non_status_outcome_has_no_services_to_report() {
+        let ctx = ctx(Ok(spoke("v2.32.1")));
+        assert_eq!(stated(dispatch(Command::Version, &ctx).await), None);
+    }
+
+    #[tokio::test]
     async fn asking_what_is_running_names_every_service_a_form_declares() {
         let engine = Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy);
         let ctx = watching(engine);
@@ -1531,6 +1601,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn asking_what_is_running_from_a_stack_that_cannot_be_read_is_refused() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            nowhere,
+            Settings::default(),
+            Environment::MacOs,
+        );
+        assert_eq!(
+            dispatch(Command::Ps { forms: Vec::new() }, &ctx)
+                .await
+                .err()
+                .map(|problem| problem.code),
+            Some(crate::stack::STACK_UNREADABLE),
+            "an operator's own --stack-dir mistake reaches them here too"
+        );
+    }
+
+    #[tokio::test]
     async fn a_status_serialises_under_its_own_kind() {
         let engine = Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy);
         let ctx = watching(engine);
@@ -1556,12 +1647,17 @@ mod tests {
 
     /// The services a log stream actually carried lines for.
     async fn heard(ctx: &Ctx, forms: &[String], services: &[String]) -> Vec<String> {
+        let (closed, silent) = tokio::sync::mpsc::channel(1);
+        drop(closed);
+
         let query = LogQuery::recent(10);
+        let mut lines = super::logs(ctx, forms, services, query)
+            .await
+            .unwrap_or(silent);
+
         let mut seen = Vec::new();
-        if let Ok(mut lines) = super::logs(ctx, forms, services, query).await {
-            while let Some(line) = lines.recv().await {
-                seen.push(line.service);
-            }
+        while let Some(line) = lines.recv().await {
+            seen.push(line.service);
         }
         seen.sort();
         seen.dedup();
@@ -1655,6 +1751,28 @@ mod tests {
     async fn a_context_can_be_told_how_long_to_wait() {
         let ctx = watching(Reporting::default()).waiting(Duration::from_secs(7));
         assert_eq!(ctx.patience, Duration::from_secs(7));
+    }
+
+    #[tokio::test]
+    async fn the_engine_these_tests_use_answers_the_whole_port() {
+        // Worth asserting rather than assuming. A fake that answers a method
+        // more agreeably than a real engine would makes the path it shortcuts
+        // untestable, which is how the log stream's own failure case went
+        // missing until it was written down here.
+        let engine = Reporting::absent();
+
+        let ran = engine.exec("gluetun", &["true".to_owned()]).await;
+        assert!(
+            matches!(&ran, Err(EngineFailure::NoSuchContainer { name }) if name == "gluetun"),
+            "{ran:?}"
+        );
+
+        let sampled = engine.stats("lemonfiber").await;
+        assert_eq!(
+            sampled.ok().map(|mut samples| samples.try_recv().is_err()),
+            Some(true),
+            "nothing is sampled, and the stream says so by ending"
+        );
     }
 
     #[test]

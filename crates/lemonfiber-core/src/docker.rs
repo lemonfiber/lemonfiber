@@ -376,46 +376,125 @@ mod tests {
     #[test]
     fn the_worst_state_is_reported_first() {
         let profiles = ["media".to_owned()];
-        let Some(manifest) = manifest() else {
-            return;
-        };
-        let names: Vec<String> = manifest
-            .services
+        let broken = "jellyfin";
+        let containers: Vec<Container> = MEDIA
             .iter()
-            .filter(|service| service.profile == "media")
-            .map(|service| service.id.clone())
+            .map(|id| {
+                let lifecycle = if *id == broken {
+                    Lifecycle::Restarting
+                } else {
+                    Lifecycle::Running
+                };
+                container(id, lifecycle, Health::Healthy)
+            })
             .collect();
 
-        let mut containers: Vec<Container> = names
-            .iter()
-            .map(|id| container(id, Lifecycle::Running, Health::Healthy))
-            .collect();
-        if let Some(last) = containers.last_mut() {
-            last.lifecycle = Lifecycle::Restarting;
-        }
-        let broken = names.last().cloned().unwrap_or_default();
-
-        let surveyed = survey(&manifest, &profiles, &containers);
+        let surveyed = manifest()
+            .map(|manifest| survey(&manifest, &profiles, &containers))
+            .unwrap_or_default();
         assert_eq!(
             surveyed.first().map(|service| service.id.clone()),
-            Some(broken),
+            Some(broken.to_owned()),
             "the thing that needs the operator comes before the things that do not"
         );
+    }
+
+    /// Everything the `media` profile declares.
+    const MEDIA: [&str; 4] = [
+        "jellyfin",
+        "seerr",
+        "calibre-web-automated",
+        "audiobookshelf",
+    ];
+
+    /// A stack where the operating system owns one of the services.
+    ///
+    /// Inline, because the stack this binary ships has no host-managed service
+    /// and the rule still has to be proven. Transcoding on some hardware needs
+    /// Jellyfin outside a container, and lemonfiber must not try to start it.
+    const NATIVE: &str = r#"
+schema_version = 1
+stack_version = "1.0.0"
+min_cli_version = "0.1.0"
+
+[[profile]]
+id = "media"
+name = "Library"
+description = "Serving what you have"
+
+[[service]]
+id = "jellyfin"
+name = "Jellyfin"
+profile = "media"
+image = "jellyfin/jellyfin"
+tag = "10.10.3"
+criticality = "core"
+license = "GPL-2.0-only"
+upstream = "https://jellyfin.org"
+last_release = "2026-01-01"
+describes = "Plays what you own"
+without_it = "Nothing plays"
+host_managed = true
+
+[[service]]
+id = "seerr"
+name = "Seerr"
+profile = "media"
+image = "fallenbagel/jellyseerr"
+tag = "2.1.0"
+criticality = "important"
+license = "MIT"
+upstream = "https://github.com/fallenbagel/jellyseerr"
+last_release = "2026-01-01"
+describes = "Takes requests"
+without_it = "Nobody can ask for anything"
+
+[[form]]
+id = "library"
+name = "Library"
+description = "Serve what exists"
+profiles = ["media"]
+"#;
+
+    #[test]
+    fn a_service_the_operating_system_owns_is_never_reported_as_something_to_start() {
+        let profiles = ["media".to_owned()];
+        // The engine knows nothing about it, which for any other service would
+        // mean absent — and absent is an invitation to start it.
+        let surveyed = Manifest::from_toml(NATIVE)
+            .ok()
+            .map(|manifest| survey(&manifest, &profiles, &[]))
+            .unwrap_or_default();
+
+        assert_eq!(
+            surveyed
+                .iter()
+                .map(|service| (service.id.clone(), service.state))
+                .collect::<Vec<_>>(),
+            vec![
+                ("seerr".to_owned(), State::Absent),
+                ("jellyfin".to_owned(), State::HostManaged),
+            ],
+            "the one lemonfiber does not own sorts last, because it wants nothing"
+        );
+        assert_eq!(
+            condition(&surveyed),
+            Condition::Inactive,
+            "one host-managed service and one absent service is not a running stack"
+        );
+        assert!(unsettled(&surveyed).iter().all(|s| s.id != "jellyfin"));
     }
 
     /// A survey of the media profile with every service in one state.
     fn media(state: Lifecycle, health: Health) -> Vec<super::Service> {
         let profiles = ["media".to_owned()];
-        let Some(manifest) = manifest() else {
-            return Vec::new();
-        };
-        let containers: Vec<Container> = manifest
-            .services
+        let containers: Vec<Container> = MEDIA
             .iter()
-            .filter(|service| service.profile == "media")
-            .map(|service| container(&service.id, state, health))
+            .map(|id| container(id, state, health))
             .collect();
-        survey(&manifest, &profiles, &containers)
+        manifest()
+            .map(|manifest| survey(&manifest, &profiles, &containers))
+            .unwrap_or_default()
     }
 
     #[test]
