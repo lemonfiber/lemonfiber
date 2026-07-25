@@ -183,7 +183,8 @@ mod fake {
         let _ = std::fs::remove_file(&socket);
 
         let version = format!(r#"{{"ApiVersion":"{CLAIMED_VERSION}","Version":"29.4.0"}}"#);
-        let mut table: Vec<(String, Reply)> = vec![("/version".to_owned(), Reply::Body(200, version))];
+        let mut table: Vec<(String, Reply)> =
+            vec![("/version".to_owned(), Reply::Body(200, version))];
         table.extend(
             routes
                 .into_iter()
@@ -260,17 +261,18 @@ const LISTING: &str = concat!(
 async fn lists_what_the_engine_says_is_there_and_what_it_left_behind() {
     let engine = fake::engine(
         "list",
-        vec![("containers/json", fake::Reply::Body(200, LISTING.to_owned()))],
+        vec![(
+            "containers/json",
+            fake::Reply::Body(200, LISTING.to_owned()),
+        )],
     );
 
     let listed = Daemon::at(&engine.socket).list("lemonfiber").await;
     assert_eq!(
-        listed
-            .ok()
-            .map(|containers| containers
-                .into_iter()
-                .map(|found| (found.service, found.lifecycle, found.health, found.exit))
-                .collect::<Vec<_>>()),
+        listed.ok().map(|containers| containers
+            .into_iter()
+            .map(|found| (found.service, found.lifecycle, found.health, found.exit))
+            .collect::<Vec<_>>()),
         Some(vec![
             (
                 "sonarr".to_owned(),
@@ -389,7 +391,10 @@ async fn log_lines_are_tagged_with_the_service_and_the_stream_they_came_from() {
     let engine = fake::engine(
         "logs",
         vec![
-            ("containers/json", fake::Reply::Body(200, LISTING.to_owned())),
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
             (
                 "/logs",
                 fake::Reply::Multiplexed(vec![
@@ -407,7 +412,7 @@ async fn log_lines_are_tagged_with_the_service_and_the_stream_they_came_from() {
     // interleaved, which is the feature, and is why each line carries the
     // service and the instant its own container put on it.
     let mut seen = Vec::new();
-    if let Ok(mut lines) = daemon.logs("lemonfiber", query).await {
+    if let Ok(mut lines) = daemon.logs("lemonfiber", &[], query).await {
         while let Some(line) = lines.recv().await {
             seen.push((
                 line.service,
@@ -458,7 +463,10 @@ async fn how_much_output_to_ask_for_reaches_the_engine() {
     let mut engine = fake::engine(
         "tail",
         vec![
-            ("containers/json", fake::Reply::Body(200, LISTING.to_owned())),
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
             ("/logs", fake::Reply::Multiplexed(Vec::new())),
         ],
     );
@@ -469,7 +477,7 @@ async fn how_much_output_to_ask_for_reaches_the_engine() {
         follow: true,
     };
     let mut seen = 0_usize;
-    if let Ok(mut lines) = daemon.logs("lemonfiber", query).await {
+    if let Ok(mut lines) = daemon.logs("lemonfiber", &[], query).await {
         while lines.recv().await.is_some() {
             seen += 1;
         }
@@ -498,7 +506,10 @@ async fn a_reader_that_walks_away_stops_the_producer_rather_than_the_process() {
     let engine = fake::engine(
         "abandoned",
         vec![
-            ("containers/json", fake::Reply::Body(200, LISTING.to_owned())),
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
             (
                 "/logs",
                 fake::Reply::Multiplexed(vec![(1, "still talking\n".to_owned())]),
@@ -508,7 +519,7 @@ async fn a_reader_that_walks_away_stops_the_producer_rather_than_the_process() {
 
     let daemon = Daemon::at(&engine.socket);
     let query = lemonfiber_core::ports::docker::LogQuery::recent(10);
-    let opened = daemon.logs("lemonfiber", query).await;
+    let opened = daemon.logs("lemonfiber", &[], query).await;
     assert!(opened.is_ok());
 
     // Closing the panel is ordinary. The producers must notice and stop,
@@ -532,7 +543,10 @@ async fn resource_use_is_sampled_for_the_services_that_are_running() {
     let mut engine = fake::engine(
         "stats",
         vec![
-            ("containers/json", fake::Reply::Body(200, LISTING.to_owned())),
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
             ("/stats", fake::Reply::Body(200, sample.to_owned())),
         ],
     );
@@ -551,7 +565,10 @@ async fn resource_use_is_sampled_for_the_services_that_are_running() {
         "the stopped service is not sampled, because it is not using anything"
     );
     assert!(
-        !engine.asked_for().iter().any(|path| path.contains("id-gluetun/stats")),
+        !engine
+            .asked_for()
+            .iter()
+            .any(|path| path.contains("id-gluetun/stats")),
         "a stopped container is never asked how busy it is"
     );
     engine.stop().await;
@@ -563,7 +580,10 @@ async fn a_sampler_nobody_is_reading_stops_as_well() {
     let engine = fake::engine(
         "unsampled",
         vec![
-            ("containers/json", fake::Reply::Body(200, LISTING.to_owned())),
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
             (
                 "/stats",
                 fake::Reply::Body(200, "{\"memory_stats\":{\"usage\":1}}\n".to_owned()),
@@ -592,10 +612,7 @@ async fn a_command_run_inside_a_container_reports_what_it_wrote() {
                 "/exec/e1/json",
                 fake::Reply::Body(200, r#"{"ExitCode":0}"#.to_owned()),
             ),
-            (
-                "/exec",
-                fake::Reply::Body(201, r#"{"Id":"e1"}"#.to_owned()),
-            ),
+            ("/exec", fake::Reply::Body(201, r#"{"Id":"e1"}"#.to_owned())),
         ],
     );
 
@@ -617,7 +634,10 @@ async fn a_command_aimed_at_a_container_that_is_not_there_says_which() {
         "no-container",
         vec![(
             "/exec",
-            fake::Reply::Body(404, r#"{"message":"No such container: gluetun"}"#.to_owned()),
+            fake::Reply::Body(
+                404,
+                r#"{"message":"No such container: gluetun"}"#.to_owned(),
+            ),
         )],
     );
 

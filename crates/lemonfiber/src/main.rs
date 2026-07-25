@@ -11,11 +11,14 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
-use lemonfiber_core::adapters::{Local, System};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::adapters::{Daemon, Local, System};
+use lemonfiber_core::app::{dispatch, logs, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{store, Protocols, Settings};
+use lemonfiber_core::docker::{Condition, Service, State};
+use lemonfiber_core::model::Envelope;
 use lemonfiber_core::platform::{Environment, HOST_OS};
+use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
 
@@ -76,6 +79,25 @@ enum Request {
         #[arg(required = true)]
         forms: Vec<String>,
     },
+    /// Report what each service is actually doing.
+    Ps {
+        /// The forms to report on; none reports the whole stack.
+        forms: Vec<String>,
+    },
+    /// Show what services are saying.
+    Logs {
+        /// The services to read; none reads them all.
+        services: Vec<String>,
+        /// Read only the services a form declares.
+        #[arg(long, value_name = "FORM")]
+        form: Vec<String>,
+        /// Keep reading as new lines arrive.
+        #[arg(long, short)]
+        follow: bool,
+        /// How many existing lines to begin with.
+        #[arg(long, default_value_t = 50)]
+        tail: u32,
+    },
     /// Read or change one setting.
     Config {
         #[command(subcommand)]
@@ -105,6 +127,32 @@ enum ConfigAction {
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
 const FAILURE: u8 = 1;
+
+/// Something outside lemonfiber has to be fixed before it can act.
+const PREFLIGHT: u8 = 3;
+
+/// Started, and a service never became usable.
+const NEVER_SETTLED: u8 = 4;
+
+/// Something the operator wrote was refused.
+const VALIDATION: u8 = 5;
+
+/// Which exit code a problem deserves.
+///
+/// A script branching on failure needs to know whether to fix its own input,
+/// start Docker, or wait longer, and one code for all three tells it nothing.
+fn exit_code(problem: &lemonfiber_core::error::Problem) -> u8 {
+    use lemonfiber_core::{app, config, ports, stack};
+
+    match problem.code {
+        app::NEVER_SETTLED => NEVER_SETTLED,
+        ports::process::MISSING_PROGRAM | ports::docker::ENGINE_UNREACHABLE => PREFLIGHT,
+        stack::STACK_INVALID | stack::STACK_UNREADABLE | config::store::CONFIG_UNREADABLE => {
+            VALIDATION
+        }
+        _ => FAILURE,
+    }
+}
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -144,6 +192,7 @@ async fn main() -> ExitCode {
 
     let mut ctx = Ctx::new(
         Arc::new(Local),
+        Arc::new(Daemon::local()),
         Arc::new(System),
         stack,
         settings,
@@ -154,6 +203,15 @@ async fn main() -> ExitCode {
     }
 
     let command = match request {
+        // Streaming is not a value that arrives once, so it does not become a
+        // command and does not go through dispatch. It still goes through the
+        // core, which is the part that matters.
+        Request::Logs {
+            services,
+            form,
+            follow,
+            tail,
+        } => return stream(&ctx, &form, &services, follow, tail, cli.json).await,
         Request::Version => Command::Version,
         Request::Up { forms } => Command::Up { forms },
         Request::Down { forms } => Command::Down { forms },
@@ -162,6 +220,7 @@ async fn main() -> ExitCode {
             services,
         },
         Request::Pull { forms } => Command::Pull { forms },
+        Request::Ps { forms } => Command::Ps { forms },
         Request::Config { action } => match action {
             ConfigAction::Get { key } => Command::ConfigGet { key },
             ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
@@ -175,6 +234,7 @@ async fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(problem) => {
+            let code = exit_code(&problem);
             eprintln!("{}: {}", problem.code, problem.summary);
             eprintln!("\n  {}\n", problem.meaning);
             for remedy in &problem.remedies {
@@ -191,9 +251,58 @@ async fn main() -> ExitCode {
                     eprintln!("  {line}");
                 }
             }
-            ExitCode::from(FAILURE)
+            ExitCode::from(code)
         }
     }
+}
+
+/// Print log lines as they arrive, until the stream ends.
+///
+/// Machine-readable output is one envelope per line rather than one document
+/// containing all of them: a stream has no last element to close a document
+/// with, and a consumer of `--follow --json` needs each line when it happens
+/// rather than when the service stops.
+async fn stream(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    follow: bool,
+    tail: u32,
+    json: bool,
+) -> ExitCode {
+    let query = LogQuery { tail, follow };
+    let opened = match logs(ctx, forms, services, query).await {
+        Ok(opened) => opened,
+        Err(problem) => {
+            eprintln!("{}: {}", problem.code, problem.summary);
+            eprintln!("\n  {}\n", problem.meaning);
+            for remedy in &problem.remedies {
+                eprintln!("  → {}", remedy.action);
+            }
+            return ExitCode::from(exit_code(&problem));
+        }
+    };
+
+    let mut lines = opened;
+    let mut seen = 0_u64;
+    while let Some(line) = lines.recv().await {
+        seen += 1;
+        if json {
+            match Envelope::new("log", &line).to_json() {
+                Some(text) => println!("{text}"),
+                None => eprintln!("this line could not be rendered as JSON"),
+            }
+        } else {
+            println!("{:<12} {}", line.service, line.line);
+        }
+    }
+
+    // Silence and "no output" are different answers, and a viewer that renders
+    // them identically leaves the operator wondering which one they got.
+    if seen == 0 && !json {
+        println!("no output");
+    }
+    ExitCode::SUCCESS
 }
 
 /// Where this machine keeps lemonfiber's files.
@@ -264,6 +373,47 @@ fn render(outcome: &Outcome, json: bool) {
                     report.dropped.join(", ")
                 );
             }
+            if let Some(condition) = report.condition {
+                println!("\n{}", describe(condition));
+                show(&report.services);
+            }
         }
+        Outcome::Status(report) => {
+            println!("{}", describe(report.condition));
+            show(&report.services);
+        }
+    }
+}
+
+/// A condition, as a sentence rather than as a word.
+fn describe(condition: Condition) -> &'static str {
+    match condition {
+        Condition::Inactive => "nothing is running",
+        Condition::Degraded => "running, and something needs attention",
+        Condition::Partial => "partly up",
+        Condition::Active => "everything is up",
+    }
+}
+
+/// What each service is doing, one per line.
+fn show(services: &[Service]) {
+    for service in services {
+        let state = match service.state {
+            State::Absent => "absent".to_owned(),
+            State::Stopped => "stopped".to_owned(),
+            State::Starting => "starting".to_owned(),
+            State::Running => "running".to_owned(),
+            State::Healthy => "healthy".to_owned(),
+            State::Unhealthy => "unhealthy".to_owned(),
+            State::CrashLooping => "crash-looping".to_owned(),
+            State::HostManaged => "host-managed".to_owned(),
+            // The code is the whole reason this is not simply "stopped", so it
+            // is shown rather than left for the operator to go and find.
+            State::Failed => match service.exit {
+                Some(code) => format!("failed ({code})"),
+                None => "failed".to_owned(),
+            },
+        };
+        println!("  {:<14} {:<14} {}", service.id, state, service.name);
     }
 }

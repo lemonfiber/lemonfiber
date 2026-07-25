@@ -9,6 +9,7 @@
 //! shape the render loop requires — nothing shares mutable state with a frame.
 
 use async_trait::async_trait;
+use serde::Serialize;
 use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
 
@@ -81,7 +82,8 @@ pub struct Stats {
 }
 
 /// Which stream a log line arrived on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Stream {
     /// Standard output.
     Stdout,
@@ -90,7 +92,11 @@ pub enum Stream {
 }
 
 /// One line of output from one service.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Serialisable because a log stream is part of the machine-readable contract:
+/// `--json` renders one envelope per line, since a stream has no last element
+/// to close a document with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LogLine {
     /// The Compose service it came from.
     pub service: String,
@@ -218,10 +224,19 @@ pub trait Engine: Send + Sync {
 
     /// Log lines for a project's containers, until the receiver is dropped.
     ///
+    /// Naming `services` narrows to those; naming none takes them all.
+    /// Narrowing here rather than at the reader means a stream is never opened
+    /// for output nobody asked for.
+    ///
     /// # Errors
     ///
     /// Returns [`Failure::Unreachable`] when the engine cannot be reached.
-    async fn logs(&self, project: &str, query: LogQuery) -> Result<Receiver<LogLine>, Failure>;
+    async fn logs(
+        &self,
+        project: &str,
+        services: &[String],
+        query: LogQuery,
+    ) -> Result<Receiver<LogLine>, Failure>;
 }
 
 #[cfg(test)]

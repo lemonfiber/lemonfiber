@@ -103,6 +103,25 @@ pub struct LifecycleReport {
     pub rehearsed: bool,
     /// The exit status, absent for a rehearsal or a signalled process.
     pub status: Option<i32>,
+    /// What each service ended up doing, where the action waited to find out.
+    ///
+    /// Empty for actions that do not wait. Stopping is finished when Compose
+    /// says it is, and surveying afterwards would only report the absence it
+    /// was asked to produce.
+    pub services: Vec<crate::docker::Service>,
+    /// What those services amount to, as one word.
+    pub condition: Option<crate::docker::Condition>,
+}
+
+/// What each service is doing, and what that adds up to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StatusReport {
+    /// The forms asked about; empty means the whole stack was.
+    pub forms: Vec<String>,
+    /// What the services amount to, as one word.
+    pub condition: crate::docker::Condition,
+    /// Each service, worst first.
+    pub services: Vec<crate::docker::Service>,
 }
 
 #[cfg(test)]

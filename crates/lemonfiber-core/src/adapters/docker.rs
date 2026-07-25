@@ -190,9 +190,7 @@ const fn health(status: Option<ContainerSummaryHealthStatusEnum>) -> Health {
         Some(ContainerSummaryHealthStatusEnum::STARTING) => Health::Starting,
         Some(ContainerSummaryHealthStatusEnum::HEALTHY) => Health::Healthy,
         Some(ContainerSummaryHealthStatusEnum::UNHEALTHY) => Health::Unhealthy,
-        Some(
-            ContainerSummaryHealthStatusEnum::NONE | ContainerSummaryHealthStatusEnum::EMPTY,
-        )
+        Some(ContainerSummaryHealthStatusEnum::NONE | ContainerSummaryHealthStatusEnum::EMPTY)
         | None => Health::None,
     }
 }
@@ -357,7 +355,9 @@ impl Engine for Daemon {
             .map_err(unreachable)?;
 
         Ok(ExecOutput {
-            status: inspected.exit_code.and_then(|code| i32::try_from(code).ok()),
+            status: inspected
+                .exit_code
+                .and_then(|code| i32::try_from(code).ok()),
             stdout,
         })
     }
@@ -378,15 +378,22 @@ impl Engine for Daemon {
         Ok(receiver)
     }
 
-    async fn logs(&self, project: &str, query: LogQuery) -> Result<Receiver<LogLine>, Failure> {
+    async fn logs(
+        &self,
+        project: &str,
+        services: &[String],
+        query: LogQuery,
+    ) -> Result<Receiver<LogLine>, Failure> {
         let containers = self.containers(project).await?;
         let docker = self.client().await?.clone();
         let (sender, receiver) = channel(BACKLOG);
 
-        // Stopped services included: their scrollback is usually the reason the
-        // operator opened the log viewer at all.
+        // Stopped services are included: their scrollback is usually the reason
+        // the operator opened the log viewer at all.
         for described in containers.into_iter().map(describe) {
-            tokio::spawn(read_into(docker.clone(), described, query, sender.clone()));
+            if services.is_empty() || services.contains(&described.service) {
+                tokio::spawn(read_into(docker.clone(), described, query, sender.clone()));
+            }
         }
 
         Ok(receiver)
@@ -412,12 +419,7 @@ async fn sample_into(docker: Docker, container: Container, sender: Sender<(Strin
 }
 
 /// Read one container's output until it ends or the reader goes away.
-async fn read_into(
-    docker: Docker,
-    container: Container,
-    query: LogQuery,
-    sender: Sender<LogLine>,
-) {
+async fn read_into(docker: Docker, container: Container, query: LogQuery, sender: Sender<LogLine>) {
     let options = LogsOptionsBuilder::default()
         .stdout(true)
         .stderr(true)
