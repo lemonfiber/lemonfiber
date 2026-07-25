@@ -14,11 +14,12 @@ use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::{Daemon, Local, System};
 use lemonfiber_core::app::{dispatch, logs, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::{store, Protocols, Settings};
+use lemonfiber_core::config::{ip_echo_from_env, store, Protocols, Settings};
 use lemonfiber_core::docker::{Condition, Service, State};
+use lemonfiber_core::doctor::{Category, Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
-    ConfigReport, Envelope, LifecycleReport, StatusReport, VersionReport,
+    ConfigReport, DoctorReport, Envelope, LifecycleReport, StatusReport, VersionReport,
 };
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
@@ -106,6 +107,15 @@ enum Request {
         #[command(subcommand)]
         action: ConfigAction,
     },
+    /// Run the checks that prove the stack is doing what it should.
+    Doctor {
+        /// Run only one category of check, such as `vpn`.
+        #[arg(long, value_name = "CATEGORY")]
+        only: Option<String>,
+        /// Include the checks that disturb the running system.
+        #[arg(long)]
+        disruptive: bool,
+    },
 }
 
 /// What to do with settings.
@@ -130,6 +140,9 @@ enum ConfigAction {
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
 const FAILURE: u8 = 1;
+
+/// A flag or argument the operator gave could not be understood.
+const USAGE: u8 = 2;
 
 /// Something outside lemonfiber has to be fixed before it can act.
 const PREFLIGHT: u8 = 3;
@@ -188,14 +201,47 @@ async fn main() -> ExitCode {
         Request::Pull { forms } => Command::Pull { forms },
         Request::Ps { forms } => Command::Ps { forms },
         Request::Config { action } => configuration(action),
+        Request::Doctor { only, disruptive } => {
+            let only = match only.as_deref().map(Category::parse) {
+                // A named category that lemonfiber does not know is a mistake to
+                // name, not a request to run everything.
+                Some(None) => {
+                    let named = only.unwrap_or_default();
+                    eprintln!("error: no diagnostic category named `{named}`");
+                    return ExitCode::from(USAGE);
+                }
+                Some(Some(category)) => Some(category),
+                None => None,
+            };
+            Command::Doctor { only, disruptive }
+        }
     };
 
     match dispatch(command, &ctx).await {
         Ok(outcome) => {
             render(&outcome, cli.json);
-            ExitCode::SUCCESS
+            settled(&outcome)
         }
         Err(problem) => complain(&problem),
+    }
+}
+
+/// The exit code an outcome deserves.
+///
+/// Most answers are simply produced, so their success is that they arrived. A
+/// diagnosis is different: a script runs it precisely to learn whether the stack
+/// is healthy, so a broken or undetermined result must exit non-zero — reporting
+/// success when nothing could be verified is the falsehood this product exists to
+/// avoid.
+fn settled(outcome: &Outcome) -> ExitCode {
+    match outcome {
+        Outcome::Doctor(report) => match report.overall {
+            Overall::Healthy | Overall::Degraded => ExitCode::SUCCESS,
+            Overall::Broken | Overall::Unknown => ExitCode::from(FAILURE),
+        },
+        Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
+            ExitCode::SUCCESS
+        }
     }
 }
 
@@ -218,6 +264,7 @@ fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
 
     let settings = Settings {
         protocols: Protocols::from_env(&recorded),
+        ip_echo: ip_echo_from_env(&recorded),
         env_file,
         stack_dir: stack_directory(),
         ..Settings::default()
@@ -364,6 +411,65 @@ fn render(outcome: &Outcome, json: bool) {
         Outcome::Config(report) => settings(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
+        Outcome::Doctor(report) => diagnosis(report),
+    }
+}
+
+/// What the diagnostic checks found, finding by finding.
+///
+/// Each finding leads with a mark that reads at a glance and the plain evidence
+/// behind it; a non-passing one carries the reason and what to do, because a
+/// finding without a remedy is a fault report rather than a diagnosis.
+fn diagnosis(report: &DoctorReport) {
+    for finding in &report.findings {
+        match &finding.verdict {
+            Verdict::Pass { note } => match note {
+                Some(note) => println!("  ✓ {}   {note}", finding.title),
+                None => println!("  ✓ {}", finding.title),
+            },
+            Verdict::Warn(problem) => {
+                println!("  ! {}   {}", finding.title, problem.summary);
+                remedies(problem);
+            }
+            Verdict::Fail(problem) => {
+                println!("  ✗ {}   {}", finding.title, problem.summary);
+                remedies(problem);
+            }
+            Verdict::Unverified { reason, remedy } => {
+                println!("  ? {}   UNVERIFIED", finding.title);
+                println!("      {reason}");
+                println!("      → {}", remedy.action);
+                if let Some(detail) = &remedy.detail {
+                    println!("        {detail}");
+                }
+            }
+            Verdict::Skipped { reason } => {
+                println!("  – {}   skipped: {reason}", finding.title);
+            }
+        }
+    }
+
+    println!("\n{}", overall(report.overall));
+}
+
+/// The problem's meaning and remedies, indented under a finding.
+fn remedies(problem: &Problem) {
+    println!("      {}", problem.meaning);
+    for remedy in &problem.remedies {
+        println!("      → {}", remedy.action);
+        if let Some(detail) = &remedy.detail {
+            println!("        {detail}");
+        }
+    }
+}
+
+/// The one-line verdict a diagnosis amounts to.
+fn overall(overall: Overall) -> &'static str {
+    match overall {
+        Overall::Healthy => "healthy — everything checked passed",
+        Overall::Degraded => "degraded — working, with warnings",
+        Overall::Broken => "broken — something needs attention",
+        Overall::Unknown => "unknown — health could not be established",
     }
 }
 
