@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::config::Settings;
 use crate::error::{Diagnose, Problem};
 use crate::model::{Envelope, VersionReport};
 use crate::ports::Runner;
@@ -61,16 +62,19 @@ pub struct Ctx {
     pub runner: Arc<dyn Runner>,
     /// Which stack is being operated.
     pub stack: Source,
+    /// What the operator chose.
+    pub settings: Settings,
 }
 
 impl Ctx {
     /// A context that runs programs for real, against a given stack.
     #[must_use]
-    pub fn new(runner: Arc<dyn Runner>, stack: Source) -> Self {
+    pub fn new(runner: Arc<dyn Runner>, stack: Source, settings: Settings) -> Self {
         Self {
             dry_run: false,
             runner,
             stack,
+            settings,
         }
     }
 
@@ -125,7 +129,7 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{dispatch, Command, Ctx, Outcome, Source, VersionReport};
+    use super::{dispatch, Command, Ctx, Outcome, Settings, Source, VersionReport};
     use crate::ports::process::{Failure, Output, Runner};
 
     /// A runner that answers with whatever the test scripted.
@@ -156,7 +160,7 @@ mod tests {
     }
 
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
-        Ctx::new(Arc::new(Scripted(scripted)), stack())
+        Ctx::new(Arc::new(Scripted(scripted)), stack(), Settings::default())
     }
 
     fn spoke(stdout: &str) -> Output {
@@ -240,7 +244,11 @@ mod tests {
     #[tokio::test]
     async fn a_stack_that_cannot_be_read_is_reported_rather_than_left_out() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(Arc::new(Scripted(Ok(spoke("v2.32.1")))), nowhere);
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("v2.32.1")))),
+            nowhere,
+            Settings::default(),
+        );
         let refusal = dispatch(Command::Version, &ctx)
             .await
             .err()

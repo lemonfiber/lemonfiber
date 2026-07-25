@@ -301,6 +301,7 @@ version = "0.0.0"
 dependencies = [
  "clap",
  "color-eyre",
+ "etcetera",
  "include_dir",
  "lemonfiber-core",
  "lemonfiber-manifest",
@@ -313,7 +314,6 @@ name = "lemonfiber-core"
 version = "0.0.0"
 dependencies = [
  "async-trait",
- "etcetera",
  "include_dir",
  "lemonfiber-manifest",
  "serde",

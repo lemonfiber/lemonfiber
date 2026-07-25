@@ -65,6 +65,28 @@ Each error module also carries an explicit sweep over all its variants, assertin
 the message names its subject and the problem carries a remedy. The gate proves
 the arms ran; the sweep proves they said something useful.
 
+## Writing assertions the gate can reach
+
+Two patterns leave lines no passing test can cover, and both look harmless:
+
+```rust
+let Ok(value) = thing() else { unreachable!("cannot happen") };   // the else arm
+assert!(cond, "{} is wrong", path.display());                     // the argument
+```
+
+A `let … else` needs an arm for the case that cannot happen, and an argument
+expression in a failure message only evaluates when the assertion fails. Prefer
+comparing whole values, and inline captures:
+
+```rust
+assert_eq!(thing().ok(), Some(expected));
+assert!(cond, "{path:?} is wrong");
+```
+
+Neither is a style preference. Per-item coverage exclusion needs
+`#[coverage(off)]`, which is nightly-only, so an uncoverable line is a gate
+failure with no escape hatch.
+
 ## `Code` is a newtype, not an enum
 
 ```rust
