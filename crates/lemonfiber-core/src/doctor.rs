@@ -14,6 +14,8 @@
 //!
 //! See `.docs/architecture/module-layout.md`.
 
+pub mod vpn;
+
 use std::time::Duration;
 
 use async_trait::async_trait;
