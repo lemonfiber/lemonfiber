@@ -113,6 +113,15 @@ pub struct LifecycleReport {
     pub condition: Option<crate::docker::Condition>,
 }
 
+/// What a diagnostic run found, and what it amounts to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DoctorReport {
+    /// What the findings amount to, as one word.
+    pub overall: crate::doctor::Overall,
+    /// Each finding, in the order the checks produced them.
+    pub findings: Vec<crate::doctor::Finding>,
+}
+
 /// What each service is doing, and what that adds up to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StatusReport {
