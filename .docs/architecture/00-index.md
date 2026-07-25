@@ -11,6 +11,7 @@ are about Rust rather than about the product.
 | [dispatch.md](dispatch.md) | The one entry point every surface goes through |
 | [ports-and-adapters.md](ports-and-adapters.md) | The seam to the outside world, and how to fake it |
 | [error-model.md](error-model.md) | Typed errors, one operator-facing value, and how the coverage gate proves it |
+| [embedded-stack.md](embedded-stack.md) | How the stack gets into the binary, and why a bad pairing cannot compile |
 
 Planned as their subsystems land: `render-loop.md`, `vpn-port-forwarding.md`,
 `seed-clients.md`, `compose-construction.md`.

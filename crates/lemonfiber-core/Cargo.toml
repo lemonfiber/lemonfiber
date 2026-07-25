@@ -11,6 +11,7 @@ repository.workspace = true
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 async-trait = { workspace = true }
 etcetera = { workspace = true }
+include_dir = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

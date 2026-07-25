@@ -43,6 +43,8 @@ pub struct VersionReport {
     pub binary: String,
     /// The manifest schema generations this build reads.
     pub supported_schema: Vec<u32>,
+    /// The version of the stack this build operates.
+    pub stack: String,
     /// What the container engine reports, when it could be asked.
     pub compose: Option<String>,
 }
@@ -72,13 +74,15 @@ mod tests {
         let report = VersionReport {
             binary: "0.1.0".to_owned(),
             supported_schema: vec![1],
+            stack: "0.1.0".to_owned(),
             compose: Some("Docker Compose version v2.32.1".to_owned()),
         };
         assert_eq!(
             json(&Envelope::new("version", report)),
             concat!(
                 r#"{"api_version":1,"kind":"version","data":{"binary":"0.1.0","#,
-                r#""supported_schema":[1],"compose":"Docker Compose version v2.32.1"}}"#
+                r#""supported_schema":[1],"stack":"0.1.0","#,
+                r#""compose":"Docker Compose version v2.32.1"}}"#
             )
         );
     }
@@ -88,6 +92,7 @@ mod tests {
         let report = VersionReport {
             binary: "0.1.0".to_owned(),
             supported_schema: vec![1],
+            stack: "0.1.0".to_owned(),
             compose: None,
         };
         assert!(json(&report).contains(r#""compose":null"#));

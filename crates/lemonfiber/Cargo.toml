@@ -11,6 +11,9 @@ repository.workspace = true
 name = "lemonfiber"
 path = "src/main.rs"
 
+[build-dependencies]
+lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+
 [dependencies]
 lemonfiber-core = { path = "../lemonfiber-core" }
 clap = { workspace = true }

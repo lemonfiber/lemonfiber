@@ -5,13 +5,23 @@
 //! its own, which is why the same request behaves identically whether it arrived
 //! as a subcommand, a keypress or an HTTP route.
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
+use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::Local;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
+
+/// The stack this binary carries.
+///
+/// Embedding it means the common install has one thing to fetch rather than
+/// two, and `build.rs` has already refused to produce this binary if the
+/// manifest is one it could not read.
+static STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
 
 /// Set up and run your media stack.
 #[derive(Debug, Parser)]
@@ -24,6 +34,10 @@ struct Cli {
     /// Say what would happen, and change nothing.
     #[arg(long, global = true)]
     dry_run: bool,
+
+    /// Operate a stack directory of your own instead of the built-in one.
+    #[arg(long, global = true, value_name = "PATH")]
+    stack_dir: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Option<Request>,
@@ -49,7 +63,14 @@ async fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     };
 
-    let mut ctx = Ctx::new(Arc::new(Local));
+    // The path outlives the process, and `Source` is Copy so it can be handed
+    // around freely; leaking one allocation at startup buys both.
+    let stack = match cli.stack_dir {
+        Some(path) => Source::External(Box::leak(path.into_boxed_path())),
+        None => Source::Embedded(&STACK),
+    };
+
+    let mut ctx = Ctx::new(Arc::new(Local), stack);
     if cli.dry_run {
         ctx = ctx.rehearsing();
     }
@@ -87,6 +108,7 @@ fn render(outcome: &Outcome, json: bool) {
     match outcome {
         Outcome::Version(report) => {
             println!("{PRODUCT} {}", report.binary);
+            println!("stack {}", report.stack);
             println!("manifest schema {:?}", report.supported_schema);
             match &report.compose {
                 Some(version) => println!("compose {version}"),
