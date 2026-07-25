@@ -23,8 +23,10 @@ lint:
 deny:
     cargo deny check
 
-# Coverage for Sonar (never a merge gate).
-# 100% on applicable code (Q-R61). main.rs is CLI wiring, excluded per Q-R62;
-# further exclusions are annotated with #[coverage(off)] in the source.
+# Coverage, and a merge gate in CI: 100% of applicable lines.
+# main.rs is surface wiring and is excluded by path. Per-item exclusion would
+# need #[coverage(off)], which is nightly-only, so applicable code is instead
+# kept coverable — see .docs/architecture/error-model.md on writing assertions
+# that leave no branch a test cannot reach.
 coverage:
     cargo llvm-cov --workspace --ignore-filename-regex '(main\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info

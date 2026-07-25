@@ -9,6 +9,15 @@ repository.workspace = true
 
 [dependencies]
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+async-trait = { workspace = true }
+etcetera = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"
+tokio = { workspace = true, features = ["rt-multi-thread"] }
 
 [lints]
 workspace = true
