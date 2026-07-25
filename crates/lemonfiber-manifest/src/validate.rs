@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Manifest, Protocol};
+use crate::{Manifest, Protocol, Service};
 
 /// Tags that move under you. A pin meaning "whatever is newest" is not a pin.
 const FLOATING_TAGS: &[&str] = &[
@@ -180,6 +180,11 @@ fn check_forms(manifest: &Manifest, profiles: &BTreeSet<String>, found: &mut Vec
 }
 
 /// Everything a service has to get right.
+///
+/// One rule per function, and the order they are chained in is the order an
+/// operator reads them. Each answers for itself and returns what it found, so
+/// adding a rule is adding a link rather than editing a body that already holds
+/// eight others.
 fn check_services(
     manifest: &Manifest,
     profiles: &BTreeSet<String>,
@@ -200,77 +205,102 @@ fn check_services(
 
     let mut declared = BTreeSet::new();
     for service in &manifest.services {
+        let repeated = (!declared.insert(service.id.clone()))
+            .then(|| "another service already has this id".to_owned());
+
+        let faults = repeated
+            .into_iter()
+            .chain(placed(service, profiles))
+            .chain(pinned(service))
+            .chain(published(service))
+            .chain(licensed(service, &osi))
+            .chain(released(service, today))
+            .chain(permitted(service))
+            .chain(depended(service, &of_service));
+
         let location = format!("service {}", service.id);
-        let mut wrong = |message: String| {
-            found.push(Violation {
-                location: location.clone(),
-                message,
-            });
-        };
-
-        if !declared.insert(service.id.clone()) {
-            wrong("another service already has this id".to_owned());
-        }
-
-        if !profiles.contains(&service.profile) {
-            wrong(format!(
-                "is in profile {}, which is not declared",
-                service.profile
-            ));
-        }
-
-        if FLOATING_TAGS.contains(&service.tag.as_str()) {
-            wrong(format!(
-                "is pinned to {}, which moves — that is not a pin",
-                service.tag
-            ));
-        }
-
-        if service.port.is_some() && service.bind.is_none() {
-            wrong("publishes a port and does not say which interface".to_owned());
-        }
-
-        if !osi.contains(service.license.as_str()) {
-            wrong(format!(
-                "declares licence {}, which is not a recognised OSI identifier",
-                service.license
-            ));
-        }
-
-        match Date::parse(&service.last_release) {
-            None => wrong(format!(
-                "records last_release {}, which is not YYYY-MM-DD",
-                service.last_release
-            )),
-            Some(recorded) if recorded > today => wrong(format!(
-                "records last_release {}, which is in the future",
-                service.last_release
-            )),
-            Some(_) => {}
-        }
-
-        for capability in &service.capabilities {
-            if !ALLOWED_CAPABILITIES.contains(&capability.as_str()) {
-                wrong(format!(
-                    "asks for capability {capability}, which is not allowed"
-                ));
-            }
-        }
-
-        // Dependencies are allowed to exist; crossing a profile is what is not.
-        // A service waiting on something that may not be running is a start-up
-        // that hangs for a reason nothing reports.
-        for needed in &service.depends_on {
-            match of_service.get(needed.as_str()) {
-                None => wrong(format!("depends on {needed}, which is not a service here")),
-                Some(other) if *other != service.profile => wrong(format!(
-                    "depends on {needed}, which is in profile {other} rather than {}",
-                    service.profile
-                )),
-                Some(_) => {}
-            }
-        }
+        found.extend(faults.map(|message| Violation {
+            location: location.clone(),
+            message,
+        }));
     }
+}
+
+/// A service belongs to a profile the stack declares.
+fn placed(service: &Service, profiles: &BTreeSet<String>) -> Option<String> {
+    (!profiles.contains(&service.profile))
+        .then(|| format!("is in profile {}, which is not declared", service.profile))
+}
+
+/// A service names a version rather than a tag that moves under it.
+fn pinned(service: &Service) -> Option<String> {
+    FLOATING_TAGS.contains(&service.tag.as_str()).then(|| {
+        format!(
+            "is pinned to {}, which moves — that is not a pin",
+            service.tag
+        )
+    })
+}
+
+/// A service that publishes a port says which interface it publishes on.
+fn published(service: &Service) -> Option<String> {
+    (service.port.is_some() && service.bind.is_none())
+        .then(|| "publishes a port and does not say which interface".to_owned())
+}
+
+/// A service declares a licence anyone can look up.
+fn licensed(service: &Service, osi: &BTreeSet<&str>) -> Option<String> {
+    (!osi.contains(service.license.as_str())).then(|| {
+        format!(
+            "declares licence {}, which is not a recognised OSI identifier",
+            service.license
+        )
+    })
+}
+
+/// A service records a release date that is a date, and has happened.
+fn released(service: &Service, today: Date) -> Option<String> {
+    match Date::parse(&service.last_release) {
+        None => Some(format!(
+            "records last_release {}, which is not YYYY-MM-DD",
+            service.last_release
+        )),
+        Some(recorded) if recorded > today => Some(format!(
+            "records last_release {}, which is in the future",
+            service.last_release
+        )),
+        Some(_) => None,
+    }
+}
+
+/// A service asks only for capabilities the stack is willing to grant.
+fn permitted(service: &Service) -> Vec<String> {
+    service
+        .capabilities
+        .iter()
+        .filter(|capability| !ALLOWED_CAPABILITIES.contains(&capability.as_str()))
+        .map(|capability| format!("asks for capability {capability}, which is not allowed"))
+        .collect()
+}
+
+/// A service waits only on things that will be running when it is.
+///
+/// Dependencies are allowed to exist; crossing a profile is what is not. A
+/// service waiting on something that may not be running is a start-up that
+/// hangs for a reason nothing reports.
+fn depended(service: &Service, of_service: &BTreeMap<&str, &str>) -> Vec<String> {
+    service
+        .depends_on
+        .iter()
+        .filter_map(|needed| match of_service.get(needed.as_str()) {
+            None => Some(format!("depends on {needed}, which is not a service here")),
+            Some(other) if *other != service.profile => Some(format!(
+                "depends on {needed}, which is in profile {other} rather than {}",
+                service.profile
+            )),
+            Some(_) => None,
+        })
+        .collect()
 }
 
 #[cfg(test)]

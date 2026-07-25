@@ -16,6 +16,7 @@ use lemonfiber_core::app::{dispatch, logs, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{store, Protocols, Settings};
 use lemonfiber_core::docker::{Condition, Service, State};
+use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
     ConfigReport, Envelope, LifecycleReport, StatusReport, VersionReport,
 };
@@ -143,7 +144,7 @@ const VALIDATION: u8 = 5;
 ///
 /// A script branching on failure needs to know whether to fix its own input,
 /// start Docker, or wait longer, and one code for all three tells it nothing.
-fn exit_code(problem: &lemonfiber_core::error::Problem) -> u8 {
+fn exit_code(problem: &Problem) -> u8 {
     use lemonfiber_core::{app, config, ports, stack};
 
     match problem.code {
@@ -158,16 +159,51 @@ fn exit_code(problem: &lemonfiber_core::error::Problem) -> u8 {
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {
         println!("{PRODUCT} — run `lemonfiber --help` to see what it can do");
         return ExitCode::SUCCESS;
     };
 
+    let ctx = context(cli.stack_dir.take(), cli.dry_run);
+
+    let command = match request {
+        // Streaming is not a value that arrives once, so it does not become a
+        // command and does not go through dispatch. It still goes through the
+        // core, which is the part that matters.
+        Request::Logs {
+            services,
+            form,
+            follow,
+            tail,
+        } => return stream(&ctx, &form, &services, follow, tail, cli.json).await,
+        Request::Version => Command::Version,
+        Request::Up { forms } => Command::Up { forms },
+        Request::Down { forms } => Command::Down { forms },
+        Request::Restart { form, services } => Command::Restart {
+            forms: vec![form],
+            services,
+        },
+        Request::Pull { forms } => Command::Pull { forms },
+        Request::Ps { forms } => Command::Ps { forms },
+        Request::Config { action } => configuration(action),
+    };
+
+    match dispatch(command, &ctx).await {
+        Ok(outcome) => {
+            render(&outcome, cli.json);
+            ExitCode::SUCCESS
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// Everything a command needs that the command itself does not carry.
+fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
     // The path outlives the process, and `Source` is Copy so it can be handed
     // around freely; leaking one allocation at startup buys both.
-    let stack = match cli.stack_dir {
+    let stack = match stack_dir {
         Some(path) => Source::External(Box::leak(path.into_boxed_path())),
         None => Source::Embedded(&STACK),
     };
@@ -192,7 +228,7 @@ async fn main() -> ExitCode {
     // here, and nothing yet depends on the difference.
     let environment = Environment::resolve(HOST_OS, false);
 
-    let mut ctx = Ctx::new(
+    let ctx = Ctx::new(
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
@@ -200,62 +236,48 @@ async fn main() -> ExitCode {
         settings,
         environment,
     );
-    if cli.dry_run {
-        ctx = ctx.rehearsing();
+
+    if dry_run {
+        return ctx.rehearsing();
     }
+    ctx
+}
 
-    let command = match request {
-        // Streaming is not a value that arrives once, so it does not become a
-        // command and does not go through dispatch. It still goes through the
-        // core, which is the part that matters.
-        Request::Logs {
-            services,
-            form,
-            follow,
-            tail,
-        } => return stream(&ctx, &form, &services, follow, tail, cli.json).await,
-        Request::Version => Command::Version,
-        Request::Up { forms } => Command::Up { forms },
-        Request::Down { forms } => Command::Down { forms },
-        Request::Restart { form, services } => Command::Restart {
-            forms: vec![form],
-            services,
-        },
-        Request::Pull { forms } => Command::Pull { forms },
-        Request::Ps { forms } => Command::Ps { forms },
-        Request::Config { action } => match action {
-            ConfigAction::Get { key } => Command::ConfigGet { key },
-            ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
-            ConfigAction::Show => Command::ConfigShow,
-        },
-    };
+/// Which setting the operator is reading or changing.
+fn configuration(action: ConfigAction) -> Command {
+    match action {
+        ConfigAction::Get { key } => Command::ConfigGet { key },
+        ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
+        ConfigAction::Show => Command::ConfigShow,
+    }
+}
 
-    match dispatch(command, &ctx).await {
-        Ok(outcome) => {
-            render(&outcome, cli.json);
-            ExitCode::SUCCESS
-        }
-        Err(problem) => {
-            let code = exit_code(&problem);
-            eprintln!("{}: {}", problem.code, problem.summary);
-            eprintln!("\n  {}\n", problem.meaning);
-            for remedy in &problem.remedies {
-                eprintln!("  → {}", remedy.action);
-                if let Some(detail) = &remedy.detail {
-                    eprintln!("    {detail}");
-                }
-            }
-            // Last, and indented: available to whoever wants it, and never the
-            // first thing the operator has to read.
-            if let Some(detail) = &problem.detail {
-                eprintln!();
-                for line in detail.lines() {
-                    eprintln!("  {line}");
-                }
-            }
-            ExitCode::from(code)
+/// Tell the operator what went wrong, and exit in a way a script can branch on.
+///
+/// One renderer, so a failure reads the same whichever command produced it —
+/// the remedies are the point of the error model, and a second copy of this is
+/// how one of them quietly starts omitting them.
+fn complain(problem: &Problem) -> ExitCode {
+    eprintln!("{}: {}", problem.code, problem.summary);
+    eprintln!("\n  {}\n", problem.meaning);
+
+    for remedy in &problem.remedies {
+        eprintln!("  → {}", remedy.action);
+        if let Some(detail) = &remedy.detail {
+            eprintln!("    {detail}");
         }
     }
+
+    // Last, and indented: available to whoever wants it, and never the first
+    // thing the operator has to read.
+    if let Some(detail) = &problem.detail {
+        eprintln!();
+        for line in detail.lines() {
+            eprintln!("  {line}");
+        }
+    }
+
+    ExitCode::from(exit_code(problem))
 }
 
 /// Print log lines as they arrive, until the stream ends.
@@ -273,19 +295,10 @@ async fn stream(
     json: bool,
 ) -> ExitCode {
     let query = LogQuery { tail, follow };
-    let opened = match logs(ctx, forms, services, query).await {
+    let mut lines = match logs(ctx, forms, services, query).await {
         Ok(opened) => opened,
-        Err(problem) => {
-            eprintln!("{}: {}", problem.code, problem.summary);
-            eprintln!("\n  {}\n", problem.meaning);
-            for remedy in &problem.remedies {
-                eprintln!("  → {}", remedy.action);
-            }
-            return ExitCode::from(exit_code(&problem));
-        }
+        Err(problem) => return complain(&problem),
     };
-
-    let mut lines = opened;
     let mut seen = 0_u64;
     while let Some(line) = lines.recv().await {
         seen += 1;
