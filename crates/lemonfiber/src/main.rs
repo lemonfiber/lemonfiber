@@ -16,7 +16,9 @@ use lemonfiber_core::app::{dispatch, logs, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{store, Protocols, Settings};
 use lemonfiber_core::docker::{Condition, Service, State};
-use lemonfiber_core::model::Envelope;
+use lemonfiber_core::model::{
+    ConfigReport, Envelope, LifecycleReport, StatusReport, VersionReport,
+};
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::stack::Source;
@@ -333,56 +335,80 @@ fn stack_directory() -> Option<PathBuf> {
 }
 
 /// Render an outcome, for a person or for a script.
+///
+/// One renderer per answer, rather than one function that knows all four. They
+/// have nothing in common beyond arriving here: what a version report owes an
+/// operator and what a lifecycle report owes them are different questions, and
+/// a single body deciding both reads as one thing with four moods.
 fn render(outcome: &Outcome, json: bool) {
     if json {
-        match outcome.clone().envelope().to_json() {
-            Some(text) => println!("{text}"),
-            None => eprintln!("this outcome could not be rendered as JSON"),
-        }
+        machine_readable(outcome);
         return;
     }
 
     match outcome {
-        Outcome::Version(report) => {
-            println!("{PRODUCT} {}", report.binary);
-            println!("stack {}", report.stack);
-            println!("manifest schema {:?}", report.supported_schema);
-            match &report.compose {
-                Some(version) => println!("compose {version}"),
-                None => println!("compose not reachable"),
-            }
-        }
-        Outcome::Config(report) => {
-            for setting in &report.settings {
-                println!("{}={}", setting.key, setting.value);
-            }
-            if report.changed {
-                println!("saved");
-            }
-        }
-        Outcome::Lifecycle(report) => {
-            if report.rehearsed {
-                println!("would run:\n  {}", report.command.join(" "));
-            }
-            println!("{}: {}", report.action, report.profiles.join(", "));
-            // Saying what was left out, and that it was deliberate, before the
-            // operator goes looking for a service that was never going to start.
-            if !report.dropped.is_empty() {
-                println!(
-                    "left out (no provider configured): {}",
-                    report.dropped.join(", ")
-                );
-            }
-            if let Some(condition) = report.condition {
-                println!("\n{}", describe(condition));
-                show(&report.services);
-            }
-        }
-        Outcome::Status(report) => {
-            println!("{}", describe(report.condition));
-            show(&report.services);
-        }
+        Outcome::Version(report) => versions(report),
+        Outcome::Config(report) => settings(report),
+        Outcome::Lifecycle(report) => lifecycle(report),
+        Outcome::Status(report) => status(report),
     }
+}
+
+/// The same answer, for something that will parse it.
+fn machine_readable(outcome: &Outcome) {
+    match outcome.clone().envelope().to_json() {
+        Some(text) => println!("{text}"),
+        None => eprintln!("this outcome could not be rendered as JSON"),
+    }
+}
+
+/// What versions are in play.
+fn versions(report: &VersionReport) {
+    println!("{PRODUCT} {}", report.binary);
+    println!("stack {}", report.stack);
+    println!("manifest schema {:?}", report.supported_schema);
+    match &report.compose {
+        Some(version) => println!("compose {version}"),
+        None => println!("compose not reachable"),
+    }
+}
+
+/// What the operator has configured.
+fn settings(report: &ConfigReport) {
+    for setting in &report.settings {
+        println!("{}={}", setting.key, setting.value);
+    }
+    if report.changed {
+        println!("saved");
+    }
+}
+
+/// What a lifecycle command did, or would have done.
+fn lifecycle(report: &LifecycleReport) {
+    if report.rehearsed {
+        println!("would run:\n  {}", report.command.join(" "));
+    }
+    println!("{}: {}", report.action, report.profiles.join(", "));
+
+    // Saying what was left out, and that it was deliberate, before the operator
+    // goes looking for a service that was never going to start.
+    if !report.dropped.is_empty() {
+        println!(
+            "left out (no provider configured): {}",
+            report.dropped.join(", ")
+        );
+    }
+
+    if let Some(condition) = report.condition {
+        println!("\n{}", describe(condition));
+        show(&report.services);
+    }
+}
+
+/// What each service is doing.
+fn status(report: &StatusReport) {
+    println!("{}", describe(report.condition));
+    show(&report.services);
 }
 
 /// A condition, as a sentence rather than as a word.
