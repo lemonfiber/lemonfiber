@@ -62,6 +62,13 @@ pub struct Container {
     pub lifecycle: Lifecycle,
     /// What its own probe says.
     pub health: Health,
+    /// How it exited, where it has exited and the engine still remembers.
+    ///
+    /// Present because stopping on purpose and falling over are the same
+    /// lifecycle and entirely different problems: an operator who stopped a
+    /// service should not be shown a fault, and one whose service died should
+    /// not be shown a tidy `stopped`.
+    pub exit: Option<i32>,
 }
 
 /// Resource use for one container at one moment.
@@ -89,8 +96,39 @@ pub struct LogLine {
     pub service: String,
     /// Which stream it arrived on.
     pub stream: Stream,
+    /// When the container itself says it wrote the line, where it said so.
+    ///
+    /// Kept verbatim and unparsed. Containers disagree with the host clock and
+    /// with each other, and the only defensible ordering is each container's own
+    /// account of itself — which a reader can only apply if it is carried
+    /// rather than replaced by an arrival time.
+    pub at: Option<String>,
     /// The line, without its trailing newline.
     pub line: String,
+}
+
+/// How much output to ask for, and whether to keep listening.
+///
+/// Both fields are the same question asked of a failure and of a log viewer:
+/// the health gate wants the last few lines of a service that would not start,
+/// and an operator wants everything, still arriving.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LogQuery {
+    /// How many existing lines to begin with.
+    pub tail: u32,
+    /// Whether to keep the stream open as new lines arrive.
+    pub follow: bool,
+}
+
+impl LogQuery {
+    /// The last `tail` lines, and then nothing more.
+    #[must_use]
+    pub const fn recent(tail: u32) -> Self {
+        Self {
+            tail,
+            follow: false,
+        }
+    }
 }
 
 /// What a command left behind after running inside a container.
@@ -183,13 +221,14 @@ pub trait Engine: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure::Unreachable`] when the engine cannot be reached.
-    async fn logs(&self, project: &str) -> Result<Receiver<LogLine>, Failure>;
+    async fn logs(&self, project: &str, query: LogQuery) -> Result<Receiver<LogLine>, Failure>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        Container, Diagnose, ExecOutput, Failure, Health, Lifecycle, LogLine, Stats, Stream,
+        Container, Diagnose, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Stats,
+        Stream,
     };
 
     #[test]
@@ -225,6 +264,7 @@ mod tests {
             service: "sonarr".to_owned(),
             lifecycle: Lifecycle::Running,
             health: Health::Healthy,
+            exit: None,
         };
         assert_eq!(container.clone(), container);
         assert_eq!(container.service, "sonarr");
@@ -232,9 +272,11 @@ mod tests {
         let line = LogLine {
             service: "sonarr".to_owned(),
             stream: Stream::Stderr,
+            at: Some("2026-07-25T10:00:00Z".to_owned()),
             line: "something happened".to_owned(),
         };
         assert_eq!(line.clone().stream, Stream::Stderr);
+        assert_eq!(line.at.as_deref(), Some("2026-07-25T10:00:00Z"));
 
         let stats = Stats {
             cpu: 0.5,
@@ -247,6 +289,18 @@ mod tests {
             stdout: "203.0.113.7".to_owned(),
         };
         assert_eq!(exec.clone().stdout, "203.0.113.7");
+    }
+
+    #[test]
+    fn asking_for_recent_output_does_not_ask_to_keep_listening() {
+        let recent = LogQuery::recent(50);
+        assert_eq!(
+            recent,
+            LogQuery {
+                tail: 50,
+                follow: false
+            }
+        );
     }
 
     #[test]
