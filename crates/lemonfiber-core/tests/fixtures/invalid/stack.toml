@@ -1,0 +1,29 @@
+# A manifest that parses and contradicts itself, so the load path can be shown
+# to report contents faults rather than only syntax ones.
+schema_version  = 1
+stack_version   = "1.0.0"
+min_cli_version = "0.1.0"
+
+[[profile]]
+id = "media"
+name = "Library"
+description = "Serving what you have"
+
+[[form]]
+id = "library"
+name = "Library"
+description = "Serve what exists."
+profiles = ["media", "telly"]
+
+[[service]]
+id = "jellyfin"
+name = "Jellyfin"
+profile = "media"
+image = "lscr.io/linuxserver/jellyfin"
+tag = "latest"
+criticality = "core"
+license = "Nonesuch-1.0"
+upstream = "https://github.com/jellyfin/jellyfin"
+last_release = "2026-01-09"
+describes = "Serves your library"
+without_it = "Nothing to watch on"

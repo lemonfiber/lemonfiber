@@ -75,7 +75,7 @@ pub struct Profile {
 }
 
 /// A download provider a profile can depend on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
     /// Needs a Usenet provider.

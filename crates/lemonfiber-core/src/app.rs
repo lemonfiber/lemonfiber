@@ -15,7 +15,7 @@ use crate::config::Settings;
 use crate::error::{Diagnose, Problem};
 use crate::model::{Envelope, LifecycleReport, VersionReport};
 use crate::platform::Environment;
-use crate::ports::Runner;
+use crate::ports::{Clock, Runner};
 use crate::stack::closure::resolve;
 use crate::stack::compose::{build, Action};
 use crate::stack::Source;
@@ -89,6 +89,8 @@ pub struct Ctx {
     pub dry_run: bool,
     /// How programs are run.
     pub runner: Arc<dyn Runner>,
+    /// What time it is, for the one rule that depends on it.
+    pub clock: Arc<dyn Clock>,
     /// Which stack is being operated.
     pub stack: Source,
     /// What the operator chose.
@@ -107,6 +109,7 @@ impl Ctx {
     #[must_use]
     pub fn new(
         runner: Arc<dyn Runner>,
+        clock: Arc<dyn Clock>,
         stack: Source,
         settings: Settings,
         environment: Environment,
@@ -114,10 +117,28 @@ impl Ctx {
         Self {
             dry_run: false,
             runner,
+            clock,
             stack,
             settings,
             environment,
         }
+    }
+
+    /// Today, as the manifest's date rules mean it.
+    ///
+    /// A clock before the epoch, or one far enough ahead to overflow a calendar,
+    /// falls back to the epoch: refusing to do anything because the machine's
+    /// clock is absurd would be a worse answer than checking dates against a
+    /// date that is merely wrong.
+    fn today(&self) -> lemonfiber_manifest::Date {
+        let seconds = self
+            .clock
+            .now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
+            .unwrap_or_default();
+        lemonfiber_manifest::Date::from_unix_seconds(seconds).unwrap_or(EPOCH)
     }
 
     /// The same context, in rehearsal.
@@ -127,6 +148,14 @@ impl Ctx {
         self
     }
 }
+
+/// The first day the calendar rules can name, used when the clock cannot be
+/// believed at all.
+const EPOCH: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
+    year: 1970,
+    month: 1,
+    day: 1,
+};
 
 /// Carry out a command.
 ///
@@ -152,7 +181,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
 /// is the point: `up` from a keypress and `up` from a subcommand reach this same
 /// function with the same arguments.
 async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome, Problem> {
-    let manifest = ctx.stack.manifest().map_err(|err| err.problem())?;
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem())?;
     let plan = resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| err.problem())?;
     let stack = ctx
         .stack
@@ -201,7 +233,10 @@ async fn version(ctx: &Ctx) -> Result<VersionReport, Problem> {
     // The stack is the one thing here that can genuinely be wrong: an
     // unreadable directory is the operator's own `--stack-dir`, and they need
     // to hear about it rather than see a version report with a hole in it.
-    let stack = ctx.stack.manifest().map_err(|err| err.problem())?;
+    let stack = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem())?;
 
     Ok(VersionReport {
         binary: env!("CARGO_PKG_VERSION").to_owned(),
@@ -250,6 +285,7 @@ mod tests {
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
         Ctx::new(
             Arc::new(Scripted(scripted)),
+            Arc::new(crate::adapters::System),
             stack(),
             Settings::default(),
             Environment::MacOs,
@@ -339,6 +375,7 @@ mod tests {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("v2.32.1")))),
+            Arc::new(crate::adapters::System),
             nowhere,
             Settings::default(),
             Environment::MacOs,
@@ -362,6 +399,7 @@ mod tests {
         };
         Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(crate::adapters::System),
             stack(),
             settings,
             Environment::MacOs,
@@ -428,6 +466,7 @@ mod tests {
         };
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(crate::adapters::System),
             stack(),
             settings,
             Environment::MacOs,
@@ -453,6 +492,7 @@ mod tests {
             Arc::new(Scripted(Err(Failure::NotFound {
                 program: "docker".to_owned(),
             }))),
+            Arc::new(crate::adapters::System),
             stack(),
             settings,
             Environment::MacOs,
@@ -501,6 +541,7 @@ mod tests {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(crate::adapters::System),
             nowhere,
             Settings::default(),
             Environment::MacOs,
@@ -526,6 +567,7 @@ mod tests {
         };
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(crate::adapters::System),
             Source::Embedded(&EMBEDDED),
             settings,
             Environment::MacOs,
@@ -538,6 +580,44 @@ mod tests {
             Some(crate::stack::STACK_NOT_SET_UP),
             "an operator who has not run setup is told to, not shown a path error"
         );
+    }
+
+    #[tokio::test]
+    async fn a_stack_that_contradicts_itself_is_refused_with_every_fault_at_once() {
+        let invalid = Source::External(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/invalid"
+        )));
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(crate::adapters::System),
+            invalid,
+            Settings::default(),
+            Environment::MacOs,
+        );
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+
+        let problem = dispatch(command, &ctx).await.err();
+        assert_eq!(
+            problem.as_ref().map(|problem| problem.code),
+            Some(crate::stack::STACK_INVALID)
+        );
+
+        let detail = problem
+            .and_then(|problem| problem.detail)
+            .unwrap_or_default();
+        for expected in [
+            "names profile telly, which is not declared",
+            "that is not a pin",
+            "not a recognised OSI identifier",
+        ] {
+            assert!(
+                detail.contains(expected),
+                "missing {expected:?} in: {detail}"
+            );
+        }
     }
 
     #[tokio::test]
