@@ -13,7 +13,7 @@ jobs:
     with:
       content: ${{ vars.DISCORD_RELEASE_ROLE_ID && format('<@&{0}>', vars.DISCORD_RELEASE_ROLE_ID) || '' }}
       title: "🍋 Lemonfiber ${{ github.event.release.tag_name }}"
-      body: ${{ github.event.release.name }}
+      body: ${{ github.event.release.body }}
       url: ${{ github.event.release.html_url }}
       color: "16309767"
     secrets:
