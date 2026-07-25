@@ -7,3 +7,5 @@ crates/lemonfiber/web-ui/dist/
 node_modules/
 .planning/
 .DS_Store
+# coverage report, produced by `just coverage`
+lcov.info
