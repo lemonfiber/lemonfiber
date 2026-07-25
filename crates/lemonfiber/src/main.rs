@@ -11,11 +11,17 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
-use lemonfiber_core::adapters::{Local, System};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::adapters::{Daemon, Local, System};
+use lemonfiber_core::app::{dispatch, logs, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{store, Protocols, Settings};
+use lemonfiber_core::docker::{Condition, Service, State};
+use lemonfiber_core::error::Problem;
+use lemonfiber_core::model::{
+    ConfigReport, Envelope, LifecycleReport, StatusReport, VersionReport,
+};
 use lemonfiber_core::platform::{Environment, HOST_OS};
+use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
 
@@ -76,6 +82,25 @@ enum Request {
         #[arg(required = true)]
         forms: Vec<String>,
     },
+    /// Report what each service is actually doing.
+    Ps {
+        /// The forms to report on; none reports the whole stack.
+        forms: Vec<String>,
+    },
+    /// Show what services are saying.
+    Logs {
+        /// The services to read; none reads them all.
+        services: Vec<String>,
+        /// Read only the services a form declares.
+        #[arg(long, value_name = "FORM")]
+        form: Vec<String>,
+        /// Keep reading as new lines arrive.
+        #[arg(long, short)]
+        follow: bool,
+        /// How many existing lines to begin with.
+        #[arg(long, default_value_t = 50)]
+        tail: u32,
+    },
     /// Read or change one setting.
     Config {
         #[command(subcommand)]
@@ -106,18 +131,79 @@ enum ConfigAction {
 /// something failed rather than merely on whether it did.
 const FAILURE: u8 = 1;
 
+/// Something outside lemonfiber has to be fixed before it can act.
+const PREFLIGHT: u8 = 3;
+
+/// Started, and a service never became usable.
+const NEVER_SETTLED: u8 = 4;
+
+/// Something the operator wrote was refused.
+const VALIDATION: u8 = 5;
+
+/// Which exit code a problem deserves.
+///
+/// A script branching on failure needs to know whether to fix its own input,
+/// start Docker, or wait longer, and one code for all three tells it nothing.
+fn exit_code(problem: &Problem) -> u8 {
+    use lemonfiber_core::{app, config, ports, stack};
+
+    match problem.code {
+        app::NEVER_SETTLED => NEVER_SETTLED,
+        ports::process::MISSING_PROGRAM | ports::docker::ENGINE_UNREACHABLE => PREFLIGHT,
+        stack::STACK_INVALID | stack::STACK_UNREADABLE | config::store::CONFIG_UNREADABLE => {
+            VALIDATION
+        }
+        _ => FAILURE,
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {
         println!("{PRODUCT} — run `lemonfiber --help` to see what it can do");
         return ExitCode::SUCCESS;
     };
 
+    let ctx = context(cli.stack_dir.take(), cli.dry_run);
+
+    let command = match request {
+        // Streaming is not a value that arrives once, so it does not become a
+        // command and does not go through dispatch. It still goes through the
+        // core, which is the part that matters.
+        Request::Logs {
+            services,
+            form,
+            follow,
+            tail,
+        } => return stream(&ctx, &form, &services, follow, tail, cli.json).await,
+        Request::Version => Command::Version,
+        Request::Up { forms } => Command::Up { forms },
+        Request::Down { forms } => Command::Down { forms },
+        Request::Restart { form, services } => Command::Restart {
+            forms: vec![form],
+            services,
+        },
+        Request::Pull { forms } => Command::Pull { forms },
+        Request::Ps { forms } => Command::Ps { forms },
+        Request::Config { action } => configuration(action),
+    };
+
+    match dispatch(command, &ctx).await {
+        Ok(outcome) => {
+            render(&outcome, cli.json);
+            ExitCode::SUCCESS
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// Everything a command needs that the command itself does not carry.
+fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
     // The path outlives the process, and `Source` is Copy so it can be handed
     // around freely; leaking one allocation at startup buys both.
-    let stack = match cli.stack_dir {
+    let stack = match stack_dir {
         Some(path) => Source::External(Box::leak(path.into_boxed_path())),
         None => Source::Embedded(&STACK),
     };
@@ -142,58 +228,96 @@ async fn main() -> ExitCode {
     // here, and nothing yet depends on the difference.
     let environment = Environment::resolve(HOST_OS, false);
 
-    let mut ctx = Ctx::new(
+    let ctx = Ctx::new(
         Arc::new(Local),
+        Arc::new(Daemon::local()),
         Arc::new(System),
         stack,
         settings,
         environment,
     );
-    if cli.dry_run {
-        ctx = ctx.rehearsing();
+
+    if dry_run {
+        return ctx.rehearsing();
+    }
+    ctx
+}
+
+/// Which setting the operator is reading or changing.
+fn configuration(action: ConfigAction) -> Command {
+    match action {
+        ConfigAction::Get { key } => Command::ConfigGet { key },
+        ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
+        ConfigAction::Show => Command::ConfigShow,
+    }
+}
+
+/// Tell the operator what went wrong, and exit in a way a script can branch on.
+///
+/// One renderer, so a failure reads the same whichever command produced it —
+/// the remedies are the point of the error model, and a second copy of this is
+/// how one of them quietly starts omitting them.
+fn complain(problem: &Problem) -> ExitCode {
+    eprintln!("{}: {}", problem.code, problem.summary);
+    eprintln!("\n  {}\n", problem.meaning);
+
+    for remedy in &problem.remedies {
+        eprintln!("  → {}", remedy.action);
+        if let Some(detail) = &remedy.detail {
+            eprintln!("    {detail}");
+        }
     }
 
-    let command = match request {
-        Request::Version => Command::Version,
-        Request::Up { forms } => Command::Up { forms },
-        Request::Down { forms } => Command::Down { forms },
-        Request::Restart { form, services } => Command::Restart {
-            forms: vec![form],
-            services,
-        },
-        Request::Pull { forms } => Command::Pull { forms },
-        Request::Config { action } => match action {
-            ConfigAction::Get { key } => Command::ConfigGet { key },
-            ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
-            ConfigAction::Show => Command::ConfigShow,
-        },
+    // Last, and indented: available to whoever wants it, and never the first
+    // thing the operator has to read.
+    if let Some(detail) = &problem.detail {
+        eprintln!();
+        for line in detail.lines() {
+            eprintln!("  {line}");
+        }
+    }
+
+    ExitCode::from(exit_code(problem))
+}
+
+/// Print log lines as they arrive, until the stream ends.
+///
+/// Machine-readable output is one envelope per line rather than one document
+/// containing all of them: a stream has no last element to close a document
+/// with, and a consumer of `--follow --json` needs each line when it happens
+/// rather than when the service stops.
+async fn stream(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    follow: bool,
+    tail: u32,
+    json: bool,
+) -> ExitCode {
+    let query = LogQuery { tail, follow };
+    let mut lines = match logs(ctx, forms, services, query).await {
+        Ok(opened) => opened,
+        Err(problem) => return complain(&problem),
     };
-
-    match dispatch(command, &ctx).await {
-        Ok(outcome) => {
-            render(&outcome, cli.json);
-            ExitCode::SUCCESS
-        }
-        Err(problem) => {
-            eprintln!("{}: {}", problem.code, problem.summary);
-            eprintln!("\n  {}\n", problem.meaning);
-            for remedy in &problem.remedies {
-                eprintln!("  → {}", remedy.action);
-                if let Some(detail) = &remedy.detail {
-                    eprintln!("    {detail}");
-                }
+    let mut seen = 0_u64;
+    while let Some(line) = lines.recv().await {
+        seen += 1;
+        if json {
+            match Envelope::new("log", &line).to_json() {
+                Some(text) => println!("{text}"),
+                None => eprintln!("this line could not be rendered as JSON"),
             }
-            // Last, and indented: available to whoever wants it, and never the
-            // first thing the operator has to read.
-            if let Some(detail) = &problem.detail {
-                eprintln!();
-                for line in detail.lines() {
-                    eprintln!("  {line}");
-                }
-            }
-            ExitCode::from(FAILURE)
+        } else {
+            println!("{:<12} {}", line.service, line.line);
         }
     }
+
+    // Silence and "no output" are different answers, and a viewer that renders
+    // them identically leaves the operator wondering which one they got.
+    if seen == 0 && !json {
+        println!("no output");
+    }
+    ExitCode::SUCCESS
 }
 
 /// Where this machine keeps lemonfiber's files.
@@ -224,46 +348,111 @@ fn stack_directory() -> Option<PathBuf> {
 }
 
 /// Render an outcome, for a person or for a script.
+///
+/// One renderer per answer, rather than one function that knows all four. They
+/// have nothing in common beyond arriving here: what a version report owes an
+/// operator and what a lifecycle report owes them are different questions, and
+/// a single body deciding both reads as one thing with four moods.
 fn render(outcome: &Outcome, json: bool) {
     if json {
-        match outcome.clone().envelope().to_json() {
-            Some(text) => println!("{text}"),
-            None => eprintln!("this outcome could not be rendered as JSON"),
-        }
+        machine_readable(outcome);
         return;
     }
 
     match outcome {
-        Outcome::Version(report) => {
-            println!("{PRODUCT} {}", report.binary);
-            println!("stack {}", report.stack);
-            println!("manifest schema {:?}", report.supported_schema);
-            match &report.compose {
-                Some(version) => println!("compose {version}"),
-                None => println!("compose not reachable"),
-            }
-        }
-        Outcome::Config(report) => {
-            for setting in &report.settings {
-                println!("{}={}", setting.key, setting.value);
-            }
-            if report.changed {
-                println!("saved");
-            }
-        }
-        Outcome::Lifecycle(report) => {
-            if report.rehearsed {
-                println!("would run:\n  {}", report.command.join(" "));
-            }
-            println!("{}: {}", report.action, report.profiles.join(", "));
-            // Saying what was left out, and that it was deliberate, before the
-            // operator goes looking for a service that was never going to start.
-            if !report.dropped.is_empty() {
-                println!(
-                    "left out (no provider configured): {}",
-                    report.dropped.join(", ")
-                );
-            }
-        }
+        Outcome::Version(report) => versions(report),
+        Outcome::Config(report) => settings(report),
+        Outcome::Lifecycle(report) => lifecycle(report),
+        Outcome::Status(report) => status(report),
+    }
+}
+
+/// The same answer, for something that will parse it.
+fn machine_readable(outcome: &Outcome) {
+    match outcome.clone().envelope().to_json() {
+        Some(text) => println!("{text}"),
+        None => eprintln!("this outcome could not be rendered as JSON"),
+    }
+}
+
+/// What versions are in play.
+fn versions(report: &VersionReport) {
+    println!("{PRODUCT} {}", report.binary);
+    println!("stack {}", report.stack);
+    println!("manifest schema {:?}", report.supported_schema);
+    match &report.compose {
+        Some(version) => println!("compose {version}"),
+        None => println!("compose not reachable"),
+    }
+}
+
+/// What the operator has configured.
+fn settings(report: &ConfigReport) {
+    for setting in &report.settings {
+        println!("{}={}", setting.key, setting.value);
+    }
+    if report.changed {
+        println!("saved");
+    }
+}
+
+/// What a lifecycle command did, or would have done.
+fn lifecycle(report: &LifecycleReport) {
+    if report.rehearsed {
+        println!("would run:\n  {}", report.command.join(" "));
+    }
+    println!("{}: {}", report.action, report.profiles.join(", "));
+
+    // Saying what was left out, and that it was deliberate, before the operator
+    // goes looking for a service that was never going to start.
+    if !report.dropped.is_empty() {
+        println!(
+            "left out (no provider configured): {}",
+            report.dropped.join(", ")
+        );
+    }
+
+    if let Some(condition) = report.condition {
+        println!("\n{}", describe(condition));
+        show(&report.services);
+    }
+}
+
+/// What each service is doing.
+fn status(report: &StatusReport) {
+    println!("{}", describe(report.condition));
+    show(&report.services);
+}
+
+/// A condition, as a sentence rather than as a word.
+fn describe(condition: Condition) -> &'static str {
+    match condition {
+        Condition::Inactive => "nothing is running",
+        Condition::Degraded => "running, and something needs attention",
+        Condition::Partial => "partly up",
+        Condition::Active => "everything is up",
+    }
+}
+
+/// What each service is doing, one per line.
+fn show(services: &[Service]) {
+    for service in services {
+        let state = match service.state {
+            State::Absent => "absent".to_owned(),
+            State::Stopped => "stopped".to_owned(),
+            State::Starting => "starting".to_owned(),
+            State::Running => "running".to_owned(),
+            State::Healthy => "healthy".to_owned(),
+            State::Unhealthy => "unhealthy".to_owned(),
+            State::CrashLooping => "crash-looping".to_owned(),
+            State::HostManaged => "host-managed".to_owned(),
+            // The code is the whole reason this is not simply "stopped", so it
+            // is shown rather than left for the operator to go and find.
+            State::Failed => match service.exit {
+                Some(code) => format!("failed ({code})"),
+                None => "failed".to_owned(),
+            },
+        };
+        println!("  {:<14} {:<14} {}", service.id, state, service.name);
     }
 }

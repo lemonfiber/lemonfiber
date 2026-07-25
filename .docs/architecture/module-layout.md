@@ -19,7 +19,8 @@ crates/lemonfiber-core/src/
 │                    ├── process.rs  trait Runner
 │                    ├── service.rs  trait Client
 │                    └── time.rs     trait Clock
-├── adapters.rs      ├── process.rs  Local — the only tokio::process
+├── adapters.rs      ├── docker.rs   Daemon — the only bollard
+│                    ├── process.rs  Local — the only tokio::process
 │                    └── time.rs     System — the only SystemTime::now
 ├── platform.rs      the only cfg!(target_os)
 ├── stack.rs         ┐
@@ -91,7 +92,7 @@ lint stays satisfied without an exception.
 | Module | Arrives with |
 |--------|--------------|
 | `stack` | The compose driver — argument construction, form closure, lifecycle |
-| `docker` | The dashboard — interpreting what the engine reports |
+| `docker` | Landed — interpreting what the engine reports, and the health gate |
 | `config` | The setup wizard — the environment file and paths |
 | `doctor` | Diagnostics — the check trait and findings |
 | `seed` | Seeding — wiring, drift, and the first writes |

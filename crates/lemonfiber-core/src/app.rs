@@ -10,12 +10,19 @@
 //! path, so there is no parallel implementation to fall out of step.
 
 use std::sync::Arc;
+use std::time::Duration;
+
+use tokio::sync::mpsc::Receiver;
 
 use crate::config::store;
 use crate::config::Settings;
-use crate::error::{Diagnose, Problem};
-use crate::model::{ConfigReport, Envelope, LifecycleReport, SettingReport, VersionReport};
+use crate::docker::{condition, survey, unsettled, Service};
+use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::model::{
+    ConfigReport, Envelope, LifecycleReport, SettingReport, StatusReport, VersionReport,
+};
 use crate::platform::Environment;
+use crate::ports::docker::{Engine, LogLine, LogQuery};
 use crate::ports::{Clock, Runner};
 use crate::stack::closure::resolve;
 use crate::stack::compose::{build, Action};
@@ -66,6 +73,11 @@ pub enum Command {
     },
     /// Show every setting, with credentials withheld.
     ConfigShow,
+    /// Report what each service is actually doing.
+    Ps {
+        /// The forms to report on; empty reports on the whole stack.
+        forms: Vec<String>,
+    },
 }
 
 /// What dispatching produced.
@@ -77,6 +89,8 @@ pub enum Outcome {
     Lifecycle(LifecycleReport),
     /// The answer to a configuration command.
     Config(ConfigReport),
+    /// What each service is doing.
+    Status(StatusReport),
 }
 
 impl Outcome {
@@ -87,6 +101,7 @@ impl Outcome {
             Self::Version(_) => "version",
             Self::Lifecycle(_) => "lifecycle",
             Self::Config(_) => "config",
+            Self::Status(_) => "status",
         };
         Envelope::new(kind, self)
     }
@@ -98,6 +113,7 @@ impl serde::Serialize for Outcome {
             Self::Version(report) => report.serialize(serializer),
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
+            Self::Status(report) => report.serialize(serializer),
         }
     }
 }
@@ -108,8 +124,15 @@ pub struct Ctx {
     pub dry_run: bool,
     /// How programs are run.
     pub runner: Arc<dyn Runner>,
+    /// How the engine is observed.
+    pub engine: Arc<dyn Engine>,
     /// What time it is, for the one rule that depends on it.
     pub clock: Arc<dyn Clock>,
+    /// How long starting waits for services to settle before giving up.
+    ///
+    /// A knob rather than a constant because it is a policy: an operator on a
+    /// slow disk needs longer than the default, and a test needs none at all.
+    pub patience: Duration,
     /// Which stack is being operated.
     pub stack: Source,
     /// What the operator chose.
@@ -128,6 +151,7 @@ impl Ctx {
     #[must_use]
     pub fn new(
         runner: Arc<dyn Runner>,
+        engine: Arc<dyn Engine>,
         clock: Arc<dyn Clock>,
         stack: Source,
         settings: Settings,
@@ -136,11 +160,20 @@ impl Ctx {
         Self {
             dry_run: false,
             runner,
+            engine,
             clock,
+            patience: PATIENCE,
             stack,
             settings,
             environment,
         }
+    }
+
+    /// The same context, willing to wait a different length of time.
+    #[must_use]
+    pub const fn waiting(mut self, patience: Duration) -> Self {
+        self.patience = patience;
+        self
     }
 
     /// Today, as the manifest's date rules mean it.
@@ -176,6 +209,157 @@ const EPOCH: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
     day: 1,
 };
 
+/// How long starting waits for every service to settle.
+///
+/// Long enough for the slowest first run on a spinning disk, and bounded
+/// because a wait with no end is indistinguishable from a hang.
+const PATIENCE: Duration = Duration::from_secs(180);
+
+/// How often the engine is asked whether anything has changed.
+const POLL: Duration = Duration::from_millis(500);
+
+/// How many recent lines a service that would not start is asked for.
+const LAST_WORDS: u32 = 20;
+
+/// Raised when a service never reached a state that starting could accept.
+pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
+
+/// Wait until every service has settled, or until patience runs out.
+///
+/// Polls rather than subscribes to engine events, because the question is about
+/// the whole set rather than about any one container, and re-reading nineteen
+/// summaries twice a second costs less than the machinery for correlating an
+/// event stream back into the same answer.
+/// The manifest is handed in rather than read again. Whoever is waiting has
+/// already resolved and validated it to know what to start, and reading it a
+/// second time would add a way for this to fail that cannot happen — a failure
+/// no test can reach is a failure nobody has checked the wording of.
+async fn settle(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    profiles: &[String],
+) -> Result<Vec<Service>, Problem> {
+    let deadline = ctx.clock.now() + ctx.patience;
+
+    loop {
+        let containers = ctx
+            .engine
+            .list(&ctx.settings.project)
+            .await
+            .map_err(|err| err.problem())?;
+        let services = survey(manifest, profiles, &containers);
+
+        let waiting: Vec<String> = unsettled(&services)
+            .into_iter()
+            .map(|service| service.id.clone())
+            .collect();
+        if waiting.is_empty() {
+            return Ok(services);
+        }
+
+        // Checked after the survey rather than before it, so a patience of zero
+        // still reports what it saw rather than reporting nothing at all.
+        if ctx.clock.now() >= deadline {
+            return Err(never_settled(ctx, &waiting).await);
+        }
+
+        tokio::time::sleep(POLL).await;
+    }
+}
+
+/// What to tell an operator whose stack did not finish starting.
+///
+/// The services' own recent output is attached, because the explanation is
+/// almost always in it and an operator who has to go and find it has been given
+/// a fault report rather than a diagnosis.
+async fn never_settled(ctx: &Ctx, waiting: &[String]) -> Problem {
+    let named = waiting.join(", ");
+    let problem = Problem::new(
+        NEVER_SETTLED,
+        Severity::Error,
+        format!("{named} did not finish starting"),
+        "The containers were started and never reached a state that counts as running. \
+         Whatever went wrong is usually in their own output, which is below.",
+        Remedy::new("Look at what the service said, then start it again")
+            .with_detail("lemonfiber logs <service>"),
+    )
+    .in_state(State::Guided);
+
+    // An engine that will not open the stream falls back to one that is already
+    // finished, so the reading below has no second shape. There is nothing
+    // useful to say about a service whose output cannot be read that the
+    // problem does not already say.
+    let (closed, silent) = tokio::sync::mpsc::channel(1);
+    drop(closed);
+
+    let query = LogQuery::recent(LAST_WORDS);
+    let mut lines = ctx
+        .engine
+        .logs(&ctx.settings.project, waiting, query)
+        .await
+        .unwrap_or(silent);
+
+    let mut said = String::new();
+    while let Some(line) = lines.recv().await {
+        said.push_str(&line.service);
+        said.push_str(": ");
+        said.push_str(&line.line);
+        said.push('\n');
+    }
+
+    if said.is_empty() {
+        return problem;
+    }
+    problem.with_detail(said)
+}
+
+/// Stream a project's log lines, tagged by the service that wrote them.
+///
+/// Streaming has its own entry point rather than an [`Outcome`], because a log
+/// stream is not a value that arrives once. Forcing it into one would mean
+/// either buffering output that has no end or giving each surface its own way
+/// of reading it, and the second is the drift [`dispatch`] exists to prevent —
+/// so there is still exactly one implementation, and all three surfaces call it.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be
+/// resolved or the engine cannot be reached.
+pub async fn logs(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    query: LogQuery,
+) -> Result<Receiver<LogLine>, Problem> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem())?;
+
+    // Naming forms and naming services are two ways of saying the same thing,
+    // and both narrow: a form is the services its profiles declare.
+    let mut wanted: Vec<String> = services.to_vec();
+    if !forms.is_empty() {
+        let plan =
+            resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| err.problem())?;
+        let profiles: Vec<String> = plan.profiles.into_iter().collect();
+        wanted.extend(
+            manifest
+                .services
+                .iter()
+                .filter(|service| profiles.contains(&service.profile))
+                .filter(|service| services.is_empty() || services.contains(&service.id))
+                .map(|service| service.id.clone()),
+        );
+        wanted.retain(|id| manifest.services.iter().any(|service| &service.id == id));
+    }
+
+    ctx.engine
+        .logs(&ctx.settings.project, &wanted, query)
+        .await
+        .map_err(|err| err.problem())
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -196,7 +380,47 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             configuration(ctx, Some(&key), Some(&value)).map_err(|p| *p)
         }
         Command::ConfigShow => configuration(ctx, None, None).map_err(|p| *p),
+        Command::Ps { forms } => status(ctx, &forms).await.map(Outcome::Status),
     }
+}
+
+/// What every service in the named forms is doing.
+///
+/// Naming no form reports the whole stack, because "what is running" is a
+/// question about the machine rather than about a form — and an operator asking
+/// it has usually forgotten which form they started.
+async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, Problem> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem())?;
+
+    let profiles: Vec<String> = if forms.is_empty() {
+        manifest
+            .profiles
+            .iter()
+            .map(|profile| profile.id.clone())
+            .collect()
+    } else {
+        resolve(&manifest, forms, ctx.settings.protocols)
+            .map_err(|err| err.problem())?
+            .profiles
+            .into_iter()
+            .collect()
+    };
+
+    let containers = ctx
+        .engine
+        .list(&ctx.settings.project)
+        .await
+        .map_err(|err| err.problem())?;
+    let services = survey(&manifest, &profiles, &containers);
+
+    Ok(StatusReport {
+        forms: forms.to_vec(),
+        condition: condition(&services),
+        services,
+    })
 }
 
 /// Read or change settings.
@@ -269,6 +493,8 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outco
         command: command.clone(),
         rehearsed: ctx.dry_run,
         status: None,
+        services: Vec::new(),
+        condition: None,
     };
 
     // A rehearsal stops here deliberately: it has already done everything except
@@ -284,6 +510,16 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outco
         .await
         .map_err(|err| err.problem())?;
     report.status = output.status;
+
+    // Starting waits for the services to be usable, because "started" that
+    // means "a process exists" is a claim the operator will disprove by opening
+    // a browser. Nothing else waits: stopping is done when Compose says so.
+    if action == &Action::Up && output.succeeded() {
+        let settled = settle(ctx, &manifest, &report.profiles).await?;
+        report.condition = Some(condition(&settled));
+        report.services = settled;
+    }
+
     Ok(Outcome::Lifecycle(report))
 }
 
@@ -322,10 +558,166 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{dispatch, Command, Ctx, Environment, Outcome, Settings, Source, VersionReport};
+    use crate::docker::{Condition, State as ServiceState};
+    use crate::ports::docker::{
+        Engine, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
+    };
     use crate::ports::process::{Failure, Output, Runner};
+    use std::time::Duration;
+    use tokio::sync::mpsc::Receiver;
 
     /// A runner that answers with whatever the test scripted.
     struct Scripted(Result<Output, Failure>);
+
+    /// An engine that reports whatever the test put in it.
+    ///
+    /// A trait fake is the right tool here and the wrong one for the adapter:
+    /// the question above the port is what lemonfiber does with an answer, and
+    /// the question below it is whether the wire is spoken correctly.
+    #[derive(Default)]
+    struct Reporting {
+        containers: Vec<crate::ports::docker::Container>,
+        said: Vec<crate::ports::docker::LogLine>,
+        reachable: bool,
+        /// How many listings to answer before every container reports healthy.
+        ///
+        /// Absent means the engine never changes its mind. A stack that is
+        /// genuinely starting does not answer the same way twice, and an engine
+        /// that always did would make the waiting itself untestable.
+        settles_after: Option<usize>,
+        asked: std::sync::atomic::AtomicUsize,
+    }
+
+    impl Reporting {
+        /// An engine reporting the named services in one state.
+        fn holding(services: &[&str], lifecycle: Lifecycle, health: Health) -> Self {
+            Self {
+                containers: services
+                    .iter()
+                    .map(|service| crate::ports::docker::Container {
+                        id: format!("id-{service}"),
+                        project: "lemonfiber".to_owned(),
+                        service: (*service).to_owned(),
+                        lifecycle,
+                        health,
+                        exit: None,
+                    })
+                    .collect(),
+                said: Vec::new(),
+                reachable: true,
+                settles_after: None,
+                asked: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        /// The same engine, unsettled until it has been asked `listings` times.
+        fn settling_after(mut self, listings: usize) -> Self {
+            self.settles_after = Some(listings);
+            self
+        }
+
+        /// The same engine, with something to say about a service.
+        fn saying(mut self, service: &str, line: &str) -> Self {
+            self.said.push(crate::ports::docker::LogLine {
+                service: service.to_owned(),
+                stream: crate::ports::docker::Stream::Stderr,
+                at: None,
+                line: line.to_owned(),
+            });
+            self
+        }
+
+        /// An engine that is not there.
+        fn absent() -> Self {
+            Self {
+                containers: Vec::new(),
+                said: Vec::new(),
+                reachable: false,
+                settles_after: None,
+                asked: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl Engine for Reporting {
+        async fn list(
+            &self,
+            _project: &str,
+        ) -> Result<Vec<crate::ports::docker::Container>, EngineFailure> {
+            if !self.reachable {
+                return Err(EngineFailure::Unreachable {
+                    reason: "no daemon here".to_owned(),
+                });
+            }
+
+            let asked = self
+                .asked
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let settled = self.settles_after.is_some_and(|after| asked >= after);
+
+            Ok(self
+                .containers
+                .iter()
+                .map(|container| crate::ports::docker::Container {
+                    health: if settled {
+                        Health::Healthy
+                    } else {
+                        container.health
+                    },
+                    ..container.clone()
+                })
+                .collect())
+        }
+
+        async fn exec(
+            &self,
+            container: &str,
+            _argv: &[String],
+        ) -> Result<crate::ports::docker::ExecOutput, EngineFailure> {
+            Err(EngineFailure::NoSuchContainer {
+                name: container.to_owned(),
+            })
+        }
+
+        async fn stats(
+            &self,
+            _project: &str,
+        ) -> Result<Receiver<(String, crate::ports::docker::Stats)>, EngineFailure> {
+            let (_sender, receiver) = tokio::sync::mpsc::channel(1);
+            Ok(receiver)
+        }
+
+        async fn logs(
+            &self,
+            _project: &str,
+            services: &[String],
+            _query: LogQuery,
+        ) -> Result<Receiver<LogLine>, EngineFailure> {
+            // Opening a stream means finding the containers first, so an engine
+            // that cannot be reached refuses this as surely as it refuses a
+            // listing. A fake that answered anyway would be a fake that made
+            // the health gate's own failure path untestable.
+            if !self.reachable {
+                return Err(EngineFailure::Unreachable {
+                    reason: "no daemon here".to_owned(),
+                });
+            }
+
+            let wanted: Vec<LogLine> = self
+                .said
+                .iter()
+                .filter(|line| services.is_empty() || services.contains(&line.service))
+                .cloned()
+                .collect();
+
+            let (sender, receiver) = tokio::sync::mpsc::channel(wanted.len().max(1));
+            for line in wanted {
+                let _ = sender.send(line).await;
+            }
+            Ok(receiver)
+        }
+    }
 
     #[async_trait]
     impl Runner for Scripted {
@@ -354,6 +746,7 @@ mod tests {
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
         Ctx::new(
             Arc::new(Scripted(scripted)),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             stack(),
             Settings::default(),
@@ -444,6 +837,7 @@ mod tests {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("v2.32.1")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             nowhere,
             Settings::default(),
@@ -468,6 +862,7 @@ mod tests {
         };
         Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             stack(),
             settings,
@@ -479,7 +874,7 @@ mod tests {
     fn report(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::LifecycleReport> {
         match outcome {
             Ok(Outcome::Lifecycle(report)) => Some(report),
-            Ok(Outcome::Version(_) | Outcome::Config(_)) | Err(_) => None,
+            Ok(Outcome::Version(_) | Outcome::Config(_) | Outcome::Status(_)) | Err(_) => None,
         }
     }
 
@@ -535,6 +930,7 @@ mod tests {
         };
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             stack(),
             settings,
@@ -561,6 +957,7 @@ mod tests {
             Arc::new(Scripted(Err(Failure::NotFound {
                 program: "docker".to_owned(),
             }))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             stack(),
             settings,
@@ -610,6 +1007,7 @@ mod tests {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             nowhere,
             Settings::default(),
@@ -636,6 +1034,7 @@ mod tests {
         };
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             Source::Embedded(&EMBEDDED),
             settings,
@@ -659,6 +1058,7 @@ mod tests {
         )));
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             invalid,
             Settings::default(),
@@ -697,6 +1097,7 @@ mod tests {
         };
         Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             stack(),
             settings,
@@ -720,7 +1121,7 @@ mod tests {
                     .map(|setting| (setting.key, setting.value))
                     .collect(),
             ),
-            Ok(Outcome::Version(_) | Outcome::Lifecycle(_)) | Err(_) => None,
+            Ok(Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Status(_)) | Err(_) => None,
         }
     }
 
@@ -890,6 +1291,7 @@ mod tests {
     async fn settings_with_nowhere_to_live_say_setup_has_not_run() {
         let ctx = Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
             stack(),
             Settings::default(),
@@ -923,6 +1325,453 @@ mod tests {
                 json.contains(r#""rehearsed":true"#)
             )),
             Some(("lifecycle", true, true))
+        );
+    }
+
+    /// A real run against an engine reporting whatever the test put in it.
+    fn watching(engine: Reporting) -> Ctx {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(engine),
+            Arc::new(crate::adapters::System),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+    }
+
+    /// Everything the `library` form declares.
+    const LIBRARY: [&str; 4] = [
+        "jellyfin",
+        "seerr",
+        "calibre-web-automated",
+        "audiobookshelf",
+    ];
+
+    #[tokio::test]
+    async fn starting_waits_until_the_services_are_usable() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let ctx = watching(engine);
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced.map(|report| (
+                report.condition,
+                report.services.len(),
+                report
+                    .services
+                    .iter()
+                    .all(|service| service.state == ServiceState::Healthy)
+            )),
+            Some((Some(Condition::Active), LIBRARY.len(), true)),
+            "started means every service answered, not that a process exists"
+        );
+    }
+
+    #[tokio::test]
+    async fn starting_keeps_asking_until_the_services_are_ready() {
+        // Unsettled on the first two listings and healthy on the third, which
+        // is what a stack that is genuinely starting looks like. A gate that
+        // only ever read the engine once would pass this test by luck and fail
+        // every real start.
+        let engine =
+            Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting).settling_after(2);
+        let ctx = watching(engine);
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced.map(|report| report.condition),
+            Some(Some(Condition::Active)),
+            "waiting is the point: the answer changed while it waited"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_service_that_never_becomes_usable_stops_the_start_and_says_which() {
+        // A container that is running but still inside its start period is
+        // exactly the case a process check would have called success.
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting)
+            .saying("jellyfin", "Cannot open database, disk is full");
+        let ctx = watching(engine).waiting(Duration::ZERO);
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+
+        let refused = dispatch(command, &ctx).await.err();
+        assert_eq!(
+            refused.as_ref().map(|problem| problem.code),
+            Some(super::NEVER_SETTLED)
+        );
+        assert_eq!(
+            refused
+                .as_ref()
+                .map(|problem| problem.summary.contains("jellyfin")),
+            Some(true),
+            "the operator is told which service, not that something went wrong"
+        );
+        assert_eq!(
+            refused
+                .and_then(|problem| problem.detail)
+                .map(|detail| detail.contains("disk is full")),
+            Some(true),
+            "the explanation is already on screen rather than left to be found"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_service_that_will_not_start_and_says_nothing_still_reports_which() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting);
+        let ctx = watching(engine).waiting(Duration::ZERO);
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+
+        let refused = dispatch(command, &ctx).await.err();
+        assert_eq!(
+            refused.map(|problem| (problem.code, problem.detail)),
+            Some((super::NEVER_SETTLED, None)),
+            "silence is reported as silence rather than as an empty quotation"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_crash_loop_is_not_something_starting_waits_out() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Restarting, Health::None);
+        let ctx = watching(engine).waiting(Duration::from_secs(3600));
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+
+        // Patience of an hour, and this must still return at once: a loop has
+        // settled, and waiting for it is waiting forever.
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced.map(|report| report.condition),
+            Some(Some(Condition::Degraded))
+        );
+    }
+
+    #[tokio::test]
+    async fn stopping_does_not_wait_for_anything() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting);
+        let ctx = watching(engine).waiting(Duration::ZERO);
+        let command = Command::Down {
+            forms: vec!["library".to_owned()],
+        };
+
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced.map(|report| (report.condition, report.services.is_empty())),
+            Some((None, true)),
+            "stopping is finished when Compose says so"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_compose_invocation_that_failed_is_not_then_waited_on() {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(refused("no such image")))),
+            Arc::new(Reporting::holding(
+                &LIBRARY,
+                Lifecycle::Running,
+                Health::Starting,
+            )),
+            Arc::new(crate::adapters::System),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+        .waiting(Duration::ZERO);
+
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced.map(|report| (report.status, report.condition)),
+            Some((Some(1), None)),
+            "waiting for health after Compose refused would report the wrong fault"
+        );
+    }
+
+    #[tokio::test]
+    async fn starting_reports_an_engine_it_cannot_see() {
+        let ctx = watching(Reporting::absent());
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+        assert_eq!(
+            dispatch(command, &ctx).await.err().map(|p| p.code),
+            Some(crate::ports::docker::ENGINE_UNREACHABLE)
+        );
+    }
+
+    /// The status a survey produced, as pairs of service and state.
+    fn stated(outcome: Result<Outcome, super::Problem>) -> Option<Vec<(String, ServiceState)>> {
+        match outcome {
+            Ok(Outcome::Status(report)) => Some(
+                report
+                    .services
+                    .into_iter()
+                    .map(|service| (service.id, service.state))
+                    .collect(),
+            ),
+            Ok(Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_)) | Err(_) => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_non_status_outcome_has_no_services_to_report() {
+        let ctx = ctx(Ok(spoke("v2.32.1")));
+        assert_eq!(stated(dispatch(Command::Version, &ctx).await), None);
+    }
+
+    #[tokio::test]
+    async fn asking_what_is_running_names_every_service_a_form_declares() {
+        let engine = Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy);
+        let ctx = watching(engine);
+        let command = Command::Ps {
+            forms: vec!["library".to_owned()],
+        };
+
+        let seen = stated(dispatch(command, &ctx).await).unwrap_or_default();
+        assert_eq!(seen.len(), LIBRARY.len());
+        assert!(
+            seen.iter()
+                .any(|(id, state)| id == "jellyfin" && *state == ServiceState::Healthy),
+            "{seen:?}"
+        );
+        assert!(
+            seen.iter()
+                .any(|(id, state)| id == "seerr" && *state == ServiceState::Absent),
+            "a service that was never started is absent, not missing: {seen:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn asking_what_is_running_without_naming_a_form_covers_the_whole_stack() {
+        let ctx = watching(Reporting::holding(&[], Lifecycle::Running, Health::None));
+        let seen = stated(dispatch(Command::Ps { forms: Vec::new() }, &ctx).await);
+
+        assert_eq!(
+            seen.map(|services| services.len() > LIBRARY.len()),
+            Some(true),
+            "what is running is a question about the machine, not about a form"
+        );
+    }
+
+    #[tokio::test]
+    async fn asking_what_is_running_reports_an_engine_it_cannot_see() {
+        let ctx = watching(Reporting::absent());
+        let refusal = dispatch(Command::Ps { forms: Vec::new() }, &ctx)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(
+            refusal,
+            Some(crate::ports::docker::ENGINE_UNREACHABLE),
+            "an unreachable engine is not a stack with nothing in it"
+        );
+    }
+
+    #[tokio::test]
+    async fn asking_about_a_form_this_stack_does_not_have_is_refused() {
+        let ctx = watching(Reporting::default());
+        let command = Command::Ps {
+            forms: vec!["telly".to_owned()],
+        };
+        assert_eq!(
+            dispatch(command, &ctx).await.err().map(|p| p.code),
+            Some(crate::stack::closure::NO_SUCH_FORM)
+        );
+    }
+
+    #[tokio::test]
+    async fn asking_what_is_running_from_a_stack_that_cannot_be_read_is_refused() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            nowhere,
+            Settings::default(),
+            Environment::MacOs,
+        );
+        assert_eq!(
+            dispatch(Command::Ps { forms: Vec::new() }, &ctx)
+                .await
+                .err()
+                .map(|problem| problem.code),
+            Some(crate::stack::STACK_UNREADABLE),
+            "an operator's own --stack-dir mistake reaches them here too"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_status_serialises_under_its_own_kind() {
+        let engine = Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy);
+        let ctx = watching(engine);
+        let command = Command::Ps {
+            forms: vec!["library".to_owned()],
+        };
+
+        let rendered = dispatch(command, &ctx)
+            .await
+            .ok()
+            .map(Outcome::envelope)
+            .and_then(|envelope| envelope.to_json().map(|json| (envelope.kind, json)));
+
+        assert_eq!(
+            rendered.map(|(kind, json)| (
+                kind,
+                json.starts_with(r#"{"api_version":1,"kind":"status","data":{"forms":["library"]"#),
+                json.contains(r#""state":"healthy""#)
+            )),
+            Some(("status", true, true))
+        );
+    }
+
+    /// The services a log stream actually carried lines for.
+    async fn heard(ctx: &Ctx, forms: &[String], services: &[String]) -> Vec<String> {
+        let (closed, silent) = tokio::sync::mpsc::channel(1);
+        drop(closed);
+
+        let query = LogQuery::recent(10);
+        let mut lines = super::logs(ctx, forms, services, query)
+            .await
+            .unwrap_or(silent);
+
+        let mut seen = Vec::new();
+        while let Some(line) = lines.recv().await {
+            seen.push(line.service);
+        }
+        seen.sort();
+        seen.dedup();
+        seen
+    }
+
+    #[tokio::test]
+    async fn reading_logs_for_a_form_narrows_to_what_that_form_declares() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+            .saying("jellyfin", "started")
+            .saying("sonarr", "also started");
+        let ctx = watching(engine);
+
+        assert_eq!(
+            heard(&ctx, &["library".to_owned()], &[]).await,
+            vec!["jellyfin".to_owned()],
+            "a form's log view must not carry another form's output"
+        );
+    }
+
+    #[tokio::test]
+    async fn naming_a_service_narrows_further_still() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+            .saying("jellyfin", "started")
+            .saying("seerr", "also started");
+        let ctx = watching(engine);
+
+        assert_eq!(
+            heard(&ctx, &["library".to_owned()], &["seerr".to_owned()]).await,
+            vec!["seerr".to_owned()]
+        );
+    }
+
+    #[tokio::test]
+    async fn naming_no_form_reads_everything_that_is_saying_anything() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+            .saying("jellyfin", "started")
+            .saying("sonarr", "also started");
+        let ctx = watching(engine);
+
+        assert_eq!(
+            heard(&ctx, &[], &[]).await,
+            vec!["jellyfin".to_owned(), "sonarr".to_owned()]
+        );
+    }
+
+    #[tokio::test]
+    async fn reading_logs_reports_an_engine_it_cannot_see() {
+        let ctx = watching(Reporting::absent());
+        let query = LogQuery::recent(10);
+        let refusal = super::logs(&ctx, &[], &[], query)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(crate::ports::docker::ENGINE_UNREACHABLE));
+    }
+
+    #[tokio::test]
+    async fn reading_logs_for_a_form_this_stack_does_not_have_is_refused() {
+        let ctx = watching(Reporting::default());
+        let query = LogQuery::recent(10);
+        let refusal = super::logs(&ctx, &["telly".to_owned()], &[], query)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(crate::stack::closure::NO_SUCH_FORM));
+    }
+
+    #[tokio::test]
+    async fn reading_logs_from_a_stack_that_cannot_be_read_is_refused() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            nowhere,
+            Settings::default(),
+            Environment::MacOs,
+        );
+        let query = LogQuery::recent(10);
+        assert_eq!(
+            super::logs(&ctx, &[], &[], query)
+                .await
+                .err()
+                .map(|problem| problem.code),
+            Some(crate::stack::STACK_UNREADABLE)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_context_can_be_told_how_long_to_wait() {
+        let ctx = watching(Reporting::default()).waiting(Duration::from_secs(7));
+        assert_eq!(ctx.patience, Duration::from_secs(7));
+    }
+
+    #[tokio::test]
+    async fn the_engine_these_tests_use_answers_the_whole_port() {
+        // Worth asserting rather than assuming. A fake that answers a method
+        // more agreeably than a real engine would makes the path it shortcuts
+        // untestable, which is how the log stream's own failure case went
+        // missing until it was written down here.
+        let engine = Reporting::absent();
+
+        let ran = engine.exec("gluetun", &["true".to_owned()]).await;
+        assert!(
+            matches!(&ran, Err(EngineFailure::NoSuchContainer { name }) if name == "gluetun"),
+            "{ran:?}"
+        );
+
+        let sampled = engine.stats("lemonfiber").await;
+        assert_eq!(
+            sampled.ok().map(|mut samples| samples.try_recv().is_err()),
+            Some(true),
+            "nothing is sampled, and the stream says so by ending"
         );
     }
 

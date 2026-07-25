@@ -5,7 +5,7 @@
 //! lemonfiber silently declines to wire up, because a typo that degrades into
 //! "no API integration" is indistinguishable from meaning it.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{is_compatible, Error, SUPPORTED_SCHEMA_VERSIONS};
 
@@ -164,7 +164,11 @@ pub enum Bind {
 }
 
 /// How much a service's absence costs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+///
+/// Serialisable as well as readable, because it reaches an operator: a status
+/// report that says a service is down without saying whether that matters
+/// leaves them to guess, and the manifest already holds the answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Criticality {
     /// Its failure has consequences outside the machine.

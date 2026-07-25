@@ -96,6 +96,39 @@ fine where a test triggers the failure; where it cannot, prefer `if let Err`.
 `unwrap_or_else(|| …)` has the same shape — use `unwrap_or(…)` when the fallback
 is cheap.
 
+A fourth is not about assertions at all. **A block whose last statement is an
+`await` never has its closing brace marked executed.**
+
+```rust
+if let Some(mut lines) = opened {           // the `}` below is uncoverable
+    while let Some(line) = lines.recv().await { … }
+}
+
+let mut lines = opened.unwrap_or(closed);   // no wrapping block, no orphan brace
+while let Some(line) = lines.recv().await { … }
+```
+
+Build the fallback eagerly and drop the wrapper. An already-closed channel or an
+empty collection costs nothing and removes the shape entirely.
+
+## A file may only have one coverage mapping
+
+`#[cfg(test)] mod tests` inside a file that an **integration test also reaches**
+compiles that file twice: once with `cfg(test)` for the unit-test binary, once
+without for the integration-test binary. The two coverage mappings do not
+describe the same line set, and merging them reports missed lines that no
+annotated report can point at — `--summary-only` says two, `--text` shows none,
+and nothing you change moves the number.
+
+The symptom is unmistakable once seen: **the count is non-zero and the annotated
+report is empty.** When they disagree like that, do not go looking for the line.
+Look for a second binary reaching the same file.
+
+The fix is to pick one. Where the file is an adapter, the integration test is
+the right home anyway — driving it through its port tests behaviour rather than
+internals, and a test that reaches past the port cannot tell a wrong mapping
+from wrong behaviour. See [engine-api.md](engine-api.md).
+
 Neither is a style preference. Per-item coverage exclusion needs
 `#[coverage(off)]`, which is nightly-only, so an uncoverable line is a gate
 failure with no escape hatch.
