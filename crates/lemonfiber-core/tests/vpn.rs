@@ -150,7 +150,8 @@ fn stack() -> Manifest {
     Manifest::from_toml(STACK).unwrap_or_else(|_| empty())
 }
 
-/// A check against the carried stack, with both protocols and leak detection on.
+/// A check against the carried stack, with both protocols and leak detection on,
+/// and the disruptive checks left off.
 fn check(behaviors: Vec<Behavior>) -> VpnCheck {
     VpnCheck::new(
         Arc::new(Fake::new(behaviors)),
@@ -158,6 +159,7 @@ fn check(behaviors: Vec<Behavior>) -> VpnCheck {
         &stack(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        false,
     )
 }
 
@@ -180,6 +182,14 @@ fn problem<'a>(findings: &'a [Finding], check: &str) -> Option<&'a Problem> {
 fn pass_note(findings: &[Finding], check: &str) -> Option<String> {
     match verdict(findings, check) {
         Some(Verdict::Pass { note }) => note.clone(),
+        _ => None,
+    }
+}
+
+/// The reason carried by an unverified finding.
+fn unverified_reason(findings: &[Finding], check: &str) -> Option<String> {
+    match verdict(findings, check) {
+        Some(Verdict::Unverified { reason, .. }) => Some(reason.clone()),
         _ => None,
     }
 }
@@ -224,6 +234,26 @@ async fn a_matching_ipv6_address_is_also_verified() {
         verdict(&findings, "vpn.egress-match"),
         Some(Verdict::Pass { .. })
     ));
+}
+
+#[tokio::test]
+async fn opting_into_the_disruptive_check_says_it_is_not_yet_built() {
+    // The killswitch is unverified either way; with --disruptive it must not
+    // point back at the flag the operator already gave.
+    let subject = VpnCheck::new(
+        Arc::new(Fake::new(vec![
+            Behavior::up("gluetun", Some("185.65.1.1")),
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ])),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Protocols::both(),
+        Some("https://ifconfig.me".to_owned()),
+        true,
+    );
+    let findings = subject.run().await;
+    assert!(unverified_reason(&findings, "vpn.killswitch")
+        .is_some_and(|reason| reason.contains("not yet built")));
 }
 
 #[tokio::test]
@@ -386,6 +416,7 @@ async fn an_unreachable_engine_leaves_the_checks_unverified() {
         &stack(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        false,
     );
     let findings = subject.run().await;
     assert!(matches!(
@@ -415,6 +446,7 @@ async fn no_torrents_configured_does_not_apply() {
         &stack(),
         Protocols::none(),
         Some("https://ifconfig.me".to_owned()),
+        false,
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
@@ -430,6 +462,7 @@ async fn leak_detection_switched_off_does_not_apply() {
         &stack(),
         Protocols::both(),
         None,
+        false,
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
@@ -445,6 +478,7 @@ async fn a_stack_with_no_gateway_does_not_apply() {
         &empty(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        false,
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
@@ -469,6 +503,7 @@ async fn a_gateway_with_no_client_does_not_apply() {
         &lone_gateway,
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        false,
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),

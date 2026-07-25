@@ -17,9 +17,12 @@ use tokio::sync::mpsc::Receiver;
 use crate::config::store;
 use crate::config::Settings;
 use crate::docker::{condition, survey, unsettled, Service};
+use crate::doctor::vpn::VpnCheck;
+use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{
-    ConfigReport, Envelope, LifecycleReport, SettingReport, StatusReport, VersionReport,
+    ConfigReport, DoctorReport, Envelope, LifecycleReport, SettingReport, StatusReport,
+    VersionReport,
 };
 use crate::platform::Environment;
 use crate::ports::docker::{Engine, LogLine, LogQuery};
@@ -78,6 +81,13 @@ pub enum Command {
         /// The forms to report on; empty reports on the whole stack.
         forms: Vec<String>,
     },
+    /// Run the diagnostic checks, or one category of them.
+    Doctor {
+        /// The category to run; empty runs every check there is.
+        only: Option<Category>,
+        /// Whether the operator opted into the checks that disturb the system.
+        disruptive: bool,
+    },
 }
 
 /// What dispatching produced.
@@ -91,6 +101,8 @@ pub enum Outcome {
     Config(ConfigReport),
     /// What each service is doing.
     Status(StatusReport),
+    /// What the diagnostic checks found.
+    Doctor(DoctorReport),
 }
 
 impl Outcome {
@@ -102,6 +114,7 @@ impl Outcome {
             Self::Lifecycle(_) => "lifecycle",
             Self::Config(_) => "config",
             Self::Status(_) => "status",
+            Self::Doctor(_) => "doctor",
         };
         Envelope::new(kind, self)
     }
@@ -114,6 +127,7 @@ impl serde::Serialize for Outcome {
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
+            Self::Doctor(report) => report.serialize(serializer),
         }
     }
 }
@@ -381,7 +395,39 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         }
         Command::ConfigShow => configuration(ctx, None, None).map_err(|p| *p),
         Command::Ps { forms } => status(ctx, &forms).await.map(Outcome::Status),
+        Command::Doctor { only, disruptive } => {
+            diagnose(ctx, only, disruptive).await.map(Outcome::Doctor)
+        }
     }
+}
+
+/// Run the diagnostic checks, or the one category asked for.
+///
+/// The checks are assembled here rather than held on the context because each
+/// needs a slice of it — the VPN check needs the engine, the resolved pair and
+/// the operator's echo choice — and building them at the point of use keeps the
+/// context a bag of capabilities rather than a registry of features.
+async fn diagnose(
+    ctx: &Ctx,
+    only: Option<Category>,
+    disruptive: bool,
+) -> Result<DoctorReport, Problem> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem())?;
+
+    let vpn = VpnCheck::new(
+        ctx.engine.clone(),
+        ctx.settings.project.clone(),
+        &manifest,
+        ctx.settings.protocols,
+        ctx.settings.ip_echo.clone(),
+        disruptive,
+    );
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(vpn)];
+
+    Ok(examine(&checks, only).await)
 }
 
 /// What every service in the named forms is doing.
@@ -557,7 +603,9 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{dispatch, Command, Ctx, Environment, Outcome, Settings, Source, VersionReport};
+    use super::{
+        dispatch, Category, Command, Ctx, Environment, Outcome, Settings, Source, VersionReport,
+    };
     use crate::docker::{Condition, State as ServiceState};
     use crate::ports::docker::{
         Engine, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
@@ -874,8 +922,85 @@ mod tests {
     fn report(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::LifecycleReport> {
         match outcome {
             Ok(Outcome::Lifecycle(report)) => Some(report),
-            Ok(Outcome::Version(_) | Outcome::Config(_) | Outcome::Status(_)) | Err(_) => None,
+            Ok(
+                Outcome::Version(_) | Outcome::Config(_) | Outcome::Status(_) | Outcome::Doctor(_),
+            )
+            | Err(_) => None,
         }
+    }
+
+    fn diagnosis(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::DoctorReport> {
+        match outcome {
+            Ok(Outcome::Doctor(report)) => Some(report),
+            Ok(
+                Outcome::Version(_)
+                | Outcome::Lifecycle(_)
+                | Outcome::Config(_)
+                | Outcome::Status(_),
+            )
+            | Err(_) => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn doctor_runs_the_checks_and_reports_them_in_the_envelope() {
+        // The engine here does not host the torrent pair, so the findings are
+        // not green — but dispatch's job is only to run the checks and hand back
+        // what they found, named in the machine-readable envelope.
+        let ctx = watching(Reporting::holding(
+            &LIBRARY,
+            Lifecycle::Running,
+            Health::Healthy,
+        ));
+        let command = Command::Doctor {
+            only: Some(Category::Vpn),
+            disruptive: false,
+        };
+        let outcome = dispatch(command, &ctx).await;
+
+        let json = outcome
+            .as_ref()
+            .ok()
+            .and_then(|outcome| outcome.clone().envelope().to_json());
+        assert!(
+            json.as_deref()
+                .is_some_and(|json| json.contains(r#""kind":"doctor""#)
+                    && json.contains(r#""category":"vpn""#)),
+            "the doctor envelope should name itself and carry vpn findings: {json:?}"
+        );
+
+        let report = diagnosis(outcome);
+        assert!(report.is_some_and(|report| !report.findings.is_empty()
+            && report
+                .findings
+                .iter()
+                .all(|finding| finding.category == Category::Vpn)));
+    }
+
+    #[tokio::test]
+    async fn doctor_reports_an_unreadable_stack_rather_than_guessing() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("v2.32.1")))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            nowhere,
+            Settings::default(),
+            Environment::MacOs,
+        );
+        let outcome = dispatch(
+            Command::Doctor {
+                only: None,
+                disruptive: false,
+            },
+            &ctx,
+        )
+        .await;
+        assert_eq!(
+            outcome.as_ref().err().map(|problem| problem.code),
+            Some(crate::stack::STACK_UNREADABLE)
+        );
+        assert!(diagnosis(outcome).is_none());
     }
 
     #[tokio::test]
@@ -1121,7 +1246,13 @@ mod tests {
                     .map(|setting| (setting.key, setting.value))
                     .collect(),
             ),
-            Ok(Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Status(_)) | Err(_) => None,
+            Ok(
+                Outcome::Version(_)
+                | Outcome::Lifecycle(_)
+                | Outcome::Status(_)
+                | Outcome::Doctor(_),
+            )
+            | Err(_) => None,
         }
     }
 
@@ -1530,7 +1661,13 @@ mod tests {
                     .map(|service| (service.id, service.state))
                     .collect(),
             ),
-            Ok(Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_)) | Err(_) => None,
+            Ok(
+                Outcome::Version(_)
+                | Outcome::Lifecycle(_)
+                | Outcome::Config(_)
+                | Outcome::Doctor(_),
+            )
+            | Err(_) => None,
         }
     }
 

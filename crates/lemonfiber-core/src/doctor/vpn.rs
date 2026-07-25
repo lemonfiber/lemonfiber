@@ -100,6 +100,7 @@ pub struct VpnCheck {
     project: String,
     echo: Option<String>,
     target: Target,
+    disruptive: bool,
 }
 
 /// Whether the check applies, and against what.
@@ -117,6 +118,10 @@ impl VpnCheck {
     /// The pair is resolved once, up front: without torrents configured there is
     /// nothing to contain, and a stack that declares no VPN-contained client has
     /// nothing to compare.
+    ///
+    /// `disruptive` records that the operator opted into the checks that disturb
+    /// the running system — the killswitch test is one — so the killswitch
+    /// finding can speak to what that will and will not yet do.
     #[must_use]
     pub fn new(
         engine: Arc<dyn Engine>,
@@ -124,6 +129,7 @@ impl VpnCheck {
         manifest: &Manifest,
         protocols: Protocols,
         echo: Option<String>,
+        disruptive: bool,
     ) -> Self {
         let target = if protocols.torrent {
             resolve_pair(manifest).map_or_else(
@@ -138,6 +144,7 @@ impl VpnCheck {
             project,
             echo,
             target,
+            disruptive,
         }
     }
 
@@ -180,7 +187,13 @@ impl VpnCheck {
 }
 
 /// The findings for an active check, given both containers' answers.
-fn assemble(pair: &Pair, gateway: &Reach, client: &Reach, note: Option<String>) -> Vec<Finding> {
+fn assemble(
+    pair: &Pair,
+    gateway: &Reach,
+    client: &Reach,
+    note: Option<String>,
+    disruptive: bool,
+) -> Vec<Finding> {
     vec![
         finding(
             "vpn.tunnel",
@@ -192,7 +205,11 @@ fn assemble(pair: &Pair, gateway: &Reach, client: &Reach, note: Option<String>) 
             &format!("{} egress", pair.client),
             egress_verdict(gateway, client, pair),
         ),
-        finding("vpn.killswitch", "killswitch", killswitch_verdict()),
+        finding(
+            "vpn.killswitch",
+            "killswitch",
+            killswitch_verdict(disruptive),
+        ),
     ]
 }
 
@@ -214,7 +231,7 @@ impl Check for VpnCheck {
         // The engine being unreachable is a reason the check could not run,
         // never a report that the stack is safe.
         let Ok(containers) = self.engine.list(&self.project).await else {
-            return unreachable_engine(pair);
+            return unreachable_engine(pair, self.disruptive);
         };
         if containers.is_empty() {
             return vec![skipped("the stack is not running".to_owned())];
@@ -239,7 +256,7 @@ impl Check for VpnCheck {
             _ => None,
         };
 
-        assemble(pair, &gateway, &client, note)
+        assemble(pair, &gateway, &client, note, self.disruptive)
     }
 }
 
@@ -406,13 +423,25 @@ fn isolated(pair: &Pair) -> Problem {
     .in_state(crate::error::State::Guided)
 }
 
-/// The killswitch finding, always unverified until the disruptive test is run.
+/// The killswitch finding: unverified either way, because proving a killswitch
+/// works means breaking the tunnel and confirming traffic stops.
 ///
-/// The only way to prove a killswitch works is to break the tunnel and confirm
-/// traffic stops, which interrupts transfers, so it is opt-in — and an untested
-/// fail-closed guarantee reported as passing would be exactly the comfortable
-/// falsehood this feature exists to eliminate.
-fn killswitch_verdict() -> Verdict {
+/// An untested fail-closed guarantee reported as passing would be exactly the
+/// comfortable falsehood this feature exists to eliminate, so it is never a pass.
+/// Where the operator opted into the disruptive checks, it says plainly that the
+/// tunnel-drop test is not yet built rather than pointing back at the flag they
+/// already gave — a remedy that led in a circle would be worse than an honest gap.
+fn killswitch_verdict(disruptive: bool) -> Verdict {
+    if disruptive {
+        return Verdict::Unverified {
+            reason: "the disruptive killswitch test — dropping the tunnel to confirm \
+                     traffic stops — is not yet built"
+                .to_owned(),
+            remedy: Remedy::new(
+                "Until it lands, confirm the tunnel container's own killswitch is enabled",
+            ),
+        };
+    }
     Verdict::Unverified {
         reason: "the killswitch has not been tested; proving it works means dropping \
                  the tunnel and confirming traffic stops, which interrupts transfers"
@@ -424,7 +453,7 @@ fn killswitch_verdict() -> Verdict {
 
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.
-fn unreachable_engine(pair: &Pair) -> Vec<Finding> {
+fn unreachable_engine(pair: &Pair, disruptive: bool) -> Vec<Finding> {
     let reason = "the container engine could not be reached, so the containers \
                   could not be asked"
         .to_owned();
@@ -443,6 +472,10 @@ fn unreachable_engine(pair: &Pair) -> Vec<Finding> {
             &format!("{} egress", pair.client),
             Verdict::Unverified { reason, remedy },
         ),
-        finding("vpn.killswitch", "killswitch", killswitch_verdict()),
+        finding(
+            "vpn.killswitch",
+            "killswitch",
+            killswitch_verdict(disruptive),
+        ),
     ]
 }
