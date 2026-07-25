@@ -65,6 +65,23 @@ pub struct Profile {
     pub name: String,
     /// Shown in form previews.
     pub description: String,
+    /// The provider this profile cannot run without, where it needs one.
+    ///
+    /// Absent means it is never narrowed away. Declaring it here rather than
+    /// letting the tool recognise profile names by sight is what keeps a
+    /// renamed profile from silently losing its guard.
+    #[serde(default)]
+    pub protocol: Option<Protocol>,
+}
+
+/// A download provider a profile can depend on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Protocol {
+    /// Needs a Usenet provider.
+    Usenet,
+    /// Needs a VPN and a torrent client.
+    Torrent,
 }
 
 /// A named slice of the stack an operator can run.
@@ -246,7 +263,7 @@ fn yes() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{ApiKind, Bind, Criticality, HealthKind, KeySource, Manifest, Service};
+    use super::{ApiKind, Bind, Criticality, HealthKind, KeySource, Manifest, Protocol, Service};
     use crate::Error;
 
     const MINIMAL: &str = r#"
@@ -258,6 +275,7 @@ min_cli_version = "0.4.0"
 id = "torrent"
 name = "Torrents"
 description = "Torrent downloading, VPN-isolated"
+protocol = "torrent"
 
 [[form]]
 id = "dl"
@@ -353,6 +371,24 @@ depends_on = ["gluetun"]
             api,
             Some((ApiKind::Qbittorrent, KeySource::Generated, None))
         );
+    }
+
+    #[test]
+    fn a_profile_declares_the_provider_it_needs() {
+        let declared = parse(MINIMAL)
+            .and_then(|manifest| manifest.profiles.into_iter().next())
+            .map(|profile| profile.protocol);
+        assert_eq!(declared, Some(Some(Protocol::Torrent)));
+    }
+
+    #[test]
+    fn a_profile_that_needs_no_provider_declares_none() {
+        let text = MINIMAL.replace("protocol = \"torrent\"\n", "");
+        let declared = Manifest::from_toml(&text)
+            .ok()
+            .and_then(|manifest| manifest.profiles.into_iter().next())
+            .map(|profile| profile.protocol);
+        assert_eq!(declared, Some(None));
     }
 
     #[test]

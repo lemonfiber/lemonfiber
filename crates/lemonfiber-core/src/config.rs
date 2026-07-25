@@ -12,6 +12,7 @@
 
 use std::path::PathBuf;
 
+use lemonfiber_manifest::Protocol;
 use serde::Serialize;
 
 /// Which download protocols the operator actually has accounts for.
@@ -51,6 +52,15 @@ impl Protocols {
     pub const fn any(self) -> bool {
         self.usenet || self.torrent
     }
+
+    /// Whether the provider a profile declared is one the operator configured.
+    #[must_use]
+    pub const fn has(self, protocol: Protocol) -> bool {
+        match protocol {
+            Protocol::Usenet => self.usenet,
+            Protocol::Torrent => self.torrent,
+        }
+    }
 }
 
 /// The settings the compose driver reads.
@@ -80,7 +90,7 @@ impl Default for Settings {
 
 #[cfg(test)]
 mod tests {
-    use super::{Protocols, Settings};
+    use super::{Protocol, Protocols, Settings};
 
     #[test]
     fn a_fresh_install_has_no_way_to_download_yet() {
@@ -101,6 +111,18 @@ mod tests {
         assert!(usenet.any());
         assert!(torrent.any());
         assert!(Protocols::both().any());
+    }
+
+    #[test]
+    fn each_protocol_answers_for_itself() {
+        let usenet_only = Protocols {
+            usenet: true,
+            torrent: false,
+        };
+        assert!(usenet_only.has(Protocol::Usenet));
+        assert!(!usenet_only.has(Protocol::Torrent));
+        assert!(Protocols::both().has(Protocol::Torrent));
+        assert!(!Protocols::none().has(Protocol::Usenet));
     }
 
     #[test]
