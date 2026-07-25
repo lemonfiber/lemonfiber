@@ -1,0 +1,67 @@
+# One-click release for maintainers. Validates that the version is already on
+# main, tags it, and drafts the GitHub Release with the generated changelog —
+# the same draft a CLI `git tag && push` produces (release.yml), but from a
+# button. The draft is NOT published: a human still reviews it and clicks
+# Publish, which is what fires the #releases announcement (releasing.md step 3,
+# OPS-R1). Restricted to maintainers; every input is validated before any write.
+name: release-dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 0.1.0 — must already be set in Cargo.toml on main."
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate to maintainers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          perm=$(gh api "repos/${REPO}/collaborators/${ACTOR}/permission" --jq '.permission')
+          case "$perm" in
+            admin|maintain) echo "${ACTOR} is a maintainer (${perm})." ;;
+            *) echo "::error::${ACTOR} lacks maintainer permission (${perm}); release refused."; exit 1 ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Validate version against main
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "::error::version must be X.Y.Z, got '${VERSION}'."; exit 1; }
+          cargo_ver=$(grep -m1 -E '^version = ' Cargo.toml | sed -E 's/.*"(.*)".*/\1/')
+          [ "$cargo_ver" = "$VERSION" ] \
+            || { echo "::error::Cargo.toml is ${cargo_ver}, not ${VERSION} — merge the version bump first."; exit 1; }
+          if git rev-parse --verify --quiet "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::error::tag v${VERSION} already exists."; exit 1
+          fi
+      - name: Tag the release
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "lemonfiber v${VERSION}"
+          git push origin "v${VERSION}"
+      - name: Generate changelog (git-cliff)
+        id: cliff
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+      - name: Draft the release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: v${{ inputs.version }}
+          body: ${{ steps.cliff.outputs.content }}
+          draft: true
+          generate_release_notes: false

@@ -4,7 +4,7 @@
 name: discord-build
 on:
   workflow_run:
-    workflows: [ci, build, codeql, validate, tokens, sonar, scorecard, release, hygiene, integrity, security, dco, commitlint, labeler, spec-check, docs]
+    workflows: [ci, build, codeql, validate, tokens, sonar, scorecard, release, release-dispatch, hygiene, integrity, security, dco, commitlint, labeler, spec-check, docs]
     types: [completed]
 permissions:
   contents: read
