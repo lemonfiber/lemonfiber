@@ -303,6 +303,7 @@ dependencies = [
  "color-eyre",
  "include_dir",
  "lemonfiber-core",
+ "lemonfiber-manifest",
  "serde_json",
  "tokio",
 ]
@@ -313,6 +314,7 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "etcetera",
+ "include_dir",
  "lemonfiber-manifest",
  "serde",
  "serde_json",

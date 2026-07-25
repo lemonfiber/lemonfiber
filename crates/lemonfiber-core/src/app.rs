@@ -11,9 +11,10 @@
 
 use std::sync::Arc;
 
-use crate::error::Problem;
+use crate::error::{Diagnose, Problem};
 use crate::model::{Envelope, VersionReport};
 use crate::ports::Runner;
+use crate::stack::Source;
 
 /// What a surface is asking for.
 ///
@@ -58,15 +59,18 @@ pub struct Ctx {
     pub dry_run: bool,
     /// How programs are run.
     pub runner: Arc<dyn Runner>,
+    /// Which stack is being operated.
+    pub stack: Source,
 }
 
 impl Ctx {
-    /// A context that runs programs for real.
+    /// A context that runs programs for real, against a given stack.
     #[must_use]
-    pub fn new(runner: Arc<dyn Runner>) -> Self {
+    pub fn new(runner: Arc<dyn Runner>, stack: Source) -> Self {
         Self {
             dry_run: false,
             runner,
+            stack,
         }
     }
 
@@ -102,9 +106,15 @@ async fn version(ctx: &Ctx) -> Result<VersionReport, Problem> {
         Ok(_) | Err(_) => None,
     };
 
+    // The stack is the one thing here that can genuinely be wrong: an
+    // unreadable directory is the operator's own `--stack-dir`, and they need
+    // to hear about it rather than see a version report with a hole in it.
+    let stack = ctx.stack.manifest().map_err(|err| err.problem())?;
+
     Ok(VersionReport {
         binary: env!("CARGO_PKG_VERSION").to_owned(),
         supported_schema: lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS.to_vec(),
+        stack: stack.stack_version,
         compose,
     })
 }
@@ -115,7 +125,7 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{dispatch, Command, Ctx, Outcome, VersionReport};
+    use super::{dispatch, Command, Ctx, Outcome, Source, VersionReport};
     use crate::ports::process::{Failure, Output, Runner};
 
     /// A runner that answers with whatever the test scripted.
@@ -137,8 +147,16 @@ mod tests {
         }
     }
 
+    /// The stack this repository carries, read from disk.
+    fn stack() -> Source {
+        Source::External(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/media-stack"
+        )))
+    }
+
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
-        Ctx::new(Arc::new(Scripted(scripted)))
+        Ctx::new(Arc::new(Scripted(scripted)), stack())
     }
 
     fn spoke(stdout: &str) -> Output {
@@ -166,6 +184,7 @@ mod tests {
         Outcome::Version(VersionReport {
             binary: env!("CARGO_PKG_VERSION").to_owned(),
             supported_schema: vec![1],
+            stack: "0.1.0".to_owned(),
             compose: compose.map(str::to_owned),
         })
     }
@@ -213,8 +232,23 @@ mod tests {
             rendered.as_deref(),
             Some(concat!(
                 r#"{"api_version":1,"kind":"version","data":{"binary":"0.0.0","#,
-                r#""supported_schema":[1],"compose":"v2.32.1"}}"#
+                r#""supported_schema":[1],"stack":"0.1.0","compose":"v2.32.1"}}"#
             ))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_is_reported_rather_than_left_out() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let ctx = Ctx::new(Arc::new(Scripted(Ok(spoke("v2.32.1")))), nowhere);
+        let refusal = dispatch(Command::Version, &ctx)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(
+            refusal,
+            Some(crate::stack::STACK_UNREADABLE),
+            "an operator's own --stack-dir mistake reaches them"
         );
     }
 

@@ -1,0 +1,5 @@
+# A stack from a generation this build does not read. Used to prove the refusal
+# names the pairing rather than reporting a syntax error.
+schema_version  = 99
+stack_version   = "9.0.0"
+min_cli_version = "9.0.0"
