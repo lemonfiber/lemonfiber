@@ -13,8 +13,11 @@ use std::sync::Arc;
 
 use crate::config::Settings;
 use crate::error::{Diagnose, Problem};
-use crate::model::{Envelope, VersionReport};
+use crate::model::{Envelope, LifecycleReport, VersionReport};
+use crate::platform::Environment;
 use crate::ports::Runner;
+use crate::stack::closure::resolve;
+use crate::stack::compose::{build, Action};
 use crate::stack::Source;
 
 /// What a surface is asking for.
@@ -26,6 +29,28 @@ use crate::stack::Source;
 pub enum Command {
     /// Report the binary's version, and the engine's where it can be reached.
     Version,
+    /// Start one or more forms.
+    Up {
+        /// The forms to start, resolved to the union of their closures.
+        forms: Vec<String>,
+    },
+    /// Stop and remove what a form started.
+    Down {
+        /// The forms to stop.
+        forms: Vec<String>,
+    },
+    /// Restart services without touching the rest.
+    Restart {
+        /// The forms holding those services.
+        forms: Vec<String>,
+        /// The services to restart; empty restarts the whole form.
+        services: Vec<String>,
+    },
+    /// Fetch newer images without applying them.
+    Pull {
+        /// The forms whose images to fetch.
+        forms: Vec<String>,
+    },
 }
 
 /// What dispatching produced.
@@ -33,6 +58,8 @@ pub enum Command {
 pub enum Outcome {
     /// The answer to [`Command::Version`].
     Version(VersionReport),
+    /// What a lifecycle command did, or would have done.
+    Lifecycle(LifecycleReport),
 }
 
 impl Outcome {
@@ -41,6 +68,7 @@ impl Outcome {
     pub fn envelope(self) -> Envelope<Self> {
         let kind = match self {
             Self::Version(_) => "version",
+            Self::Lifecycle(_) => "lifecycle",
         };
         Envelope::new(kind, self)
     }
@@ -50,6 +78,7 @@ impl serde::Serialize for Outcome {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Version(report) => report.serialize(serializer),
+            Self::Lifecycle(report) => report.serialize(serializer),
         }
     }
 }
@@ -64,17 +93,30 @@ pub struct Ctx {
     pub stack: Source,
     /// What the operator chose.
     pub settings: Settings,
+    /// Which of the four environments this is.
+    ///
+    /// Supplied rather than decided here. Telling Docker Engine from Docker
+    /// Desktop means asking the daemon, and a core that guessed would be wrong
+    /// silently — so the surface answers, and today it answers with what it can
+    /// see until the engine adapter can tell it the rest.
+    pub environment: Environment,
 }
 
 impl Ctx {
     /// A context that runs programs for real, against a given stack.
     #[must_use]
-    pub fn new(runner: Arc<dyn Runner>, stack: Source, settings: Settings) -> Self {
+    pub fn new(
+        runner: Arc<dyn Runner>,
+        stack: Source,
+        settings: Settings,
+        environment: Environment,
+    ) -> Self {
         Self {
             dry_run: false,
             runner,
             stack,
             settings,
+            environment,
         }
     }
 
@@ -95,7 +137,53 @@ impl Ctx {
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
     match command {
         Command::Version => version(ctx).await.map(Outcome::Version),
+        Command::Up { forms } => lifecycle(ctx, &forms, &Action::Up).await,
+        Command::Down { forms } => lifecycle(ctx, &forms, &Action::Down).await,
+        Command::Restart { forms, services } => {
+            lifecycle(ctx, &forms, &Action::Restart(services)).await
+        }
+        Command::Pull { forms } => lifecycle(ctx, &forms, &Action::Pull).await,
     }
+}
+
+/// Resolve forms, build the command, and run it unless this is a rehearsal.
+///
+/// Nothing here decides anything a surface could have decided differently, which
+/// is the point: `up` from a keypress and `up` from a subcommand reach this same
+/// function with the same arguments.
+async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome, Problem> {
+    let manifest = ctx.stack.manifest().map_err(|err| err.problem())?;
+    let plan = resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| err.problem())?;
+    let stack = ctx
+        .stack
+        .materialise(ctx.settings.stack_dir.as_deref())
+        .map_err(|err| err.problem())?;
+
+    let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
+
+    let mut report = LifecycleReport {
+        action: action.name().to_owned(),
+        profiles: plan.profiles.into_iter().collect(),
+        dropped: plan.dropped.into_iter().collect(),
+        command: command.clone(),
+        rehearsed: ctx.dry_run,
+        status: None,
+    };
+
+    // A rehearsal stops here deliberately: it has already done everything except
+    // the one irreversible step, so what it reports is what would run rather
+    // than an approximation of it.
+    if ctx.dry_run {
+        return Ok(Outcome::Lifecycle(report));
+    }
+
+    let output = ctx
+        .runner
+        .run(&command)
+        .await
+        .map_err(|err| err.problem())?;
+    report.status = output.status;
+    Ok(Outcome::Lifecycle(report))
 }
 
 /// The binary's version, and the engine's where it answers.
@@ -129,7 +217,7 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{dispatch, Command, Ctx, Outcome, Settings, Source, VersionReport};
+    use super::{dispatch, Command, Ctx, Environment, Outcome, Settings, Source, VersionReport};
     use crate::ports::process::{Failure, Output, Runner};
 
     /// A runner that answers with whatever the test scripted.
@@ -160,7 +248,12 @@ mod tests {
     }
 
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
-        Ctx::new(Arc::new(Scripted(scripted)), stack(), Settings::default())
+        Ctx::new(
+            Arc::new(Scripted(scripted)),
+            stack(),
+            Settings::default(),
+            Environment::MacOs,
+        )
     }
 
     fn spoke(stdout: &str) -> Output {
@@ -231,7 +324,7 @@ mod tests {
         let rendered = dispatch(Command::Version, &ctx)
             .await
             .ok()
-            .and_then(|outcome| serde_json::to_string(&outcome.envelope()).ok());
+            .and_then(|outcome| outcome.envelope().to_json());
         assert_eq!(
             rendered.as_deref(),
             Some(concat!(
@@ -248,6 +341,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("v2.32.1")))),
             nowhere,
             Settings::default(),
+            Environment::MacOs,
         );
         let refusal = dispatch(Command::Version, &ctx)
             .await
@@ -257,6 +351,214 @@ mod tests {
             refusal,
             Some(crate::stack::STACK_UNREADABLE),
             "an operator's own --stack-dir mistake reaches them"
+        );
+    }
+
+    /// A context that runs against the checked-out stack, in rehearsal.
+    fn rehearsing(protocols: crate::config::Protocols) -> Ctx {
+        let settings = Settings {
+            protocols,
+            ..Settings::default()
+        };
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+        .rehearsing()
+    }
+
+    fn report(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::LifecycleReport> {
+        match outcome {
+            Ok(Outcome::Lifecycle(report)) => Some(report),
+            Ok(Outcome::Version(_)) | Err(_) => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn starting_a_form_reports_what_it_would_run_and_runs_nothing() {
+        let ctx = rehearsing(crate::config::Protocols::both());
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced.map(|report| (
+                report.action,
+                report.profiles,
+                report.rehearsed,
+                report.status,
+                report.command.last().cloned()
+            )),
+            Some((
+                "up".to_owned(),
+                vec!["media".to_owned()],
+                true,
+                None,
+                Some("--detach".to_owned())
+            )),
+            "a rehearsal reports the command and never ran it"
+        );
+    }
+
+    #[tokio::test]
+    async fn what_the_configuration_left_out_is_reported_rather_than_dropped() {
+        let ctx = rehearsing(crate::config::Protocols {
+            usenet: true,
+            torrent: false,
+        });
+        let command = Command::Up {
+            forms: vec!["tv".to_owned()],
+        };
+        let produced = report(dispatch(command, &ctx).await);
+
+        assert_eq!(
+            produced.map(|report| report.dropped),
+            Some(vec!["torrent".to_owned()]),
+            "the operator hears which service is missing, and why"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_real_run_reports_how_the_command_exited() {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            stack(),
+            settings,
+            Environment::MacOs,
+        );
+        let command = Command::Down {
+            forms: vec!["library".to_owned()],
+        };
+        let produced = report(dispatch(command, &ctx).await);
+
+        assert_eq!(
+            produced.map(|report| (report.action, report.rehearsed, report.status)),
+            Some(("down".to_owned(), false, Some(0)))
+        );
+    }
+
+    #[tokio::test]
+    async fn an_engine_that_will_not_start_is_reported_to_the_operator() {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Err(Failure::NotFound {
+                program: "docker".to_owned(),
+            }))),
+            stack(),
+            settings,
+            Environment::MacOs,
+        );
+        let command = Command::Pull {
+            forms: vec!["library".to_owned()],
+        };
+        let refusal = dispatch(command, &ctx)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(crate::ports::process::MISSING_PROGRAM));
+    }
+
+    #[tokio::test]
+    async fn restarting_names_the_services_and_nothing_else() {
+        let ctx = rehearsing(crate::config::Protocols::both());
+        let command = Command::Restart {
+            forms: vec!["library".to_owned()],
+            services: vec!["jellyfin".to_owned()],
+        };
+        let produced = report(dispatch(command, &ctx).await);
+
+        assert_eq!(
+            produced.map(|report| (report.action, report.command.last().cloned())),
+            Some(("restart".to_owned(), Some("jellyfin".to_owned())))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_form_this_stack_does_not_have_never_reaches_the_engine() {
+        let ctx = rehearsing(crate::config::Protocols::both());
+        let command = Command::Up {
+            forms: vec!["telly".to_owned()],
+        };
+        let outcome = dispatch(command, &ctx).await;
+        assert_eq!(
+            outcome.as_ref().err().map(|problem| problem.code),
+            Some(crate::stack::closure::NO_SUCH_FORM)
+        );
+        assert_eq!(report(outcome), None, "nothing ran, so there is no report");
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_stack_is_reported_before_anything_is_started() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            nowhere,
+            Settings::default(),
+            Environment::MacOs,
+        );
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+        assert_eq!(
+            dispatch(command, &ctx).await.err().map(|p| p.code),
+            Some(crate::stack::STACK_UNREADABLE)
+        );
+    }
+
+    #[tokio::test]
+    async fn an_embedded_stack_with_nowhere_to_go_stops_before_starting_anything() {
+        static EMBEDDED: include_dir::Dir<'_> =
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            stack_dir: None,
+            ..Settings::default()
+        };
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Source::Embedded(&EMBEDDED),
+            settings,
+            Environment::MacOs,
+        );
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+        assert_eq!(
+            dispatch(command, &ctx).await.err().map(|p| p.code),
+            Some(crate::stack::STACK_NOT_SET_UP),
+            "an operator who has not run setup is told to, not shown a path error"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_lifecycle_outcome_serialises_under_its_own_kind() {
+        let ctx = rehearsing(crate::config::Protocols::both());
+        let command = Command::Up {
+            forms: vec!["library".to_owned()],
+        };
+        let rendered = dispatch(command, &ctx)
+            .await
+            .ok()
+            .map(Outcome::envelope)
+            .and_then(|envelope| envelope.to_json().map(|json| (envelope.kind, json)));
+
+        assert_eq!(
+            rendered.map(|(kind, json)| (
+                kind,
+                json.starts_with(r#"{"api_version":1,"kind":"lifecycle","data":{"action":"up""#),
+                json.contains(r#""rehearsed":true"#)
+            )),
+            Some(("lifecycle", true, true))
         );
     }
 

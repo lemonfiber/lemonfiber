@@ -15,6 +15,7 @@ use lemonfiber_core::adapters::Local;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
 
@@ -50,6 +51,31 @@ struct Cli {
 enum Request {
     /// Report the versions in play.
     Version,
+    /// Start a form, or the union of several.
+    Up {
+        /// The forms to start.
+        #[arg(required = true)]
+        forms: Vec<String>,
+    },
+    /// Stop and remove what a form started.
+    Down {
+        /// The forms to stop.
+        #[arg(required = true)]
+        forms: Vec<String>,
+    },
+    /// Restart services without touching the rest.
+    Restart {
+        /// The form holding them.
+        form: String,
+        /// The services to restart; none restarts the whole form.
+        services: Vec<String>,
+    },
+    /// Fetch newer images without applying them.
+    Pull {
+        /// The forms whose images to fetch.
+        #[arg(required = true)]
+        forms: Vec<String>,
+    },
 }
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
@@ -77,13 +103,25 @@ async fn main() -> ExitCode {
         ..Settings::default()
     };
 
-    let mut ctx = Ctx::new(Arc::new(Local), stack, settings);
+    // Docker Engine and Docker Desktop are told apart by asking the daemon,
+    // which needs the engine adapter. Until then this is what can be seen from
+    // here, and nothing yet depends on the difference.
+    let environment = Environment::resolve(HOST_OS, false);
+
+    let mut ctx = Ctx::new(Arc::new(Local), stack, settings, environment);
     if cli.dry_run {
         ctx = ctx.rehearsing();
     }
 
     let command = match request {
         Request::Version => Command::Version,
+        Request::Up { forms } => Command::Up { forms },
+        Request::Down { forms } => Command::Down { forms },
+        Request::Restart { form, services } => Command::Restart {
+            forms: vec![form],
+            services,
+        },
+        Request::Pull { forms } => Command::Pull { forms },
     };
 
     match dispatch(command, &ctx).await {
@@ -120,9 +158,9 @@ fn environment_file() -> Option<PathBuf> {
 /// Render an outcome, for a person or for a script.
 fn render(outcome: &Outcome, json: bool) {
     if json {
-        match serde_json::to_string(&outcome.clone().envelope()) {
-            Ok(text) => println!("{text}"),
-            Err(err) => eprintln!("could not render output: {err}"),
+        match outcome.clone().envelope().to_json() {
+            Some(text) => println!("{text}"),
+            None => eprintln!("this outcome could not be rendered as JSON"),
         }
         return;
     }
@@ -135,6 +173,20 @@ fn render(outcome: &Outcome, json: bool) {
             match &report.compose {
                 Some(version) => println!("compose {version}"),
                 None => println!("compose not reachable"),
+            }
+        }
+        Outcome::Lifecycle(report) => {
+            if report.rehearsed {
+                println!("would run:\n  {}", report.command.join(" "));
+            }
+            println!("{}: {}", report.action, report.profiles.join(", "));
+            // Saying what was left out, and that it was deliberate, before the
+            // operator goes looking for a service that was never going to start.
+            if !report.dropped.is_empty() {
+                println!(
+                    "left out (no provider configured): {}",
+                    report.dropped.join(", ")
+                );
             }
         }
     }

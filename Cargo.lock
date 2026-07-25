@@ -305,7 +305,6 @@ dependencies = [
  "include_dir",
  "lemonfiber-core",
  "lemonfiber-manifest",
- "serde_json",
  "tokio",
 ]
 

@@ -69,6 +69,20 @@ output is the same value a person sees rather than a second rendering of it.
 tagging itself, because the envelope already carries `kind` and a serde tag would
 put the discriminant in twice.
 
+## Lifecycle: one function, four commands
+
+`up`, `down`, `restart` and `pull` all reach the same `lifecycle` function with a
+different `Action`. Resolve the manifest, resolve the forms, materialise the
+stack, build the command, run it — and a rehearsal returns *after* the build and
+before the run, so what it reports is the command that would run rather than an
+approximation of it.
+
+`ps` and `logs` are deliberately **not** here. They are reads, and reads go
+through the Engine API rather than through Compose — polling a subprocess once a
+second across nineteen services would be both wasteful and visibly jittery.
+`Action` therefore covers only `up`, `down`, `stop`, `restart`, `pull` and
+`config`, which is exactly the split the architecture draws.
+
 ## Errors come back as values
 
 `dispatch` returns `Result<Outcome, Problem>`, never a formatted string. The core
