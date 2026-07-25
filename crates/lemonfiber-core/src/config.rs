@@ -76,6 +76,11 @@ pub struct Settings {
     pub env_file: Option<PathBuf>,
     /// Compose files layered over the stack's own, such as a storage overlay.
     pub overlays: Vec<PathBuf>,
+    /// Where an embedded stack is written so Compose can read it.
+    ///
+    /// Absent until setup has chosen a location, which is why an operator who
+    /// has not run setup is told to rather than shown a path error.
+    pub stack_dir: Option<PathBuf>,
     /// Which download protocols are configured.
     pub protocols: Protocols,
 }
@@ -86,6 +91,7 @@ impl Default for Settings {
             project: crate::PRODUCT.to_owned(),
             env_file: None,
             overlays: Vec::new(),
+            stack_dir: None,
             protocols: Protocols::none(),
         }
     }
@@ -133,6 +139,7 @@ mod tests {
         let settings = Settings::default();
         assert_eq!(settings.project, "lemonfiber");
         assert_eq!(settings.env_file, None);
+        assert_eq!(settings.stack_dir, None);
         assert!(settings.overlays.is_empty());
     }
 }

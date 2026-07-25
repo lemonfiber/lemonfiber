@@ -71,6 +71,38 @@ impl Source {
         }
     }
 
+    /// Write the stack somewhere Compose can read it, and say where that is.
+    ///
+    /// Compose reads files. An embedded stack has to reach the filesystem before
+    /// it can be run, and it is written out on every invocation rather than
+    /// cached: the cost is a few kilobytes, and the alternative is a stale copy
+    /// surviving an upgrade, which is the failure mode embedding was chosen to
+    /// avoid in the first place.
+    ///
+    /// An external stack is already on disk and is left exactly as it is.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when there is nowhere to write to, or when writing
+    /// fails.
+    pub fn materialise(self, into: Option<&Path>) -> Result<PathBuf, Failure> {
+        match self {
+            Self::External(path) => Ok(path.to_path_buf()),
+            Self::Embedded(dir) => {
+                let Some(into) = into else {
+                    return Err(Failure::NowhereToWrite);
+                };
+                let unwritable = |err: std::io::Error| Failure::NotWritten {
+                    path: into.to_path_buf(),
+                    reason: err.to_string(),
+                };
+                std::fs::create_dir_all(into).map_err(unwritable)?;
+                dir.extract(into).map_err(unwritable)?;
+                Ok(into.to_path_buf())
+            }
+        }
+    }
+
     /// The parsed manifest.
     ///
     /// # Errors
@@ -105,6 +137,17 @@ pub enum Failure {
     /// The embedded stack is not intact, which the build should have prevented.
     #[error("this build has no embedded stack manifest")]
     NotEmbedded,
+    /// The embedded stack has to be written somewhere, and nowhere was named.
+    #[error("no directory was named to write the stack into")]
+    NowhereToWrite,
+    /// The stack could not be written where it was asked to go.
+    #[error("the stack could not be written to {path}: {reason}")]
+    NotWritten {
+        /// Where it was going, in full.
+        path: PathBuf,
+        /// The operating system's own words.
+        reason: String,
+    },
 }
 
 /// Raised when a stack directory holds no readable manifest.
@@ -115,6 +158,12 @@ pub const STACK_UNUSABLE: Code = Code::new("STACK-2");
 
 /// Raised when the embedded stack is not intact.
 pub const STACK_NOT_EMBEDDED: Code = Code::new("STACK-3");
+
+/// Raised when lemonfiber has nowhere to write the stack.
+pub const STACK_NOT_SET_UP: Code = Code::new("STACK-4");
+
+/// Raised when the stack could not be written to disk.
+pub const STACK_NOT_WRITTEN: Code = Code::new("STACK-5");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {
@@ -138,6 +187,25 @@ impl Diagnose for Failure {
                 "This stack was written for a different version of lemonfiber",
                 "Stacks and lemonfiber are versioned separately so each can move on its own. This pairing does not line up, and guessing at the difference would fail later in a way that looks unrelated.",
                 Remedy::new("Update lemonfiber, or point at a stack this version reads"),
+            )
+            .in_state(State::Guided)
+            .with_detail(reason.clone()),
+            Self::NowhereToWrite => Problem::new(
+                STACK_NOT_SET_UP,
+                Severity::Error,
+                "lemonfiber has not been set up on this machine yet",
+                "The stack ships inside lemonfiber and has to be written somewhere before Docker can read it, and no location has been chosen.",
+                Remedy::new("Run setup").with_detail("lemonfiber init"),
+            )
+            .or_try(Remedy::new("Or operate a stack directory of your own")
+                .with_detail("lemonfiber --stack-dir <path>"))
+            .in_state(State::Guided),
+            Self::NotWritten { path, reason } => Problem::new(
+                STACK_NOT_WRITTEN,
+                Severity::Error,
+                format!("The stack could not be written to {}", path.display()),
+                "Docker reads the stack from disk, so nothing can start until this succeeds. It is usually a permission problem or a full disk.",
+                Remedy::new("Check that the location is writable and has space"),
             )
             .in_state(State::Guided)
             .with_detail(reason.clone()),
@@ -235,6 +303,90 @@ mod tests {
         );
     }
 
+    /// A directory of our own under the system temporary directory.
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("lemonfiber-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
+    }
+
+    #[test]
+    fn an_embedded_stack_is_written_where_compose_can_read_it() {
+        let dir = scratch("materialise");
+        let written = Source::Embedded(&EMBEDDED).materialise(Some(&dir));
+
+        assert_eq!(written.ok().as_deref(), Some(dir.as_path()));
+        assert!(dir.join("stack.toml").is_file(), "the manifest is written");
+        assert!(
+            dir.join("compose.yml").is_file(),
+            "so are the compose files"
+        );
+        assert!(
+            dir.join("compose").join("tv.yml").is_file(),
+            "including the fragments, which the root file includes by path"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn writing_the_stack_twice_is_the_same_as_writing_it_once() {
+        let dir = scratch("materialise-twice");
+        let first = Source::Embedded(&EMBEDDED).materialise(Some(&dir)).is_ok();
+        let second = Source::Embedded(&EMBEDDED).materialise(Some(&dir)).is_ok();
+        assert!(first && second, "an existing directory is written over");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_external_stack_is_left_exactly_where_it_is() {
+        let path = Path::new("/opt/somebody/stack");
+        assert_eq!(
+            Source::External(path).materialise(None).ok().as_deref(),
+            Some(path),
+            "nothing is written, and no destination is needed"
+        );
+    }
+
+    #[test]
+    fn an_embedded_stack_with_nowhere_to_go_says_setup_has_not_run() {
+        let refusal = Source::Embedded(&EMBEDDED).materialise(None).err();
+        assert!(matches!(refusal, Some(Failure::NowhereToWrite)));
+
+        let problem = Failure::NowhereToWrite.problem();
+        assert_eq!(
+            problem.remedies.len(),
+            2,
+            "run setup, or bring your own stack"
+        );
+    }
+
+    #[test]
+    fn a_destination_that_cannot_be_written_names_it() {
+        // A file where a directory needs to be: the closest thing to a
+        // permission failure that behaves the same way on every platform.
+        let blocker = scratch("not-a-directory");
+        if let Some(parent) = blocker.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&blocker, "in the way");
+
+        let refusal = Source::Embedded(&EMBEDDED)
+            .materialise(Some(&blocker.join("stack")))
+            .err()
+            .map(|err| err.to_string());
+        assert_eq!(
+            refusal
+                .as_deref()
+                .map(|m| m.contains("could not be written")),
+            Some(true),
+            "got: {refusal:?}"
+        );
+
+        let _ = std::fs::remove_file(&blocker);
+    }
+
     #[test]
     fn a_missing_stack_offers_both_ways_out() {
         let problem = Failure::Unreadable {
@@ -281,6 +433,11 @@ mod tests {
                 reason: "schema 99".to_owned(),
             },
             Failure::NotEmbedded,
+            Failure::NowhereToWrite,
+            Failure::NotWritten {
+                path: "/tmp/x".into(),
+                reason: "denied".to_owned(),
+            },
         ];
         for failure in &failures {
             assert!(!failure.to_string().is_empty());

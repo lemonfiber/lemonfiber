@@ -24,6 +24,21 @@ pub struct Envelope<T> {
     pub data: T,
 }
 
+impl<T: Serialize> Envelope<T> {
+    /// Render this payload as the machine-readable contract.
+    ///
+    /// Rendering lives here rather than in a surface so there is one
+    /// implementation of the contract rather than one per surface, and so a
+    /// surface needs no JSON library to satisfy it.
+    ///
+    /// `None` only if a payload cannot serialise, which for these types cannot
+    /// happen — they are plain data with no maps keyed by anything unusual.
+    #[must_use]
+    pub fn to_json(&self) -> Option<String> {
+        serde_json::to_string(self).ok()
+    }
+}
+
 impl<T> Envelope<T> {
     /// Wrap a payload for machine-readable output.
     #[must_use]
@@ -49,14 +64,35 @@ pub struct VersionReport {
     pub compose: Option<String>,
 }
 
+/// What a lifecycle command did, or would have done.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LifecycleReport {
+    /// The Compose subcommand that was run.
+    pub action: String,
+    /// The profiles that were activated.
+    pub profiles: Vec<String>,
+    /// Profiles the forms asked for that the configuration does not support.
+    ///
+    /// Reported rather than dropped quietly: an operator seeing fewer services
+    /// than they expected needs to be told which, and why, before they go
+    /// looking for a fault that is not there.
+    pub dropped: Vec<String>,
+    /// The exact command, so what happened is never a matter of trust.
+    pub command: Vec<String>,
+    /// Whether this was a rehearsal.
+    pub rehearsed: bool,
+    /// The exit status, absent for a rehearsal or a signalled process.
+    pub status: Option<i32>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Envelope, VersionReport, API_VERSION};
 
     /// These are plain data, so serialising cannot fail; an empty string on the
     /// impossible branch keeps the helper free of a line no test can cover.
-    fn json(value: &impl serde::Serialize) -> String {
-        serde_json::to_string(value).unwrap_or_default()
+    fn json<T: serde::Serialize>(envelope: &Envelope<T>) -> String {
+        envelope.to_json().unwrap_or_default()
     }
 
     #[test]
@@ -95,6 +131,6 @@ mod tests {
             stack: "0.1.0".to_owned(),
             compose: None,
         };
-        assert!(json(&report).contains(r#""compose":null"#));
+        assert!(json(&Envelope::new("version", report)).contains(r#""compose":null"#));
     }
 }

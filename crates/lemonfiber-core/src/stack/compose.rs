@@ -17,48 +17,54 @@ use crate::platform::Environment;
 use super::closure::Plan;
 
 /// What to do with the profiles in a plan.
+///
+/// Every variant changes something. Reading what is running — state, stats,
+/// logs — goes through the Engine API instead, because observation is streamed
+/// and cheap there and spawning a process once a second to watch nineteen
+/// services would be both wasteful and visibly jittery.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     /// Start, detached.
     Up,
     /// Stop and remove.
     Down,
+    /// Stop without removing.
+    Stop,
     /// Restart named services, leaving the rest alone.
     Restart(Vec<String>),
-    /// Report what is running.
-    Ps,
-    /// Stream logs, optionally following and optionally for named services.
-    Logs {
-        /// Keep the stream open.
-        follow: bool,
-        /// Limit to these services; empty means all of them.
-        services: Vec<String>,
-    },
     /// Fetch newer images without applying them.
     Pull,
+    /// Resolve the project and print it, changing nothing.
+    Config,
 }
 
 impl Action {
+    /// What this action is called, for reporting it back.
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Up => "up",
+            Self::Down => "down",
+            Self::Stop => "stop",
+            Self::Restart(_) => "restart",
+            Self::Pull => "pull",
+            Self::Config => "config",
+        }
+    }
+
     /// The Compose subcommand and its own arguments.
-    fn argv(&self) -> Vec<String> {
+    pub(crate) fn argv(&self) -> Vec<String> {
         match self {
             Self::Up => vec!["up".to_owned(), "--detach".to_owned()],
             Self::Down => vec!["down".to_owned()],
+            Self::Stop => vec!["stop".to_owned()],
             Self::Restart(services) => {
                 let mut argv = vec!["restart".to_owned()];
                 argv.extend(services.iter().cloned());
                 argv
             }
-            Self::Ps => vec!["ps".to_owned()],
-            Self::Logs { follow, services } => {
-                let mut argv = vec!["logs".to_owned()];
-                if *follow {
-                    argv.push("--follow".to_owned());
-                }
-                argv.extend(services.iter().cloned());
-                argv
-            }
             Self::Pull => vec!["pull".to_owned()],
+            Self::Config => vec!["config".to_owned()],
         }
     }
 }
@@ -229,28 +235,37 @@ mod tests {
 
         assert_eq!(ending(&Action::Up).as_deref(), Some("up --detach"));
         assert_eq!(ending(&Action::Down).as_deref(), Some("down"));
-        assert_eq!(ending(&Action::Ps).as_deref(), Some("ps"));
+        assert_eq!(ending(&Action::Stop).as_deref(), Some("stop"));
         assert_eq!(ending(&Action::Pull).as_deref(), Some("pull"));
+        assert_eq!(ending(&Action::Config).as_deref(), Some("config"));
         assert_eq!(
             ending(&Action::Restart(vec!["sonarr".to_owned()])).as_deref(),
             Some("restart sonarr")
         );
         assert_eq!(
-            ending(&Action::Logs {
-                follow: true,
-                services: vec!["sonarr".to_owned()],
-            })
-            .as_deref(),
-            Some("logs --follow sonarr")
+            ending(&Action::Restart(Vec::new())).as_deref(),
+            Some("restart"),
+            "restarting nothing in particular restarts the form"
         );
-        assert_eq!(
-            ending(&Action::Logs {
-                follow: false,
-                services: Vec::new(),
-            })
-            .as_deref(),
-            Some("logs")
-        );
+    }
+
+    #[test]
+    fn every_action_reports_the_name_it_runs_under() {
+        for (action, name) in [
+            (Action::Up, "up"),
+            (Action::Down, "down"),
+            (Action::Stop, "stop"),
+            (Action::Restart(Vec::new()), "restart"),
+            (Action::Pull, "pull"),
+            (Action::Config, "config"),
+        ] {
+            assert_eq!(action.name(), name);
+            assert_eq!(
+                action.argv().first().map(String::as_str),
+                Some(name),
+                "the name and the subcommand must not drift apart"
+            );
+        }
     }
 
     #[test]
