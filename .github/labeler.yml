@@ -1,9 +1,27 @@
+# Area labels applied by the reusable auto-labeler (OPS-R12), by changed path.
+# The labels are the canonical set in the spec; this only maps paths to them.
+# adapters is a part of core, so a change there is labelled both.
+adapters:
+  - changed-files:
+      - any-glob-to-any-file: ['crates/lemonfiber-core/src/adapters/**']
+core:
+  - changed-files:
+      - any-glob-to-any-file: ['crates/lemonfiber-core/**']
+cli:
+  - changed-files:
+      - any-glob-to-any-file: ['crates/lemonfiber/**']
+manifest:
+  - changed-files:
+      - any-glob-to-any-file: ['crates/lemonfiber-manifest/**']
+stack:
+  - changed-files:
+      - any-glob-to-any-file: ['assets/media-stack/**']
 documentation:
   - changed-files:
       - any-glob-to-any-file: ['**/*.md', '.docs/**']
 ci:
   - changed-files:
-      - any-glob-to-any-file: ['.github/workflows/**']
+      - any-glob-to-any-file: ['.github/**', 'justfile', 'deny.toml']
 dependencies:
   - changed-files:
       - any-glob-to-any-file: ['**/Cargo.toml', '**/package.json', 'renovate.json']
