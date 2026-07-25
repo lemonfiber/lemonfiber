@@ -83,9 +83,44 @@ assert_eq!(thing().ok(), Some(expected));
 assert!(cond, "{path:?} is wrong");
 ```
 
+A third is subtler: a closure that only runs on failure.
+
+```rust
+std::fs::write(path, text).map_err(|err| Failure::NotWritten { .. })?;   // closure
+if let Err(err) = std::fs::write(path, text) { return Err(..) }          // no closure
+```
+
+A closure is a function of its own as far as coverage is concerned, and one that
+only runs when something fails is a symbol no passing test reaches. `map_err` is
+fine where a test triggers the failure; where it cannot, prefer `if let Err`.
+`unwrap_or_else(|| …)` has the same shape — use `unwrap_or(…)` when the fallback
+is cheap.
+
 Neither is a style preference. Per-item coverage exclusion needs
 `#[coverage(off)]`, which is nightly-only, so an uncoverable line is a gate
 failure with no escape hatch.
+
+## When the coverage report contradicts itself
+
+It will, and the cause is almost always **stale profile data**. `cargo llvm-cov
+clean --workspace` does not always clear it, and a report built from a mix of old
+and new profiles names symbols that no longer exist in the source.
+
+The symptom is a summary claiming N missed lines while `--text` shows a clean
+file, or mangled names for closures you just deleted. The fix:
+
+```sh
+cargo clean && cargo llvm-cov --workspace --ignore-filename-regex '(main\.rs)' --fail-under-lines 100
+```
+
+To ask the same profile more than one question without re-running the tests —
+which is what makes the answers disagree — run once and query it repeatedly:
+
+```sh
+cargo llvm-cov --no-report --workspace
+cargo llvm-cov report --summary-only
+cargo llvm-cov report --lcov --output-path /tmp/cov.info
+```
 
 ## `Code` is a newtype, not an enum
 

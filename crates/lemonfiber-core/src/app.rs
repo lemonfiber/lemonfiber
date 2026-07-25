@@ -11,9 +11,10 @@
 
 use std::sync::Arc;
 
+use crate::config::store;
 use crate::config::Settings;
 use crate::error::{Diagnose, Problem};
-use crate::model::{Envelope, LifecycleReport, VersionReport};
+use crate::model::{ConfigReport, Envelope, LifecycleReport, SettingReport, VersionReport};
 use crate::platform::Environment;
 use crate::ports::{Clock, Runner};
 use crate::stack::closure::resolve;
@@ -51,6 +52,20 @@ pub enum Command {
         /// The forms whose images to fetch.
         forms: Vec<String>,
     },
+    /// Read one setting.
+    ConfigGet {
+        /// The setting to read.
+        key: String,
+    },
+    /// Change one setting.
+    ConfigSet {
+        /// The setting to change.
+        key: String,
+        /// What to change it to.
+        value: String,
+    },
+    /// Show every setting, with credentials withheld.
+    ConfigShow,
 }
 
 /// What dispatching produced.
@@ -60,6 +75,8 @@ pub enum Outcome {
     Version(VersionReport),
     /// What a lifecycle command did, or would have done.
     Lifecycle(LifecycleReport),
+    /// The answer to a configuration command.
+    Config(ConfigReport),
 }
 
 impl Outcome {
@@ -69,6 +86,7 @@ impl Outcome {
         let kind = match self {
             Self::Version(_) => "version",
             Self::Lifecycle(_) => "lifecycle",
+            Self::Config(_) => "config",
         };
         Envelope::new(kind, self)
     }
@@ -79,6 +97,7 @@ impl serde::Serialize for Outcome {
         match self {
             Self::Version(report) => report.serialize(serializer),
             Self::Lifecycle(report) => report.serialize(serializer),
+            Self::Config(report) => report.serialize(serializer),
         }
     }
 }
@@ -172,7 +191,57 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             lifecycle(ctx, &forms, &Action::Restart(services)).await
         }
         Command::Pull { forms } => lifecycle(ctx, &forms, &Action::Pull).await,
+        Command::ConfigGet { key } => configuration(ctx, Some(&key), None).map_err(|p| *p),
+        Command::ConfigSet { key, value } => {
+            configuration(ctx, Some(&key), Some(&value)).map_err(|p| *p)
+        }
+        Command::ConfigShow => configuration(ctx, None, None).map_err(|p| *p),
     }
+}
+
+/// Read or change settings.
+///
+/// A rehearsal reads and reports what it would have written without writing it,
+/// so `--dry-run` means the same thing here as everywhere else.
+///
+/// The failure is boxed. This is the only fallible path here that is not async,
+/// so it is the only one where a large error variant sits in the returned value
+/// rather than inside a future — and a problem is a rare, cold thing that is
+/// cheaper to move behind a pointer.
+fn configuration(
+    ctx: &Ctx,
+    key: Option<&str>,
+    value: Option<&str>,
+) -> Result<Outcome, Box<Problem>> {
+    let Some(path) = ctx.settings.env_file.as_deref() else {
+        return Err(Box::new(store::Failure::Nowhere.problem()));
+    };
+
+    let changed = match (key, value) {
+        (Some(key), Some(value)) if !ctx.dry_run => {
+            if let Err(err) = store::set(path, key, value) {
+                return Err(Box::new(err.problem()));
+            }
+            true
+        }
+        (_, value) => value.is_some(),
+    };
+
+    let file = match store::read(path) {
+        Ok(file) => file,
+        Err(err) => return Err(Box::new(err.problem())),
+    };
+    let settings = store::shown(&file)
+        .into_iter()
+        .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
+        .map(|setting| SettingReport {
+            key: setting.key,
+            value: setting.value,
+            secret: setting.secret,
+        })
+        .collect();
+
+    Ok(Outcome::Config(ConfigReport { settings, changed }))
 }
 
 /// Resolve forms, build the command, and run it unless this is a rehearsal.
@@ -410,7 +479,7 @@ mod tests {
     fn report(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::LifecycleReport> {
         match outcome {
             Ok(Outcome::Lifecycle(report)) => Some(report),
-            Ok(Outcome::Version(_)) | Err(_) => None,
+            Ok(Outcome::Version(_) | Outcome::Config(_)) | Err(_) => None,
         }
     }
 
@@ -618,6 +687,221 @@ mod tests {
                 "missing {expected:?} in: {detail}"
             );
         }
+    }
+
+    /// A context whose settings live in a scratch file.
+    fn with_config(path: &std::path::Path) -> Ctx {
+        let settings = Settings {
+            env_file: Some(path.to_path_buf()),
+            ..Settings::default()
+        };
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(crate::adapters::System),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+    }
+
+    fn config_scratch(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-app-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir.join(".env")
+    }
+
+    fn settings_of(outcome: Result<Outcome, super::Problem>) -> Option<Vec<(String, String)>> {
+        match outcome {
+            Ok(Outcome::Config(report)) => Some(
+                report
+                    .settings
+                    .into_iter()
+                    .map(|setting| (setting.key, setting.value))
+                    .collect(),
+            ),
+            Ok(Outcome::Version(_) | Outcome::Lifecycle(_)) | Err(_) => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_setting_can_be_written_and_read_back() {
+        let path = config_scratch("round-trip");
+        let ctx = with_config(&path);
+
+        let written = dispatch(
+            Command::ConfigSet {
+                key: "LEMONFIBER_USENET".to_owned(),
+                value: "on".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+        assert_eq!(
+            settings_of(written),
+            Some(vec![("LEMONFIBER_USENET".to_owned(), "on".to_owned())])
+        );
+
+        let read = dispatch(
+            Command::ConfigGet {
+                key: "LEMONFIBER_USENET".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+        assert_eq!(
+            settings_of(read),
+            Some(vec![("LEMONFIBER_USENET".to_owned(), "on".to_owned())])
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn a_rehearsed_change_reports_itself_and_writes_nothing() {
+        let path = config_scratch("rehearsed");
+        let ctx = with_config(&path).rehearsing();
+
+        let outcome = dispatch(
+            Command::ConfigSet {
+                key: "LEMONFIBER_TORRENT".to_owned(),
+                value: "on".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+        assert!(matches!(outcome, Ok(Outcome::Config(_))));
+        assert!(!path.exists(), "a rehearsal writes nothing");
+    }
+
+    #[tokio::test]
+    async fn showing_settings_withholds_credentials() {
+        let path = config_scratch("secrets");
+        let ctx = with_config(&path);
+        for (key, value) in [("DATA_ROOT", "/media"), ("WIREGUARD_PRIVATE_KEY", "abc123")] {
+            let _ = dispatch(
+                Command::ConfigSet {
+                    key: key.to_owned(),
+                    value: value.to_owned(),
+                },
+                &ctx,
+            )
+            .await;
+        }
+
+        let shown = settings_of(dispatch(Command::ConfigShow, &ctx).await).unwrap_or_default();
+        assert_eq!(
+            shown,
+            vec![
+                ("DATA_ROOT".to_owned(), "/media".to_owned()),
+                (
+                    "WIREGUARD_PRIVATE_KEY".to_owned(),
+                    crate::config::store::REDACTED.to_owned()
+                ),
+            ]
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn a_configuration_answer_serialises_under_its_own_kind() {
+        let path = config_scratch("envelope");
+        let ctx = with_config(&path);
+        let _ = dispatch(
+            Command::ConfigSet {
+                key: "DATA_ROOT".to_owned(),
+                value: "/media".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        let rendered = dispatch(Command::ConfigShow, &ctx)
+            .await
+            .ok()
+            .map(Outcome::envelope)
+            .and_then(|envelope| envelope.to_json().map(|json| (envelope.kind, json)));
+
+        assert_eq!(
+            rendered.map(|(kind, json)| (
+                kind,
+                json.starts_with(r#"{"api_version":1,"kind":"config","data":{"settings":["#),
+                json.contains(r#""changed":false"#)
+            )),
+            Some(("config", true, true))
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn asking_a_non_configuration_outcome_for_settings_gets_none() {
+        let ctx = ctx(Ok(spoke("v2.32.1")));
+        assert_eq!(settings_of(dispatch(Command::Version, &ctx).await), None);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn settings_that_cannot_be_saved_reach_the_operator() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let dir = std::env::temp_dir().join(format!("lemonfiber-app-{}-ro", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500));
+
+        let ctx = with_config(&dir.join(".env"));
+        let refusal = dispatch(
+            Command::ConfigSet {
+                key: "A".to_owned(),
+                value: "1".to_owned(),
+            },
+            &ctx,
+        )
+        .await
+        .err()
+        .map(|problem| problem.code);
+        assert_eq!(refusal, Some(crate::config::store::CONFIG_NOT_WRITTEN));
+
+        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn settings_that_cannot_be_read_reach_the_operator() {
+        // A file where the directory holding settings should be.
+        let blocker =
+            std::env::temp_dir().join(format!("lemonfiber-app-{}-blocked", std::process::id()));
+        let _ = std::fs::remove_dir_all(&blocker);
+        let _ = std::fs::write(&blocker, "in the way");
+
+        let ctx = with_config(&blocker.join(".env"));
+        let refusal = dispatch(Command::ConfigShow, &ctx)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(crate::config::store::CONFIG_UNREADABLE));
+
+        let _ = std::fs::remove_file(&blocker);
+    }
+
+    #[tokio::test]
+    async fn settings_with_nowhere_to_live_say_setup_has_not_run() {
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(crate::adapters::System),
+            stack(),
+            Settings::default(),
+            Environment::MacOs,
+        );
+        assert_eq!(
+            dispatch(Command::ConfigShow, &ctx)
+                .await
+                .err()
+                .map(|p| p.code),
+            Some(crate::config::store::CONFIG_NOWHERE)
+        );
     }
 
     #[tokio::test]
