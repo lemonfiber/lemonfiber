@@ -8,6 +8,19 @@ rust-version = "1.82"
 repository = "https://github.com/lemonfiber/lemonfiber"
 authors = ["NightWorks.io"]
 
+# Versions are declared once here so the three crates cannot drift onto
+# different minors of the same dependency. See spec 30-repos/lemonfiber.md.
+[workspace.dependencies]
+async-trait = "0.1"
+clap = { version = "4", features = ["derive"] }
+color-eyre = "0.6"
+etcetera = "0.10"
+include_dir = "0.7"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "process", "rt", "sync", "time"] }
+toml = "0.9"
+
 # Strict, zero-suppression posture — see spec 40-quality/code-standards.md (Q-R11, Q-R12).
 [workspace.lints.rust]
 unsafe_code = "forbid"
