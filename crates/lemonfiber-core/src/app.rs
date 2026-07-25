@@ -17,6 +17,7 @@ use tokio::sync::mpsc::Receiver;
 use crate::config::store;
 use crate::config::Settings;
 use crate::docker::{condition, survey, unsettled, Service};
+use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
@@ -417,6 +418,7 @@ async fn diagnose(
         .checked_manifest(ctx.today())
         .map_err(|err| err.problem())?;
 
+    let environment = EnvironmentCheck::new(ctx.runner.clone());
     let vpn = VpnCheck::new(
         ctx.engine.clone(),
         ctx.settings.project.clone(),
@@ -425,7 +427,7 @@ async fn diagnose(
         ctx.settings.ip_echo.clone(),
         disruptive,
     );
-    let checks: Vec<Box<dyn Check>> = vec![Box::new(vpn)];
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(environment), Box::new(vpn)];
 
     Ok(examine(&checks, only).await)
 }
