@@ -1,0 +1,13 @@
+# Label PRs by the area of the codebase they touch, mapped in .github/labeler.yml
+# against the canonical area labels (OPS-R12). Reusable workflow lives in the spec.
+name: labeler
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  label:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: lemonfiber/spec/.github/workflows/labeler.yml@1a9cab6135aafe52b8426a8713284a0a4c0e6a77 # main
