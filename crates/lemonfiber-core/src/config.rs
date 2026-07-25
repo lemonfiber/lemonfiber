@@ -10,6 +10,9 @@
 //! shape the compose driver reads: enough to decide what runs, and nothing about
 //! how it is stored.
 
+pub mod env;
+pub mod paths;
+
 use std::path::PathBuf;
 
 use lemonfiber_manifest::Protocol;

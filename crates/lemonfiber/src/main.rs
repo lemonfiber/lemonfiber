@@ -13,6 +13,8 @@ use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::Local;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::config::Settings;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
 
@@ -70,7 +72,12 @@ async fn main() -> ExitCode {
         None => Source::Embedded(&STACK),
     };
 
-    let mut ctx = Ctx::new(Arc::new(Local), stack);
+    let settings = Settings {
+        env_file: environment_file(),
+        ..Settings::default()
+    };
+
+    let mut ctx = Ctx::new(Arc::new(Local), stack, settings);
     if cli.dry_run {
         ctx = ctx.rehearsing();
     }
@@ -93,6 +100,21 @@ async fn main() -> ExitCode {
             ExitCode::from(FAILURE)
         }
     }
+}
+
+/// The operator's environment file, when they have one.
+///
+/// Finding the platform's base directories is the surface's job: it means asking
+/// the operating system, and there is nothing about it a test could catch that
+/// running it would not. The layout beneath those bases is the core's, and is
+/// tested there.
+fn environment_file() -> Option<PathBuf> {
+    use etcetera::BaseStrategy as _;
+
+    let strategy = etcetera::choose_base_strategy().ok()?;
+    let paths = Paths::rooted(&strategy.config_dir(), &strategy.data_dir());
+    let env = paths.env_file();
+    env.is_file().then_some(env)
 }
 
 /// Render an outcome, for a person or for a script.
