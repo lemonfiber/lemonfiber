@@ -23,6 +23,9 @@ the logic and the rendering must stay separate.
 
 ## Where to start
 
+0. [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) — what is built vs. what
+   the roadmap still asks for, so you don't reconstruct it from source. Keep it
+   current in the same PR as your change.
 1. The three `30-repos/lemonfiber*.md` specs above.
 2. [`20-architecture/component-model.md`](https://github.com/lemonfiber/spec/blob/main/20-architecture/component-model.md) — the crate boundaries and async model.
 3. The feature you're implementing under `10-functional/features/`.
