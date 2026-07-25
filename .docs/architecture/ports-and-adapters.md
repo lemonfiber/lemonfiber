@@ -65,17 +65,32 @@ silent degradation the probe exists to catch.
 |---------|-------|
 | `adapters::process::Local` | Real. `tokio::process`, four tests. |
 | `adapters::time::System` | Real. |
-| `adapters::docker` | Not yet — arrives with the dashboard, on `bollard`. |
+| `adapters::docker::Daemon` | Real. `bollard`; see [engine-api.md](engine-api.md). |
 | `adapters::http` | Not yet — arrives with seeding, on `reqwest`. |
 
-The ports for both are defined, so the logic above them can be written and
+The port for the last one is defined, so the logic above it can be written and
 tested first. That ordering is the point of the seam: nothing waits on an
 adapter.
 
-The architecture test already reserves their filenames — `bollard` is permitted
-only in `adapters/docker.rs` and `reqwest` only in `adapters/http.rs`, before
-either file exists. A first attempt to reach the network from somewhere else
-fails the build rather than being noticed in review, or not.
+The architecture test reserves their filenames — `bollard` is permitted only in
+`adapters/docker.rs` and `reqwest` only in `adapters/http.rs`, the latter before
+the file exists. A first attempt to reach the network from somewhere else fails
+the build rather than being noticed in review, or not.
+
+It is coarse enough to catch the *name* rather than the use: a prose mention of
+`bollard` in a comment outside that file fails too. Reword the comment; do not
+widen the rule.
+
+## The adapter a trait fake cannot test
+
+`Daemon` is the exception to everything above. Faking `Engine` to test it would
+put the fake below the code under test and prove only that the fake works, so
+what gets replaced is the daemon rather than the trait — a socket speaking the
+Engine API, in `tests/engine.rs`. [engine-api.md](engine-api.md) covers it.
+
+The rule this suggests generally: fake the port when the question is what
+lemonfiber does with an answer, and fake the far side when the question is
+whether the protocol is spoken correctly.
 
 ## Writing a fake
 

@@ -10,6 +10,7 @@ are about Rust rather than about the product.
 | [module-layout.md](module-layout.md) | Where things live, and what the architecture test enforces |
 | [dispatch.md](dispatch.md) | The one entry point every surface goes through |
 | [ports-and-adapters.md](ports-and-adapters.md) | The seam to the outside world, and how to fake it |
+| [engine-api.md](engine-api.md) | What the container engine is asked, and testing it without a daemon |
 | [error-model.md](error-model.md) | Typed errors, one operator-facing value, and how the coverage gate proves it |
 | [embedded-stack.md](embedded-stack.md) | How the stack gets into the binary, and why a bad pairing cannot compile |
 | [form-closure.md](form-closure.md) | Forms to profiles to a Compose invocation, and the golden files |
