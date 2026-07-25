@@ -1,5 +1,5 @@
-# A PR that passes CI with no review, from a non-maintainer, is flagged for a
-# maintainer; the flag clears when a review lands. OPS-R26, OPS-R27.
+# The maintainer queue flag. Triggers are declared here because a reusable
+# cannot declare its caller's; the behaviour lives in the spec repo. OPS-R26, OPS-R27.
 name: awaiting-maintainer
 on:
   workflow_run:
@@ -7,53 +7,18 @@ on:
     types: [completed]
   pull_request_review:
     types: [submitted]
+  # Fork PRs carry a read-only token under `pull_request`, so the close event has
+  # to run in the base repo's context to be able to edit a label at all.
+  pull_request_target:
+    types: [closed]
 permissions:
   contents: read
+
 jobs:
-  toggle:
-    runs-on: ubuntu-latest
+  awaiting:
     permissions:
       contents: read
       pull-requests: write
-    outputs:
-      flagged: ${{ steps.act.outputs.flagged }}
-      pr: ${{ steps.act.outputs.pr }}
-    steps:
-      - name: Toggle label
-        id: act
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          EVENT: ${{ github.event_name }}
-          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          REVIEW_STATE: ${{ github.event.review.state }}
-          REVIEW_PR: ${{ github.event.pull_request.number }}
-        run: |
-          if [ "$EVENT" = "pull_request_review" ]; then
-            case "$REVIEW_STATE" in
-              approved|changes_requested)
-                gh pr edit "$REVIEW_PR" --remove-label awaiting-maintainer 2>/dev/null || true ;;
-            esac
-            exit 0
-          fi
-          [ "$CONCLUSION" = "success" ] || exit 0
-          pr=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number' 2>/dev/null || true)
-          [ -n "$pr" ] && [ "$pr" != "null" ] || exit 0
-          assoc=$(gh api "repos/$GH_REPO/pulls/$pr" --jq '.author_association' 2>/dev/null || echo "")
-          case "$assoc" in OWNER|MEMBER|COLLABORATOR) echo "maintainer-authored; skip"; exit 0 ;; esac
-          approved=$(gh api "repos/$GH_REPO/pulls/$pr/reviews" --jq '[.[] | select(.state=="APPROVED")] | length' 2>/dev/null || echo 0)
-          [ "${approved:-0}" -gt 0 ] && exit 0
-          gh pr edit "$pr" --add-label awaiting-maintainer 2>/dev/null || true
-          { echo "flagged=true"; echo "pr=$pr"; } >> "$GITHUB_OUTPUT"
-  notify:
-    needs: toggle
-    if: needs.toggle.outputs.flagged == 'true'
-    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@4eb85bd0ffafb9ed804bd78b23221a2bdb99db91 # main
-    with:
-      title: "🔔 Awaiting review · ${{ github.event.repository.name }} #${{ needs.toggle.outputs.pr }}"
-      body: "Passed CI with no review — a maintainer needs to take a look."
-      url: "https://github.com/${{ github.repository }}/pull/${{ needs.toggle.outputs.pr }}"
-      color: "14235678"
+    uses: lemonfiber/spec/.github/workflows/awaiting-maintainer.yml@e387fef347f4715a253d66ee00a6914763343d6b # main
     secrets:
-      webhook: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
+      DISCORD_MAINTAINERS_WEBHOOK: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
