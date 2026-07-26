@@ -18,6 +18,7 @@ use crate::config::store;
 use crate::config::Settings;
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::doctor::environment::EnvironmentCheck;
+use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
@@ -427,7 +428,8 @@ async fn diagnose(
         ctx.settings.ip_echo.clone(),
         disruptive,
     );
-    let checks: Vec<Box<dyn Check>> = vec![Box::new(environment), Box::new(vpn)];
+    let storage = StorageCheck::new(ctx.settings.data_root.clone(), ctx.environment);
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(environment), Box::new(vpn), Box::new(storage)];
 
     Ok(examine(&checks, only).await)
 }

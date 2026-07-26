@@ -15,6 +15,7 @@
 //! See `.docs/architecture/module-layout.md`.
 
 pub mod environment;
+pub mod storage;
 pub mod vpn;
 
 use std::time::Duration;

@@ -54,6 +54,15 @@ pub const DEFAULT_IP_ECHO: &str = "https://ifconfig.me";
 /// The setting naming the IP-echo service, or switching leak detection off.
 pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 
+/// The single data mount every service shares, beneath which downloads and media
+/// are subdirectories on one filesystem.
+///
+/// It is the stack's own variable rather than one under lemonfiber's prefix,
+/// because Compose expands it directly into every service's one bind mount. The
+/// storage probe tests exactly this location, since it is the volume imports
+/// hardlink onto.
+pub const DATA_ROOT_KEY: &str = "DATA_ROOT";
+
 /// Whether a recorded setting reads as switched on.
 ///
 /// Generous about spelling because this is a file people edit by hand, and a
@@ -95,6 +104,20 @@ pub fn ip_echo_from_env(file: &env::EnvFile) -> Option<String> {
         Some(value) if reads_as_off(value) => None,
         Some(value) => Some(value.trim().to_owned()),
     }
+}
+
+/// The data root the operator chose, where one has been recorded.
+///
+/// A blank value is treated as unset rather than as the current directory: an
+/// empty `DATA_ROOT=` in a half-finished file is an operator who has not chosen
+/// yet, and probing the working directory would test the wrong volume and report
+/// a capability the real data root may not have.
+#[must_use]
+pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
+    file.get(DATA_ROOT_KEY)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
 }
 
 impl Protocols {
@@ -165,6 +188,11 @@ pub struct Settings {
     /// On by default, because the failure it catches is the one whose
     /// consequences reach outside the machine.
     pub ip_echo: Option<String>,
+    /// The volume downloads and media share, which the storage probe tests.
+    ///
+    /// Absent until setup has chosen a location, which is why the storage check
+    /// reports itself skipped rather than probing the wrong directory.
+    pub data_root: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -176,13 +204,18 @@ impl Default for Settings {
             stack_dir: None,
             protocols: Protocols::none(),
             ip_echo: Some(DEFAULT_IP_ECHO.to_owned()),
+            data_root: None,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{env, ip_echo_from_env, Protocol, Protocols, Settings, DEFAULT_IP_ECHO};
+    use std::path::PathBuf;
+
+    use super::{
+        data_root_from_env, env, ip_echo_from_env, Protocol, Protocols, Settings, DEFAULT_IP_ECHO,
+    };
 
     #[test]
     fn a_fresh_install_has_no_way_to_download_yet() {
@@ -297,5 +330,26 @@ mod tests {
             ip_echo_from_env(&file).as_deref(),
             Some("https://ip.example")
         );
+    }
+
+    #[test]
+    fn a_recorded_data_root_is_the_location_to_probe() {
+        let file = env::EnvFile::parse("DATA_ROOT=/srv/media\n");
+        assert_eq!(data_root_from_env(&file), Some(PathBuf::from("/srv/media")));
+        assert_eq!(Settings::default().data_root, None);
+    }
+
+    #[test]
+    fn an_absent_or_blank_data_root_is_treated_as_unchosen() {
+        // A half-finished file with an empty value is an operator who has not
+        // chosen yet, not one who chose the working directory.
+        assert_eq!(data_root_from_env(&env::EnvFile::parse("")), None);
+        for blank in ["DATA_ROOT=\n", "DATA_ROOT=   \n"] {
+            assert_eq!(
+                data_root_from_env(&env::EnvFile::parse(blank)),
+                None,
+                "{blank:?}"
+            );
+        }
     }
 }

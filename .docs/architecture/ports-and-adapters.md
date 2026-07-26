@@ -59,6 +59,11 @@ link counts on the operator's *actual* volume. A faked filesystem would report
 that hard-linking works on a volume where it does not, which is precisely the
 silent degradation the probe exists to catch.
 
+That probe now exists in `doctor::storage`, and it holds the line differently: it
+touches the real disk and keeps every *judgement* in a pure reading of what the
+disk returned, so the coverage gate is satisfied without a port to fake. See
+[storage-probe.md](storage-probe.md).
+
 ## What is implemented, and what is not
 
 | Adapter | State |
