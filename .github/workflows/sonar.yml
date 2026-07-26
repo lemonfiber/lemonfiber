@@ -26,72 +26,14 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      # The free-plan quality gate cannot require zero issues (Q-R63), so the
-      # standard is enforced here instead: read the summary SonarCloud posts on
-      # the PR and fail on any new issue (Q-R64). The verdict is posted back as
-      # its own sticky comment, so the result is visible on the PR rather than
-      # buried in the run log. The Sonar comment body is fetched at runtime and
-      # only pattern-matched, never interpolated into the shell.
-      - name: Enforce zero new SonarCloud issues (Q-R64)
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
-          BOT: sonarqubecloud[bot]
-          MARKER: "<!-- lemonfiber:issue-gate -->"
-        run: |
-          set -euo pipefail
-
-          # Post the verdict as a comment, updating our own previous one in place
-          # so a re-run does not stack duplicates. The message is written to a
-          # file so its markdown reaches the API verbatim, without shell or YAML
-          # indentation leaking into it.
-          verdict() {
-            printf '%s\n\n%s\n' "$MARKER" "$1" > verdict.md
-            id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
-              --jq "[.[] | select(.body | contains(\"${MARKER}\"))] | last | .id // empty" || true)
-            if [ -n "$id" ]; then
-              gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -F body=@verdict.md >/dev/null
-            else
-              gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -F body=@verdict.md >/dev/null
-            fi
-          }
-
-          if [ -z "${SONAR_TOKEN:-}" ]; then
-            echo "No SONAR_TOKEN — the scan did not run (fork PR); nothing to gate on."
-            exit 0
-          fi
-
-          # SonarCloud edits one comment in place after its analysis finishes, so
-          # poll for it rather than assume it has arrived by the time the scan
-          # step returns.
-          body=""
-          for attempt in $(seq 1 30); do
-            body=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
-              --jq "[.[] | select(.user.login == \"${BOT}\")] | last | .body // empty" || true)
-            if [ -n "$body" ]; then break; fi
-            echo "Waiting for the SonarCloud summary… (${attempt}/30)"
-            sleep 10
-          done
-
-          if [ -z "$body" ]; then
-            verdict "### ⚠️ Issue gate — inconclusive · SonarCloud posted no summary within the timeout, so the new-issue count could not be read."
-            echo "::error::SonarCloud posted no summary within the timeout"
-            exit 1
-          fi
-
-          count=$(printf '%s' "$body" | grep -oE '\[[0-9]+ New issues\]' \
-            | grep -oE '[0-9]+' | head -1 || true)
-          if [ -z "$count" ]; then
-            verdict "### ⚠️ Issue gate — inconclusive · could not read the new-issue count from the SonarCloud summary."
-            echo "::error::Could not read the new-issue count from the SonarCloud summary"
-            exit 1
-          fi
-          if [ "$count" -ne 0 ]; then
-            verdict "### ❌ Issue gate failed · SonarCloud reports **${count} new issue(s)**; this repository requires zero (\`Q-R64\`)."
-            echo "::error::SonarCloud reports ${count} new issue(s); this repo requires zero"
-            exit 1
-          fi
-          verdict "### ✅ Issue gate passed · SonarCloud reports **0 new issues**."
-          echo "SonarCloud reports 0 new issues."
+  # The zero-new-issues standard (Q-R63/R64) is enforced by the shared reusable in
+  # spec, so all repos gate identically. It reads the scan's summary and fails on
+  # any new issue, posting a sticky verdict on the PR.
+  gate:
+    needs: sonar
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@48c475fb2a674f2460bfdfc0093d918291341530 # main
+    secrets:
+      sonar-token: ${{ secrets.SONAR_TOKEN }}
