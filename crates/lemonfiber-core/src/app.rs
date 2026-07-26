@@ -876,8 +876,9 @@ mod tests {
         assert_eq!(
             rendered.as_deref(),
             Some(concat!(
-                r#"{"api_version":1,"kind":"version","data":{"binary":"0.0.0","#,
-                r#""supported_schema":[1],"stack":"0.1.0","compose":"v2.32.1"}}"#
+                r#"{"api_version":1,"kind":"version","data":{"binary":""#,
+                env!("CARGO_PKG_VERSION"),
+                r#"","supported_schema":[1],"stack":"0.1.0","compose":"v2.32.1"}}"#
             ))
         );
     }

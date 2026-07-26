@@ -23,10 +23,11 @@
 
 ---
 
-> **Status: pre-implementation.** This is a scaffold. The specification is
-> complete; the code is not written yet. See the
-> [spec](https://github.com/lemonfiber/spec) and the
-> [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
+> **Status: early (`0.1.0`).** The core, compose driver, CLI, and the first
+> diagnostics (`doctor`, VPN leak test) are built; the setup wizard, seed, and
+> TUI are not yet, and release artifacts are source-only until M6. See
+> [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for built-vs-roadmap and
+> the [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
 > (this repo is milestones **M2–M6**).
 
 ## What it is
