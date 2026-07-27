@@ -15,13 +15,15 @@ crates/lemonfiber-core/src/
 ├── app.rs           the one entry point — Command in, Outcome out
 ├── model.rs         the values surfaces render, and serialise
 ├── error.rs         Problem, Severity, State, Remedy, Diagnose
-├── ports.rs         ├── docker.rs   trait Engine
-│                    ├── process.rs  trait Runner
-│                    ├── service.rs  trait Client
-│                    └── time.rs     trait Clock
-├── adapters.rs      ├── docker.rs   Daemon — the only bollard
-│                    ├── process.rs  Local — the only tokio::process
-│                    └── time.rs     System — the only SystemTime::now
+├── ports.rs         ├── docker.rs      trait Engine
+│                    ├── filesystem.rs  trait FileSystem
+│                    ├── process.rs     trait Runner
+│                    ├── service.rs     trait Client
+│                    └── time.rs        trait Clock
+├── adapters.rs      ├── docker.rs      Daemon — the only bollard
+│                    ├── filesystem.rs  Disk — the only sysinfo
+│                    ├── process.rs     Local — the only tokio::process
+│                    └── time.rs        System — the only SystemTime::now
 ├── platform.rs      the only cfg!(target_os)
 ├── stack.rs         ┐
 ├── docker.rs        │

@@ -11,6 +11,7 @@ This is what it is made of.
 | Port | Trait | Reaches |
 |------|-------|---------|
 | `ports::docker` | `Engine` | The Docker Engine API — state, stats, logs, exec |
+| `ports::filesystem` | `FileSystem` | The data root — resolving it, and proving it can hardlink |
 | `ports::process` | `Runner` | Spawned programs, which is how Compose is driven |
 | `ports::service` | `Client` | The services' own HTTP APIs, for seeding |
 | `ports::time` | `Clock` | The wall clock |
@@ -20,7 +21,7 @@ must never wait on it.
 
 ## `async_trait`, not native async fn
 
-All three I/O ports use `#[async_trait]`. Native `async fn` in traits is stable,
+All four I/O ports use `#[async_trait]`. Native `async fn` in traits is stable,
 but the resulting trait is not object-safe, and every one of these is held as
 `Arc<dyn …>`:
 
@@ -66,6 +67,7 @@ silent degradation the probe exists to catch.
 | `adapters::process::Local` | Real. `tokio::process`, four tests. |
 | `adapters::time::System` | Real. |
 | `adapters::docker::Daemon` | Real. `bollard`; see [engine-api.md](engine-api.md). |
+| `adapters::filesystem::Disk` | Real. Standard-library I/O; `sysinfo` for the filesystem type. |
 | `adapters::http` | Not yet — arrives with seeding, on `reqwest`. |
 
 The port for the last one is defined, so the logic above it can be written and

@@ -12,9 +12,11 @@
 //! `.docs/architecture/ports-and-adapters.md`.
 
 pub mod docker;
+pub mod filesystem;
 pub mod process;
 pub mod time;
 
 pub use docker::Daemon;
+pub use filesystem::Disk;
 pub use process::Local;
 pub use time::System;

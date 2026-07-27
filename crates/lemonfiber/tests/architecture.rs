@@ -93,11 +93,12 @@ fn the_core_has_no_user_interface_dependency() {
 /// to the network fails the build.
 #[test]
 fn talking_to_the_outside_world_only_happens_in_adapters() {
-    let confined: [(&str, &[&str]); 4] = [
+    let confined: [(&str, &[&str]); 5] = [
         ("tokio::process", &["adapters/process.rs"]),
         ("std::process::Command", &["adapters/process.rs"]),
         ("bollard", &["adapters/docker.rs"]),
         ("reqwest", &["adapters/http.rs"]),
+        ("sysinfo", &["adapters/filesystem.rs"]),
     ];
 
     for (crate_name, permitted) in confined {
