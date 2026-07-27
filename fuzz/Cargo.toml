@@ -1,0 +1,52 @@
+# Fuzz targets for the manifest crate.
+#
+# Deliberately its own workspace: the fuzz harness is built with a nightly
+# toolchain and a sanitizer, and it must not inherit the strict lint set the
+# main workspace forbids code under (`panic`, `unwrap_used`, `indexing_slicing`)
+# — a fuzz target's whole job is to reach those paths, not to avoid them.
+[package]
+name = "lemonfiber-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license-file = "../LICENSE"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.lemonfiber-manifest]
+path = "../crates/lemonfiber-manifest"
+
+# Fuzzing wants the optimiser on and debug assertions kept, so an overflow or a
+# failed invariant aborts loudly instead of wrapping quietly.
+[profile.release]
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+[[bin]]
+name = "manifest_from_toml"
+path = "fuzz_targets/manifest_from_toml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "manifest_validate"
+path = "fuzz_targets/manifest_validate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "date_parse"
+path = "fuzz_targets/date_parse.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

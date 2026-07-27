@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+# The fuzz harness is its own workspace: it builds on nightly with a sanitizer
+# and must not inherit the lints below, since reaching a panic is its purpose.
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.1.0"
