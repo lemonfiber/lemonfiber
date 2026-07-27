@@ -43,6 +43,7 @@ pub mod ports;
 pub mod prerequisites;
 pub mod seed;
 pub mod stack;
+pub mod wizard;
 
 /// The name of the product, as it appears to users.
 pub const PRODUCT: &str = "lemonfiber";

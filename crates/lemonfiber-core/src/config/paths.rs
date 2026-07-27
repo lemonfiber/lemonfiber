@@ -58,6 +58,13 @@ impl Paths {
         self.config.join("journal.jsonl")
     }
 
+    /// The setup wizard's saved progress, so quitting mid-setup resumes rather
+    /// than restarts. The one thing setup writes before the operator confirms.
+    #[must_use]
+    pub fn setup_progress(&self) -> PathBuf {
+        self.config.join("setup-progress.json")
+    }
+
     /// The materialised stack — compose files written where Compose can read
     /// them.
     #[must_use]
@@ -111,7 +118,7 @@ mod tests {
     #[test]
     fn configuration_and_regenerable_data_are_kept_apart() {
         let paths = paths();
-        let config: Vec<PathBuf> = vec![paths.env_file(), paths.journal()];
+        let config: Vec<PathBuf> = vec![paths.env_file(), paths.journal(), paths.setup_progress()];
         let data: Vec<PathBuf> = vec![
             paths.stack(),
             paths.service_config(),
@@ -142,6 +149,7 @@ mod tests {
         let all = [
             paths.env_file(),
             paths.journal(),
+            paths.setup_progress(),
             paths.stack(),
             paths.service_config(),
             paths.backups(),

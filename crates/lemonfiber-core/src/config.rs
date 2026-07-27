@@ -17,14 +17,14 @@ pub mod store;
 use std::path::PathBuf;
 
 use lemonfiber_manifest::Protocol;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Which download protocols the operator actually has accounts for.
 ///
 /// A form names both, because a form describes what it *does* rather than what
 /// this operator has paid for. Narrowing happens afterwards, so a tunnel is
 /// never started with credentials that were never supplied.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Protocols {
     /// A Usenet provider is configured.
     pub usenet: bool,
