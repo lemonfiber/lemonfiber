@@ -169,6 +169,27 @@ impl Client for Servarr {
     }
 }
 
+/// The API key a Servarr application wrote to its configuration, if it has
+/// written one yet.
+///
+/// Each application generates its key on first start and records it in a small,
+/// machine-generated XML file with the key in a single `<ApiKey>` element. It is
+/// read as text rather than parsed as a tree: the format is fixed and exactly one
+/// value is wanted, so a full XML dependency would be weight for nothing. An
+/// absent or empty element reads as "not generated yet" — a service still
+/// completing its first start, to be skipped and picked up on a later run — which
+/// is `None`, never a fault.
+#[must_use]
+pub fn api_key(config_xml: &str) -> Option<String> {
+    const OPEN: &str = "<ApiKey>";
+    const CLOSE: &str = "</ApiKey>";
+    let after_open = config_xml.find(OPEN)? + OPEN.len();
+    let rest = config_xml.get(after_open..)?;
+    let close = rest.find(CLOSE)?;
+    let key = rest.get(..close)?.trim();
+    (!key.is_empty()).then(|| key.to_owned())
+}
+
 /// A non-success response as the detail of a refusal: the service's own words
 /// where it gave any, its status code alone otherwise.
 fn describe(response: &Response) -> String {
