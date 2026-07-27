@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
-use lemonfiber_core::adapters::{Daemon, Local, System};
+use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, logs, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::{ip_echo_from_env, store, Protocols, Settings};
+use lemonfiber_core::config::{data_root_from_env, ip_echo_from_env, store, Protocols, Settings};
 use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::doctor::{Category, Overall, Verdict};
 use lemonfiber_core::error::Problem;
@@ -265,6 +265,7 @@ fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
     let settings = Settings {
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
+        data_root: data_root_from_env(&recorded),
         env_file,
         stack_dir: stack_directory(),
         ..Settings::default()
@@ -279,6 +280,7 @@ fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
+        Arc::new(Disk),
         stack,
         settings,
         environment,

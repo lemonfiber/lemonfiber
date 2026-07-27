@@ -18,6 +18,7 @@ use crate::config::store;
 use crate::config::Settings;
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::doctor::environment::EnvironmentCheck;
+use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
@@ -27,7 +28,7 @@ use crate::model::{
 };
 use crate::platform::Environment;
 use crate::ports::docker::{Engine, LogLine, LogQuery};
-use crate::ports::{Clock, Runner};
+use crate::ports::{Clock, FileSystem, Runner};
 use crate::stack::closure::resolve;
 use crate::stack::compose::{build, Action};
 use crate::stack::Source;
@@ -143,6 +144,8 @@ pub struct Ctx {
     pub engine: Arc<dyn Engine>,
     /// What time it is, for the one rule that depends on it.
     pub clock: Arc<dyn Clock>,
+    /// How the filesystem is reached, for the checks that prove what it can do.
+    pub filesystem: Arc<dyn FileSystem>,
     /// How long starting waits for services to settle before giving up.
     ///
     /// A knob rather than a constant because it is a policy: an operator on a
@@ -168,6 +171,7 @@ impl Ctx {
         runner: Arc<dyn Runner>,
         engine: Arc<dyn Engine>,
         clock: Arc<dyn Clock>,
+        filesystem: Arc<dyn FileSystem>,
         stack: Source,
         settings: Settings,
         environment: Environment,
@@ -177,6 +181,7 @@ impl Ctx {
             runner,
             engine,
             clock,
+            filesystem,
             patience: PATIENCE,
             stack,
             settings,
@@ -419,6 +424,7 @@ async fn diagnose(
         .map_err(|err| err.problem())?;
 
     let environment = EnvironmentCheck::new(ctx.runner.clone());
+    let storage = StorageCheck::new(ctx.filesystem.clone(), ctx.settings.data_root.clone());
     let vpn = VpnCheck::new(
         ctx.engine.clone(),
         ctx.settings.project.clone(),
@@ -427,7 +433,7 @@ async fn diagnose(
         ctx.settings.ip_echo.clone(),
         disruptive,
     );
-    let checks: Vec<Box<dyn Check>> = vec![Box::new(environment), Box::new(vpn)];
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(environment), Box::new(storage), Box::new(vpn)];
 
     Ok(examine(&checks, only).await)
 }
@@ -798,6 +804,7 @@ mod tests {
             Arc::new(Scripted(scripted)),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             Settings::default(),
             Environment::MacOs,
@@ -890,6 +897,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("v2.32.1")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             nowhere,
             Settings::default(),
             Environment::MacOs,
@@ -915,6 +923,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             settings,
             Environment::MacOs,
@@ -987,6 +996,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("v2.32.1")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             nowhere,
             Settings::default(),
             Environment::MacOs,
@@ -1060,6 +1070,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             settings,
             Environment::MacOs,
@@ -1087,6 +1098,7 @@ mod tests {
             }))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             settings,
             Environment::MacOs,
@@ -1137,6 +1149,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             nowhere,
             Settings::default(),
             Environment::MacOs,
@@ -1164,6 +1177,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             Source::Embedded(&EMBEDDED),
             settings,
             Environment::MacOs,
@@ -1188,6 +1202,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             invalid,
             Settings::default(),
             Environment::MacOs,
@@ -1227,6 +1242,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             settings,
             Environment::MacOs,
@@ -1427,6 +1443,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             Settings::default(),
             Environment::MacOs,
@@ -1472,6 +1489,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(engine),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             settings,
             Environment::MacOs,
@@ -1625,6 +1643,7 @@ mod tests {
                 Health::Starting,
             )),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             stack(),
             settings,
             Environment::MacOs,
@@ -1747,6 +1766,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             nowhere,
             Settings::default(),
             Environment::MacOs,
@@ -1873,6 +1893,7 @@ mod tests {
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::default()),
             Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
             nowhere,
             Settings::default(),
             Environment::MacOs,

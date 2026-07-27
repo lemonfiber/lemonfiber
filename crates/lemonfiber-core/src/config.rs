@@ -54,6 +54,13 @@ pub const DEFAULT_IP_ECHO: &str = "https://ifconfig.me";
 /// The setting naming the IP-echo service, or switching leak detection off.
 pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 
+/// The setting naming where downloads and the library are kept.
+///
+/// The one location the storage contract rests on: the compose driver mounts it
+/// and the storage checks probe it. It is the stack's own setting rather than
+/// one of lemonfiber's, so it carries no prefix.
+pub const DATA_ROOT_KEY: &str = "DATA_ROOT";
+
 /// Whether a recorded setting reads as switched on.
 ///
 /// Generous about spelling because this is a file people edit by hand, and a
@@ -95,6 +102,20 @@ pub fn ip_echo_from_env(file: &env::EnvFile) -> Option<String> {
         Some(value) if reads_as_off(value) => None,
         Some(value) => Some(value.trim().to_owned()),
     }
+}
+
+/// Where the operator chose to keep downloads and media, if they have chosen.
+///
+/// Absent until setup writes it, and an empty value is read as absent rather
+/// than as the current directory — a data root of nothing is a mistake, never an
+/// intent, and probing the working directory in its place would test the wrong
+/// filesystem.
+#[must_use]
+pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
+    file.get(DATA_ROOT_KEY)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
 }
 
 impl Protocols {
@@ -165,6 +186,11 @@ pub struct Settings {
     /// On by default, because the failure it catches is the one whose
     /// consequences reach outside the machine.
     pub ip_echo: Option<String>,
+    /// Where downloads and the library are kept, once setup has chosen it.
+    ///
+    /// Absent until then, which is why the storage checks tell an operator to
+    /// run setup rather than reporting a fault about a location they never picked.
+    pub data_root: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -176,6 +202,7 @@ impl Default for Settings {
             stack_dir: None,
             protocols: Protocols::none(),
             ip_echo: Some(DEFAULT_IP_ECHO.to_owned()),
+            data_root: None,
         }
     }
 }
@@ -297,5 +324,23 @@ mod tests {
             ip_echo_from_env(&file).as_deref(),
             Some("https://ip.example")
         );
+    }
+
+    #[test]
+    fn a_data_root_is_read_when_set_and_absent_when_blank() {
+        use std::path::PathBuf;
+
+        assert_eq!(
+            super::data_root_from_env(&env::EnvFile::parse("DATA_ROOT=/srv/media\n")),
+            Some(PathBuf::from("/srv/media"))
+        );
+        // A blank or unset value is not the current directory; it is no choice
+        // yet, and the storage check treats it as such.
+        assert_eq!(
+            super::data_root_from_env(&env::EnvFile::parse("DATA_ROOT=   \n")),
+            None
+        );
+        assert_eq!(super::data_root_from_env(&env::EnvFile::parse("")), None);
+        assert_eq!(Settings::default().data_root, None);
     }
 }
