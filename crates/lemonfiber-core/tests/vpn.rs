@@ -730,6 +730,40 @@ async fn port_forwarding_not_enabled_does_not_apply() {
 }
 
 #[tokio::test]
+async fn a_missing_gateway_leaves_the_forward_unverified() {
+    // The stack is up but the tunnel container is not among it, so there is no
+    // status file to read: the port is unknown, not absent.
+    let findings = check_with(
+        vec![Behavior::up("qbittorrent", Some("81.2.3.4"))],
+        forwarding("protonvpn"),
+    )
+    .run()
+    .await;
+    assert!(matches!(
+        verdict(&findings, "vpn.port-forward"),
+        Some(Verdict::Unverified { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_gateway_that_cannot_be_read_leaves_the_forward_unverified() {
+    // The tunnel container is up, but the command to read its status file could
+    // not be run at all — unknown, so unverified rather than a port not granted.
+    let mut gluetun = gateway_with_port("51413");
+    gluetun.exec_fails = true;
+    let findings = check_with(
+        vec![gluetun, Behavior::up("qbittorrent", None)],
+        forwarding("protonvpn"),
+    )
+    .run()
+    .await;
+    assert!(matches!(
+        verdict(&findings, "vpn.port-forward"),
+        Some(Verdict::Unverified { .. })
+    ));
+}
+
+#[tokio::test]
 async fn a_down_gateway_leaves_the_forward_unverified() {
     // The port lives in the tunnel container; with it down the port is unknown,
     // not absent, so the honest answer is unverified rather than a failure.
