@@ -428,6 +428,8 @@ async fn diagnose(
         ctx.filesystem.clone(),
         ctx.settings.data_root.clone(),
         ctx.settings.storage_state.clone(),
+        ctx.environment,
+        ctx.settings.service_user,
     );
     let vpn = VpnCheck::new(
         ctx.engine.clone(),
