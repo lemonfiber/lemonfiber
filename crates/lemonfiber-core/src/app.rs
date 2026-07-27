@@ -439,6 +439,7 @@ async fn diagnose(
         &manifest,
         ctx.settings.protocols,
         ctx.settings.ip_echo.clone(),
+        ctx.settings.port_forward.clone(),
         disruptive,
     );
     let checks: Vec<Box<dyn Check>> = vec![Box::new(environment), Box::new(storage), Box::new(vpn)];

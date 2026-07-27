@@ -9,8 +9,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::config::Protocols;
-use lemonfiber_core::doctor::vpn::{VpnCheck, CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
+use lemonfiber_core::config::{PortForward, Protocols};
+use lemonfiber_core::doctor::vpn::{
+    VpnCheck, CLIENT_ISOLATED, LEAKING, NO_FORWARDED_PORT, VPN_CONTAINER_DOWN,
+};
 use lemonfiber_core::doctor::{Category, Check, Finding, Verdict};
 use lemonfiber_core::error::{Problem, Severity};
 use lemonfiber_core::ports::docker::{
@@ -29,6 +31,8 @@ struct Behavior {
     running: bool,
     address: Option<&'static str>,
     country: Option<&'static str>,
+    /// What the container's forwarded-port status file reads, where it has one.
+    forwarded_port: Option<&'static str>,
     exec_fails: bool,
 }
 
@@ -39,6 +43,7 @@ impl Behavior {
             running: true,
             address,
             country: None,
+            forwarded_port: None,
             exec_fails: false,
         }
     }
@@ -98,6 +103,21 @@ impl Engine for Fake {
                 name: container.to_owned(),
             });
         }
+        // The forwarded-port read: `cat` of the status file. A container with a
+        // port answers it; one without makes `cat` exit non-zero with no output,
+        // exactly as a missing file does.
+        if argv.first().is_some_and(|arg| arg == "cat") {
+            return Ok(match behavior.forwarded_port {
+                Some(port) => ExecOutput {
+                    status: Some(0),
+                    stdout: format!("{port}\n"),
+                },
+                None => ExecOutput {
+                    status: Some(1),
+                    stdout: String::new(),
+                },
+            });
+        }
         let wants_country = argv.last().is_some_and(|arg| arg.ends_with("/country-iso"));
         if wants_country {
             return Ok(ExecOutput {
@@ -151,16 +171,31 @@ fn stack() -> Manifest {
 }
 
 /// A check against the carried stack, with both protocols and leak detection on,
-/// and the disruptive checks left off.
+/// port forwarding not configured, and the disruptive checks left off.
 fn check(behaviors: Vec<Behavior>) -> VpnCheck {
+    check_with(behaviors, PortForward::default())
+}
+
+/// A check as above, but with a chosen port-forward configuration, for the cases
+/// that exercise the forwarded-port finding.
+fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnCheck {
     VpnCheck::new(
         Arc::new(Fake::new(behaviors)),
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        port_forward,
         false,
     )
+}
+
+/// A port-forward configuration: enabled, for the named provider.
+fn forwarding(provider: &str) -> PortForward {
+    PortForward {
+        enabled: true,
+        provider: Some(provider.to_owned()),
+    }
 }
 
 fn verdict<'a>(findings: &'a [Finding], check: &str) -> Option<&'a Verdict> {
@@ -249,6 +284,7 @@ async fn opting_into_the_disruptive_check_says_it_is_not_yet_built() {
         &stack(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        PortForward::default(),
         true,
     );
     let findings = subject.run().await;
@@ -433,6 +469,7 @@ async fn an_unreachable_engine_leaves_the_checks_unverified() {
         &stack(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        PortForward::default(),
         false,
     );
     let findings = subject.run().await;
@@ -463,6 +500,7 @@ async fn no_torrents_configured_does_not_apply() {
         &stack(),
         Protocols::none(),
         Some("https://ifconfig.me".to_owned()),
+        PortForward::default(),
         false,
     );
     assert!(matches!(
@@ -473,18 +511,52 @@ async fn no_torrents_configured_does_not_apply() {
 
 #[tokio::test]
 async fn leak_detection_switched_off_does_not_apply() {
+    // A running stack, so this exercises the echo-off branch itself rather than
+    // the stack-not-running one: with leak detection off the egress comparison is
+    // skipped rather than run.
     let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![])),
+        Arc::new(Fake::new(vec![
+            Behavior::up("gluetun", Some("185.65.1.1")),
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ])),
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
         None,
+        PortForward::default(),
         false,
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })
     ));
+}
+
+#[tokio::test]
+async fn leak_detection_off_holds_even_when_the_engine_is_down() {
+    // The opt-out is the operator's, and it stands whether or not the engine can
+    // be reached: egress stays skipped, never an engine-unreachable unverified.
+    let mut engine = Fake::new(vec![]);
+    engine.reachable = false;
+    let subject = VpnCheck::new(
+        Arc::new(engine),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Protocols::both(),
+        None,
+        PortForward::default(),
+        false,
+    );
+    let findings = subject.run().await;
+    // The egress group is skipped, not reported unverified against a down engine.
+    assert!(matches!(
+        verdict(&findings, "vpn"),
+        Some(Verdict::Skipped { .. })
+    ));
+    assert!(
+        verdict(&findings, "vpn.egress-match").is_none(),
+        "leak detection is off, so no egress finding is produced at all"
+    );
 }
 
 #[tokio::test]
@@ -495,11 +567,220 @@ async fn a_stack_with_no_gateway_does_not_apply() {
         &empty(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        PortForward::default(),
         false,
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })
+    ));
+}
+
+/// A gluetun behaviour whose status file names a forwarded port.
+fn gateway_with_port(port: &'static str) -> Behavior {
+    let mut gluetun = Behavior::up("gluetun", Some("185.65.1.1"));
+    gluetun.forwarded_port = Some(port);
+    gluetun
+}
+
+#[tokio::test]
+async fn a_granted_port_is_a_verified_forward() {
+    let findings = check_with(
+        vec![
+            gateway_with_port("51413"),
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ],
+        forwarding("protonvpn"),
+    )
+    .run()
+    .await;
+    assert!(
+        pass_note(&findings, "vpn.port-forward").is_some_and(|note| note.contains("51413")),
+        "a granted port passes and states the port it saw"
+    );
+}
+
+#[tokio::test]
+async fn no_port_on_protonvpn_names_the_nat_pmp_trap_first() {
+    // Tunnel up, but no port granted: ProtonVPN's cause — forwarding not enabled
+    // when the config was generated — is the one an operator cannot guess, so it
+    // is named as the cause rather than left to them.
+    let findings = check_with(
+        vec![
+            Behavior::up("gluetun", Some("185.65.1.1")),
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ],
+        forwarding("protonvpn"),
+    )
+    .run()
+    .await;
+    let problem = problem(&findings, "vpn.port-forward");
+    assert_eq!(problem.map(|problem| problem.code), Some(NO_FORWARDED_PORT));
+    // Degraded, not broken: nothing is leaking, peers simply cannot connect in.
+    assert_eq!(
+        problem.map(|problem| problem.severity),
+        Some(Severity::Warning)
+    );
+    assert!(
+        problem
+            .is_some_and(|problem| problem.meaning.contains("NAT-PMP")
+                && problem.meaning.contains("ProtonVPN")),
+        "ProtonVPN's NAT-PMP-at-generation trap must be named: {problem:?}"
+    );
+}
+
+#[tokio::test]
+async fn no_port_on_another_forwarding_provider_is_degraded_without_speculation() {
+    // A provider that forwards ports but has no lemonfiber-specific trap: still a
+    // degraded finding, but it must not borrow ProtonVPN's cause.
+    let findings = check_with(
+        vec![
+            Behavior::up("gluetun", Some("185.65.1.1")),
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ],
+        forwarding("private internet access"),
+    )
+    .run()
+    .await;
+    let problem = problem(&findings, "vpn.port-forward");
+    assert_eq!(problem.map(|problem| problem.code), Some(NO_FORWARDED_PORT));
+    assert!(
+        problem.is_some_and(|problem| !problem.meaning.contains("ProtonVPN")),
+        "a different provider must not be told ProtonVPN's cause: {problem:?}"
+    );
+}
+
+#[tokio::test]
+async fn no_port_on_an_unknown_provider_is_unverified_not_blamed() {
+    // lemonfiber has no port-forwarding knowledge of this provider, so it cannot
+    // say why a port is missing without guessing — and guessing is what the
+    // whole subsystem exists to avoid. Unverified, never a fabricated failure.
+    let findings = check_with(
+        vec![
+            Behavior::up("gluetun", Some("185.65.1.1")),
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ],
+        forwarding("some-obscure-vpn"),
+    )
+    .run()
+    .await;
+    assert!(matches!(
+        verdict(&findings, "vpn.port-forward"),
+        Some(Verdict::Unverified { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_released_port_reads_as_no_port() {
+    // The release path writes a literal 0; that is a port taken back, not a port
+    // granted, so it must be read as absent.
+    let findings = check_with(
+        vec![
+            gateway_with_port("0"),
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ],
+        forwarding("protonvpn"),
+    )
+    .run()
+    .await;
+    assert_eq!(
+        problem(&findings, "vpn.port-forward").map(|problem| problem.code),
+        Some(NO_FORWARDED_PORT)
+    );
+}
+
+#[tokio::test]
+async fn unusable_status_file_contents_read_as_no_port() {
+    // A reachable status file that names no usable port — non-numeric, out of the
+    // u16 a port fits in, or only whitespace — is a port not granted, not a failed
+    // read. For a provider known to forward, that is the degraded finding.
+    for contents in ["not-a-port", "70000", "   "] {
+        let findings = check_with(
+            vec![
+                gateway_with_port(contents),
+                Behavior::up("qbittorrent", Some("185.65.1.1")),
+            ],
+            forwarding("protonvpn"),
+        )
+        .run()
+        .await;
+        assert_eq!(
+            problem(&findings, "vpn.port-forward").map(|problem| problem.code),
+            Some(NO_FORWARDED_PORT),
+            "{contents:?} names no usable port, so it is a port not granted"
+        );
+    }
+}
+
+#[tokio::test]
+async fn port_forwarding_not_enabled_does_not_apply() {
+    // Even with a running tunnel, an operator who did not ask for port forwarding
+    // gets a not-applicable finding, never a fault — and the status file is not
+    // even read.
+    let findings = check(vec![
+        gateway_with_port("51413"),
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ])
+    .run()
+    .await;
+    assert!(matches!(
+        verdict(&findings, "vpn.port-forward"),
+        Some(Verdict::Skipped { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_down_gateway_leaves_the_forward_unverified() {
+    // The port lives in the tunnel container; with it down the port is unknown,
+    // not absent, so the honest answer is unverified rather than a failure.
+    let mut gluetun = Behavior::up("gluetun", None);
+    gluetun.running = false;
+    let findings = check_with(vec![gluetun], forwarding("protonvpn"))
+        .run()
+        .await;
+    assert!(matches!(
+        verdict(&findings, "vpn.port-forward"),
+        Some(Verdict::Unverified { .. })
+    ));
+}
+
+#[tokio::test]
+async fn port_forwarding_is_checked_even_with_leak_detection_off() {
+    // The port is read from the container's own file, not from an IP-echo
+    // comparison, so switching leak detection off does not blind this check.
+    let subject = VpnCheck::new(
+        Arc::new(Fake::new(vec![gateway_with_port("51413")])),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Protocols::both(),
+        None,
+        forwarding("protonvpn"),
+        false,
+    );
+    let findings = subject.run().await;
+    assert!(
+        pass_note(&findings, "vpn.port-forward").is_some_and(|note| note.contains("51413")),
+        "port forwarding is still verified with leak detection off"
+    );
+}
+
+#[tokio::test]
+async fn an_unreachable_engine_leaves_an_enabled_forward_unverified() {
+    let mut engine = Fake::new(vec![]);
+    engine.reachable = false;
+    let subject = VpnCheck::new(
+        Arc::new(engine),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Protocols::both(),
+        Some("https://ifconfig.me".to_owned()),
+        forwarding("protonvpn"),
+        false,
+    );
+    let findings = subject.run().await;
+    assert!(matches!(
+        verdict(&findings, "vpn.port-forward"),
+        Some(Verdict::Unverified { .. })
     ));
 }
 
@@ -520,6 +801,7 @@ async fn a_gateway_with_no_client_does_not_apply() {
         &lone_gateway,
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
+        PortForward::default(),
         false,
     );
     assert!(matches!(

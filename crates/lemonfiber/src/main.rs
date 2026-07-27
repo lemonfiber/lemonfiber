@@ -15,7 +15,8 @@ use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, logs, supervise, Command, Ctx, Outcome, WATCH};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
-    data_root_from_env, ip_echo_from_env, service_user_from_env, store, Protocols, Settings,
+    data_root_from_env, ip_echo_from_env, port_forward_from_env, service_user_from_env, store,
+    Protocols, Settings,
 };
 use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::doctor::{Category, Overall, Verdict};
@@ -280,6 +281,7 @@ fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
         data_root: data_root_from_env(&recorded),
         storage_state: here().map(|paths| paths.storage_state()),
         service_user: service_user_from_env(&recorded),
+        port_forward: port_forward_from_env(&recorded),
         env_file,
         stack_dir: stack_directory(),
         ..Settings::default()

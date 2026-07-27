@@ -19,8 +19,8 @@ use async_trait::async_trait;
 use lemonfiber_manifest::{Manifest, Protocol};
 
 use super::{Category, Check, Finding, Verdict};
-use crate::config::Protocols;
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::config::{PortForward, Protocols};
+use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::ports::docker::{Container, Engine, Lifecycle};
 
 /// Raised when the download client's egress does not match the tunnel.
@@ -31,6 +31,19 @@ pub const VPN_CONTAINER_DOWN: Code = Code::new("VPN-2");
 
 /// Raised when the client cannot reach the internet through the tunnel.
 pub const CLIENT_ISOLATED: Code = Code::new("VPN-3");
+
+/// Raised when port forwarding was asked for but the provider granted no port.
+pub const NO_FORWARDED_PORT: Code = Code::new("VPN-4");
+
+/// Gluetun's own record of the port its provider forwarded, written inside the
+/// container when port forwarding is on. Read from there rather than from the
+/// control server, so no API token is needed and a locked-down control server
+/// cannot be mistaken for an absent port.
+const FORWARDED_PORT_FILE: &str = "/tmp/gluetun/forwarded_port";
+
+/// Why the port-forward check does not apply when the switch is off — shared so
+/// the running and offline paths word it identically.
+const NOT_ENABLED: &str = "port forwarding is not enabled, so there is no forwarded port to verify";
 
 /// The capability a VPN gateway needs to route the traffic of the containers
 /// sharing its network, and so the mark by which one is recognised — the unit is
@@ -94,12 +107,39 @@ enum Reach {
     Unknown,
 }
 
+/// What the gateway's forwarded-port status file amounted to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Grant {
+    /// A port was granted.
+    Port(u16),
+    /// The file was read but names no usable port, so none was granted.
+    Absent,
+    /// The file could not be read: the container is down or the engine is
+    /// unreachable, so whether a port exists is unknown rather than absent.
+    Unreadable,
+}
+
+/// How much lemonfiber knows about a provider's port forwarding, which decides
+/// what a missing port can honestly be called.
+enum Knowledge {
+    /// `ProtonVPN`, whose trap — port forwarding and a P2P server both chosen when
+    /// the `WireGuard` configuration is generated — is specific and nameable.
+    Proton,
+    /// A provider known to offer port forwarding, but without a lemonfiber-specific
+    /// trap to name beyond the generic one.
+    Forwarding,
+    /// A provider lemonfiber has no port-forwarding knowledge of, so a missing
+    /// port cannot be explained without guessing.
+    Unknown,
+}
+
 /// The VPN leak check: compare the client's egress against the tunnel's.
 pub struct VpnCheck {
     engine: Arc<dyn Engine>,
     project: String,
     echo: Option<String>,
     target: Target,
+    port_forward: PortForward,
     disruptive: bool,
 }
 
@@ -129,6 +169,7 @@ impl VpnCheck {
         manifest: &Manifest,
         protocols: Protocols,
         echo: Option<String>,
+        port_forward: PortForward,
         disruptive: bool,
     ) -> Self {
         let target = if protocols.torrent {
@@ -144,6 +185,7 @@ impl VpnCheck {
             project,
             echo,
             target,
+            port_forward,
             disruptive,
         }
     }
@@ -182,6 +224,57 @@ impl VpnCheck {
                 Some(output.stdout.trim().to_ascii_uppercase())
             }
             _ => None,
+        }
+    }
+
+    /// The port-forward finding: whether a port was granted, where the operator
+    /// asked for one.
+    ///
+    /// Independent of leak detection — the port is read from the gateway's own
+    /// status file, not from an IP-echo comparison — so it is still established
+    /// where the operator has switched leak detection off. Where the switch is
+    /// off the exec is skipped entirely: there is nothing to read.
+    async fn port_forward_finding(&self, gateway: Option<&Container>) -> Finding {
+        let verdict = if self.port_forward.enabled {
+            match self.granted_port(gateway).await {
+                Grant::Port(port) => Verdict::Pass {
+                    note: Some(format!("forwarded port {port}")),
+                },
+                Grant::Absent => no_port(self.port_forward.provider.as_deref()),
+                Grant::Unreadable => Verdict::Unverified {
+                    reason: "the VPN container did not return a forwarded port, which the tunnel \
+                             being down and the engine being unreachable both produce"
+                        .to_owned(),
+                    remedy: Remedy::new("Confirm the tunnel is up, then run this again"),
+                },
+            }
+        } else {
+            Verdict::Skipped {
+                reason: NOT_ENABLED.to_owned(),
+            }
+        };
+        finding("vpn.port-forward", "forwarded port", verdict)
+    }
+
+    /// Read the granted port from the gateway's own status file.
+    ///
+    /// A container that is not running, or an engine that cannot be reached, makes
+    /// the answer unknown rather than absent. A file that reads as no port — empty,
+    /// missing, or the zero the release path writes — is a port that was not
+    /// granted, which for an enabled provider is the failure this check exists for.
+    async fn granted_port(&self, gateway: Option<&Container>) -> Grant {
+        let Some(container) = gateway else {
+            return Grant::Unreadable;
+        };
+        if container.lifecycle != Lifecycle::Running {
+            return Grant::Unreadable;
+        }
+        // Awaited into a plain value first: a block whose last statement is an
+        // await leaves its own closing brace unmarked by coverage.
+        let result = self.engine.exec(&container.id, &read_port()).await;
+        match result {
+            Err(_) => Grant::Unreadable,
+            Ok(output) => parse_grant(&output.stdout),
         }
     }
 }
@@ -224,20 +317,43 @@ impl Check for VpnCheck {
             Target::Skip(reason) => return vec![skipped(reason.clone())],
             Target::Pair(pair) => pair,
         };
-        let Some(echo) = self.echo.as_deref() else {
-            return vec![skipped("leak detection is switched off".to_owned())];
-        };
 
-        // The engine being unreachable is a reason the check could not run,
-        // never a report that the stack is safe.
+        // The engine being unreachable is a reason the checks could not run,
+        // never a report that the stack is safe. Leak detection being switched off
+        // is an opt-out that still holds here: the operator asked not to be told
+        // about egress, so it stays skipped rather than becoming an unverified
+        // engine finding — while port forwarding, which they did ask for, reports.
         let Ok(containers) = self.engine.list(&self.project).await else {
-            return unreachable_engine(pair, self.disruptive);
+            return match self.echo {
+                Some(_) => unreachable_engine(pair, &self.port_forward, self.disruptive),
+                None => vec![
+                    skipped("leak detection is switched off".to_owned()),
+                    port_forward_offline(&self.port_forward),
+                ],
+            };
         };
+        // Nothing is running, so the whole VPN check collapses to one line rather
+        // than repeating "cannot check, nothing is up" for each finding — the
+        // port-forward finding included, since its port lives in a container that
+        // is not there either.
         if containers.is_empty() {
             return vec![skipped("the stack is not running".to_owned())];
         }
 
         let gateway_container = find(&containers, &pair.gateway);
+
+        // Port forwarding is read from the gateway's own status file rather than
+        // from the IP-echo comparison, so it is established even where the operator
+        // has switched leak detection off.
+        let port_forward = self.port_forward_finding(gateway_container).await;
+
+        let Some(echo) = self.echo.as_deref() else {
+            return vec![
+                skipped("leak detection is switched off".to_owned()),
+                port_forward,
+            ];
+        };
+
         let client_container = find(&containers, &pair.client);
 
         let gateway = self.reach(gateway_container, echo).await;
@@ -256,7 +372,9 @@ impl Check for VpnCheck {
             _ => None,
         };
 
-        assemble(pair, &gateway, &client, note, self.disruptive)
+        let mut findings = assemble(pair, &gateway, &client, note, self.disruptive);
+        findings.push(port_forward);
+        findings
     }
 }
 
@@ -264,6 +382,106 @@ impl Check for VpnCheck {
 /// container.
 fn wget(url: String) -> Vec<String> {
     vec!["wget".to_owned(), "-qO-".to_owned(), url]
+}
+
+/// The command that reads the gateway's forwarded-port status file from inside
+/// the container.
+fn read_port() -> Vec<String> {
+    vec!["cat".to_owned(), FORWARDED_PORT_FILE.to_owned()]
+}
+
+/// Read the status file's contents as a granted port.
+///
+/// A file that is missing makes `cat` exit non-zero with nothing on stdout, and
+/// the release path writes a literal `0`; both are read as no port granted rather
+/// than as a failure to read, because the file was reachable — it simply names no
+/// port. Only an engine or container fault, handled before this, is `Unreadable`.
+fn parse_grant(stdout: &str) -> Grant {
+    match stdout.trim().parse::<u16>() {
+        Ok(port) if port != 0 => Grant::Port(port),
+        _ => Grant::Absent,
+    }
+}
+
+/// The verdict for an enabled provider that granted no port.
+///
+/// A provider lemonfiber knows forwards ports gets a failure — degraded, not
+/// broken: nothing is leaking, but peers cannot reach the client. `ProtonVPN`'s
+/// specific trap is named first where it is the provider. A provider lemonfiber
+/// has no knowledge of is left `unverified` rather than blamed, because the cause
+/// cannot be named without guessing.
+fn no_port(provider: Option<&str>) -> Verdict {
+    match knowledge(provider) {
+        Knowledge::Proton => Verdict::Warn(proton_trap()),
+        Knowledge::Forwarding => Verdict::Warn(generic_trap()),
+        Knowledge::Unknown => Verdict::Unverified {
+            reason: "port forwarding is enabled but no port was granted, and this is not a \
+                     provider lemonfiber has specific guidance for, so the cause cannot be named \
+                     without guessing"
+                .to_owned(),
+            remedy: Remedy::new(
+                "Confirm your provider supports port forwarding and that it was enabled when the \
+                 VPN credentials were generated",
+            ),
+        },
+    }
+}
+
+/// How much lemonfiber knows about a provider, by the name Gluetun uses for it.
+fn knowledge(provider: Option<&str>) -> Knowledge {
+    match provider {
+        Some("protonvpn" | "proton") => Knowledge::Proton,
+        Some(
+            "private internet access"
+            | "pia"
+            | "privateinternetaccess"
+            | "privatevpn"
+            | "perfect privacy"
+            | "perfectprivacy",
+        ) => Knowledge::Forwarding,
+        _ => Knowledge::Unknown,
+    }
+}
+
+/// `ProtonVPN`'s trap, named first: the tunnel connects but the port never arrives
+/// because forwarding was not chosen at configuration time.
+fn proton_trap() -> Problem {
+    Problem::new(
+        NO_FORWARDED_PORT,
+        Severity::Warning,
+        "The VPN granted no forwarded port",
+        "The tunnel is up, but no port was forwarded, so peers cannot open connections to your \
+         client and both download connectivity and seeding are reduced. With ProtonVPN the usual \
+         cause is that port forwarding (NAT-PMP) was not enabled, or a non-P2P server was chosen, \
+         when the WireGuard configuration was generated — the tunnel still connects, only the port \
+         never arrives. It cannot be fixed at runtime.",
+        Remedy::new(
+            "Regenerate the ProtonVPN WireGuard credentials with NAT-PMP enabled and a P2P server, \
+             then replace WIREGUARD_PRIVATE_KEY",
+        )
+        .with_detail("account.protonvpn.com → Downloads → WireGuard: enable NAT-PMP, pick a P2P server"),
+    )
+    .in_state(State::Guided)
+}
+
+/// The trap for a provider that forwards ports but has no lemonfiber-specific
+/// note: state the consequence and where the setting usually lives, without
+/// inventing a cause.
+fn generic_trap() -> Problem {
+    Problem::new(
+        NO_FORWARDED_PORT,
+        Severity::Warning,
+        "The VPN granted no forwarded port",
+        "The tunnel is up, but no port was forwarded, so peers cannot open connections to your \
+         client and both download connectivity and seeding are reduced. On providers that support \
+         port forwarding it usually has to be enabled at the point the credentials are generated, \
+         not afterwards.",
+        Remedy::new(
+            "Confirm port forwarding is enabled for this provider, and regenerate the VPN \
+             credentials with it enabled if it was not",
+        ),
+    )
+    .in_state(State::Guided)
 }
 
 /// Whether a response is an address rather than an error page.
@@ -464,7 +682,7 @@ fn killswitch_verdict(disruptive: bool) -> Verdict {
 
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.
-fn unreachable_engine(pair: &Pair, disruptive: bool) -> Vec<Finding> {
+fn unreachable_engine(pair: &Pair, port_forward: &PortForward, disruptive: bool) -> Vec<Finding> {
     let reason = "the container engine could not be reached, so the containers \
                   could not be asked"
         .to_owned();
@@ -488,5 +706,25 @@ fn unreachable_engine(pair: &Pair, disruptive: bool) -> Vec<Finding> {
             "killswitch",
             killswitch_verdict(disruptive),
         ),
+        port_forward_offline(port_forward),
     ]
+}
+
+/// The port-forward finding when the gateway cannot be read at all, because the
+/// engine is unreachable: unverified where a port was expected, and still just
+/// not-applicable where forwarding was never enabled.
+fn port_forward_offline(port_forward: &PortForward) -> Finding {
+    let verdict = if port_forward.enabled {
+        Verdict::Unverified {
+            reason: "the container engine could not be reached, so the forwarded port \
+                     could not be read"
+                .to_owned(),
+            remedy: Remedy::new("Start the container engine, then run this again"),
+        }
+    } else {
+        Verdict::Skipped {
+            reason: NOT_ENABLED.to_owned(),
+        }
+    };
+    finding("vpn.port-forward", "forwarded port", verdict)
 }

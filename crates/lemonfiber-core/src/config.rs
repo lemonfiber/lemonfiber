@@ -67,6 +67,19 @@ pub const PUID_KEY: &str = "PUID";
 /// The group id the service containers run as.
 pub const PGID_KEY: &str = "PGID";
 
+/// The VPN provider the tunnel connects through.
+///
+/// Read by the port-forward check for one purpose: to name a provider's known
+/// trap when port forwarding was asked for but no port arrived. It never decides
+/// whether the tunnel itself works.
+pub const VPN_PROVIDER_KEY: &str = "VPN_PROVIDER";
+
+/// The setting recording whether server-side port forwarding was asked for.
+///
+/// Only some providers offer it, so a stack on one that does not leaves this off,
+/// and the port-forward check reads that as "does not apply" rather than a fault.
+pub const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
+
 /// A recorded value with the whitespace and surrounding quotes a person might
 /// add stripped, so `"on"` and ` on ` both read the same as `on`.
 fn bare(value: &str) -> String {
@@ -138,6 +151,42 @@ pub fn service_user_from_env(file: &env::EnvFile) -> Option<(u32, u32)> {
     let uid = file.get(PUID_KEY)?.trim().parse().ok()?;
     let gid = file.get(PGID_KEY)?.trim().parse().ok()?;
     Some((uid, gid))
+}
+
+/// What the operator recorded about VPN port forwarding: whether they asked for
+/// it, and which provider is meant to grant it.
+///
+/// Port forwarding is a per-provider capability — only some VPNs offer it — so
+/// the provider name travels with the switch. The name is consulted not to decide
+/// whether the tunnel works, but to name a provider's known trap when the switch
+/// is on and no port arrives.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PortForward {
+    /// Whether `VPN_PORT_FORWARDING` reads as switched on.
+    pub enabled: bool,
+    /// The provider name, lower-cased, where one is recorded.
+    ///
+    /// Carried even when the switch is off, but only read when it is on.
+    pub provider: Option<String>,
+}
+
+/// What the operator recorded about port forwarding.
+///
+/// Absent or off leaves it disabled, in which case there is no forwarded port to
+/// verify and the check does not apply. A blank provider is read as absent rather
+/// than as a provider named the empty string.
+#[must_use]
+pub fn port_forward_from_env(file: &env::EnvFile) -> PortForward {
+    PortForward {
+        enabled: file.get(VPN_PORT_FORWARDING_KEY).is_some_and(reads_as_on),
+        // `bare`, not a plain trim: the switch is de-quoted the same way, and a
+        // provider left quoted would otherwise miss its known trap — the very
+        // guidance the check exists to give — and read as an unknown provider.
+        provider: file
+            .get(VPN_PROVIDER_KEY)
+            .map(bare)
+            .filter(|value| !value.is_empty()),
+    }
 }
 
 impl Protocols {
@@ -225,6 +274,11 @@ pub struct Settings {
     /// one: the operator may own the data root while the containers, running as
     /// this pair, cannot write it.
     pub service_user: Option<(u32, u32)>,
+    /// What the operator asked for around VPN port forwarding.
+    ///
+    /// Disabled by default: a fresh install has no VPN configured, so the
+    /// port-forward check reports that it does not apply rather than a fault.
+    pub port_forward: PortForward,
 }
 
 impl Default for Settings {
@@ -239,6 +293,7 @@ impl Default for Settings {
             data_root: None,
             storage_state: None,
             service_user: None,
+            port_forward: PortForward::default(),
         }
     }
 }
@@ -401,5 +456,42 @@ mod tests {
             None
         );
         assert_eq!(Settings::default().service_user, None);
+    }
+
+    #[test]
+    fn port_forwarding_reads_the_switch_and_the_provider() {
+        let file = env::EnvFile::parse("VPN_PROVIDER=ProtonVPN\nVPN_PORT_FORWARDING=on\n");
+        let recorded = super::port_forward_from_env(&file);
+        assert!(recorded.enabled);
+        // The provider is lower-cased so the check can match it without caring how
+        // the operator spelled it.
+        assert_eq!(recorded.provider.as_deref(), Some("protonvpn"));
+    }
+
+    #[test]
+    fn a_quoted_provider_is_de_quoted_like_the_switch() {
+        // A hand-edited .env commonly quotes values. The provider must be stripped
+        // the same way the switch is, or a quoted name misses its known trap and
+        // reads as an unknown provider.
+        let file = env::EnvFile::parse("VPN_PROVIDER=\"protonvpn\"\nVPN_PORT_FORWARDING=\"on\"\n");
+        let recorded = super::port_forward_from_env(&file);
+        assert!(recorded.enabled);
+        assert_eq!(recorded.provider.as_deref(), Some("protonvpn"));
+    }
+
+    #[test]
+    fn port_forwarding_is_off_by_default_and_a_blank_provider_is_absent() {
+        // A fresh install has no VPN configured, so nothing to verify a port for.
+        assert!(!super::port_forward_from_env(&env::EnvFile::parse("")).enabled);
+        assert_eq!(
+            Settings::default().port_forward,
+            super::PortForward::default()
+        );
+
+        // A named-but-empty provider is no provider, not one called "".
+        let blank = env::EnvFile::parse("VPN_PROVIDER=   \nVPN_PORT_FORWARDING=off\n");
+        let recorded = super::port_forward_from_env(&blank);
+        assert!(!recorded.enabled);
+        assert_eq!(recorded.provider, None);
     }
 }
