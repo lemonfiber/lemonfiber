@@ -17,7 +17,7 @@ pub mod service;
 pub mod time;
 
 pub use docker::Engine;
-pub use filesystem::FileSystem;
+pub use filesystem::{FileSystem, Volume};
 pub use process::Runner;
 pub use service::Client;
 pub use time::Clock;

@@ -16,7 +16,9 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
-use crate::ports::filesystem::{Fault, FileSystem, Identity, Mount, Ownership, StorageFacts};
+use crate::ports::filesystem::{
+    Fault, FileSystem, Identity, Mount, Ownership, Presence, StorageFacts, Volume,
+};
 
 /// The filesystem on this machine, reached through the standard library.
 #[derive(Debug, Default, Clone, Copy)]
@@ -80,6 +82,16 @@ impl FileSystem for Disk {
     }
 }
 
+#[async_trait]
+impl Volume for Disk {
+    async fn presence(&self, path: &Path) -> Presence {
+        match std::fs::metadata(path) {
+            Ok(meta) => Presence::On(volume_of(&meta)),
+            Err(_) => Presence::Gone,
+        }
+    }
+}
+
 /// A filesystem error in the platform's own words.
 fn fault(error: &std::io::Error) -> Fault {
     Fault::new(error.to_string())
@@ -121,6 +133,26 @@ fn ownership_of(_path: &Path) -> Option<Ownership> {
     None
 }
 
+/// The volume a file sits on, as Unix's device number.
+///
+/// The number that changes when the same path resolves to a different mount —
+/// the signal a watch reads to tell a drive that is still there from one that
+/// was pulled and left its mount point behind.
+#[cfg(unix)]
+fn volume_of(meta: &std::fs::Metadata) -> u64 {
+    use std::os::unix::fs::MetadataExt as _;
+
+    meta.dev()
+}
+
+/// The volume as Windows reports it: with no device number to read, every
+/// present path reads as the same volume, so a watch there notices a path
+/// disappearing but not a mount being swapped beneath it.
+#[cfg(not(unix))]
+fn volume_of(_meta: &std::fs::Metadata) -> u64 {
+    0
+}
+
 /// A file's identity as Windows reports it: its file index, and its link count
 /// where the filesystem supplies one.
 ///
@@ -142,7 +174,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use super::{Disk, FileSystem};
+    use super::{Disk, FileSystem, Volume};
 
     /// A fresh, empty directory of its own, so tests cannot collide over a file
     /// name. Built from the process id and a counter rather than a random name,
@@ -249,6 +281,27 @@ mod tests {
         Disk.write(&note, "remembered").await;
         assert_eq!(Disk.read(&note).await.as_deref(), Some("remembered"));
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_present_path_reports_its_volume_and_an_absent_one_is_gone() {
+        use crate::ports::filesystem::Presence;
+
+        let dir = scratch();
+        let here = Disk.presence(&dir).await;
+        let sibling = Disk.presence(&dir.join("child")).await;
+        assert!(
+            matches!(here, Presence::On(_)),
+            "a real directory is present"
+        );
+        // The child does not exist yet, so it is gone even though its parent is
+        // not — presence is about the path asked for, not its neighbourhood.
+        assert_eq!(sibling, Presence::Gone);
+        assert_eq!(
+            Disk.presence(Path::new("/lemonfiber/no/such/root")).await,
+            Presence::Gone
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

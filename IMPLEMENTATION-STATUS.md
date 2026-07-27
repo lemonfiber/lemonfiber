@@ -66,6 +66,7 @@ harness and the first check landed before the wizard.
 | Free-space check on the data root | `C5-R6` | ◐ | `storage.space` finding warns on a floor; queue-based projection waits on the `service::Client` adapter |
 | Degraded-link detection (was linking, now not) | `C5-R11` | ✅ | `storage.hardlinks` reports a regression against a baseline recorded in `storage-state.json` |
 | Permission distinction (operator vs service PUID/PGID) | `C5-R10` | ✅ | `storage.permissions`; native-Linux only, ownership vs `PUID`/`PGID` (mapped away on Docker Desktop, so skipped there) |
+| Data-root availability supervisor (stop on loss, no auto-restart) | `C5-R7`, `C5-R8`, `C5-R9` | ✅ | `lemonfiber watch`; the `Volume` port detects a vanished or swapped mount by device id and stops the forms |
 | Credential validation against live services | `A3-R1..R4`, `A3-R10` | ☐ | `service::Client` port defined; no adapter/check |
 | VPN port-forward validation + ProtonVPN NAT-PMP guidance | `A3-R8` | ☐ | — |
 | Prerequisites / account guidance (dependency map before credentials) | `A1-R1..R13` | ◐ | [`prerequisites.rs`](crates/lemonfiber-core/src/prerequisites.rs) derives the map; the wizard renders it (A1-R7/R8/R10 arrive with A2/A3) |

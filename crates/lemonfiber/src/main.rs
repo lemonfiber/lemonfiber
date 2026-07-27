@@ -12,7 +12,7 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
-use lemonfiber_core::app::{dispatch, logs, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, logs, supervise, Command, Ctx, Outcome, WATCH};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, ip_echo_from_env, service_user_from_env, store, Protocols, Settings,
@@ -21,7 +21,8 @@ use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::doctor::{Category, Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, StatusReport, VersionReport,
+    ConfigReport, DoctorReport, Envelope, LifecycleReport, StatusReport, SupervisionReport,
+    VersionReport,
 };
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
@@ -118,6 +119,12 @@ enum Request {
         #[arg(long)]
         disruptive: bool,
     },
+    /// Guard the data location while forms run, stopping them if it disappears.
+    Watch {
+        /// The forms to stop if the data location is lost.
+        #[arg(required = true)]
+        forms: Vec<String>,
+    },
 }
 
 /// What to do with settings.
@@ -193,6 +200,9 @@ async fn main() -> ExitCode {
             follow,
             tail,
         } => return stream(&ctx, &form, &services, follow, tail, cli.json).await,
+        // A watch is long-running and produces one report at its end, not a value
+        // that arrives once, so like streaming it does not go through dispatch.
+        Request::Watch { forms } => return guard(&ctx, &forms, cli.json).await,
         Request::Version => Command::Version,
         Request::Up { forms } => Command::Up { forms },
         Request::Down { forms } => Command::Down { forms },
@@ -371,6 +381,43 @@ async fn stream(
         println!("no output");
     }
     ExitCode::SUCCESS
+}
+
+/// Watch the data location until it is lost, then report what was stopped.
+///
+/// This blocks for as long as the location holds — the operator ends it with the
+/// same interrupt they end any foreground command. It returns only once the
+/// location is lost and the services have been stopped, which is the one thing
+/// it exists to do.
+async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
+    match supervise(ctx, &Disk, forms, WATCH).await {
+        Ok(report) => {
+            watched(&report, json);
+            ExitCode::SUCCESS
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// What a watch did once its location was lost.
+fn watched(report: &SupervisionReport, json: bool) {
+    if json {
+        match Envelope::new("watch", report.clone()).to_json() {
+            Some(text) => println!("{text}"),
+            None => eprintln!("this report could not be rendered as JSON"),
+        }
+        return;
+    }
+
+    println!("the watch ended: {}", report.reason);
+    if report.stopped {
+        println!("stopped: {}", report.forms.join(", "));
+    } else {
+        println!(
+            "could not stop {} — check the services by hand",
+            report.forms.join(", ")
+        );
+    }
 }
 
 /// Where this machine keeps lemonfiber's files.
