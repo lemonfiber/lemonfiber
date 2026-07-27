@@ -11,7 +11,19 @@ deny = []
 version = 2
 # Permissive licences we accept for dependencies. Our own crate is Hippocratic
 # (license-file), which does not constrain what deps may use.
-allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
+# CDLA-Permissive-2.0 covers webpki-roots — Mozilla's CA root bundle that rustls
+# trusts by default. It is a permissive data licence for the certificate set, not
+# code we link, and carries no copyleft or attribution burden.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+  "CDLA-Permissive-2.0",
+]
 confidence-threshold = 0.9
 # Our own workspace crates are Hippocratic (license-file); cargo-deny's
 # licence gate is for third-party deps, not first-party code.

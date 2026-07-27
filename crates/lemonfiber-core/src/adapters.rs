@@ -13,10 +13,12 @@
 
 pub mod docker;
 pub mod filesystem;
+pub mod http;
 pub mod process;
 pub mod time;
 
 pub use docker::Daemon;
 pub use filesystem::Disk;
+pub use http::Web;
 pub use process::Local;
 pub use time::System;

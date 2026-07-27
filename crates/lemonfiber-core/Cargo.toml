@@ -12,6 +12,7 @@ lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 async-trait = { workspace = true }
 bollard = { workspace = true }
 include_dir = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = "1"
 sysinfo = { workspace = true }
