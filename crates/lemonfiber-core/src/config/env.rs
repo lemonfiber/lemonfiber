@@ -94,9 +94,11 @@ impl EnvFile {
     ///
     /// Rewriting in place is what keeps a setting underneath the comment that
     /// explains it. A new key is appended, because there is nowhere better to
-    /// put it that would not be a guess.
+    /// put it that would not be a guess. The *last* occurrence is rewritten, so
+    /// a hand-edited file with a duplicated key changes the one Compose and
+    /// [`Self::get`] actually read rather than an earlier one they ignore.
     pub fn set(&mut self, key: &str, value: &str) {
-        for line in &mut self.lines {
+        for line in self.lines.iter_mut().rev() {
             if let Line::Entry {
                 key: k, value: v, ..
             } = line
@@ -260,10 +262,13 @@ mod tests {
     }
 
     #[test]
-    fn a_repeated_key_is_changed_where_it_was_first_declared() {
+    fn a_repeated_key_is_changed_where_it_takes_effect() {
+        // The last occurrence is the one the shell and `get` read, so that is the
+        // one `set` rewrites — otherwise the change is a silent no-op.
         let mut file = EnvFile::parse("A=first\nA=second\n");
         file.set("A", "only");
-        assert_eq!(file.render(), "A=only\nA=second\n");
+        assert_eq!(file.render(), "A=first\nA=only\n");
+        assert_eq!(file.get("A"), Some("only"));
     }
 
     #[test]

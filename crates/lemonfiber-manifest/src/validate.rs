@@ -51,14 +51,31 @@ impl Date {
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
         let mut parts = text.split('-');
-        let year: u16 = parts.next()?.parse().ok()?;
-        let month: u8 = parts.next()?.parse().ok()?;
-        let day: u8 = parts.next()?.parse().ok()?;
+        let year = parts.next()?;
+        let month = parts.next()?;
+        let day = parts.next()?;
         if parts.next().is_some() {
             return None;
         }
-        let shaped = text.len() == 10 && (1..=12).contains(&month) && (1..=31).contains(&day);
-        shaped.then_some(Self { year, month, day })
+
+        // Each field is a fixed width of digits and nothing else. A bare length
+        // check let `2026-006-1` and a `+`-signed part through, because an integer
+        // parse accepts either; requiring exact digit widths is what actually
+        // pins the one unambiguous shape.
+        let shaped = year.len() == 4
+            && month.len() == 2
+            && day.len() == 2
+            && [year, month, day]
+                .iter()
+                .all(|part| part.bytes().all(|byte| byte.is_ascii_digit()));
+        if !shaped {
+            return None;
+        }
+
+        let year: u16 = year.parse().ok()?;
+        let month: u8 = month.parse().ok()?;
+        let day: u8 = day.parse().ok()?;
+        ((1..=12).contains(&month) && (1..=31).contains(&day)).then_some(Self { year, month, day })
     }
 }
 
@@ -234,6 +251,9 @@ fn placed(service: &Service, profiles: &BTreeSet<String>) -> Option<String> {
 
 /// A service names a version rather than a tag that moves under it.
 fn pinned(service: &Service) -> Option<String> {
+    if service.tag.is_empty() {
+        return Some("declares an empty image tag".to_owned());
+    }
     FLOATING_TAGS.contains(&service.tag.as_str()).then(|| {
         format!(
             "is pinned to {}, which moves — that is not a pin",
@@ -389,6 +409,17 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_tag_is_caught() {
+        let text = STACK.replacen("tag = ", "tag = \"\" # ", 1);
+        assert!(
+            messages(&text)
+                .iter()
+                .any(|m| m.contains("empty image tag")),
+            "an empty tag is a broken image reference, not a pin"
+        );
+    }
+
+    #[test]
     fn a_published_port_with_no_binding_is_caught() {
         let text = edited("bind = \"loopback\"\n", "");
         assert!(messages(&text)
@@ -498,6 +529,13 @@ mod tests {
             "2026-06-00",
             "2026-06",
             "2026-06-26-01",
+            // Misaligned digit groups and signed parts reach length ten but are
+            // not the one unambiguous shape.
+            "2026-006-1",
+            "200-006-01",
+            "2026-+6-26",
+            "+026-06-26",
+            "2026-06-2 ",
             "not a date",
             "",
         ] {

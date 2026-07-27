@@ -299,6 +299,23 @@ async fn a_client_online_while_the_tunnel_is_not_is_a_leak() {
 }
 
 #[tokio::test]
+async fn a_tunnel_that_cannot_be_asked_is_unverified_not_a_leak() {
+    // The client returned an address, but the tunnel's own could not be read at
+    // all. Unknown is not proven-absent, so egress cannot be compared and no
+    // leak is claimed — the honest answer is unverified, never a critical alarm.
+    let mut gluetun = Behavior::up("gluetun", None);
+    gluetun.exec_fails = true;
+    let findings = check(vec![gluetun, Behavior::up("qbittorrent", Some("81.2.3.4"))])
+        .run()
+        .await;
+    assert!(
+        unverified_reason(&findings, "vpn.egress-match")
+            .is_some_and(|reason| reason.contains("could not be compared")),
+        "an unaskable tunnel makes egress unverified, not a leak"
+    );
+}
+
+#[tokio::test]
 async fn a_contained_client_with_no_connectivity_is_a_warning() {
     let findings = check(vec![
         Behavior::up("gluetun", Some("185.65.1.1")),

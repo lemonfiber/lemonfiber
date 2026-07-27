@@ -18,11 +18,12 @@ use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 /// direction that publishes one.
 const SECRET_MARKERS: &[&str] = &[
     "KEY",
-    "PASSWORD",
+    "PASS",
     "SECRET",
     "TOKEN",
     "PRIVATE",
     "CREDENTIAL",
+    "AUTH",
 ];
 
 /// What is shown in place of a secret.
@@ -342,10 +343,15 @@ mod tests {
         for key in [
             "WIREGUARD_PRIVATE_KEY",
             "QBITTORRENT_PASSWORD",
+            // A password key that says PASS but not PASSWORD, which the stack's
+            // own .env.example ships and an earlier marker list showed in the
+            // clear.
+            "HOMEPAGE_VAR_QBITTORRENT_PASS",
             "SONARR_API_KEY",
             "some_token",
             "SHARED_SECRET",
             "CREDENTIAL_X",
+            "NORDVPN_AUTH",
         ] {
             assert!(is_secret(key), "{key} holds a credential");
         }

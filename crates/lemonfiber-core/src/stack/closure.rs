@@ -39,6 +39,12 @@ impl Plan {
 
 /// Resolve named forms into the profiles that will actually be started.
 ///
+/// The manifest is assumed valid — every form's profiles declared, every
+/// dependency in bounds — as [`crate::stack::Source::checked_manifest`]
+/// guarantees before this is called. Given a raw manifest, a form naming a
+/// profile the manifest does not declare would pass that profile straight
+/// through and escape narrowing.
+///
 /// # Errors
 ///
 /// Returns [`Failure`] when a form is not declared, when forms that refuse to
@@ -53,6 +59,7 @@ pub fn resolve(
     }
 
     let mut chosen = Vec::new();
+    let mut seen = BTreeSet::new();
     for name in forms {
         let Some(form) = manifest.forms.iter().find(|form| &form.id == name) else {
             return Err(Failure::NoSuchForm {
@@ -60,7 +67,11 @@ pub fn resolve(
                 known: manifest.forms.iter().map(|form| form.id.clone()).collect(),
             });
         };
-        chosen.push(form);
+        // The same form named twice is the same form: deduped here so a repeated
+        // non-composable form is not mistaken for two forms that refuse company.
+        if seen.insert(form.id.as_str()) {
+            chosen.push(form);
+        }
     }
 
     let refuses_company = chosen.iter().find(|form| !form.composable);
@@ -376,6 +387,17 @@ composable = false
         let alone = solo(&["exclusive"]).and_then(Result::ok);
         assert_eq!(
             alone.map(|plan| plan.profiles.into_iter().collect::<Vec<_>>()),
+            Some(named(&["search"]))
+        );
+    }
+
+    #[test]
+    fn a_non_composable_form_named_twice_is_still_just_itself() {
+        // Naming the same solo form twice is not combining it with another; it is
+        // the same form, and must not be refused as if two forms clashed.
+        let twice = solo(&["exclusive", "exclusive"]).and_then(Result::ok);
+        assert_eq!(
+            twice.map(|plan| plan.profiles.into_iter().collect::<Vec<_>>()),
             Some(named(&["search"]))
         );
     }

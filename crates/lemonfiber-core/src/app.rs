@@ -527,7 +527,11 @@ fn configuration(
         })
         .collect();
 
-    Ok(Outcome::Config(ConfigReport { settings, changed }))
+    Ok(Outcome::Config(ConfigReport {
+        settings,
+        changed,
+        rehearsed: ctx.dry_run,
+    }))
 }
 
 /// Resolve forms, build the command, and run it unless this is a rehearsal.
@@ -1465,7 +1469,10 @@ mod tests {
             &ctx,
         )
         .await;
-        assert!(matches!(outcome, Ok(Outcome::Config(_))));
+        assert!(
+            matches!(&outcome, Ok(Outcome::Config(report)) if report.changed && report.rehearsed),
+            "a rehearsal reports the change it would make, and that it was a rehearsal"
+        );
         assert!(!path.exists(), "a rehearsal writes nothing");
     }
 

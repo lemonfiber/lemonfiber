@@ -44,15 +44,30 @@ impl Manifest {
     /// [`Error::UnsupportedSchema`] if it declares a generation this build does
     /// not read.
     pub fn from_toml(text: &str) -> Result<Self, Error> {
-        let manifest: Self = toml::from_str(text)?;
-        if !is_compatible(manifest.schema_version) {
+        // Read only the generation first. A newer generation may add or drop
+        // fields the full parse would reject as unknown; reading it alone lets an
+        // old binary say "you need a newer lemonfiber" rather than describe a
+        // field it has simply never heard of.
+        let generation: Generation = toml::from_str(text)?;
+        if !is_compatible(generation.schema_version) {
             return Err(Error::UnsupportedSchema {
-                found: manifest.schema_version,
+                found: generation.schema_version,
                 supported: SUPPORTED_SCHEMA_VERSIONS.to_vec(),
             });
         }
-        Ok(manifest)
+
+        Ok(toml::from_str(text)?)
     }
+}
+
+/// Just the manifest generation, read before the whole contract so the version
+/// gate can speak before the field-by-field parse does.
+///
+/// No `deny_unknown_fields`: it must read a future manifest whose other fields
+/// this build does not know, precisely so the generation can be checked first.
+#[derive(Deserialize)]
+struct Generation {
+    schema_version: u32,
 }
 
 /// A Compose profile — one service's role in the stack.
@@ -421,6 +436,21 @@ depends_on = ["gluetun"]
             .err()
             .map(|err| matches!(err, Error::Syntax(_)));
         assert_eq!(refusal, Some(true));
+    }
+
+    #[test]
+    fn a_newer_generation_is_named_as_such_even_when_it_carries_unknown_fields() {
+        // A future manifest declares a newer generation and, plausibly, fields
+        // this build has never heard of. The version gate must speak first — "you
+        // need a newer lemonfiber" — rather than the parser rejecting a field.
+        let text = format!(
+            "{}\n[[service]]\nfield_from_the_future = true\n",
+            MINIMAL.replace("schema_version = 1", "schema_version = 99")
+        );
+        assert!(matches!(
+            Manifest::from_toml(&text),
+            Err(Error::UnsupportedSchema { found: 99, .. })
+        ));
     }
 
     #[test]
