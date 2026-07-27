@@ -42,6 +42,7 @@ pub mod platform;
 pub mod ports;
 pub mod prerequisites;
 pub mod seed;
+pub mod servarr;
 pub mod stack;
 pub mod wizard;
 
