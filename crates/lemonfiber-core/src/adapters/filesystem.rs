@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
-use crate::ports::filesystem::{Fault, FileSystem, Identity, Mount, StorageFacts};
+use crate::ports::filesystem::{Fault, FileSystem, Identity, Mount, Ownership, StorageFacts};
 
 /// The filesystem on this machine, reached through the standard library.
 #[derive(Debug, Default, Clone, Copy)]
@@ -59,6 +59,10 @@ impl FileSystem for Disk {
         let _ = std::fs::write(path, contents);
     }
 
+    async fn ownership(&self, path: &Path) -> Option<Ownership> {
+        ownership_of(path)
+    }
+
     async fn describe(&self, path: &Path) -> StorageFacts {
         let disks = sysinfo::Disks::new_with_refreshed_list();
         let mounts: Vec<Mount> = disks
@@ -91,6 +95,30 @@ fn identity_of(meta: &std::fs::Metadata) -> Identity {
         file: meta.ino(),
         links: meta.nlink(),
     }
+}
+
+/// Who owns a path on Unix, and its permission bits.
+///
+/// Only the low bits of the mode are kept — the nine that decide who may read,
+/// write and traverse — because the file-type bits above them are not what the
+/// permission check reasons about.
+#[cfg(unix)]
+fn ownership_of(path: &Path) -> Option<Ownership> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let meta = std::fs::metadata(path).ok()?;
+    Some(Ownership {
+        uid: meta.uid(),
+        gid: meta.gid(),
+        mode: meta.mode() & 0o777,
+    })
+}
+
+/// Ownership as Windows reports it: it does not, in the terms this check needs,
+/// so there is nothing to report and the check skips accordingly.
+#[cfg(not(unix))]
+fn ownership_of(_path: &Path) -> Option<Ownership> {
+    None
 }
 
 /// A file's identity as Windows reports it: its file index, and its link count
@@ -221,6 +249,26 @@ mod tests {
         Disk.write(&note, "remembered").await;
         assert_eq!(Disk.read(&note).await.as_deref(), Some("remembered"));
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_real_directory_reports_ownership_and_an_absent_one_reports_none() {
+        let dir = scratch();
+        // On Unix the scratch directory has an owner and a mode; the point is that
+        // ownership comes back at all and its mode is within the permission bits.
+        // Where the platform does not report ownership, both cases are None, which
+        // the assertion below still holds for.
+        let present = Disk.ownership(&dir).await;
+        assert!(
+            present.is_none_or(|owner| owner.mode <= 0o777),
+            "a reported mode is only the permission bits"
+        );
+        assert_eq!(
+            Disk.ownership(Path::new("/lemonfiber/no/such/path")).await,
+            None,
+            "nothing to own where nothing is there"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

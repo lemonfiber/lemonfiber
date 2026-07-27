@@ -33,6 +33,22 @@ pub struct Identity {
     pub links: u64,
 }
 
+/// Who owns a path and how its permission bits are set, as the platform reports
+/// them.
+///
+/// Meaningful where ownership is real — native Linux — and reported so the check
+/// above can decide whether the user the services run as could write here. The
+/// mode is the low permission bits, the same nine a person reads as `rwxr-xr-x`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Ownership {
+    /// The owning user id.
+    pub uid: u32,
+    /// The owning group id.
+    pub gid: u32,
+    /// The permission bits.
+    pub mode: u32,
+}
+
 /// A filesystem operation could not be completed, in the platform's own words.
 ///
 /// One shape for every refusal because the caller decides what a failure *at a
@@ -260,6 +276,10 @@ pub trait FileSystem: Send + Sync {
     /// cannot detect a change from it, which is a lost opportunity rather than a
     /// fault to report — so this reports nothing.
     async fn write(&self, path: &Path, contents: &str);
+
+    /// Who owns a path and how it may be accessed, or `None` where the platform
+    /// does not report it — which is every platform but Unix.
+    async fn ownership(&self, path: &Path) -> Option<Ownership>;
 
     /// What the platform reports about the filesystem behind a path.
     async fn describe(&self, path: &Path) -> StorageFacts;

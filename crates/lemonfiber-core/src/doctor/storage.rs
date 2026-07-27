@@ -26,7 +26,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
-use crate::ports::filesystem::{FileSystem, Identity, StorageFacts};
+use crate::platform::Environment;
+use crate::ports::filesystem::{FileSystem, Identity, Ownership, StorageFacts};
 
 /// Raised when the data root cannot hardlink, so imports must copy.
 pub const COPY_ONLY: Code = Code::new("STORAGE-1");
@@ -42,6 +43,9 @@ pub const SPACE_LOW: Code = Code::new("STORAGE-4");
 
 /// Raised when the data root used to hardlink and no longer does.
 pub const DEGRADED: Code = Code::new("STORAGE-5");
+
+/// Raised when the operator owns the data root but the services cannot write it.
+pub const SERVICE_DENIED: Code = Code::new("STORAGE-6");
 
 /// The capability the storage check remembers between runs, so a later run can
 /// tell that a location which used to hardlink has stopped.
@@ -81,27 +85,36 @@ pub struct StorageCheck {
     filesystem: Arc<dyn FileSystem>,
     root: Option<PathBuf>,
     state: Option<PathBuf>,
+    environment: Environment,
+    service_user: Option<(u32, u32)>,
 }
 
 impl StorageCheck {
-    /// A storage check over the given filesystem, data root, and the file where
-    /// it remembers what it last saw.
+    /// A storage check over the given filesystem, data root, the file where it
+    /// remembers what it last saw, the platform, and the user the services run
+    /// as.
     ///
     /// The root is optional because a machine that has not been set up has not
     /// chosen one yet, and an operator in that state is told to run setup rather
     /// than shown an error about a path they never picked. The state file is
     /// optional too: without it the check still runs, it just cannot notice a
-    /// capability that was there before and is now gone.
+    /// capability that was there before and is now gone. The platform and service
+    /// user decide the permission finding: host ownership only gates the services
+    /// where Docker does not map it away, and only once a service user is known.
     #[must_use]
     pub fn new(
         filesystem: Arc<dyn FileSystem>,
         root: Option<PathBuf>,
         state: Option<PathBuf>,
+        environment: Environment,
+        service_user: Option<(u32, u32)>,
     ) -> Self {
         Self {
             filesystem,
             root,
             state,
+            environment,
+            service_user,
         }
     }
 
@@ -122,9 +135,12 @@ impl StorageCheck {
         let probe = real.join(PROBE);
         let linked = real.join(LINKED);
 
+        let permissions = self.permissions(real).await;
+
         if let Err(fault) = self.filesystem.touch(&probe).await {
             let mut findings = unwritable(&fault.message);
             findings.push(space);
+            findings.push(permissions);
             return findings;
         }
 
@@ -147,7 +163,30 @@ impl StorageCheck {
         self.filesystem.remove(&probe).await;
         self.remember(current).await;
         findings.push(space);
+        findings.push(permissions);
         findings
+    }
+
+    /// Whether the user the services run as can write the data root — a problem
+    /// distinct from the operator being unable to, and reported apart from it.
+    ///
+    /// Only meaningful where ownership is real. Docker Desktop maps it away, so
+    /// on every platform but native Linux the host's permissions do not gate the
+    /// containers and the finding is skipped rather than guessed at.
+    async fn permissions(&self, real: &Path) -> Finding {
+        if self.environment != Environment::LinuxNative {
+            return service_skipped(
+                "Docker maps file ownership on this platform, so the host's permissions do not \
+                 gate the services",
+            );
+        }
+        let Some((uid, gid)) = self.service_user else {
+            return service_skipped("the user the services run as is not configured yet");
+        };
+        match self.filesystem.ownership(real).await {
+            None => service_unverified(),
+            Some(owner) => service_verdict(owner, uid, gid),
+        }
     }
 
     /// The hardlink capability recorded on the last run, where there is a state
@@ -309,6 +348,79 @@ fn copy_mode(facts: &StorageFacts) -> Verdict {
     }
 }
 
+/// Whether a user and group can write a path, by the ownership and mode of it.
+///
+/// The classes do not fall back on each other: a file owned by the user is
+/// judged on its owner bits alone, even where the group or other bits would be
+/// more permissive, because that is how the kernel decides it.
+fn writable(owner: Ownership, uid: u32, gid: u32) -> bool {
+    const OWNER_WRITE: u32 = 0o200;
+    const GROUP_WRITE: u32 = 0o020;
+    const OTHER_WRITE: u32 = 0o002;
+    if owner.uid == uid {
+        owner.mode & OWNER_WRITE != 0
+    } else if owner.gid == gid {
+        owner.mode & GROUP_WRITE != 0
+    } else {
+        owner.mode & OTHER_WRITE != 0
+    }
+}
+
+/// The service-facing permission finding, once ownership is known.
+fn service_verdict(owner: Ownership, uid: u32, gid: u32) -> Finding {
+    let verdict = if writable(owner, uid, gid) {
+        Verdict::Pass {
+            note: Some(format!("writable by the services ({uid}:{gid})")),
+        }
+    } else {
+        Verdict::Fail(
+            Problem::new(
+                SERVICE_DENIED,
+                Severity::Error,
+                "The services cannot write to the data location",
+                format!(
+                    "The containers run as {uid}:{gid}, but the data location is owned by {}:{} \
+                     with mode {:o} and is not writable by them. Imports fail inside the services, \
+                     far from where the cause is.",
+                    owner.uid, owner.gid, owner.mode
+                ),
+                Remedy::new(
+                    "Give the service user ownership of the data location, or write access",
+                )
+                .with_detail(format!("chown -R {uid}:{gid} the data location")),
+            )
+            .in_state(State::Guided),
+        )
+    };
+    finding("storage.permissions", "Service access", verdict)
+}
+
+/// The permission finding where it does not apply — off native Linux, or before
+/// the service user is known.
+fn service_skipped(reason: &str) -> Finding {
+    finding(
+        "storage.permissions",
+        "Service access",
+        Verdict::Skipped {
+            reason: reason.to_owned(),
+        },
+    )
+}
+
+/// The permission finding where ownership could not be read.
+fn service_unverified() -> Finding {
+    finding(
+        "storage.permissions",
+        "Service access",
+        Verdict::Unverified {
+            reason: "the data location's ownership could not be read".to_owned(),
+            remedy: Remedy::new(
+                "Confirm the data location exists, then run the storage check again",
+            ),
+        },
+    )
+}
+
 /// The free-space finding for the volume the data root sits on.
 ///
 /// A volume that reports no size at all could not be measured rather than being
@@ -448,10 +560,10 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        humanize, Check, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED, ROOT_ABSENT,
-        ROOT_UNWRITABLE, SPACE_LOW,
+        humanize, writable, Check, Environment, Finding, StorageCheck, Verdict, COPY_ONLY,
+        DEGRADED, ROOT_ABSENT, ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
     };
-    use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, StorageFacts};
+    use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
 
     /// Room to spare, so a test that is not about space never trips the floor.
     const AMPLE: u64 = 500 * 1024 * 1024 * 1024;
@@ -481,6 +593,7 @@ mod tests {
         confirmed: Result<Identity, Fault>,
         facts: StorageFacts,
         remembered: Option<String>,
+        owner: Option<Ownership>,
     }
 
     impl Bench {
@@ -496,6 +609,7 @@ mod tests {
                 confirmed: Ok(Identity { file: 7, links: 2 }),
                 facts: facts(FsKind::Linking("apfs".to_owned()), false),
                 remembered: None,
+                owner: None,
             }
         }
     }
@@ -523,15 +637,26 @@ mod tests {
             self.remembered.clone()
         }
         async fn write(&self, _path: &Path, _contents: &str) {}
+        async fn ownership(&self, _path: &Path) -> Option<Ownership> {
+            self.owner
+        }
         async fn describe(&self, _path: &Path) -> StorageFacts {
             self.facts.clone()
         }
     }
 
+    /// Off native Linux, so the permission finding skips and the tests that are
+    /// not about it are undisturbed by it.
     async fn run(bench: Bench, root: Option<&str>) -> Vec<Finding> {
-        StorageCheck::new(Arc::new(bench), root.map(PathBuf::from), None)
-            .run()
-            .await
+        StorageCheck::new(
+            Arc::new(bench),
+            root.map(PathBuf::from),
+            None,
+            Environment::MacOs,
+            None,
+        )
+        .run()
+        .await
     }
 
     /// The same run, but with a place to remember what was seen, so a regression
@@ -541,6 +666,22 @@ mod tests {
             Arc::new(bench),
             Some(PathBuf::from(root)),
             Some(PathBuf::from("/state/storage-state.json")),
+            Environment::MacOs,
+            None,
+        )
+        .run()
+        .await
+    }
+
+    /// A run on native Linux, where host ownership gates the services, with the
+    /// service user configured.
+    async fn run_on_native_linux(bench: Bench, service_user: (u32, u32)) -> Vec<Finding> {
+        StorageCheck::new(
+            Arc::new(bench),
+            Some(PathBuf::from("/data")),
+            None,
+            Environment::LinuxNative,
+            Some(service_user),
         )
         .run()
         .await
@@ -833,6 +974,127 @@ mod tests {
         assert!(matches!(
             verdict(&findings, "storage.hardlinks"),
             Some(Verdict::Unverified { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn where_docker_maps_ownership_the_permission_check_does_not_apply() {
+        let findings = run(Bench::healthy(), Some("/data")).await;
+        assert!(matches!(
+            verdict(&findings, "storage.permissions"),
+            Some(Verdict::Skipped { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_unconfigured_service_user_skips_the_permission_check_on_native_linux() {
+        let findings = StorageCheck::new(
+            Arc::new(Bench::healthy()),
+            Some(PathBuf::from("/data")),
+            None,
+            Environment::LinuxNative,
+            None,
+        )
+        .run()
+        .await;
+        assert!(matches!(
+            verdict(&findings, "storage.permissions"),
+            Some(Verdict::Skipped { reason }) if reason.contains("not configured")
+        ));
+    }
+
+    #[tokio::test]
+    async fn ownership_that_cannot_be_read_leaves_the_permission_unverified() {
+        // The healthy bench reports no ownership; on native Linux with a service
+        // user that is the "could not read it" case.
+        let findings = run_on_native_linux(Bench::healthy(), (1000, 1000)).await;
+        assert!(matches!(
+            verdict(&findings, "storage.permissions"),
+            Some(Verdict::Unverified { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_data_root_the_services_can_write_passes() {
+        let bench = Bench {
+            owner: Some(Ownership {
+                uid: 1000,
+                gid: 1000,
+                mode: 0o755,
+            }),
+            ..Bench::healthy()
+        };
+        let findings = run_on_native_linux(bench, (1000, 1000)).await;
+        assert!(matches!(
+            verdict(&findings, "storage.permissions"),
+            Some(Verdict::Pass { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_root_the_operator_owns_but_the_services_cannot_write_is_its_own_failure() {
+        // Owned by root, world-unwritable: the operator running the check may
+        // well own it, yet the containers running as 1000:1000 cannot write, and
+        // that is a different problem from the operator being unable to.
+        let bench = Bench {
+            owner: Some(Ownership {
+                uid: 0,
+                gid: 0,
+                mode: 0o755,
+            }),
+            ..Bench::healthy()
+        };
+        let findings = run_on_native_linux(bench, (1000, 1000)).await;
+        assert!(matches!(
+            verdict(&findings, "storage.permissions"),
+            Some(Verdict::Fail(problem)) if problem.code == SERVICE_DENIED
+        ));
+        // The hardlink finding, which speaks for the operator, is untroubled —
+        // the two permission problems are reported apart.
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Pass { .. })
+        ));
+    }
+
+    #[test]
+    fn writing_is_judged_by_the_class_that_owns_the_file() {
+        let owns = |mode| Ownership {
+            uid: 5,
+            gid: 5,
+            mode,
+        };
+        // Owner class, even when the group or other bits would be kinder.
+        assert!(writable(owns(0o200), 5, 9));
+        assert!(!writable(owns(0o077), 5, 5));
+        // Group class, when the user is not the owner but shares the group.
+        assert!(writable(
+            Ownership {
+                uid: 0,
+                gid: 5,
+                mode: 0o020
+            },
+            5,
+            5
+        ));
+        // Other class, when neither the user nor the group owns it.
+        assert!(writable(
+            Ownership {
+                uid: 0,
+                gid: 0,
+                mode: 0o002
+            },
+            5,
+            5
+        ));
+        assert!(!writable(
+            Ownership {
+                uid: 0,
+                gid: 0,
+                mode: 0o750
+            },
+            5,
+            5
         ));
     }
 }

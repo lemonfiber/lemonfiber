@@ -61,6 +61,12 @@ pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 /// one of lemonfiber's, so it carries no prefix.
 pub const DATA_ROOT_KEY: &str = "DATA_ROOT";
 
+/// The user id the service containers run as.
+pub const PUID_KEY: &str = "PUID";
+
+/// The group id the service containers run as.
+pub const PGID_KEY: &str = "PGID";
+
 /// Whether a recorded setting reads as switched on.
 ///
 /// Generous about spelling because this is a file people edit by hand, and a
@@ -116,6 +122,18 @@ pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
+}
+
+/// The user and group the service containers run as, where both are configured.
+///
+/// Both or neither: deciding whether that user can write a directory needs the
+/// pair, and one half without the other cannot answer the question, so a
+/// half-configured file is treated as unconfigured rather than guessed at.
+#[must_use]
+pub fn service_user_from_env(file: &env::EnvFile) -> Option<(u32, u32)> {
+    let uid = file.get(PUID_KEY)?.trim().parse().ok()?;
+    let gid = file.get(PGID_KEY)?.trim().parse().ok()?;
+    Some((uid, gid))
 }
 
 impl Protocols {
@@ -197,6 +215,12 @@ pub struct Settings {
     /// Absent where the surface could not find the platform's data directory, in
     /// which case the check still runs but cannot detect a change over time.
     pub storage_state: Option<PathBuf>,
+    /// The user and group the service containers run as, where configured.
+    ///
+    /// Used to tell an operator-facing permission problem from a service-facing
+    /// one: the operator may own the data root while the containers, running as
+    /// this pair, cannot write it.
+    pub service_user: Option<(u32, u32)>,
 }
 
 impl Default for Settings {
@@ -210,6 +234,7 @@ impl Default for Settings {
             ip_echo: Some(DEFAULT_IP_ECHO.to_owned()),
             data_root: None,
             storage_state: None,
+            service_user: None,
         }
     }
 }
@@ -349,5 +374,24 @@ mod tests {
         );
         assert_eq!(super::data_root_from_env(&env::EnvFile::parse("")), None);
         assert_eq!(Settings::default().data_root, None);
+    }
+
+    #[test]
+    fn a_service_user_is_read_only_when_both_halves_are_present_and_numeric() {
+        assert_eq!(
+            super::service_user_from_env(&env::EnvFile::parse("PUID=1000\nPGID=1001\n")),
+            Some((1000, 1001))
+        );
+        // One half without the other cannot answer the question it is for, so it
+        // is treated as unconfigured rather than half-guessed.
+        assert_eq!(
+            super::service_user_from_env(&env::EnvFile::parse("PUID=1000\n")),
+            None
+        );
+        assert_eq!(
+            super::service_user_from_env(&env::EnvFile::parse("PUID=root\nPGID=1000\n")),
+            None
+        );
+        assert_eq!(Settings::default().service_user, None);
     }
 }
