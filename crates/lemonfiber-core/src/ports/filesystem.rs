@@ -246,6 +246,21 @@ pub trait FileSystem: Send + Sync {
     /// behind is untidy, never wrong.
     async fn remove(&self, path: &Path);
 
+    /// Read a small file lemonfiber wrote itself, or `None` where it is not there
+    /// yet or cannot be read.
+    ///
+    /// Absence is the ordinary first-run case, not an error, so it and an
+    /// unreadable file collapse to the same "nothing to compare against" answer.
+    async fn read(&self, path: &Path) -> Option<String>;
+
+    /// Record a small file lemonfiber keeps for itself, creating the directory
+    /// for it where needed.
+    ///
+    /// Best-effort: a baseline that could not be written means the next run
+    /// cannot detect a change from it, which is a lost opportunity rather than a
+    /// fault to report — so this reports nothing.
+    async fn write(&self, path: &Path, contents: &str);
+
     /// What the platform reports about the filesystem behind a path.
     async fn describe(&self, path: &Path) -> StorageFacts;
 }

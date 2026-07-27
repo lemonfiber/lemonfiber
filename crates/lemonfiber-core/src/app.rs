@@ -424,7 +424,11 @@ async fn diagnose(
         .map_err(|err| err.problem())?;
 
     let environment = EnvironmentCheck::new(ctx.runner.clone());
-    let storage = StorageCheck::new(ctx.filesystem.clone(), ctx.settings.data_root.clone());
+    let storage = StorageCheck::new(
+        ctx.filesystem.clone(),
+        ctx.settings.data_root.clone(),
+        ctx.settings.storage_state.clone(),
+    );
     let vpn = VpnCheck::new(
         ctx.engine.clone(),
         ctx.settings.project.clone(),

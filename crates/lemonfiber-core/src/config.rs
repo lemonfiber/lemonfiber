@@ -191,6 +191,12 @@ pub struct Settings {
     /// Absent until then, which is why the storage checks tell an operator to
     /// run setup rather than reporting a fault about a location they never picked.
     pub data_root: Option<PathBuf>,
+    /// Where the storage check records the last hardlink capability it saw, so a
+    /// later run can notice the capability was lost.
+    ///
+    /// Absent where the surface could not find the platform's data directory, in
+    /// which case the check still runs but cannot detect a change over time.
+    pub storage_state: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -203,6 +209,7 @@ impl Default for Settings {
             protocols: Protocols::none(),
             ip_echo: Some(DEFAULT_IP_ECHO.to_owned()),
             data_root: None,
+            storage_state: None,
         }
     }
 }
