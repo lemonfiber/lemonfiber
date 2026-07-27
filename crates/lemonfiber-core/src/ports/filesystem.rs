@@ -57,14 +57,20 @@ impl Fault {
 
 /// What the platform reports about the filesystem behind a path.
 ///
-/// A hint used only to *name* a limitation the probe has already established —
-/// never to decide capability, which is measured rather than inferred.
+/// The type is a hint used only to *name* a limitation the probe has already
+/// established — never to decide capability, which is measured rather than
+/// inferred. The capacity figures are the platform's own, reported as they are
+/// because a disk filling mid-import leaves partial files and a stalled queue.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageFacts {
     /// The filesystem type, as far as it can be recognised.
     pub kind: FsKind,
     /// Whether it sits on removable media.
     pub removable: bool,
+    /// Bytes free on the volume the path sits on.
+    pub available: u64,
+    /// The volume's total size in bytes, or zero where it could not be read.
+    pub total: u64,
 }
 
 /// The filesystem types whose hardlink behaviour lemonfiber can speak to by name.
@@ -148,29 +154,49 @@ impl FsKind {
     }
 }
 
+/// One mounted volume as the platform reports it, before a path is attributed to
+/// one of them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Mount {
+    /// Where the volume is mounted.
+    pub point: PathBuf,
+    /// The filesystem type name it reports.
+    pub kind: String,
+    /// Whether it is removable media.
+    pub removable: bool,
+    /// Bytes free on it.
+    pub available: u64,
+    /// Its total size in bytes.
+    pub total: u64,
+}
+
 /// Choose the filesystem a path sits on from a set of mounts, by the longest
 /// mount point that is a prefix of it.
 ///
 /// The longest match is the right one: `/` is a prefix of everything, so a data
 /// root under `/mnt/media` must be attributed to `/mnt/media` and not to the
 /// root filesystem it also technically descends from. Where nothing matches —
-/// no mount was reported — the type is simply unknown, which the caller treats
-/// as "no specific limitation to name" rather than as a failure.
+/// no mount was reported — the type is unknown and the capacity zero, which the
+/// caller treats as "nothing to name, nothing to measure" rather than a failure.
 #[must_use]
-pub fn pick(mounts: &[(PathBuf, String, bool)], path: &Path) -> StorageFacts {
+pub fn pick(mounts: &[Mount], path: &Path) -> StorageFacts {
     let chosen = mounts
         .iter()
-        .filter(|(mount, _, _)| path.starts_with(mount))
-        .max_by_key(|(mount, _, _)| mount.components().count());
+        .filter(|mount| path.starts_with(&mount.point))
+        .max_by_key(|mount| mount.point.components().count());
 
     match chosen {
-        Some((_, name, removable)) => StorageFacts {
-            kind: FsKind::classify(name),
-            removable: *removable,
+        Some(mount) => StorageFacts {
+            kind: FsKind::classify(&mount.kind),
+            removable: mount.removable,
+            available: mount.available,
+            total: mount.total,
         },
         None => StorageFacts {
             kind: FsKind::Unknown(String::new()),
             removable: false,
+            available: 0,
+            total: 0,
         },
     }
 }
@@ -228,7 +254,19 @@ pub trait FileSystem: Send + Sync {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{pick, FsKind};
+    use super::{pick, FsKind, Mount};
+
+    /// A mount at a point, with a type and capacity a test does not otherwise
+    /// care about filled in.
+    fn mount(point: &str, kind: &str, removable: bool) -> Mount {
+        Mount {
+            point: PathBuf::from(point),
+            kind: kind.to_owned(),
+            removable,
+            available: 500,
+            total: 1_000,
+        }
+    }
 
     #[test]
     fn a_network_share_is_recognised_under_either_platforms_name() {
@@ -289,12 +327,16 @@ mod tests {
     #[test]
     fn a_path_is_attributed_to_the_longest_mount_that_contains_it() {
         let mounts = vec![
-            (PathBuf::from("/"), "apfs".to_owned(), false),
-            (PathBuf::from("/Volumes/media"), "exfat".to_owned(), true),
+            mount("/", "apfs", false),
+            mount("/Volumes/media", "exfat", true),
         ];
         let facts = pick(&mounts, Path::new("/Volumes/media/tv"));
         assert_eq!(facts.kind, FsKind::ExFat);
         assert!(facts.removable);
+        assert_eq!(
+            facts.total, 1_000,
+            "the chosen mount's capacity comes through"
+        );
     }
 
     #[test]
@@ -302,5 +344,6 @@ mod tests {
         let facts = pick(&[], Path::new("/anywhere"));
         assert_eq!(facts.kind, FsKind::Unknown(String::new()));
         assert!(!facts.removable);
+        assert_eq!(facts.total, 0, "nothing to measure where nothing matched");
     }
 }
