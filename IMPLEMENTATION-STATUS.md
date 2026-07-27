@@ -68,7 +68,7 @@ harness and the first check landed before the wizard.
 | Permission distinction (operator vs service PUID/PGID) | `C5-R10` | ✅ | `storage.permissions`; native-Linux only, ownership vs `PUID`/`PGID` (mapped away on Docker Desktop, so skipped there) |
 | Data-root availability supervisor (stop on loss, no auto-restart) | `C5-R7`, `C5-R8`, `C5-R9` | ✅ | `lemonfiber watch`; the `Volume` port detects a vanished or swapped mount by device id and stops the forms |
 | Credential validation against live services | `A3-R1..R4`, `A3-R10` | ☐ | `service::Client` port defined; no adapter/check |
-| VPN port-forward validation + ProtonVPN NAT-PMP guidance | `A3-R8` | ☐ | — |
+| VPN port-forward validation + ProtonVPN NAT-PMP guidance | `A3-R8` | ✅ | `vpn.port-forward` finding: reads the granted port from Gluetun's status file; names ProtonVPN's NAT-PMP-at-generation trap on failure, generic for other forwarding providers, `unverified` for unknown ones, `not-applicable` where forwarding is off (`C2-R6`, `C2-R16`, `C2-R18`, `A3-R14`, `A3-R15`). The continuous re-push lifecycle (`C2-R4`/`C2-R5`/`C2-R19`) stays with M-later. |
 | Prerequisites / account guidance (dependency map before credentials) | `A1-R1..R13` | ◐ | [`prerequisites.rs`](crates/lemonfiber-core/src/prerequisites.rs) derives the map; the wizard renders it (A1-R7/R8/R10 arrive with A2/A3) |
 | Wizard state machine (resumable, review-before-write, non-interactive guard) | `A2-R1..R15` | ☐ | core exposes steps; surface drives prompting |
 | Jellyfin native-mode + PUID/PGID offers (platform-aware) | `A2-R6`, `A2-R7` | ☐ | — |
