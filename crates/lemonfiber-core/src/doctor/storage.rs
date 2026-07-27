@@ -137,6 +137,13 @@ impl StorageCheck {
 
         let permissions = self.permissions(real).await;
 
+        // A run killed between the link and the cleanup below leaves the link
+        // behind, and a link to a name that already exists fails — which would
+        // read as "cannot hardlink" on a filesystem that hardlinks fine. Clearing
+        // both names first makes the probe robust to its own interrupted past.
+        self.filesystem.remove(&linked).await;
+        self.filesystem.remove(&probe).await;
+
         if let Err(fault) = self.filesystem.touch(&probe).await {
             let mut findings = unwritable(&fault.message);
             findings.push(space);
@@ -152,10 +159,9 @@ impl StorageCheck {
             (copying(&facts, remembered == Some(true)), Some(false))
         } else {
             let confirmed = self.filesystem.identify(&linked).await.ok();
-            let linked_ok = matches!((original, confirmed), (Some(a), Some(b)) if a.file == b.file);
             (
                 linked_result(original, confirmed, &facts),
-                linked_ok.then_some(true),
+                same_file(original, confirmed).then_some(true),
             )
         };
 
@@ -199,14 +205,18 @@ impl StorageCheck {
             .map(|recorded| recorded.hardlinks)
     }
 
-    /// Record what this run found, so the next can notice a change. A result that
-    /// could not be determined is not written, so a single unreadable run does
-    /// not erase a known-good baseline.
+    /// Record a working link, so a later run can notice the capability was lost.
+    ///
+    /// Only a success is written. A failure is never recorded over a known-good
+    /// baseline: a location that has regressed keeps reporting degraded until it
+    /// links again, rather than quietly settling into an ordinary copy-mode
+    /// warning on its second run. A result that could not be determined is not
+    /// written either.
     async fn remember(&self, current: Option<bool>) {
-        let (Some(path), Some(hardlinks)) = (self.state.as_ref(), current) else {
+        let (Some(path), Some(true)) = (self.state.as_ref(), current) else {
             return;
         };
-        let text = serde_json::to_string(&Recorded { hardlinks }).unwrap_or_default();
+        let text = serde_json::to_string(&Recorded { hardlinks: true }).unwrap_or_default();
         self.filesystem.write(path, &text).await;
     }
 }
@@ -234,6 +244,15 @@ impl Check for StorageCheck {
     }
 }
 
+/// Whether two entries name the same underlying file.
+///
+/// A zero identity is no identity — a real file's inode is never zero, and a
+/// platform that reports no file index leaves nothing to compare — so it never
+/// counts as a match, however equal two zeroes look.
+fn same_file(original: Option<Identity>, confirmed: Option<Identity>) -> bool {
+    matches!((original, confirmed), (Some(a), Some(b)) if a.file == b.file && a.file != 0)
+}
+
 /// The findings when the link was made: a pass if the two names are one file,
 /// and the mode the working link puts the stack in.
 fn linked_result(
@@ -241,25 +260,25 @@ fn linked_result(
     confirmed: Option<Identity>,
     facts: &StorageFacts,
 ) -> Vec<Finding> {
-    match (original, confirmed) {
-        (Some(one), Some(two)) if one.file == two.file => {
-            let note = format!("{}, {} names to one file", facts.kind.label(), two.links);
-            pair(Verdict::Pass { note: Some(note) }, working_mode(facts))
-        }
-        // The link call succeeded yet the names do not agree on a file, or one
-        // could not be read back: the capability is not disproven, but it is not
-        // proven either, and an unproven guarantee is never reported as met.
-        _ => pair(
-            Verdict::Unverified {
-                reason: "the link was made but could not be confirmed to point at the same file"
-                    .to_owned(),
-                remedy: Remedy::new("Run the storage check again"),
-            },
-            Verdict::Skipped {
-                reason: "the link could not be confirmed, so no mode was derived".to_owned(),
-            },
-        ),
+    if same_file(original, confirmed) {
+        let links = confirmed.map_or(0, |identity| identity.links);
+        let note = format!("{}, {links} names to one file", facts.kind.label());
+        return pair(Verdict::Pass { note: Some(note) }, working_mode(facts));
     }
+
+    // The link call succeeded yet the names do not agree on a file, or one could
+    // not be read back: the capability is not disproven, but it is not proven
+    // either, and an unproven guarantee is never reported as met.
+    pair(
+        Verdict::Unverified {
+            reason: "the link was made but could not be confirmed to point at the same file"
+                .to_owned(),
+            remedy: Remedy::new("Run the storage check again"),
+        },
+        Verdict::Skipped {
+            reason: "the link could not be confirmed, so no mode was derived".to_owned(),
+        },
+    )
 }
 
 /// The findings when the link could not be made.
@@ -357,6 +376,11 @@ fn writable(owner: Ownership, uid: u32, gid: u32) -> bool {
     const OWNER_WRITE: u32 = 0o200;
     const GROUP_WRITE: u32 = 0o020;
     const OTHER_WRITE: u32 = 0o002;
+    // Root is bound by no permission bits, so a container running as it can
+    // write regardless of who owns the directory.
+    if uid == 0 {
+        return true;
+    }
     if owner.uid == uid {
         owner.mode & OWNER_WRITE != 0
     } else if owner.gid == gid {
@@ -472,8 +496,16 @@ fn humanize(bytes: u64) -> String {
     ];
     for (label, size) in UNITS {
         if bytes >= size {
-            let whole = bytes / size;
-            let tenths = (bytes % size) * 10 / size;
+            // Rounded to the nearest tenth rather than truncated, so 2.0 GiB does
+            // not read as 1.9. The remainder is well under a terabyte, so scaling
+            // it by ten cannot overflow; a remainder that rounds up to a whole
+            // unit carries into it.
+            let mut whole = bytes / size;
+            let mut tenths = ((bytes % size) * 10 + size / 2) / size;
+            if tenths == 10 {
+                whole += 1;
+                tenths = 0;
+            }
             return format!("{whole}.{tenths} {label}");
         }
     }
@@ -594,6 +626,9 @@ mod tests {
         facts: StorageFacts,
         remembered: Option<String>,
         owner: Option<Ownership>,
+        /// What the check wrote to the state file, so a test can assert whether —
+        /// and with what — the baseline was recorded.
+        recorded: Arc<std::sync::Mutex<Vec<String>>>,
     }
 
     impl Bench {
@@ -610,6 +645,7 @@ mod tests {
                 facts: facts(FsKind::Linking("apfs".to_owned()), false),
                 remembered: None,
                 owner: None,
+                recorded: Arc::new(std::sync::Mutex::new(Vec::new())),
             }
         }
     }
@@ -636,7 +672,11 @@ mod tests {
         async fn read(&self, _path: &Path) -> Option<String> {
             self.remembered.clone()
         }
-        async fn write(&self, _path: &Path, _contents: &str) {}
+        async fn write(&self, _path: &Path, contents: &str) {
+            if let Ok(mut log) = self.recorded.lock() {
+                log.push(contents.to_owned());
+            }
+        }
         async fn ownership(&self, _path: &Path) -> Option<Ownership> {
             self.owner
         }
@@ -894,6 +934,10 @@ mod tests {
             "10.5 GiB"
         );
         assert_eq!(humanize(1024_u64.pow(4) * 2), "2.0 TiB");
+        // Rounded, not truncated: a hair under two gigabytes reads as 2.0, and
+        // the tenth that rounds up carries into the whole rather than showing 1.10.
+        assert_eq!(humanize(2 * 1024 * 1024 * 1024 - 1), "2.0 GiB");
+        assert_eq!(humanize(1024 * 1024 * 1024 + 550 * 1024 * 1024), "1.5 GiB");
     }
 
     #[tokio::test]
@@ -903,6 +947,7 @@ mod tests {
             remembered: Some(r#"{"hardlinks":true}"#.to_owned()),
             ..Bench::healthy()
         };
+        let recorded = bench.recorded.clone();
         let findings = run_remembering(bench, "/data").await;
         assert!(
             matches!(
@@ -915,6 +960,12 @@ mod tests {
             verdict(&findings, "storage.mode"),
             Some(Verdict::Warn(problem)) if problem.code == DEGRADED
         ));
+        // The failure is not written over the good baseline, so the next run
+        // still sees it and keeps shouting rather than downgrading to a warning.
+        assert!(
+            recorded.lock().is_ok_and(|log| log.is_empty()),
+            "a regression must not overwrite the known-good baseline"
+        );
     }
 
     #[tokio::test]
@@ -949,13 +1000,36 @@ mod tests {
 
     #[tokio::test]
     async fn a_healthy_run_records_what_it_saw_for_next_time() {
-        // With nothing remembered yet, the run passes and writes its result; the
-        // fake's write is a no-op, so this exercises the recording path without
-        // asserting on a side effect a unit has no way to see.
-        let findings = run_remembering(Bench::healthy(), "/data").await;
+        let bench = Bench::healthy();
+        let recorded = bench.recorded.clone();
+        let findings = run_remembering(bench, "/data").await;
         assert!(matches!(
             verdict(&findings, "storage.hardlinks"),
             Some(Verdict::Pass { .. })
+        ));
+        // A working link is written down, so a later run can notice if it stops.
+        assert!(
+            recorded
+                .lock()
+                .is_ok_and(|log| log.iter().any(|written| written.contains("true"))),
+            "the working link is recorded"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_link_whose_identity_reads_as_zero_is_not_taken_as_proof() {
+        // A filesystem that reports no usable file identity leaves nothing to
+        // compare; two zeroes are equal but prove nothing, so the link is
+        // unverified rather than passed.
+        let bench = Bench {
+            original: Ok(Identity { file: 0, links: 1 }),
+            confirmed: Ok(Identity { file: 0, links: 2 }),
+            ..Bench::healthy()
+        };
+        let findings = run(bench, Some("/data")).await;
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Unverified { .. })
         ));
     }
 
@@ -1096,5 +1170,48 @@ mod tests {
             5,
             5
         ));
+        // Root is bound by no bits: a container running as uid 0 writes a
+        // directory it does not own and has no mode share in.
+        assert!(writable(
+            Ownership {
+                uid: 5,
+                gid: 5,
+                mode: 0o700
+            },
+            0,
+            0
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_leftover_probe_link_does_not_read_as_an_inability_to_hardlink() {
+        // A previous run interrupted between the link and its cleanup leaves the
+        // link behind. Against a real filesystem that hardlinks fine, the check
+        // must clear it and still pass, not conclude the volume cannot link.
+        let dir = std::env::temp_dir().join(format!(
+            "lemonfiber-storage-{}-leftover",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::write(dir.join(".lemonfiber-hardlink-probe.link"), "stale");
+
+        let findings = StorageCheck::new(
+            Arc::new(crate::adapters::Disk),
+            Some(dir.clone()),
+            None,
+            Environment::MacOs,
+            None,
+        )
+        .run()
+        .await;
+        // A stale probe link must not be mistaken for a filesystem that cannot
+        // link: the check clears it first and still passes.
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Pass { .. })
+        ));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

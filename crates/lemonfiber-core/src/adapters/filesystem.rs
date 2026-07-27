@@ -314,8 +314,8 @@ mod tests {
         // the assertion below still holds for.
         let present = Disk.ownership(&dir).await;
         assert!(
-            present.is_none_or(|owner| owner.mode <= 0o777),
-            "a reported mode is only the permission bits"
+            present.is_none_or(|owner| owner.mode & 0o200 != 0 && owner.mode <= 0o777),
+            "a directory we just created is writable by its owner, and only permission bits are kept"
         );
         assert_eq!(
             Disk.ownership(Path::new("/lemonfiber/no/such/path")).await,
