@@ -36,6 +36,18 @@ pub const ROOT_UNWRITABLE: Code = Code::new("STORAGE-2");
 /// Raised when the data root is not there to test.
 pub const ROOT_ABSENT: Code = Code::new("STORAGE-3");
 
+/// Raised when the volume holding the data root is nearly full.
+pub const SPACE_LOW: Code = Code::new("STORAGE-4");
+
+/// The free space below which an import is at risk of failing.
+///
+/// A coarse floor rather than the projection the spec ultimately wants: computing
+/// exhaustion from what the download queue holds needs the service client, which
+/// is not built yet, so this catches a volume that is nearly full before that
+/// arrives. A single large import can be tens of gigabytes, so the floor sits
+/// well above one file.
+const LOW_SPACE_FLOOR: u64 = 10 * 1024 * 1024 * 1024;
+
 /// The name of the file the probe creates, and the second name it links it to.
 ///
 /// Fixed and unmistakable so that a probe interrupted mid-run leaves something a
@@ -70,19 +82,27 @@ impl StorageCheck {
     }
 
     /// Run the probe against a resolved data root and read what it proved.
+    ///
+    /// The volume is described first, so its free space is reported alongside
+    /// even a root that cannot be written to — a full disk and an unwritable one
+    /// are different problems, and the operator is owed both answers at once.
     async fn probe(&self, real: &Path) -> Vec<Finding> {
+        let facts = self.filesystem.describe(real).await;
+        let space = space(&facts);
+
         let probe = real.join(PROBE);
         let linked = real.join(LINKED);
 
         if let Err(fault) = self.filesystem.touch(&probe).await {
-            return unwritable(&fault.message);
+            let mut findings = unwritable(&fault.message);
+            findings.push(space);
+            return findings;
         }
 
         let original = self.filesystem.identify(&probe).await.ok();
         let link = self.filesystem.link(&probe, &linked).await;
-        let facts = self.filesystem.describe(real).await;
 
-        let findings = if link.is_err() {
+        let mut findings = if link.is_err() {
             copying(&facts)
         } else {
             let confirmed = self.filesystem.identify(&linked).await.ok();
@@ -91,6 +111,7 @@ impl StorageCheck {
 
         self.filesystem.remove(&linked).await;
         self.filesystem.remove(&probe).await;
+        findings.push(space);
         findings
     }
 }
@@ -191,6 +212,65 @@ fn copy_mode(facts: &StorageFacts) -> Verdict {
     }
 }
 
+/// The free-space finding for the volume the data root sits on.
+///
+/// A volume that reports no size at all could not be measured rather than being
+/// empty, so it is unverified rather than reported as full. This is the raw
+/// figure, not the projection from queued content the spec ultimately wants —
+/// that needs the download client — so it warns on a floor rather than on an
+/// exhaustion date.
+fn space(facts: &StorageFacts) -> Finding {
+    let verdict = if facts.total == 0 {
+        Verdict::Unverified {
+            reason: "the volume's free space could not be read".to_owned(),
+            remedy: Remedy::new("Run the storage check again once the location is reachable"),
+        }
+    } else if facts.available < LOW_SPACE_FLOOR {
+        Verdict::Warn(
+            Problem::new(
+                SPACE_LOW,
+                Severity::Warning,
+                format!("Free space is low — {} left", humanize(facts.available)),
+                "A disk that fills partway through an import leaves half a file behind and \
+                 stalls the queue, so what is left has to cover what is still to come.",
+                Remedy::new("Free space on the data location, or move it to a larger volume"),
+            )
+            .in_state(State::Guided),
+        )
+    } else {
+        Verdict::Pass {
+            note: Some(format!(
+                "{} free of {}",
+                humanize(facts.available),
+                humanize(facts.total)
+            )),
+        }
+    };
+    finding("storage.space", "Free space", verdict)
+}
+
+/// A byte count as a person reads it, to one decimal place.
+///
+/// Binary units, because that is what the tools an operator will cross-check
+/// against report, and one decimal because a library measured to the byte is
+/// noise around a figure whose point is "roughly how much room is left".
+fn humanize(bytes: u64) -> String {
+    const UNITS: [(&str, u64); 4] = [
+        ("TiB", 1 << 40),
+        ("GiB", 1 << 30),
+        ("MiB", 1 << 20),
+        ("KiB", 1 << 10),
+    ];
+    for (label, size) in UNITS {
+        if bytes >= size {
+            let whole = bytes / size;
+            let tenths = (bytes % size) * 10 / size;
+            return format!("{whole}.{tenths} {label}");
+        }
+    }
+    format!("{bytes} B")
+}
+
 /// The findings when the data root could not be reached at all.
 fn absent(root: &Path, detail: &str) -> Vec<Finding> {
     let problem = Problem::new(
@@ -270,8 +350,28 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{Check, Finding, StorageCheck, Verdict, COPY_ONLY, ROOT_ABSENT, ROOT_UNWRITABLE};
+    use super::{
+        humanize, Check, Finding, StorageCheck, Verdict, COPY_ONLY, ROOT_ABSENT, ROOT_UNWRITABLE,
+        SPACE_LOW,
+    };
     use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, StorageFacts};
+
+    /// Room to spare, so a test that is not about space never trips the floor.
+    const AMPLE: u64 = 500 * 1024 * 1024 * 1024;
+
+    /// A one-terabyte volume, the size the ample figure is free space on.
+    const CAPACITY: u64 = 1024 * 1024 * 1024 * 1024;
+
+    /// Facts for a filesystem, with a capacity a test does not otherwise care
+    /// about filled in generously.
+    fn facts(kind: FsKind, removable: bool) -> StorageFacts {
+        StorageFacts {
+            kind,
+            removable,
+            available: AMPLE,
+            total: CAPACITY,
+        }
+    }
 
     /// A filesystem whose every answer the test scripts. Identity is asked twice
     /// — of the original and of the link — and told apart by the name asked
@@ -287,7 +387,7 @@ mod tests {
 
     impl Bench {
         /// A healthy local filesystem: resolves, writes, links, and reports the
-        /// two names as one file on a filesystem that links.
+        /// two names as one file on a filesystem that links, with room to spare.
         fn healthy() -> Self {
             Self {
                 resolves: Ok(PathBuf::from("/data")),
@@ -295,10 +395,7 @@ mod tests {
                 original: Ok(Identity { file: 7, links: 1 }),
                 links: Ok(()),
                 confirmed: Ok(Identity { file: 7, links: 2 }),
-                facts: StorageFacts {
-                    kind: FsKind::Linking("apfs".to_owned()),
-                    removable: false,
-                },
+                facts: facts(FsKind::Linking("apfs".to_owned()), false),
             }
         }
     }
@@ -356,10 +453,7 @@ mod tests {
     #[tokio::test]
     async fn a_working_link_on_removable_media_is_the_external_mode() {
         let bench = Bench {
-            facts: StorageFacts {
-                kind: FsKind::Linking("apfs".to_owned()),
-                removable: true,
-            },
+            facts: facts(FsKind::Linking("apfs".to_owned()), true),
             ..Bench::healthy()
         };
         let findings = run(bench, Some("/data")).await;
@@ -373,10 +467,7 @@ mod tests {
     async fn exfat_is_named_specifically_as_the_reason_it_cannot_link() {
         let bench = Bench {
             links: Err(Fault::new("operation not permitted")),
-            facts: StorageFacts {
-                kind: FsKind::ExFat,
-                removable: true,
-            },
+            facts: facts(FsKind::ExFat, true),
             ..Bench::healthy()
         };
         let findings = run(bench, Some("/data")).await;
@@ -395,10 +486,7 @@ mod tests {
     async fn a_network_share_that_cannot_link_derives_the_nas_mode() {
         let bench = Bench {
             links: Err(Fault::new("not supported")),
-            facts: StorageFacts {
-                kind: FsKind::Nfs,
-                removable: false,
-            },
+            facts: facts(FsKind::Nfs, false),
             ..Bench::healthy()
         };
         let findings = run(bench, Some("/data")).await;
@@ -412,10 +500,7 @@ mod tests {
     async fn a_filesystem_that_does_not_link_but_names_nothing_still_warns() {
         let bench = Bench {
             links: Err(Fault::new("nope")),
-            facts: StorageFacts {
-                kind: FsKind::Unknown("weirdfs".to_owned()),
-                removable: false,
-            },
+            facts: facts(FsKind::Unknown("weirdfs".to_owned()), false),
             ..Bench::healthy()
         };
         let findings = run(bench, Some("/data")).await;
@@ -478,5 +563,79 @@ mod tests {
             verdict(&findings, "storage"),
             Some(Verdict::Skipped { reason }) if reason.contains("setup")
         ));
+    }
+
+    #[tokio::test]
+    async fn a_volume_with_room_reports_its_free_space() {
+        let findings = run(Bench::healthy(), Some("/data")).await;
+        assert!(matches!(
+            verdict(&findings, "storage.space"),
+            Some(Verdict::Pass { note: Some(note) }) if note.contains("free of")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_nearly_full_volume_warns_about_space() {
+        let mut low = facts(FsKind::Linking("ext4".to_owned()), false);
+        low.available = 2 * 1024 * 1024 * 1024;
+        let findings = run(
+            Bench {
+                facts: low,
+                ..Bench::healthy()
+            },
+            Some("/data"),
+        )
+        .await;
+        assert!(matches!(
+            verdict(&findings, "storage.space"),
+            Some(Verdict::Warn(problem)) if problem.code == SPACE_LOW
+        ));
+    }
+
+    #[tokio::test]
+    async fn free_space_is_reported_even_when_the_root_cannot_be_written_to() {
+        let bench = Bench {
+            writes: Err(Fault::new("permission denied")),
+            ..Bench::healthy()
+        };
+        let findings = run(bench, Some("/data")).await;
+        // A full disk and an unwritable one are different problems; the operator
+        // gets both rather than the write failure hiding the space figure.
+        assert!(matches!(
+            verdict(&findings, "storage.space"),
+            Some(Verdict::Pass { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_volume_whose_size_cannot_be_read_is_unverified_not_reported_full() {
+        let mut unreadable = facts(FsKind::Linking("ext4".to_owned()), false);
+        unreadable.total = 0;
+        unreadable.available = 0;
+        let findings = run(
+            Bench {
+                facts: unreadable,
+                ..Bench::healthy()
+            },
+            Some("/data"),
+        )
+        .await;
+        assert!(matches!(
+            verdict(&findings, "storage.space"),
+            Some(Verdict::Unverified { .. })
+        ));
+    }
+
+    #[test]
+    fn a_byte_count_reads_in_the_unit_a_person_would_use() {
+        assert_eq!(humanize(0), "0 B");
+        assert_eq!(humanize(512), "512 B");
+        assert_eq!(humanize(1536), "1.5 KiB");
+        assert_eq!(humanize(3 * 1024 * 1024), "3.0 MiB");
+        assert_eq!(
+            humanize(10 * 1024 * 1024 * 1024 + 512 * 1024 * 1024),
+            "10.5 GiB"
+        );
+        assert_eq!(humanize(1024_u64.pow(4) * 2), "2.0 TiB");
     }
 }

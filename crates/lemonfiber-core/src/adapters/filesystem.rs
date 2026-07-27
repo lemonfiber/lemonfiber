@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
-use crate::ports::filesystem::{Fault, FileSystem, Identity, StorageFacts};
+use crate::ports::filesystem::{Fault, FileSystem, Identity, Mount, StorageFacts};
 
 /// The filesystem on this machine, reached through the standard library.
 #[derive(Debug, Default, Clone, Copy)]
@@ -50,15 +50,15 @@ impl FileSystem for Disk {
 
     async fn describe(&self, path: &Path) -> StorageFacts {
         let disks = sysinfo::Disks::new_with_refreshed_list();
-        let mounts: Vec<(PathBuf, String, bool)> = disks
+        let mounts: Vec<Mount> = disks
             .list()
             .iter()
-            .map(|disk| {
-                (
-                    disk.mount_point().to_path_buf(),
-                    disk.file_system().to_string_lossy().into_owned(),
-                    disk.is_removable(),
-                )
+            .map(|disk| Mount {
+                point: disk.mount_point().to_path_buf(),
+                kind: disk.file_system().to_string_lossy().into_owned(),
+                removable: disk.is_removable(),
+                available: disk.available_space(),
+                total: disk.total_space(),
             })
             .collect();
         crate::ports::filesystem::pick(&mounts, path)
@@ -210,6 +210,7 @@ mod tests {
             !facts.kind.is_network(),
             "a local temp directory is not a network filesystem"
         );
+        assert!(facts.total > 0, "a real volume reports a size");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
