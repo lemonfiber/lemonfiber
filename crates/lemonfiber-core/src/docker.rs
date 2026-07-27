@@ -187,7 +187,13 @@ pub fn condition(services: &[Service]) -> Condition {
         .filter(|service| service.state != State::HostManaged)
         .collect();
 
-    if ours.is_empty() || ours.iter().all(|service| service.state == State::Absent) {
+    // Nothing is up when every service is either absent or stopped: a stack the
+    // operator stopped is not "partly up", it is down with its containers kept.
+    if ours.is_empty()
+        || ours
+            .iter()
+            .all(|service| matches!(service.state, State::Absent | State::Stopped))
+    {
         return Condition::Inactive;
     }
     if ours.iter().any(|service| service.state.wants_attention()) {
@@ -528,6 +534,17 @@ profiles = ["media"]
             .map(|manifest| survey(&manifest, &profiles, &[]))
             .unwrap_or_default();
         assert_eq!(condition(&absent), Condition::Inactive);
+
+        // A stack the operator stopped keeps its containers but runs nothing, so
+        // it reads as inactive rather than as partly up.
+        let stopped: Vec<super::Service> = media(Lifecycle::Running, Health::Healthy)
+            .iter()
+            .map(|service| super::Service {
+                state: State::Stopped,
+                ..service.clone()
+            })
+            .collect();
+        assert_eq!(condition(&stopped), Condition::Inactive);
 
         let mut partial = media(Lifecycle::Running, Health::Healthy);
         if let Some(first) = partial.first_mut() {

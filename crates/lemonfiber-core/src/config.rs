@@ -67,6 +67,16 @@ pub const PUID_KEY: &str = "PUID";
 /// The group id the service containers run as.
 pub const PGID_KEY: &str = "PGID";
 
+/// A recorded value with the whitespace and surrounding quotes a person might
+/// add stripped, so `"on"` and ` on ` both read the same as `on`.
+fn bare(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'')
+        .trim()
+        .to_ascii_lowercase()
+}
+
 /// Whether a recorded setting reads as switched on.
 ///
 /// Generous about spelling because this is a file people edit by hand, and a
@@ -74,10 +84,7 @@ pub const PGID_KEY: &str = "PGID";
 /// would be indistinguishable from lemonfiber ignoring it.
 #[must_use]
 pub fn reads_as_on(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_lowercase().as_str(),
-        "on" | "true" | "yes" | "1"
-    )
+    matches!(bare(value).as_str(), "on" | "true" | "yes" | "1")
 }
 
 /// Whether a recorded setting reads as switched off.
@@ -87,10 +94,7 @@ pub fn reads_as_on(value: &str) -> bool {
 /// would leave it on.
 #[must_use]
 pub fn reads_as_off(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_lowercase().as_str(),
-        "off" | "false" | "no" | "0" | ""
-    )
+    matches!(bare(value).as_str(), "off" | "false" | "no" | "0" | "")
 }
 
 /// The IP-echo service to verify egress against, or `None` where the operator
@@ -298,11 +302,15 @@ mod tests {
 
     #[test]
     fn a_setting_may_be_spelled_the_ways_people_spell_it() {
-        for on in ["on", "ON", "true", "yes", "1", " on "] {
+        // Including quoted, which a hand-edited .env commonly is.
+        for on in ["on", "ON", "true", "yes", "1", " on ", "\"on\"", "'yes'"] {
             assert!(super::reads_as_on(on), "{on:?} should read as on");
         }
-        for off in ["off", "false", "no", "0", "", "maybe"] {
+        for off in ["off", "false", "no", "0", "", "maybe", "\"off\"", "\"\""] {
             assert!(!super::reads_as_on(off), "{off:?} should not read as on");
+            if off != "maybe" {
+                assert!(super::reads_as_off(off), "{off:?} should read as off");
+            }
         }
     }
 

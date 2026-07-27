@@ -551,7 +551,15 @@ fn settings(report: &ConfigReport) {
         println!("{}={}", setting.key, setting.value);
     }
     if report.changed {
-        println!("saved");
+        // A rehearsal reports what it would do, so it must not claim it saved.
+        println!(
+            "{}",
+            if report.rehearsed {
+                "would save"
+            } else {
+                "saved"
+            }
+        );
     }
 }
 

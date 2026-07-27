@@ -266,14 +266,13 @@ fn wget(url: String) -> Vec<String> {
     vec!["wget".to_owned(), "-qO-".to_owned(), url]
 }
 
-/// Whether a response is plausibly an address rather than an error page.
+/// Whether a response is an address rather than an error page.
+///
+/// Parsed as an address rather than pattern-matched, so an error body that
+/// happens to hold dots and hex digits cannot be mistaken for one and shown as
+/// the tunnel's egress.
 fn looks_like_ip(text: &str) -> bool {
-    !text.is_empty()
-        && text.len() <= 45
-        && text.chars().any(|c| c == '.' || c == ':')
-        && text
-            .chars()
-            .all(|c| c.is_ascii_hexdigit() || c == '.' || c == ':')
+    text.parse::<std::net::IpAddr>().is_ok()
 }
 
 /// Whether a response is a two- or three-letter country code.
@@ -355,7 +354,19 @@ fn egress_verdict(gateway: &Reach, client: &Reach, pair: &Pair) -> Verdict {
                 note: Some(client_ip.clone()),
             },
             Reach::Address(_) => Verdict::Fail(mismatch(pair)),
-            _ => Verdict::Fail(uncontained(pair)),
+            // The tunnel down or reachable-but-blocked, while the client reached
+            // the internet, is the client going around it — a real leak. The
+            // tunnel merely unaskable is not: its address is unknown, not proven
+            // absent, so a leak cannot be established and is never claimed.
+            Reach::Down | Reach::Blocked => Verdict::Fail(uncontained(pair)),
+            Reach::Unknown => Verdict::Unverified {
+                reason: format!(
+                    "{} returned an address, but {}'s own address could not be read, so egress \
+                     could not be compared",
+                    pair.client, pair.gateway
+                ),
+                remedy: Remedy::new("Confirm the tunnel is up, then run this again"),
+            },
         },
         Reach::Blocked => match gateway {
             Reach::Address(_) => Verdict::Warn(isolated(pair)),

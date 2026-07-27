@@ -80,8 +80,11 @@ pub struct SettingReport {
 pub struct ConfigReport {
     /// The settings asked about — one for a lookup, all of them for a listing.
     pub settings: Vec<SettingReport>,
-    /// Whether this command changed anything.
+    /// Whether this command changed, or would change, a setting.
     pub changed: bool,
+    /// Whether this was a rehearsal, so a change that `changed` reports was one
+    /// that *would* be made rather than one that was.
+    pub rehearsed: bool,
 }
 
 /// What a lifecycle command did, or would have done.

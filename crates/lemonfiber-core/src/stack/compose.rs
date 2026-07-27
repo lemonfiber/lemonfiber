@@ -60,7 +60,12 @@ impl Action {
             Self::Stop => vec!["stop".to_owned()],
             Self::Restart(services) => {
                 let mut argv = vec!["restart".to_owned()];
-                argv.extend(services.iter().cloned());
+                // A `--` fences the service names off from option parsing, so one
+                // that begins with a dash is treated as a name and not a flag.
+                if !services.is_empty() {
+                    argv.push("--".to_owned());
+                    argv.extend(services.iter().cloned());
+                }
                 argv
             }
             Self::Pull => vec!["pull".to_owned()],
@@ -240,7 +245,8 @@ mod tests {
         assert_eq!(ending(&Action::Config).as_deref(), Some("config"));
         assert_eq!(
             ending(&Action::Restart(vec!["sonarr".to_owned()])).as_deref(),
-            Some("restart sonarr")
+            Some("restart -- sonarr"),
+            "named services are fenced off from option parsing"
         );
         assert_eq!(
             ending(&Action::Restart(Vec::new())).as_deref(),
