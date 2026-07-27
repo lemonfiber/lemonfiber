@@ -266,6 +266,7 @@ fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
+        storage_state: here().map(|paths| paths.storage_state()),
         env_file,
         stack_dir: stack_directory(),
         ..Settings::default()

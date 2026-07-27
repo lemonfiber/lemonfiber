@@ -48,6 +48,17 @@ impl FileSystem for Disk {
         let _ = std::fs::remove_file(path);
     }
 
+    async fn read(&self, path: &Path) -> Option<String> {
+        std::fs::read_to_string(path).ok()
+    }
+
+    async fn write(&self, path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(path, contents);
+    }
+
     async fn describe(&self, path: &Path) -> StorageFacts {
         let disks = sysinfo::Disks::new_with_refreshed_list();
         let mounts: Vec<Mount> = disks
@@ -197,6 +208,20 @@ mod tests {
         // remove reports nothing, so the guarantee is only that it returns; an
         // absent file is the case that would fail if it did not swallow it.
         Disk.remove(Path::new("/lemonfiber/no/such/file")).await;
+    }
+
+    #[tokio::test]
+    async fn a_written_note_reads_back_and_an_absent_one_is_nothing() {
+        let dir = scratch();
+        // The directory does not exist beforehand; write creates it, which is the
+        // first-run case for a state file lemonfiber keeps for itself.
+        let note = dir.join("state").join("note.json");
+
+        assert_eq!(Disk.read(&note).await, None, "nothing recorded yet");
+        Disk.write(&note, "remembered").await;
+        assert_eq!(Disk.read(&note).await.as_deref(), Some("remembered"));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]

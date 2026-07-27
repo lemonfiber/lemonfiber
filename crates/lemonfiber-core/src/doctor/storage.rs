@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
@@ -38,6 +39,17 @@ pub const ROOT_ABSENT: Code = Code::new("STORAGE-3");
 
 /// Raised when the volume holding the data root is nearly full.
 pub const SPACE_LOW: Code = Code::new("STORAGE-4");
+
+/// Raised when the data root used to hardlink and no longer does.
+pub const DEGRADED: Code = Code::new("STORAGE-5");
+
+/// The capability the storage check remembers between runs, so a later run can
+/// tell that a location which used to hardlink has stopped.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+struct Recorded {
+    /// Whether the data root could hardlink when it was last checked.
+    hardlinks: bool,
+}
 
 /// The free space below which an import is at risk of failing.
 ///
@@ -68,17 +80,29 @@ const CONSEQUENCE: &str = "Imports will copy instead of link. Each takes minutes
 pub struct StorageCheck {
     filesystem: Arc<dyn FileSystem>,
     root: Option<PathBuf>,
+    state: Option<PathBuf>,
 }
 
 impl StorageCheck {
-    /// A storage check over the given filesystem and configured data root.
+    /// A storage check over the given filesystem, data root, and the file where
+    /// it remembers what it last saw.
     ///
     /// The root is optional because a machine that has not been set up has not
     /// chosen one yet, and an operator in that state is told to run setup rather
-    /// than shown an error about a path they never picked.
+    /// than shown an error about a path they never picked. The state file is
+    /// optional too: without it the check still runs, it just cannot notice a
+    /// capability that was there before and is now gone.
     #[must_use]
-    pub fn new(filesystem: Arc<dyn FileSystem>, root: Option<PathBuf>) -> Self {
-        Self { filesystem, root }
+    pub fn new(
+        filesystem: Arc<dyn FileSystem>,
+        root: Option<PathBuf>,
+        state: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            filesystem,
+            root,
+            state,
+        }
     }
 
     /// Run the probe against a resolved data root and read what it proved.
@@ -86,6 +110,11 @@ impl StorageCheck {
     /// The volume is described first, so its free space is reported alongside
     /// even a root that cannot be written to — a full disk and an unwritable one
     /// are different problems, and the operator is owed both answers at once.
+    ///
+    /// The capability seen last time is loaded before the finding is built, so a
+    /// location that used to link and no longer does is reported as a regression
+    /// rather than as an ordinary copy-mode location, and the current result is
+    /// recorded for the next run to compare against.
     async fn probe(&self, real: &Path) -> Vec<Finding> {
         let facts = self.filesystem.describe(real).await;
         let space = space(&facts);
@@ -101,18 +130,45 @@ impl StorageCheck {
 
         let original = self.filesystem.identify(&probe).await.ok();
         let link = self.filesystem.link(&probe, &linked).await;
+        let remembered = self.remembered().await;
 
-        let mut findings = if link.is_err() {
-            copying(&facts)
+        let (mut findings, current) = if link.is_err() {
+            (copying(&facts, remembered == Some(true)), Some(false))
         } else {
             let confirmed = self.filesystem.identify(&linked).await.ok();
-            linked_result(original, confirmed, &facts)
+            let linked_ok = matches!((original, confirmed), (Some(a), Some(b)) if a.file == b.file);
+            (
+                linked_result(original, confirmed, &facts),
+                linked_ok.then_some(true),
+            )
         };
 
         self.filesystem.remove(&linked).await;
         self.filesystem.remove(&probe).await;
+        self.remember(current).await;
         findings.push(space);
         findings
+    }
+
+    /// The hardlink capability recorded on the last run, where there is a state
+    /// file and it holds a reading.
+    async fn remembered(&self) -> Option<bool> {
+        let path = self.state.as_ref()?;
+        let text = self.filesystem.read(path).await?;
+        serde_json::from_str::<Recorded>(&text)
+            .ok()
+            .map(|recorded| recorded.hardlinks)
+    }
+
+    /// Record what this run found, so the next can notice a change. A result that
+    /// could not be determined is not written, so a single unreadable run does
+    /// not erase a known-good baseline.
+    async fn remember(&self, current: Option<bool>) {
+        let (Some(path), Some(hardlinks)) = (self.state.as_ref(), current) else {
+            return;
+        };
+        let text = serde_json::to_string(&Recorded { hardlinks }).unwrap_or_default();
+        self.filesystem.write(path, &text).await;
     }
 }
 
@@ -167,9 +223,18 @@ fn linked_result(
     }
 }
 
-/// The findings when the link could not be made: the copy-mode warning, named
-/// with the filesystem's specific limitation where there is one.
-fn copying(facts: &StorageFacts) -> Vec<Finding> {
+/// The findings when the link could not be made.
+///
+/// A location that used to link and now cannot is a regression, not the same
+/// thing as one that never could: something changed under a running stack, and
+/// every import since has quietly been copying. It is reported as its own,
+/// louder finding, while a location that was never able to link stays the
+/// ordinary copy-mode warning.
+fn copying(facts: &StorageFacts, regressed: bool) -> Vec<Finding> {
+    if regressed {
+        return pair(Verdict::Fail(degraded()), degraded_mode());
+    }
+
     let summary = match facts.kind.limitation() {
         Some(cause) => format!("This location cannot hardlink — {cause}"),
         None => "This location cannot hardlink".to_owned(),
@@ -185,6 +250,38 @@ fn copying(facts: &StorageFacts) -> Vec<Finding> {
     .in_state(State::Guided);
 
     pair(Verdict::Warn(problem), copy_mode(facts))
+}
+
+/// The problem for a location whose hardlink capability was lost.
+fn degraded() -> Problem {
+    Problem::new(
+        DEGRADED,
+        Severity::Error,
+        "Hardlinks have stopped working here",
+        "This location used to hardlink and no longer does — usually a drive that came back \
+         mounted with different options. Every import since has been copying, using twice the \
+         disk and leaving nothing to seed from.",
+        Remedy::new("Check how the data location is mounted, and remount it as it was")
+            .with_detail("A network share remounted without the right options is the common cause"),
+    )
+    .in_state(State::Guided)
+}
+
+/// The mode a regressed location is now in: copying, where it used to link.
+fn degraded_mode() -> Verdict {
+    Verdict::Warn(
+        Problem::new(
+            DEGRADED,
+            Severity::Warning,
+            "degraded — was linking, now copying",
+            "The stack is running in copy mode it was not set up for, because the location \
+             changed under it.",
+            Remedy::new(
+                "Restore the location's hardlink support, then run the storage check again",
+            ),
+        )
+        .in_state(State::Guided),
+    )
 }
 
 /// The mode a working link puts the stack in: local, or external on removable
@@ -351,8 +448,8 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        humanize, Check, Finding, StorageCheck, Verdict, COPY_ONLY, ROOT_ABSENT, ROOT_UNWRITABLE,
-        SPACE_LOW,
+        humanize, Check, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED, ROOT_ABSENT,
+        ROOT_UNWRITABLE, SPACE_LOW,
     };
     use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, StorageFacts};
 
@@ -383,11 +480,13 @@ mod tests {
         links: Result<(), Fault>,
         confirmed: Result<Identity, Fault>,
         facts: StorageFacts,
+        remembered: Option<String>,
     }
 
     impl Bench {
         /// A healthy local filesystem: resolves, writes, links, and reports the
-        /// two names as one file on a filesystem that links, with room to spare.
+        /// two names as one file on a filesystem that links, with room to spare
+        /// and no capability remembered from before.
         fn healthy() -> Self {
             Self {
                 resolves: Ok(PathBuf::from("/data")),
@@ -396,6 +495,7 @@ mod tests {
                 links: Ok(()),
                 confirmed: Ok(Identity { file: 7, links: 2 }),
                 facts: facts(FsKind::Linking("apfs".to_owned()), false),
+                remembered: None,
             }
         }
     }
@@ -419,15 +519,31 @@ mod tests {
             }
         }
         async fn remove(&self, _path: &Path) {}
+        async fn read(&self, _path: &Path) -> Option<String> {
+            self.remembered.clone()
+        }
+        async fn write(&self, _path: &Path, _contents: &str) {}
         async fn describe(&self, _path: &Path) -> StorageFacts {
             self.facts.clone()
         }
     }
 
     async fn run(bench: Bench, root: Option<&str>) -> Vec<Finding> {
-        StorageCheck::new(Arc::new(bench), root.map(PathBuf::from))
+        StorageCheck::new(Arc::new(bench), root.map(PathBuf::from), None)
             .run()
             .await
+    }
+
+    /// The same run, but with a place to remember what was seen, so a regression
+    /// can be noticed between one call and the next.
+    async fn run_remembering(bench: Bench, root: &str) -> Vec<Finding> {
+        StorageCheck::new(
+            Arc::new(bench),
+            Some(PathBuf::from(root)),
+            Some(PathBuf::from("/state/storage-state.json")),
+        )
+        .run()
+        .await
     }
 
     fn verdict<'a>(findings: &'a [Finding], check: &str) -> Option<&'a Verdict> {
@@ -637,5 +753,86 @@ mod tests {
             "10.5 GiB"
         );
         assert_eq!(humanize(1024_u64.pow(4) * 2), "2.0 TiB");
+    }
+
+    #[tokio::test]
+    async fn a_location_that_used_to_link_and_stopped_is_reported_as_a_regression() {
+        let bench = Bench {
+            links: Err(Fault::new("not supported")),
+            remembered: Some(r#"{"hardlinks":true}"#.to_owned()),
+            ..Bench::healthy()
+        };
+        let findings = run_remembering(bench, "/data").await;
+        assert!(
+            matches!(
+                verdict(&findings, "storage.hardlinks"),
+                Some(Verdict::Fail(problem)) if problem.code == DEGRADED
+            ),
+            "a lost capability is louder than one that was never there"
+        );
+        assert!(matches!(
+            verdict(&findings, "storage.mode"),
+            Some(Verdict::Warn(problem)) if problem.code == DEGRADED
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_location_that_never_linked_is_copy_mode_not_a_regression() {
+        let bench = Bench {
+            links: Err(Fault::new("not supported")),
+            remembered: Some(r#"{"hardlinks":false}"#.to_owned()),
+            ..Bench::healthy()
+        };
+        let findings = run_remembering(bench, "/data").await;
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Warn(problem)) if problem.code == COPY_ONLY
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_baseline_is_ignored_rather_than_trusted() {
+        let bench = Bench {
+            links: Err(Fault::new("not supported")),
+            remembered: Some("not json at all".to_owned()),
+            ..Bench::healthy()
+        };
+        let findings = run_remembering(bench, "/data").await;
+        // A corrupt baseline cannot say the capability was ever there, so it is a
+        // plain copy-mode location rather than a regression against nonsense.
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Warn(problem)) if problem.code == COPY_ONLY
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_healthy_run_records_what_it_saw_for_next_time() {
+        // With nothing remembered yet, the run passes and writes its result; the
+        // fake's write is a no-op, so this exercises the recording path without
+        // asserting on a side effect a unit has no way to see.
+        let findings = run_remembering(Bench::healthy(), "/data").await;
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Pass { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_run_that_could_not_confirm_the_link_records_nothing() {
+        // An unconfirmed result must not overwrite a known-good baseline, so the
+        // recording step is skipped rather than writing an uncertain answer.
+        let bench = Bench {
+            confirmed: Ok(Identity {
+                file: 999,
+                links: 1,
+            }),
+            ..Bench::healthy()
+        };
+        let findings = run_remembering(bench, "/data").await;
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Unverified { .. })
+        ));
     }
 }

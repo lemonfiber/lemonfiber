@@ -65,6 +65,13 @@ impl Paths {
         self.data.join("stack")
     }
 
+    /// The baseline the storage check records, to notice when hardlinks stop
+    /// working. Regenerable — losing it costs one run's history, nothing more.
+    #[must_use]
+    pub fn storage_state(&self) -> PathBuf {
+        self.data.join("storage-state.json")
+    }
+
     /// The per-service configuration directories the containers mount.
     #[must_use]
     pub fn service_config(&self) -> PathBuf {
@@ -105,7 +112,12 @@ mod tests {
     fn configuration_and_regenerable_data_are_kept_apart() {
         let paths = paths();
         let config: Vec<PathBuf> = vec![paths.env_file(), paths.journal()];
-        let data: Vec<PathBuf> = vec![paths.stack(), paths.service_config(), paths.backups()];
+        let data: Vec<PathBuf> = vec![
+            paths.stack(),
+            paths.service_config(),
+            paths.backups(),
+            paths.storage_state(),
+        ];
 
         // The failure message uses an inline capture rather than a call such as
         // `path.display()`: an argument expression only evaluates when the
@@ -133,6 +145,7 @@ mod tests {
             paths.stack(),
             paths.service_config(),
             paths.backups(),
+            paths.storage_state(),
         ];
         for (index, path) in all.iter().enumerate() {
             for other in all.iter().skip(index + 1) {
