@@ -9,11 +9,17 @@ name: release
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+# The write grant belongs to the job that tags and drafts the release, not to
+# the workflow: a top-level grant applies to every job added later, including
+# ones that only need to read. Scorecard's Token-Permissions check scores the
+# whole repository on this, and these two files were the only ones failing it.
 permissions:
-  contents: write
+  contents: read
 jobs:
   changelog:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
