@@ -80,6 +80,13 @@ pub const VPN_PROVIDER_KEY: &str = "VPN_PROVIDER";
 /// and the port-forward check reads that as "does not apply" rather than a fault.
 pub const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 
+/// The setting selecting how Jellyfin is served: in a container or on the host.
+///
+/// A single switch is the whole of the difference between the two modes — the
+/// compose stack drops one service and the URLs change, nothing more. Absent
+/// where the operator runs no media server at all.
+pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
+
 /// A recorded value with the whitespace and surrounding quotes a person might
 /// add stripped, so `"on"` and ` on ` both read the same as `on`.
 fn bare(value: &str) -> String {

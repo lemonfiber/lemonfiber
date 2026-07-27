@@ -17,7 +17,9 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::Protocols;
+use crate::config::{
+    Protocols, DATA_ROOT_KEY, JELLYFIN_MODE_KEY, PGID_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
+};
 use crate::platform::Environment;
 
 /// How the operator wants their existing and downloaded media served, where they
@@ -34,6 +36,19 @@ pub enum Library {
     /// Only a valid answer where the platform offers it; the wizard rejects it
     /// elsewhere rather than letting a surface record a choice that buys nothing.
     JellyfinNative,
+}
+
+impl Library {
+    /// The `JELLYFIN_MODE` this choice records, where it runs Jellyfin at all.
+    ///
+    /// `None` means no media server, which writes no mode rather than a third one.
+    const fn mode(self) -> Option<&'static str> {
+        match self {
+            Self::JellyfinDocker => Some("docker"),
+            Self::JellyfinNative => Some("native"),
+            Self::None => None,
+        }
+    }
 }
 
 /// A step of setup, in the order the operator meets it.
@@ -389,6 +404,57 @@ impl Wizard {
     pub fn ready_for_review(&self) -> bool {
         self.unanswered().is_empty()
     }
+
+    /// The configuration these answers will be written as.
+    ///
+    /// What review shows and what apply writes, the same value for both, so the
+    /// operator confirms exactly what lands. Built from whatever has been
+    /// answered, so it is empty at the start and complete at review; an
+    /// unanswered question contributes no setting rather than a guessed default.
+    /// The household and autostart choices have no configuration home here — they
+    /// are applied by their own features — so they are collected but not written.
+    #[must_use]
+    pub fn plan(&self) -> Plan {
+        let mut settings = Vec::new();
+        let answers = &self.progress.answers;
+        if let Some(protocols) = answers.protocols {
+            settings.push((USENET_KEY.to_owned(), on_off(protocols.usenet)));
+            settings.push((TORRENT_KEY.to_owned(), on_off(protocols.torrent)));
+        }
+        if let Some(path) = &answers.data_location {
+            settings.push((DATA_ROOT_KEY.to_owned(), path.display().to_string()));
+        }
+        if let Some(Some((uid, gid))) = answers.service_user {
+            settings.push((PUID_KEY.to_owned(), uid.to_string()));
+            settings.push((PGID_KEY.to_owned(), gid.to_string()));
+        }
+        if let Some(mode) = answers.library.and_then(Library::mode) {
+            settings.push((JELLYFIN_MODE_KEY.to_owned(), mode.to_owned()));
+        }
+        Plan { settings }
+    }
+}
+
+/// The environment settings a reviewed wizard will write.
+///
+/// The answers turned into the keys the compose driver reads, in a stable order
+/// so the review renders and the write compares the same way every time.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Plan {
+    settings: Vec<(String, String)>,
+}
+
+impl Plan {
+    /// The settings, as ordered key/value pairs to write.
+    #[must_use]
+    pub fn settings(&self) -> &[(String, String)] {
+        &self.settings
+    }
+}
+
+/// A yes/no answer as the on/off a hand-editable setting records.
+fn on_off(enabled: bool) -> String {
+    if enabled { "on" } else { "off" }.to_owned()
 }
 
 /// Which way [`Wizard::neighbour`] looks.
@@ -439,7 +505,7 @@ mod tests {
             .answer(Answer::DataLocation(PathBuf::from("/srv/media")))
             .unwrap_or(());
         wizard
-            .answer(Answer::ServiceUser(Some((1000, 1000))))
+            .answer(Answer::ServiceUser(Some((1000, 1001))))
             .unwrap_or(());
         wizard
             .answer(Answer::Library(Library::JellyfinDocker))
@@ -726,5 +792,79 @@ mod tests {
         let json = serde_json::to_string(wizard.progress()).unwrap_or_default();
         assert!(json.contains(r#""at":"data-location""#), "{json}");
         assert!(json.contains(r#""library":"jellyfin-native""#), "{json}");
+    }
+
+    /// The value a plan records for a key, if any.
+    fn setting<'a>(plan: &'a super::Plan, key: &str) -> Option<&'a str> {
+        plan.settings()
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, value)| value.as_str())
+    }
+
+    #[test]
+    fn a_reviewed_wizard_plans_every_setting_it_gathered() {
+        let mut wizard = on_native_linux();
+        answer_all(&mut wizard);
+        let plan = wizard.plan();
+        assert_eq!(setting(&plan, "LEMONFIBER_USENET"), Some("on"));
+        assert_eq!(setting(&plan, "LEMONFIBER_TORRENT"), Some("on"));
+        assert_eq!(setting(&plan, "DATA_ROOT"), Some("/srv/media"));
+        assert_eq!(setting(&plan, "PUID"), Some("1000"));
+        // Distinct from PUID, so a swapped mapping would not pass unnoticed.
+        assert_eq!(setting(&plan, "PGID"), Some("1001"));
+        assert_eq!(setting(&plan, "JELLYFIN_MODE"), Some("docker"));
+    }
+
+    #[test]
+    fn an_unanswered_question_contributes_no_setting() {
+        // A fresh wizard writes nothing; a partly answered one writes only what it
+        // has, never a guessed default for what it does not.
+        assert!(on_native_linux().plan().settings().is_empty());
+
+        let mut wizard = on_native_linux();
+        wizard
+            .answer(Answer::Protocols(Protocols {
+                usenet: true,
+                torrent: false,
+            }))
+            .unwrap_or(());
+        let plan = wizard.plan();
+        assert_eq!(setting(&plan, "LEMONFIBER_USENET"), Some("on"));
+        // A declined protocol is written off, not omitted.
+        assert_eq!(setting(&plan, "LEMONFIBER_TORRENT"), Some("off"));
+        assert_eq!(setting(&plan, "DATA_ROOT"), None);
+        assert_eq!(setting(&plan, "JELLYFIN_MODE"), None);
+    }
+
+    #[test]
+    fn a_declined_container_user_writes_no_ids() {
+        let mut wizard = on_native_linux();
+        wizard.answer(Answer::ServiceUser(None)).unwrap_or(());
+        // The step is answered — recorded as "no id" rather than left open — and
+        // that answered-with-nothing still writes neither id.
+        assert_eq!(wizard.answers().service_user, Some(None));
+        let plan = wizard.plan();
+        assert_eq!(setting(&plan, "PUID"), None);
+        assert_eq!(setting(&plan, "PGID"), None);
+    }
+
+    #[test]
+    fn the_library_choice_maps_to_its_mode_or_to_nothing() {
+        let mut docker = on_native_linux();
+        docker
+            .answer(Answer::Library(Library::JellyfinDocker))
+            .unwrap_or(());
+        assert_eq!(setting(&docker.plan(), "JELLYFIN_MODE"), Some("docker"));
+
+        let mut native = on_macos();
+        native
+            .answer(Answer::Library(Library::JellyfinNative))
+            .unwrap_or(());
+        assert_eq!(setting(&native.plan(), "JELLYFIN_MODE"), Some("native"));
+
+        let mut none = on_native_linux();
+        none.answer(Answer::Library(Library::None)).unwrap_or(());
+        assert_eq!(setting(&none.plan(), "JELLYFIN_MODE"), None);
     }
 }
