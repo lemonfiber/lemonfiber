@@ -33,6 +33,21 @@ pub struct Identity {
     pub links: u64,
 }
 
+/// Whether a path is there, and on which volume.
+///
+/// The volume matters as much as the presence: when a drive is unplugged its
+/// mount point often survives as an empty directory on the filesystem beneath
+/// it, so a path that is still there but on a *different* volume than before is
+/// a loss, not a presence. The number identifies the volume; comparing it to an
+/// earlier reading is how a swapped-out mount is told from a steady one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Presence {
+    /// The path is there, on the volume identified this way.
+    On(u64),
+    /// The path is not there at all.
+    Gone,
+}
+
 /// Who owns a path and how its permission bits are set, as the platform reports
 /// them.
 ///
@@ -283,6 +298,19 @@ pub trait FileSystem: Send + Sync {
 
     /// What the platform reports about the filesystem behind a path.
     async fn describe(&self, path: &Path) -> StorageFacts;
+}
+
+/// Watching whether a path is still there, and still the same volume.
+///
+/// A trait of its own rather than another method on [`FileSystem`], because the
+/// watch that needs it needs nothing else — and a check that needs the rest has
+/// no use for this. Keeping them apart means a fake for either drives only the
+/// question it answers.
+#[async_trait]
+pub trait Volume: Send + Sync {
+    /// Whether a path is there, and on which volume, so a watch can tell a steady
+    /// mount from one swapped out under it.
+    async fn presence(&self, path: &Path) -> Presence;
 }
 
 #[cfg(test)]

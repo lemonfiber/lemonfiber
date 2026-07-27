@@ -122,6 +122,18 @@ pub struct DoctorReport {
     pub findings: Vec<crate::doctor::Finding>,
 }
 
+/// What a watch saw, once the data root it was guarding was lost.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SupervisionReport {
+    /// The forms that were being watched, and are now stopped.
+    pub forms: Vec<String>,
+    /// Why the watch ended: the data root vanished, or a different volume took
+    /// its place.
+    pub reason: String,
+    /// Whether stopping the services succeeded.
+    pub stopped: bool,
+}
+
 /// What each service is doing, and what that adds up to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StatusReport {
