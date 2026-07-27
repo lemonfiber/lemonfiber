@@ -84,9 +84,26 @@ impl Environment {
     /// True on Linux with Docker Engine and nowhere else. Asking an operator for
     /// a user id where it changes nothing observable is a question that cannot
     /// be answered meaningfully, which is worse than not asking.
+    ///
+    /// This is the gate the setup wizard uses to decide whether to ask for
+    /// `PUID`/`PGID` at all: they are requested only where ownership is
+    /// user-visible.
     #[must_use]
     pub const fn ownership_is_real(self) -> bool {
         matches!(self, Self::LinuxNative)
+    }
+
+    /// Whether the setup wizard should offer to run Jellyfin natively rather than
+    /// in a container.
+    ///
+    /// Native mode exists to reach a hardware encoder the Docker VM cannot, so it
+    /// is offered only where the container cannot transcode and the platform is
+    /// one lemonfiber supports — macOS and Windows. On Linux, Docker reaches the
+    /// encoder directly, so native mode buys nothing and must not be offered;
+    /// offering it there would trade away deployment uniformity for no gain.
+    #[must_use]
+    pub const fn offers_native_jellyfin(self) -> bool {
+        !self.can_transcode_in_docker() && !matches!(self, Self::Unsupported)
     }
 
     /// Whether hardware transcoding is reachable from inside a container.
@@ -165,6 +182,42 @@ mod tests {
             Environment::Unsupported,
         ] {
             assert!(!environment.can_transcode_in_docker());
+        }
+    }
+
+    #[test]
+    fn puid_pgid_is_asked_only_where_ownership_is_visible() {
+        // The wizard asks for PUID/PGID only where it changes something the
+        // operator can see — native Linux Docker, and nowhere else.
+        assert!(Environment::LinuxNative.ownership_is_real());
+        for environment in [
+            Environment::MacOs,
+            Environment::LinuxDesktop,
+            Environment::Windows,
+            Environment::Unsupported,
+        ] {
+            assert!(
+                !environment.ownership_is_real(),
+                "{environment:?} maps ownership away, so PUID/PGID must not be asked"
+            );
+        }
+    }
+
+    #[test]
+    fn native_jellyfin_is_offered_only_where_docker_cannot_transcode() {
+        // Offered on macOS and Windows, where the Docker VM cannot reach the
+        // encoder; never on Linux, where the container can.
+        assert!(Environment::MacOs.offers_native_jellyfin());
+        assert!(Environment::Windows.offers_native_jellyfin());
+        for environment in [
+            Environment::LinuxNative,
+            Environment::LinuxDesktop,
+            Environment::Unsupported,
+        ] {
+            assert!(
+                !environment.offers_native_jellyfin(),
+                "{environment:?} either transcodes in Docker or is unsupported"
+            );
         }
     }
 
