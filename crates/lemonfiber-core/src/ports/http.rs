@@ -1,0 +1,128 @@
+//! Reaching a service's HTTP API.
+//!
+//! One seam for everything lemonfiber does over HTTP — proving a credential by
+//! reading back an identity, and later wiring one service to another. The
+//! transport lives behind this trait so the request-building and
+//! response-handling above it run in a test against a fake, and the one crate
+//! that speaks HTTP for real stays confined to a single adapter.
+//!
+//! A status code is never a failure here: a service that answers `401` has
+//! answered, and the caller decides what a refusal means. The failure this port
+//! reports is the other kind — nothing answered at all.
+
+use async_trait::async_trait;
+use thiserror::Error;
+
+/// The method a request uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Method {
+    /// Read.
+    Get,
+    /// Write.
+    Post,
+}
+
+/// A request to a service's API.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Request {
+    /// Read or write.
+    pub method: Method,
+    /// The absolute URL.
+    pub url: String,
+    /// Headers to send, such as the credential the service authenticates with.
+    pub headers: Vec<(String, String)>,
+    /// The body, where the request carries one.
+    pub body: Option<String>,
+}
+
+/// What a service answered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Response {
+    /// The status code, whatever it was — a refusal is still an answer.
+    pub status: u16,
+    /// The body it returned.
+    pub body: String,
+}
+
+impl Response {
+    /// Whether the status is in the 2xx range.
+    #[must_use]
+    pub const fn is_success(&self) -> bool {
+        self.status >= 200 && self.status < 300
+    }
+}
+
+/// The service could not be reached at all.
+///
+/// Distinct from any status code: this is a refused connection, a name that did
+/// not resolve, a handshake that did not complete, or a wait that ran out —
+/// nothing answered, so nothing can be concluded about the credential.
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[error("{url} could not be reached: {reason}")]
+pub struct Unreachable {
+    /// The URL that was tried.
+    pub url: String,
+    /// The transport's own account of why.
+    pub reason: String,
+}
+
+/// Sends HTTP requests to services and returns what they answered.
+#[async_trait]
+pub trait Http: Send + Sync {
+    /// Send a request and read the response.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Unreachable`] when nothing answered. A status code — including a
+    /// refusal — is a [`Response`], never an error.
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Method, Request, Response, Unreachable};
+
+    #[test]
+    fn a_two_hundred_is_a_success_and_a_refusal_is_not() {
+        assert!(Response {
+            status: 200,
+            body: String::new()
+        }
+        .is_success());
+        assert!(Response {
+            status: 204,
+            body: String::new()
+        }
+        .is_success());
+        for status in [199, 300, 401, 500] {
+            assert!(!Response {
+                status,
+                body: String::new()
+            }
+            .is_success());
+        }
+    }
+
+    #[test]
+    fn unreachable_names_the_url_and_the_reason() {
+        let failure = Unreachable {
+            url: "http://sonarr:8989/api".to_owned(),
+            reason: "connection refused".to_owned(),
+        };
+        let rendered = failure.to_string();
+        assert!(rendered.contains("sonarr"));
+        assert!(rendered.contains("connection refused"));
+    }
+
+    #[test]
+    fn a_request_is_plain_data() {
+        let request = Request {
+            method: Method::Post,
+            url: "http://sonarr:8989/api/v3/rootfolder".to_owned(),
+            headers: vec![("X-Api-Key".to_owned(), "secret".to_owned())],
+            body: Some("{}".to_owned()),
+        };
+        assert_eq!(request.clone(), request);
+        assert_eq!(request.method, Method::Post);
+    }
+}
