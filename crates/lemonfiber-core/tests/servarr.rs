@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{Client, DownloadClient, Failure, RootFolder};
-use lemonfiber_core::servarr::Servarr;
+use lemonfiber_core::servarr::{api_key, Servarr};
 
 /// What the fake transport answers with.
 enum Answer {
@@ -225,4 +225,41 @@ async fn a_rejected_download_client_registration_is_refused() {
         sonarr(&fake).register_download_client(&client).await,
         Err(Failure::Refused { .. })
     ));
+}
+
+#[test]
+fn a_generated_api_key_is_read_from_the_config() {
+    let config = "<Config>\n  <Port>8989</Port>\n  <ApiKey>a1b2c3d4e5</ApiKey>\n</Config>";
+    assert_eq!(api_key(config).as_deref(), Some("a1b2c3d4e5"));
+}
+
+#[test]
+fn surrounding_whitespace_in_the_key_element_is_trimmed() {
+    let config = "<ApiKey>\n    a1b2c3d4e5\n  </ApiKey>";
+    assert_eq!(api_key(config).as_deref(), Some("a1b2c3d4e5"));
+}
+
+#[test]
+fn a_key_not_generated_yet_is_absent_not_a_fault() {
+    // The element is present but empty until first start completes.
+    assert_eq!(api_key("<Config><ApiKey></ApiKey></Config>"), None);
+    // Present but only whitespace trims to empty, which is also not-yet.
+    assert_eq!(api_key("<Config><ApiKey>   </ApiKey></Config>"), None);
+    // Or the element is not there at all yet.
+    assert_eq!(api_key("<Config><Port>8989</Port></Config>"), None);
+}
+
+#[test]
+fn a_multibyte_key_survives_intact() {
+    // The offsets are byte offsets at ASCII tag boundaries, so a key with
+    // multibyte characters is read whole rather than split mid-codepoint.
+    let config = "<Config><ApiKey>café☃clé</ApiKey></Config>";
+    assert_eq!(api_key(config).as_deref(), Some("café☃clé"));
+}
+
+#[test]
+fn a_truncated_config_yields_no_key_rather_than_a_panic() {
+    // The opening tag is there but the file was read mid-write, so there is no
+    // close: no key, and no crash on the missing end.
+    assert_eq!(api_key("<Config><ApiKey>a1b2c3"), None);
 }
