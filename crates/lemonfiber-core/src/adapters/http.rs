@@ -23,10 +23,18 @@ impl Web {
     /// process-wide impossibility with rustls, not a per-request condition — so
     /// construction stays infallible for callers rather than threading a `Result`
     /// through every use.
+    ///
+    /// A cookie store is kept because one service needs it: qBittorrent's web UI
+    /// authenticates a session by a cookie set at login and expected on the calls
+    /// that follow. The store is scoped to a host, so a service that ignores
+    /// cookies is unaffected by it.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::builder().build().unwrap_or_default(),
+            client: reqwest::Client::builder()
+                .cookie_store(true)
+                .build()
+                .unwrap_or_default(),
         }
     }
 }
