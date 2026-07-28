@@ -14,9 +14,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
-use crate::ports::http::{Http, Method, Request, Response};
+use crate::endpoint::Endpoint;
+use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
     Client, ClientKind, Credential, DownloadClient, Failure, Identity, RegisteredClient,
     RegisteredFolder, RootFolder,
@@ -27,13 +29,12 @@ const API_KEY_HEADER: &str = "X-Api-Key";
 
 /// A client for one Servarr-shape service.
 ///
-/// Holds the transport, the service's address and key, and its name — the last
-/// only so a failure can say which service it is about.
+/// Holds the endpoint — the transport, the service's address and its name — and
+/// the key, which is the one thing the Servarr shape adds: a header on every
+/// request.
 pub struct Servarr {
-    http: Arc<dyn Http>,
-    base: String,
+    endpoint: Endpoint,
     key: String,
-    service: String,
 }
 
 impl Servarr {
@@ -46,10 +47,8 @@ impl Servarr {
         service: impl Into<String>,
     ) -> Self {
         Self {
-            http,
-            base: base.into(),
+            endpoint: Endpoint::new(http, base, service),
             key: key.into(),
-            service: service.into(),
         }
     }
 
@@ -57,36 +56,24 @@ impl Servarr {
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
         Request {
             method,
-            url: format!("{}/api/v3{path}", self.base.trim_end_matches('/')),
+            url: self.endpoint.url(&format!("/api/v3{path}")),
             headers: vec![(API_KEY_HEADER.to_owned(), self.key.clone())],
             body,
         }
     }
 
-    /// Send a request, turning a transport failure into "not answering".
-    ///
-    /// The port reports the no-answer case; here it becomes the service failure
-    /// the rest of the system acts on — a prerequisite that is not up yet, to be
-    /// skipped and picked up on a later run rather than counted as broken.
-    async fn send(&self, request: &Request) -> Result<Response, Failure> {
-        let result = self.http.send(request).await;
-        result.map_err(|_| Failure::Unavailable {
-            service: self.service.clone(),
-        })
-    }
-
-    /// What a non-success response amounts to: a refused credential, or an answer
-    /// lemonfiber cannot use, carrying the service's own words.
-    fn refusal(&self, response: &Response) -> Failure {
-        match response.status {
-            401 | 403 => Failure::Unauthorised {
-                service: self.service.clone(),
-            },
-            _ => Failure::Refused {
-                service: self.service.clone(),
-                detail: describe(response),
-            },
+    /// Read a JSON body into `T`, or fail: a non-success status is the service's
+    /// refusal, and a body that will not parse is an answer that arrived but
+    /// could not be used, named by `what`.
+    fn decode<T: DeserializeOwned>(
+        &self,
+        response: &crate::ports::http::Response,
+        what: &str,
+    ) -> Result<T, Failure> {
+        if !response.is_success() {
+            return Err(self.endpoint.refusal(response));
         }
+        serde_json::from_str(&response.body).map_err(|_| self.endpoint.refused(what))
     }
 }
 
@@ -110,26 +97,19 @@ struct Status {
 impl Client for Servarr {
     async fn identity(&self) -> Result<Identity, Failure> {
         let response = self
+            .endpoint
             .send(&self.request(Method::Get, "/system/status", None))
             .await?;
-        if !response.is_success() {
-            return Err(self.refusal(&response));
-        }
-        let status: Status =
-            serde_json::from_str(&response.body).map_err(|_| Failure::Refused {
-                service: self.service.clone(),
-                detail: "the status response could not be read".to_owned(),
-            })?;
+        let status: Status = self.decode(&response, "the status response could not be read")?;
         let name = if status.instance_name.is_empty() {
             status.app_name
         } else {
             status.instance_name
         };
         if name.is_empty() || status.version.is_empty() {
-            return Err(Failure::Refused {
-                service: self.service.clone(),
-                detail: "the service named neither itself nor its version".to_owned(),
-            });
+            return Err(self
+                .endpoint
+                .refused("the service named neither itself nor its version"));
         }
         Ok(Identity {
             name,
@@ -139,6 +119,7 @@ impl Client for Servarr {
 
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
         let response = self
+            .endpoint
             .send(&self.request(
                 Method::Post,
                 "/downloadclient",
@@ -148,34 +129,30 @@ impl Client for Servarr {
         if response.is_success() {
             Ok(())
         } else {
-            Err(self.refusal(&response))
+            Err(self.endpoint.refusal(&response))
         }
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
         let body = serde_json::json!({ "path": folder.path }).to_string();
         let response = self
+            .endpoint
             .send(&self.request(Method::Post, "/rootfolder", Some(body)))
             .await?;
         if response.is_success() {
             Ok(())
         } else {
-            Err(self.refusal(&response))
+            Err(self.endpoint.refusal(&response))
         }
     }
 
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
         let response = self
+            .endpoint
             .send(&self.request(Method::Get, "/rootfolder", None))
             .await?;
-        if !response.is_success() {
-            return Err(self.refusal(&response));
-        }
         let folders: Vec<FolderResource> =
-            serde_json::from_str(&response.body).map_err(|_| Failure::Refused {
-                service: self.service.clone(),
-                detail: "the root-folder list could not be read".to_owned(),
-            })?;
+            self.decode(&response, "the root-folder list could not be read")?;
         Ok(folders
             .into_iter()
             .map(|folder| RegisteredFolder {
@@ -187,16 +164,11 @@ impl Client for Servarr {
 
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
         let response = self
+            .endpoint
             .send(&self.request(Method::Get, "/downloadclient", None))
             .await?;
-        if !response.is_success() {
-            return Err(self.refusal(&response));
-        }
         let clients: Vec<ClientResource> =
-            serde_json::from_str(&response.body).map_err(|_| Failure::Refused {
-                service: self.service.clone(),
-                detail: "the download-client list could not be read".to_owned(),
-            })?;
+            self.decode(&response, "the download-client list could not be read")?;
         Ok(clients
             .into_iter()
             .filter_map(ClientResource::endpoint)
@@ -310,15 +282,4 @@ fn download_client_body(client: &DownloadClient) -> String {
         "fields": fields,
     })
     .to_string()
-}
-
-/// A non-success response as the detail of a refusal: the service's own words
-/// where it gave any, its status code alone otherwise.
-fn describe(response: &Response) -> String {
-    let body = response.body.trim();
-    if body.is_empty() {
-        format!("HTTP {}", response.status)
-    } else {
-        format!("HTTP {}: {body}", response.status)
-    }
 }

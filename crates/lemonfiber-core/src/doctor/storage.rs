@@ -565,12 +565,7 @@ fn pair(hardlinks: Verdict, mode: Verdict) -> Vec<Finding> {
 
 /// A finding in the storage category.
 fn finding(check: &str, title: &str, verdict: Verdict) -> Finding {
-    Finding {
-        check: check.to_owned(),
-        category: Category::Storage,
-        title: title.to_owned(),
-        verdict,
-    }
+    Finding::in_category(Category::Storage, check, title, verdict)
 }
 
 /// A single finding for a check that does not apply.

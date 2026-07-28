@@ -14,7 +14,8 @@
 
 use std::sync::Arc;
 
-use crate::ports::http::{Http, Method, Request, Response};
+use crate::endpoint::{describe, Endpoint};
+use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::Failure;
 
 /// The service name a failure is reported against.
@@ -44,8 +45,7 @@ pub fn temporary_password(log: &str) -> Option<String> {
 
 /// A client for one qBittorrent web UI.
 pub struct Qbittorrent {
-    http: Arc<dyn Http>,
-    base: String,
+    endpoint: Endpoint,
 }
 
 impl Qbittorrent {
@@ -53,8 +53,7 @@ impl Qbittorrent {
     #[must_use]
     pub fn new(http: Arc<dyn Http>, base: impl Into<String>) -> Self {
         Self {
-            http,
-            base: base.into(),
+            endpoint: Endpoint::new(http, base, SERVICE),
         }
     }
 
@@ -62,20 +61,10 @@ impl Qbittorrent {
     fn post(&self, path: &str, fields: &[(&str, &str)]) -> Request {
         Request {
             method: Method::Post,
-            url: format!("{}/api/v2{path}", self.base.trim_end_matches('/')),
+            url: self.endpoint.url(&format!("/api/v2{path}")),
             headers: vec![("Content-Type".to_owned(), FORM.to_owned())],
             body: Some(encode(fields)),
         }
-    }
-
-    /// Send a request, turning a transport failure into "not answering".
-    async fn send(&self, request: &Request) -> Result<Response, Failure> {
-        self.http
-            .send(request)
-            .await
-            .map_err(|_| Failure::Unavailable {
-                service: SERVICE.to_owned(),
-            })
     }
 
     /// Authenticate, so the session cookie the transport carries lets the calls
@@ -88,18 +77,13 @@ impl Qbittorrent {
             "/auth/login",
             &[("username", "admin"), ("password", password)],
         );
-        let response = self.send(&request).await?;
+        let response = self.endpoint.send(&request).await?;
         if response.is_success() && response.body.trim() == "Ok." {
             Ok(())
         } else if response.status == 403 || response.body.contains("Fails") {
-            Err(Failure::Unauthorised {
-                service: SERVICE.to_owned(),
-            })
+            Err(self.endpoint.unauthorised())
         } else {
-            Err(Failure::Refused {
-                service: SERVICE.to_owned(),
-                detail: describe(&response),
-            })
+            Err(self.endpoint.refused(&describe(&response)))
         }
     }
 
@@ -118,9 +102,9 @@ impl Qbittorrent {
 
         let preferences = serde_json::json!({ "web_ui_password": new }).to_string();
         let request = self.post("/app/setPreferences", &[("json", &preferences)]);
-        let response = self.send(&request).await?;
+        let response = self.endpoint.send(&request).await?;
         if !response.is_success() {
-            return Err(refusal(&response));
+            return Err(self.endpoint.refusal(&response));
         }
 
         self.login(new).await
@@ -137,29 +121,4 @@ fn encode(fields: &[(&str, &str)]) -> String {
         form.append_pair(name, value);
     }
     form.finish()
-}
-
-/// What a non-success response amounts to: a refused credential, or an answer
-/// lemonfiber cannot use, carrying the service's own words.
-fn refusal(response: &Response) -> Failure {
-    match response.status {
-        401 | 403 => Failure::Unauthorised {
-            service: SERVICE.to_owned(),
-        },
-        _ => Failure::Refused {
-            service: SERVICE.to_owned(),
-            detail: describe(response),
-        },
-    }
-}
-
-/// A non-success response as the detail of a refusal: the service's own words
-/// where it gave any, its status code alone otherwise.
-fn describe(response: &Response) -> String {
-    let body = response.body.trim();
-    if body.is_empty() {
-        format!("HTTP {}", response.status)
-    } else {
-        format!("HTTP {}: {body}", response.status)
-    }
 }
