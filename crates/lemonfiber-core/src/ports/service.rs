@@ -19,6 +19,45 @@ pub struct Identity {
     pub version: String,
 }
 
+/// Which download client an entry is, selecting the field schema the Servarr app
+/// files it under — see the download-client contract in the spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClientKind {
+    /// `SABnzbd` — a Usenet client.
+    Sabnzbd,
+    /// `qBittorrent` — a torrent client.
+    Qbittorrent,
+}
+
+/// How a download client proves itself, which differs by client — a single API
+/// key for one, a username and its password for the other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Credential {
+    /// A single API key.
+    ApiKey(String),
+    /// A username and its password.
+    UserPass {
+        /// The account name.
+        username: String,
+        /// Its password.
+        password: String,
+    },
+}
+
+/// The category a download is filed under, named after the media the requesting
+/// application manages.
+///
+/// The field is not shared across applications — Sonarr names it `tvCategory`,
+/// Radarr `movieCategory`, Lidarr `musicCategory` — so it travels with the client
+/// rather than being assumed by the writer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Category {
+    /// The field the target application names its category.
+    pub field: String,
+    /// The value a download is filed under.
+    pub value: String,
+}
+
 /// A download client, as one service needs to be told about another.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadClient {
@@ -28,8 +67,12 @@ pub struct DownloadClient {
     pub host: String,
     /// The port it listens on.
     pub port: u16,
-    /// The credential, where one is needed.
-    pub credential: Option<String>,
+    /// Which client it is, selecting the field schema.
+    pub kind: ClientKind,
+    /// How the service authenticates to it.
+    pub credential: Credential,
+    /// The category the requesting application files its downloads under.
+    pub category: Category,
 }
 
 /// Where a service should file the media it imports.
@@ -186,7 +229,9 @@ pub trait Client: Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    use super::{Diagnose, DownloadClient, Failure, Identity, RootFolder};
+    use super::{
+        Category, ClientKind, Credential, Diagnose, DownloadClient, Failure, Identity, RootFolder,
+    };
     use crate::error::{Severity, State};
 
     #[test]
@@ -252,7 +297,12 @@ mod tests {
             name: "SABnzbd".to_owned(),
             host: "sabnzbd".to_owned(),
             port: 8080,
-            credential: None,
+            kind: ClientKind::Sabnzbd,
+            credential: Credential::ApiKey("the-key".to_owned()),
+            category: Category {
+                field: "tvCategory".to_owned(),
+                value: "tv".to_owned(),
+            },
         };
         assert_eq!(client.clone().port, 8080);
 

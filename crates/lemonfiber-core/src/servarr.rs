@@ -18,7 +18,8 @@ use serde::Deserialize;
 
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
-    Client, DownloadClient, Failure, Identity, RegisteredClient, RegisteredFolder, RootFolder,
+    Client, ClientKind, Credential, DownloadClient, Failure, Identity, RegisteredClient,
+    RegisteredFolder, RootFolder,
 };
 
 /// The header every Servarr application authenticates with.
@@ -137,19 +138,12 @@ impl Client for Servarr {
     }
 
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
-        // The full per-implementation schema — the field set differs between
-        // SABnzbd and qBittorrent — is filled in when seed wires a concrete
-        // client and the port carries which one it is. This registers the
-        // connection lemonfiber knows about; the endpoint and auth are settled.
-        let body = serde_json::json!({
-            "enable": true,
-            "name": client.name,
-            "host": client.host,
-            "port": client.port,
-        })
-        .to_string();
         let response = self
-            .send(&self.request(Method::Post, "/downloadclient", Some(body)))
+            .send(&self.request(
+                Method::Post,
+                "/downloadclient",
+                Some(download_client_body(client)),
+            ))
             .await?;
         if response.is_success() {
             Ok(())
@@ -280,6 +274,42 @@ pub fn api_key(config_xml: &str) -> Option<String> {
     let close = rest.find(CLOSE)?;
     let key = rest.get(..close)?.trim();
     (!key.is_empty()).then(|| key.to_owned())
+}
+
+/// The registration document for a download client, per the download-client
+/// contract: the `implementation` and `configContract` that select the schema,
+/// the protocol, and the `fields` array carrying the connection, the credential
+/// the client uses, and the category the target application files under.
+fn download_client_body(client: &DownloadClient) -> String {
+    let (implementation, config_contract, protocol) = match client.kind {
+        ClientKind::Sabnzbd => ("Sabnzbd", "SabnzbdSettings", "usenet"),
+        ClientKind::Qbittorrent => ("QBittorrent", "QBittorrentSettings", "torrent"),
+    };
+
+    let mut fields = vec![
+        serde_json::json!({ "name": "host", "value": client.host }),
+        serde_json::json!({ "name": "port", "value": client.port }),
+        serde_json::json!({ "name": client.category.field, "value": client.category.value }),
+    ];
+    match &client.credential {
+        Credential::ApiKey(key) => {
+            fields.push(serde_json::json!({ "name": "apiKey", "value": key }));
+        }
+        Credential::UserPass { username, password } => {
+            fields.push(serde_json::json!({ "name": "username", "value": username }));
+            fields.push(serde_json::json!({ "name": "password", "value": password }));
+        }
+    }
+
+    serde_json::json!({
+        "enable": true,
+        "protocol": protocol,
+        "name": client.name,
+        "implementation": implementation,
+        "configContract": config_contract,
+        "fields": fields,
+    })
+    .to_string()
 }
 
 /// A non-success response as the detail of a refusal: the service's own words
