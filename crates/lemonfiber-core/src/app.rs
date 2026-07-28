@@ -463,12 +463,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
 /// Wire the stack's services to each other, idempotently, and report what was
 /// wired and what a re-run still owes.
 ///
-/// The one connection here is qBittorrent's web UI password — the credential
-/// lemonfiber mints rather than reads. Its temporary password is read from the
-/// container's log, replaced with a generated one, and the generated one recorded
-/// where the forwarded-port push reads it. The rest of the graph — root folders
-/// and download clients into each \*arr — wires on the same pattern and lands
-/// next.
+/// One connection is unlike the rest: qBittorrent's web UI password, the
+/// credential lemonfiber mints rather than reads — its temporary password is
+/// read from the container's log, replaced with a generated one, and the
+/// generated one recorded where the forwarded-port push reads it. The rest of
+/// the graph reads a credential and writes a connection: each media-filing
+/// \*arr's root folders, and its download clients (`SABnzbd` and qBittorrent).
+/// Prowlarr, Bindery and Jellyfin→Seerr wire on the same pattern and land next.
 async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     let manifest = ctx
         .stack
