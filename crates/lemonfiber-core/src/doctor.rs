@@ -139,6 +139,21 @@ pub struct Finding {
     pub verdict: Verdict,
 }
 
+impl Finding {
+    /// A finding in a given category. Each check module wraps this with its own
+    /// category bound, so the shape of a finding is written once here rather than
+    /// re-spelled per module.
+    #[must_use]
+    pub fn in_category(category: Category, check: &str, title: &str, verdict: Verdict) -> Self {
+        Self {
+            check: check.to_owned(),
+            category,
+            title: title.to_owned(),
+            verdict,
+        }
+    }
+}
+
 /// What a run's findings amount to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

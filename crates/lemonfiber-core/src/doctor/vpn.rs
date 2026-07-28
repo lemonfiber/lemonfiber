@@ -516,12 +516,7 @@ fn find<'a>(containers: &'a [Container], service: &str) -> Option<&'a Container>
 
 /// A finding in the VPN category.
 fn finding(check: &str, title: &str, verdict: Verdict) -> Finding {
-    Finding {
-        check: check.to_owned(),
-        category: Category::Vpn,
-        title: title.to_owned(),
-        verdict,
-    }
+    Finding::in_category(Category::Vpn, check, title, verdict)
 }
 
 /// A single finding for a check that does not apply.
