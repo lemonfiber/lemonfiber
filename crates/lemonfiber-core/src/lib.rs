@@ -41,6 +41,7 @@ pub mod model;
 pub mod platform;
 pub mod ports;
 pub mod prerequisites;
+pub mod qbittorrent;
 pub mod sabnzbd;
 pub mod secret;
 pub mod seed;
