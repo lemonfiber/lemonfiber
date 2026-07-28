@@ -35,6 +35,7 @@ pub mod app;
 pub mod config;
 pub mod docker;
 pub mod doctor;
+mod endpoint;
 pub mod error;
 pub mod journal;
 pub mod model;
