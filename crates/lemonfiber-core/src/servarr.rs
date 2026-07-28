@@ -73,7 +73,11 @@ impl Servarr {
         if !response.is_success() {
             return Err(self.endpoint.refusal(response));
         }
-        serde_json::from_str(&response.body).map_err(|_| self.endpoint.refused(what))
+        // The parser's own account of what failed is kept, not paraphrased: when
+        // a Servarr release changes the shape of a response, "missing field
+        // `version`" names the break where a generic sentence would hide it.
+        serde_json::from_str(&response.body)
+            .map_err(|err| self.endpoint.refused(&format!("{what}: {err}")))
     }
 }
 
