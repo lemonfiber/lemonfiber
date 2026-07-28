@@ -27,6 +27,7 @@ use lemonfiber_core::model::{
 };
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
+use lemonfiber_core::seed::{Report as SeedReport, State as SeedState};
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
 
@@ -126,6 +127,8 @@ enum Request {
         #[arg(required = true)]
         forms: Vec<String>,
     },
+    /// Wire the stack's services to each other, idempotently.
+    Seed,
 }
 
 /// What to do with settings.
@@ -228,6 +231,7 @@ async fn main() -> ExitCode {
             };
             Command::Doctor { only, disruptive }
         }
+        Request::Seed => Command::Seed,
     };
 
     match dispatch(command, &ctx).await {
@@ -252,6 +256,15 @@ fn settled(outcome: &Outcome) -> ExitCode {
             Overall::Healthy | Overall::Degraded => ExitCode::SUCCESS,
             Overall::Broken | Overall::Unknown => ExitCode::from(FAILURE),
         },
+        // Seeding is run to make the wiring true, so leaving any of it unmade is a
+        // non-zero result a script can act on by running again.
+        Outcome::Seed(report) => {
+            if report.is_complete() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(FAILURE)
+            }
+        }
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
             ExitCode::SUCCESS
         }
@@ -467,6 +480,35 @@ fn render(outcome: &Outcome, json: bool) {
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
         Outcome::Doctor(report) => diagnosis(report),
+        Outcome::Seed(report) => seeding(report),
+    }
+}
+
+/// What seeding wired, connection by connection, with what a re-run still owes
+/// named last so it is the thing the operator is left looking at.
+fn seeding(report: &SeedReport) {
+    for wiring in &report.wirings {
+        match &wiring.state {
+            SeedState::Wired => println!("  ✓ {}   wired", wiring.connection),
+            SeedState::AlreadyWired => println!("  ✓ {}   already wired", wiring.connection),
+            SeedState::Drifted => println!("  · {}   left as you set it", wiring.connection),
+            SeedState::Skipped { reason } => {
+                println!("  ? {}   skipped", wiring.connection);
+                println!("      {reason}");
+            }
+            SeedState::Failed { detail } => {
+                println!("  ✗ {}   {detail}", wiring.connection);
+            }
+        }
+    }
+    let outstanding = report.outstanding();
+    if outstanding.is_empty() {
+        println!("\nEverything is wired.");
+    } else {
+        println!(
+            "\n{} left to wire — run seed again once ready.",
+            outstanding.len()
+        );
     }
 }
 

@@ -32,6 +32,7 @@ use crate::platform::Environment;
 use crate::ports::docker::{Engine, LogLine, LogQuery};
 use crate::ports::filesystem::{Presence, Volume};
 use crate::ports::http::Http;
+use crate::ports::random::Random;
 use crate::ports::{Clock, FileSystem, Runner};
 use crate::stack::closure::resolve;
 use crate::stack::compose::{build, Action};
@@ -94,6 +95,8 @@ pub enum Command {
         /// Whether the operator opted into the checks that disturb the system.
         disruptive: bool,
     },
+    /// Wire the stack's services to each other, idempotently.
+    Seed,
 }
 
 /// What dispatching produced.
@@ -109,6 +112,8 @@ pub enum Outcome {
     Status(StatusReport),
     /// What the diagnostic checks found.
     Doctor(DoctorReport),
+    /// What seeding wired, and what it left for a re-run.
+    Seed(crate::seed::Report),
 }
 
 impl Outcome {
@@ -121,6 +126,7 @@ impl Outcome {
             Self::Config(_) => "config",
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
+            Self::Seed(_) => "seed",
         };
         Envelope::new(kind, self)
     }
@@ -134,6 +140,7 @@ impl serde::Serialize for Outcome {
             Self::Config(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
+            Self::Seed(report) => report.serialize(serializer),
         }
     }
 }
@@ -153,6 +160,9 @@ pub struct Ctx {
     /// How services are reached over HTTP, for the checks and seeding that ask
     /// one what it is or wire it to another.
     pub http: Arc<dyn Http>,
+    /// Where unpredictable bytes come from, for the one credential seeding mints
+    /// itself.
+    pub random: Arc<dyn Random>,
     /// How long starting waits for services to settle before giving up.
     ///
     /// A knob rather than a constant because it is a policy: an operator on a
@@ -193,11 +203,32 @@ impl Ctx {
             // that needs to answer for a fake service overrides it with
             // `with_http`, so no test reaches the network to build a context.
             http: Arc::new(crate::adapters::Web::new()),
+            random: Arc::new(crate::adapters::Os),
             patience: PATIENCE,
             stack,
             settings,
             environment,
         }
+    }
+
+    /// The same context, reaching services over the given transport.
+    ///
+    /// The seam seeding is driven through in a test: a fake here answers as a
+    /// service would, so wiring is exercised with nothing running.
+    #[must_use]
+    pub fn with_http(mut self, http: Arc<dyn Http>) -> Self {
+        self.http = http;
+        self
+    }
+
+    /// The same context, drawing randomness from the given source.
+    ///
+    /// Lets a test script the bytes a generated secret is rendered from, so the
+    /// value it produces is known rather than unpredictable.
+    #[must_use]
+    pub fn with_random(mut self, random: Arc<dyn Random>) -> Self {
+        self.random = random;
+        self
     }
 
     /// The same context, willing to wait a different length of time.
@@ -415,8 +446,113 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::Doctor { only, disruptive } => {
             diagnose(ctx, only, disruptive).await.map(Outcome::Doctor)
         }
+        Command::Seed => seed(ctx).await.map(Outcome::Seed),
     }
 }
+
+/// Wire the stack's services to each other, idempotently, and report what was
+/// wired and what a re-run still owes.
+///
+/// The one connection here is qBittorrent's web UI password — the credential
+/// lemonfiber mints rather than reads. Its temporary password is read from the
+/// container's log, replaced with a generated one, and the generated one recorded
+/// where the forwarded-port push reads it. The rest of the graph — root folders
+/// and download clients into each \*arr — wires on the same pattern and lands
+/// next.
+async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem())?;
+
+    // qBittorrent is the only edge wired so far. Collecting the optional target
+    // into a list wires it where the stack has it and produces nothing where it
+    // does not, without a branch on the option that a test could not reach.
+    let targets: Vec<(String, String)> =
+        qbittorrent_target(&manifest.services).into_iter().collect();
+    let mut wirings = Vec::with_capacity(targets.len());
+    for target in &targets {
+        wirings.push(seed_qbittorrent_password(ctx, target).await);
+    }
+
+    Ok(crate::seed::Report { wirings })
+}
+
+/// qBittorrent's address, if the stack has it: the id names the container to read
+/// a log from, the base is where the host reaches its web UI.
+fn qbittorrent_target(services: &[lemonfiber_manifest::Service]) -> Option<(String, String)> {
+    services.iter().find_map(|service| {
+        let api = service.api.as_ref()?;
+        (api.kind == lemonfiber_manifest::ApiKind::Qbittorrent).then(|| {
+            let port = service.port.unwrap_or(0);
+            (service.id.clone(), format!("http://127.0.0.1:{port}"))
+        })
+    })
+}
+
+/// Replace qBittorrent's temporary web UI password and record the generated one.
+///
+/// The temporary password is read from the container's own log; without it there
+/// is nothing to authenticate with, so the connection is skipped for a re-run
+/// once the container has announced one. A generated password that lands is
+/// recorded in the environment where the forwarded-port push reads it.
+async fn seed_qbittorrent_password(ctx: &Ctx, target: &(String, String)) -> crate::seed::Wiring {
+    let (id, base) = target;
+    let connection = "qBittorrent web UI password".to_owned();
+
+    let Some(temporary) = read_temporary_password(ctx, id).await else {
+        return crate::seed::Wiring {
+            connection,
+            state: crate::seed::State::Skipped {
+                reason: "qBittorrent has not announced a temporary password yet; a later run completes it".to_owned(),
+            },
+        };
+    };
+
+    let client = crate::qbittorrent::Qbittorrent::new(ctx.http.clone(), base);
+    let (wiring, recorded) =
+        crate::seed::wire_qbittorrent_password(&client, ctx.random.as_ref(), &temporary).await;
+
+    if let Some(password) = recorded {
+        record_qbittorrent_password(ctx, &password);
+    }
+    wiring
+}
+
+/// The temporary password qBittorrent announced in its log, if it has.
+async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
+    let mut lines = ctx
+        .engine
+        .logs(
+            &ctx.settings.project,
+            &[service.to_owned()],
+            LogQuery::recent(TEMP_PASSWORD_LOG_LINES),
+        )
+        .await
+        .ok()?;
+
+    let mut log = String::new();
+    while let Some(line) = lines.recv().await {
+        log.push_str(&line.line);
+        log.push('\n');
+    }
+    crate::qbittorrent::temporary_password(&log)
+}
+
+/// Record the generated password where the forwarded-port push reads it — the
+/// `QBITTORRENT_PASSWORD` setting in the environment file. Best-effort: a value
+/// that could not be written is reported by the push's own missing-password
+/// message rather than failing the wiring that did land.
+fn record_qbittorrent_password(ctx: &Ctx, password: &str) {
+    if let Some(path) = ctx.settings.env_file.as_deref() {
+        let _ = store::set(path, crate::config::QBITTORRENT_PASSWORD_KEY, password);
+    }
+}
+
+/// How many lines back to read for qBittorrent's start-up announcement. Its
+/// temporary password is printed once, early, so a generous tail finds it well
+/// after start without pulling the whole log.
+const TEMP_PASSWORD_LOG_LINES: u32 = 200;
 
 /// Run the diagnostic checks, or the one category asked for.
 ///
@@ -997,6 +1133,52 @@ mod tests {
         }
     }
 
+    /// A transport that answers seeding's HTTP calls from a scripted queue.
+    struct ScriptedHttp {
+        replies: std::sync::Mutex<std::collections::VecDeque<(u16, &'static str)>>,
+    }
+
+    impl ScriptedHttp {
+        fn new(replies: Vec<(u16, &'static str)>) -> Self {
+            Self {
+                replies: std::sync::Mutex::new(replies.into()),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl crate::ports::http::Http for ScriptedHttp {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            let reply = self
+                .replies
+                .lock()
+                .ok()
+                .and_then(|mut replies| replies.pop_front());
+            match reply {
+                Some((status, body)) => Ok(crate::ports::http::Response {
+                    status,
+                    body: body.to_owned(),
+                }),
+                None => Err(crate::ports::http::Unreachable {
+                    url: request.url.clone(),
+                    reason: "nothing scripted".to_owned(),
+                }),
+            }
+        }
+    }
+
+    /// A randomness source answering with exactly the bytes a test scripts.
+    struct FixedRandom(Option<Vec<u8>>);
+
+    impl crate::ports::random::Random for FixedRandom {
+        fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
+            self.0.clone()
+        }
+    }
+
     #[async_trait]
     impl Runner for Scripted {
         async fn run(&self, _argv: &[String]) -> Result<Output, Failure> {
@@ -1157,7 +1339,11 @@ mod tests {
         match outcome {
             Ok(Outcome::Lifecycle(report)) => Some(report),
             Ok(
-                Outcome::Version(_) | Outcome::Config(_) | Outcome::Status(_) | Outcome::Doctor(_),
+                Outcome::Version(_)
+                | Outcome::Config(_)
+                | Outcome::Status(_)
+                | Outcome::Doctor(_)
+                | Outcome::Seed(_),
             )
             | Err(_) => None,
         }
@@ -1170,7 +1356,8 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
-                | Outcome::Status(_),
+                | Outcome::Status(_)
+                | Outcome::Seed(_),
             )
             | Err(_) => None,
         }
@@ -1297,6 +1484,173 @@ mod tests {
             Some(8989),
         )];
         assert!(servarr_targets(&services, None).is_empty());
+    }
+
+    /// The seed report an outcome carried, if it was a seed outcome.
+    fn seeded(outcome: Result<Outcome, super::Problem>) -> Option<crate::seed::Report> {
+        match outcome {
+            Ok(Outcome::Seed(report)) => Some(report),
+            _ => None,
+        }
+    }
+
+    /// Whether a wiring was skipped, on one line so it holds no phantom coverage.
+    fn is_skipped(wiring: &crate::seed::Wiring) -> bool {
+        matches!(wiring.state, crate::seed::State::Skipped { .. })
+    }
+
+    /// Whether a wiring failed, on one line so it holds no phantom coverage.
+    fn is_failed(wiring: &crate::seed::Wiring) -> bool {
+        matches!(wiring.state, crate::seed::State::Failed { .. })
+    }
+
+    /// A context whose engine says the given qBittorrent log line, answering
+    /// seeding's HTTP from `replies` and its randomness from `bytes`.
+    fn seed_ctx(
+        log: Option<&str>,
+        reachable: bool,
+        replies: Vec<(u16, &'static str)>,
+        bytes: Option<Vec<u8>>,
+        env: Option<std::path::PathBuf>,
+    ) -> Ctx {
+        let mut engine = if reachable {
+            Reporting::holding(&["qbittorrent"], Lifecycle::Running, Health::Healthy)
+        } else {
+            Reporting::absent()
+        };
+        if let Some(line) = log {
+            engine = engine.saying("qbittorrent", line);
+        }
+        let settings = Settings {
+            env_file: env,
+            ..Settings::default()
+        };
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(engine),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+        .with_http(Arc::new(ScriptedHttp::new(replies)))
+        .with_random(Arc::new(FixedRandom(bytes)))
+    }
+
+    /// The three replies a full password exchange expects: log in, set, confirm.
+    fn exchange() -> Vec<(u16, &'static str)> {
+        vec![(200, "Ok."), (200, ""), (200, "Ok.")]
+    }
+
+    /// The line qBittorrent logs its temporary password on.
+    const TEMP_LOG: &str = "A temporary password is provided for this session: read-from-log";
+
+    #[test]
+    fn a_non_seed_outcome_carries_no_seed_report() {
+        assert!(seeded(Ok(reported(None))).is_none());
+    }
+
+    #[tokio::test]
+    async fn seed_replaces_and_records_the_qbittorrent_password() {
+        let env = config_scratch("seed-records");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+        let ctx = seed_ctx(
+            Some(TEMP_LOG),
+            true,
+            exchange(),
+            Some(vec![0x11; 24]),
+            Some(env.clone()),
+        );
+
+        let outcome = dispatch(Command::Seed, &ctx).await;
+
+        let json = outcome
+            .as_ref()
+            .ok()
+            .and_then(|outcome| outcome.clone().envelope().to_json());
+        assert!(json
+            .as_deref()
+            .is_some_and(|json| json.contains(r#""kind":"seed""#)));
+
+        let report = seeded(outcome).unwrap_or_default();
+        let wired = report
+            .wirings
+            .iter()
+            .any(|wiring| wiring.state == crate::seed::State::Wired);
+        assert!(wired, "the password is wired");
+
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(written.contains("QBITTORRENT_PASSWORD="));
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn seed_sets_the_password_even_with_nowhere_to_record_it() {
+        let ctx = seed_ctx(Some(TEMP_LOG), true, exchange(), Some(vec![0x11; 24]), None);
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let wired = report
+            .wirings
+            .iter()
+            .any(|wiring| wiring.state == crate::seed::State::Wired);
+        assert!(wired, "the password is set even with nowhere to record it");
+    }
+
+    #[tokio::test]
+    async fn seed_reports_an_unreadable_stack_rather_than_guessing() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            nowhere,
+            Settings::default(),
+            Environment::MacOs,
+        );
+        let outcome = dispatch(Command::Seed, &ctx).await;
+        assert_eq!(
+            outcome.err().map(|problem| problem.code),
+            Some(crate::stack::STACK_UNREADABLE)
+        );
+    }
+
+    #[tokio::test]
+    async fn seed_reports_a_failed_password_change_and_records_nothing() {
+        // The temporary password is read but the client rejects it, so the change
+        // fails and there is no generated value to record.
+        let ctx = seed_ctx(
+            Some(TEMP_LOG),
+            true,
+            vec![(200, "Fails.")],
+            Some(vec![0x11; 24]),
+            None,
+        );
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let failed = report.wirings.iter().any(is_failed);
+        assert!(failed, "a rejected change is reported as failed");
+    }
+
+    #[tokio::test]
+    async fn seed_skips_qbittorrent_when_no_password_is_announced() {
+        let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None);
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let all_skipped = report.wirings.iter().all(is_skipped);
+        assert!(
+            all_skipped,
+            "an unannounced password is skipped, not failed"
+        );
+    }
+
+    #[tokio::test]
+    async fn seed_skips_qbittorrent_when_its_log_cannot_be_read() {
+        let ctx = seed_ctx(None, false, Vec::new(), Some(vec![0x11; 24]), None);
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let all_skipped = report.wirings.iter().all(is_skipped);
+        assert!(all_skipped, "an unreadable log is skipped, not failed");
     }
 
     #[tokio::test]
@@ -1614,7 +1968,8 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Status(_)
-                | Outcome::Doctor(_),
+                | Outcome::Doctor(_)
+                | Outcome::Seed(_),
             )
             | Err(_) => None,
         }
@@ -2035,7 +2390,8 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
-                | Outcome::Doctor(_),
+                | Outcome::Doctor(_)
+                | Outcome::Seed(_),
             )
             | Err(_) => None,
         }
