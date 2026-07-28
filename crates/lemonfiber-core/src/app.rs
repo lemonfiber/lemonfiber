@@ -463,12 +463,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
 /// Wire the stack's services to each other, idempotently, and report what was
 /// wired and what a re-run still owes.
 ///
-/// The one connection here is qBittorrent's web UI password — the credential
-/// lemonfiber mints rather than reads. Its temporary password is read from the
-/// container's log, replaced with a generated one, and the generated one recorded
-/// where the forwarded-port push reads it. The rest of the graph — root folders
-/// and download clients into each \*arr — wires on the same pattern and lands
-/// next.
+/// One connection is unlike the rest: qBittorrent's web UI password, the
+/// credential lemonfiber mints rather than reads — its temporary password is
+/// read from the container's log, replaced with a generated one, and the
+/// generated one recorded where the forwarded-port push reads it. The rest of
+/// the graph reads a credential and writes a connection: each media-filing
+/// \*arr's root folders, and its download clients (`SABnzbd` and qBittorrent).
+/// Prowlarr, Bindery and Jellyfin→Seerr wire on the same pattern and land next.
 async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     let manifest = ctx
         .stack
@@ -479,19 +480,40 @@ async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
 
     // qBittorrent's password, the one credential lemonfiber mints. Collecting the
     // optional target into a list wires it where the stack has it and does nothing
-    // where it does not, without a branch a test could not reach.
+    // where it does not, without a branch a test could not reach. The generated
+    // value is kept to register qBittorrent as a download client below.
+    let mut qbittorrent_password = None;
     for target in qbittorrent_target(&manifest.services)
         .into_iter()
         .collect::<Vec<_>>()
     {
-        wirings.push(seed_qbittorrent_password(ctx, &target).await);
+        let (wiring, generated) = seed_qbittorrent_password(ctx, &target).await;
+        qbittorrent_password = generated.or(qbittorrent_password);
+        wirings.push(wiring);
     }
 
-    // Each \*arr's root folders, one per media type it manages, under the data
-    // root the whole stack shares.
+    // A later run mints nothing — the temporary password is long gone — so the
+    // value recorded on the run that minted it stands in. Without this an \*arr
+    // that came up after the first seed would never learn about qBittorrent,
+    // since its password cannot be read back from qBittorrent itself.
+    let qbittorrent_password = qbittorrent_password.or_else(|| recorded_qbittorrent_password(ctx));
+
+    // Root folders and download clients for each \*arr that files media. The
+    // download clients' own credentials are read once: SABnzbd's key from its
+    // config, qBittorrent's the password minted or recorded above.
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let sabnzbd_key = read_sabnzbd_key(ctx, &manifest.services, project.as_deref()).await;
     for arr in servarr_arrs(&manifest.services, project.as_deref()) {
         wirings.extend(seed_root_folders(ctx, &arr).await);
+        wirings.extend(
+            seed_download_clients(
+                ctx,
+                &arr,
+                sabnzbd_key.as_deref(),
+                qbittorrent_password.as_deref(),
+            )
+            .await,
+        );
     }
 
     Ok(crate::seed::Report { wirings })
@@ -586,6 +608,162 @@ fn seed_stamp(ctx: &Ctx) -> String {
         .unwrap_or_default()
 }
 
+/// Where a Servarr application reaches `SABnzbd` on the stack's network: the
+/// container name, and `SABnzbd`'s own listening port rather than the
+/// host-published one, because the application connects across the network, not
+/// through the host.
+const SABNZBD_HOST: (&str, u16) = ("sabnzbd", 8080);
+
+/// Where a Servarr application reaches qBittorrent: through Gluetun, whose network
+/// namespace qBittorrent shares, on qBittorrent's web UI port. qBittorrent has no
+/// network of its own, so its address is Gluetun's.
+const QBITTORRENT_HOST: (&str, u16) = ("gluetun", 8081);
+
+/// The category an application files under, named as that application names its
+/// category field, for the media type it manages.
+///
+/// The field is fixed per application — Sonarr names it `tvCategory`, Radarr
+/// `movieCategory`, Lidarr `musicCategory` — so the mapping is by the media type
+/// that identifies the application. A media type lemonfiber does not recognise has
+/// no known field, so it names none rather than guessing.
+fn category_for(media: &str) -> Option<crate::ports::service::Category> {
+    let field = match media {
+        "tv" => "tvCategory",
+        "movies" => "movieCategory",
+        "music" => "musicCategory",
+        _ => return None,
+    };
+    Some(crate::ports::service::Category {
+        field: field.to_owned(),
+        value: media.to_owned(),
+    })
+}
+
+/// `SABnzbd`'s API key, read from its `sabnzbd.ini` under the project root, or
+/// nothing where the stack has no `SABnzbd`, no project to read from, or
+/// `SABnzbd` has not written its key yet.
+async fn read_sabnzbd_key(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Option<String> {
+    let path = sabnzbd_config_path(services, project?)?;
+    let text = ctx.filesystem.read(&path).await?;
+    crate::sabnzbd::api_key(&text)
+}
+
+/// The host path to `SABnzbd`'s configuration file, resolved the way a Servarr
+/// config path is: its `/config` mount lives at `config/<id>` under the project
+/// root. Nothing where the stack has no `SABnzbd` writing a config there.
+fn sabnzbd_config_path(
+    services: &[lemonfiber_manifest::Service],
+    project: &Path,
+) -> Option<PathBuf> {
+    services.iter().find_map(|service| {
+        let api = service.api.as_ref()?;
+        if api.kind != lemonfiber_manifest::ApiKind::Sabnzbd {
+            return None;
+        }
+        let inside = api.path.as_deref()?.strip_prefix("/config/")?;
+        Some(project.join("config").join(&service.id).join(inside))
+    })
+}
+
+/// Register into an application the download clients whose credentials are in
+/// hand: `SABnzbd` where its key was read, qBittorrent where its password was
+/// minted. Both carry the application's category. Without the application's own
+/// key its clients are skipped for a re-run, as its root folders are.
+async fn seed_download_clients(
+    ctx: &Ctx,
+    arr: &Arr,
+    sabnzbd_key: Option<&str>,
+    qbittorrent_password: Option<&str>,
+) -> Vec<crate::seed::Wiring> {
+    let categories: Vec<crate::ports::service::Category> = arr
+        .media_types
+        .first()
+        .and_then(|media| category_for(media))
+        .into_iter()
+        .collect();
+
+    let mut wirings = Vec::new();
+    for category in &categories {
+        let clients = download_clients(sabnzbd_key, qbittorrent_password, category);
+        if clients.is_empty() {
+            continue;
+        }
+        wirings.extend(wire_arr_download_clients(ctx, arr, &clients).await);
+    }
+    wirings
+}
+
+/// The download clients to register, one per credential that is in hand.
+fn download_clients(
+    sabnzbd_key: Option<&str>,
+    qbittorrent_password: Option<&str>,
+    category: &crate::ports::service::Category,
+) -> Vec<crate::ports::service::DownloadClient> {
+    let mut clients = Vec::new();
+    if let Some(key) = sabnzbd_key {
+        clients.push(crate::ports::service::DownloadClient {
+            name: "SABnzbd".to_owned(),
+            host: SABNZBD_HOST.0.to_owned(),
+            port: SABNZBD_HOST.1,
+            kind: crate::ports::service::ClientKind::Sabnzbd,
+            credential: crate::ports::service::Credential::ApiKey(key.to_owned()),
+            category: category.clone(),
+        });
+    }
+    if let Some(password) = qbittorrent_password {
+        clients.push(crate::ports::service::DownloadClient {
+            name: "qBittorrent".to_owned(),
+            host: QBITTORRENT_HOST.0.to_owned(),
+            port: QBITTORRENT_HOST.1,
+            kind: crate::ports::service::ClientKind::Qbittorrent,
+            credential: crate::ports::service::Credential::UserPass {
+                username: "admin".to_owned(),
+                password: password.to_owned(),
+            },
+            category: category.clone(),
+        });
+    }
+    clients
+}
+
+/// Wire the given clients into one application, reading its key first; without it
+/// the application has not finished starting and the clients are skipped.
+async fn wire_arr_download_clients(
+    ctx: &Ctx,
+    arr: &Arr,
+    clients: &[crate::ports::service::DownloadClient],
+) -> Vec<crate::seed::Wiring> {
+    let Some(key) = read_servarr_key(ctx, &arr.target.config).await else {
+        return clients
+            .iter()
+            .map(|client| crate::seed::Wiring {
+                connection: format!("{} into {}", client.name, arr.target.name),
+                state: crate::seed::State::Skipped {
+                    reason: format!(
+                        "{} has not written its API key yet; a later run completes it",
+                        arr.target.name
+                    ),
+                },
+            })
+            .collect();
+    };
+    let servarr =
+        crate::servarr::Servarr::new(ctx.http.clone(), &arr.target.base, key, &arr.target.id);
+    let mut journal = crate::journal::Journal::new();
+    crate::seed::wire_download_clients(
+        &servarr,
+        &arr.target.name,
+        clients,
+        &mut journal,
+        &seed_stamp(ctx),
+    )
+    .await
+}
+
 /// qBittorrent's address, if the stack has it: the id names the container to read
 /// a log from, the base is where the host reaches its web UI.
 fn qbittorrent_target(services: &[lemonfiber_manifest::Service]) -> Option<(String, String)> {
@@ -604,27 +782,31 @@ fn qbittorrent_target(services: &[lemonfiber_manifest::Service]) -> Option<(Stri
 /// is nothing to authenticate with, so the connection is skipped for a re-run
 /// once the container has announced one. A generated password that lands is
 /// recorded in the environment where the forwarded-port push reads it.
-async fn seed_qbittorrent_password(ctx: &Ctx, target: &(String, String)) -> crate::seed::Wiring {
+async fn seed_qbittorrent_password(
+    ctx: &Ctx,
+    target: &(String, String),
+) -> (crate::seed::Wiring, Option<String>) {
     let (id, base) = target;
     let connection = "qBittorrent web UI password".to_owned();
 
     let Some(temporary) = read_temporary_password(ctx, id).await else {
-        return crate::seed::Wiring {
+        let wiring = crate::seed::Wiring {
             connection,
             state: crate::seed::State::Skipped {
                 reason: "qBittorrent has not announced a temporary password yet; a later run completes it".to_owned(),
             },
         };
+        return (wiring, None);
     };
 
     let client = crate::qbittorrent::Qbittorrent::new(ctx.http.clone(), base);
     let (wiring, recorded) =
         crate::seed::wire_qbittorrent_password(&client, ctx.random.as_ref(), &temporary).await;
 
-    if let Some(password) = recorded {
-        record_qbittorrent_password(ctx, &password);
+    if let Some(password) = &recorded {
+        record_qbittorrent_password(ctx, password);
     }
-    wiring
+    (wiring, recorded)
 }
 
 /// The temporary password qBittorrent announced in its log, if it has.
@@ -655,6 +837,17 @@ fn record_qbittorrent_password(ctx: &Ctx, password: &str) {
     if let Some(path) = ctx.settings.env_file.as_deref() {
         let _ = store::set(path, crate::config::QBITTORRENT_PASSWORD_KEY, password);
     }
+}
+
+/// The qBittorrent password recorded on the run that minted it, so a later run
+/// still offers qBittorrent as a download client. Nothing where no env file
+/// holds one yet; an unreadable file reads the same as an empty one, because a
+/// missing password is a missing password however the reading failed.
+fn recorded_qbittorrent_password(ctx: &Ctx) -> Option<String> {
+    let path = ctx.settings.env_file.as_deref()?;
+    let file = store::read(path).unwrap_or_default();
+    let value = file.get(crate::config::QBITTORRENT_PASSWORD_KEY)?;
+    (!value.is_empty()).then(|| value.to_owned())
 }
 
 /// How many lines back to read for qBittorrent's start-up announcement. Its
@@ -1077,8 +1270,9 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        dispatch, project_directory, servarr_arrs, servarr_targets, Category, Command, Ctx,
-        Environment, Outcome, Settings, Source, VersionReport,
+        category_for, dispatch, download_clients, project_directory, read_sabnzbd_key,
+        recorded_qbittorrent_password, sabnzbd_config_path, servarr_arrs, servarr_targets, store,
+        Category, Command, Ctx, Environment, Outcome, Settings, Source, VersionReport,
     };
     use crate::docker::{Condition, State as ServiceState};
     use crate::ports::docker::{
@@ -1287,9 +1481,45 @@ mod tests {
         }
     }
 
-    /// A filesystem that hands back one configuration text for any read, or
-    /// nothing. Only `read` is meaningful to seeding; the rest are unused.
-    struct SeedFs(Option<&'static str>);
+    /// A transport that answers by the shape of the URL, so a combined seed run's
+    /// many calls need no exact ordering. Root-folder and download-client lists
+    /// hold exactly what each arr wants, so every connection reads back as already
+    /// wired; qBittorrent's auth and set both answer success.
+    struct RoutedHttp;
+
+    #[async_trait]
+    impl crate::ports::http::Http for RoutedHttp {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            let body = if request.url.contains("/downloadclient") {
+                r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081}]}]"#
+            } else if request.url.contains("/rootfolder") {
+                r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#
+            } else {
+                "Ok."
+            };
+            Ok(crate::ports::http::Response {
+                status: 200,
+                body: body.to_owned(),
+            })
+        }
+    }
+
+    /// A filesystem that hands back a Servarr configuration for a Servarr path and
+    /// a `SABnzbd` one for `SABnzbd`'s, or nothing. Only `read` is meaningful to
+    /// seeding; the rest are unused.
+    struct SeedFs {
+        servarr: Option<&'static str>,
+        sabnzbd: Option<&'static str>,
+    }
+
+    impl SeedFs {
+        fn keyed(servarr: Option<&'static str>, sabnzbd: Option<&'static str>) -> Self {
+            Self { servarr, sabnzbd }
+        }
+    }
 
     #[async_trait]
     impl crate::ports::filesystem::FileSystem for SeedFs {
@@ -1319,8 +1549,13 @@ mod tests {
             Err(crate::ports::filesystem::Fault::new("unused"))
         }
         async fn remove(&self, _path: &std::path::Path) {}
-        async fn read(&self, _path: &std::path::Path) -> Option<String> {
-            self.0.map(str::to_owned)
+        async fn read(&self, path: &std::path::Path) -> Option<String> {
+            let text = if path.to_string_lossy().contains("sabnzbd") {
+                self.sabnzbd
+            } else {
+                self.servarr
+            };
+            text.map(str::to_owned)
         }
         async fn write(&self, _path: &std::path::Path, _contents: &str) {}
         async fn ownership(
@@ -1640,6 +1875,78 @@ mod tests {
     }
 
     #[test]
+    fn a_sabnzbd_config_path_is_the_config_mount_of_the_one_sabnzbd_service() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        let sabnzbd_api = |path: Option<&str>| lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+            key_source: lemonfiber_manifest::KeySource::ConfigIni,
+            path: path.map(str::to_owned),
+        };
+        let services = vec![
+            manifest_service("jellyfin", None, Some(8096)),
+            manifest_service(
+                "sonarr",
+                Some(servarr_api(Some("/config/config.xml"))),
+                Some(8989),
+            ),
+            manifest_service(
+                "sabnzbd",
+                Some(sabnzbd_api(Some("/config/sabnzbd.ini"))),
+                Some(8080),
+            ),
+        ];
+
+        assert_eq!(
+            sabnzbd_config_path(&services, project),
+            Some(project.join("config/sabnzbd/sabnzbd.ini")),
+            "read from where Compose mounts SABnzbd's config"
+        );
+        assert!(
+            sabnzbd_config_path(&[], project).is_none(),
+            "no SABnzbd service, no path"
+        );
+        assert!(
+            sabnzbd_config_path(
+                &[manifest_service(
+                    "sabnzbd",
+                    Some(sabnzbd_api(None)),
+                    Some(8080)
+                )],
+                project
+            )
+            .is_none(),
+            "a SABnzbd that declares no config file"
+        );
+        assert!(
+            sabnzbd_config_path(
+                &[manifest_service(
+                    "sabnzbd",
+                    Some(sabnzbd_api(Some("/data/elsewhere.ini"))),
+                    Some(8080)
+                )],
+                project
+            )
+            .is_none(),
+            "a config path outside the /config mount"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_sabnzbd_key_needs_a_project_and_a_sabnzbd_to_read() {
+        let ctx = seed_ctx(None, true, Vec::new(), None, None);
+        assert!(
+            read_sabnzbd_key(&ctx, &[], None).await.is_none(),
+            "without a project there is nowhere to read from"
+        );
+        assert!(
+            read_sabnzbd_key(&ctx, &[], Some(std::path::Path::new("/srv/stack")))
+                .await
+                .is_none(),
+            "without a SABnzbd service there is no key"
+        );
+    }
+
+    #[test]
     fn nothing_can_be_proven_without_a_project_directory() {
         let services = vec![manifest_service(
             "sonarr",
@@ -1838,7 +2145,7 @@ mod tests {
             Some(vec![0x11; 24]),
             None,
         )
-        .with_filesystem(Arc::new(SeedFs(Some(KEYED))));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
         let folders = root_folder_wirings(&report);
@@ -1854,7 +2161,7 @@ mod tests {
         // No configuration to read a key from, so the arrs have not finished
         // starting: their folders are skipped for a re-run, not failed.
         let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None)
-            .with_filesystem(Arc::new(SeedFs(None)));
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
         let folders = root_folder_wirings(&report);
@@ -1872,7 +2179,7 @@ mod tests {
         // The fake answers only `read`; the rest are stubs, exercised here so the
         // fake carries no uncovered lines of its own.
         use crate::ports::filesystem::FileSystem;
-        let fs = SeedFs(None);
+        let fs = SeedFs::keyed(None, None);
         let path = std::path::Path::new("/x");
         assert!(fs.canonicalize(path).await.is_ok());
         assert!(fs.touch(path).await.is_err());
@@ -1883,6 +2190,143 @@ mod tests {
         fs.write(path, "unused").await;
         assert!(fs.ownership(path).await.is_none());
         let _ = fs.describe(path).await;
+    }
+
+    #[test]
+    fn a_category_is_named_by_the_media_the_application_files() {
+        assert_eq!(
+            category_for("tv").map(|category| category.field),
+            Some("tvCategory".to_owned())
+        );
+        assert_eq!(
+            category_for("movies").map(|category| category.field),
+            Some("movieCategory".to_owned())
+        );
+        assert_eq!(
+            category_for("music").map(|category| category.field),
+            Some("musicCategory".to_owned())
+        );
+        assert!(category_for("comics").is_none());
+    }
+
+    #[test]
+    fn a_download_client_is_built_for_each_credential_in_hand() {
+        let category = crate::ports::service::Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        };
+        assert_eq!(download_clients(Some("k"), Some("p"), &category).len(), 2);
+        assert_eq!(download_clients(Some("k"), None, &category).len(), 1);
+        assert_eq!(download_clients(None, Some("p"), &category).len(), 1);
+        assert!(download_clients(None, None, &category).is_empty());
+    }
+
+    #[test]
+    fn a_recorded_qbittorrent_password_is_read_back_or_read_as_absent() {
+        // Nowhere to read from.
+        let ctx = seed_ctx(None, true, Vec::new(), None, None);
+        assert!(recorded_qbittorrent_password(&ctx).is_none());
+
+        let path = config_scratch("qbt-readback");
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.clone()));
+        // A file that holds no password of ours.
+        let _ = store::set(&path, "SOMETHING_ELSE", "x");
+        assert!(
+            recorded_qbittorrent_password(&ctx).is_none(),
+            "no password recorded"
+        );
+        // An empty value is not a password.
+        let _ = store::set(&path, crate::config::QBITTORRENT_PASSWORD_KEY, "");
+        assert!(
+            recorded_qbittorrent_password(&ctx).is_none(),
+            "an empty value is absent"
+        );
+        // The value recorded on an earlier run is handed back.
+        let _ = store::set(
+            &path,
+            crate::config::QBITTORRENT_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        assert_eq!(
+            recorded_qbittorrent_password(&ctx).as_deref(),
+            Some("minted-earlier")
+        );
+    }
+
+    /// The wirings whose connection registers a download client into an arr.
+    fn download_client_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
+        report
+            .wirings
+            .iter()
+            .filter(|wiring| wiring.connection.contains("into "))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn seed_wires_each_arrs_download_clients() {
+        // qBittorrent announces a temporary password, so it is set and its value
+        // threaded to the download clients; each arr already holds both clients.
+        const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+        let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
+            .with_http(Arc::new(RoutedHttp))
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let clients = download_client_wirings(&report);
+        assert_eq!(
+            clients.len(),
+            6,
+            "SABnzbd and qBittorrent into each of three arrs"
+        );
+        let all_wired = clients
+            .iter()
+            .all(|wiring| wiring.state == crate::seed::State::AlreadyWired);
+        assert!(all_wired, "a client already registered is left wired");
+    }
+
+    #[tokio::test]
+    async fn seed_skips_download_clients_when_the_arr_key_is_not_readable() {
+        // The clients' own credentials are in hand, but the arrs have not written
+        // their keys, so registration is skipped for a re-run rather than failed.
+        const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+        let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
+            .with_http(Arc::new(RoutedHttp))
+            .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let clients = download_client_wirings(&report);
+        assert_eq!(clients.len(), 6);
+        assert!(clients.iter().all(|wiring| is_skipped(wiring)));
+    }
+
+    #[tokio::test]
+    async fn a_later_seed_offers_qbittorrent_from_its_recorded_password() {
+        // The temporary password is gone, so nothing is minted this run; the
+        // password recorded earlier stands in and qBittorrent is offered anyway.
+        const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+        let path = config_scratch("qbt-later-seed");
+        let _ = store::set(
+            &path,
+            crate::config::QBITTORRENT_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(path))
+            .with_http(Arc::new(RoutedHttp))
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let clients = download_client_wirings(&report);
+        assert_eq!(clients.len(), 6, "both clients into each of three arrs");
+        let qbittorrent = clients
+            .iter()
+            .filter(|wiring| wiring.connection.starts_with("qBittorrent into "))
+            .count();
+        assert_eq!(
+            qbittorrent, 3,
+            "qBittorrent is offered to every arr on a later run"
+        );
     }
 
     #[tokio::test]
