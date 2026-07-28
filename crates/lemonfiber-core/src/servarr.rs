@@ -211,6 +211,21 @@ impl ClientResource {
             id: self.id.to_string(),
             host,
             port,
+            category: self.category(),
+        })
+    }
+
+    /// The category the client files under, read from whichever `*Category` field
+    /// the target application names it — `tvCategory`, `movieCategory`,
+    /// `musicCategory`. Nothing where the client carries no such field.
+    fn category(&self) -> Option<crate::ports::service::Category> {
+        let field = self
+            .fields
+            .iter()
+            .find(|field| field.name.ends_with("Category"))?;
+        Some(crate::ports::service::Category {
+            field: field.name.clone(),
+            value: field.value.as_str()?.to_owned(),
         })
     }
 
