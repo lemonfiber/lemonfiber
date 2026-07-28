@@ -14,6 +14,7 @@ pub mod docker;
 pub mod filesystem;
 pub mod http;
 pub mod process;
+pub mod random;
 pub mod service;
 pub mod time;
 
@@ -21,5 +22,6 @@ pub use docker::Engine;
 pub use filesystem::{FileSystem, Volume};
 pub use http::Http;
 pub use process::Runner;
+pub use random::Random;
 pub use service::Client;
 pub use time::Clock;
