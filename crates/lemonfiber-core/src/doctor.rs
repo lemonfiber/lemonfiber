@@ -14,6 +14,7 @@
 //!
 //! See `.docs/architecture/module-layout.md`.
 
+pub mod credentials;
 pub mod environment;
 pub mod storage;
 pub mod vpn;

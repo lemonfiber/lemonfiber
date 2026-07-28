@@ -9,7 +9,7 @@
 //! Whether this is a rehearsal is a property of the [`Ctx`], not a second code
 //! path, so there is no parallel implementation to fall out of step.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,6 +18,7 @@ use tokio::sync::mpsc::Receiver;
 use crate::config::store;
 use crate::config::Settings;
 use crate::docker::{condition, survey, unsettled, Service};
+use crate::doctor::credentials::{CredentialsCheck, Target};
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
@@ -30,6 +31,7 @@ use crate::model::{
 use crate::platform::Environment;
 use crate::ports::docker::{Engine, LogLine, LogQuery};
 use crate::ports::filesystem::{Presence, Volume};
+use crate::ports::http::Http;
 use crate::ports::{Clock, FileSystem, Runner};
 use crate::stack::closure::resolve;
 use crate::stack::compose::{build, Action};
@@ -148,6 +150,9 @@ pub struct Ctx {
     pub clock: Arc<dyn Clock>,
     /// How the filesystem is reached, for the checks that prove what it can do.
     pub filesystem: Arc<dyn FileSystem>,
+    /// How services are reached over HTTP, for the checks and seeding that ask
+    /// one what it is or wire it to another.
+    pub http: Arc<dyn Http>,
     /// How long starting waits for services to settle before giving up.
     ///
     /// A knob rather than a constant because it is a policy: an operator on a
@@ -184,6 +189,10 @@ impl Ctx {
             engine,
             clock,
             filesystem,
+            // The real transport is the only sensible default; the one code path
+            // that needs to answer for a fake service overrides it with
+            // `with_http`, so no test reaches the network to build a context.
+            http: Arc::new(crate::adapters::Web::new()),
             patience: PATIENCE,
             stack,
             settings,
@@ -442,9 +451,72 @@ async fn diagnose(
         ctx.settings.port_forward.clone(),
         disruptive,
     );
-    let checks: Vec<Box<dyn Check>> = vec![Box::new(environment), Box::new(storage), Box::new(vpn)];
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let credentials = CredentialsCheck::new(
+        ctx.http.clone(),
+        ctx.filesystem.clone(),
+        servarr_targets(&manifest.services, project.as_deref()),
+    );
+    let checks: Vec<Box<dyn Check>> = vec![
+        Box::new(environment),
+        Box::new(storage),
+        Box::new(vpn),
+        Box::new(credentials),
+    ];
 
     Ok(examine(&checks, only).await)
+}
+
+/// The directory Compose treats as the project root, where the services' config
+/// volumes are bind-mounted — the same path `up` hands Compose as
+/// `--project-directory`, resolved here without writing anything.
+///
+/// An external stack is its own root; an embedded one lives wherever it was
+/// materialised. Without that path there is nowhere to read a service's key from,
+/// which the caller turns into no targets rather than a guess.
+fn project_directory(stack: &Source, stack_dir: Option<&Path>) -> Option<PathBuf> {
+    match stack {
+        Source::External(path) => Some((*path).to_path_buf()),
+        Source::Embedded(_) => stack_dir.map(Path::to_path_buf),
+    }
+}
+
+/// The Servarr-shape services whose credential can be proven, and where to read
+/// each one's key and reach it.
+///
+/// Only a service that speaks the Servarr shape, publishes a port to reach it on
+/// and names the config file it writes its key to can be proven; anything else is
+/// left out rather than reported as a fault. The host path to that file follows
+/// the stack's bind-mount convention — a service's `/config` is `config/<id>`
+/// under the project root — so the key the service wrote is read from where
+/// Compose mounted it.
+fn servarr_targets(
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Vec<Target> {
+    let Some(project) = project else {
+        return Vec::new();
+    };
+    services
+        .iter()
+        .filter_map(|service| target_for(service, project))
+        .collect()
+}
+
+/// One service as a target to prove, or nothing where it cannot be one.
+fn target_for(service: &lemonfiber_manifest::Service, project: &Path) -> Option<Target> {
+    let api = service.api.as_ref()?;
+    if api.kind != lemonfiber_manifest::ApiKind::Servarr {
+        return None;
+    }
+    let port = service.port?;
+    let inside_config = api.path.as_deref()?.strip_prefix("/config/")?;
+    Some(Target {
+        id: service.id.clone(),
+        name: service.name.clone(),
+        base: format!("http://127.0.0.1:{port}"),
+        config: project.join("config").join(&service.id).join(inside_config),
+    })
 }
 
 /// What every service in the named forms is doing.
@@ -761,7 +833,8 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        dispatch, Category, Command, Ctx, Environment, Outcome, Settings, Source, VersionReport,
+        dispatch, project_directory, servarr_targets, Category, Command, Ctx, Environment, Outcome,
+        Settings, Source, VersionReport,
     };
     use crate::docker::{Condition, State as ServiceState};
     use crate::ports::docker::{
@@ -1101,6 +1174,129 @@ mod tests {
             )
             | Err(_) => None,
         }
+    }
+
+    /// A manifest service with the few fields the credential resolver reads, and
+    /// filler for the rest, so a test can vary the shape, port and key file.
+    fn manifest_service(
+        id: &str,
+        api: Option<lemonfiber_manifest::Api>,
+        port: Option<u16>,
+    ) -> lemonfiber_manifest::Service {
+        lemonfiber_manifest::Service {
+            id: id.to_owned(),
+            name: format!("{id} the app"),
+            profile: "media".to_owned(),
+            image: "example/image".to_owned(),
+            tag: "1".to_owned(),
+            port,
+            bind: None,
+            health: None,
+            api,
+            criticality: lemonfiber_manifest::Criticality::Core,
+            license: "MIT".to_owned(),
+            upstream: "https://example.test".to_owned(),
+            last_release: "2026-01-01".to_owned(),
+            describes: "an example service".to_owned(),
+            without_it: "nothing works".to_owned(),
+            media_types: Vec::new(),
+            depends_on: Vec::new(),
+            capabilities: Vec::new(),
+            host_managed: false,
+        }
+    }
+
+    /// A Servarr-shape API declaration naming the given key file, or none.
+    fn servarr_api(path: Option<&str>) -> lemonfiber_manifest::Api {
+        lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Servarr,
+            key_source: lemonfiber_manifest::KeySource::ConfigXml,
+            path: path.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn the_project_directory_is_the_external_path_or_the_materialise_target() {
+        static EMBEDDED: include_dir::Dir<'_> =
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/ports");
+        assert_eq!(
+            project_directory(&Source::External(std::path::Path::new("/srv/stack")), None)
+                .as_deref(),
+            Some(std::path::Path::new("/srv/stack")),
+            "an external stack is its own project root"
+        );
+        assert_eq!(
+            project_directory(
+                &Source::Embedded(&EMBEDDED),
+                Some(std::path::Path::new("/opt/lemonfiber/stack"))
+            )
+            .as_deref(),
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            "an embedded stack's root is wherever it was materialised"
+        );
+        assert_eq!(
+            project_directory(&Source::Embedded(&EMBEDDED), None),
+            None,
+            "an embedded stack materialised nowhere has no root to read from"
+        );
+    }
+
+    #[test]
+    fn only_reachable_servarr_services_with_a_config_path_become_targets() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        let services = vec![
+            manifest_service(
+                "sonarr",
+                Some(servarr_api(Some("/config/config.xml"))),
+                Some(8989),
+            ),
+            manifest_service(
+                "sabnzbd",
+                Some(lemonfiber_manifest::Api {
+                    kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+                    key_source: lemonfiber_manifest::KeySource::ConfigIni,
+                    path: Some("/config/sabnzbd.ini".to_owned()),
+                }),
+                Some(8080),
+            ),
+            manifest_service("jellyfin", None, Some(8096)),
+            manifest_service(
+                "radarr",
+                Some(servarr_api(Some("/config/config.xml"))),
+                None,
+            ),
+            manifest_service(
+                "lidarr",
+                Some(servarr_api(Some("/data/elsewhere.xml"))),
+                Some(8686),
+            ),
+            manifest_service("prowlarr", Some(servarr_api(None)), Some(9696)),
+        ];
+
+        let targets = servarr_targets(&services, Some(project));
+
+        assert_eq!(
+            targets.len(),
+            1,
+            "only the reachable Servarr service qualifies"
+        );
+        let target = targets.first();
+        assert!(
+            target.is_some_and(|target| target.id == "sonarr"
+                && target.base == "http://127.0.0.1:8989"
+                && target.config == project.join("config/sonarr/config.xml")),
+            "the key is read from where Compose mounts the service's config"
+        );
+    }
+
+    #[test]
+    fn nothing_can_be_proven_without_a_project_directory() {
+        let services = vec![manifest_service(
+            "sonarr",
+            Some(servarr_api(Some("/config/config.xml"))),
+            Some(8989),
+        )];
+        assert!(servarr_targets(&services, None).is_empty());
     }
 
     #[tokio::test]
