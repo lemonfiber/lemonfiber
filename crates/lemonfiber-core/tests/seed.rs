@@ -9,7 +9,8 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{
-    Client, DownloadClient, Failure, Identity, RegisteredClient, RegisteredFolder, RootFolder,
+    Category, Client, ClientKind, Credential, DownloadClient, Failure, Identity, RegisteredClient,
+    RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::seed::{
     intent, wire_download_clients, wire_root_folders, Intent, Observed, Report, State, Wiring,
@@ -439,7 +440,12 @@ fn client(name: &str, host: &str, port: u16) -> DownloadClient {
         name: name.to_owned(),
         host: host.to_owned(),
         port,
-        credential: None,
+        kind: ClientKind::Sabnzbd,
+        credential: Credential::ApiKey("sab-key".to_owned()),
+        category: Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        },
     }
 }
 

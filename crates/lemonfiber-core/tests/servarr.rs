@@ -12,7 +12,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
-    Client, DownloadClient, Failure, RegisteredClient, RegisteredFolder, RootFolder,
+    Category, Client, ClientKind, Credential, DownloadClient, Failure, RegisteredClient,
+    RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::servarr::{api_key, Servarr};
 
@@ -180,17 +181,103 @@ async fn a_root_folder_is_posted_to_its_endpoint() {
         .is_some_and(|body| body.contains("/data/media/tv"))));
 }
 
-#[tokio::test]
-async fn a_download_client_is_posted_to_its_endpoint() {
-    let fake = Fake::new(Answer::Reply(201, ""));
-    let client = DownloadClient {
+/// A `SABnzbd` download client: a Usenet client authenticated by an API key.
+fn sabnzbd() -> DownloadClient {
+    DownloadClient {
         name: "SABnzbd".to_owned(),
         host: "sabnzbd".to_owned(),
         port: 8080,
-        credential: None,
-    };
+        kind: ClientKind::Sabnzbd,
+        credential: Credential::ApiKey("sab-key".to_owned()),
+        category: Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        },
+    }
+}
+
+/// A `qBittorrent` download client: a torrent client authenticated by a login.
+fn qbit() -> DownloadClient {
+    DownloadClient {
+        name: "qBittorrent".to_owned(),
+        host: "qbittorrent".to_owned(),
+        port: 8081,
+        kind: ClientKind::Qbittorrent,
+        credential: Credential::UserPass {
+            username: "admin".to_owned(),
+            password: "web-pass".to_owned(),
+        },
+        category: Category {
+            field: "movieCategory".to_owned(),
+            value: "movies".to_owned(),
+        },
+    }
+}
+
+#[tokio::test]
+async fn a_sabnzbd_client_is_posted_as_its_usenet_implementation() {
+    let fake = Fake::new(Answer::Reply(201, ""));
     assert!(sonarr(&fake)
-        .register_download_client(&client)
+        .register_download_client(&sabnzbd())
+        .await
+        .is_ok());
+
+    let body = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    for expected in [
+        r#""implementation":"Sabnzbd""#,
+        r#""configContract":"SabnzbdSettings""#,
+        r#""protocol":"usenet""#,
+        r#""name":"apiKey""#,
+        "sab-key",
+        r#""name":"tvCategory""#,
+    ] {
+        assert!(
+            body.contains(expected),
+            "SABnzbd body missing {expected}: {body}"
+        );
+    }
+    // A Usenet client is not told a username and password.
+    assert!(!body.contains(r#""name":"username""#));
+}
+
+#[tokio::test]
+async fn a_qbittorrent_client_is_posted_as_its_torrent_implementation() {
+    let fake = Fake::new(Answer::Reply(201, ""));
+    assert!(sonarr(&fake)
+        .register_download_client(&qbit())
+        .await
+        .is_ok());
+
+    let body = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    for expected in [
+        r#""implementation":"QBittorrent""#,
+        r#""configContract":"QBittorrentSettings""#,
+        r#""protocol":"torrent""#,
+        r#""name":"username""#,
+        r#""name":"password""#,
+        "web-pass",
+        r#""name":"movieCategory""#,
+    ] {
+        assert!(
+            body.contains(expected),
+            "qBittorrent body missing {expected}: {body}"
+        );
+    }
+    // A torrent client authenticated by login is not told an API key.
+    assert!(!body.contains(r#""name":"apiKey""#));
+}
+
+#[tokio::test]
+async fn a_download_client_is_posted_to_its_endpoint() {
+    let fake = Fake::new(Answer::Reply(201, ""));
+    assert!(sonarr(&fake)
+        .register_download_client(&sabnzbd())
         .await
         .is_ok());
 
@@ -217,14 +304,8 @@ async fn a_rejected_root_folder_registration_is_refused() {
 #[tokio::test]
 async fn a_rejected_download_client_registration_is_refused() {
     let fake = Fake::new(Answer::Reply(400, "unknown implementation"));
-    let client = DownloadClient {
-        name: "SABnzbd".to_owned(),
-        host: "sabnzbd".to_owned(),
-        port: 8080,
-        credential: None,
-    };
     assert!(matches!(
-        sonarr(&fake).register_download_client(&client).await,
+        sonarr(&fake).register_download_client(&sabnzbd()).await,
         Err(Failure::Refused { .. })
     ));
 }
