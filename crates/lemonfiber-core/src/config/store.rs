@@ -82,9 +82,13 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Failure> {
     // Written with `if let` rather than `map_err`, and without a block around
     // the directory. A closure is a function of its own for coverage purposes,
     // and one that only runs on failure is a symbol no passing test reaches in
-    // every build of this crate. A path with no parent is a filesystem root,
-    // which cannot hold a settings file anyway.
-    let parent = path.parent().unwrap_or(Path::new("."));
+    // every build of this crate. A path with no usable parent — a filesystem
+    // root, or a bare relative name whose parent is the empty string — is
+    // written in the current directory rather than under `create_dir_all("")`.
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     if let Err(err) = std::fs::create_dir_all(parent) {
         return Err(unwritable(path, &err));
     }
