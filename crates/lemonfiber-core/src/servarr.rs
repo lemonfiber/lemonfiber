@@ -18,7 +18,7 @@ use serde::Deserialize;
 
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
-    Client, DownloadClient, Failure, Identity, RegisteredFolder, RootFolder,
+    Client, DownloadClient, Failure, Identity, RegisteredClient, RegisteredFolder, RootFolder,
 };
 
 /// The header every Servarr application authenticates with.
@@ -189,6 +189,67 @@ impl Client for Servarr {
                 path: folder.path,
             })
             .collect())
+    }
+
+    async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
+        let response = self
+            .send(&self.request(Method::Get, "/downloadclient", None))
+            .await?;
+        if !response.is_success() {
+            return Err(self.refusal(&response));
+        }
+        let clients: Vec<ClientResource> =
+            serde_json::from_str(&response.body).map_err(|_| Failure::Refused {
+                service: self.service.clone(),
+                detail: "the download-client list could not be read".to_owned(),
+            })?;
+        Ok(clients
+            .into_iter()
+            .filter_map(ClientResource::endpoint)
+            .collect())
+    }
+}
+
+/// A download-client resource as the service reports it: the identifier it
+/// assigned, and the connection settings, which Servarr carries as named entries
+/// in a `fields` array rather than as top-level keys.
+#[derive(Deserialize)]
+struct ClientResource {
+    id: i64,
+    #[serde(default)]
+    fields: Vec<ClientField>,
+}
+
+/// One entry in a resource's `fields` array — a setting's name and its value,
+/// whose type varies by setting, so it is read as untyped JSON and interpreted
+/// per field.
+#[derive(Deserialize)]
+struct ClientField {
+    name: String,
+    #[serde(default)]
+    value: serde_json::Value,
+}
+
+impl ClientResource {
+    /// The client as the endpoint it reaches, or nothing where it does not name
+    /// both a host and a port — which is all that a connection can be matched by,
+    /// so one that names neither cannot be told from another and is left out.
+    fn endpoint(self) -> Option<RegisteredClient> {
+        let host = self.field("host")?.as_str()?.to_owned();
+        let port = u16::try_from(self.field("port")?.as_u64()?).ok()?;
+        Some(RegisteredClient {
+            id: self.id.to_string(),
+            host,
+            port,
+        })
+    }
+
+    /// The value of the named field, where the resource carries it.
+    fn field(&self, name: &str) -> Option<&serde_json::Value> {
+        self.fields
+            .iter()
+            .find(|field| field.name == name)
+            .map(|field| &field.value)
     }
 }
 

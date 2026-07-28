@@ -9,9 +9,11 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{
-    Client, DownloadClient, Failure, Identity, RegisteredFolder, RootFolder,
+    Client, DownloadClient, Failure, Identity, RegisteredClient, RegisteredFolder, RootFolder,
 };
-use lemonfiber_core::seed::{intent, wire_root_folders, Intent, Observed, Report, State, Wiring};
+use lemonfiber_core::seed::{
+    intent, wire_download_clients, wire_root_folders, Intent, Observed, Report, State, Wiring,
+};
 
 // ---- The policy: pure, decided without a service. ----
 
@@ -144,6 +146,7 @@ enum Mode {
 struct FakeService {
     mode: Mode,
     folders: Mutex<Vec<RegisteredFolder>>,
+    clients: Mutex<Vec<RegisteredClient>>,
     reads: Mutex<u32>,
     next_id: Mutex<u32>,
 }
@@ -153,6 +156,17 @@ impl FakeService {
         Self {
             mode,
             folders: Mutex::new(folders),
+            clients: Mutex::new(Vec::new()),
+            reads: Mutex::new(0),
+            next_id: Mutex::new(100),
+        }
+    }
+
+    fn with_clients(mode: Mode, clients: Vec<RegisteredClient>) -> Self {
+        Self {
+            mode,
+            folders: Mutex::new(Vec::new()),
+            clients: Mutex::new(clients),
             reads: Mutex::new(0),
             next_id: Mutex::new(100),
         }
@@ -174,8 +188,48 @@ impl Client for FakeService {
         })
     }
 
-    async fn register_download_client(&self, _client: &DownloadClient) -> Result<(), Failure> {
-        Ok(())
+    async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
+        match self.mode {
+            Mode::Down => Err(down("sonarr")),
+            Mode::RejectsRegister => Err(Failure::Refused {
+                service: "sonarr".to_owned(),
+                detail: "HTTP 400: unknown implementation".to_owned(),
+            }),
+            Mode::Swallows => Ok(()),
+            _ => {
+                if let (Ok(mut clients), Ok(mut id)) = (self.clients.lock(), self.next_id.lock()) {
+                    clients.push(RegisteredClient {
+                        id: id.to_string(),
+                        host: client.host.clone(),
+                        port: client.port,
+                    });
+                    *id += 1;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
+        let count = match self.reads.lock() {
+            Ok(mut reads) => {
+                *reads += 1;
+                *reads
+            }
+            Err(_) => 0,
+        };
+        match self.mode {
+            Mode::Down => Err(down("sonarr")),
+            Mode::RefusesList => Err(Failure::Unauthorised {
+                service: "sonarr".to_owned(),
+            }),
+            Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
+            _ => Ok(self
+                .clients
+                .lock()
+                .map(|clients| clients.clone())
+                .unwrap_or_default()),
+        }
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
@@ -369,6 +423,140 @@ async fn a_service_that_stops_answering_after_the_write_is_skipped() {
     let (states, recorded) = seed(
         FakeService::with(Mode::DropsAfterRegister, Vec::new()),
         &[folder("/data/media/tv")],
+    )
+    .await;
+    assert!(
+        matches!(states.as_slice(), [State::Skipped { .. }]),
+        "{states:?}"
+    );
+    assert_eq!(recorded, 0, "an unconfirmed write is not recorded as done");
+}
+
+// ---- Download clients: the same driver, matched by endpoint not label. ----
+
+fn client(name: &str, host: &str, port: u16) -> DownloadClient {
+    DownloadClient {
+        name: name.to_owned(),
+        host: host.to_owned(),
+        port,
+        credential: None,
+    }
+}
+
+/// Run the client driver for the wanted clients, returning their resulting states
+/// and the number of changes journalled.
+async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<State>, usize) {
+    let mut journal = Journal::new();
+    let wirings = wire_download_clients(&service, "sonarr", wanted, &mut journal, "t").await;
+    let states = wirings.into_iter().map(|wiring| wiring.state).collect();
+    (states, journal.changes().len())
+}
+
+#[tokio::test]
+async fn an_absent_download_client_is_registered_read_back_and_recorded() {
+    let (states, recorded) = seed_clients(
+        FakeService::with_clients(Mode::Normal, Vec::new()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    assert_eq!(states, vec![State::Wired]);
+    assert_eq!(recorded, 1, "the write is journalled so it can be undone");
+}
+
+#[tokio::test]
+async fn a_client_at_the_same_endpoint_is_left_untouched_despite_a_different_name() {
+    // The connection detail, not the label, decides identity: the operator
+    // renamed the client, but it reaches the same host and port, so it is left
+    // alone rather than registered a second time.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "qbittorrent".to_owned(),
+        port: 8080,
+    }];
+    let (states, recorded) = seed_clients(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("qBittorrent — my own name", "qbittorrent", 8080)],
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(
+        recorded, 0,
+        "a client already at the endpoint is not duplicated"
+    );
+}
+
+#[tokio::test]
+async fn an_unavailable_service_skips_every_download_client() {
+    let (states, recorded) = seed_clients(
+        FakeService::with_clients(Mode::Down, Vec::new()),
+        &[
+            client("SABnzbd", "sabnzbd", 8080),
+            client("qBittorrent", "qbittorrent", 8080),
+        ],
+    )
+    .await;
+    assert!(
+        states
+            .iter()
+            .all(|state| matches!(state, State::Skipped { .. })),
+        "{states:?}"
+    );
+    assert_eq!(recorded, 0);
+}
+
+#[tokio::test]
+async fn a_service_that_refuses_the_client_listing_fails() {
+    let (states, _) = seed_clients(
+        FakeService::with_clients(Mode::RefusesList, Vec::new()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    assert!(
+        matches!(states.as_slice(), [State::Failed { .. }]),
+        "{states:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_rejected_client_registration_fails_with_the_services_own_words() {
+    let (states, recorded) = seed_clients(
+        FakeService::with_clients(Mode::RejectsRegister, Vec::new()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    let detail = match states.as_slice() {
+        [State::Failed { detail }] => Some(detail.clone()),
+        _ => None,
+    };
+    assert!(
+        detail.is_some_and(|words| words.contains("unknown implementation")),
+        "the service's own words survive: {states:?}"
+    );
+    assert_eq!(recorded, 0, "a rejected write is not journalled");
+}
+
+#[tokio::test]
+async fn a_client_write_that_does_not_appear_when_read_back_is_a_failure() {
+    // Accepted but not reported back, so it did not land — not done, not recorded.
+    let (states, recorded) = seed_clients(
+        FakeService::with_clients(Mode::Swallows, Vec::new()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    assert!(
+        matches!(states.as_slice(), [State::Failed { .. }]),
+        "{states:?}"
+    );
+    assert_eq!(recorded, 0);
+}
+
+#[tokio::test]
+async fn a_service_that_stops_answering_after_the_client_write_is_skipped() {
+    // The write went out but could not be confirmed, so it is left for a later
+    // run to reconcile rather than declared wired.
+    let (states, recorded) = seed_clients(
+        FakeService::with_clients(Mode::DropsAfterRegister, Vec::new()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
     assert!(

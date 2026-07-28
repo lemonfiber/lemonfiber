@@ -20,7 +20,7 @@
 use serde::Serialize;
 
 use crate::journal::{Change, Journal, Kind};
-use crate::ports::service::{Client, Failure, RootFolder};
+use crate::ports::service::{Client, DownloadClient, Failure, RegisteredClient, RootFolder};
 
 /// What lemonfiber observed about a connection it wants to make.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,6 +215,104 @@ async fn wire_one(
             detail: "the folder was accepted but did not appear when read back".to_owned(),
         },
     }
+}
+
+/// Wire a service's download clients: register the ones it lacks, leave the ones
+/// it already has, and record each write so it can be undone.
+///
+/// The same shape as [`wire_root_folders`], and the same two gates — an
+/// unanswering service skips every client so a later run completes them, a
+/// refusal fails. The difference is what "already there" means: a client is
+/// matched by the endpoint it reaches, its host and port, not by its label, so a
+/// client the operator renamed is recognised as the same connection and left
+/// alone rather than registered a second time under lemonfiber's name.
+pub async fn wire_download_clients(
+    client: &dyn Client,
+    service: &str,
+    wanted: &[DownloadClient],
+    journal: &mut Journal,
+    at: &str,
+) -> Vec<Wiring> {
+    let existing = match client.download_clients().await {
+        Ok(clients) => clients,
+        Err(failure) => {
+            let state = unreached(&failure);
+            return wanted
+                .iter()
+                .map(|want| Wiring {
+                    connection: describe_client(service, want),
+                    state: state.clone(),
+                })
+                .collect();
+        }
+    };
+
+    let mut wirings = Vec::new();
+    for want in wanted {
+        let already = existing.iter().any(|have| same_endpoint(have, want));
+        let state = if already {
+            State::AlreadyWired
+        } else {
+            wire_one_client(client, service, want, journal, at).await
+        };
+        wirings.push(Wiring {
+            connection: describe_client(service, want),
+            state,
+        });
+    }
+    wirings
+}
+
+/// Register one download client, confirm it landed by reading it back, and record
+/// it.
+async fn wire_one_client(
+    client: &dyn Client,
+    service: &str,
+    want: &DownloadClient,
+    journal: &mut Journal,
+    at: &str,
+) -> State {
+    if let Err(failure) = client.register_download_client(want).await {
+        return unreached(&failure);
+    }
+    let registered = match client.download_clients().await {
+        Ok(clients) => clients,
+        Err(failure) => return unreached(&failure),
+    };
+    match registered
+        .into_iter()
+        .find(|have| same_endpoint(have, want))
+    {
+        Some(landed) => {
+            journal.record(Change {
+                at: at.to_owned(),
+                operation: "seed".to_owned(),
+                target: service.to_owned(),
+                kind: Kind::Created {
+                    resource: "downloadclient".to_owned(),
+                    id: landed.id,
+                },
+            });
+            State::Wired
+        }
+        None => State::Failed {
+            detail: "the download client was accepted but did not appear when read back".to_owned(),
+        },
+    }
+}
+
+/// Whether a registered client reaches the same endpoint as a wanted one.
+///
+/// The host and port together, never the name: this is what makes the match by
+/// connection rather than by label, so a client already present under a different
+/// name is not registered again.
+fn same_endpoint(have: &RegisteredClient, want: &DownloadClient) -> bool {
+    have.host == want.host && have.port == want.port
+}
+
+/// A download-client connection's description for the report.
+fn describe_client(service: &str, client: &DownloadClient) -> String {
+    format!("{} into {service}", client.name)
 }
 
 /// A failure as the state it leaves a connection in: a service not answering is

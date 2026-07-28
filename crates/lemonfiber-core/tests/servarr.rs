@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
-    Client, DownloadClient, Failure, RegisteredFolder, RootFolder,
+    Client, DownloadClient, Failure, RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::servarr::{api_key, Servarr};
 
@@ -275,6 +275,74 @@ async fn a_folder_listing_with_no_answer_is_unavailable() {
     assert!(matches!(
         sonarr(&fake).root_folders().await,
         Err(Failure::Unavailable { .. })
+    ));
+}
+
+#[tokio::test]
+async fn the_download_clients_are_read_back_by_their_endpoint() {
+    // Servarr carries the connection settings as named entries in a `fields`
+    // array, not top-level keys; the endpoint is decoded from there.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"[{"id":3,"name":"SABnzbd","fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]}]"#,
+    ));
+    let clients = sonarr(&fake).download_clients().await;
+    assert_eq!(
+        clients.ok(),
+        Some(vec![RegisteredClient {
+            id: "3".to_owned(),
+            host: "sabnzbd".to_owned(),
+            port: 8080,
+        }])
+    );
+
+    let sent = fake.request();
+    assert!(sent.is_some_and(|request| request.url.ends_with("/api/v3/downloadclient")));
+}
+
+#[tokio::test]
+async fn a_client_that_names_no_endpoint_is_left_out_rather_than_guessed() {
+    // A resource without both a host and a port cannot be matched by connection,
+    // so it is left out rather than returned as an unusable half-endpoint.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"[{"id":3,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]},{"id":4,"fields":[{"name":"port","value":9090}]}]"#,
+    ));
+    let clients = sonarr(&fake)
+        .download_clients()
+        .await
+        .ok()
+        .unwrap_or_default();
+    assert_eq!(clients.len(), 1, "the half-specified client is left out");
+    assert!(clients
+        .iter()
+        .any(|client| client.id == "3" && client.host == "sabnzbd" && client.port == 8080));
+}
+
+#[tokio::test]
+async fn a_download_client_listing_that_is_refused_is_unauthorised() {
+    let fake = Fake::new(Answer::Reply(401, ""));
+    assert!(matches!(
+        sonarr(&fake).download_clients().await,
+        Err(Failure::Unauthorised { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_download_client_listing_with_no_answer_is_unavailable() {
+    let fake = Fake::new(Answer::Silent);
+    assert!(matches!(
+        sonarr(&fake).download_clients().await,
+        Err(Failure::Unavailable { .. })
+    ));
+}
+
+#[tokio::test]
+async fn an_unreadable_download_client_list_is_refused() {
+    let fake = Fake::new(Answer::Reply(200, "not an array"));
+    assert!(matches!(
+        sonarr(&fake).download_clients().await,
+        Err(Failure::Refused { .. })
     ));
 }
 
