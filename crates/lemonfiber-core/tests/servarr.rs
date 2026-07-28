@@ -11,7 +11,9 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
-use lemonfiber_core::ports::service::{Client, DownloadClient, Failure, RootFolder};
+use lemonfiber_core::ports::service::{
+    Client, DownloadClient, Failure, RegisteredFolder, RootFolder,
+};
 use lemonfiber_core::servarr::{api_key, Servarr};
 
 /// What the fake transport answers with.
@@ -224,6 +226,55 @@ async fn a_rejected_download_client_registration_is_refused() {
     assert!(matches!(
         sonarr(&fake).register_download_client(&client).await,
         Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn the_root_folders_are_read_back_with_their_ids() {
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"[{"id":1,"path":"/data/media/tv"},{"id":7,"path":"/data/media/movies"}]"#,
+    ));
+    let folders = sonarr(&fake).root_folders().await;
+    assert_eq!(
+        folders.ok(),
+        Some(vec![
+            RegisteredFolder {
+                id: "1".to_owned(),
+                path: "/data/media/tv".to_owned(),
+            },
+            RegisteredFolder {
+                id: "7".to_owned(),
+                path: "/data/media/movies".to_owned(),
+            },
+        ])
+    );
+}
+
+#[tokio::test]
+async fn an_unreadable_folder_list_is_refused() {
+    let fake = Fake::new(Answer::Reply(200, "not an array"));
+    assert!(matches!(
+        sonarr(&fake).root_folders().await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_rejected_folder_listing_is_unauthorised() {
+    let fake = Fake::new(Answer::Reply(401, ""));
+    assert!(matches!(
+        sonarr(&fake).root_folders().await,
+        Err(Failure::Unauthorised { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_folder_listing_with_no_answer_is_unavailable() {
+    let fake = Fake::new(Answer::Silent);
+    assert!(matches!(
+        sonarr(&fake).root_folders().await,
+        Err(Failure::Unavailable { .. })
     ));
 }
 

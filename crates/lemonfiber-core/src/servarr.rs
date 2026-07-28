@@ -17,7 +17,9 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::ports::http::{Http, Method, Request, Response};
-use crate::ports::service::{Client, DownloadClient, Failure, Identity, RootFolder};
+use crate::ports::service::{
+    Client, DownloadClient, Failure, Identity, RegisteredFolder, RootFolder,
+};
 
 /// The header every Servarr application authenticates with.
 const API_KEY_HEADER: &str = "X-Api-Key";
@@ -167,6 +169,35 @@ impl Client for Servarr {
             Err(self.refusal(&response))
         }
     }
+
+    async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
+        let response = self
+            .send(&self.request(Method::Get, "/rootfolder", None))
+            .await?;
+        if !response.is_success() {
+            return Err(self.refusal(&response));
+        }
+        let folders: Vec<FolderResource> =
+            serde_json::from_str(&response.body).map_err(|_| Failure::Refused {
+                service: self.service.clone(),
+                detail: "the root-folder list could not be read".to_owned(),
+            })?;
+        Ok(folders
+            .into_iter()
+            .map(|folder| RegisteredFolder {
+                id: folder.id.to_string(),
+                path: folder.path,
+            })
+            .collect())
+    }
+}
+
+/// The fields of a root-folder resource that seed reads back: the identifier the
+/// service assigned, and the path, to match a wanted folder against.
+#[derive(Deserialize)]
+struct FolderResource {
+    id: i64,
+    path: String,
 }
 
 /// The API key a Servarr application wrote to its configuration, if it has

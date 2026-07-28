@@ -41,6 +41,18 @@ pub struct RootFolder {
     pub media_type: String,
 }
 
+/// A root folder a service already holds, with the identifier it gave it.
+///
+/// Read back so an absent connection can be told from one already made — matched
+/// by path, not by any label — and so a later undo names exactly the one created.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegisteredFolder {
+    /// The identifier the service assigned.
+    pub id: String,
+    /// The path it holds.
+    pub path: String,
+}
+
 /// A service refused, or could not be reached.
 #[derive(Debug, Error)]
 pub enum Failure {
@@ -133,6 +145,16 @@ pub trait Client: Send + Sync {
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure>;
+
+    /// The root folders the service already has.
+    ///
+    /// Read so a connection already made is left alone rather than duplicated,
+    /// and so a write can be confirmed by reading it back.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure>;
 }
 
 #[cfg(test)]
