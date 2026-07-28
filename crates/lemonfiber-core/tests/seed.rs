@@ -1,0 +1,379 @@
+//! The seed policy and the driver that carries it out.
+//!
+//! The policy is pure and could be tested in place; the driver speaks the service
+//! port, an async trait, so both are driven from here — where a fake service
+//! stands in and the driver's coverage is counted from the one compiled copy.
+
+use std::sync::Mutex;
+
+use async_trait::async_trait;
+use lemonfiber_core::journal::Journal;
+use lemonfiber_core::ports::service::{
+    Client, DownloadClient, Failure, Identity, RegisteredFolder, RootFolder,
+};
+use lemonfiber_core::seed::{intent, wire_root_folders, Intent, Observed, Report, State, Wiring};
+
+// ---- The policy: pure, decided without a service. ----
+
+#[test]
+fn the_policy_follows_from_what_was_observed() {
+    assert_eq!(intent(Observed::Unavailable), Intent::Skip);
+    assert_eq!(intent(Observed::Absent), Intent::Wire);
+    // Idempotent: a connection already correct is left, so a second run writes
+    // nothing.
+    assert_eq!(intent(Observed::Present), Intent::Leave);
+    // Drift-aware: an operator's own change is preserved, never reverted.
+    assert_eq!(intent(Observed::Drifted), Intent::Preserve);
+}
+
+#[test]
+fn only_a_wired_or_preserved_connection_is_settled() {
+    for settled in [State::Wired, State::AlreadyWired, State::Drifted] {
+        assert!(settled.is_settled(), "{settled:?} is settled");
+    }
+    for unsettled in [
+        State::Skipped {
+            reason: "lidarr is not in the active form".to_owned(),
+        },
+        State::Failed {
+            detail: "rejected".to_owned(),
+        },
+    ] {
+        assert!(!unsettled.is_settled(), "{unsettled:?} is not settled");
+    }
+}
+
+fn wiring(connection: &str, state: State) -> Wiring {
+    Wiring {
+        connection: connection.to_owned(),
+        state,
+    }
+}
+
+#[test]
+fn a_pass_where_everything_settled_is_complete() {
+    let report = Report {
+        wirings: vec![
+            wiring("SABnzbd into Sonarr", State::Wired),
+            wiring("root folder in Radarr", State::AlreadyWired),
+        ],
+    };
+    assert!(report.is_complete());
+    assert!(report.outstanding().is_empty());
+}
+
+#[test]
+fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
+    let report = Report {
+        wirings: vec![
+            wiring("SABnzbd into Sonarr", State::Wired),
+            wiring(
+                "SABnzbd into Lidarr",
+                State::Skipped {
+                    reason: "lidarr is not running".to_owned(),
+                },
+            ),
+            wiring(
+                "qBittorrent into Radarr",
+                State::Failed {
+                    detail: "rejected".to_owned(),
+                },
+            ),
+        ],
+    };
+    assert!(!report.is_complete());
+    let outstanding: Vec<&str> = report
+        .outstanding()
+        .into_iter()
+        .map(|wiring| wiring.connection.as_str())
+        .collect();
+    assert_eq!(
+        outstanding,
+        vec!["SABnzbd into Lidarr", "qBittorrent into Radarr"],
+        "a re-run is told exactly what it still owes"
+    );
+}
+
+#[test]
+fn the_report_names_each_state_on_the_wire() {
+    let report = Report {
+        wirings: vec![
+            wiring("a", State::Wired),
+            wiring("b", State::AlreadyWired),
+            wiring("c", State::Drifted),
+            wiring(
+                "d",
+                State::Skipped {
+                    reason: "later".to_owned(),
+                },
+            ),
+            wiring(
+                "e",
+                State::Failed {
+                    detail: "no".to_owned(),
+                },
+            ),
+        ],
+    };
+    let json = serde_json::to_string(&report).unwrap_or_default();
+    for state in ["wired", "already-wired", "drifted", "skipped", "failed"] {
+        assert!(json.contains(&format!(r#""state":"{state}""#)), "{json}");
+    }
+}
+
+// ---- The driver: carried out against a fake service. ----
+
+/// How the fake service behaves.
+enum Mode {
+    /// Answers normally; registering a folder adds it.
+    Normal,
+    /// Not answering — listing and registering both fail as unavailable.
+    Down,
+    /// Reachable but refuses the credential when listed.
+    RefusesList,
+    /// Reachable, lists fine, but rejects a registration with its own words.
+    RejectsRegister,
+    /// Accepts a registration but the folder never appears on read-back.
+    Swallows,
+    /// Lists fine to observe and registers fine, then stops answering on the
+    /// read-back that would confirm the write.
+    DropsAfterRegister,
+}
+
+/// A service that answers the seed driver from a script.
+struct FakeService {
+    mode: Mode,
+    folders: Mutex<Vec<RegisteredFolder>>,
+    reads: Mutex<u32>,
+    next_id: Mutex<u32>,
+}
+
+impl FakeService {
+    fn with(mode: Mode, folders: Vec<RegisteredFolder>) -> Self {
+        Self {
+            mode,
+            folders: Mutex::new(folders),
+            reads: Mutex::new(0),
+            next_id: Mutex::new(100),
+        }
+    }
+}
+
+fn down(service: &str) -> Failure {
+    Failure::Unavailable {
+        service: service.to_owned(),
+    }
+}
+
+#[async_trait]
+impl Client for FakeService {
+    async fn identity(&self) -> Result<Identity, Failure> {
+        Ok(Identity {
+            name: "sonarr".to_owned(),
+            version: "4".to_owned(),
+        })
+    }
+
+    async fn register_download_client(&self, _client: &DownloadClient) -> Result<(), Failure> {
+        Ok(())
+    }
+
+    async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
+        match self.mode {
+            Mode::Down => Err(down("sonarr")),
+            Mode::RejectsRegister => Err(Failure::Refused {
+                service: "sonarr".to_owned(),
+                detail: "HTTP 400: path is already used".to_owned(),
+            }),
+            Mode::Swallows => Ok(()),
+            _ => {
+                if let (Ok(mut folders), Ok(mut id)) = (self.folders.lock(), self.next_id.lock()) {
+                    folders.push(RegisteredFolder {
+                        id: id.to_string(),
+                        // The service stores the canonical path, dropping a
+                        // trailing slash — as the Servarr apps do.
+                        path: folder.path.trim_end_matches('/').to_owned(),
+                    });
+                    *id += 1;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
+        let count = match self.reads.lock() {
+            Ok(mut reads) => {
+                *reads += 1;
+                *reads
+            }
+            Err(_) => 0,
+        };
+        match self.mode {
+            Mode::Down => Err(down("sonarr")),
+            Mode::RefusesList => Err(Failure::Unauthorised {
+                service: "sonarr".to_owned(),
+            }),
+            Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
+            _ => Ok(self
+                .folders
+                .lock()
+                .map(|folders| folders.clone())
+                .unwrap_or_default()),
+        }
+    }
+}
+
+fn folder(path: &str) -> RootFolder {
+    RootFolder {
+        path: path.to_owned(),
+        media_type: "tv".to_owned(),
+    }
+}
+
+/// Run the driver for one wanted folder, returning its resulting state and the
+/// number of changes journalled.
+async fn seed(service: FakeService, wanted: &[RootFolder]) -> (Vec<State>, usize) {
+    let mut journal = Journal::new();
+    let wirings = wire_root_folders(&service, "sonarr", wanted, &mut journal, "t").await;
+    let states = wirings.into_iter().map(|wiring| wiring.state).collect();
+    (states, journal.changes().len())
+}
+
+#[tokio::test]
+async fn an_absent_folder_is_registered_read_back_and_recorded() {
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Normal, Vec::new()),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert_eq!(states, vec![State::Wired]);
+    assert_eq!(recorded, 1, "the write is journalled so it can be undone");
+}
+
+#[tokio::test]
+async fn a_folder_the_service_already_has_is_left_untouched() {
+    // Idempotent: the folder is present, so nothing is written or journalled.
+    let existing = vec![RegisteredFolder {
+        id: "1".to_owned(),
+        path: "/data/media/tv".to_owned(),
+    }];
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Normal, existing),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(recorded, 0, "an already-wired connection writes nothing");
+}
+
+#[tokio::test]
+async fn a_wanted_path_is_matched_to_the_services_canonical_form() {
+    // The service stores the path without its trailing slash. The read-back must
+    // still recognise the folder it just registered, wire it, and record it —
+    // rather than declaring the landed write a failure.
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Normal, Vec::new()),
+        &[folder("/data/media/tv/")],
+    )
+    .await;
+    assert_eq!(states, vec![State::Wired]);
+    assert_eq!(recorded, 1);
+}
+
+#[tokio::test]
+async fn a_present_folder_is_matched_despite_a_trailing_slash() {
+    // Idempotent across the same normalization: the service already holds the
+    // canonical path, and a wanted path that differs only by a trailing slash is
+    // left alone, not re-registered.
+    let existing = vec![RegisteredFolder {
+        id: "1".to_owned(),
+        path: "/data/media/tv".to_owned(),
+    }];
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Normal, existing),
+        &[folder("/data/media/tv/")],
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(recorded, 0);
+}
+
+#[tokio::test]
+async fn an_unavailable_service_skips_every_folder() {
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Down, Vec::new()),
+        &[folder("/data/media/tv"), folder("/data/media/movies")],
+    )
+    .await;
+    assert!(
+        states
+            .iter()
+            .all(|state| matches!(state, State::Skipped { .. })),
+        "{states:?}"
+    );
+    assert_eq!(recorded, 0);
+}
+
+#[tokio::test]
+async fn a_service_that_refuses_the_listing_fails() {
+    let (states, _) = seed(
+        FakeService::with(Mode::RefusesList, Vec::new()),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert!(
+        matches!(states.as_slice(), [State::Failed { .. }]),
+        "{states:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_rejected_registration_fails_with_the_services_own_words() {
+    let (states, recorded) = seed(
+        FakeService::with(Mode::RejectsRegister, Vec::new()),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    let detail = match states.as_slice() {
+        [State::Failed { detail }] => Some(detail.clone()),
+        _ => None,
+    };
+    assert!(
+        detail.is_some_and(|words| words.contains("already used")),
+        "the service's own words survive: {states:?}"
+    );
+    assert_eq!(recorded, 0, "a rejected write is not journalled");
+}
+
+#[tokio::test]
+async fn a_write_that_does_not_appear_when_read_back_is_a_failure() {
+    // The service accepted the registration but does not report the folder, so it
+    // did not land — not done, and not recorded.
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Swallows, Vec::new()),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert!(
+        matches!(states.as_slice(), [State::Failed { .. }]),
+        "{states:?}"
+    );
+    assert_eq!(recorded, 0);
+}
+
+#[tokio::test]
+async fn a_service_that_stops_answering_after_the_write_is_skipped() {
+    // The write went out but could not be confirmed, so it is left for a later
+    // run to reconcile rather than declared wired.
+    let (states, recorded) = seed(
+        FakeService::with(Mode::DropsAfterRegister, Vec::new()),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert!(
+        matches!(states.as_slice(), [State::Skipped { .. }]),
+        "{states:?}"
+    );
+    assert_eq!(recorded, 0, "an unconfirmed write is not recorded as done");
+}

@@ -11,13 +11,16 @@
 //! Every write is read back to confirm it landed, and recorded so it can be
 //! undone.
 //!
-//! What lives here is the policy, kept apart from the doing of it: given what was
-//! observed about a connection, what seed intends; and, once each connection has
-//! been carried out, what the whole pass amounted to and what a re-run still owes.
-//! Observing the services and carrying the intent out is the driver's part, above
-//! this; deciding is pure, and tested without a service.
+//! The policy — given what was observed about a connection, what seed intends —
+//! is pure and settled without a service. The driver carries it out: it observes
+//! the service through the port, registers what is missing, reads it back before
+//! calling it done, and records each write so it can be undone. The driver
+//! reaches the outside only through the port, so it too runs against a fake.
 
 use serde::Serialize;
+
+use crate::journal::{Change, Journal, Kind};
+use crate::ports::service::{Client, Failure, RootFolder};
 
 /// What lemonfiber observed about a connection it wants to make.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,113 +132,119 @@ impl Report {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{intent, Intent, Observed, Report, State, Wiring};
-
-    #[test]
-    fn the_policy_follows_from_what_was_observed() {
-        assert_eq!(intent(Observed::Unavailable), Intent::Skip);
-        assert_eq!(intent(Observed::Absent), Intent::Wire);
-        // Idempotent: a connection already correct is left, so a second run writes
-        // nothing.
-        assert_eq!(intent(Observed::Present), Intent::Leave);
-        // Drift-aware: an operator's own change is preserved, never reverted.
-        assert_eq!(intent(Observed::Drifted), Intent::Preserve);
-    }
-
-    #[test]
-    fn only_a_wired_or_preserved_connection_is_settled() {
-        for settled in [State::Wired, State::AlreadyWired, State::Drifted] {
-            assert!(settled.is_settled(), "{settled:?} is settled");
+/// Wire a service's root folders: register the ones it lacks, leave the ones it
+/// already has, and record each write so it can be undone.
+///
+/// The service is observed once. If it is not answering, every folder is skipped
+/// so a later run completes them rather than any being called broken; if it
+/// refuses, they fail. A folder the service already has is left alone — matched
+/// by path, so a second run writes nothing. Each folder that must be written is
+/// read back before it is called wired, because a write is not done until the
+/// service reports it, and only then is it recorded.
+pub async fn wire_root_folders(
+    client: &dyn Client,
+    service: &str,
+    wanted: &[RootFolder],
+    journal: &mut Journal,
+    at: &str,
+) -> Vec<Wiring> {
+    let existing = match client.root_folders().await {
+        Ok(folders) => folders,
+        Err(failure) => {
+            let state = unreached(&failure);
+            return wanted
+                .iter()
+                .map(|folder| Wiring {
+                    connection: describe(service, folder),
+                    state: state.clone(),
+                })
+                .collect();
         }
-        for unsettled in [
-            State::Skipped {
-                reason: "lidarr is not in the active form".to_owned(),
-            },
-            State::Failed {
-                detail: "rejected".to_owned(),
-            },
-        ] {
-            assert!(!unsettled.is_settled(), "{unsettled:?} is not settled");
-        }
-    }
+    };
 
-    fn wiring(connection: &str, state: State) -> Wiring {
-        Wiring {
-            connection: connection.to_owned(),
+    let mut wirings = Vec::new();
+    for folder in wanted {
+        let already = existing
+            .iter()
+            .any(|have| same_path(&have.path, &folder.path));
+        let state = if already {
+            State::AlreadyWired
+        } else {
+            wire_one(client, service, folder, journal, at).await
+        };
+        wirings.push(Wiring {
+            connection: describe(service, folder),
             state,
+        });
+    }
+    wirings
+}
+
+/// Register one folder, confirm it landed by reading it back, and record it.
+async fn wire_one(
+    client: &dyn Client,
+    service: &str,
+    folder: &RootFolder,
+    journal: &mut Journal,
+    at: &str,
+) -> State {
+    if let Err(failure) = client.register_root_folder(folder).await {
+        return unreached(&failure);
+    }
+    let registered = match client.root_folders().await {
+        Ok(folders) => folders,
+        Err(failure) => return unreached(&failure),
+    };
+    match registered
+        .into_iter()
+        .find(|have| same_path(&have.path, &folder.path))
+    {
+        Some(landed) => {
+            journal.record(Change {
+                at: at.to_owned(),
+                operation: "seed".to_owned(),
+                target: service.to_owned(),
+                kind: Kind::Created {
+                    resource: "rootfolder".to_owned(),
+                    id: landed.id,
+                },
+            });
+            State::Wired
         }
+        None => State::Failed {
+            detail: "the folder was accepted but did not appear when read back".to_owned(),
+        },
     }
+}
 
-    #[test]
-    fn a_pass_where_everything_settled_is_complete() {
-        let report = Report {
-            wirings: vec![
-                wiring("SABnzbd into Sonarr", State::Wired),
-                wiring("root folder in Radarr", State::AlreadyWired),
-            ],
-        };
-        assert!(report.is_complete());
-        assert!(report.outstanding().is_empty());
+/// A failure as the state it leaves a connection in: a service not answering is
+/// skipped and retried; one that refuses is a failure, carrying its own words.
+fn unreached(failure: &Failure) -> State {
+    match failure {
+        Failure::Unavailable { .. } => State::Skipped {
+            reason: "the service is not answering; a later run will complete it".to_owned(),
+        },
+        Failure::Unauthorised { service } => State::Failed {
+            detail: format!("{service} refused the credential"),
+        },
+        Failure::Refused { detail, .. } => State::Failed {
+            detail: detail.clone(),
+        },
     }
+}
 
-    #[test]
-    fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
-        let report = Report {
-            wirings: vec![
-                wiring("SABnzbd into Sonarr", State::Wired),
-                wiring(
-                    "SABnzbd into Lidarr",
-                    State::Skipped {
-                        reason: "lidarr is not running".to_owned(),
-                    },
-                ),
-                wiring(
-                    "qBittorrent into Radarr",
-                    State::Failed {
-                        detail: "rejected".to_owned(),
-                    },
-                ),
-            ],
-        };
-        assert!(!report.is_complete());
-        let outstanding: Vec<&str> = report
-            .outstanding()
-            .into_iter()
-            .map(|wiring| wiring.connection.as_str())
-            .collect();
-        assert_eq!(
-            outstanding,
-            vec!["SABnzbd into Lidarr", "qBittorrent into Radarr"],
-            "a re-run is told exactly what it still owes"
-        );
-    }
+/// Whether two paths name the same folder.
+///
+/// A trailing separator is ignored, because a service commonly stores the
+/// canonical form of the path it was given — dropping a trailing slash — and the
+/// wanted path and its stored canonical form must be recognised as one. Without
+/// this, a folder is re-registered every run and read-back never confirms the
+/// write it just made.
+fn same_path(a: &str, b: &str) -> bool {
+    a.trim_end_matches('/') == b.trim_end_matches('/')
+}
 
-    #[test]
-    fn the_report_names_each_state_on_the_wire() {
-        let report = Report {
-            wirings: vec![
-                wiring("a", State::Wired),
-                wiring("b", State::AlreadyWired),
-                wiring("c", State::Drifted),
-                wiring(
-                    "d",
-                    State::Skipped {
-                        reason: "later".to_owned(),
-                    },
-                ),
-                wiring(
-                    "e",
-                    State::Failed {
-                        detail: "no".to_owned(),
-                    },
-                ),
-            ],
-        };
-        let json = serde_json::to_string(&report).unwrap_or_default();
-        for state in ["wired", "already-wired", "drifted", "skipped", "failed"] {
-            assert!(json.contains(&format!(r#""state":"{state}""#)), "{json}");
-        }
-    }
+/// A connection's description for the report.
+fn describe(service: &str, folder: &RootFolder) -> String {
+    format!("{} root folder in {service}", folder.media_type)
 }
