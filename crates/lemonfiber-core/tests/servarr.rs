@@ -365,7 +365,7 @@ async fn the_download_clients_are_read_back_by_their_endpoint() {
     // array, not top-level keys; the endpoint is decoded from there.
     let fake = Fake::new(Answer::Reply(
         200,
-        r#"[{"id":3,"name":"SABnzbd","fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]}]"#,
+        r#"[{"id":3,"name":"SABnzbd","fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080},{"name":"tvCategory","value":"tv"}]}]"#,
     ));
     let clients = sonarr(&fake).download_clients().await;
     assert_eq!(
@@ -374,6 +374,12 @@ async fn the_download_clients_are_read_back_by_their_endpoint() {
             id: "3".to_owned(),
             host: "sabnzbd".to_owned(),
             port: 8080,
+            // The category the client files under is read back too, so a later
+            // run can tell an operator's re-filing from a fresh wire.
+            category: Some(Category {
+                field: "tvCategory".to_owned(),
+                value: "tv".to_owned(),
+            }),
         }])
     );
 

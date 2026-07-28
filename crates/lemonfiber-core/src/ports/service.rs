@@ -110,6 +110,10 @@ pub struct RegisteredClient {
     pub host: String,
     /// The port it listens on.
     pub port: u16,
+    /// The category the client currently files under, where the service reports
+    /// one — read back so an operator's change to it can be seen and preserved
+    /// rather than reverted. Absent where the service names no category field.
+    pub category: Option<Category>,
 }
 
 /// A service refused, or could not be reached.
