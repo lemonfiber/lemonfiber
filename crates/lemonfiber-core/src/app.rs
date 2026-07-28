@@ -231,6 +231,16 @@ impl Ctx {
         self
     }
 
+    /// The same context, reaching the filesystem through the given seam.
+    ///
+    /// Lets seeding's key-reading be driven from a fake that hands back a
+    /// configuration without a service ever having written one.
+    #[must_use]
+    pub fn with_filesystem(mut self, filesystem: Arc<dyn FileSystem>) -> Self {
+        self.filesystem = filesystem;
+        self
+    }
+
     /// The same context, willing to wait a different length of time.
     #[must_use]
     pub const fn waiting(mut self, patience: Duration) -> Self {
@@ -465,17 +475,115 @@ async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
         .checked_manifest(ctx.today())
         .map_err(|err| err.problem())?;
 
-    // qBittorrent is the only edge wired so far. Collecting the optional target
-    // into a list wires it where the stack has it and produces nothing where it
-    // does not, without a branch on the option that a test could not reach.
-    let targets: Vec<(String, String)> =
-        qbittorrent_target(&manifest.services).into_iter().collect();
-    let mut wirings = Vec::with_capacity(targets.len());
-    for target in &targets {
-        wirings.push(seed_qbittorrent_password(ctx, target).await);
+    let mut wirings = Vec::new();
+
+    // qBittorrent's password, the one credential lemonfiber mints. Collecting the
+    // optional target into a list wires it where the stack has it and does nothing
+    // where it does not, without a branch a test could not reach.
+    for target in qbittorrent_target(&manifest.services)
+        .into_iter()
+        .collect::<Vec<_>>()
+    {
+        wirings.push(seed_qbittorrent_password(ctx, &target).await);
+    }
+
+    // Each \*arr's root folders, one per media type it manages, under the data
+    // root the whole stack shares.
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    for arr in servarr_arrs(&manifest.services, project.as_deref()) {
+        wirings.extend(seed_root_folders(ctx, &arr).await);
     }
 
     Ok(crate::seed::Report { wirings })
+}
+
+/// A Servarr application that files media: its identity and address (as the
+/// credential check resolves them) and the media types it manages, which give
+/// the root folders it needs.
+struct Arr {
+    target: crate::doctor::credentials::Target,
+    media_types: Vec<String>,
+}
+
+/// The Servarr applications that file media — Sonarr, Radarr, Lidarr — resolved
+/// with their media types. Prowlarr shares the shape but manages no media, so it
+/// declares no media types and is left out.
+fn servarr_arrs(services: &[lemonfiber_manifest::Service], project: Option<&Path>) -> Vec<Arr> {
+    let Some(project) = project else {
+        return Vec::new();
+    };
+    services
+        .iter()
+        .filter_map(|service| {
+            let target = target_for(service, project)?;
+            if service.media_types.is_empty() {
+                return None;
+            }
+            Some(Arr {
+                target,
+                media_types: service.media_types.clone(),
+            })
+        })
+        .collect()
+}
+
+/// Register an application's root folders, one per media type, under
+/// `/data/media`. The application's key is read from its configuration; without
+/// it — the application has not finished starting — the folders are skipped for a
+/// re-run rather than failed.
+async fn seed_root_folders(ctx: &Ctx, arr: &Arr) -> Vec<crate::seed::Wiring> {
+    let wanted: Vec<crate::ports::service::RootFolder> = arr
+        .media_types
+        .iter()
+        .map(|media| crate::ports::service::RootFolder {
+            path: format!("/data/media/{media}"),
+            media_type: media.clone(),
+        })
+        .collect();
+
+    let Some(key) = read_servarr_key(ctx, &arr.target.config).await else {
+        return wanted
+            .iter()
+            .map(|folder| crate::seed::Wiring {
+                connection: format!("{} root folder in {}", folder.media_type, arr.target.name),
+                state: crate::seed::State::Skipped {
+                    reason: format!(
+                        "{} has not written its API key yet; a later run completes it",
+                        arr.target.name
+                    ),
+                },
+            })
+            .collect();
+    };
+
+    let client =
+        crate::servarr::Servarr::new(ctx.http.clone(), &arr.target.base, key, &arr.target.id);
+    let mut journal = crate::journal::Journal::new();
+    crate::seed::wire_root_folders(
+        &client,
+        &arr.target.name,
+        &wanted,
+        &mut journal,
+        &seed_stamp(ctx),
+    )
+    .await
+}
+
+/// A Servarr application's API key, read from the configuration file it wrote it
+/// to, or nothing where it has not written one yet.
+async fn read_servarr_key(ctx: &Ctx, config: &Path) -> Option<String> {
+    let text = ctx.filesystem.read(config).await?;
+    crate::servarr::api_key(&text)
+}
+
+/// A timestamp for the change journal — seconds since the epoch, the clock's own
+/// account of now.
+fn seed_stamp(ctx: &Ctx) -> String {
+    ctx.clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs().to_string())
+        .unwrap_or_default()
 }
 
 /// qBittorrent's address, if the stack has it: the id names the container to read
@@ -969,8 +1077,8 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        dispatch, project_directory, servarr_targets, Category, Command, Ctx, Environment, Outcome,
-        Settings, Source, VersionReport,
+        dispatch, project_directory, servarr_arrs, servarr_targets, Category, Command, Ctx,
+        Environment, Outcome, Settings, Source, VersionReport,
     };
     use crate::docker::{Condition, State as ServiceState};
     use crate::ports::docker::{
@@ -1176,6 +1284,61 @@ mod tests {
     impl crate::ports::random::Random for FixedRandom {
         fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
             self.0.clone()
+        }
+    }
+
+    /// A filesystem that hands back one configuration text for any read, or
+    /// nothing. Only `read` is meaningful to seeding; the rest are unused.
+    struct SeedFs(Option<&'static str>);
+
+    #[async_trait]
+    impl crate::ports::filesystem::FileSystem for SeedFs {
+        async fn canonicalize(
+            &self,
+            path: &std::path::Path,
+        ) -> Result<std::path::PathBuf, crate::ports::filesystem::Fault> {
+            Ok(path.to_path_buf())
+        }
+        async fn touch(
+            &self,
+            _path: &std::path::Path,
+        ) -> Result<(), crate::ports::filesystem::Fault> {
+            Err(crate::ports::filesystem::Fault::new("unused"))
+        }
+        async fn link(
+            &self,
+            _from: &std::path::Path,
+            _to: &std::path::Path,
+        ) -> Result<(), crate::ports::filesystem::Fault> {
+            Err(crate::ports::filesystem::Fault::new("unused"))
+        }
+        async fn identify(
+            &self,
+            _path: &std::path::Path,
+        ) -> Result<crate::ports::filesystem::Identity, crate::ports::filesystem::Fault> {
+            Err(crate::ports::filesystem::Fault::new("unused"))
+        }
+        async fn remove(&self, _path: &std::path::Path) {}
+        async fn read(&self, _path: &std::path::Path) -> Option<String> {
+            self.0.map(str::to_owned)
+        }
+        async fn write(&self, _path: &std::path::Path, _contents: &str) {}
+        async fn ownership(
+            &self,
+            _path: &std::path::Path,
+        ) -> Option<crate::ports::filesystem::Ownership> {
+            None
+        }
+        async fn describe(
+            &self,
+            _path: &std::path::Path,
+        ) -> crate::ports::filesystem::StorageFacts {
+            crate::ports::filesystem::StorageFacts {
+                kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
+                removable: false,
+                available: 0,
+                total: 0,
+            }
         }
     }
 
@@ -1651,6 +1814,75 @@ mod tests {
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
         let all_skipped = report.wirings.iter().all(is_skipped);
         assert!(all_skipped, "an unreadable log is skipped, not failed");
+    }
+
+    /// The wirings whose connection names a root folder.
+    fn root_folder_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
+        report
+            .wirings
+            .iter()
+            .filter(|wiring| wiring.connection.contains("root folder"))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn seed_wires_each_arrs_root_folders() {
+        // Each application already holds the folders, so each is left as wired.
+        // qBittorrent announces no password, so the only calls are the arrs'.
+        const FOLDERS: &str = r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#;
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let ctx = seed_ctx(
+            None,
+            true,
+            vec![(200, FOLDERS), (200, FOLDERS), (200, FOLDERS)],
+            Some(vec![0x11; 24]),
+            None,
+        )
+        .with_filesystem(Arc::new(SeedFs(Some(KEYED))));
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let folders = root_folder_wirings(&report);
+        assert_eq!(folders.len(), 3, "one root folder per media-filing arr");
+        let all_wired = folders
+            .iter()
+            .all(|wiring| wiring.state == crate::seed::State::AlreadyWired);
+        assert!(all_wired, "a folder already present is left wired");
+    }
+
+    #[tokio::test]
+    async fn seed_skips_arr_root_folders_when_the_key_is_not_readable() {
+        // No configuration to read a key from, so the arrs have not finished
+        // starting: their folders are skipped for a re-run, not failed.
+        let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None)
+            .with_filesystem(Arc::new(SeedFs(None)));
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let folders = root_folder_wirings(&report);
+        assert_eq!(folders.len(), 3);
+        assert!(folders.iter().all(|wiring| is_skipped(wiring)));
+    }
+
+    #[test]
+    fn no_project_directory_means_no_arrs_to_wire() {
+        assert!(servarr_arrs(&[], None).is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_read_only_filesystem_fake_is_inert_elsewhere() {
+        // The fake answers only `read`; the rest are stubs, exercised here so the
+        // fake carries no uncovered lines of its own.
+        use crate::ports::filesystem::FileSystem;
+        let fs = SeedFs(None);
+        let path = std::path::Path::new("/x");
+        assert!(fs.canonicalize(path).await.is_ok());
+        assert!(fs.touch(path).await.is_err());
+        assert!(fs.link(path, path).await.is_err());
+        assert!(fs.identify(path).await.is_err());
+        fs.remove(path).await;
+        assert!(fs.read(path).await.is_none());
+        fs.write(path, "unused").await;
+        assert!(fs.ownership(path).await.is_none());
+        let _ = fs.describe(path).await;
     }
 
     #[tokio::test]
