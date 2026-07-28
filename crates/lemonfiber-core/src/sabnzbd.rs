@@ -42,13 +42,13 @@ mod tests {
     const CONFIG: &str = "\
 [misc]
 host = 0.0.0.0
-api_key = a1b2c3d4e5f6
+api_key = the-key
 nzb_key = ffffffffffff
 ";
 
     #[test]
     fn the_generated_key_is_read_from_its_entry() {
-        assert_eq!(api_key(CONFIG).as_deref(), Some("a1b2c3d4e5f6"));
+        assert_eq!(api_key(CONFIG).as_deref(), Some("the-key"));
     }
 
     #[test]
@@ -62,15 +62,12 @@ nzb_key = ffffffffffff
     #[test]
     fn a_commented_entry_is_not_read_as_the_key() {
         // A commented-out line keeps the `#` on the name, so it does not match.
-        assert_eq!(api_key("#api_key = a1b2c3d4e5f6"), None);
+        assert_eq!(api_key("#api_key = the-key"), None);
     }
 
     #[test]
     fn surrounding_whitespace_is_trimmed() {
-        assert_eq!(
-            api_key("api_key =   a1b2c3d4e5f6  ").as_deref(),
-            Some("a1b2c3d4e5f6")
-        );
+        assert_eq!(api_key("api_key =   the-key  ").as_deref(), Some("the-key"));
     }
 
     #[test]
