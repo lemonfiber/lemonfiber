@@ -1,0 +1,19 @@
+# gitleaks configuration. Extends the default ruleset; adds an allowlist for the
+# placeholder credentials that live in test fixtures — deliberately fake values
+# used to exercise a parser, never real secrets.
+#
+# The CI scans the whole history (`gitleaks git .`), so a fixture value that
+# reached `main` in an earlier commit stays visible to the scanner even after the
+# code that used it changes. Allowlisting the value by pattern keeps that history
+# from failing every later run, without rewriting a protected branch.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder credentials in test fixtures — fake by construction"
+regexes = [
+  # An early sabnzbd.ini parser fixture, since replaced by an obvious
+  # placeholder but still present in history.
+  '''a1b2c3d4e5f6''',
+]
