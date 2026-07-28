@@ -53,6 +53,22 @@ pub struct RegisteredFolder {
     pub path: String,
 }
 
+/// A download client a service already holds, with the identifier it gave it.
+///
+/// Read back so a client already registered can be told from an absent one —
+/// matched by the endpoint it reaches, the host and port, rather than by its
+/// label, so a differently-named but equivalent client is not duplicated — and so
+/// a later undo names exactly the one created.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegisteredClient {
+    /// The identifier the service assigned.
+    pub id: String,
+    /// The host the client is reached on.
+    pub host: String,
+    /// The port it listens on.
+    pub port: u16,
+}
+
 /// A service refused, or could not be reached.
 #[derive(Debug, Error)]
 pub enum Failure {
@@ -155,6 +171,17 @@ pub trait Client: Send + Sync {
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure>;
+
+    /// The download clients the service already has, each by the endpoint it
+    /// reaches rather than its label.
+    ///
+    /// Read so a client already registered is left alone rather than duplicated,
+    /// and so a registration can be confirmed by reading it back.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure>;
 }
 
 #[cfg(test)]
