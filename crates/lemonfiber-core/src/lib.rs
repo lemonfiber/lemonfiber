@@ -48,6 +48,8 @@ pub mod secret;
 pub mod seed;
 pub mod servarr;
 pub mod stack;
+#[cfg(test)]
+mod test_support;
 pub mod wizard;
 
 /// The name of the product, as it appears to users.
