@@ -96,7 +96,10 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
     let confined: [(&str, &[&str]); 5] = [
         ("tokio::process", &["adapters/process.rs"]),
         ("std::process::Command", &["adapters/process.rs"]),
-        ("bollard", &["adapters/docker.rs"]),
+        (
+            "bollard",
+            &["adapters/docker.rs", "adapters/docker/translate.rs"],
+        ),
         ("reqwest", &["adapters/http.rs"]),
         ("sysinfo", &["adapters/filesystem.rs"]),
     ];
