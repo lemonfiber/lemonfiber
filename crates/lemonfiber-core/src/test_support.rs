@@ -223,9 +223,9 @@ impl crate::ports::random::Random for FixedRandom {
 }
 
 /// A transport that answers by the shape of the URL, so a combined seed run's
-/// many calls need no exact ordering. Root-folder and download-client lists
-/// hold exactly what each arr wants, so every connection reads back as already
-/// wired; qBittorrent's auth and set both answer success.
+/// many calls need no exact ordering. Root-folder, download-client and Prowlarr
+/// application lists hold exactly what each service wants, so every connection
+/// reads back as already wired; qBittorrent's auth and set both answer success.
 pub(crate) struct RoutedHttp;
 
 #[async_trait]
@@ -238,6 +238,8 @@ impl crate::ports::http::Http for RoutedHttp {
             r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081}]}]"#
         } else if request.url.contains("/rootfolder") {
             r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#
+        } else if request.url.contains("/applications") {
+            r#"[{"id":1,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]},{"id":2,"fields":[{"name":"baseUrl","value":"http://radarr:7878"}]},{"id":3,"fields":[{"name":"baseUrl","value":"http://lidarr:8686"}]}]"#
         } else {
             "Ok."
         };
@@ -254,11 +256,25 @@ impl crate::ports::http::Http for RoutedHttp {
 pub(crate) struct SeedFs {
     servarr: Option<&'static str>,
     sabnzbd: Option<&'static str>,
+    /// When set, the Servarr configuration is handed back only for Prowlarr's
+    /// path, so a test can make Prowlarr's key readable while an \*arr's is not —
+    /// the case of an \*arr that started after Prowlarr.
+    only_prowlarr: bool,
 }
 
 impl SeedFs {
     pub(crate) fn keyed(servarr: Option<&'static str>, sabnzbd: Option<&'static str>) -> Self {
-        Self { servarr, sabnzbd }
+        Self {
+            servarr,
+            sabnzbd,
+            only_prowlarr: false,
+        }
+    }
+
+    /// The same, but withholding the Servarr key from every path but Prowlarr's.
+    pub(crate) fn only_for_prowlarr(mut self) -> Self {
+        self.only_prowlarr = true;
+        self
     }
 }
 
@@ -288,12 +304,14 @@ impl crate::ports::filesystem::FileSystem for SeedFs {
     }
     async fn remove(&self, _path: &std::path::Path) {}
     async fn read(&self, path: &std::path::Path) -> Option<String> {
-        let text = if path.to_string_lossy().contains("sabnzbd") {
-            self.sabnzbd
-        } else {
-            self.servarr
-        };
-        text.map(str::to_owned)
+        let path = path.to_string_lossy();
+        if path.contains("sabnzbd") {
+            return self.sabnzbd.map(str::to_owned);
+        }
+        if self.only_prowlarr && !path.contains("prowlarr") {
+            return None;
+        }
+        self.servarr.map(str::to_owned)
     }
     async fn write(&self, _path: &std::path::Path, _contents: &str) {}
     async fn ownership(

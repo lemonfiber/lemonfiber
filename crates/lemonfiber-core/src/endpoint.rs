@@ -77,6 +77,25 @@ impl Endpoint {
             detail: detail.to_owned(),
         }
     }
+
+    /// Read a JSON body into `T`, or fail: a non-success status is the service's
+    /// refusal, and a body that will not parse is an answer that arrived but
+    /// could not be used, named by `what`.
+    ///
+    /// The parser's own account of what failed is kept, not paraphrased: when a
+    /// pinned service's release changes the shape of a response, "missing field
+    /// `version`" names the break where a generic sentence would hide it. Every
+    /// client that reads a list back shares this, so the reading is written once.
+    pub(crate) fn decode<T: serde::de::DeserializeOwned>(
+        &self,
+        response: &Response,
+        what: &str,
+    ) -> Result<T, Failure> {
+        if !response.is_success() {
+            return Err(self.refusal(response));
+        }
+        serde_json::from_str(&response.body).map_err(|err| self.refused(&format!("{what}: {err}")))
+    }
 }
 
 /// A non-success response as the detail of a refusal: the service's own words

@@ -1,0 +1,269 @@
+//! The Prowlarr application-sync client, driven through the HTTP port against a
+//! fake transport.
+//!
+//! The client turns a request into an `/api/v1/applications` call and reads what
+//! Prowlarr answered; the fake is that Prowlarr, replying with exactly the status
+//! and body a test wants — so every branch of the registration and read-back
+//! paths is exercised with nothing running. It speaks an async trait built on
+//! another, so it is driven from here rather than from an in-crate test, where it
+//! would be compiled twice and its coverage counted from the wrong copy.
+
+use std::sync::{Arc, Mutex};
+
+use async_trait::async_trait;
+use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use lemonfiber_core::ports::service::{
+    AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
+};
+use lemonfiber_core::prowlarr::Prowlarr;
+
+/// What the fake transport answers with.
+enum Answer {
+    /// A response with this status and body.
+    Reply(u16, &'static str),
+    /// Nothing answered.
+    Silent,
+}
+
+/// A transport that answers every request the same way, keeping the last one.
+struct Fake {
+    answer: Answer,
+    seen: Mutex<Option<Request>>,
+}
+
+impl Fake {
+    fn new(answer: Answer) -> Arc<Self> {
+        Arc::new(Self {
+            answer,
+            seen: Mutex::new(None),
+        })
+    }
+
+    /// The request the client sent.
+    fn request(&self) -> Option<Request> {
+        self.seen.lock().ok().and_then(|guard| guard.clone())
+    }
+}
+
+#[async_trait]
+impl Http for Fake {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        if let Ok(mut guard) = self.seen.lock() {
+            *guard = Some(request.clone());
+        }
+        match self.answer {
+            Answer::Reply(status, body) => Ok(Response {
+                status,
+                body: body.to_owned(),
+            }),
+            Answer::Silent => Err(Unreachable {
+                url: request.url.clone(),
+                reason: "connection refused".to_owned(),
+            }),
+        }
+    }
+}
+
+/// A Prowlarr client over the given fake.
+fn prowlarr(fake: &Arc<Fake>) -> Prowlarr {
+    let http: Arc<dyn Http> = fake.clone();
+    Prowlarr::new(http, "http://127.0.0.1:9696", "prowlarr-key", "prowlarr")
+}
+
+/// A wanted application of the given kind, reaching the given \*arr.
+fn application(name: &str, kind: ApplicationKind, base_url: &str) -> Application {
+    Application {
+        name: name.to_owned(),
+        kind,
+        prowlarr_url: "http://prowlarr:9696".to_owned(),
+        base_url: base_url.to_owned(),
+        api_key: "arr-key".to_owned(),
+    }
+}
+
+#[tokio::test]
+async fn an_application_is_posted_to_its_v1_endpoint_with_the_key() {
+    let fake = Fake::new(Answer::Reply(201, ""));
+    let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
+    assert!(prowlarr(&fake).register_application(&sonarr).await.is_ok());
+
+    let sent = fake.request();
+    // Prowlarr's API is a major behind the media *arrs': v1, not v3.
+    assert!(sent
+        .as_ref()
+        .is_some_and(|request| request.url.ends_with("/api/v1/applications")));
+    assert!(sent.is_some_and(|request| request
+        .headers
+        .iter()
+        .any(|(name, value)| name == "X-Api-Key" && value == "prowlarr-key")));
+}
+
+#[tokio::test]
+async fn a_sonarr_application_carries_its_schema_and_television_categories() {
+    let fake = Fake::new(Answer::Reply(201, ""));
+    let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
+    assert!(prowlarr(&fake).register_application(&sonarr).await.is_ok());
+
+    let body = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    for expected in [
+        r#""syncLevel":"fullSync""#,
+        r#""implementation":"Sonarr""#,
+        r#""configContract":"SonarrSettings""#,
+        r#""name":"prowlarrUrl""#,
+        "http://prowlarr:9696",
+        r#""name":"baseUrl""#,
+        "http://sonarr:8989",
+        r#""name":"apiKey""#,
+        "arr-key",
+        r#""name":"syncCategories""#,
+        "5000",
+    ] {
+        assert!(
+            body.contains(expected),
+            "Sonarr body missing {expected}: {body}"
+        );
+    }
+    // The television categories, not a movie one.
+    assert!(
+        !body.contains("2000"),
+        "no movie category in a TV sync: {body}"
+    );
+}
+
+#[tokio::test]
+async fn a_radarr_application_carries_its_schema_and_movie_categories() {
+    let fake = Fake::new(Answer::Reply(201, ""));
+    let radarr = application("Radarr", ApplicationKind::Radarr, "http://radarr:7878");
+    assert!(prowlarr(&fake).register_application(&radarr).await.is_ok());
+
+    let body = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    for expected in [
+        r#""implementation":"Radarr""#,
+        r#""configContract":"RadarrSettings""#,
+        "2000",
+    ] {
+        assert!(
+            body.contains(expected),
+            "Radarr body missing {expected}: {body}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_lidarr_application_carries_its_schema_and_music_categories() {
+    let fake = Fake::new(Answer::Reply(201, ""));
+    let lidarr = application("Lidarr", ApplicationKind::Lidarr, "http://lidarr:8686");
+    assert!(prowlarr(&fake).register_application(&lidarr).await.is_ok());
+
+    let body = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    for expected in [
+        r#""implementation":"Lidarr""#,
+        r#""configContract":"LidarrSettings""#,
+        "3000",
+    ] {
+        assert!(
+            body.contains(expected),
+            "Lidarr body missing {expected}: {body}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_rejected_application_registration_is_refused() {
+    let fake = Fake::new(Answer::Reply(400, "unknown implementation"));
+    let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
+    assert!(matches!(
+        prowlarr(&fake).register_application(&sonarr).await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_registration_with_no_answer_is_unavailable() {
+    let fake = Fake::new(Answer::Silent);
+    let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
+    assert!(matches!(
+        prowlarr(&fake).register_application(&sonarr).await,
+        Err(Failure::Unavailable { .. })
+    ));
+}
+
+#[tokio::test]
+async fn the_applications_are_read_back_by_their_base_url() {
+    // Prowlarr carries the connection settings as named entries in a `fields`
+    // array, not top-level keys; the address is decoded from there.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"[{"id":3,"name":"Sonarr","fields":[{"name":"baseUrl","value":"http://sonarr:8989"},{"name":"apiKey","value":"x"}]}]"#,
+    ));
+    let applications = prowlarr(&fake).applications().await;
+    assert_eq!(
+        applications.ok(),
+        Some(vec![RegisteredApplication {
+            id: "3".to_owned(),
+            base_url: "http://sonarr:8989".to_owned(),
+        }])
+    );
+
+    let sent = fake.request();
+    assert!(sent.is_some_and(|request| request.url.ends_with("/api/v1/applications")));
+}
+
+#[tokio::test]
+async fn an_application_that_names_no_base_url_is_left_out_rather_than_guessed() {
+    // A resource without a baseUrl cannot be matched by connection, so it is left
+    // out rather than returned as an unusable half-entry.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"[{"id":3,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]},{"id":4,"fields":[{"name":"apiKey","value":"x"}]}]"#,
+    ));
+    let applications = prowlarr(&fake)
+        .applications()
+        .await
+        .ok()
+        .unwrap_or_default();
+    assert_eq!(
+        applications.len(),
+        1,
+        "the entry with no address is left out"
+    );
+    assert!(applications
+        .iter()
+        .any(|app| app.id == "3" && app.base_url == "http://sonarr:8989"));
+}
+
+#[tokio::test]
+async fn an_unreadable_application_list_is_refused() {
+    let fake = Fake::new(Answer::Reply(200, "not an array"));
+    assert!(matches!(
+        prowlarr(&fake).applications().await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn an_application_listing_that_is_refused_is_unauthorised() {
+    let fake = Fake::new(Answer::Reply(401, ""));
+    assert!(matches!(
+        prowlarr(&fake).applications().await,
+        Err(Failure::Unauthorised { .. })
+    ));
+}
+
+#[tokio::test]
+async fn an_application_listing_with_no_answer_is_unavailable() {
+    let fake = Fake::new(Answer::Silent);
+    assert!(matches!(
+        prowlarr(&fake).applications().await,
+        Err(Failure::Unavailable { .. })
+    ));
+}

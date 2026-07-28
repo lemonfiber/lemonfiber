@@ -14,7 +14,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
 use crate::endpoint::Endpoint;
@@ -61,24 +60,6 @@ impl Servarr {
             body,
         }
     }
-
-    /// Read a JSON body into `T`, or fail: a non-success status is the service's
-    /// refusal, and a body that will not parse is an answer that arrived but
-    /// could not be used, named by `what`.
-    fn decode<T: DeserializeOwned>(
-        &self,
-        response: &crate::ports::http::Response,
-        what: &str,
-    ) -> Result<T, Failure> {
-        if !response.is_success() {
-            return Err(self.endpoint.refusal(response));
-        }
-        // The parser's own account of what failed is kept, not paraphrased: when
-        // a Servarr release changes the shape of a response, "missing field
-        // `version`" names the break where a generic sentence would hide it.
-        serde_json::from_str(&response.body)
-            .map_err(|err| self.endpoint.refused(&format!("{what}: {err}")))
-    }
 }
 
 /// The fields of `system/status` that identify a service.
@@ -104,7 +85,9 @@ impl Client for Servarr {
             .endpoint
             .send(&self.request(Method::Get, "/system/status", None))
             .await?;
-        let status: Status = self.decode(&response, "the status response could not be read")?;
+        let status: Status = self
+            .endpoint
+            .decode(&response, "the status response could not be read")?;
         let name = if status.instance_name.is_empty() {
             status.app_name
         } else {
@@ -155,8 +138,9 @@ impl Client for Servarr {
             .endpoint
             .send(&self.request(Method::Get, "/rootfolder", None))
             .await?;
-        let folders: Vec<FolderResource> =
-            self.decode(&response, "the root-folder list could not be read")?;
+        let folders: Vec<FolderResource> = self
+            .endpoint
+            .decode(&response, "the root-folder list could not be read")?;
         Ok(folders
             .into_iter()
             .map(|folder| RegisteredFolder {
@@ -171,8 +155,9 @@ impl Client for Servarr {
             .endpoint
             .send(&self.request(Method::Get, "/downloadclient", None))
             .await?;
-        let clients: Vec<ClientResource> =
-            self.decode(&response, "the download-client list could not be read")?;
+        let clients: Vec<ClientResource> = self
+            .endpoint
+            .decode(&response, "the download-client list could not be read")?;
         Ok(clients
             .into_iter()
             .filter_map(ClientResource::endpoint)

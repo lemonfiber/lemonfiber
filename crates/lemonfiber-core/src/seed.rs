@@ -21,7 +21,9 @@ use serde::Serialize;
 
 use crate::journal::{Change, Journal, Kind};
 use crate::ports::random::Random;
-use crate::ports::service::{Client, DownloadClient, Failure, RegisteredClient, RootFolder};
+use crate::ports::service::{
+    AppSync, Application, Client, DownloadClient, Failure, RegisteredClient, RootFolder,
+};
 use crate::qbittorrent::Qbittorrent;
 use crate::secret;
 
@@ -339,6 +341,104 @@ fn same_endpoint(have: &RegisteredClient, want: &DownloadClient) -> bool {
 /// A download-client connection's description for the report.
 fn describe_client(service: &str, client: &DownloadClient) -> String {
     format!("{} into {service}", client.name)
+}
+
+/// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave
+/// the ones it already has, and record each write so it can be undone.
+///
+/// The same shape as [`wire_root_folders`], matched by the address Prowlarr
+/// reaches an \*arr on rather than by a label, so an application an operator
+/// renamed is recognised as the same connection and not registered a second time.
+/// An application already present is left exactly as it is and never rewritten,
+/// which is what preserves an operator's own change to its sync settings.
+pub async fn wire_applications(
+    prowlarr: &dyn AppSync,
+    service: &str,
+    wanted: &[Application],
+    journal: &mut Journal,
+    at: &str,
+) -> Vec<Wiring> {
+    let existing = match prowlarr.applications().await {
+        Ok(applications) => applications,
+        Err(failure) => {
+            let state = unreached(&failure);
+            return wanted
+                .iter()
+                .map(|application| Wiring {
+                    connection: describe_application(service, application),
+                    state: state.clone(),
+                })
+                .collect();
+        }
+    };
+
+    let mut wirings = Vec::new();
+    for application in wanted {
+        let already = existing
+            .iter()
+            .any(|have| same_base_url(&have.base_url, &application.base_url));
+        let state = if already {
+            State::AlreadyWired
+        } else {
+            wire_one_application(prowlarr, service, application, journal, at).await
+        };
+        wirings.push(Wiring {
+            connection: describe_application(service, application),
+            state,
+        });
+    }
+    wirings
+}
+
+/// Register one application, confirm it landed by reading it back, and record it.
+async fn wire_one_application(
+    prowlarr: &dyn AppSync,
+    service: &str,
+    application: &Application,
+    journal: &mut Journal,
+    at: &str,
+) -> State {
+    if let Err(failure) = prowlarr.register_application(application).await {
+        return unreached(&failure);
+    }
+    let registered = match prowlarr.applications().await {
+        Ok(applications) => applications,
+        Err(failure) => return unreached(&failure),
+    };
+    match registered
+        .into_iter()
+        .find(|have| same_base_url(&have.base_url, &application.base_url))
+    {
+        Some(landed) => {
+            journal.record(Change {
+                at: at.to_owned(),
+                operation: "seed".to_owned(),
+                target: service.to_owned(),
+                kind: Kind::Created {
+                    resource: "application".to_owned(),
+                    id: landed.id,
+                },
+            });
+            State::Wired
+        }
+        None => State::Failed {
+            detail: "the application was accepted but did not appear when read back".to_owned(),
+        },
+    }
+}
+
+/// Whether two application addresses reach the same \*arr.
+///
+/// A trailing separator is ignored, as it is for a folder path: Prowlarr may
+/// store the canonical form of the address it was given, and the wanted address
+/// and its stored form must be recognised as one so a write is not made every run.
+fn same_base_url(a: &str, b: &str) -> bool {
+    a.trim_end_matches('/') == b.trim_end_matches('/')
+}
+
+/// An application connection's description for the report.
+fn describe_application(service: &str, application: &Application) -> String {
+    format!("{} indexer sync via {service}", application.name)
 }
 
 /// Replace qBittorrent's temporary web UI password with a generated one, and hand
