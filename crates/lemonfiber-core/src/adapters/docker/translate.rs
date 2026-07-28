@@ -1,9 +1,10 @@
 //! Turning the engine's replies into the port's vocabulary.
 //!
-//! Pure translation, kept apart from the daemon I/O in the parent module so it
-//! can be unit-tested directly rather than only through a live socket: a state
-//! or health enum into the port's own, a status line into an exit code, a log
-//! line into its timestamp, a stats sample into a CPU fraction.
+//! Pure translation, kept apart from the daemon I/O in the parent module so the
+//! two concerns read separately: a state or health enum into the port's own, a
+//! status line into an exit code, a log line into its timestamp, a stats sample
+//! into a CPU fraction. Exercised through the adapter's fake-socket tests
+//! alongside the I/O it sits beside, as the rest of the adapter is.
 
 use bollard::models::{
     ContainerStatsResponse, ContainerSummary, ContainerSummaryHealthStatusEnum,
@@ -94,9 +95,9 @@ pub(super) fn split_timestamp(line: &str) -> (Option<String>, String) {
 /// Fraction of one core, from two samples of the same container.
 ///
 /// The engine reports totals, not rates, so a rate is the difference between
-/// consecutive samples. Where the difference in system time is zero or missing
-/// — which is what the very first sample looks like — the honest answer is zero
-/// rather than a division that would be either infinite or invented.
+/// consecutive samples. With no previous sample at all, or where two samples
+/// fall in the same system-time tick, there is no interval to divide by and the
+/// answer is zero rather than a division that would be infinite or invented.
 pub(super) fn cpu_fraction(sample: &ContainerStatsResponse) -> f64 {
     // Both readings or neither. One without the other is not half an answer,
     // it is the same absence of one.

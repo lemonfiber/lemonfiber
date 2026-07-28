@@ -146,12 +146,22 @@ async fn an_unexpected_status_with_no_body_is_refused_with_its_code() {
 }
 
 #[tokio::test]
-async fn an_unreadable_status_body_is_refused() {
+async fn an_unreadable_status_body_is_refused_and_the_detail_names_the_break() {
     let fake = Fake::new(Answer::Reply(200, "not json at all"));
-    assert!(matches!(
-        sonarr(&fake).identity().await,
-        Err(Failure::Refused { .. })
-    ));
+    let detail = match sonarr(&fake).identity().await {
+        Err(Failure::Refused { detail, .. }) => detail,
+        _ => String::new(),
+    };
+    // The generic phrase, then the parser's own account of what failed — kept
+    // rather than paraphrased, so a shape change is diagnosable.
+    assert!(
+        detail.starts_with("the status response could not be read: "),
+        "missing the generic lead-in: {detail}"
+    );
+    assert!(
+        detail.contains("expected") || detail.contains("column"),
+        "the parser's own words should survive: {detail}"
+    );
 }
 
 #[tokio::test]
