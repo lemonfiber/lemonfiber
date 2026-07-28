@@ -18,18 +18,16 @@ use lemonfiber_core::config::{
     data_root_from_env, ip_echo_from_env, port_forward_from_env, service_user_from_env, store,
     Protocols, Settings,
 };
-use lemonfiber_core::docker::{Condition, Service, State};
-use lemonfiber_core::doctor::{Category, Overall, Verdict};
+use lemonfiber_core::doctor::{Category, Overall};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, StatusReport, SupervisionReport,
-    VersionReport,
-};
+use lemonfiber_core::model::Envelope;
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
-use lemonfiber_core::seed::{Report as SeedReport, State as SeedState};
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::PRODUCT;
+
+mod render;
+use render::{render, watched};
 
 /// The stack this binary carries.
 ///
@@ -414,27 +412,6 @@ async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
     }
 }
 
-/// What a watch did once its location was lost.
-fn watched(report: &SupervisionReport, json: bool) {
-    if json {
-        match Envelope::new("watch", report.clone()).to_json() {
-            Some(text) => println!("{text}"),
-            None => eprintln!("this report could not be rendered as JSON"),
-        }
-        return;
-    }
-
-    println!("the watch ended: {}", report.reason);
-    if report.stopped {
-        println!("stopped: {}", report.forms.join(", "));
-    } else {
-        println!(
-            "could not stop {} — check the services by hand",
-            report.forms.join(", ")
-        );
-    }
-}
-
 /// Where this machine keeps lemonfiber's files.
 ///
 /// Finding the platform's base directories is the surface's job: it means asking
@@ -460,210 +437,4 @@ fn configuration_file() -> Option<PathBuf> {
 /// Where an embedded stack is written so Compose can read it.
 fn stack_directory() -> Option<PathBuf> {
     here().map(|paths| paths.stack())
-}
-
-/// Render an outcome, for a person or for a script.
-///
-/// One renderer per answer, rather than one function that knows all four. They
-/// have nothing in common beyond arriving here: what a version report owes an
-/// operator and what a lifecycle report owes them are different questions, and
-/// a single body deciding both reads as one thing with four moods.
-fn render(outcome: &Outcome, json: bool) {
-    if json {
-        machine_readable(outcome);
-        return;
-    }
-
-    match outcome {
-        Outcome::Version(report) => versions(report),
-        Outcome::Config(report) => settings(report),
-        Outcome::Lifecycle(report) => lifecycle(report),
-        Outcome::Status(report) => status(report),
-        Outcome::Doctor(report) => diagnosis(report),
-        Outcome::Seed(report) => seeding(report),
-    }
-}
-
-/// What seeding wired, connection by connection, with what a re-run still owes
-/// named last so it is the thing the operator is left looking at.
-fn seeding(report: &SeedReport) {
-    for wiring in &report.wirings {
-        match &wiring.state {
-            SeedState::Wired => println!("  ✓ {}   wired", wiring.connection),
-            SeedState::AlreadyWired => println!("  ✓ {}   already wired", wiring.connection),
-            SeedState::Drifted => println!("  · {}   left as you set it", wiring.connection),
-            SeedState::Skipped { reason } => {
-                println!("  ? {}   skipped", wiring.connection);
-                println!("      {reason}");
-            }
-            SeedState::Failed { detail } => {
-                println!("  ✗ {}   {detail}", wiring.connection);
-            }
-        }
-    }
-    let outstanding = report.outstanding();
-    if outstanding.is_empty() {
-        println!("\nEverything is wired.");
-    } else {
-        println!(
-            "\n{} left to wire — run seed again once ready.",
-            outstanding.len()
-        );
-    }
-}
-
-/// What the diagnostic checks found, finding by finding.
-///
-/// Each finding leads with a mark that reads at a glance and the plain evidence
-/// behind it; a non-passing one carries the reason and what to do, because a
-/// finding without a remedy is a fault report rather than a diagnosis.
-fn diagnosis(report: &DoctorReport) {
-    for finding in &report.findings {
-        match &finding.verdict {
-            Verdict::Pass { note } => match note {
-                Some(note) => println!("  ✓ {}   {note}", finding.title),
-                None => println!("  ✓ {}", finding.title),
-            },
-            Verdict::Warn(problem) => {
-                println!("  ! {}   {}", finding.title, problem.summary);
-                remedies(problem);
-            }
-            Verdict::Fail(problem) => {
-                println!("  ✗ {}   {}", finding.title, problem.summary);
-                remedies(problem);
-            }
-            Verdict::Unverified { reason, remedy } => {
-                println!("  ? {}   UNVERIFIED", finding.title);
-                println!("      {reason}");
-                println!("      → {}", remedy.action);
-                if let Some(detail) = &remedy.detail {
-                    println!("        {detail}");
-                }
-            }
-            Verdict::Skipped { reason } => {
-                println!("  – {}   skipped: {reason}", finding.title);
-            }
-        }
-    }
-
-    println!("\n{}", overall(report.overall));
-}
-
-/// The problem's meaning and remedies, indented under a finding.
-fn remedies(problem: &Problem) {
-    println!("      {}", problem.meaning);
-    for remedy in &problem.remedies {
-        println!("      → {}", remedy.action);
-        if let Some(detail) = &remedy.detail {
-            println!("        {detail}");
-        }
-    }
-}
-
-/// The one-line verdict a diagnosis amounts to.
-fn overall(overall: Overall) -> &'static str {
-    match overall {
-        Overall::Healthy => "healthy — everything checked passed",
-        Overall::Degraded => "degraded — working, with warnings",
-        Overall::Broken => "broken — something needs attention",
-        Overall::Unknown => "unknown — health could not be established",
-    }
-}
-
-/// The same answer, for something that will parse it.
-fn machine_readable(outcome: &Outcome) {
-    match outcome.clone().envelope().to_json() {
-        Some(text) => println!("{text}"),
-        None => eprintln!("this outcome could not be rendered as JSON"),
-    }
-}
-
-/// What versions are in play.
-fn versions(report: &VersionReport) {
-    println!("{PRODUCT} {}", report.binary);
-    println!("stack {}", report.stack);
-    println!("manifest schema {:?}", report.supported_schema);
-    match &report.compose {
-        Some(version) => println!("compose {version}"),
-        None => println!("compose not reachable"),
-    }
-}
-
-/// What the operator has configured.
-fn settings(report: &ConfigReport) {
-    for setting in &report.settings {
-        println!("{}={}", setting.key, setting.value);
-    }
-    if report.changed {
-        // A rehearsal reports what it would do, so it must not claim it saved.
-        println!(
-            "{}",
-            if report.rehearsed {
-                "would save"
-            } else {
-                "saved"
-            }
-        );
-    }
-}
-
-/// What a lifecycle command did, or would have done.
-fn lifecycle(report: &LifecycleReport) {
-    if report.rehearsed {
-        println!("would run:\n  {}", report.command.join(" "));
-    }
-    println!("{}: {}", report.action, report.profiles.join(", "));
-
-    // Saying what was left out, and that it was deliberate, before the operator
-    // goes looking for a service that was never going to start.
-    if !report.dropped.is_empty() {
-        println!(
-            "left out (no provider configured): {}",
-            report.dropped.join(", ")
-        );
-    }
-
-    if let Some(condition) = report.condition {
-        println!("\n{}", describe(condition));
-        show(&report.services);
-    }
-}
-
-/// What each service is doing.
-fn status(report: &StatusReport) {
-    println!("{}", describe(report.condition));
-    show(&report.services);
-}
-
-/// A condition, as a sentence rather than as a word.
-fn describe(condition: Condition) -> &'static str {
-    match condition {
-        Condition::Inactive => "nothing is running",
-        Condition::Degraded => "running, and something needs attention",
-        Condition::Partial => "partly up",
-        Condition::Active => "everything is up",
-    }
-}
-
-/// What each service is doing, one per line.
-fn show(services: &[Service]) {
-    for service in services {
-        let state = match service.state {
-            State::Absent => "absent".to_owned(),
-            State::Stopped => "stopped".to_owned(),
-            State::Starting => "starting".to_owned(),
-            State::Running => "running".to_owned(),
-            State::Healthy => "healthy".to_owned(),
-            State::Unhealthy => "unhealthy".to_owned(),
-            State::CrashLooping => "crash-looping".to_owned(),
-            State::HostManaged => "host-managed".to_owned(),
-            // The code is the whole reason this is not simply "stopped", so it
-            // is shown rather than left for the operator to go and find.
-            State::Failed => match service.exit {
-                Some(code) => format!("failed ({code})"),
-                None => "failed".to_owned(),
-            },
-        };
-        println!("  {:<14} {:<14} {}", service.id, state, service.name);
-    }
 }

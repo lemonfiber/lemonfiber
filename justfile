@@ -29,4 +29,4 @@ deny:
 # kept coverable — see .docs/architecture/error-model.md on writing assertions
 # that leave no branch a test cannot reach.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '(main\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/)' --fail-under-lines 100 --lcov --output-path lcov.info
