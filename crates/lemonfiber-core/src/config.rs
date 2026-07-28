@@ -95,13 +95,19 @@ pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 pub const QBITTORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 
 /// A recorded value with the whitespace and surrounding quotes a person might
-/// add stripped, so `"on"` and ` on ` both read the same as `on`.
-fn bare(value: &str) -> String {
+/// add stripped, its case left alone — so a hand-edited `"https://IP.example"`
+/// keeps its path but loses the quotes that would otherwise reach the reader.
+fn unquoted(value: &str) -> String {
     value
         .trim()
         .trim_matches(|c| c == '"' || c == '\'')
         .trim()
-        .to_ascii_lowercase()
+        .to_owned()
+}
+
+/// The same, folded to lower case, so `"on"` and ` on ` both read as `on`.
+fn bare(value: &str) -> String {
+    unquoted(value).to_ascii_lowercase()
 }
 
 /// Whether a recorded setting reads as switched on.
@@ -137,7 +143,7 @@ pub fn ip_echo_from_env(file: &env::EnvFile) -> Option<String> {
         None => Some(DEFAULT_IP_ECHO.to_owned()),
         Some(value) if reads_as_on(value) => Some(DEFAULT_IP_ECHO.to_owned()),
         Some(value) if reads_as_off(value) => None,
-        Some(value) => Some(value.trim().to_owned()),
+        Some(value) => Some(unquoted(value)),
     }
 }
 
@@ -432,6 +438,18 @@ mod tests {
         assert_eq!(
             ip_echo_from_env(&file).as_deref(),
             Some("https://ip.example")
+        );
+    }
+
+    #[test]
+    fn a_hand_quoted_endpoint_loses_the_quotes_but_keeps_its_case() {
+        // A person editing the file by hand commonly quotes the value; the
+        // quotes must not reach the container's wget, and a URL's path is
+        // case-sensitive so the value is not folded like the on/off switch is.
+        let file = env::EnvFile::parse("LEMONFIBER_IP_ECHO=\"https://IP.Example/Path\"\n");
+        assert_eq!(
+            ip_echo_from_env(&file).as_deref(),
+            Some("https://IP.Example/Path")
         );
     }
 
