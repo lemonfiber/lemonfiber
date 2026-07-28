@@ -6,16 +6,18 @@
 //! `lemonfiber-core`, which is what lets both be tested with no Docker, no
 //! terminal and no configuration.
 
+mod date;
 mod error;
 mod schema;
 mod validate;
 
+pub use date::Date;
 pub use error::Error;
 pub use schema::{
     Api, ApiKind, Bind, Criticality, Form, Health, HealthKind, KeySource, Manifest, Profile,
     Protocol, Service,
 };
-pub use validate::{validate, Date, Violation};
+pub use validate::{validate, Violation};
 
 /// The manifest schema version this crate prefers.
 pub const SCHEMA_VERSION: u32 = 1;
