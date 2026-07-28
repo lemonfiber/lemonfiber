@@ -221,12 +221,7 @@ fn compose_outdated(found: &str) -> Problem {
 
 /// A finding in the environment category.
 fn finding(check: &str, title: &str, verdict: Verdict) -> Finding {
-    Finding {
-        check: check.to_owned(),
-        category: Category::Environment,
-        title: title.to_owned(),
-        verdict,
-    }
+    Finding::in_category(Category::Environment, check, title, verdict)
 }
 
 /// A check that ran but could not settle its question, with what to try.
