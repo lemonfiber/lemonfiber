@@ -203,6 +203,7 @@ impl Client for FakeService {
                         id: id.to_string(),
                         host: client.host.clone(),
                         port: client.port,
+                        category: Some(client.category.clone()),
                     });
                     *id += 1;
                 }
@@ -478,6 +479,11 @@ async fn a_client_at_the_same_endpoint_is_left_untouched_despite_a_different_nam
         id: "1".to_owned(),
         host: "qbittorrent".to_owned(),
         port: 8080,
+        // Same category as wanted, so only the name differs.
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        }),
     }];
     let (states, recorded) = seed_clients(
         FakeService::with_clients(Mode::Normal, existing),
@@ -488,6 +494,32 @@ async fn a_client_at_the_same_endpoint_is_left_untouched_despite_a_different_nam
     assert_eq!(
         recorded, 0,
         "a client already at the endpoint is not duplicated"
+    );
+}
+
+#[tokio::test]
+async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
+    // Same endpoint, but the operator changed the category in the *arr itself.
+    // That is their edit to keep, not a mistake to revert: it is reported as
+    // drift and left exactly as it is, nothing re-registered.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "qbittorrent".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "my-own-tv".to_owned(),
+        }),
+    }];
+    let (states, recorded) = seed_clients(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("qBittorrent", "qbittorrent", 8080)],
+    )
+    .await;
+    assert_eq!(states, vec![State::Drifted]);
+    assert_eq!(
+        recorded, 0,
+        "an operator's own change is preserved, not rewritten"
     );
 }
 

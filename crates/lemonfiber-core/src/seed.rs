@@ -252,11 +252,14 @@ pub async fn wire_download_clients(
 
     let mut wirings = Vec::new();
     for want in wanted {
-        let already = existing.iter().any(|have| same_endpoint(have, want));
-        let state = if already {
-            State::AlreadyWired
-        } else {
-            wire_one_client(client, service, want, journal, at).await
+        // The policy decides from what was observed: a client already there and
+        // correct is left, one the operator re-filed is preserved, an absent one
+        // is written. Unavailable never reaches here — a read-back failure was
+        // handled above — so it folds harmlessly onto `Leave`.
+        let state = match intent(observe_client(&existing, want)) {
+            Intent::Wire => wire_one_client(client, service, want, journal, at).await,
+            Intent::Preserve => State::Drifted,
+            Intent::Leave | Intent::Skip => State::AlreadyWired,
         };
         wirings.push(Wiring {
             connection: describe_client(service, want),
@@ -264,6 +267,26 @@ pub async fn wire_download_clients(
         });
     }
     wirings
+}
+
+/// What a seed pass observes about a wanted client against what the service
+/// already holds: absent, present and correct, or present but re-filed by the
+/// operator under a different category.
+fn observe_client(existing: &[RegisteredClient], want: &DownloadClient) -> Observed {
+    match existing.iter().find(|have| same_endpoint(have, want)) {
+        None => Observed::Absent,
+        Some(have) if drifted(have, want) => Observed::Drifted,
+        Some(_) => Observed::Present,
+    }
+}
+
+/// Whether a client at the wanted endpoint files under a different category than
+/// seed intends. Only a category the service reported can drift; where it names
+/// none there is nothing to compare, so the connection is taken as it stands.
+fn drifted(have: &RegisteredClient, want: &DownloadClient) -> bool {
+    have.category
+        .as_ref()
+        .is_some_and(|category| category != &want.category)
 }
 
 /// Register one download client, confirm it landed by reading it back, and record
