@@ -187,6 +187,7 @@ fn engine_verdict(engine: Engine) -> Verdict {
                 "The client is present, so this is usually a permission problem rather than a missing install.",
                 Remedy::new("Check that you may run docker, then try again"),
             )
+            .in_state(State::Guided)
             .with_detail(reason),
         ),
     }
@@ -435,6 +436,9 @@ mod tests {
             Some(Verdict::Fail(problem))
                 if problem.code == DAEMON_DOWN
                     && problem.detail.as_deref() == Some("permission denied")
+                    // Guided, the same as its daemon-down sibling — both point the
+                    // operator to act elsewhere, so they must agree.
+                    && problem.state == crate::error::State::Guided
         ));
         assert!(matches!(
             verdict(&findings, "environment.compose"),
