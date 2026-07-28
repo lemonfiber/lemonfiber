@@ -699,6 +699,11 @@ fn assess(baseline: u64, current: Presence) -> Availability {
         Presence::Gone => Availability::Lost(Loss::Vanished),
         Presence::On(volume) if volume == baseline => Availability::Holding,
         Presence::On(_) => Availability::Lost(Loss::Moved),
+        // A reading that could not be taken is not a loss. A permission error or
+        // an interrupted stat says nothing about whether the drive is still
+        // there, so the watch holds and lets a later poll settle it rather than
+        // stopping the stack on a hiccup.
+        Presence::Unknown => Availability::Holding,
     }
 }
 
@@ -737,7 +742,10 @@ pub async fn supervise(
     };
     let baseline = match volume.presence(root).await {
         Presence::On(volume) => volume,
-        Presence::Gone => return Err(already_gone(root)),
+        // Missing, or unreadable at the outset: either way there is no baseline
+        // to watch against, so the watch does not begin. Once it is running, an
+        // unreadable reading is held rather than acted on — see `assess`.
+        Presence::Gone | Presence::Unknown => return Err(already_gone(root)),
     };
 
     let loss = watch_until_lost(volume, root, baseline, interval).await;
@@ -2056,6 +2064,11 @@ mod tests {
                 super::super::assess(9, Presence::On(4)),
                 Availability::Lost(Loss::Moved)
             ));
+            // A reading that could not be taken is held, not treated as a loss.
+            assert!(matches!(
+                super::super::assess(9, Presence::Unknown),
+                Availability::Holding
+            ));
         }
 
         #[tokio::test]
@@ -2096,6 +2109,24 @@ mod tests {
             .await
             .ok();
             assert_eq!(report.map(|report| report.stopped), Some(true));
+        }
+
+        #[tokio::test]
+        async fn a_reading_that_cannot_be_taken_is_held_not_acted_on() {
+            // A transient error mid-watch — the drive is still there. The watch
+            // holds through it and only stops when the volume genuinely goes.
+            let ctx = watching(Ok(spoke("")), Some("/data"));
+            let report = watch(
+                &ctx,
+                Drive::playing(vec![Presence::On(9), Presence::Unknown, Presence::Gone]),
+            )
+            .await
+            .ok();
+            assert_eq!(
+                report.map(|report| (report.stopped, report.reason.contains("no longer present"))),
+                Some((true, true)),
+                "the hiccup was held; the real loss stopped the services"
+            );
         }
 
         #[tokio::test]
