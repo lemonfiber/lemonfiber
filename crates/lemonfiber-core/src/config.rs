@@ -87,6 +87,13 @@ pub const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 /// where the operator runs no media server at all.
 pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 
+/// The environment key holding qBittorrent's web UI password.
+///
+/// Seeding generates this password and records it here, because the
+/// forwarded-port push authenticates to qBittorrent with it — the one credential
+/// lemonfiber mints and writes rather than reads from a service.
+pub const QBITTORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
+
 /// A recorded value with the whitespace and surrounding quotes a person might
 /// add stripped, so `"on"` and ` on ` both read the same as `on`.
 fn bare(value: &str) -> String {

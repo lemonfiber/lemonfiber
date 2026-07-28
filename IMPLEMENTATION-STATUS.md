@@ -79,9 +79,14 @@ misconfigured VPN (the leak half is met).
 
 ---
 
-## M4 — Seed · ☐
+## M4 — Seed · ◐
 
-Wiring services to each other and recording it so it can be undone.
+Wiring services to each other and recording it so it can be undone. The
+`lemonfiber seed` command exists and wires the first edge — qBittorrent's web UI
+password (`D1-R16`): it reads the temporary password from the container's log,
+replaces it with a generated one through the client, and records the generated
+one in `QBITTORRENT_PASSWORD` where the forwarded-port push reads it. Root-folder
+and download-client wiring, whose drivers are built, join the command next.
 
 | Deliverable | Spec | Status | Landing / notes |
 |-------------|------|--------|-----------------|
