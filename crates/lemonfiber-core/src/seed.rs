@@ -20,7 +20,10 @@
 use serde::Serialize;
 
 use crate::journal::{Change, Journal, Kind};
+use crate::ports::random::Random;
 use crate::ports::service::{Client, DownloadClient, Failure, RegisteredClient, RootFolder};
+use crate::qbittorrent::Qbittorrent;
+use crate::secret;
 
 /// What lemonfiber observed about a connection it wants to make.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -313,6 +316,53 @@ fn same_endpoint(have: &RegisteredClient, want: &DownloadClient) -> bool {
 /// A download-client connection's description for the report.
 fn describe_client(service: &str, client: &DownloadClient) -> String {
     format!("{} into {service}", client.name)
+}
+
+/// Replace qBittorrent's temporary web UI password with a generated one, and hand
+/// the generated value back so the surface can record it where the forwarded-port
+/// push reads it.
+///
+/// Unlike every other connection, this one is a credential lemonfiber mints
+/// rather than reads. Generating it needs randomness the operating system might
+/// withhold; without it there is nothing to set, and the connection fails rather
+/// than falling back to a guessable secret on the client the forwarded port
+/// authenticates to. The client sets the password and confirms it by
+/// authenticating again; only a confirmed change is wired, and only then is the
+/// value returned to record — an unset or unconfirmed one records nothing.
+pub async fn wire_qbittorrent_password(
+    client: &Qbittorrent,
+    random: &dyn Random,
+    temporary: &str,
+) -> (Wiring, Option<String>) {
+    let connection = "qBittorrent web UI password".to_owned();
+    let Some(password) = secret::generate(random) else {
+        return (
+            Wiring {
+                connection,
+                state: State::Failed {
+                    detail: "no randomness was available to generate a password".to_owned(),
+                },
+            },
+            None,
+        );
+    };
+
+    match client.replace_password(temporary, &password).await {
+        Ok(()) => (
+            Wiring {
+                connection,
+                state: State::Wired,
+            },
+            Some(password),
+        ),
+        Err(failure) => (
+            Wiring {
+                connection,
+                state: unreached(&failure),
+            },
+            None,
+        ),
+    }
 }
 
 /// A failure as the state it leaves a connection in: a service not answering is
