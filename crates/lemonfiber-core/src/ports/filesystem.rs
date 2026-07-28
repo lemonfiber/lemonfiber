@@ -46,6 +46,11 @@ pub enum Presence {
     On(u64),
     /// The path is not there at all.
     Gone,
+    /// The path could not be read this time — a permission error, an interrupted
+    /// call, anything that is not a plain "not there". Distinct from `Gone` so a
+    /// transient hiccup is not mistaken for the volume being unplugged and does
+    /// not, on its own, stop a running stack.
+    Unknown,
 }
 
 /// Who owns a path and how its permission bits are set, as the platform reports

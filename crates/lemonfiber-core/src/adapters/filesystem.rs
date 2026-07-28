@@ -87,7 +87,11 @@ impl Volume for Disk {
     async fn presence(&self, path: &Path) -> Presence {
         match std::fs::metadata(path) {
             Ok(meta) => Presence::On(volume_of(&meta)),
-            Err(_) => Presence::Gone,
+            // Only a plain "not there" is `Gone`. A permission error or an
+            // interrupted call says nothing about whether the volume is still
+            // mounted, so it is `Unknown` and the watch holds rather than acting.
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Presence::Gone,
+            Err(_) => Presence::Unknown,
         }
     }
 }
@@ -302,6 +306,12 @@ mod tests {
             Disk.presence(Path::new("/lemonfiber/no/such/root")).await,
             Presence::Gone
         );
+        // A path that reaches *through* a regular file cannot be statted, and the
+        // error is "not a directory", not "not found" — so it reads as Unknown
+        // rather than being mistaken for the volume being gone.
+        let file = dir.join("a-file");
+        let _ = std::fs::write(&file, "x");
+        assert_eq!(Disk.presence(&file.join("child")).await, Presence::Unknown);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
