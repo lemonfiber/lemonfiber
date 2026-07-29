@@ -12,7 +12,9 @@ use async_trait::async_trait;
 use lemonfiber_core::ports::nntp::{Endpoint, Nntp, Unreachable};
 use rustls::ClientConfig;
 use rustls_pki_types::ServerName;
-use tokio::io::{AsyncBufReadExt as _, AsyncRead, AsyncWrite, AsyncWriteExt as _, BufReader};
+use tokio::io::{
+    AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufReader,
+};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 
@@ -124,13 +126,21 @@ where
 
 /// Read one CRLF-terminated reply line, its trailing newline trimmed. A closed
 /// connection where a line was expected is nothing usable answering.
+///
+/// Bounded in length: a status line is tens of bytes, so a peer streaming a
+/// newline-less blob — hostile or broken, and reached before the login is even
+/// proven — is cut off rather than allowed to grow the buffer without limit.
 async fn read_reply<S, F>(connection: &mut BufReader<S>, fail: &F) -> Result<String, Unreachable>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     F: Fn(String) -> Unreachable,
 {
+    /// Far above any real NNTP status line, far below a memory concern.
+    const MAX_LINE: u64 = 8 * 1024;
+
     let mut line = String::new();
-    let read = connection
+    let read = (&mut *connection)
+        .take(MAX_LINE)
         .read_line(&mut line)
         .await
         .map_err(|error| fail(error.to_string()))?;

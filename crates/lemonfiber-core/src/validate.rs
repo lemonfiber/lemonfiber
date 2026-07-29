@@ -269,6 +269,17 @@ fn interpret_usenet(replies: &[String]) -> Validation {
             detail: "the provider is at its connection limit; try again shortly".to_owned(),
         };
     }
+    // Some providers accept at the username step and ask for no password; the login
+    // is already proven, and the password reply that follows would read as an
+    // out-of-sequence refusal if it were taken as the answer.
+    if matches!(
+        replies.get(1).and_then(|line| code(line)),
+        Some(AUTH_ACCEPTED)
+    ) {
+        return Validation::Valid {
+            observed: "the provider accepted the login".to_owned(),
+        };
+    }
     // The greeting, the reply to the username, then the reply to the password.
     let Some(password_reply) = replies.get(2) else {
         return Validation::Unreachable {
@@ -596,6 +607,19 @@ mod tests {
     async fn a_provider_that_accepts_the_login_proves_the_account() {
         // Greeting, reply to USER, then 281 accepted to PASS.
         let outcome = dialling(&["200 welcome", "381 more", "281 authenticated"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Valid { observed } if observed.contains("accepted the login")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_provider_that_accepts_at_the_username_step_needs_no_password() {
+        // 281 to AUTHINFO USER means the login is already accepted; the password
+        // reply that still follows must not be mistaken for a refusal.
+        let outcome = dialling(&["200 welcome", "281 authenticated", "482 out of sequence"])
             .validate(&usenet())
             .await;
         assert!(matches!(
