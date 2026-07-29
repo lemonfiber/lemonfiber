@@ -13,6 +13,7 @@
 pub mod docker;
 pub mod filesystem;
 pub mod http;
+pub mod nntp;
 pub mod process;
 pub mod random;
 pub mod service;

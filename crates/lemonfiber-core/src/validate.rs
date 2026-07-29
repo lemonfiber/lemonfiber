@@ -24,6 +24,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::ports::http::{Http, Method, Request};
+use crate::ports::nntp::{Endpoint, Nntp};
 
 /// A credential the operator supplies, to be proven against the live service it
 /// authenticates to.
@@ -43,6 +44,19 @@ pub enum Credential {
         url: String,
         /// The API key it authenticates with, sent as `X-Api-Key`.
         key: String,
+    },
+    /// A Usenet provider, reached over NNTP and asked to accept a login.
+    Usenet {
+        /// The provider's hostname.
+        host: String,
+        /// The port it answers NNTP on.
+        port: u16,
+        /// Whether the connection is TLS-wrapped.
+        secure: bool,
+        /// The account username.
+        user: String,
+        /// The account password.
+        pass: String,
     },
 }
 
@@ -85,16 +99,69 @@ pub trait Validator: Send + Sync {
 }
 
 /// A validator that proves credentials against the real services, over whatever
-/// each one speaks — today the HTTP the indexers answer on.
+/// each one speaks — the HTTP the indexers and services answer on, and, where a
+/// transport for it is supplied, the NNTP a Usenet provider does.
 pub struct Live {
     http: Arc<dyn Http>,
+    /// How Usenet providers are reached, where the caller can reach them.
+    ///
+    /// Optional because not every caller proves Usenet: a diagnosis re-proving a
+    /// stored indexer has no provider to speak to and supplies none, while setup,
+    /// which may, supplies one. A `Usenet` credential with no transport is reported
+    /// unreachable rather than pretended proven.
+    nntp: Option<Arc<dyn Nntp>>,
 }
 
 impl Live {
-    /// A live validator reaching services over `http`.
+    /// A live validator reaching services over `http`, with no Usenet transport —
+    /// for a caller that proves only what HTTP answers.
     #[must_use]
     pub fn new(http: Arc<dyn Http>) -> Self {
-        Self { http }
+        Self { http, nntp: None }
+    }
+
+    /// The same, also able to prove a Usenet provider over `nntp`.
+    #[must_use]
+    pub fn with_nntp(http: Arc<dyn Http>, nntp: Arc<dyn Nntp>) -> Self {
+        Self {
+            http,
+            nntp: Some(nntp),
+        }
+    }
+
+    /// Prove a Usenet provider by opening a connection and asking it to accept a
+    /// login — the reply codes say whether it did. Where no NNTP transport was
+    /// supplied there is nothing to ask, so the credential is left unproven.
+    async fn usenet(
+        &self,
+        host: &str,
+        port: u16,
+        secure: bool,
+        user: &str,
+        pass: &str,
+    ) -> Validation {
+        let Some(nntp) = &self.nntp else {
+            return Validation::Unreachable {
+                detail: "no Usenet transport is configured to reach the provider".to_owned(),
+            };
+        };
+        let endpoint = Endpoint {
+            host: host.to_owned(),
+            port,
+            secure,
+        };
+        // AUTHINFO is a fixed two-step: the username, then the password. The
+        // provider's reply to the password is what says whether the login took.
+        let commands = vec![
+            format!("AUTHINFO USER {user}"),
+            format!("AUTHINFO PASS {pass}"),
+        ];
+        match nntp.converse(&endpoint, &commands).await {
+            Ok(replies) => interpret_usenet(&replies),
+            Err(unreachable) => Validation::Unreachable {
+                detail: unreachable.reason,
+            },
+        }
     }
 
     /// Prove an indexer by issuing a real search against it and reading what came
@@ -150,6 +217,13 @@ impl Validator for Live {
         match credential {
             Credential::Indexer { url, key } => self.indexer(url, key).await,
             Credential::Service { url, key } => self.service(url, key).await,
+            Credential::Usenet {
+                host,
+                port,
+                secure,
+                user,
+                pass,
+            } => self.usenet(host, *port, *secure, user, pass).await,
         }
     }
 }
@@ -176,6 +250,74 @@ fn interpret_service(status: u16, body: &str) -> Validation {
     }
     Validation::Unreachable {
         detail: format!("the service answered {status}, not as a reachable API — check the URL"),
+    }
+}
+
+/// Read a provider's replies to a login into an outcome.
+///
+/// The reply to the password is what decides it: accepted proves the login,
+/// refused is a wrong username or password, and a permission or connection-limit
+/// code is an account that authenticated but cannot serve right now. A greeting
+/// that already turned the connection away — the provider at its limit — is that
+/// same degraded case, told before the login was even reached. Too few replies to
+/// have finished the exchange leave it unreachable.
+fn interpret_usenet(replies: &[String]) -> Validation {
+    // A provider that turns the connection away at the greeting never reaches the
+    // login; its limit is the reason, not the credential.
+    if matches!(replies.first().and_then(|line| code(line)), Some(400 | 502)) {
+        return Validation::Degraded {
+            detail: "the provider is at its connection limit; try again shortly".to_owned(),
+        };
+    }
+    // The greeting, the reply to the username, then the reply to the password.
+    let Some(password_reply) = replies.get(2) else {
+        return Validation::Unreachable {
+            detail: "the provider did not complete the login exchange".to_owned(),
+        };
+    };
+    match code(password_reply) {
+        Some(AUTH_ACCEPTED) => Validation::Valid {
+            observed: "the provider accepted the login".to_owned(),
+        },
+        Some(AUTH_REJECTED | AUTH_OUT_OF_SEQUENCE) => Validation::Rejected {
+            detail: "the provider refused the username or password".to_owned(),
+        },
+        Some(NO_PERMISSION) => Validation::Degraded {
+            detail: "the provider accepted the account but would not serve it — usually its \
+                     connection limit"
+                .to_owned(),
+        },
+        Some(other) => Validation::Rejected {
+            detail: format!("the provider answered {other} to the login"),
+        },
+        None => Validation::Unreachable {
+            detail: "the provider did not answer the login in a way that could be read".to_owned(),
+        },
+    }
+}
+
+/// The NNTP reply code for an accepted authentication.
+const AUTH_ACCEPTED: u16 = 281;
+
+/// The code for a rejected authentication.
+const AUTH_REJECTED: u16 = 481;
+
+/// The code for an authentication command out of sequence — the login as a whole
+/// did not take, so it reads the same as a refusal to the operator.
+const AUTH_OUT_OF_SEQUENCE: u16 = 482;
+
+/// The code for a command the account is not permitted — on a login, an account
+/// that is known but cannot be served, typically at its connection limit.
+const NO_PERMISSION: u16 = 502;
+
+/// The three-digit status code an NNTP reply line begins with, where it begins
+/// with one — the only part of the line an outcome turns on.
+fn code(line: &str) -> Option<u16> {
+    let digits = line.get(0..3)?;
+    if digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        digits.parse().ok()
+    } else {
+        None
     }
 }
 
@@ -283,6 +425,7 @@ mod tests {
 
     use super::{Credential, Live, Validation, Validator};
     use crate::ports::http::{Http, Request, Response, Unreachable};
+    use crate::ports::nntp::{Endpoint, Nntp};
 
     /// An HTTP transport that answers every request the same scripted way — either
     /// a response, or nothing at all.
@@ -407,6 +550,158 @@ mod tests {
             url: "http://sonarr.test:8989/api/v3/system/status".to_owned(),
             key: "abc".to_owned(),
         }
+    }
+
+    /// An NNTP transport that answers `converse` with scripted reply lines, or
+    /// with nothing at all where the connection could not be made.
+    struct Dialogue(Result<Vec<String>, crate::ports::nntp::Unreachable>);
+
+    #[async_trait]
+    impl Nntp for Dialogue {
+        async fn converse(
+            &self,
+            _endpoint: &Endpoint,
+            _commands: &[String],
+        ) -> Result<Vec<String>, crate::ports::nntp::Unreachable> {
+            self.0.clone()
+        }
+    }
+
+    /// A validator that reaches Usenet through a transport scripted to reply with
+    /// `lines` (greeting, then a reply per command).
+    fn dialling(lines: &[&str]) -> Live {
+        let replies = lines.iter().map(|line| (*line).to_owned()).collect();
+        Live::with_nntp(
+            Arc::new(Canned(Ok(Response {
+                status: 200,
+                body: String::new(),
+            }))),
+            Arc::new(Dialogue(Ok(replies))),
+        )
+    }
+
+    /// The Usenet credential the tests prove; host and port are immaterial to a
+    /// scripted transport.
+    fn usenet() -> Credential {
+        Credential::Usenet {
+            host: "news.provider.test".to_owned(),
+            port: 563,
+            secure: true,
+            user: "person".to_owned(),
+            pass: "secret".to_owned(),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_provider_that_accepts_the_login_proves_the_account() {
+        // Greeting, reply to USER, then 281 accepted to PASS.
+        let outcome = dialling(&["200 welcome", "381 more", "281 authenticated"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Valid { observed } if observed.contains("accepted the login")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_provider_that_refuses_the_login_is_rejected() {
+        let outcome = dialling(&["200 welcome", "381 more", "481 authentication failed"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Rejected { detail } if detail.contains("username or password")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_provider_at_its_connection_limit_at_the_greeting_is_degraded() {
+        // 502 at the greeting turns the connection away before the login.
+        let outcome = dialling(&["502 too many connections"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Degraded { detail } if detail.contains("connection limit")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_login_refused_for_no_permission_is_degraded_not_a_wrong_password() {
+        let outcome = dialling(&["200 welcome", "381 more", "502 no permission"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Degraded { detail } if detail.contains("connection limit")
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_out_of_sequence_login_reads_as_a_refusal() {
+        let outcome = dialling(&["200 welcome", "381 more", "482 out of sequence"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(outcome, Validation::Rejected { .. }));
+    }
+
+    #[tokio::test]
+    async fn an_unexpected_login_code_is_refused_carrying_the_number() {
+        let outcome = dialling(&["200 welcome", "381 more", "400 service discontinued"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Rejected { detail } if detail.contains("400")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_login_reply_without_a_code_cannot_be_read() {
+        let outcome = dialling(&["200 welcome", "381 more", "not a coded line"])
+            .validate(&usenet())
+            .await;
+        assert!(matches!(outcome, Validation::Unreachable { .. }));
+    }
+
+    #[tokio::test]
+    async fn an_exchange_that_did_not_finish_is_unreachable() {
+        // Only a greeting came back — the login never completed.
+        let outcome = dialling(&["200 welcome"]).validate(&usenet()).await;
+        assert!(matches!(
+            outcome,
+            Validation::Unreachable { detail } if detail.contains("did not complete")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_provider_that_cannot_be_reached_is_unreachable() {
+        let live = Live::with_nntp(
+            Arc::new(Canned(Ok(Response {
+                status: 200,
+                body: String::new(),
+            }))),
+            Arc::new(Dialogue(Err(crate::ports::nntp::Unreachable {
+                host: "news.provider.test".to_owned(),
+                reason: "connection refused".to_owned(),
+            }))),
+        );
+        assert!(matches!(
+            live.validate(&usenet()).await,
+            Validation::Unreachable { detail } if detail.contains("connection refused")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_usenet_credential_with_no_transport_is_unproven_not_pretended() {
+        // The HTTP-only validator has no NNTP transport, so a Usenet credential
+        // cannot be proven — reported unreachable rather than passed.
+        let outcome = answering(String::new().as_str()).validate(&usenet()).await;
+        assert!(matches!(
+            outcome,
+            Validation::Unreachable { detail } if detail.contains("no Usenet transport")
+        ));
     }
 
     #[tokio::test]
