@@ -42,13 +42,19 @@ impl Prowlarr {
         }
     }
 
-    /// A request to a path under Prowlarr's `/api/v1`, carrying the key. The
-    /// version is the whole reason this is a client apart from the media \*arrs'.
+    /// A request to a path under Prowlarr's `/api/v1`, carrying the key — and,
+    /// where it has a JSON body, declaring it as such so Prowlarr binds it rather
+    /// than refusing it. The version is the whole reason this is a client apart
+    /// from the media \*arrs'.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
+        let mut headers = vec![(API_KEY_HEADER.to_owned(), self.key.clone())];
+        if body.is_some() {
+            headers.push(("Content-Type".to_owned(), "application/json".to_owned()));
+        }
         Request {
             method,
             url: self.endpoint.url(&format!("/api/v1{path}")),
-            headers: vec![(API_KEY_HEADER.to_owned(), self.key.clone())],
+            headers,
             body,
         }
     }

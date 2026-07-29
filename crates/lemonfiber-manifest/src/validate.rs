@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Date, Manifest, Protocol, Service};
+use crate::{ApiKind, Date, Manifest, Protocol, Service};
 
 /// Tags that move under you. A pin meaning "whatever is newest" is not a pin.
 const FLOATING_TAGS: &[&str] = &[
@@ -142,6 +142,7 @@ fn check_services(
             .chain(licensed(service, &osi))
             .chain(released(service, today))
             .chain(permitted(service))
+            .chain(versioned(service))
             .chain(depended(service, &of_service));
 
         let location = format!("service {}", service.id);
@@ -150,6 +151,18 @@ fn check_services(
             message,
         }));
     }
+}
+
+/// A Servarr-shape service names the version of the API its client speaks.
+///
+/// The shape spans two — Sonarr and Radarr at v3, Lidarr and Prowlarr at v1 — so
+/// the version cannot be assumed. A servarr service that omits it is a fault
+/// surfaced here, rather than one that silently drops the service from seeding
+/// and the doctor because it cannot be reached at a known path.
+fn versioned(service: &Service) -> Option<String> {
+    let api = service.api.as_ref()?;
+    (api.kind == ApiKind::Servarr && api.version.is_none())
+        .then(|| "has the servarr API shape but names no api.version".to_owned())
 }
 
 /// A service belongs to a profile the stack declares.
@@ -270,6 +283,21 @@ mod tests {
             Vec::new(),
             "the committed stack has no faults"
         );
+    }
+
+    #[test]
+    fn a_servarr_service_without_an_api_version_is_caught() {
+        // The servarr shape spans two API versions, so one omitting it cannot be
+        // reached at a known path; dropping the first version the stack records
+        // (Sonarr's v3) must be a surfaced fault, not a silent exclusion.
+        let text = edited(
+            r#"path = "/config/config.xml", version = 3 }"#,
+            r#"path = "/config/config.xml" }"#,
+        );
+        let caught = messages(&text)
+            .iter()
+            .any(|message| message.contains("names no api.version"));
+        assert!(caught);
     }
 
     #[test]

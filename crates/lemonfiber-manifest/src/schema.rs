@@ -235,6 +235,14 @@ pub struct Api {
     /// The file holding the credential, where one applies.
     #[serde(default)]
     pub path: Option<String>,
+    /// The major version of the service's HTTP API — the `/api/vN` path segment.
+    ///
+    /// Required for the `servarr` shape and read there, because that one shape
+    /// spans two versions (Sonarr and Radarr at v3, Lidarr and Prowlarr at v1),
+    /// so the version is data rather than a guess from a service's name. Absent
+    /// for the other kinds, whose one fixed version their client already knows.
+    #[serde(default)]
+    pub version: Option<u32>,
 }
 
 /// The API shapes lemonfiber knows how to speak.

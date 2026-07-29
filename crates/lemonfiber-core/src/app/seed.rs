@@ -142,8 +142,13 @@ async fn seed_root_folders(ctx: &Ctx, arr: &Arr) -> Vec<crate::seed::Wiring> {
             .collect();
     };
 
-    let client =
-        crate::servarr::Servarr::new(ctx.http.clone(), &arr.target.base, key, &arr.target.id);
+    let client = crate::servarr::Servarr::new(
+        ctx.http.clone(),
+        &arr.target.base,
+        key,
+        &arr.target.id,
+        arr.target.version,
+    );
     let mut journal = crate::journal::Journal::new();
     crate::seed::wire_root_folders(
         &client,
@@ -315,8 +320,13 @@ async fn wire_arr_download_clients(
             })
             .collect();
     };
-    let servarr =
-        crate::servarr::Servarr::new(ctx.http.clone(), &arr.target.base, key, &arr.target.id);
+    let servarr = crate::servarr::Servarr::new(
+        ctx.http.clone(),
+        &arr.target.base,
+        key,
+        &arr.target.id,
+        arr.target.version,
+    );
     let mut journal = crate::journal::Journal::new();
     crate::seed::wire_download_clients(
         &servarr,
@@ -417,6 +427,9 @@ fn prowlarr_source(
         if !service.media_types.is_empty() {
             return None;
         }
+        // The target's api version is required for it to resolve, but Prowlarr's
+        // own client fixes v1, so it is the config path here that is load-bearing,
+        // not the version the target carries.
         let target = target_for(service, project)?;
         let port = service.port?;
         Some(AppSyncSource {
@@ -707,12 +720,19 @@ mod tests {
         }
     }
 
-    /// A Servarr-shape API declaration naming the given key file, or none.
+    /// A Servarr-shape API declaration naming the given key file, or none, at the
+    /// v3 most tests need; the version-specific tests set their own.
     fn servarr_api(path: Option<&str>) -> lemonfiber_manifest::Api {
+        servarr_api_at(path, Some(3))
+    }
+
+    /// The same, at a given API version — `None` to omit it entirely.
+    fn servarr_api_at(path: Option<&str>, version: Option<u32>) -> lemonfiber_manifest::Api {
         lemonfiber_manifest::Api {
             kind: lemonfiber_manifest::ApiKind::Servarr,
             key_source: lemonfiber_manifest::KeySource::ConfigXml,
             path: path.map(str::to_owned),
+            version,
         }
     }
 
@@ -757,6 +777,7 @@ mod tests {
                     kind: lemonfiber_manifest::ApiKind::Sabnzbd,
                     key_source: lemonfiber_manifest::KeySource::ConfigIni,
                     path: Some("/config/sabnzbd.ini".to_owned()),
+                    version: None,
                 }),
                 Some(8080),
             ),
@@ -797,6 +818,7 @@ mod tests {
             kind: lemonfiber_manifest::ApiKind::Sabnzbd,
             key_source: lemonfiber_manifest::KeySource::ConfigIni,
             path: path.map(str::to_owned),
+            version: None,
         };
         let services = vec![
             manifest_service("jellyfin", None, Some(8096)),
@@ -1504,6 +1526,7 @@ mod tests {
             kind: lemonfiber_manifest::ApiKind::Seerr,
             key_source: lemonfiber_manifest::KeySource::ApiSettings,
             path: None,
+            version: None,
         }
     }
 
@@ -1516,6 +1539,7 @@ mod tests {
             kind: lemonfiber_manifest::ApiKind::Jellyfin,
             key_source: lemonfiber_manifest::KeySource::Generated,
             path: None,
+            version: None,
         }
     }
 
@@ -1653,5 +1677,38 @@ mod tests {
             identity.is_some_and(is_skipped),
             "an externally set-up Jellyfin leaves the identity for the household"
         );
+    }
+
+    #[test]
+    fn a_target_carries_the_servarr_api_version() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        // Sonarr answers at v3, Lidarr at v1: the version travels with the target
+        // rather than being assumed by the client.
+        let sonarr = manifest_service(
+            "sonarr",
+            Some(servarr_api_at(Some("/config/config.xml"), Some(3))),
+            Some(8989),
+        );
+        assert_eq!(
+            super::target_for(&sonarr, project).map(|target| target.version),
+            Some(3)
+        );
+        let lidarr = manifest_service(
+            "lidarr",
+            Some(servarr_api_at(Some("/config/config.xml"), Some(1))),
+            Some(8686),
+        );
+        assert_eq!(
+            super::target_for(&lidarr, project).map(|target| target.version),
+            Some(1)
+        );
+        // A servarr service that names no version cannot be reached at a known
+        // path, so it is no target rather than one guessed at the wrong version.
+        let versionless = manifest_service(
+            "sonarr",
+            Some(servarr_api_at(Some("/config/config.xml"), None)),
+            Some(8989),
+        );
+        assert!(super::target_for(&versionless, project).is_none());
     }
 }

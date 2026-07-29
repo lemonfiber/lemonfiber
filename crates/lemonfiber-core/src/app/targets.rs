@@ -52,10 +52,15 @@ pub(super) fn target_for(service: &lemonfiber_manifest::Service, project: &Path)
     }
     let port = service.port?;
     let inside_config = api.path.as_deref()?.strip_prefix("/config/")?;
+    // The Servarr shape spans two API versions, so the manifest carries it. A
+    // servarr service that names none cannot be reached at a known path, so it is
+    // no target rather than one guessed at the wrong version.
+    let version = api.version?;
     Some(Target {
         id: service.id.clone(),
         name: service.name.clone(),
         base: format!("http://127.0.0.1:{port}"),
         config: project.join("config").join(&service.id).join(inside_config),
+        version,
     })
 }

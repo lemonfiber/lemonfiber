@@ -28,35 +28,45 @@ const API_KEY_HEADER: &str = "X-Api-Key";
 
 /// A client for one Servarr-shape service.
 ///
-/// Holds the endpoint — the transport, the service's address and its name — and
-/// the key, which is the one thing the Servarr shape adds: a header on every
-/// request.
+/// Holds the endpoint — the transport, the service's address and its name — the
+/// key, which is the one thing the Servarr shape adds: a header on every request,
+/// and the API version, because the shape spans two of them.
 pub struct Servarr {
     endpoint: Endpoint,
     key: String,
+    version: u32,
 }
 
 impl Servarr {
-    /// A client for the service named `service`, reached at `base` with `key`.
+    /// A client for the service named `service`, reached at `base` with `key`,
+    /// speaking its API `version` — v3 for Sonarr and Radarr, v1 for Lidarr.
     #[must_use]
     pub fn new(
         http: Arc<dyn Http>,
         base: impl Into<String>,
         key: impl Into<String>,
         service: impl Into<String>,
+        version: u32,
     ) -> Self {
         Self {
             endpoint: Endpoint::new(http, base, service),
             key: key.into(),
+            version,
         }
     }
 
-    /// A request to a path under the service's versioned API, carrying the key.
+    /// A request to a path under the service's versioned API, carrying the key —
+    /// and, where it has a JSON body, declaring it as such so the service binds
+    /// it rather than refusing it.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
+        let mut headers = vec![(API_KEY_HEADER.to_owned(), self.key.clone())];
+        if body.is_some() {
+            headers.push(("Content-Type".to_owned(), "application/json".to_owned()));
+        }
         Request {
             method,
-            url: self.endpoint.url(&format!("/api/v3{path}")),
-            headers: vec![(API_KEY_HEADER.to_owned(), self.key.clone())],
+            url: self.endpoint.url(&format!("/api/v{}{path}", self.version)),
+            headers,
             body,
         }
     }
