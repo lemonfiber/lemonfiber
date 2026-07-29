@@ -78,6 +78,18 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Failure> {
     write(path, &file.render())
 }
 
+/// Remove a setting, restoring the file to not having it — what undoes an added
+/// key on a rolled-back apply.
+///
+/// # Errors
+///
+/// Returns [`Failure`] when the file cannot be read or written.
+pub fn unset(path: &Path, key: &str) -> Result<(), Failure> {
+    let mut file = read(path)?;
+    file.remove(key);
+    write(path, &file.render())
+}
+
 /// Write `text` to `path`, creating the directory for it where needed.
 ///
 /// The one place a small lemonfiber-owned file is put on disk, so the wizard's
@@ -210,7 +222,7 @@ impl Diagnose for Failure {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{is_secret, read, set, shown, Diagnose, Failure, REDACTED};
+    use super::{is_secret, read, set, shown, unset, Diagnose, Failure, REDACTED};
     use crate::config::env::EnvFile;
 
     fn scratch(name: &str) -> PathBuf {
@@ -235,6 +247,20 @@ mod tests {
                 .ok()
                 .and_then(|file| file.get("LEMONFIBER_USENET").map(ToOwned::to_owned)),
             Some("on".to_owned())
+        );
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
+    }
+
+    #[test]
+    fn unsetting_a_setting_removes_it_and_leaves_the_rest() {
+        let path = scratch("unset");
+        assert!(set(&path, "A", "1").is_ok());
+        assert!(set(&path, "B", "2").is_ok());
+        assert!(unset(&path, "A").is_ok());
+
+        assert_eq!(
+            std::fs::read_to_string(&path).ok().as_deref(),
+            Some("B=2\n")
         );
         let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
     }
