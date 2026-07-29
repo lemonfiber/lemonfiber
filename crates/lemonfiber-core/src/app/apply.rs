@@ -17,11 +17,11 @@
 //! making each write atomic — a temporary file renamed over the target — is a
 //! hardening the shared writer will grow, and is called out where it bites.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
-use crate::journal::Journal;
+use crate::journal::{Change, Journal, Kind};
 use crate::wizard::{Phase, Wizard};
 
 /// Write a reviewed setup's configuration to disk, driving the lifecycle and
@@ -54,7 +54,40 @@ pub fn apply(
     // Every file failure is boxed as one problem on the way out, because a
     // `Problem` is large beside the `()` this returns on success — so the writes
     // themselves stay a plain sequence, each stopping the rest.
-    write(wizard, env_file, progress, journal, stamp).map_err(|err| Box::new(err.problem()))
+    write(wizard, env_file, progress, journal, stamp).map_err(|fault| Box::new(fault.problem()))
+}
+
+/// A failure part-way through applying, named finely enough to remedy: a file the
+/// config store could not read or write, or a data directory that could not be
+/// made. Carried so the one boxing site above turns whichever it was into a
+/// problem, rather than each write growing its own.
+enum Fault {
+    /// A configuration, progress, or journal file could not be read or written.
+    Store(store::Failure),
+    /// The operator's chosen data directory could not be created.
+    DirNotMade {
+        /// The directory that could not be made.
+        path: PathBuf,
+        /// The operating system's own words.
+        reason: String,
+    },
+}
+
+impl Fault {
+    /// The problem to report, in the words that fit what actually failed.
+    fn problem(&self) -> Problem {
+        match self {
+            Self::Store(failure) => failure.problem(),
+            Self::DirNotMade { path, reason } => Problem::new(
+                DIR_NOT_MADE,
+                Severity::Error,
+                "The data directory could not be created",
+                "lemonfiber makes the directory the library and downloads live under before it starts anything. Setup has stopped, and the next run recovers it.",
+                Remedy::new("Check the location is on a writable disk and try again"),
+            )
+            .with_detail(format!("{}: {reason}", path.display())),
+        }
+    }
 }
 
 /// Perform the writes of an apply, stopping at the first that fails.
@@ -68,28 +101,51 @@ fn write(
     progress: &Path,
     journal: &Path,
     stamp: &str,
-) -> Result<(), store::Failure> {
-    store::write(progress, &rendered(wizard))?;
+) -> Result<(), Fault> {
+    store::write(progress, &rendered(wizard)).map_err(Fault::Store)?;
 
     // The whole plan is diffed against the file as it stands before any write, so
     // every recorded `previous` is what was really there. The plan's keys are all
     // distinct, so no write moves a `previous` out from under a later one.
-    let before = store::read(env_file)?;
+    let before = store::read(env_file).map_err(Fault::Store)?;
     let plan = wizard.plan();
     let changes = plan.changes(&before, stamp);
+
+    let mut log = Journal::new();
+
+    // The library and downloads live under the operator's chosen location, so it
+    // must exist before anything mounts it — but only where it does not already.
+    // A location that is already there is the operator's own (a library to adopt),
+    // left untouched and unrecorded, so unwinding never removes it. The chosen
+    // location is iterated rather than matched, so a reviewed wizard that always
+    // has one needs no unreachable "no location" branch.
+    for root in data_root(wizard).into_iter().filter(|root| !root.exists()) {
+        // Making the leaf makes every missing ancestor with it, so each one is
+        // recorded — parent before child, to be unwound child-first — and none
+        // lemonfiber creates is left without a way back. Journalled before the
+        // directories are made, so a stop between records paths that may not exist
+        // yet, whose removal is a harmless no-op.
+        for ancestor in made_by(&root) {
+            log.record(made(&ancestor, stamp));
+        }
+        store::write(journal, &lines(&log)).map_err(Fault::Store)?;
+        std::fs::create_dir_all(&root).map_err(|err| Fault::DirNotMade {
+            path: root,
+            reason: err.to_string(),
+        })?;
+    }
 
     // `changes` is one entry per setting in the same order, so each pairs with the
     // key and value it was built from; they are two views of the same list, walked
     // together.
-    let mut log = Journal::new();
     for (change, (key, value)) in changes.into_iter().zip(plan.settings()) {
         // Journalled before it is written: a run that dies between the two leaves a
         // record of a change that may not have landed, and undoing that restores
         // what was already there — harmless. The reverse would leave a real write
         // with nothing to unwind it.
         log.record(change);
-        store::write(journal, &lines(&log))?;
-        store::set(env_file, key, value)?;
+        store::write(journal, &lines(&log)).map_err(Fault::Store)?;
+        store::set(env_file, key, value).map_err(Fault::Store)?;
     }
 
     // The applied marker lands only after every setting is on disk, so a stop
@@ -97,7 +153,41 @@ fn write(
     // an incomplete one — the next run treats that as a failed apply and offers to
     // resume, which keeps the writes, rather than trusting a half-written stack.
     wizard.transition(Phase::Applied);
-    store::write(progress, &rendered(wizard))
+    store::write(progress, &rendered(wizard)).map_err(Fault::Store)
+}
+
+/// The data location the operator chose, where they chose one.
+fn data_root(wizard: &Wizard) -> Option<PathBuf> {
+    wizard.answers().data_location.clone()
+}
+
+/// The directories creating `root` will make: every ancestor from the first that
+/// is missing down to `root`, parent before child.
+///
+/// `create_dir_all` makes the whole missing chain, not just the leaf, so all of it
+/// is what a reversal must remove. Ordered parent-first here, it is recorded that
+/// way and so unwound child-first. `root` is known not to exist when this is
+/// called, so the walk always yields at least it.
+fn made_by(root: &Path) -> Vec<PathBuf> {
+    let mut making = Vec::new();
+    let mut here = Some(root);
+    while let Some(path) = here.filter(|path| !path.exists()) {
+        making.push(path.to_path_buf());
+        here = path.parent();
+    }
+    making.reverse();
+    making
+}
+
+/// The journal entry for a directory apply created, so it can be removed again.
+fn made(path: &Path, stamp: &str) -> Change {
+    let path = path.display().to_string();
+    Change {
+        at: stamp.to_owned(),
+        operation: "apply".to_owned(),
+        target: path.clone(),
+        kind: Kind::Made { path },
+    }
 }
 
 /// The wizard's progress as the single JSON object the recovery frame reads back.
@@ -123,6 +213,9 @@ fn lines(journal: &Journal) -> String {
 
 /// Raised when apply is asked for before the answers have been reviewed.
 pub const NOT_REVIEWED: Code = Code::new("SETUP-1");
+
+/// Raised when the operator's chosen data directory cannot be created.
+pub const DIR_NOT_MADE: Code = Code::new("SETUP-2");
 
 /// The problem of applying before review — nothing is settled to write.
 fn not_reviewed() -> Problem {
@@ -162,6 +255,18 @@ mod tests {
         }
     }
 
+    /// A journal line for a directory apply created, pinned to the path stated
+    /// here.
+    fn made_dir(path: &Path) -> Change {
+        let path = path.display().to_string();
+        Change {
+            at: "t".to_owned(),
+            operation: "apply".to_owned(),
+            target: path.clone(),
+            kind: Kind::Made { path },
+        }
+    }
+
     /// The journal text those changes serialise to, one object per line.
     fn journal_text(changes: &[Change]) -> String {
         changes
@@ -190,14 +295,15 @@ mod tests {
     }
 
     /// A wizard on native Linux with every applicable question answered, moved to
-    /// review — the state apply expects.
-    fn reviewed() -> Wizard {
+    /// review — the state apply expects. The data location is given so the test
+    /// controls whether it already exists.
+    fn reviewed(data_root: &Path) -> Wizard {
         let mut wizard = Wizard::new(Environment::LinuxNative);
         wizard
             .answer(Answer::Protocols(Protocols::both()))
             .unwrap_or(());
         wizard
-            .answer(Answer::DataLocation(PathBuf::from("/srv/media")))
+            .answer(Answer::DataLocation(data_root.to_path_buf()))
             .unwrap_or(());
         wizard
             .answer(Answer::ServiceUser(Some((1000, 1000))))
@@ -212,17 +318,23 @@ mod tests {
     }
 
     #[test]
-    fn applying_writes_the_settings_and_finishes_applied() {
+    fn applying_writes_the_settings_makes_the_data_directory_and_finishes_applied() {
         let dir = scratch("applied");
         let (env, progress, journal) = paths(&dir);
-        let mut wizard = reviewed();
+        let root = dir.join("data");
+        let mut wizard = reviewed(&root);
 
         assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
 
-        // The settings the plan named are on disk, and the wizard finished applied.
+        // The settings the plan named are on disk, the data directory was created,
+        // and the wizard finished applied.
         let file = store::read(&env).unwrap_or_default();
         assert_eq!(file.get("LEMONFIBER_USENET"), Some("on"));
-        assert_eq!(file.get("DATA_ROOT"), Some("/srv/media"));
+        assert_eq!(
+            file.get("DATA_ROOT"),
+            Some(root.display().to_string().as_str())
+        );
+        assert!(root.is_dir(), "the data directory was made");
         assert_eq!(wizard.phase(), Phase::Applied);
     }
 
@@ -230,7 +342,7 @@ mod tests {
     fn the_applied_marker_reaches_disk_so_a_later_run_reads_it() {
         let dir = scratch("marker");
         let (env, progress, journal) = paths(&dir);
-        let mut wizard = reviewed();
+        let mut wizard = reviewed(&dir.join("data"));
 
         assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
 
@@ -242,25 +354,108 @@ mod tests {
     fn every_write_is_journalled_so_it_can_be_unwound() {
         let dir = scratch("journal");
         let (env, progress, journal) = paths(&dir);
-        let mut wizard = reviewed();
+        let root = dir.join("data");
+        let mut wizard = reviewed(&root);
 
         assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
 
-        // The journal on disk is one Set per setting, in plan order, each over a
-        // fresh file so nothing is there to restore — pinned to keys and values
-        // stated here, not to a recomputation of what apply wrote, so a wrong key
-        // or a dropped setting would be caught.
+        // The journal on disk is the data directory made, then one Set per setting
+        // in plan order over a fresh file — pinned to what should land, not to a
+        // recomputation of what apply wrote, so a wrong key, a dropped setting, or a
+        // missing directory record would be caught.
+        let root_shown = root.display().to_string();
         let written = std::fs::read_to_string(&journal).unwrap_or_default();
         assert_eq!(
             written,
             journal_text(&[
+                made_dir(&root),
                 fresh_write("LEMONFIBER_USENET", "on"),
                 fresh_write("LEMONFIBER_TORRENT", "on"),
-                fresh_write("DATA_ROOT", "/srv/media"),
+                fresh_write("DATA_ROOT", &root_shown),
                 fresh_write("PUID", "1000"),
                 fresh_write("PGID", "1000"),
                 fresh_write("JELLYFIN_MODE", "docker"),
             ]),
+        );
+    }
+
+    #[test]
+    fn a_data_directory_several_levels_deep_records_every_directory_it_makes() {
+        let dir = scratch("deep");
+        let (env, progress, journal) = paths(&dir);
+        // A parent and its child are both absent, so both must be made and both
+        // recorded — parent's line first — or a roll back would strand the parent.
+        let parent = dir.join("library-root");
+        let root = parent.join("data");
+        let mut wizard = reviewed(&root);
+
+        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
+
+        assert!(root.is_dir(), "the leaf was made");
+        let root_shown = root.display().to_string();
+        let written = std::fs::read_to_string(&journal).unwrap_or_default();
+        assert_eq!(
+            written,
+            journal_text(&[
+                made_dir(&parent),
+                made_dir(&root),
+                fresh_write("LEMONFIBER_USENET", "on"),
+                fresh_write("LEMONFIBER_TORRENT", "on"),
+                fresh_write("DATA_ROOT", &root_shown),
+                fresh_write("PUID", "1000"),
+                fresh_write("PGID", "1000"),
+                fresh_write("JELLYFIN_MODE", "docker"),
+            ]),
+        );
+    }
+
+    #[test]
+    fn an_existing_data_directory_is_left_alone_and_not_journalled() {
+        let dir = scratch("adopt");
+        let (env, progress, journal) = paths(&dir);
+        // The location is already there — the operator's own library to adopt. It
+        // must not be recorded as made, so unwinding never removes it.
+        let root = dir.join("existing-library");
+        assert!(std::fs::create_dir_all(&root).is_ok(), "the library exists");
+        let mut wizard = reviewed(&root);
+
+        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
+
+        let written = std::fs::read_to_string(&journal).unwrap_or_default();
+        assert!(
+            !written.contains("\"made\""),
+            "an existing directory is not recorded as made: {written}",
+        );
+        assert!(root.is_dir(), "and it is still there");
+    }
+
+    #[test]
+    fn a_data_directory_that_cannot_be_made_stops_the_apply() {
+        let dir = scratch("undir");
+        let (env, progress, journal) = paths(&dir);
+        // A file stands where the data directory's parent would be, so creating the
+        // directory under it cannot succeed.
+        let blocker = dir.join("a-file");
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        assert!(std::fs::write(&blocker, "").is_ok(), "the blocking file");
+        let root = blocker.join("data");
+        let mut wizard = reviewed(&root);
+
+        let stopped = apply(&mut wizard, &env, &progress, &journal, "t");
+
+        assert!(matches!(stopped, Err(problem) if problem.code == super::DIR_NOT_MADE));
+        let marker = std::fs::read_to_string(&progress).unwrap_or_default();
+        assert!(
+            marker.contains("\"applying\""),
+            "left mid-apply for recovery"
+        );
+        // The directory was journalled as made before the attempt that failed, so
+        // recovery reads a record for it — removing a path that was not created is
+        // a harmless no-op.
+        let written = std::fs::read_to_string(&journal).unwrap_or_default();
+        assert!(
+            written.contains("\"made\""),
+            "the attempt was recorded: {written}"
         );
     }
 
@@ -283,8 +478,8 @@ mod tests {
     fn a_stop_partway_through_the_writes_leaves_the_applying_marker_for_recovery() {
         let dir = scratch("interrupted");
         let (env, progress, _) = paths(&dir);
-        // Obstruct the journal path with a directory, so the first change fails to
-        // journal — a stop in the middle of applying, after the applying marker is
+        // Obstruct the journal path with a directory, so the first journal write
+        // fails — a stop in the middle of applying, after the applying marker is
         // down but before any setting lands. The recovery-critical property is that
         // the marker reached disk first, so the next run reads a failed apply rather
         // than mistaking a half-done setup for a finished one.
@@ -293,12 +488,14 @@ mod tests {
             std::fs::create_dir_all(&journal).is_ok(),
             "obstructing directory"
         );
-        let mut wizard = reviewed();
+        let root = dir.join("data");
+        let mut wizard = reviewed(&root);
 
         assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_err());
 
         let marker = std::fs::read_to_string(&progress).unwrap_or_default();
         assert!(marker.contains("\"applying\""), "left mid-apply: {marker}");
         assert!(!env.exists(), "no setting was written before the stop");
+        assert!(!root.exists(), "the directory was not made before the stop");
     }
 }
