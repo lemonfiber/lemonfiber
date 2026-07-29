@@ -11,6 +11,22 @@ use std::sync::Arc;
 use crate::ports::http::{Http, Request, Response};
 use crate::ports::service::Failure;
 
+/// The header a Servarr-shape service authenticates with — Sonarr, Radarr,
+/// Lidarr and Prowlarr all read the key from it, and the setup validator sends
+/// it the same way, so its name is written once.
+pub(crate) const API_KEY_HEADER: &str = "X-Api-Key";
+
+/// The media type a JSON request declares, so a service binds the body rather
+/// than refusing it.
+const JSON: &str = "application/json";
+
+/// The `Content-Type` header a JSON request carries: present only where the
+/// request has a body, absent on a bodiless GET. Returned as an `Option` so a
+/// caller folds it into its header list with `extend`.
+pub(crate) fn json_content_type(body: Option<&String>) -> Option<(String, String)> {
+    body.map(|_| ("Content-Type".to_owned(), JSON.to_owned()))
+}
+
 /// A service reached over the HTTP port: where it is, and what to call it when
 /// something goes wrong.
 pub(crate) struct Endpoint {
@@ -75,6 +91,18 @@ impl Endpoint {
         Failure::Refused {
             service: self.service.clone(),
             detail: detail.to_owned(),
+        }
+    }
+
+    /// Nothing when the response succeeded, the refusal a non-success status
+    /// amounts to otherwise — the answer to "did it take?" for a call whose body
+    /// the caller discards. Used with `?` it also serves as a guard partway
+    /// through a longer exchange.
+    pub(crate) fn expect_success(&self, response: &Response) -> Result<(), Failure> {
+        if response.is_success() {
+            Ok(())
+        } else {
+            Err(self.refusal(response))
         }
     }
 

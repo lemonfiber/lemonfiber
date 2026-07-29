@@ -103,9 +103,7 @@ impl Qbittorrent {
         let preferences = serde_json::json!({ "web_ui_password": new }).to_string();
         let request = self.post("/app/setPreferences", &[("json", &preferences)]);
         let response = self.endpoint.send(&request).await?;
-        if !response.is_success() {
-            return Err(self.endpoint.refusal(&response));
-        }
+        self.endpoint.expect_success(&response)?;
 
         self.login(new).await
     }

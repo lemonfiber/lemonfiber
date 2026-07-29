@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::Endpoint;
+use crate::endpoint::{json_content_type, Endpoint};
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{Failure, Requests};
 
@@ -43,23 +43,12 @@ impl Seerr {
     /// such, because Seerr's framework only parses a body it is told is JSON and
     /// silently drops one it is not.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        let headers = json_headers(body.as_ref());
         Request {
             method,
             url: self.endpoint.url(&format!("/api/v1{path}")),
-            headers,
+            headers: json_content_type(body.as_ref()).into_iter().collect(),
             body,
         }
-    }
-}
-
-/// The `Content-Type` a request carries: JSON where it has a body, nothing where
-/// it does not.
-fn json_headers(body: Option<&String>) -> Vec<(String, String)> {
-    if body.is_some() {
-        vec![("Content-Type".to_owned(), "application/json".to_owned())]
-    } else {
-        Vec::new()
     }
 }
 
@@ -104,9 +93,7 @@ impl Requests for Seerr {
             .endpoint
             .send(&self.request(Method::Post, "/auth/jellyfin", Some(body)))
             .await?;
-        if !signed_in.is_success() {
-            return Err(self.endpoint.refusal(&signed_in));
-        }
+        self.endpoint.expect_success(&signed_in)?;
 
         // Finishing setup is the step that marks Seerr initialised. The session
         // cookie the sign-in set, carried by the transport, is what authorises it.
@@ -114,10 +101,6 @@ impl Requests for Seerr {
             .endpoint
             .send(&self.request(Method::Post, "/settings/initialize", None))
             .await?;
-        if finished.is_success() {
-            Ok(())
-        } else {
-            Err(self.endpoint.refusal(&finished))
-        }
+        self.endpoint.expect_success(&finished)
     }
 }
