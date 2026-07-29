@@ -54,6 +54,7 @@ pub mod stack;
 pub mod storage;
 #[cfg(test)]
 mod test_support;
+pub mod validate;
 pub mod wizard;
 
 /// The name of the product, as it appears to users.
