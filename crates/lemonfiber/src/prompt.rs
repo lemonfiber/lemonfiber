@@ -146,9 +146,9 @@ impl Prompt for Terminal {
         if url.is_empty() {
             return None;
         }
-        // Setup never prints the key back — the review redacts it, and only the
-        // outcome of testing it reaches the screen.
-        let key = ask("Indexer API key:");
+        // Read without echo and never printed back — the review redacts it, so the
+        // key reaches neither the screen as it is typed nor the summary after.
+        let key = ask_secret("Indexer API key:");
         Some((url, key))
     }
 
@@ -189,9 +189,8 @@ impl Prompt for Terminal {
         // must not cross the wire in the clear.
         let port = ask("Port [563]:").parse().unwrap_or(563);
         let user = ask("Username:");
-        // Setup never prints the password back — the review redacts it, and only
-        // the test's outcome reaches the screen.
-        let pass = ask("Password:");
+        // Read without echo and never printed back — the review redacts it.
+        let pass = ask_secret("Password:");
         let tls = yes_no("Connect over TLS?", true);
         Some(ProviderEntry {
             host,
@@ -272,6 +271,19 @@ fn yes_no(question: &str, default: bool) -> bool {
     }
 }
 
+/// Read a secret without echoing it, its surrounding whitespace trimmed.
+///
+/// A password shown as it is typed reaches scrollback and any shoulder or screen
+/// recording, so it is read with the terminal's echo suppressed. The trim is the
+/// same the other fields get: a pasted key's stray newline is the common error,
+/// and removing it serves the operator.
+fn ask_secret(prompt: &str) -> String {
+    rpassword::prompt_password(format!("{prompt} "))
+        .unwrap_or_default()
+        .trim()
+        .to_owned()
+}
+
 /// Read a `UID:GID` pair, or nothing where it is blank or malformed.
 fn parse_ids(answer: &str) -> Option<(u32, u32)> {
     let (uid, gid) = answer.split_once(':')?;
@@ -290,6 +302,7 @@ pub struct SetupFlags {
     protocols: Option<Protocols>,
     data_location: Option<PathBuf>,
     indexer: Option<(String, String)>,
+    provider: Option<ProviderEntry>,
     service_user: Option<(u32, u32)>,
     library: Option<Library>,
     household: Option<bool>,
@@ -297,7 +310,7 @@ pub struct SetupFlags {
 }
 
 /// The setup flags exactly as the command line gives them, before they are typed
-/// and checked — a plain carrier so the parse is one argument, not nine.
+/// and checked — a plain carrier so the parse is one argument, not a dozen.
 pub struct RawSetup {
     /// `--yes`: standing consent to apply without a prompt.
     pub yes: bool,
@@ -309,6 +322,16 @@ pub struct RawSetup {
     pub indexer_url: Option<String>,
     /// `--indexer-key`.
     pub indexer_key: Option<String>,
+    /// `--usenet-host`.
+    pub usenet_host: Option<String>,
+    /// `--usenet-port`.
+    pub usenet_port: Option<u16>,
+    /// `--usenet-user`.
+    pub usenet_user: Option<String>,
+    /// `--usenet-pass`.
+    pub usenet_pass: Option<String>,
+    /// `--usenet-tls`.
+    pub usenet_tls: Option<bool>,
     /// `--library`.
     pub library: Option<String>,
     /// `--service-user`.
@@ -329,6 +352,7 @@ impl SetupFlags {
             protocols: None,
             data_location: None,
             indexer: None,
+            provider: None,
             service_user: None,
             library: None,
             household: None,
@@ -355,6 +379,23 @@ impl SetupFlags {
                     return Err(
                         "an indexer needs both --indexer-url and --indexer-key, or neither".into(),
                     )
+                }
+            },
+            provider: match (raw.usenet_host, raw.usenet_user, raw.usenet_pass) {
+                (Some(host), Some(user), Some(pass)) => Some(ProviderEntry {
+                    host,
+                    // 563 is the standard TLS port, and TLS the default, since the
+                    // password must not cross the wire in the clear.
+                    port: raw.usenet_port.unwrap_or(563),
+                    user,
+                    pass,
+                    tls: raw.usenet_tls.unwrap_or(true),
+                }),
+                (None, None, None) => None,
+                _ => {
+                    return Err("a Usenet provider needs --usenet-host, --usenet-user and \
+                                --usenet-pass together, or none"
+                        .into())
                 }
             },
             service_user: raw
@@ -464,10 +505,8 @@ impl Prompt for Flags {
             CredentialChoice::Skip
         }
     }
-    // A Usenet provider is optional (an unset one is a supported end), so a flag
-    // run leaves it unset for now; configuring it from flags is a later addition.
     fn usenet_provider(&self) -> Option<ProviderEntry> {
-        None
+        self.flags.provider.clone()
     }
     fn service_user(&self) -> Option<(u32, u32)> {
         self.flags.service_user
@@ -519,9 +558,11 @@ fn parse_library(value: &str) -> Result<Library, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{RawSetup, SetupFlags};
+    use super::{Flags, RawSetup, SetupFlags};
+    use lemonfiber_core::app::setup::{Prompt, ProviderEntry};
     use lemonfiber_core::platform::Environment;
     use lemonfiber_core::wizard::Wizard;
+    use std::path::PathBuf;
 
     /// A macOS wizard, where the container-user step does not apply, so the
     /// required set is the questions that do.
@@ -537,6 +578,11 @@ mod tests {
             data_location: None,
             indexer_url: None,
             indexer_key: None,
+            usenet_host: None,
+            usenet_port: None,
+            usenet_user: None,
+            usenet_pass: None,
+            usenet_tls: None,
             library: None,
             service_user: None,
             household: None,
@@ -613,5 +659,32 @@ mod tests {
             ..raw()
         };
         assert!(SetupFlags::parse(half_indexer).is_err());
+
+        // Half a provider is refused too: host with no login.
+        let half_provider = RawSetup {
+            usenet_host: Some("news.test".to_owned()),
+            ..raw()
+        };
+        assert!(SetupFlags::parse(half_provider).is_err());
+    }
+
+    #[test]
+    fn a_complete_provider_flag_set_is_offered_to_the_wizard() {
+        let complete = RawSetup {
+            usenet_host: Some("news.test".to_owned()),
+            usenet_user: Some("person".to_owned()),
+            usenet_pass: Some("secret".to_owned()),
+            ..raw()
+        };
+        let flags = SetupFlags::parse(complete)
+            .ok()
+            .unwrap_or_else(SetupFlags::none);
+        // The flag run answers the provider question from the flags, defaulting the
+        // port to the TLS standard and TLS to on.
+        let entry = Flags::new(flags, PathBuf::from("/tmp")).usenet_provider();
+        assert!(matches!(
+            entry,
+            Some(ProviderEntry { host, port, tls, .. }) if host == "news.test" && port == 563 && tls
+        ));
     }
 }

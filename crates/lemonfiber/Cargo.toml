@@ -26,6 +26,9 @@ tokio = { workspace = true, features = ["rt-multi-thread", "net", "io-util", "ti
 # static musl release stays free of a system TLS library. Bundled Mozilla roots,
 # for the same reason: a static binary carries its own trust anchors.
 async-trait = { workspace = true }
+# Reading a secret without echoing it needs raw-terminal control, which this
+# workspace forbids doing directly (`unsafe_code = "forbid"`); rpassword wraps it.
+rpassword = "7"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 rustls-pki-types = "1"
