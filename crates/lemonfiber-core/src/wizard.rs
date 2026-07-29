@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::{
     Protocols, DATA_ROOT_KEY, JELLYFIN_MODE_KEY, PGID_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
 };
+use crate::journal::{Change, Journal, Undo};
 use crate::platform::Environment;
 
 /// How the operator wants their existing and downloaded media served, where they
@@ -193,6 +194,28 @@ pub enum Rejected {
     ServiceUserNotApplicable,
 }
 
+/// Where an in-flight or finished setup stands in its lifecycle.
+///
+/// The persisted marker a later run reads to tell answers still being gathered
+/// from a half-written apply. Only these four are ever written: the two states a
+/// run infers instead of storing — no setup at all, and an apply that stopped
+/// mid-write — are read off the world rather than trusted from a file (see
+/// [`Status`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Phase {
+    /// Still gathering answers. Resumable, and nothing has touched disk.
+    #[default]
+    InProgress,
+    /// Every applicable question answered, awaiting the operator's confirmation.
+    Reviewing,
+    /// Writing configuration and starting services — the one non-atomic phase,
+    /// and so the only marker whose persistence signals an interrupted run.
+    Applying,
+    /// Configuration written and valid.
+    Applied,
+}
+
 /// The part of the wizard that survives quitting: the step reached and the
 /// answers gathered.
 ///
@@ -205,6 +228,12 @@ pub struct Progress {
     pub at: Step,
     /// What they had answered.
     pub answers: Answers,
+    /// Where this setup stands in its lifecycle, so a later run can tell a
+    /// half-written apply from answers still being gathered. Missing from
+    /// progress files written before it was tracked, which read back as the
+    /// gathering phase — the state those files were only ever left in.
+    #[serde(default)]
+    pub phase: Phase,
 }
 
 /// The setup wizard: where the operator is, what they have answered, and the
@@ -476,12 +505,135 @@ pub const fn offer_setup(configuration_present: bool) -> bool {
     !configuration_present
 }
 
+/// What a later run makes of the setup it finds — the whole lifecycle, read from
+/// the world rather than trusted from a file.
+///
+/// Two of these are inferred rather than stored. No saved progress at all is
+/// `Absent`; a saved progress still marked applying is `FailedApply`, because the
+/// only thing that writes the applying marker is a live apply, so finding it
+/// persisted means that apply stopped before it finished. Every other state is
+/// its marker read straight back.
+///
+/// A surface must consult this before it decides whether to offer setup or resume
+/// a run: `FailedApply` takes precedence over both. An interrupted apply that got
+/// as far as writing configuration looks "already configured" to a naive check,
+/// and its half-written state must be recovered rather than mistaken for a
+/// finished one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    /// No setup has been started; the wizard is offered.
+    Absent,
+    /// Setup is part-answered and resumable.
+    InProgress,
+    /// Answers are complete and awaiting confirmation.
+    Reviewing,
+    /// Setup finished and configuration is on disk.
+    Applied,
+    /// An apply was interrupted and must be recovered before setup goes on.
+    FailedApply,
+}
+
+impl Status {
+    /// Classify the setup a run finds from its saved progress, if any.
+    ///
+    /// No progress read back is `Absent`. A saved applying marker is the
+    /// interrupted case, surfaced as `FailedApply` for deliberate recovery rather
+    /// than resumed as if nothing had gone wrong.
+    #[must_use]
+    pub const fn of(progress: Option<&Progress>) -> Self {
+        match progress {
+            None => Self::Absent,
+            Some(progress) => match progress.phase {
+                Phase::InProgress => Self::InProgress,
+                Phase::Reviewing => Self::Reviewing,
+                Phase::Applying => Self::FailedApply,
+                Phase::Applied => Self::Applied,
+            },
+        }
+    }
+}
+
+/// What to do about an interrupted apply, once one is found.
+///
+/// The three exits the setup wizard promises for its one dangerous state: keep
+/// going, walk it back, or drop it entirely. A surface offers these; [`Recovery`]
+/// turns the chosen one into the work it means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Choice {
+    /// Carry on from where apply stopped, keeping what was already written.
+    Resume,
+    /// Undo what was written and return to the reviewed answers, ready to apply
+    /// again.
+    RollBack,
+    /// Undo what was written and discard the answers too, back to a clean slate.
+    StartOver,
+}
+
+/// The recovery offered for an interrupted apply: what it wrote, and what each
+/// choice does about it.
+///
+/// Built from the change journal — the record of what apply managed to write
+/// before it stopped — so the operator is shown the real partial state, not a
+/// guess, and a reversal touches exactly what was recorded. Only recorded changes
+/// can be reversed: whatever apply writes and wants undone, it must journal.
+#[derive(Debug)]
+pub struct Recovery<'a> {
+    written: &'a Journal,
+}
+
+impl<'a> Recovery<'a> {
+    /// The recovery for an apply that stopped after writing what `written` holds.
+    #[must_use]
+    pub const fn of(written: &'a Journal) -> Self {
+        Self { written }
+    }
+
+    /// What the interrupted apply wrote, in the order it wrote it — the partial
+    /// state to report before a choice is offered.
+    #[must_use]
+    pub fn written(&self) -> &[Change] {
+        self.written.changes()
+    }
+
+    /// The concrete work a choice resolves to, for a surface to carry out.
+    ///
+    /// Both walking back and starting over reverse what was written — the one
+    /// difference is whether the answers survive, so neither leaves the partial
+    /// apply stranded on disk. The reversal is computed here, so the whole of it
+    /// stays testable without a service or a disk.
+    #[must_use]
+    pub fn resolve(&self, choice: Choice) -> Resolution {
+        match choice {
+            Choice::Resume => Resolution::Resume,
+            Choice::RollBack => Resolution::RollBack(self.written.rewind()),
+            Choice::StartOver => Resolution::StartOver(self.written.rewind()),
+        }
+    }
+}
+
+/// The work a [`Choice`] resolves to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Resolution {
+    /// Continue the apply, keeping every write already made.
+    Resume,
+    /// Reverse the recorded writes, most recent first, keeping the answers so the
+    /// apply can be reviewed and run again.
+    RollBack(Vec<Undo>),
+    /// Reverse the recorded writes, then discard the saved progress and journal —
+    /// nothing of this attempt left behind.
+    StartOver(Vec<Undo>),
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use super::{offer_setup, Answer, Library, Progress, Step, Wizard};
+    use super::{
+        offer_setup, Answer, Choice, Library, Phase, Progress, Recovery, Resolution, Status, Step,
+        Wizard,
+    };
     use crate::config::Protocols;
+    use crate::journal::{Action, Change, Journal, Kind, Undo};
     use crate::platform::Environment;
 
     /// A wizard on a platform where every step applies (native Linux asks for the
@@ -866,5 +1018,150 @@ mod tests {
         let mut none = on_native_linux();
         none.answer(Answer::Library(Library::None)).unwrap_or(());
         assert_eq!(setting(&none.plan(), "JELLYFIN_MODE"), None);
+    }
+
+    /// A saved progress sitting at a given lifecycle phase.
+    fn saved_at(phase: Phase) -> Progress {
+        Progress {
+            phase,
+            ..Progress::default()
+        }
+    }
+
+    /// One `.env` write an apply made: a new key, with nothing there before.
+    fn wrote(key: &str, value: &str) -> Change {
+        Change {
+            at: "t".to_owned(),
+            operation: "apply".to_owned(),
+            target: ".env".to_owned(),
+            kind: Kind::Set {
+                key: key.to_owned(),
+                previous: None,
+                current: value.to_owned(),
+            },
+        }
+    }
+
+    /// The reversal of writing a fresh `.env` key: remove it again.
+    fn removed(key: &str) -> Undo {
+        Undo {
+            target: ".env".to_owned(),
+            action: Action::Restore {
+                key: key.to_owned(),
+                value: None,
+            },
+        }
+    }
+
+    /// The two writes an apply had managed to make before it was interrupted.
+    fn partial_apply() -> Journal {
+        Journal::replay(vec![
+            wrote("DATA_ROOT", "/srv/media"),
+            wrote("USENET", "on"),
+        ])
+    }
+
+    #[test]
+    fn a_fresh_setup_is_in_the_gathering_phase() {
+        assert_eq!(Phase::default(), Phase::InProgress);
+        assert_eq!(Progress::default().phase, Phase::InProgress);
+    }
+
+    #[test]
+    fn a_progress_file_predating_the_phase_field_reads_as_gathering() {
+        // A file written before the lifecycle was tracked carries no phase; it was
+        // only ever left mid-gathering, so it must read back as that rather than
+        // fail to load.
+        let old = r#"{"at":"protocols","answers":{}}"#;
+        let restored = serde_json::from_str::<Progress>(old).ok();
+        assert_eq!(
+            restored.map(|progress| (progress.phase, progress.at)),
+            Some((Phase::InProgress, Step::Protocols)),
+        );
+    }
+
+    #[test]
+    fn the_phase_survives_a_round_trip() {
+        for phase in [
+            Phase::InProgress,
+            Phase::Reviewing,
+            Phase::Applying,
+            Phase::Applied,
+        ] {
+            let line = serde_json::to_string(&saved_at(phase)).unwrap_or_default();
+            let read = serde_json::from_str::<Progress>(&line).ok();
+            assert_eq!(read.map(|progress| progress.phase), Some(phase), "{line}");
+        }
+    }
+
+    #[test]
+    fn no_saved_setup_is_absent() {
+        assert_eq!(Status::of(None), Status::Absent);
+    }
+
+    #[test]
+    fn each_stored_phase_maps_to_its_status() {
+        assert_eq!(
+            Status::of(Some(&saved_at(Phase::InProgress))),
+            Status::InProgress,
+        );
+        assert_eq!(
+            Status::of(Some(&saved_at(Phase::Reviewing))),
+            Status::Reviewing,
+        );
+        assert_eq!(Status::of(Some(&saved_at(Phase::Applied))), Status::Applied);
+    }
+
+    #[test]
+    fn a_persisted_applying_marker_is_a_failed_apply() {
+        // The only writer of the applying marker is a live apply, so reading it
+        // back off disk means that apply stopped before it finished.
+        assert_eq!(
+            Status::of(Some(&saved_at(Phase::Applying))),
+            Status::FailedApply,
+        );
+    }
+
+    #[test]
+    fn recovery_reports_exactly_what_the_interrupted_apply_wrote() {
+        // The report is the journal's writes unaltered and in order — the data
+        // root first, then the protocol toggle.
+        let journal = partial_apply();
+        assert_eq!(
+            Recovery::of(&journal).written(),
+            [wrote("DATA_ROOT", "/srv/media"), wrote("USENET", "on")],
+        );
+    }
+
+    #[test]
+    fn resuming_keeps_every_write_already_made() {
+        let journal = partial_apply();
+        assert_eq!(
+            Recovery::of(&journal).resolve(Choice::Resume),
+            Resolution::Resume,
+        );
+    }
+
+    #[test]
+    fn rolling_back_reverses_the_writes_most_recent_first() {
+        // The later write is undone before the earlier one, and each set with no
+        // prior value is removed — the reversal of a two-step partial apply.
+        let journal = partial_apply();
+        assert_eq!(
+            Recovery::of(&journal).resolve(Choice::RollBack),
+            Resolution::RollBack(vec![removed("USENET"), removed("DATA_ROOT")]),
+        );
+    }
+
+    #[test]
+    fn starting_over_also_reverses_the_writes_before_discarding_them() {
+        // Start over is not a bare discard: the partial apply is unwound first,
+        // most recent write to earliest, so nothing is stranded on disk — the
+        // reversal is the same as a roll back's; only what follows it differs.
+        let journal = partial_apply();
+        assert_eq!(
+            Recovery::of(&journal).resolve(Choice::StartOver),
+            Resolution::StartOver(vec![removed("USENET"), removed("DATA_ROOT")]),
+        );
     }
 }
