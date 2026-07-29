@@ -26,6 +26,13 @@ const PROBE: &str = ".lemonfiber-hardlink-probe";
 /// The second name the probe file is linked to.
 const LINKED: &str = ".lemonfiber-hardlink-probe.link";
 
+/// What a location that cannot hardlink costs, in concrete terms — stated the
+/// same way wherever it is reported, at setup and in a later diagnosis, because
+/// "hardlinks unsupported" means nothing and this is what it means.
+pub const COPY_CONSEQUENCE: &str = "Imports will copy instead of link. Each takes minutes rather \
+    than being instant, uses twice the disk while it runs, and torrents cannot seed from the \
+    library copy.";
+
 /// What creating and inspecting a hardlink under a directory established.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Linked {

@@ -6,12 +6,13 @@
 //! apply where it runs, so an answer the wizard would reject is never gathered.
 
 use std::io::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::Prompt;
+use lemonfiber_core::app::setup::{Prompt, StorageWarning};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
+use lemonfiber_core::storage::COPY_CONSEQUENCE;
 use lemonfiber_core::wizard::{Library, Plan};
 
 /// A prompt that reads the operator's answers from the terminal.
@@ -91,6 +92,37 @@ impl Prompt for Terminal {
         } else {
             PathBuf::from(answer)
         }
+    }
+
+    fn hardlinks(&self, path: &Path) {
+        println!(
+            "  ✓ {} hardlinks — imports will be instant and cost no extra disk.",
+            path.display()
+        );
+    }
+
+    fn storage_warning(&self, path: &Path, warning: &StorageWarning) -> bool {
+        match warning {
+            StorageWarning::CopyOnly { limitation } => {
+                match limitation {
+                    Some(reason) => println!("  ✗ {} cannot hardlink — {reason}.", path.display()),
+                    None => println!("  ✗ {} cannot hardlink.", path.display()),
+                }
+                // The consequence is stated in the same words a later diagnosis
+                // would use, indented so it reads as the explanation of the line
+                // above rather than a new claim.
+                println!("    {COPY_CONSEQUENCE}");
+            }
+            StorageWarning::Untested { reason } => {
+                println!(
+                    "  ? {} could not be tested for hardlinks — {reason}.",
+                    path.display()
+                );
+            }
+        }
+        // Defaulting to no nudges the operator toward a location that links,
+        // without taking the choice away — some know their setup and mean it.
+        yes_no("\nUse this location anyway?", false)
     }
 
     fn service_user(&self) -> Option<(u32, u32)> {
