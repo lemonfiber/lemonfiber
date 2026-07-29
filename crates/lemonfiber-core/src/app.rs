@@ -38,6 +38,7 @@ use crate::stack::closure::resolve;
 use crate::stack::compose::{build, Action};
 use crate::stack::Source;
 
+pub mod apply;
 mod seed;
 mod targets;
 
