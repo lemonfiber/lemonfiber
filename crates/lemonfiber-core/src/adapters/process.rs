@@ -101,7 +101,9 @@ fn started(program: &str, err: &std::io::Error) -> Failure {
 /// Send each line a reader produces until it is spent. A send to a receiver that
 /// has walked away is let go rather than acted on: the process is finite and
 /// already running, so reading it out costs nothing and stopping early buys
-/// nothing.
+/// nothing. This is why `stream` is for finite commands only — a pull, not a
+/// `--follow`: a dropped receiver does not stop the child, so an endless one would
+/// leave this task reading forever.
 async fn forward<R: AsyncRead + Unpin + Send + 'static>(reader: R, sender: Sender<Progress>) {
     let mut lines = BufReader::new(reader).lines();
     while let Ok(Some(line)) = lines.next_line().await {

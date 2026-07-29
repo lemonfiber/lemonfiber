@@ -201,6 +201,37 @@ async fn a_service_that_is_not_listening_is_unreachable() {
 }
 
 #[tokio::test]
+async fn a_secret_in_the_query_is_masked_out_of_an_unreachable() {
+    // An indexer authenticates by an apikey in the URL, not a header. When it
+    // cannot be reached the failure must not carry that key — not in the URL it
+    // keeps, and not in the reason read from the transport error, which can quote
+    // the URL it failed on.
+    let request = Request {
+        method: Method::Get,
+        url: format!("{}/api?t=search&apikey=super-secret-key", dead_url().await),
+        headers: Vec::new(),
+        body: None,
+    };
+    let outcome = Web::new().send(&request).await;
+    let unreachable = outcome.err();
+    assert!(
+        unreachable.is_some(),
+        "nothing answered, so it is unreachable"
+    );
+    let rendered = unreachable
+        .map(|failure| format!("{} {}", failure.url, failure.reason))
+        .unwrap_or_default();
+    assert!(
+        !rendered.contains("super-secret-key"),
+        "the apikey must appear nowhere the operator could see it: {rendered:?}"
+    );
+    assert!(
+        rendered.contains("t=search"),
+        "a non-secret parameter is left legible for diagnosis: {rendered:?}"
+    );
+}
+
+#[tokio::test]
 async fn a_body_that_does_not_arrive_is_unreachable() {
     // The server promises a body and closes without sending it. A truncated
     // answer is no answer: the port reports one response or none.
