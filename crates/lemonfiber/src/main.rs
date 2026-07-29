@@ -211,9 +211,10 @@ async fn main() -> ExitCode {
         // A watch is long-running and produces one report at its end, not a value
         // that arrives once, so like streaming it does not go through dispatch.
         Request::Watch { forms } => return guard(&ctx, &forms, cli.json).await,
-        // Setup is a conversation, not a value that arrives once, so like streaming
-        // and watching it runs its own way rather than through dispatch.
-        Request::Setup => return run_setup(&ctx),
+        // Setup is a conversation and then a stack coming up, not a value that
+        // arrives once, so like streaming and watching it runs its own way. It
+        // takes the context by value because it rewrites the settings mid-run.
+        Request::Setup => return run_setup(ctx).await,
         Request::Version => Command::Version,
         Request::Up { forms } => Command::Up { forms },
         Request::Down { forms } => Command::Down { forms },
@@ -287,25 +288,7 @@ fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
         None => Source::Embedded(&STACK),
     };
 
-    // Settings come from the operator's own file, so what runs reflects what
-    // they configured rather than what a default happened to be.
-    let env_file = configuration_file();
-    let recorded = env_file
-        .as_deref()
-        .and_then(|path| store::read(path).ok())
-        .unwrap_or_default();
-
-    let settings = Settings {
-        protocols: Protocols::from_env(&recorded),
-        ip_echo: ip_echo_from_env(&recorded),
-        data_root: data_root_from_env(&recorded),
-        storage_state: here().map(|paths| paths.storage_state()),
-        service_user: service_user_from_env(&recorded),
-        port_forward: port_forward_from_env(&recorded),
-        env_file,
-        stack_dir: stack_directory(),
-        ..Settings::default()
-    };
+    let settings = read_settings();
 
     // Docker Engine and Docker Desktop are told apart by asking the daemon,
     // which needs the engine adapter. Until then this is what can be seen from
@@ -326,6 +309,31 @@ fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
         return ctx.rehearsing();
     }
     ctx
+}
+
+/// The operator's settings, read from their file as it stands now.
+///
+/// Read fresh rather than passed around, because setup writes the file mid-run:
+/// the settings this process started with predate what it just applied, and
+/// starting the stack against the stale set would run the wrong thing.
+fn read_settings() -> Settings {
+    let env_file = configuration_file();
+    let recorded = env_file
+        .as_deref()
+        .and_then(|path| store::read(path).ok())
+        .unwrap_or_default();
+
+    Settings {
+        protocols: Protocols::from_env(&recorded),
+        ip_echo: ip_echo_from_env(&recorded),
+        data_root: data_root_from_env(&recorded),
+        storage_state: here().map(|paths| paths.storage_state()),
+        service_user: service_user_from_env(&recorded),
+        port_forward: port_forward_from_env(&recorded),
+        env_file,
+        stack_dir: stack_directory(),
+        ..Settings::default()
+    }
 }
 
 /// Which setting the operator is reading or changing.
@@ -427,7 +435,7 @@ async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
 /// it decides nothing itself, but reading a line and rendering a question is the
 /// surface's job, and the [`Terminal`] does it. What to ask, what an answer means,
 /// and what to write are all the core's, reached through [`setup::run`].
-fn run_setup(ctx: &Ctx) -> ExitCode {
+async fn run_setup(mut ctx: Ctx) -> ExitCode {
     // Applying is the point of it, so there is nothing to rehearse; saying so is
     // kinder than a wizard that asks every question and then changes nothing.
     if ctx.dry_run {
@@ -465,12 +473,36 @@ fn run_setup(ctx: &Ctx) -> ExitCode {
 
     match setup::run(&mut wizard, &prompt, &paths, ctx.stack, &stamp()) {
         Ok(setup::Outcome::Applied) => {
-            println!("\nSetup is done. Start your stack with `{PRODUCT} up tv`.");
-            ExitCode::SUCCESS
+            // The settings read at startup predate the file setup just wrote, so
+            // they are refreshed before the stack is brought up against them.
+            ctx.settings = read_settings();
+            println!("\nSetup is done — bringing your stack up.");
+            start(&ctx).await
         }
         Ok(setup::Outcome::Abandoned) => {
             println!("\nSetup was left here — nothing was written.");
             ExitCode::SUCCESS
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// The form setup brings up once the answers are applied.
+///
+/// The television form is the one the product is measured on — a fresh machine to
+/// a working stack — and it is what a first run wants: an operator after only
+/// movies or music switches with `up` once they are running.
+const STARTER_FORM: &str = "tv";
+
+/// Bring the stack up and report how it settled, the last step of a fresh setup.
+async fn start(ctx: &Ctx) -> ExitCode {
+    let up = Command::Up {
+        forms: vec![STARTER_FORM.to_owned()],
+    };
+    match dispatch(up, ctx).await {
+        Ok(outcome) => {
+            render(&outcome, false);
+            settled(&outcome)
         }
         Err(problem) => complain(&problem),
     }
