@@ -94,11 +94,24 @@ impl Prompt for Terminal {
         }
     }
 
-    fn hardlinks(&self, path: &Path) {
-        println!(
-            "  ✓ {} hardlinks — imports will be instant and cost no extra disk.",
-            path.display()
-        );
+    fn hardlinks(&self, path: &Path, inferred_from: Option<&Path>) {
+        match inferred_from {
+            // Tested directly: the chosen location itself proved it links.
+            None => println!(
+                "  ✓ {} hardlinks — imports will be instant and cost no extra disk.",
+                path.display()
+            ),
+            // The location does not exist yet, so its parent's filesystem stood in
+            // for it. Say so, rather than present a parent's answer as proven of a
+            // path never touched — a separate drive mounted here later could differ,
+            // and the storage check re-tests the real location once it exists.
+            Some(parent) => println!(
+                "  ✓ {} will hardlink — its filesystem ({}) does. If it becomes a \
+                 separate drive, that is checked when the stack first runs.",
+                path.display(),
+                parent.display()
+            ),
+        }
     }
 
     fn storage_warning(&self, path: &Path, warning: &StorageWarning) -> bool {

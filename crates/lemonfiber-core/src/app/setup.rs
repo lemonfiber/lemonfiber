@@ -36,7 +36,10 @@ pub trait Prompt {
     fn data_location(&self) -> PathBuf;
     /// The chosen location was just tested and it hardlinks — report the good
     /// result, so the operator sees the test happen rather than a silent pause.
-    fn hardlinks(&self, path: &Path);
+    /// `inferred_from` is the parent the test actually ran against where the
+    /// location did not exist yet, so an answer proven on a parent is shown as
+    /// inferred rather than as the chosen path's own proven capability.
+    fn hardlinks(&self, path: &Path, inferred_from: Option<&Path>);
     /// The chosen location cannot be used for instant, space-free imports: state
     /// what was found and its consequence, and ask whether to use it anyway
     /// (`true`) or name another location (`false`). The storage *mode* is never
@@ -246,8 +249,8 @@ async fn resolve_location(prompt: &dyn Prompt, filesystem: &dyn FileSystem) -> P
     loop {
         let chosen = prompt.data_location();
         match assess(filesystem, &chosen).await {
-            Assessment::Links => {
-                prompt.hardlinks(&chosen);
+            Assessment::Links { inferred_from } => {
+                prompt.hardlinks(&chosen, inferred_from.as_deref());
                 return chosen;
             }
             Assessment::Warned(warning) => {
@@ -261,8 +264,11 @@ async fn resolve_location(prompt: &dyn Prompt, filesystem: &dyn FileSystem) -> P
 
 /// What testing a prospective data location for hardlinks came to.
 enum Assessment {
-    /// The location hardlinks: nothing stands in the way of taking it.
-    Links,
+    /// The location hardlinks. `inferred_from` is the ancestor the test actually
+    /// ran against where the location itself did not exist yet to be tested — so a
+    /// result read off a parent is never presented as if the chosen path were
+    /// proven. `None` where the chosen path was tested directly.
+    Links { inferred_from: Option<PathBuf> },
     /// The location is usable only with a caveat the operator must weigh.
     Warned(StorageWarning),
 }
@@ -271,18 +277,23 @@ enum Assessment {
 ///
 /// The location itself is not created here: nothing setup does before the
 /// operator confirms the plan touches disk beyond the resumable progress file, so
-/// the filesystem it *will* live on is tested through the deepest parent that is
-/// already there. A place with no reachable parent cannot be tested at all, and
-/// says so rather than guessing.
+/// where the chosen path does not exist yet its filesystem is tested through the
+/// deepest parent that does. That parent's answer is only a proxy — a separate
+/// drive mounted there later could differ — so a result read off a parent is
+/// carried back as such rather than dressed up as the chosen path's own. A place
+/// with no reachable parent cannot be tested at all, and says so.
 async fn assess(filesystem: &dyn FileSystem, chosen: &Path) -> Assessment {
-    let Some(base) = nearest_existing(filesystem, chosen).await else {
+    let Some((base, exact)) = nearest_existing(filesystem, chosen).await else {
         return Assessment::Warned(StorageWarning::Untested {
-            reason: "it does not exist yet, and neither does any parent of it".to_owned(),
+            reason: "it could not be reached, and neither could any parent of it".to_owned(),
         });
     };
+    // A parent tested in the location's place is the inferred case; the location
+    // itself, where it already exists, is a direct result.
+    let inferred_from = (!exact).then(|| base.clone());
 
     match storage::test_link(filesystem, &base).await {
-        Linked::Yes { .. } => Assessment::Links,
+        Linked::Yes { .. } => Assessment::Links { inferred_from },
         Linked::No => {
             let facts = filesystem.describe(&base).await;
             Assessment::Warned(StorageWarning::CopyOnly {
@@ -299,13 +310,21 @@ async fn assess(filesystem: &dyn FileSystem, chosen: &Path) -> Assessment {
     }
 }
 
-/// The deepest ancestor of `path` that is already on disk, resolved through any
-/// symlinks, or nothing where not even the root of it can be reached.
-async fn nearest_existing(filesystem: &dyn FileSystem, path: &Path) -> Option<PathBuf> {
+/// The deepest ancestor of `path` already on disk, resolved through any symlinks,
+/// and whether it is `path` itself — or nothing where not even the root of it can
+/// be reached.
+///
+/// The flag is how a caller tells a location it tested directly from one whose
+/// answer it had to read off a parent, since the chosen leaf does not exist yet.
+async fn nearest_existing(filesystem: &dyn FileSystem, path: &Path) -> Option<(PathBuf, bool)> {
+    let mut exact = true;
     for ancestor in path.ancestors() {
         if let Ok(real) = filesystem.canonicalize(ancestor).await {
-            return Some(real);
+            return Some((real, exact));
         }
+        // Past the first step the resolved place is a parent, not the path asked
+        // about, so a link proven there is inferred rather than direct.
+        exact = false;
     }
     None
 }
@@ -382,6 +401,10 @@ mod tests {
         /// Whether `canonicalize` finds the path — false makes the probe walk up
         /// and, finding nothing, report the location untestable.
         reachable: bool,
+        /// How many `canonicalize` calls fail before they start resolving, so a
+        /// chosen leaf can be absent while a parent of it is found — the case where
+        /// a link is proven on a parent rather than on the path itself.
+        missing_leaves: AtomicUsize,
         /// Whether a probe file can be created there.
         writable: bool,
         /// How many link attempts fail before they start taking, so one chosen
@@ -399,6 +422,7 @@ mod tests {
         fn links() -> Self {
             Self {
                 reachable: true,
+                missing_leaves: AtomicUsize::new(0),
                 writable: true,
                 failing_links: AtomicUsize::new(0),
                 confirmed_file: 7,
@@ -410,11 +434,15 @@ mod tests {
     #[async_trait]
     impl FileSystem for ProbeFs {
         async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-            if self.reachable {
-                Ok(path.to_owned())
-            } else {
-                Err(Fault::new("no such file or directory"))
+            if !self.reachable {
+                return Err(Fault::new("no such file or directory"));
             }
+            let missing = self.missing_leaves.load(Ordering::SeqCst);
+            if missing > 0 {
+                self.missing_leaves.store(missing - 1, Ordering::SeqCst);
+                return Err(Fault::new("no such file or directory"));
+            }
+            Ok(path.to_owned())
         }
         async fn touch(&self, _path: &Path) -> Result<(), Fault> {
             if self.writable {
@@ -486,8 +514,9 @@ mod tests {
         accept: Accept,
         /// The storage warnings put to the operator, in order.
         warnings: std::cell::RefCell<Vec<StorageWarning>>,
-        /// The locations reported as hardlinking.
-        hardlinked: std::cell::RefCell<Vec<PathBuf>>,
+        /// The locations reported as hardlinking, each with whether the result was
+        /// inferred from a parent rather than proven on the location itself.
+        hardlinked: std::cell::RefCell<Vec<(PathBuf, bool)>>,
     }
 
     impl Scripted {
@@ -519,8 +548,10 @@ mod tests {
         fn data_location(&self) -> PathBuf {
             self.locations.borrow_mut().pop_front().unwrap_or_default()
         }
-        fn hardlinks(&self, path: &Path) {
-            self.hardlinked.borrow_mut().push(path.to_owned());
+        fn hardlinks(&self, path: &Path, inferred_from: Option<&Path>) {
+            self.hardlinked
+                .borrow_mut()
+                .push((path.to_owned(), inferred_from.is_some()));
         }
         fn storage_warning(&self, _path: &Path, warning: &StorageWarning) -> bool {
             self.warnings.borrow_mut().push(warning.clone());
@@ -611,10 +642,11 @@ mod tests {
             Some("1000"),
             "the container user was asked"
         );
-        // A location that links is taken as chosen, and the good result is shown.
+        // A location whose own filesystem links is taken as chosen, and the good
+        // result is shown directly — not inferred from a parent.
         assert_eq!(
             prompt.hardlinked.borrow().as_slice(),
-            [dir.join("data-root")]
+            [(dir.join("data-root"), false)]
         );
     }
 
@@ -921,12 +953,36 @@ mod tests {
         assert_eq!(prompt.warnings.borrow().len(), 1);
         assert_eq!(
             prompt.hardlinked.borrow().as_slice(),
-            std::slice::from_ref(&second)
+            [(second.clone(), false)]
         );
         let file = store::read(&paths.env_file()).unwrap_or_default();
         assert_eq!(
             file.get("DATA_ROOT"),
             Some(second.to_string_lossy().as_ref())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_location_that_does_not_exist_yet_is_tested_through_its_parent() {
+        let dir = scratch("inferred");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = Scripted::workable(dir.join("data-root"));
+        // The chosen leaf is not there yet, so the first resolve fails and its
+        // parent stands in — the link is proven on the parent, not the path.
+        let filesystem = ProbeFs {
+            missing_leaves: AtomicUsize::new(1),
+            ..ProbeFs::links()
+        };
+
+        let outcome = run(&mut wizard, &prompt, &filesystem, &paths, external(), "t").await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        // The good result is carried back as inferred, so the operator is not told a
+        // path the probe never touched is proven to link.
+        assert_eq!(
+            prompt.hardlinked.borrow().as_slice(),
+            [(dir.join("data-root"), true)]
         );
     }
 
@@ -977,7 +1033,7 @@ mod tests {
         let warnings = prompt.warnings.borrow();
         assert!(matches!(
             warnings.as_slice(),
-            [StorageWarning::Untested { reason }] if reason.contains("does not exist yet")
+            [StorageWarning::Untested { reason }] if reason.contains("could not be reached")
         ));
     }
 
