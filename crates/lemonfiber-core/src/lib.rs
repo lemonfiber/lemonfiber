@@ -37,6 +37,7 @@ pub mod docker;
 pub mod doctor;
 mod endpoint;
 pub mod error;
+pub mod jellyfin;
 pub mod journal;
 pub mod model;
 pub mod platform;
@@ -47,6 +48,7 @@ pub mod qbittorrent;
 pub mod sabnzbd;
 pub mod secret;
 pub mod seed;
+pub mod seerr;
 pub mod servarr;
 pub mod stack;
 #[cfg(test)]

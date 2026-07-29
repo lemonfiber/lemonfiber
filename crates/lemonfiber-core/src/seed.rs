@@ -22,10 +22,15 @@ use serde::Serialize;
 use crate::journal::{Change, Journal, Kind};
 use crate::ports::random::Random;
 use crate::ports::service::{
-    AppSync, Application, Client, DownloadClient, Failure, RegisteredClient, RootFolder,
+    AppSync, Application, Client, DownloadClient, Failure, MediaServer, RegisteredClient, Requests,
+    RootFolder,
 };
 use crate::qbittorrent::Qbittorrent;
 use crate::secret;
+
+/// The administrator account name lemonfiber creates on the media server and
+/// signs Seerr in with. Fixed, and recorded beside the password it mints.
+const ADMIN: &str = "admin";
 
 /// What lemonfiber observed about a connection it wants to make.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -485,6 +490,90 @@ pub async fn wire_qbittorrent_password(
             },
             None,
         ),
+    }
+}
+
+/// Make Jellyfin the identity source for Seerr: mint and set Jellyfin's admin
+/// account where its wizard has not run, then point Seerr's authentication at it.
+///
+/// Two services in order. Jellyfin has no key to read, so — like qBittorrent —
+/// its admin password is one lemonfiber mints, sets by driving the first-run
+/// wizard, and hands back for the surface to record; a wizard already run by the
+/// household leaves its password unknown, so the wiring is skipped rather than
+/// reset. With the credential in hand, Seerr is signed in through Jellyfin, which
+/// on a fresh Seerr also creates its owner. An already-initialised Seerr is never
+/// re-pointed, since that would cost the household its existing sign-ins. The
+/// minted password is returned to record whenever the account was created, even
+/// if Seerr itself could not then be reached, because the account now holds it.
+pub async fn wire_jellyfin_identity(
+    jellyfin: &dyn MediaServer,
+    seerr: &dyn Requests,
+    random: &dyn Random,
+    recorded_password: Option<&str>,
+    server_url: &str,
+) -> (Wiring, Option<String>) {
+    let connection = "Jellyfin as Seerr's identity".to_owned();
+    let (password, minted) = match jellyfin_admin(jellyfin, random, recorded_password).await {
+        Ok(pair) => pair,
+        Err(state) => return (Wiring { connection, state }, None),
+    };
+    let state = configure_seerr(seerr, &password, server_url).await;
+    (Wiring { connection, state }, minted)
+}
+
+/// The Jellyfin admin credential, and the password to record if it was newly
+/// minted: minted where the wizard has not run, read from what was recorded where
+/// it has, and unknown — so the wiring cannot proceed — where the household ran
+/// the wizard itself.
+async fn jellyfin_admin(
+    jellyfin: &dyn MediaServer,
+    random: &dyn Random,
+    recorded: Option<&str>,
+) -> Result<(String, Option<String>), State> {
+    let completed = match jellyfin.startup_completed().await {
+        Ok(done) => done,
+        Err(failure) => return Err(unreached(&failure)),
+    };
+    if completed {
+        return match recorded {
+            Some(password) => Ok((password.to_owned(), None)),
+            None => Err(State::Skipped {
+                reason: "Jellyfin was set up outside lemonfiber, so its admin password is unknown; a later run cannot complete this until it is set up through lemonfiber".to_owned(),
+            }),
+        };
+    }
+    let Some(password) = secret::generate(random) else {
+        return Err(State::Failed {
+            detail: "no randomness was available to generate a password".to_owned(),
+        });
+    };
+    match jellyfin.create_admin(ADMIN, &password).await {
+        Ok(()) => Ok((password.clone(), Some(password))),
+        Err(failure) => Err(unreached(&failure)),
+    }
+}
+
+/// Point Seerr at the media server, unless it is already initialised — which is
+/// left untouched, whether lemonfiber initialised it on an earlier run or the
+/// household set it up with accounts of its own. A fresh Seerr is signed in and
+/// then read back: it must report itself initialised, or the write did not land.
+async fn configure_seerr(seerr: &dyn Requests, password: &str, server_url: &str) -> State {
+    let initialized = match seerr.initialized().await {
+        Ok(done) => done,
+        Err(failure) => return unreached(&failure),
+    };
+    if initialized {
+        return State::AlreadyWired;
+    }
+    if let Err(failure) = seerr.configure_identity(ADMIN, password, server_url).await {
+        return unreached(&failure);
+    }
+    match seerr.initialized().await {
+        Ok(true) => State::Wired,
+        Ok(false) => State::Failed {
+            detail: "Seerr accepted the sign-in but did not report itself initialised".to_owned(),
+        },
+        Err(failure) => unreached(&failure),
     }
 }
 

@@ -304,6 +304,58 @@ pub trait AppSync: Send + Sync {
     async fn applications(&self) -> Result<Vec<RegisteredApplication>, Failure>;
 }
 
+/// A media server's first-run setup — Jellyfin, the one service lemonfiber
+/// creates an account on rather than reading a key from.
+///
+/// Jellyfin writes no key to disk and asks for its first account through a setup
+/// wizard, so the credential is one lemonfiber mints and sets here rather than
+/// reads elsewhere.
+#[async_trait]
+pub trait MediaServer: Send + Sync {
+    /// Whether the first-run setup is already done — the gate that keeps a
+    /// completed wizard, and the household's own account, untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn startup_completed(&self) -> Result<bool, Failure>;
+
+    /// Create the administrator account and finish setup, in one step because the
+    /// setup endpoints answer only until it is complete.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
+}
+
+/// A request manager's identity setup — Seerr, configured to authenticate its
+/// household against the media server rather than against accounts of its own.
+#[async_trait]
+pub trait Requests: Send + Sync {
+    /// Whether it has already been initialised — the gate that never re-points a
+    /// running instance's identity source and so keeps its existing sign-ins.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn initialized(&self) -> Result<bool, Failure>;
+
+    /// Point authentication at the media server reached at `server_url`, signing
+    /// in as `username` with `password` — which on the first call also creates the
+    /// owner from that account.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn configure_identity(
+        &self,
+        username: &str,
+        password: &str,
+        server_url: &str,
+    ) -> Result<(), Failure>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

@@ -94,6 +94,14 @@ pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 /// lemonfiber mints and writes rather than reads from a service.
 pub const QBITTORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 
+/// The environment key holding the Jellyfin administrator password.
+///
+/// Jellyfin generates no key on disk and asks for an account to be created, so
+/// seeding mints this password, sets it by driving Jellyfin's own first-run
+/// setup, and records it here — the same shape as qBittorrent's, and the
+/// credential the Seerr identity wiring reads back. The account name is `admin`.
+pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
+
 /// A recorded value with the whitespace and surrounding quotes a person might
 /// add stripped, its case left alone — so a hand-edited `"https://IP.example"`
 /// keeps its path but loses the quotes that would otherwise reach the reader.
