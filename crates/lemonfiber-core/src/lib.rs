@@ -51,6 +51,7 @@ pub mod seed;
 pub mod seerr;
 pub mod servarr;
 pub mod stack;
+pub mod storage;
 #[cfg(test)]
 mod test_support;
 pub mod wizard;
