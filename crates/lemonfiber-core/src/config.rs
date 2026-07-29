@@ -87,6 +87,19 @@ pub const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 /// where the operator runs no media server at all.
 pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 
+/// The base URL of the indexer the operator gave at setup.
+pub const INDEXER_URL_KEY: &str = "INDEXER_URL";
+
+/// The indexer's API key. A secret, held here the way the stack holds its others.
+pub const INDEXER_APIKEY_KEY: &str = "INDEXER_APIKEY";
+
+/// Whether the indexer credential was proven against the live service before it
+/// was kept.
+///
+/// Off records a credential the operator chose to proceed with unverified, so a
+/// later diagnosis can point at it rather than trusting it silently.
+pub const INDEXER_VALIDATED_KEY: &str = "INDEXER_VALIDATED";
+
 /// The environment key holding qBittorrent's web UI password.
 ///
 /// Seeding generates this password and records it here, because the

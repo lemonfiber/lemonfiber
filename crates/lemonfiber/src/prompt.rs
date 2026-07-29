@@ -8,11 +8,12 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::{Prompt, StorageWarning};
+use lemonfiber_core::app::setup::{CredentialChoice, Prompt, StorageWarning};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::storage::COPY_CONSEQUENCE;
+use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Library, Plan};
 
 /// A prompt that reads the operator's answers from the terminal.
@@ -136,6 +137,45 @@ impl Prompt for Terminal {
         // Defaulting to no nudges the operator toward a location that links,
         // without taking the choice away — some know their setup and mean it.
         yes_no("\nUse this location anyway?", false)
+    }
+
+    fn credential(&self) -> Option<(String, String)> {
+        println!("\nAn indexer is where the stack searches for content.");
+        println!("Leave the URL blank to set one up later.");
+        let url = ask("Indexer URL:");
+        if url.is_empty() {
+            return None;
+        }
+        // The key is read on its own line and never printed back — only the outcome
+        // of testing it ever reaches the screen.
+        let key = ask("Indexer API key:");
+        Some((url, key))
+    }
+
+    fn credential_valid(&self, observed: &str) {
+        println!("  ✓ {observed}");
+    }
+
+    fn credential_failed(&self, outcome: &Validation) -> CredentialChoice {
+        // Each cause is named as itself, because their remedies differ — a wrong
+        // key, a host that did not answer, and an account that cannot do the job
+        // send the operator to three different places.
+        match outcome {
+            Validation::Rejected { detail } => println!("  ✗ Rejected — {detail}"),
+            Validation::Unreachable { detail } => println!("  ✗ Unreachable — {detail}"),
+            Validation::Degraded { detail } => println!("  ! Degraded — {detail}"),
+            // The proven case never reaches here; setup keeps it rather than asking.
+            Validation::Valid { observed } => println!("  ✓ {observed}"),
+        }
+        println!("\nWhat would you like to do?");
+        println!("  1) Try again — re-enter it and test afresh");
+        println!("  2) Use it anyway — keep it unverified");
+        println!("  3) Skip — leave the indexer unset for now");
+        match ask("Choose [1]:").as_str() {
+            "2" => CredentialChoice::Proceed,
+            "3" => CredentialChoice::Skip,
+            _ => CredentialChoice::Retry,
+        }
     }
 
     fn service_user(&self) -> Option<(u32, u32)> {
