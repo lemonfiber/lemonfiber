@@ -197,8 +197,7 @@ async fn main() -> ExitCode {
     let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {
-        println!("{PRODUCT} — run `lemonfiber --help` to see what it can do");
-        return ExitCode::SUCCESS;
+        return greet(cli.stack_dir.take(), cli.dry_run).await;
     };
 
     let ctx = context(cli.stack_dir.take(), cli.dry_run);
@@ -432,6 +431,85 @@ async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// Meet an operator who typed `lemonfiber` with nothing after it.
+///
+/// A bare invocation is the front door, and what waits behind it depends on what
+/// the machine has. On one with nothing configured that is almost always a first
+/// run, so setup is offered right here rather than behind a subcommand a newcomer
+/// has no way to know to type. On a configured one setup is the wrong tool — its
+/// answers are already written — so the operator is pointed at changing a setting
+/// or starting the stack instead. A setup left unfinished is neither: it is the
+/// same business a bare run should pick up as `setup` would, so those states are
+/// handed straight to [`run_setup`], which knows the way out.
+async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode {
+    let ctx = context(stack_dir, dry_run);
+
+    let Some(paths) = here() else {
+        // With nowhere to keep its files there is nothing to offer and nothing to
+        // point at, so the plain pointer is the only honest thing left to say.
+        println!("{PRODUCT} — run `{PRODUCT} --help` to see what it can do");
+        return ExitCode::SUCCESS;
+    };
+
+    // A stopped apply or a quit mid-question is unfinished setup, not a fresh or a
+    // finished machine, and must be caught before the configured-yet check below —
+    // an interrupted apply leaves half-written settings that check would read as
+    // done. Handing these to the setup path detects and offers the way out.
+    let progress = setup::progress_at(&paths.setup_progress());
+    if matches!(
+        Status::of(progress.as_ref()),
+        Status::FailedApply | Status::InProgress
+    ) {
+        return run_setup(ctx).await;
+    }
+
+    if !offer_setup(paths.env_file().exists()) {
+        // Already set up: setup would walk a done machine back to its first
+        // question. Reconfiguration and starting are what a bare run wants instead —
+        // and this is guidance, not a misuse, so it leaves with success.
+        println!("{PRODUCT} is already set up on this machine.");
+        println!("  · change a setting with `{PRODUCT} config set <key> <value>`");
+        println!("  · start the stack with `{PRODUCT} up`");
+        println!("  · see everything with `{PRODUCT} --help`");
+        return ExitCode::SUCCESS;
+    }
+
+    println!("No configuration found.");
+
+    // Setup applies answers, so there is nothing for --dry-run to rehearse. Said
+    // here, before the offer, rather than asking a question whose yes could not be
+    // honoured — the same refusal `setup` gives, and at the same point in the walk.
+    if ctx.dry_run {
+        eprintln!("Setup applies your answers, so it has nothing to rehearse.");
+        eprintln!("Run `{PRODUCT} setup` without --dry-run when you are ready.");
+        return ExitCode::from(USAGE);
+    }
+
+    if !std::io::stdin().is_terminal() {
+        // No one is here to take the offer, so it is stated rather than asked —
+        // never left waiting on input that will not come.
+        println!("Run `{PRODUCT} setup` to configure your stack.");
+        return ExitCode::SUCCESS;
+    }
+    if !confirm_setup() {
+        println!("No changes made — run `{PRODUCT} setup` when you are ready.");
+        return ExitCode::SUCCESS;
+    }
+    run_setup(ctx).await
+}
+
+/// Ask whether to begin setup now, taking silence and anything but a clear no as
+/// yes — a first run is what a bare invocation on an unconfigured machine means,
+/// so the gentle default is to proceed.
+fn confirm_setup() -> bool {
+    !matches!(
+        read_line("Run first-time setup? [Y/n]")
+            .to_lowercase()
+            .as_str(),
+        "n" | "no"
+    )
 }
 
 /// Run the setup wizard on a machine that is not configured yet.
