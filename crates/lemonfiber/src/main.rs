@@ -499,6 +499,16 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard) -> ExitCode {
     // The questions need someone at a terminal to answer them. A piped or scripted
     // run has no one, so it is told what it would have been asked rather than left
     // waiting on input that never comes.
+    // The environment is checked before the first question, so a missing or
+    // unreachable container engine is caught here rather than after eleven
+    // answers — nothing setup does can work without one.
+    if let Err(code) = preflight(&ctx).await {
+        return code;
+    }
+
+    // The questions need someone at a terminal to answer them. A piped or scripted
+    // run has no one, so it is told what it would have been asked rather than left
+    // waiting on input that never comes.
     if !std::io::stdin().is_terminal() {
         eprintln!("error: setup asks questions that need a terminal to answer.");
         eprintln!(
@@ -633,6 +643,38 @@ fn read_line(prompt: &str) -> String {
     let mut line = String::new();
     let _ = std::io::stdin().read_line(&mut line);
     line.trim().to_owned()
+}
+
+/// Check the environment before setup asks anything.
+///
+/// It runs the very check `lemonfiber doctor` runs for the environment — not a
+/// second copy of it — so a missing container engine and one whose daemon is down
+/// are told apart and remedied here in the same words as everywhere else. A broken
+/// or undetermined result stops setup before a single question is asked; a healthy
+/// one passes without a word.
+async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
+    let report = match dispatch(
+        Command::Doctor {
+            only: Some(Category::Environment),
+            disruptive: false,
+        },
+        ctx,
+    )
+    .await
+    {
+        Ok(Outcome::Doctor(report)) => report,
+        // Asking for a diagnosis and being handed anything else cannot happen, but
+        // is not worth a crash if it somehow does.
+        Ok(_) => return Err(ExitCode::from(FAILURE)),
+        Err(problem) => return Err(complain(&problem)),
+    };
+
+    if matches!(report.overall, Overall::Broken | Overall::Unknown) {
+        render(&Outcome::Doctor(report), false);
+        eprintln!("\nSetup needs these put right before it can go on.");
+        return Err(ExitCode::from(PREFLIGHT));
+    }
+    Ok(())
 }
 
 /// The form setup brings up once the answers are applied.
