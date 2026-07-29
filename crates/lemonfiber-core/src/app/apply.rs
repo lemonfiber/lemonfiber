@@ -8,9 +8,11 @@
 //! `applied`. A run that stops in between is found on the next start as a failed
 //! apply, with the journal holding exactly what to unwind.
 //!
-//! Only the environment file is written here — the first, cleanly reversible slice
-//! of apply. Creating directories and materialising the stack join it once the
-//! journal can record a filesystem change well enough to reverse one.
+//! Applied here are the environment settings, the operator's data directory, and
+//! the stack Compose reads — everything the stack needs on disk before it starts.
+//! What is reversible is journalled: the settings and the data directory the
+//! operator would not want silently left behind. The stack is lemonfiber's own
+//! regenerable output and is not, since the next apply simply rewrites it.
 //!
 //! Recovery here is between whole writes, not within one. Each file is written in
 //! place, so a stop in the middle of a single write can still tear that one file;
@@ -19,48 +21,51 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::config::paths::Paths;
 use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Change, Journal, Kind};
+use crate::stack::{self, Source};
 use crate::wizard::{Phase, Wizard};
 
-/// Write a reviewed setup's configuration to disk, driving the lifecycle and
-/// recording each write so an interrupted run can be unwound.
+/// Write a reviewed setup to disk, driving the lifecycle and recording each
+/// reversible write so an interrupted run can be unwound.
 ///
 /// The wizard must be at review — every applicable question answered and
-/// confirmed — or there is nothing settled to apply. The settings are written to
-/// `env_file`, the lifecycle marker to `progress`, and the record of what was
-/// written to `journal`; the marker reaches `applying` on disk before the first
-/// write, and each journal entry lands before the write it describes, so a stop at
-/// any point leaves a state the next run can recover rather than one it must
-/// guess at. The `stamp` times the journal entries, which the wizard has no clock
-/// to do itself.
+/// confirmed — or there is nothing settled to apply. Everything lands under the
+/// install `paths`: the settings in the environment file, the lifecycle marker and
+/// the change journal beside it, and the `source` stack where Compose reads it. The
+/// marker reaches `applying` on disk before the first write, and each journal entry
+/// lands before the write it describes, so a stop at any point leaves a state the
+/// next run can recover rather than one it must guess at. The `stamp` times the
+/// journal entries, which the wizard has no clock to do itself.
 ///
 /// # Errors
 ///
-/// Returns a [`Problem`] where review has not been reached, or where a file could
-/// not be read or written — leaving the marker at `applying` and the journal
-/// holding what had been written, which the next run recovers from.
+/// Returns a [`Problem`] where review has not been reached, where a file could not
+/// be read or written, where the data directory could not be created, or where the
+/// stack could not be materialised — leaving the marker at `applying` and the
+/// journal holding what had been written, which the next run recovers from.
 pub fn apply(
     wizard: &mut Wizard,
-    env_file: &Path,
-    progress: &Path,
-    journal: &Path,
+    paths: &Paths,
+    source: Source,
     stamp: &str,
 ) -> Result<(), Box<Problem>> {
     if !wizard.transition(Phase::Applying) {
         return Err(Box::new(not_reviewed()));
     }
-    // Every file failure is boxed as one problem on the way out, because a
-    // `Problem` is large beside the `()` this returns on success — so the writes
-    // themselves stay a plain sequence, each stopping the rest.
-    write(wizard, env_file, progress, journal, stamp).map_err(|fault| Box::new(fault.problem()))
+    // Every failure is boxed as one problem on the way out, because a `Problem` is
+    // large beside the `()` this returns on success — so the writes themselves stay
+    // a plain sequence, each stopping the rest.
+    write(wizard, paths, source, stamp).map_err(|fault| Box::new(fault.problem()))
 }
 
 /// A failure part-way through applying, named finely enough to remedy: a file the
-/// config store could not read or write, or a data directory that could not be
-/// made. Carried so the one boxing site above turns whichever it was into a
-/// problem, rather than each write growing its own.
+/// config store could not read or write, a data directory that could not be made,
+/// or the stack that could not be written out. Carried so the one boxing site
+/// above turns whichever it was into a problem, rather than each write growing its
+/// own.
 enum Fault {
     /// A configuration, progress, or journal file could not be read or written.
     Store(store::Failure),
@@ -71,6 +76,8 @@ enum Fault {
         /// The operating system's own words.
         reason: String,
     },
+    /// The stack could not be materialised where Compose reads it.
+    Stack(stack::Failure),
 }
 
 impl Fault {
@@ -78,6 +85,7 @@ impl Fault {
     fn problem(&self) -> Problem {
         match self {
             Self::Store(failure) => failure.problem(),
+            Self::Stack(failure) => failure.problem(),
             Self::DirNotMade { path, reason } => Problem::new(
                 DIR_NOT_MADE,
                 Severity::Error,
@@ -95,19 +103,15 @@ impl Fault {
 /// Ordered for recovery: the applying marker is persisted first, each change is
 /// journalled before it is written, and the applied marker is persisted last — so
 /// a stop at any point leaves the marker and journal a later run reads.
-fn write(
-    wizard: &mut Wizard,
-    env_file: &Path,
-    progress: &Path,
-    journal: &Path,
-    stamp: &str,
-) -> Result<(), Fault> {
-    store::write(progress, &rendered(wizard)).map_err(Fault::Store)?;
+fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Result<(), Fault> {
+    let (progress, env_file, journal) = (paths.setup_progress(), paths.env_file(), paths.journal());
+
+    store::write(&progress, &rendered(wizard)).map_err(Fault::Store)?;
 
     // The whole plan is diffed against the file as it stands before any write, so
     // every recorded `previous` is what was really there. The plan's keys are all
     // distinct, so no write moves a `previous` out from under a later one.
-    let before = store::read(env_file).map_err(Fault::Store)?;
+    let before = store::read(&env_file).map_err(Fault::Store)?;
     let plan = wizard.plan();
     let changes = plan.changes(&before, stamp);
 
@@ -128,12 +132,22 @@ fn write(
         for ancestor in made_by(&root) {
             log.record(made(&ancestor, stamp));
         }
-        store::write(journal, &lines(&log)).map_err(Fault::Store)?;
+        store::write(&journal, &lines(&log)).map_err(Fault::Store)?;
         std::fs::create_dir_all(&root).map_err(|err| Fault::DirNotMade {
             path: root,
             reason: err.to_string(),
         })?;
     }
+
+    // The stack is written where Compose reads it. An embedded stack is
+    // lemonfiber's own regenerable output — materialised the same way on every
+    // run, holding nothing an operator could lose — so it is not journalled: its
+    // undo is simply that the next apply rewrites it, and a directory left behind
+    // is a build artifact, not stranded work. An external stack is the operator's,
+    // already on disk, and materialising it writes nothing.
+    source
+        .materialise(Some(&paths.stack()))
+        .map_err(Fault::Stack)?;
 
     // `changes` is one entry per setting in the same order, so each pairs with the
     // key and value it was built from; they are two views of the same list, walked
@@ -144,8 +158,8 @@ fn write(
         // what was already there — harmless. The reverse would leave a real write
         // with nothing to unwind it.
         log.record(change);
-        store::write(journal, &lines(&log)).map_err(Fault::Store)?;
-        store::set(env_file, key, value).map_err(Fault::Store)?;
+        store::write(&journal, &lines(&log)).map_err(Fault::Store)?;
+        store::set(&env_file, key, value).map_err(Fault::Store)?;
     }
 
     // The applied marker lands only after every setting is on disk, so a stop
@@ -153,7 +167,7 @@ fn write(
     // an incomplete one — the next run treats that as a failed apply and offers to
     // resume, which keeps the writes, rather than trusting a half-written stack.
     wizard.transition(Phase::Applied);
-    store::write(progress, &rendered(wizard)).map_err(Fault::Store)
+    store::write(&progress, &rendered(wizard)).map_err(Fault::Store)
 }
 
 /// The data location the operator chose, where they chose one.
@@ -233,9 +247,11 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::apply;
+    use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::journal::{Change, Kind};
     use crate::platform::Environment;
+    use crate::stack::Source;
     use crate::wizard::{Answer, Library, Phase, Wizard};
 
     /// A journal line for a setting written over nothing — a fresh file, so the
@@ -285,13 +301,16 @@ mod tests {
         dir
     }
 
-    /// The three files apply writes, under a scratch config directory.
-    fn paths(dir: &Path) -> (PathBuf, PathBuf, PathBuf) {
-        (
-            dir.join(".env"),
-            dir.join("setup-progress.json"),
-            dir.join("journal.jsonl"),
-        )
+    /// The install layout under a scratch directory: configuration and data kept
+    /// apart, as they are on a real machine.
+    fn layout(dir: &Path) -> Paths {
+        Paths::rooted(&dir.join("config"), &dir.join("data"))
+    }
+
+    /// A stack the operator supplied, already on disk — materialising it writes
+    /// nothing, so a test that is not about the stack can ignore it.
+    fn external() -> Source {
+        Source::External(Path::new("/lemonfiber-not-a-real-stack"))
     }
 
     /// A wizard on native Linux with every applicable question answered, moved to
@@ -320,15 +339,15 @@ mod tests {
     #[test]
     fn applying_writes_the_settings_makes_the_data_directory_and_finishes_applied() {
         let dir = scratch("applied");
-        let (env, progress, journal) = paths(&dir);
-        let root = dir.join("data");
+        let paths = layout(&dir);
+        let root = dir.join("data-root");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
 
         // The settings the plan named are on disk, the data directory was created,
         // and the wizard finished applied.
-        let file = store::read(&env).unwrap_or_default();
+        let file = store::read(&paths.env_file()).unwrap_or_default();
         assert_eq!(file.get("LEMONFIBER_USENET"), Some("on"));
         assert_eq!(
             file.get("DATA_ROOT"),
@@ -341,30 +360,30 @@ mod tests {
     #[test]
     fn the_applied_marker_reaches_disk_so_a_later_run_reads_it() {
         let dir = scratch("marker");
-        let (env, progress, journal) = paths(&dir);
-        let mut wizard = reviewed(&dir.join("data"));
+        let paths = layout(&dir);
+        let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
 
-        let saved = std::fs::read_to_string(&progress).unwrap_or_default();
+        let saved = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
         assert!(saved.contains("\"applied\""), "phase is persisted: {saved}");
     }
 
     #[test]
     fn every_write_is_journalled_so_it_can_be_unwound() {
         let dir = scratch("journal");
-        let (env, progress, journal) = paths(&dir);
-        let root = dir.join("data");
+        let paths = layout(&dir);
+        let root = dir.join("data-root");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
+        // An external stack writes nothing, so the journal is only the data
+        // directory made, then one Set per setting in plan order over a fresh file —
+        // pinned to what should land, not to a recomputation of what apply wrote, so
+        // a wrong key, a dropped setting, or a missing directory record is caught.
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
 
-        // The journal on disk is the data directory made, then one Set per setting
-        // in plan order over a fresh file — pinned to what should land, not to a
-        // recomputation of what apply wrote, so a wrong key, a dropped setting, or a
-        // missing directory record would be caught.
         let root_shown = root.display().to_string();
-        let written = std::fs::read_to_string(&journal).unwrap_or_default();
+        let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
         assert_eq!(
             written,
             journal_text(&[
@@ -382,18 +401,18 @@ mod tests {
     #[test]
     fn a_data_directory_several_levels_deep_records_every_directory_it_makes() {
         let dir = scratch("deep");
-        let (env, progress, journal) = paths(&dir);
+        let paths = layout(&dir);
         // A parent and its child are both absent, so both must be made and both
         // recorded — parent's line first — or a roll back would strand the parent.
         let parent = dir.join("library-root");
         let root = parent.join("data");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
 
         assert!(root.is_dir(), "the leaf was made");
         let root_shown = root.display().to_string();
-        let written = std::fs::read_to_string(&journal).unwrap_or_default();
+        let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
         assert_eq!(
             written,
             journal_text(&[
@@ -412,16 +431,16 @@ mod tests {
     #[test]
     fn an_existing_data_directory_is_left_alone_and_not_journalled() {
         let dir = scratch("adopt");
-        let (env, progress, journal) = paths(&dir);
+        let paths = layout(&dir);
         // The location is already there — the operator's own library to adopt. It
         // must not be recorded as made, so unwinding never removes it.
         let root = dir.join("existing-library");
         assert!(std::fs::create_dir_all(&root).is_ok(), "the library exists");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_ok());
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
 
-        let written = std::fs::read_to_string(&journal).unwrap_or_default();
+        let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
         assert!(
             !written.contains("\"made\""),
             "an existing directory is not recorded as made: {written}",
@@ -432,7 +451,7 @@ mod tests {
     #[test]
     fn a_data_directory_that_cannot_be_made_stops_the_apply() {
         let dir = scratch("undir");
-        let (env, progress, journal) = paths(&dir);
+        let paths = layout(&dir);
         // A file stands where the data directory's parent would be, so creating the
         // directory under it cannot succeed.
         let blocker = dir.join("a-file");
@@ -441,10 +460,10 @@ mod tests {
         let root = blocker.join("data");
         let mut wizard = reviewed(&root);
 
-        let stopped = apply(&mut wizard, &env, &progress, &journal, "t");
+        let stopped = apply(&mut wizard, &paths, external(), "t");
 
         assert!(matches!(stopped, Err(problem) if problem.code == super::DIR_NOT_MADE));
-        let marker = std::fs::read_to_string(&progress).unwrap_or_default();
+        let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
         assert!(
             marker.contains("\"applying\""),
             "left mid-apply for recovery"
@@ -452,7 +471,7 @@ mod tests {
         // The directory was journalled as made before the attempt that failed, so
         // recovery reads a record for it — removing a path that was not created is
         // a harmless no-op.
-        let written = std::fs::read_to_string(&journal).unwrap_or_default();
+        let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
         assert!(
             written.contains("\"made\""),
             "the attempt was recorded: {written}"
@@ -460,42 +479,107 @@ mod tests {
     }
 
     #[test]
+    fn the_embedded_stack_is_written_where_compose_reads_it_but_not_journalled() {
+        static EMBEDDED: include_dir::Dir<'_> =
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        let dir = scratch("stack");
+        let paths = layout(&dir);
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        assert!(apply(&mut wizard, &paths, Source::Embedded(&EMBEDDED), "t").is_ok());
+
+        // The stack is on disk where Compose reads it — its manifest among the
+        // files. It is lemonfiber's regenerable output, so it is not recorded in the
+        // journal: its undo is the next apply rewriting it, not a reversal.
+        assert!(
+            paths.stack().join("stack.toml").is_file(),
+            "the stack was materialised"
+        );
+        let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
+        let stack_line = journal_text(&[made_dir(&paths.stack())]);
+        assert!(
+            !written.contains(&stack_line),
+            "the stack directory is not journalled: {written}",
+        );
+    }
+
+    #[test]
+    fn an_external_stack_is_left_where_it_is_and_not_written_here() {
+        let dir = scratch("external");
+        let paths = layout(&dir);
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+
+        // The operator's own stack stays where it is; nothing is written to the
+        // location an embedded stack would land in.
+        assert!(!paths.stack().exists(), "no stack was written here");
+    }
+
+    #[test]
+    fn a_stack_that_cannot_be_written_stops_the_apply() {
+        static EMBEDDED: include_dir::Dir<'_> =
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        let dir = scratch("nostack");
+        let paths = layout(&dir);
+        // A file sits where the stack's own data directory must be created, so
+        // materialising the embedded stack under it cannot succeed.
+        assert!(
+            std::fs::create_dir_all(dir.join("data")).is_ok(),
+            "the data base"
+        );
+        assert!(
+            std::fs::write(paths.data_dir(), "").is_ok(),
+            "the blocking file"
+        );
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        let stopped = apply(&mut wizard, &paths, Source::Embedded(&EMBEDDED), "t");
+
+        assert!(stopped.is_err(), "the stack could not be written");
+        let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
+        assert!(marker.contains("\"applying\""), "left mid-apply: {marker}");
+    }
+
+    #[test]
     fn an_unreviewed_wizard_is_refused_and_writes_nothing() {
         let dir = scratch("unreviewed");
-        let (env, progress, journal) = paths(&dir);
+        let paths = layout(&dir);
         // Still gathering answers — apply has nothing settled to write.
         let mut wizard = Wizard::new(Environment::LinuxNative);
 
-        let refused = apply(&mut wizard, &env, &progress, &journal, "t");
+        let refused = apply(&mut wizard, &paths, external(), "t");
 
         assert!(matches!(refused, Err(problem) if problem.code == super::NOT_REVIEWED));
-        assert!(!env.exists(), "nothing was written");
-        assert!(!progress.exists(), "no marker was left");
+        assert!(!paths.env_file().exists(), "nothing was written");
+        assert!(!paths.setup_progress().exists(), "no marker was left");
         assert_eq!(wizard.phase(), Phase::InProgress);
     }
 
     #[test]
     fn a_stop_partway_through_the_writes_leaves_the_applying_marker_for_recovery() {
         let dir = scratch("interrupted");
-        let (env, progress, _) = paths(&dir);
+        let paths = layout(&dir);
         // Obstruct the journal path with a directory, so the first journal write
         // fails — a stop in the middle of applying, after the applying marker is
         // down but before any setting lands. The recovery-critical property is that
         // the marker reached disk first, so the next run reads a failed apply rather
         // than mistaking a half-done setup for a finished one.
-        let journal = dir.join("journal-is-a-directory");
         assert!(
-            std::fs::create_dir_all(&journal).is_ok(),
+            std::fs::create_dir_all(paths.journal()).is_ok(),
             "obstructing directory"
         );
-        let root = dir.join("data");
+        let root = dir.join("data-root");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &env, &progress, &journal, "t").is_err());
+        assert!(apply(&mut wizard, &paths, external(), "t").is_err());
 
-        let marker = std::fs::read_to_string(&progress).unwrap_or_default();
+        let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
         assert!(marker.contains("\"applying\""), "left mid-apply: {marker}");
-        assert!(!env.exists(), "no setting was written before the stop");
+        assert!(
+            !paths.env_file().exists(),
+            "no setting was written before the stop"
+        );
         assert!(!root.exists(), "the directory was not made before the stop");
     }
 }
