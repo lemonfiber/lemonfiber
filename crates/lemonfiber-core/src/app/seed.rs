@@ -21,7 +21,9 @@ use crate::ports::docker::LogQuery;
 /// generated one recorded where the forwarded-port push reads it. The rest of
 /// the graph reads a credential and writes a connection: each media-filing
 /// \*arr's root folders, and its download clients (`SABnzbd` and qBittorrent).
-/// Prowlarr, Bindery and Jellyfin→Seerr wire on the same pattern and land next.
+/// Prowlarr's app sync registers each of those \*arrs back into Prowlarr, so it
+/// pushes them indexers. Bindery and Jellyfin→Seerr wire on the same pattern and
+/// land next.
 pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     let manifest = ctx
         .stack
@@ -67,6 +69,11 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
             .await,
         );
     }
+
+    // Prowlarr's app sync: register each of those media-filing \*arrs back into
+    // Prowlarr, so it pushes them its indexers. Bindery is left out here — it is
+    // not one of Prowlarr's applications and is wired via Torznab instead.
+    wirings.extend(seed_applications(ctx, &manifest.services, project.as_deref()).await);
 
     Ok(crate::seed::Report { wirings })
 }
@@ -316,6 +323,153 @@ async fn wire_arr_download_clients(
     .await
 }
 
+/// Prowlarr as the app-sync source, and the media-filing \*arrs to register into
+/// it — the resolution app sync starts from.
+struct AppSyncSource {
+    /// Prowlarr itself: where to reach its API and read its key.
+    target: crate::doctor::credentials::Target,
+    /// The address the \*arrs reach Prowlarr back on, on the stack's network.
+    network_url: String,
+}
+
+/// One media-filing \*arr to register into Prowlarr: what to call it, which
+/// application it is, where to read its key, and where Prowlarr reaches it.
+struct SyncableArr {
+    name: String,
+    kind: crate::ports::service::ApplicationKind,
+    config: PathBuf,
+    network_url: String,
+}
+
+/// Register each media-filing \*arr as an application in Prowlarr, so Prowlarr
+/// pushes it indexers.
+///
+/// Two keys gate a write, both read from configuration and never asked for:
+/// Prowlarr's own — without it Prowlarr is still starting, so every application
+/// is skipped for a re-run — and each \*arr's, which is what lets Prowlarr write
+/// into that \*arr; an \*arr that has not written its key yet is skipped on its
+/// own while the others proceed.
+async fn seed_applications(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Vec<crate::seed::Wiring> {
+    let Some(source) = prowlarr_source(services, project) else {
+        return Vec::new();
+    };
+
+    let Some(prowlarr_key) = read_servarr_key(ctx, &source.target.config).await else {
+        return syncable_arrs(services, project)
+            .into_iter()
+            .map(|arr| skipped_application(&arr.name, &source.target.name))
+            .collect();
+    };
+
+    let mut wanted = Vec::new();
+    let mut skipped = Vec::new();
+    for arr in syncable_arrs(services, project) {
+        match read_servarr_key(ctx, &arr.config).await {
+            Some(key) => wanted.push(crate::ports::service::Application {
+                name: arr.name,
+                kind: arr.kind,
+                prowlarr_url: source.network_url.clone(),
+                base_url: arr.network_url,
+                api_key: key,
+            }),
+            None => skipped.push(skipped_application(&arr.name, &source.target.name)),
+        }
+    }
+
+    let client = crate::prowlarr::Prowlarr::new(
+        ctx.http.clone(),
+        &source.target.base,
+        prowlarr_key,
+        &source.target.id,
+    );
+    let mut journal = crate::journal::Journal::new();
+    let mut wirings = crate::seed::wire_applications(
+        &client,
+        &source.target.name,
+        &wanted,
+        &mut journal,
+        &seed_stamp(ctx),
+    )
+    .await;
+    wirings.extend(skipped);
+    wirings
+}
+
+/// Prowlarr as the app-sync source: the Servarr-shape service that manages no
+/// media, reached at its published port and known on the network by its own
+/// container name. Nothing where the stack has no such service or no project to
+/// read its key from.
+fn prowlarr_source(
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Option<AppSyncSource> {
+    let project = project?;
+    services.iter().find_map(|service| {
+        if !service.media_types.is_empty() {
+            return None;
+        }
+        let target = target_for(service, project)?;
+        let port = service.port?;
+        Some(AppSyncSource {
+            target,
+            network_url: format!("http://{}:{port}", service.id),
+        })
+    })
+}
+
+/// The media-filing \*arrs Prowlarr's app sync covers, each as the application it
+/// is and where Prowlarr reaches it on the network. A Servarr service whose media
+/// is not one app sync covers — or none — is left out rather than guessed at.
+fn syncable_arrs(
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Vec<SyncableArr> {
+    let Some(project) = project else {
+        return Vec::new();
+    };
+    services
+        .iter()
+        .filter_map(|service| {
+            let target = target_for(service, project)?;
+            let kind = application_kind(&service.media_types)?;
+            let port = service.port?;
+            Some(SyncableArr {
+                name: service.name.clone(),
+                kind,
+                config: target.config,
+                network_url: format!("http://{}:{port}", service.id),
+            })
+        })
+        .collect()
+}
+
+/// The Prowlarr application kind for an \*arr's media, or nothing where its media
+/// is not one Prowlarr's app sync covers — the same by-media mapping the download
+/// clients' categories use, so the two stay in step.
+fn application_kind(media_types: &[String]) -> Option<crate::ports::service::ApplicationKind> {
+    match media_types.first().map(String::as_str) {
+        Some("tv") => Some(crate::ports::service::ApplicationKind::Sonarr),
+        Some("movies") => Some(crate::ports::service::ApplicationKind::Radarr),
+        Some("music") => Some(crate::ports::service::ApplicationKind::Lidarr),
+        _ => None,
+    }
+}
+
+/// An application skipped for a re-run because a key it needs is not written yet,
+/// named as the driver names it so a re-run's report reads consistently.
+fn skipped_application(arr: &str, prowlarr: &str) -> crate::seed::Wiring {
+    crate::seed::Wiring {
+        connection: format!("{arr} indexer sync via {prowlarr}"),
+        state: crate::seed::State::Skipped {
+            reason: format!("{arr} has not written its API key yet; a later run completes it"),
+        },
+    }
+}
+
 /// qBittorrent's address, if the stack has it: the id names the container to read
 /// a log from, the base is where the host reaches its web UI.
 fn qbittorrent_target(services: &[lemonfiber_manifest::Service]) -> Option<(String, String)> {
@@ -412,8 +566,8 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        category_for, download_clients, read_sabnzbd_key, recorded_qbittorrent_password,
-        sabnzbd_config_path, servarr_arrs,
+        application_kind, category_for, download_clients, prowlarr_source, read_sabnzbd_key,
+        recorded_qbittorrent_password, sabnzbd_config_path, servarr_arrs, syncable_arrs,
     };
     use crate::app::targets::{project_directory, servarr_targets};
     use crate::app::{dispatch, Command, Ctx, Outcome};
@@ -1005,5 +1159,243 @@ mod tests {
             qbittorrent, 3,
             "qBittorrent is offered to every arr on a later run"
         );
+    }
+
+    // ---- Prowlarr app sync: register each media-filing arr back into Prowlarr. ----
+
+    /// A media-filing \*arr as a manifest service, with the media that makes it
+    /// syncable — `manifest_service` alone leaves the media empty, which is what
+    /// marks Prowlarr.
+    fn arr(id: &str, port: u16, media: &str) -> lemonfiber_manifest::Service {
+        let mut service = manifest_service(
+            id,
+            Some(servarr_api(Some("/config/config.xml"))),
+            Some(port),
+        );
+        service.media_types = vec![media.to_owned()];
+        service
+    }
+
+    /// Prowlarr as a manifest service: a Servarr shape that files no media.
+    fn prowlarr() -> lemonfiber_manifest::Service {
+        manifest_service(
+            "prowlarr",
+            Some(servarr_api(Some("/config/config.xml"))),
+            Some(9696),
+        )
+    }
+
+    /// The wirings whose connection registers an \*arr into Prowlarr's app sync.
+    fn application_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
+        report
+            .wirings
+            .iter()
+            .filter(|wiring| wiring.connection.contains("indexer sync via"))
+            .collect()
+    }
+
+    #[test]
+    fn the_application_kind_follows_from_the_media() {
+        use crate::ports::service::ApplicationKind;
+        assert_eq!(
+            application_kind(&["tv".to_owned()]),
+            Some(ApplicationKind::Sonarr)
+        );
+        assert_eq!(
+            application_kind(&["movies".to_owned()]),
+            Some(ApplicationKind::Radarr)
+        );
+        assert_eq!(
+            application_kind(&["music".to_owned()]),
+            Some(ApplicationKind::Lidarr)
+        );
+        // Bindery files books but is not one of Prowlarr's applications.
+        assert!(application_kind(&["books".to_owned()]).is_none());
+        // A service that files no media is not an application at all.
+        assert!(application_kind(&[]).is_none());
+    }
+
+    #[test]
+    fn prowlarr_is_the_servarr_service_that_files_no_media() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        // A media-filing *arr is never the source, however reachable.
+        assert!(prowlarr_source(&[arr("sonarr", 8989, "tv")], Some(project)).is_none());
+        // The Servarr service with no media is, known on the network by its own
+        // container name and port.
+        let source = prowlarr_source(&[prowlarr()], Some(project));
+        assert!(source
+            .is_some_and(|source| source.network_url == "http://prowlarr:9696"
+                && source.target.id == "prowlarr"));
+        // Without a project there is nowhere to read a key from.
+        assert!(prowlarr_source(&[prowlarr()], None).is_none());
+    }
+
+    #[test]
+    fn no_project_directory_means_no_arrs_to_sync() {
+        assert!(syncable_arrs(&[arr("sonarr", 8989, "tv")], None).is_empty());
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        let arrs = syncable_arrs(
+            &[arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
+            Some(project),
+        );
+        assert_eq!(arrs.len(), 2, "each media-filing arr is syncable");
+        assert!(arrs
+            .iter()
+            .any(|arr| arr.network_url == "http://sonarr:8989"));
+    }
+
+    #[tokio::test]
+    async fn app_sync_does_nothing_where_the_stack_has_no_prowlarr() {
+        let ctx = seed_ctx(None, true, Vec::new(), None, None);
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        // Only a media-filing arr, so there is no app-sync source at all.
+        let wirings =
+            super::seed_applications(&ctx, &[arr("sonarr", 8989, "tv")], Some(project)).await;
+        assert!(wirings.is_empty(), "no Prowlarr, no app sync");
+    }
+
+    #[tokio::test]
+    async fn app_sync_skips_every_arr_until_prowlarr_has_written_its_key() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+        // Prowlarr's key is not readable yet, so it is still starting: every
+        // application is skipped for a re-run rather than failed.
+        let ctx = seed_ctx(None, true, Vec::new(), None, None)
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        let wirings = super::seed_applications(&ctx, &services, Some(project)).await;
+        assert_eq!(wirings.len(), 1);
+        assert!(wirings.iter().all(is_skipped));
+    }
+
+    #[tokio::test]
+    async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
+        const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+        // Prowlarr's key is readable but Sonarr's is not — Sonarr came up after
+        // Prowlarr — so Sonarr's application waits while Prowlarr itself proceeds.
+        let ctx = seed_ctx(None, true, Vec::new(), None, None)
+            .with_http(Arc::new(RoutedHttp))
+            .with_filesystem(Arc::new(
+                SeedFs::keyed(Some(SERVARR), None).only_for_prowlarr(),
+            ));
+        let wirings = super::seed_applications(&ctx, &services, Some(project)).await;
+        assert_eq!(wirings.len(), 1);
+        assert!(wirings.iter().all(is_skipped));
+    }
+
+    #[tokio::test]
+    async fn app_sync_registers_an_arr_whose_keys_are_all_readable() {
+        const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+        // RoutedHttp reports Sonarr already registered — its baseUrl is in the
+        // application list — so the connection reads back as already wired.
+        let ctx = seed_ctx(None, true, Vec::new(), None, None)
+            .with_http(Arc::new(RoutedHttp))
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
+        let wirings = super::seed_applications(&ctx, &services, Some(project)).await;
+        assert_eq!(wirings.len(), 1);
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::AlreadyWired)
+        );
+    }
+
+    /// A Prowlarr transport that starts with no applications, captures the POST
+    /// that registers one, and reports it on the next read — so the orchestrator's
+    /// write path runs end to end rather than short-circuiting to already-wired.
+    struct CapturingProwlarr {
+        posted: std::sync::Mutex<Option<crate::ports::http::Request>>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::ports::http::Http for CapturingProwlarr {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            if request.method == crate::ports::http::Method::Post {
+                if let Ok(mut posted) = self.posted.lock() {
+                    *posted = Some(request.clone());
+                }
+                return Ok(crate::ports::http::Response {
+                    status: 201,
+                    body: String::new(),
+                });
+            }
+            let registered = self.posted.lock().is_ok_and(|posted| posted.is_some());
+            let body = if registered {
+                r#"[{"id":9,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]}]"#
+            } else {
+                "[]"
+            };
+            Ok(crate::ports::http::Response {
+                status: 200,
+                body: body.to_owned(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn app_sync_registers_an_absent_arr_and_reads_it_back() {
+        const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+        // Prowlarr holds no applications, so Sonarr is genuinely written and then
+        // read back — the write path a pre-populated list would hide.
+        let http = Arc::new(CapturingProwlarr {
+            posted: std::sync::Mutex::new(None),
+        });
+        let ctx = seed_ctx(None, true, Vec::new(), None, None)
+            .with_http(http.clone())
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
+
+        let wirings = super::seed_applications(&ctx, &services, Some(project)).await;
+        assert_eq!(wirings.len(), 1);
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Wired),
+            "an absent application is written and confirmed by read-back"
+        );
+
+        // The orchestrator built the registration for the right *arr, reaching it
+        // and Prowlarr on the stack network, and posted it to Prowlarr's v1 API.
+        let posted = http.posted.lock().ok().and_then(|guard| guard.clone());
+        assert!(posted
+            .as_ref()
+            .is_some_and(|request| request.url.ends_with("/api/v1/applications")));
+        let body = posted.and_then(|request| request.body).unwrap_or_default();
+        assert!(
+            body.contains("http://sonarr:8989"),
+            "the *arr's address: {body}"
+        );
+        assert!(body.contains(r#""implementation":"Sonarr""#), "{body}");
+        assert!(
+            body.contains("http://prowlarr:9696"),
+            "Prowlarr's callback url: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn seed_registers_each_arr_into_prowlarr() {
+        // The whole command against the real manifest: Prowlarr and the three
+        // media-filing arrs, each already registered per RoutedHttp.
+        const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+        let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
+            .with_http(Arc::new(RoutedHttp))
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let applications = application_wirings(&report);
+        assert_eq!(
+            applications.len(),
+            3,
+            "Sonarr, Radarr and Lidarr each registered into Prowlarr"
+        );
+        assert!(applications
+            .iter()
+            .all(|wiring| wiring.state == crate::seed::State::AlreadyWired));
     }
 }
