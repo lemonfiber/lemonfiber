@@ -34,6 +34,7 @@ use lemonfiber_core::wizard::{
 };
 use lemonfiber_core::PRODUCT;
 
+mod nntp;
 mod prompt;
 mod render;
 use prompt::{Flags, SetupFlags, Terminal};
@@ -658,9 +659,10 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard, flags: SetupFlag
         return code;
     }
 
-    // Credentials are proven against their live services as they are entered, over
-    // the same HTTP seam the rest of the stack is reached through.
-    let validator = Live::new(ctx.http.clone());
+    // Credentials are proven against their live services as they are entered — the
+    // indexer and any existing service over HTTP, a Usenet provider over a real,
+    // TLS-wrapped NNTP connection.
+    let validator = Live::with_nntp(ctx.http.clone(), Arc::new(nntp::Dialer::new()));
 
     // A terminal answers the questions; without one the flags do, and where a flag
     // a question needs is missing the run is told which rather than left waiting on

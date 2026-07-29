@@ -20,7 +20,8 @@ use serde::{Deserialize, Serialize};
 use crate::config::env::EnvFile;
 use crate::config::{
     Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, INDEXER_VALIDATED_KEY,
-    JELLYFIN_MODE_KEY, PGID_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
+    JELLYFIN_MODE_KEY, PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY,
+    PROVIDER_TLS_KEY, PROVIDER_USER_KEY, PROVIDER_VALIDATED_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
 };
 use crate::journal::{Change, Journal, Kind, Undo};
 use crate::platform::Environment;
@@ -78,6 +79,9 @@ pub enum Step {
     /// The indexer credential, tested against the live service. Asked only where a
     /// download protocol was chosen.
     Credentials,
+    /// The Usenet provider login, tested over NNTP. Asked only where Usenet was
+    /// chosen.
+    Provider,
     /// The user and group the containers run as. Asked only where it is visible.
     ServiceUser,
     /// Whether to run Jellyfin, and if so how.
@@ -92,13 +96,14 @@ pub enum Step {
 
 impl Step {
     /// The steps in presentation order.
-    const ORDER: [Self; 11] = [
+    const ORDER: [Self; 12] = [
         Self::Welcome,
         Self::Preflight,
         Self::Protocols,
         Self::Prerequisites,
         Self::DataLocation,
         Self::Credentials,
+        Self::Provider,
         Self::ServiceUser,
         Self::Library,
         Self::Household,
@@ -118,11 +123,12 @@ impl Step {
             Self::Prerequisites => 3,
             Self::DataLocation => 4,
             Self::Credentials => 5,
-            Self::ServiceUser => 6,
-            Self::Library => 7,
-            Self::Household => 8,
-            Self::Autostart => 9,
-            Self::Review => 10,
+            Self::Provider => 6,
+            Self::ServiceUser => 7,
+            Self::Library => 8,
+            Self::Household => 9,
+            Self::Autostart => 10,
+            Self::Review => 11,
         }
     }
 
@@ -137,6 +143,7 @@ impl Step {
             Self::Protocols
                 | Self::DataLocation
                 | Self::Credentials
+                | Self::Provider
                 | Self::ServiceUser
                 | Self::Library
                 | Self::Household
@@ -180,6 +187,41 @@ pub enum Credentials {
     Given(Indexer),
 }
 
+/// A Usenet provider login the operator supplied, and whether it was proven.
+///
+/// Its password rides here the way the stack holds its other secrets; `validated`
+/// records whether the live login took before it was kept, so a later diagnosis
+/// knows an unproven one went in unverified.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Provider {
+    /// The provider's hostname.
+    pub host: String,
+    /// The port it answers NNTP on.
+    pub port: u16,
+    /// The account username.
+    pub user: String,
+    /// The account password.
+    pub pass: String,
+    /// Whether to connect over TLS, as it must be to carry the password.
+    pub tls: bool,
+    /// Whether a live login proved the account before it was kept.
+    pub validated: bool,
+}
+
+/// Where the Usenet-provider step stands: the same three states the credentials
+/// step has, kept distinct on the wire for the same reason.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Usenet {
+    /// The step has not been reached yet.
+    #[default]
+    Unanswered,
+    /// Reached, and left without a provider — a supported end.
+    Empty,
+    /// Answered with a provider, proven or not.
+    Given(Provider),
+}
+
 /// What the operator has answered so far.
 ///
 /// Every field is optional because a wizard mid-flight is partly answered, and a
@@ -197,6 +239,11 @@ pub struct Answers {
     /// nested option would lose. Absent from an older progress file, so defaulted.
     #[serde(default)]
     pub credentials: Credentials,
+    /// The Usenet provider, where Usenet was chosen. Its own three-state value for
+    /// the same reason the indexer's is. Absent from an older progress file, so
+    /// defaulted.
+    #[serde(default)]
+    pub usenet: Usenet,
     /// The container user and group, where the platform makes it meaningful.
     ///
     /// Distinguishes "answered: no id needed here" (`Some(None)`) from "not yet
@@ -220,6 +267,9 @@ pub enum Answer {
     /// The indexer credential the operator settled on, or none where they entered
     /// nothing.
     Credentials(Option<Indexer>),
+    /// The Usenet provider the operator settled on, or none where they entered
+    /// nothing.
+    Provider(Option<Provider>),
     /// The container user and group, or none where it is not needed.
     ServiceUser(Option<(u32, u32)>),
     /// How the library is served.
@@ -378,6 +428,9 @@ impl Wizard {
             // Credentials are for the download services; a library-only run that
             // chose neither protocol has none to give, so the step is passed over.
             Step::Credentials => matches!(self.progress.answers.protocols, Some(p) if p.any()),
+            // A Usenet provider is only for a Usenet run; a torrent-only or
+            // library-only one has no provider to give.
+            Step::Provider => matches!(self.progress.answers.protocols, Some(p) if p.usenet),
             _ => true,
         }
     }
@@ -397,6 +450,12 @@ impl Wizard {
                 self.progress.answers.credentials = match indexer {
                     Some(indexer) => Credentials::Given(indexer),
                     None => Credentials::Empty,
+                };
+            }
+            Answer::Provider(provider) => {
+                self.progress.answers.usenet = match provider {
+                    Some(provider) => Usenet::Given(provider),
+                    None => Usenet::Empty,
                 };
             }
             Answer::ServiceUser(user) => {
@@ -480,6 +539,7 @@ impl Wizard {
             Step::Protocols => answers.protocols.is_some(),
             Step::DataLocation => answers.data_location.is_some(),
             Step::Credentials => !matches!(answers.credentials, Credentials::Unanswered),
+            Step::Provider => !matches!(answers.usenet, Usenet::Unanswered),
             Step::ServiceUser => answers.service_user.is_some(),
             Step::Library => answers.library.is_some(),
             Step::Household => answers.household.is_some(),
@@ -552,6 +612,21 @@ impl Wizard {
                 settings.push((INDEXER_URL_KEY.to_owned(), indexer.url.clone()));
                 settings.push((INDEXER_APIKEY_KEY.to_owned(), indexer.key.clone()));
                 settings.push((INDEXER_VALIDATED_KEY.to_owned(), on_off(indexer.validated)));
+            }
+        }
+        // Gated on the step still applying, so a provider given for a Usenet run
+        // that was then changed to torrent-only leaves no stale login behind.
+        if self.applies(Step::Provider) {
+            if let Usenet::Given(provider) = &answers.usenet {
+                settings.push((PROVIDER_HOST_KEY.to_owned(), provider.host.clone()));
+                settings.push((PROVIDER_PORT_KEY.to_owned(), provider.port.to_string()));
+                settings.push((PROVIDER_USER_KEY.to_owned(), provider.user.clone()));
+                settings.push((PROVIDER_PASS_KEY.to_owned(), provider.pass.clone()));
+                settings.push((PROVIDER_TLS_KEY.to_owned(), on_off(provider.tls)));
+                settings.push((
+                    PROVIDER_VALIDATED_KEY.to_owned(),
+                    on_off(provider.validated),
+                ));
             }
         }
         if let Some(Some((uid, gid))) = answers.service_user {
@@ -792,6 +867,7 @@ mod tests {
             .answer(Answer::DataLocation(PathBuf::from("/srv/media")))
             .unwrap_or(());
         wizard.answer(Answer::Credentials(None)).unwrap_or(());
+        wizard.answer(Answer::Provider(None)).unwrap_or(());
         wizard
             .answer(Answer::ServiceUser(Some((1000, 1001))))
             .unwrap_or(());
@@ -1147,6 +1223,46 @@ mod tests {
             setting(&plan, "INDEXER_APIKEY"),
             None,
             "no stale key is written"
+        );
+    }
+
+    #[test]
+    fn a_given_provider_is_planned_but_dropped_when_usenet_is_no_longer_chosen() {
+        let provider = Answer::Provider(Some(super::Provider {
+            host: "news.provider.test".to_owned(),
+            port: 563,
+            user: "person".to_owned(),
+            pass: "secret".to_owned(),
+            tls: true,
+            validated: true,
+        }));
+
+        // Chosen with Usenet, the provider login is written.
+        let mut wizard = on_native_linux();
+        wizard
+            .answer(Answer::Protocols(Protocols::both()))
+            .unwrap_or(());
+        wizard.answer(provider.clone()).unwrap_or(());
+        let plan = wizard.plan();
+        assert_eq!(setting(&plan, "USENET_HOST"), Some("news.provider.test"));
+        assert_eq!(setting(&plan, "USENET_PORT"), Some("563"));
+        assert_eq!(setting(&plan, "USENET_USER"), Some("person"));
+        assert_eq!(setting(&plan, "USENET_VALIDATED"), Some("on"));
+
+        // Then torrents only, so the provider step no longer applies; its login,
+        // password and all, must not be written for a stack that will not use it.
+        wizard
+            .answer(Answer::Protocols(Protocols {
+                usenet: false,
+                torrent: true,
+            }))
+            .unwrap_or(());
+        let plan = wizard.plan();
+        assert_eq!(setting(&plan, "USENET_HOST"), None);
+        assert_eq!(
+            setting(&plan, "USENET_PASS"),
+            None,
+            "no stale password is written"
         );
     }
 

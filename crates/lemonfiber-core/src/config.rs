@@ -100,6 +100,25 @@ pub const INDEXER_APIKEY_KEY: &str = "INDEXER_APIKEY";
 /// later diagnosis can point at it rather than trusting it silently.
 pub const INDEXER_VALIDATED_KEY: &str = "INDEXER_VALIDATED";
 
+/// The Usenet provider's hostname.
+pub const PROVIDER_HOST_KEY: &str = "USENET_HOST";
+
+/// The port the Usenet provider answers NNTP on.
+pub const PROVIDER_PORT_KEY: &str = "USENET_PORT";
+
+/// The Usenet account username.
+pub const PROVIDER_USER_KEY: &str = "USENET_USER";
+
+/// The Usenet account password. A secret, held the way the stack holds its others.
+pub const PROVIDER_PASS_KEY: &str = "USENET_PASS";
+
+/// Whether the Usenet connection uses TLS.
+pub const PROVIDER_TLS_KEY: &str = "USENET_TLS";
+
+/// Whether the Usenet login was proven before it was kept — off records one the
+/// operator chose to proceed with unverified.
+pub const PROVIDER_VALIDATED_KEY: &str = "USENET_VALIDATED";
+
 /// The environment key holding qBittorrent's web UI password.
 ///
 /// Seeding generates this password and records it here, because the

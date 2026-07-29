@@ -20,7 +20,16 @@ clap = { workspace = true }
 etcetera = { workspace = true }
 color-eyre = { workspace = true }
 include_dir = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "io-util", "time"] }
+# Proving a Usenet provider means opening a real, TLS-wrapped NNTP connection —
+# rustls (already in the tree via reqwest) rather than the platform's TLS, so the
+# static musl release stays free of a system TLS library. Bundled Mozilla roots,
+# for the same reason: a static binary carries its own trust anchors.
+async-trait = { workspace = true }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-pki-types = "1"
+webpki-roots = "1"
 
 [lints]
 workspace = true

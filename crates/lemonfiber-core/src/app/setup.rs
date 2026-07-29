@@ -20,7 +20,9 @@ use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::stack::Source;
 use crate::storage::{self, Linked};
 use crate::validate::{Credential, Validation, Validator};
-use crate::wizard::{Answer, Indexer, Library, Phase, Plan, Progress, Rejected, Step, Wizard};
+use crate::wizard::{
+    Answer, Indexer, Library, Phase, Plan, Progress, Provider, Rejected, Step, Wizard,
+};
 
 /// How the operator is asked the questions the wizard cannot answer itself.
 ///
@@ -57,6 +59,11 @@ pub trait Prompt {
     /// apart by cause, and ask whether to try again, proceed with it unverified, or
     /// leave it unset for now.
     fn credential_failed(&self, outcome: &Validation) -> CredentialChoice;
+    /// Ask for the Usenet provider's host, port, login and TLS, or nothing where
+    /// the operator has none to give now. The password is read but never echoed.
+    /// Its live test reports through [`Prompt::credential_valid`] and
+    /// [`Prompt::credential_failed`], the same as the indexer's.
+    fn usenet_provider(&self) -> Option<ProviderEntry>;
     /// The user and group the containers run as, asked only where ownership shows;
     /// `None` where the operator declines and the image's own default is kept.
     fn service_user(&self) -> Option<(u32, u32)>;
@@ -88,6 +95,22 @@ pub enum StorageWarning {
         /// Why the test could not be run.
         reason: String,
     },
+}
+
+/// A Usenet provider login as the operator enters it, before it is proven — the
+/// same fields the wizard keeps, without the `validated` the test decides.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderEntry {
+    /// The provider's hostname.
+    pub host: String,
+    /// The port it answers NNTP on.
+    pub port: u16,
+    /// The account username.
+    pub user: String,
+    /// The account password.
+    pub pass: String,
+    /// Whether to connect over TLS.
+    pub tls: bool,
 }
 
 /// What the operator does with a credential the live test could not prove.
@@ -204,6 +227,8 @@ enum How {
     Location,
     /// Ask for a credential and prove it against its live service before keeping it.
     Credential,
+    /// Ask for a Usenet provider and prove its login before keeping it.
+    Provider,
 }
 
 async fn gather(
@@ -217,13 +242,14 @@ async fn gather(
     // record, and save before moving on, so quitting mid-setup resumes at the
     // question reached rather than restarting. One loop keeps the recording a
     // single `?` rather than one tucked inside each conditional.
-    let questions: [(Step, How); 7] = [
+    let questions: [(Step, How); 8] = [
         (
             Step::Protocols,
             How::Sync(|prompt| Answer::Protocols(prompt.protocols())),
         ),
         (Step::DataLocation, How::Location),
         (Step::Credentials, How::Credential),
+        (Step::Provider, How::Provider),
         (
             Step::ServiceUser,
             How::Sync(|prompt| Answer::ServiceUser(prompt.service_user())),
@@ -250,6 +276,7 @@ async fn gather(
             How::Sync(ask) => ask(prompt),
             How::Location => Answer::DataLocation(resolve_location(prompt, filesystem).await),
             How::Credential => resolve_credentials(prompt, validator).await,
+            How::Provider => resolve_provider(prompt, validator).await,
         };
 
         // The accounts a protocol needs are shown the moment the protocol is
@@ -331,6 +358,46 @@ async fn resolve_credentials(prompt: &dyn Prompt, validator: &dyn Validator) -> 
                 }))
             }
             CredentialChoice::Skip => return Answer::Credentials(None),
+        }
+    }
+}
+
+/// Ask for a Usenet provider and prove its login over NNTP, until one is settled
+/// on — proven, taken unverified, or left for now. The same shape as the indexer,
+/// against a different transport: nothing is kept before the login is attempted,
+/// and a login that does not take is put back to the operator by cause.
+async fn resolve_provider(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
+    loop {
+        let Some(entry) = prompt.usenet_provider() else {
+            return Answer::Provider(None);
+        };
+        let outcome = validator
+            .validate(&Credential::Usenet {
+                host: entry.host.clone(),
+                port: entry.port,
+                secure: entry.tls,
+                user: entry.user.clone(),
+                pass: entry.pass.clone(),
+            })
+            .await;
+        let kept = |validated| {
+            Answer::Provider(Some(Provider {
+                host: entry.host.clone(),
+                port: entry.port,
+                user: entry.user.clone(),
+                pass: entry.pass.clone(),
+                tls: entry.tls,
+                validated,
+            }))
+        };
+        if let Validation::Valid { observed } = &outcome {
+            prompt.credential_valid(observed);
+            return kept(true);
+        }
+        match prompt.credential_failed(&outcome) {
+            CredentialChoice::Retry => {}
+            CredentialChoice::Proceed => return kept(false),
+            CredentialChoice::Skip => return Answer::Provider(None),
         }
     }
 }
@@ -458,7 +525,9 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{progress_at, run, CredentialChoice, Outcome, Prompt, StorageWarning};
+    use super::{
+        progress_at, run, CredentialChoice, Outcome, Prompt, ProviderEntry, StorageWarning,
+    };
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::platform::Environment;
@@ -629,6 +698,8 @@ mod tests {
         /// The indexer the operator enters, or none to leave it unset. Returned on
         /// every `credential` call, so a retry re-enters the same one.
         credential: Option<(String, String)>,
+        /// The Usenet provider the operator enters, or none to leave it unset.
+        provider: Option<ProviderEntry>,
         /// What the operator does with a credential the test could not prove.
         on_failure: CredentialChoice,
         /// The observed facts of credentials proven, and the outcomes of those that
@@ -655,6 +726,7 @@ mod tests {
                 warnings: std::cell::RefCell::new(Vec::new()),
                 hardlinked: std::cell::RefCell::new(Vec::new()),
                 credential: None,
+                provider: None,
                 on_failure: CredentialChoice::Skip,
                 proven: std::cell::RefCell::new(Vec::new()),
                 failures: std::cell::RefCell::new(Vec::new()),
@@ -690,6 +762,9 @@ mod tests {
         fn credential_failed(&self, outcome: &Validation) -> CredentialChoice {
             self.failures.borrow_mut().push(outcome.clone());
             self.on_failure
+        }
+        fn usenet_provider(&self) -> Option<ProviderEntry> {
+            self.provider.clone()
         }
         fn service_user(&self) -> Option<(u32, u32)> {
             self.service_user
@@ -915,6 +990,7 @@ mod tests {
             Answer::Protocols(Protocols::both()),
             Answer::DataLocation(dir.join("data-root")),
             Answer::Credentials(None),
+            Answer::Provider(None),
             Answer::ServiceUser(Some((1000, 1000))),
             Answer::Library(Library::JellyfinDocker),
             Answer::Household(true),
@@ -944,6 +1020,7 @@ mod tests {
             Answer::Protocols(Protocols::both()),
             Answer::DataLocation(dir.join("data-root")),
             Answer::Credentials(None),
+            Answer::Provider(None),
             Answer::ServiceUser(Some((1000, 1000))),
             Answer::Library(Library::JellyfinDocker),
             Answer::Household(true),
@@ -1420,6 +1497,140 @@ mod tests {
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         let file = store::read(&paths.env_file()).unwrap_or_default();
         assert_eq!(file.get("INDEXER_URL"), None);
+    }
+
+    /// A prompt that enters the given Usenet provider and answers a failed login
+    /// the given way — everything else the workable defaults.
+    fn entering_provider(dir: &Path, on_failure: CredentialChoice) -> Scripted {
+        Scripted {
+            provider: Some(ProviderEntry {
+                host: "news.provider.test".to_owned(),
+                port: 563,
+                user: "person".to_owned(),
+                pass: "secret".to_owned(),
+                tls: true,
+            }),
+            on_failure,
+            ..Scripted::workable(dir.join("data-root"))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_usenet_provider_proven_is_kept_and_recorded_as_validated() {
+        let dir = scratch("provider-valid");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering_provider(&dir, CredentialChoice::Skip);
+        let validator = Proving::giving(vec![Validation::Valid {
+            observed: "the provider accepted the login".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("USENET_HOST"), Some("news.provider.test"));
+        assert_eq!(file.get("USENET_USER"), Some("person"));
+        assert_eq!(file.get("USENET_VALIDATED"), Some("on"));
+        assert!(prompt
+            .proven
+            .borrow()
+            .iter()
+            .any(|observed| observed.contains("accepted the login")));
+    }
+
+    #[tokio::test]
+    async fn a_provider_that_fails_then_passes_on_retry_is_kept() {
+        let dir = scratch("provider-retry");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering_provider(&dir, CredentialChoice::Retry);
+        let validator = Proving::giving(vec![
+            Validation::Rejected {
+                detail: "the provider refused the username or password".to_owned(),
+            },
+            Validation::Valid {
+                observed: "the provider accepted the login".to_owned(),
+            },
+        ]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        assert_eq!(prompt.failures.borrow().len(), 1);
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("USENET_VALIDATED"), Some("on"));
+    }
+
+    #[tokio::test]
+    async fn a_provider_kept_unverified_records_that_it_was_not_proven() {
+        let dir = scratch("provider-proceed");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering_provider(&dir, CredentialChoice::Proceed);
+        let validator = Proving::giving(vec![Validation::Unreachable {
+            detail: "nothing answered".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("USENET_HOST"), Some("news.provider.test"));
+        assert_eq!(file.get("USENET_VALIDATED"), Some("off"));
+    }
+
+    #[tokio::test]
+    async fn a_provider_skipped_leaves_usenet_unset() {
+        let dir = scratch("provider-skip");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering_provider(&dir, CredentialChoice::Skip);
+        let validator = Proving::giving(vec![Validation::Rejected {
+            detail: "refused".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("USENET_HOST"), None);
     }
 
     #[tokio::test]

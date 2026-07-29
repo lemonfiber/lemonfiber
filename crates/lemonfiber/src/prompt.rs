@@ -8,7 +8,7 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::{CredentialChoice, Prompt, StorageWarning};
+use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
@@ -176,6 +176,29 @@ impl Prompt for Terminal {
             "3" => CredentialChoice::Skip,
             _ => CredentialChoice::Retry,
         }
+    }
+
+    fn usenet_provider(&self) -> Option<ProviderEntry> {
+        println!("\nA Usenet provider is where downloads are fetched from.");
+        println!("Leave the host blank to set one up later.");
+        let host = ask("Provider host:");
+        if host.is_empty() {
+            return None;
+        }
+        // 563 is the standard TLS port; TLS is the default because the password
+        // must not cross the wire in the clear.
+        let port = ask("Port [563]:").parse().unwrap_or(563);
+        let user = ask("Username:");
+        // Read on its own line and never printed back — only the test's outcome is.
+        let pass = ask("Password:");
+        let tls = yes_no("Connect over TLS?", true);
+        Some(ProviderEntry {
+            host,
+            port,
+            user,
+            pass,
+            tls,
+        })
     }
 
     fn service_user(&self) -> Option<(u32, u32)> {
@@ -427,6 +450,11 @@ impl Prompt for Flags {
         } else {
             CredentialChoice::Skip
         }
+    }
+    // A Usenet provider is optional (an unset one is a supported end), so a flag
+    // run leaves it unset for now; configuring it from flags is a later addition.
+    fn usenet_provider(&self) -> Option<ProviderEntry> {
+        None
     }
     fn service_user(&self) -> Option<(u32, u32)> {
         self.flags.service_user
