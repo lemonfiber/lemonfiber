@@ -36,7 +36,7 @@ use lemonfiber_core::PRODUCT;
 
 mod prompt;
 mod render;
-use prompt::Terminal;
+use prompt::{Flags, SetupFlags, Terminal};
 use render::{render, watched};
 
 /// The stack this binary carries.
@@ -70,7 +70,40 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Request {
     /// Set up the stack by answering a few questions.
-    Setup,
+    ///
+    /// Interactive by default. Given the flags below, it runs unattended: each
+    /// answers a question the wizard would otherwise ask, and `--yes` stands in for
+    /// the confirmation. A non-interactive run missing a flag it needs is told
+    /// which, rather than left waiting on input that will not come.
+    Setup {
+        /// Apply without a prompt to confirm — required for an unattended run.
+        #[arg(long)]
+        yes: bool,
+        /// How to fetch content: `both`, `usenet`, `torrent`, or `none`.
+        #[arg(long, value_name = "PROTOCOLS")]
+        protocols: Option<String>,
+        /// Where the library and downloads live.
+        #[arg(long, value_name = "PATH")]
+        data_location: Option<PathBuf>,
+        /// An indexer's API base URL.
+        #[arg(long, value_name = "URL")]
+        indexer_url: Option<String>,
+        /// The indexer's API key.
+        #[arg(long, value_name = "KEY")]
+        indexer_key: Option<String>,
+        /// How to serve the library: `docker`, `native`, or `none`.
+        #[arg(long, value_name = "MODE")]
+        library: Option<String>,
+        /// The container user, as `UID:GID`.
+        #[arg(long, value_name = "UID:GID")]
+        service_user: Option<String>,
+        /// Whether others in the home will use it.
+        #[arg(long, value_name = "BOOL")]
+        household: Option<bool>,
+        /// Whether to start the stack when the machine boots.
+        #[arg(long, value_name = "BOOL")]
+        autostart: Option<bool>,
+    },
     /// Report the versions in play.
     Version,
     /// Start a form, or the union of several.
@@ -219,7 +252,37 @@ async fn main() -> ExitCode {
         // Setup is a conversation and then a stack coming up, not a value that
         // arrives once, so like streaming and watching it runs its own way. It
         // takes the context by value because it rewrites the settings mid-run.
-        Request::Setup => return run_setup(ctx).await,
+        Request::Setup {
+            yes,
+            protocols,
+            data_location,
+            indexer_url,
+            indexer_key,
+            library,
+            service_user,
+            household,
+            autostart,
+        } => {
+            let raw = prompt::RawSetup {
+                yes,
+                protocols,
+                data_location,
+                indexer_url,
+                indexer_key,
+                library,
+                service_user,
+                household,
+                autostart,
+            };
+            let flags = match SetupFlags::parse(raw) {
+                Ok(flags) => flags,
+                Err(message) => {
+                    eprintln!("error: {message}");
+                    return ExitCode::from(USAGE);
+                }
+            };
+            return run_setup(ctx, flags).await;
+        }
         Request::Version => Command::Version,
         Request::Up { forms } => Command::Up { forms },
         Request::Down { forms } => Command::Down { forms },
@@ -464,7 +527,9 @@ async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode {
         Status::of(progress.as_ref()),
         Status::FailedApply | Status::InProgress
     ) {
-        return run_setup(ctx).await;
+        // A bare invocation carries no flags; unfinished setup is picked up
+        // interactively, the same conversation a fresh bare run would have.
+        return run_setup(ctx, SetupFlags::none()).await;
     }
 
     if !offer_setup(paths.env_file().exists()) {
@@ -499,7 +564,7 @@ async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode {
         println!("No changes made — run `{PRODUCT} setup` when you are ready.");
         return ExitCode::SUCCESS;
     }
-    run_setup(ctx).await
+    run_setup(ctx, SetupFlags::none()).await
 }
 
 /// Ask whether to begin setup now, taking silence and anything but a clear no as
@@ -520,7 +585,7 @@ fn confirm_setup() -> bool {
 /// it decides nothing itself, but reading a line and rendering a question is the
 /// surface's job, and the [`Terminal`] does it. What to ask, what an answer means,
 /// and what to write are all the core's, reached through [`setup::run`].
-async fn run_setup(ctx: Ctx) -> ExitCode {
+async fn run_setup(ctx: Ctx, flags: SetupFlags) -> ExitCode {
     // Applying is the point of it, so there is nothing to rehearse; saying so is
     // kinder than a wizard that asks every question and then changes nothing.
     if ctx.dry_run {
@@ -541,15 +606,15 @@ async fn run_setup(ctx: Ctx) -> ExitCode {
     match Status::of(progress.as_ref()) {
         Status::FailedApply => recover_setup(ctx, &paths, progress).await,
         // A run that quit mid-question saved where it reached; pick it back up.
-        Status::InProgress => resume_gather(ctx, &paths, progress).await,
+        Status::InProgress => resume_gather(ctx, &paths, progress, flags).await,
         // Absent and applied are neither a stopped apply nor a saved run, so they
         // begin, or decline, a fresh one.
-        _ => fresh_setup(ctx, &paths).await,
+        _ => fresh_setup(ctx, &paths, flags).await,
     }
 }
 
 /// Gather answers on a machine with nothing to recover or resume.
-async fn fresh_setup(ctx: Ctx, paths: &Paths) -> ExitCode {
+async fn fresh_setup(ctx: Ctx, paths: &Paths, flags: SetupFlags) -> ExitCode {
     // Setup is for a machine with nothing configured; a configured one is changed
     // through its settings, not walked back to its first question.
     if !offer_setup(paths.env_file().exists()) {
@@ -559,26 +624,33 @@ async fn fresh_setup(ctx: Ctx, paths: &Paths) -> ExitCode {
     }
 
     let environment = ctx.environment;
-    drive(ctx, paths, Wizard::new(environment)).await
+    drive(ctx, paths, Wizard::new(environment), flags).await
 }
 
 /// Pick a setup back up from the answers a quit run saved.
-async fn resume_gather(ctx: Ctx, paths: &Paths, progress: Option<Progress>) -> ExitCode {
+async fn resume_gather(
+    ctx: Ctx,
+    paths: &Paths,
+    progress: Option<Progress>,
+    flags: SetupFlags,
+) -> ExitCode {
     // In-progress means a saved run; if it is somehow gone there is nothing to
     // resume, so a fresh run is the honest fallback.
     let Some(progress) = progress else {
-        return fresh_setup(ctx, paths).await;
+        return fresh_setup(ctx, paths, flags).await;
     };
     println!("Picking up where a previous setup left off.");
     let environment = ctx.environment;
-    drive(ctx, paths, Wizard::resume(environment, progress)).await
+    drive(ctx, paths, Wizard::resume(environment, progress), flags).await
 }
 
 /// Ask the questions the `wizard` still needs, apply the answers, and start.
-async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard) -> ExitCode {
-    // The questions need someone at a terminal to answer them. A piped or scripted
-    // run has no one, so it is told what it would have been asked rather than left
-    // waiting on input that never comes.
+///
+/// The answers come from a terminal where there is one; where there is not, they
+/// come from the flags. Either way it is the same walk — the wizard cannot tell —
+/// so a flag run still probes the data location and proves the indexer, with the
+/// warnings a person would weigh settled by the standing `--yes`.
+async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard, flags: SetupFlags) -> ExitCode {
     // The environment is checked before the first question, so a missing or
     // unreachable container engine is caught here rather than after eleven
     // answers — nothing setup does can work without one.
@@ -586,26 +658,31 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard) -> ExitCode {
         return code;
     }
 
-    // The questions need someone at a terminal to answer them. A piped or scripted
-    // run has no one, so it is told what it would have been asked rather than left
-    // waiting on input that never comes.
-    if !std::io::stdin().is_terminal() {
-        eprintln!("error: setup asks questions that need a terminal to answer.");
-        eprintln!(
-            "Run it interactively, or set values with `{PRODUCT} config set` and start with `{PRODUCT} up`."
-        );
-        return ExitCode::from(USAGE);
-    }
-
-    let prompt = Terminal::new(ctx.environment, default_data_location());
-
     // Credentials are proven against their live services as they are entered, over
     // the same HTTP seam the rest of the stack is reached through.
     let validator = Live::new(ctx.http.clone());
 
+    // A terminal answers the questions; without one the flags do, and where a flag
+    // a question needs is missing the run is told which rather than left waiting on
+    // input that never comes.
+    let prompt: Box<dyn setup::Prompt> = if std::io::stdin().is_terminal() {
+        Box::new(Terminal::new(ctx.environment, default_data_location()))
+    } else {
+        let missing = flags.missing(&wizard);
+        if !missing.is_empty() {
+            eprintln!("error: setup here is non-interactive, so it needs values as flags:");
+            for flag in missing {
+                eprintln!("  {flag}");
+            }
+            eprintln!("\nRun it in a terminal to answer interactively instead.");
+            return ExitCode::from(USAGE);
+        }
+        Box::new(Flags::new(flags, default_data_location()))
+    };
+
     match setup::run(
         &mut wizard,
-        &prompt,
+        prompt.as_ref(),
         ctx.filesystem.as_ref(),
         &validator,
         paths,
@@ -637,9 +714,10 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard) -> ExitCode {
 /// it is, still recoverable, rather than acted on unasked.
 async fn recover_setup(ctx: Ctx, paths: &Paths, progress: Option<Progress>) -> ExitCode {
     // A stopped apply always leaves its answers; if they are somehow gone there is
-    // nothing to resume from, so a fresh run is the honest fallback.
+    // nothing to resume from, so a fresh run is the honest fallback — interactive,
+    // since recovery carries no flags.
     let Some(progress) = progress else {
-        return fresh_setup(ctx, paths).await;
+        return fresh_setup(ctx, paths, SetupFlags::none()).await;
     };
 
     let journal = recover::journal_at(&paths.journal());
