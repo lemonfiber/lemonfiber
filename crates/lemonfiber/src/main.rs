@@ -477,6 +477,16 @@ async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode {
     }
 
     println!("No configuration found.");
+
+    // Setup applies answers, so there is nothing for --dry-run to rehearse. Said
+    // here, before the offer, rather than asking a question whose yes could not be
+    // honoured — the same refusal `setup` gives, and at the same point in the walk.
+    if ctx.dry_run {
+        eprintln!("Setup applies your answers, so it has nothing to rehearse.");
+        eprintln!("Run `{PRODUCT} setup` without --dry-run when you are ready.");
+        return ExitCode::from(USAGE);
+    }
+
     if !std::io::stdin().is_terminal() {
         // No one is here to take the offer, so it is stated rather than asked —
         // never left waiting on input that will not come.
