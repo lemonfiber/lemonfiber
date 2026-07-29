@@ -17,10 +17,11 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::config::env::EnvFile;
 use crate::config::{
     Protocols, DATA_ROOT_KEY, JELLYFIN_MODE_KEY, PGID_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
 };
-use crate::journal::{Change, Journal, Undo};
+use crate::journal::{Change, Journal, Kind, Undo};
 use crate::platform::Environment;
 
 /// How the operator wants their existing and downloaded media served, where they
@@ -434,6 +435,35 @@ impl Wizard {
         self.unanswered().is_empty()
     }
 
+    /// Which lifecycle phase this setup is in.
+    #[must_use]
+    pub const fn phase(&self) -> Phase {
+        self.progress.phase
+    }
+
+    /// Move the lifecycle to `phase`, but only along an edge setup actually takes.
+    /// Returns whether it moved.
+    ///
+    /// The legal edges are few and named here rather than inferred from an
+    /// ordering, because the lifecycle is not a straight line: review is reached
+    /// only once every applicable question is answered; apply follows review, and
+    /// applied follows apply; and an apply that is rolled back returns to review to
+    /// be run again — the one backward edge. Every other move — skipping review,
+    /// re-applying a finished setup, quietly downgrading a persisted `applying` to
+    /// look unstarted — is refused, so a caller cannot reach a writing or written
+    /// phase without having passed the gate the earlier one stands for.
+    pub fn transition(&mut self, phase: Phase) -> bool {
+        let allowed = match (self.progress.phase, phase) {
+            (Phase::InProgress | Phase::Applying, Phase::Reviewing) => self.ready_for_review(),
+            (Phase::Reviewing, Phase::Applying) | (Phase::Applying, Phase::Applied) => true,
+            _ => false,
+        };
+        if allowed {
+            self.progress.phase = phase;
+        }
+        allowed
+    }
+
     /// The configuration these answers will be written as.
     ///
     /// What review shows and what apply writes, the same value for both, so the
@@ -479,7 +509,40 @@ impl Plan {
     pub fn settings(&self) -> &[(String, String)] {
         &self.settings
     }
+
+    /// The journal changes that applying this plan makes to the environment file,
+    /// against what that file holds now.
+    ///
+    /// One `Set` per setting, each carrying the value the file held for that key
+    /// before — read from `current`, `None` where the key is new — so applying is
+    /// a recorded, reversible act rather than a blind overwrite, and an interrupted
+    /// apply can be unwound to exactly what was there. The plan has no clock, so
+    /// the caller stamps the time.
+    #[must_use]
+    pub fn changes(&self, current: &EnvFile, stamp: &str) -> Vec<Change> {
+        self.settings
+            .iter()
+            .map(|(key, value)| Change {
+                at: stamp.to_owned(),
+                operation: APPLY.to_owned(),
+                target: ENV_FILE.to_owned(),
+                kind: Kind::Set {
+                    key: key.clone(),
+                    previous: current.get(key).map(str::to_owned),
+                    current: value.clone(),
+                },
+            })
+            .collect()
+    }
 }
+
+/// The change-journal target for the environment file setup writes into — the
+/// name it is known by in a history, not a machine-specific path.
+const ENV_FILE: &str = ".env";
+
+/// The change-journal operation these writes belong to, so a browsable history
+/// reads as the setup that made them.
+const APPLY: &str = "apply";
 
 /// A yes/no answer as the on/off a hand-editable setting records.
 fn on_off(enabled: bool) -> String {
@@ -632,6 +695,7 @@ mod tests {
         offer_setup, Answer, Choice, Library, Phase, Progress, Recovery, Resolution, Status, Step,
         Wizard,
     };
+    use crate::config::env::EnvFile;
     use crate::config::Protocols;
     use crate::journal::{Action, Change, Journal, Kind, Undo};
     use crate::platform::Environment;
@@ -1162,6 +1226,113 @@ mod tests {
         assert_eq!(
             Recovery::of(&journal).resolve(Choice::StartOver),
             Resolution::StartOver(vec![removed("USENET"), removed("DATA_ROOT")]),
+        );
+    }
+
+    #[test]
+    fn a_setup_moves_review_to_apply_to_applied_along_its_edges() {
+        let mut wizard = on_native_linux();
+        answer_all(&mut wizard);
+        assert_eq!(wizard.phase(), Phase::InProgress);
+        assert!(wizard.transition(Phase::Reviewing));
+        assert!(wizard.transition(Phase::Applying));
+        assert!(wizard.transition(Phase::Applied));
+        assert_eq!(wizard.phase(), Phase::Applied);
+        // A finished apply cannot be re-run, nor walked back to an earlier phase,
+        // so a reached phase is never quietly rewritten.
+        assert!(!wizard.transition(Phase::Applying));
+        assert!(!wizard.transition(Phase::Reviewing));
+        assert_eq!(wizard.phase(), Phase::Applied);
+    }
+
+    #[test]
+    fn apply_cannot_be_reached_without_passing_review() {
+        // The gate review stands for — every question answered — cannot be skipped
+        // by jumping a fully-answered wizard straight to applying.
+        let mut wizard = on_native_linux();
+        answer_all(&mut wizard);
+        assert!(!wizard.transition(Phase::Applying));
+        assert!(!wizard.transition(Phase::Applied));
+        assert_eq!(wizard.phase(), Phase::InProgress);
+    }
+
+    #[test]
+    fn review_is_refused_until_every_question_is_answered() {
+        let mut wizard = on_native_linux();
+        assert!(!wizard.transition(Phase::Reviewing));
+        assert_eq!(wizard.phase(), Phase::InProgress);
+
+        answer_all(&mut wizard);
+        assert!(wizard.transition(Phase::Reviewing));
+        assert_eq!(wizard.phase(), Phase::Reviewing);
+    }
+
+    #[test]
+    fn a_rolled_back_apply_returns_to_review_to_be_run_again() {
+        // The one backward edge: an apply that was unwound goes back to review,
+        // its answers intact, ready to apply once more.
+        let mut wizard = on_native_linux();
+        answer_all(&mut wizard);
+        assert!(wizard.transition(Phase::Reviewing));
+        assert!(wizard.transition(Phase::Applying));
+        assert!(wizard.transition(Phase::Reviewing));
+        assert_eq!(wizard.phase(), Phase::Reviewing);
+    }
+
+    #[test]
+    fn applying_the_plan_records_each_setting_against_what_was_there() {
+        let mut wizard = on_native_linux();
+        wizard
+            .answer(Answer::Protocols(Protocols::both()))
+            .unwrap_or(());
+        // The file already carries a usenet setting and nothing about torrents, so
+        // one change has a previous value to restore and the other has none.
+        let current = EnvFile::parse("LEMONFIBER_USENET=off\n");
+        let set = |key: &str, previous: Option<&str>, value: &str| Change {
+            at: "t".to_owned(),
+            operation: "apply".to_owned(),
+            target: ".env".to_owned(),
+            kind: Kind::Set {
+                key: key.to_owned(),
+                previous: previous.map(str::to_owned),
+                current: value.to_owned(),
+            },
+        };
+        assert_eq!(
+            wizard.plan().changes(&current, "t"),
+            vec![
+                set("LEMONFIBER_USENET", Some("off"), "on"),
+                set("LEMONFIBER_TORRENT", None, "on"),
+            ],
+        );
+    }
+
+    #[test]
+    fn a_setting_that_was_present_but_empty_is_captured_as_empty_not_absent() {
+        // An empty prior value is a value: rolling the write back must restore the
+        // empty string, so `changes` records `Some("")`, distinct from the `None`
+        // of a key that was never there.
+        let mut wizard = on_native_linux();
+        wizard
+            .answer(Answer::Protocols(Protocols::both()))
+            .unwrap_or(());
+        let current = EnvFile::parse("LEMONFIBER_USENET=\n");
+        let set = |key: &str, previous: Option<&str>, value: &str| Change {
+            at: "t".to_owned(),
+            operation: "apply".to_owned(),
+            target: ".env".to_owned(),
+            kind: Kind::Set {
+                key: key.to_owned(),
+                previous: previous.map(str::to_owned),
+                current: value.to_owned(),
+            },
+        };
+        assert_eq!(
+            wizard.plan().changes(&current, "t"),
+            vec![
+                set("LEMONFIBER_USENET", Some(""), "on"),
+                set("LEMONFIBER_TORRENT", None, "on"),
+            ],
         );
     }
 }
