@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use crate::app::apply;
 use crate::config::paths::Paths;
-use crate::config::Protocols;
+use crate::config::{store, Protocols};
 use crate::error::{Code, Problem, Remedy, Severity};
 use crate::stack::Source;
 use crate::wizard::{Answer, Library, Phase, Plan, Progress, Rejected, Step, Wizard};
@@ -73,7 +73,7 @@ pub fn run(
     if wizard.phase() != Phase::InProgress {
         return Err(Box::new(already_underway()));
     }
-    gather(wizard, prompt).map_err(|rejected| Box::new(does_not_apply(rejected)))?;
+    gather(wizard, prompt, paths).map_err(|rejected| Box::new(does_not_apply(rejected)))?;
 
     if !prompt.confirm(&wizard.plan()) {
         return Ok(Outcome::Abandoned);
@@ -127,34 +127,52 @@ pub fn resume(
 ///
 /// A question that does not apply on this platform, or that a resumed run already
 /// answered, is passed over rather than asked again.
-fn gather(wizard: &mut Wizard, prompt: &dyn Prompt) -> Result<(), Rejected> {
-    // The answers to ask for are chosen first, then recorded — so which questions
-    // apply is read off the wizard before any answer changes it, and the recording
-    // is one plain loop rather than a `?` tucked inside each conditional.
-    let mut answers = Vec::new();
-    if wants(wizard, Step::Protocols) {
-        answers.push(Answer::Protocols(prompt.protocols()));
-    }
-    if wants(wizard, Step::DataLocation) {
-        answers.push(Answer::DataLocation(prompt.data_location()));
-    }
-    if wants(wizard, Step::ServiceUser) {
-        answers.push(Answer::ServiceUser(prompt.service_user()));
-    }
-    if wants(wizard, Step::Library) {
-        answers.push(Answer::Library(prompt.library()));
-    }
-    if wants(wizard, Step::Household) {
-        answers.push(Answer::Household(prompt.household()));
-    }
-    if wants(wizard, Step::Autostart) {
-        answers.push(Answer::Autostart(prompt.autostart()));
-    }
+/// How one question is put to a prompt: the answer it gives for that step.
+type Ask = fn(&dyn Prompt) -> Answer;
 
-    for answer in answers {
-        wizard.answer(answer)?;
+fn gather(wizard: &mut Wizard, prompt: &dyn Prompt, paths: &Paths) -> Result<(), Rejected> {
+    // Each question is paired with how to ask it, so the walk is one loop: ask,
+    // record, and save before moving on, so quitting mid-setup resumes at the
+    // question reached rather than restarting. One loop keeps the recording a
+    // single `?` rather than one tucked inside each conditional.
+    let questions: [(Step, Ask); 6] = [
+        (Step::Protocols, |prompt| {
+            Answer::Protocols(prompt.protocols())
+        }),
+        (Step::DataLocation, |prompt| {
+            Answer::DataLocation(prompt.data_location())
+        }),
+        (Step::ServiceUser, |prompt| {
+            Answer::ServiceUser(prompt.service_user())
+        }),
+        (Step::Library, |prompt| Answer::Library(prompt.library())),
+        (Step::Household, |prompt| {
+            Answer::Household(prompt.household())
+        }),
+        (Step::Autostart, |prompt| {
+            Answer::Autostart(prompt.autostart())
+        }),
+    ];
+
+    for (step, ask) in questions {
+        if !wants(wizard, step) {
+            continue;
+        }
+        wizard.answer(ask(prompt))?;
+        save(wizard, paths);
     }
     Ok(())
+}
+
+/// Save where the wizard has reached, so quitting mid-setup resumes rather than
+/// restarts.
+///
+/// Best-effort: a progress file that could not be written costs the resume, not
+/// the run, so it is not raised. The operator can still finish here; only a crash
+/// before they do would lose what was gathered, which is what this guards against.
+fn save(wizard: &Wizard, paths: &Paths) {
+    let text = serde_json::to_string(wizard.progress()).unwrap_or_default();
+    let _ = store::write(&paths.setup_progress(), &text);
 }
 
 /// Whether a question applies here and is still unanswered — one to ask.
@@ -322,6 +340,32 @@ mod tests {
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         let file = store::read(&paths.env_file()).unwrap_or_default();
         assert_eq!(file.get("PUID"), None, "no container user was written");
+    }
+
+    #[test]
+    fn gathering_saves_progress_so_a_quit_run_can_resume() {
+        let dir = scratch("gather-save");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        // Declining at review stops before apply, so the file on disk is what
+        // gathering saved: every answer, still gathering.
+        let prompt = Scripted {
+            confirm: false,
+            ..Scripted::workable(dir.join("data-root"))
+        };
+
+        let outcome = run(&mut wizard, &prompt, &paths, external(), "t");
+        assert!(matches!(outcome, Ok(Outcome::Abandoned)));
+
+        // A wizard resumed from what was saved needs no more questions — every
+        // answer survived the quit.
+        let resumed = progress_at(&paths.setup_progress())
+            .map(|progress| Wizard::resume(Environment::LinuxNative, progress));
+        assert_eq!(
+            resumed.map(|wizard| wizard.ready_for_review()),
+            Some(true),
+            "the saved progress resumes to a complete set of answers",
+        );
     }
 
     #[test]
