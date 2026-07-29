@@ -14,7 +14,23 @@ use std::path::{Path, PathBuf};
 
 use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
-use crate::journal::{Action, Undo};
+use crate::journal::{Action, Change, Journal, Undo};
+
+/// The change journal saved at `path`, empty where none is there or it does not
+/// read.
+///
+/// A torn final line — a crash caught mid-write — is dropped rather than failing
+/// the whole read, so a reversal still has every entry that fully landed to work
+/// from; an absent or unreadable file is an empty journal, nothing to reverse.
+#[must_use]
+pub fn journal_at(path: &Path) -> Journal {
+    let changes = std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Change>(line).ok())
+        .collect();
+    Journal::replay(changes)
+}
 
 /// Carry out a reversal, undo by undo, in the order given.
 ///
@@ -176,6 +192,54 @@ mod tests {
                 path: path.display().to_string(),
             },
         }
+    }
+
+    /// One recorded change, a setting written over nothing.
+    fn a_set(key: &str) -> Change {
+        Change {
+            at: "t".to_owned(),
+            operation: "apply".to_owned(),
+            target: ".env".to_owned(),
+            kind: Kind::Set {
+                key: key.to_owned(),
+                previous: None,
+                current: "on".to_owned(),
+            },
+        }
+    }
+
+    #[test]
+    fn a_journal_reads_back_the_changes_that_were_written() {
+        let dir = scratch("journal-read");
+        let path = dir.join("journal.jsonl");
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        let changes = [a_set("USENET"), a_set("TORRENT")];
+        let text = changes
+            .iter()
+            .map(|change| serde_json::to_string(change).unwrap_or_default())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(std::fs::write(&path, text).is_ok());
+
+        assert_eq!(super::journal_at(&path).changes(), changes);
+    }
+
+    #[test]
+    fn a_torn_final_line_is_dropped_and_the_rest_kept() {
+        let dir = scratch("journal-torn");
+        let path = dir.join("journal.jsonl");
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        // One entry that fully landed and one half-written — a crash mid-append.
+        let good = serde_json::to_string(&a_set("USENET")).unwrap_or_default();
+        assert!(std::fs::write(&path, format!("{good}\n{{ torn")).is_ok());
+
+        assert_eq!(super::journal_at(&path).changes().len(), 1);
+    }
+
+    #[test]
+    fn no_journal_file_reads_as_nothing_to_reverse() {
+        let absent = Path::new("/lemonfiber/no/such/journal.jsonl");
+        assert_eq!(super::journal_at(absent).changes().len(), 0);
     }
 
     #[test]
