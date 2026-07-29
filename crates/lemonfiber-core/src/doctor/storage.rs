@@ -27,7 +27,8 @@ use serde::{Deserialize, Serialize};
 use super::{Category, Check, Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::platform::Environment;
-use crate::ports::filesystem::{FileSystem, Identity, Ownership, StorageFacts};
+use crate::ports::filesystem::{FileSystem, Ownership, StorageFacts};
+use crate::storage::{self, Linked};
 
 /// Raised when the data root cannot hardlink, so imports must copy.
 pub const COPY_ONLY: Code = Code::new("STORAGE-1");
@@ -63,15 +64,6 @@ struct Recorded {
 /// arrives. A single large import can be tens of gigabytes, so the floor sits
 /// well above one file.
 const LOW_SPACE_FLOOR: u64 = 10 * 1024 * 1024 * 1024;
-
-/// The name of the file the probe creates, and the second name it links it to.
-///
-/// Fixed and unmistakable so that a probe interrupted mid-run leaves something a
-/// person recognises as lemonfiber's rather than a mystery file in their media.
-const PROBE: &str = ".lemonfiber-hardlink-probe";
-
-/// The second name the probe file is linked to.
-const LINKED: &str = ".lemonfiber-hardlink-probe.link";
 
 /// The one consequence sentence a lost link means, stated the same way wherever
 /// it is reported — because "hardlinks unsupported" means nothing, and this is
@@ -131,42 +123,28 @@ impl StorageCheck {
     async fn probe(&self, real: &Path) -> Vec<Finding> {
         let facts = self.filesystem.describe(real).await;
         let space = space(&facts);
-
-        let probe = real.join(PROBE);
-        let linked = real.join(LINKED);
-
         let permissions = self.permissions(real).await;
 
-        // A run killed between the link and the cleanup below leaves the link
-        // behind, and a link to a name that already exists fails — which would
-        // read as "cannot hardlink" on a filesystem that hardlinks fine. Clearing
-        // both names first makes the probe robust to its own interrupted past.
-        self.filesystem.remove(&linked).await;
-        self.filesystem.remove(&probe).await;
-
-        if let Err(fault) = self.filesystem.touch(&probe).await {
-            let mut findings = unwritable(&fault.message);
-            findings.push(space);
-            findings.push(permissions);
-            return findings;
-        }
-
-        let original = self.filesystem.identify(&probe).await.ok();
-        let link = self.filesystem.link(&probe, &linked).await;
-        let remembered = self.remembered().await;
-
-        let (mut findings, current) = if link.is_err() {
-            (copying(&facts, remembered == Some(true)), Some(false))
-        } else {
-            let confirmed = self.filesystem.identify(&linked).await.ok();
-            (
-                linked_result(original, confirmed, &facts),
-                same_file(original, confirmed).then_some(true),
-            )
+        // The empirical create-link-inspect lives above the filesystem port, in the
+        // one place both this check and setup ask it, so the two can never disagree
+        // about what "can hardlink" means. What is left here is turning that one
+        // answer into the findings a diagnosis reports.
+        let (mut findings, current) = match storage::test_link(self.filesystem.as_ref(), real).await
+        {
+            Linked::Unwritable { message } => (unwritable(&message), None),
+            // A location that used to link and now cannot is a regression, told from
+            // one that never could by what the last run recorded.
+            Linked::No => (
+                copying(&facts, self.remembered().await == Some(true)),
+                Some(false),
+            ),
+            Linked::Yes { links } => (linked(&facts, links), Some(true)),
+            Linked::Unconfirmed => (unconfirmed(), None),
         };
 
-        self.filesystem.remove(&linked).await;
-        self.filesystem.remove(&probe).await;
+        // Only a working link is written down (inside `remember`), so a lost
+        // capability keeps reporting degraded rather than settling into an ordinary
+        // copy-mode warning on its second run.
         self.remember(current).await;
         findings.push(space);
         findings.push(permissions);
@@ -244,31 +222,17 @@ impl Check for StorageCheck {
     }
 }
 
-/// Whether two entries name the same underlying file.
-///
-/// A zero identity is no identity — a real file's inode is never zero, and a
-/// platform that reports no file index leaves nothing to compare — so it never
-/// counts as a match, however equal two zeroes look.
-fn same_file(original: Option<Identity>, confirmed: Option<Identity>) -> bool {
-    matches!((original, confirmed), (Some(a), Some(b)) if a.file == b.file && a.file != 0)
+/// The findings when the link was made and confirmed: a pass naming how many
+/// names point at the one file, and the mode a working link puts the stack in.
+fn linked(facts: &StorageFacts, links: u64) -> Vec<Finding> {
+    let note = format!("{}, {links} names to one file", facts.kind.label());
+    pair(Verdict::Pass { note: Some(note) }, working_mode(facts))
 }
 
-/// The findings when the link was made: a pass if the two names are one file,
-/// and the mode the working link puts the stack in.
-fn linked_result(
-    original: Option<Identity>,
-    confirmed: Option<Identity>,
-    facts: &StorageFacts,
-) -> Vec<Finding> {
-    if same_file(original, confirmed) {
-        let links = confirmed.map_or(0, |identity| identity.links);
-        let note = format!("{}, {links} names to one file", facts.kind.label());
-        return pair(Verdict::Pass { note: Some(note) }, working_mode(facts));
-    }
-
-    // The link call succeeded yet the names do not agree on a file, or one could
-    // not be read back: the capability is not disproven, but it is not proven
-    // either, and an unproven guarantee is never reported as met.
+/// The findings when the link was made but could not be confirmed to point at one
+/// file: the capability is not disproven, but it is not proven either, and an
+/// unproven guarantee is never reported as met.
+fn unconfirmed() -> Vec<Finding> {
     pair(
         Verdict::Unverified {
             reason: "the link was made but could not be confirmed to point at the same file"
