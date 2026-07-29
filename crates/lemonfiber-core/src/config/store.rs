@@ -90,20 +90,28 @@ pub fn unset(path: &Path, key: &str) -> Result<(), Failure> {
     write(path, &file.render())
 }
 
-/// Write `text` to `path`, creating the directory for it where needed.
+/// Write `text` to `path`, creating the directory for it where needed and
+/// keeping both private to their owner.
 ///
 /// The one place a small lemonfiber-owned file is put on disk, so the wizard's
 /// progress and change journal land the same way a setting does — and report the
-/// same [`Failure::NotWritten`] where they cannot.
+/// same [`Failure::NotWritten`] where they cannot. Every file that lands here may
+/// hold a credential — the indexer key, the Usenet password, the VPN private key
+/// — so where the platform has the notion the directory is created `0700` and the
+/// file tightened to `0600`: another user on the same machine, the common shape
+/// of a self-hosted host, must not be able to read what setup wrote.
 ///
 /// Creating the directory and writing the file are one operation as far as the
 /// operator is concerned, so they share one failure rather than two that say the
 /// same thing. Written with `if let` rather than `map_err`, and without a block
 /// around the directory: a closure is a function of its own for coverage
 /// purposes, and one that only runs on failure is a symbol no passing test
-/// reaches in every build of this crate. A path with no usable parent — a
-/// filesystem root, or a bare relative name whose parent is the empty string — is
-/// written in the current directory rather than under `create_dir_all("")`.
+/// reaches in every build of this crate. The private-mode step is folded into the
+/// write's own result for the same reason — one failure path, already exercised,
+/// rather than a second that only a chmod refusal on a just-written file reaches.
+/// A path with no usable parent — a filesystem root, or a bare relative name whose
+/// parent is the empty string — is written in the current directory rather than
+/// under `create_dir_all("")`.
 ///
 /// # Errors
 ///
@@ -114,12 +122,45 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
-    if let Err(err) = std::fs::create_dir_all(parent) {
+    if let Err(err) = make_private_dir(parent) {
         return Err(unwritable(path, &err));
     }
-    if let Err(err) = std::fs::write(path, text) {
+    if let Err(err) = std::fs::write(path, text).and_then(|()| make_private(path)) {
         return Err(unwritable(path, &err));
     }
+    Ok(())
+}
+
+/// Create the configuration directory, private to its owner where the platform
+/// tracks ownership. The mode is set as the directory is created, so an existing
+/// one — a parent like `~/.config` this does not own — is left exactly as it was.
+#[cfg(unix)]
+fn make_private_dir(parent: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::DirBuilderExt as _;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(parent)
+}
+
+/// Elsewhere there is no owner-only notion to honour, so this is an ordinary
+/// recursive create.
+#[cfg(not(unix))]
+fn make_private_dir(parent: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(parent)
+}
+
+/// Tighten a just-written file to its owner alone. Applied every write, so a file
+/// left `0644` by an earlier version is corrected the next time it is touched.
+#[cfg(unix)]
+fn make_private(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+}
+
+/// A no-op where the platform has no owner-only file mode to set.
+#[cfg(not(unix))]
+fn make_private(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
@@ -230,6 +271,30 @@ mod tests {
             std::env::temp_dir().join(format!("lemonfiber-cfg-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir.join(".env")
+    }
+
+    /// Only on unix: the guarantee is a file mode, which is the platform's own
+    /// notion. A credential setup writes must not be readable by another user.
+    #[cfg(unix)]
+    #[test]
+    fn a_setting_is_written_private_to_its_owner() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let path = scratch("private");
+        assert!(set(&path, "USENET_PASS", "hunter2").is_ok());
+
+        let mode = |p: &Path| std::fs::metadata(p).map(|m| m.permissions().mode() & 0o777);
+        assert_eq!(
+            mode(&path).ok(),
+            Some(0o600),
+            "the file is readable only by its owner"
+        );
+        assert_eq!(
+            mode(path.parent().unwrap_or(Path::new("/"))).ok(),
+            Some(0o700),
+            "and so is the directory that holds it"
+        );
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
     }
 
     #[test]
