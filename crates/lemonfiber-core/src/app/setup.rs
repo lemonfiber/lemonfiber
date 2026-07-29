@@ -174,6 +174,7 @@ pub async fn run(
     // gathering itself, so it always takes here.
     wizard.transition(Phase::Reviewing);
     apply::apply(wizard, paths, source, stamp)?;
+    clear_progress(paths);
     Ok(Outcome::Applied)
 }
 
@@ -209,7 +210,9 @@ pub fn resume(
     stamp: &str,
 ) -> Result<(), Box<Problem>> {
     wizard.transition(Phase::Reviewing);
-    apply::apply(wizard, paths, source, stamp)
+    apply::apply(wizard, paths, source, stamp)?;
+    clear_progress(paths);
+    Ok(())
 }
 
 /// Ask each question the wizard presents here and has no answer for yet, in order.
@@ -480,6 +483,20 @@ async fn nearest_existing(filesystem: &dyn FileSystem, path: &Path) -> Option<(P
 fn save(wizard: &Wizard, paths: &Paths) {
     let text = serde_json::to_string(wizard.progress()).unwrap_or_default();
     let _ = store::write(&paths.setup_progress(), &text);
+}
+
+/// Remove the saved progress once setup has fully applied.
+///
+/// The progress file exists to make an interrupted setup resumable, and to do
+/// that it holds every gathered answer — the indexer key and the Usenet password
+/// among them — in the clear. A finished apply has nothing left to resume and has
+/// already written those secrets to their real home in the `.env`, so this second
+/// copy is not left lying on disk. Best-effort, and safe as one: apply persisted
+/// the durable `applied` marker immediately before this, so a removal that does
+/// not happen leaves a file a later run still reads as a finished setup, not a
+/// lost one — and removing a file already gone is not a failure.
+fn clear_progress(paths: &Paths) {
+    let _ = std::fs::remove_file(paths.setup_progress());
 }
 
 /// Whether a question applies here and is still unanswered — one to ask.
@@ -854,6 +871,12 @@ mod tests {
             file.get("PUID"),
             Some("1000"),
             "the container user was asked"
+        );
+        // Gathering saved progress — including the answers — and a finished apply
+        // removes that copy: the secrets it held live only in the .env now.
+        assert!(
+            !paths.setup_progress().exists(),
+            "the resumable progress file is gone once setup is applied"
         );
         // A location whose own filesystem links is taken as chosen, and the good
         // result is shown directly — not inferred from a parent.
