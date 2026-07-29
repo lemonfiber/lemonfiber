@@ -129,6 +129,7 @@ fn sonarr(config: &Path) -> Target {
         name: "Sonarr".to_owned(),
         base: "http://127.0.0.1:8989".to_owned(),
         config: config.to_path_buf(),
+        version: 3,
     }
 }
 
@@ -253,6 +254,7 @@ async fn each_service_is_reported_independently() {
         name: "Radarr".to_owned(),
         base: "http://127.0.0.1:7878".to_owned(),
         config: radarr_config,
+        version: 3,
     };
 
     let check = CredentialsCheck::new(http, fs, vec![sonarr(&sonarr_config), radarr]);

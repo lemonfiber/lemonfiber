@@ -64,10 +64,10 @@ impl Http for Fake {
     }
 }
 
-/// A Sonarr client over the given fake.
+/// A Sonarr client over the given fake — the v3 the media *arrs answer at.
 fn sonarr(fake: &Arc<Fake>) -> Servarr {
     let http: Arc<dyn Http> = fake.clone();
-    Servarr::new(http, "http://sonarr:8989", "the-key", "sonarr")
+    Servarr::new(http, "http://sonarr:8989", "the-key", "sonarr", 3)
 }
 
 #[tokio::test]
@@ -478,4 +478,65 @@ fn a_truncated_config_yields_no_key_rather_than_a_panic() {
     // The opening tag is there but the file was read mid-write, so there is no
     // close: no key, and no crash on the missing end.
     assert_eq!(api_key("<Config><ApiKey>a1b2c3"), None);
+}
+
+/// A client at the given API version over the fake.
+fn versioned(fake: &Arc<Fake>, version: u32) -> Servarr {
+    let http: Arc<dyn Http> = fake.clone();
+    Servarr::new(http, "http://arr:8989", "the-key", "arr", version)
+}
+
+#[tokio::test]
+async fn the_api_version_selects_the_path_segment() {
+    // The one shape spans two versions: Lidarr answers at v1, Sonarr at v3, so the
+    // version the manifest carries — not the client — decides the path.
+    let folder = RootFolder {
+        path: "/data/media/music".to_owned(),
+        media_type: "music".to_owned(),
+    };
+
+    let lidarr = Fake::new(Answer::Reply(201, ""));
+    assert!(versioned(&lidarr, 1)
+        .register_root_folder(&folder)
+        .await
+        .is_ok());
+    assert!(lidarr
+        .request()
+        .is_some_and(|request| request.url.ends_with("/api/v1/rootfolder")));
+
+    let sonarr = Fake::new(Answer::Reply(201, ""));
+    assert!(versioned(&sonarr, 3)
+        .register_root_folder(&folder)
+        .await
+        .is_ok());
+    assert!(sonarr
+        .request()
+        .is_some_and(|request| request.url.ends_with("/api/v3/rootfolder")));
+}
+
+#[tokio::test]
+async fn a_json_post_declares_its_content_type() {
+    // A body Servarr reads as JSON is announced as such; a service that binds by
+    // content type would otherwise drop it.
+    let fake = Fake::new(Answer::Reply(201, ""));
+    let folder = RootFolder {
+        path: "/data/media/tv".to_owned(),
+        media_type: "tv".to_owned(),
+    };
+    assert!(sonarr(&fake).register_root_folder(&folder).await.is_ok());
+    assert!(fake.request().is_some_and(|request| request
+        .headers
+        .iter()
+        .any(|(name, value)| name == "Content-Type" && value == "application/json")));
+}
+
+#[tokio::test]
+async fn a_get_carries_no_content_type() {
+    // A read has no body, so it declares no content type.
+    let fake = Fake::new(Answer::Reply(200, "[]"));
+    let _ = sonarr(&fake).root_folders().await;
+    assert!(fake.request().is_some_and(|request| request
+        .headers
+        .iter()
+        .all(|(name, _)| name != "Content-Type")));
 }

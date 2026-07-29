@@ -92,10 +92,16 @@ async fn an_application_is_posted_to_its_v1_endpoint_with_the_key() {
     assert!(sent
         .as_ref()
         .is_some_and(|request| request.url.ends_with("/api/v1/applications")));
-    assert!(sent.is_some_and(|request| request
+    assert!(sent.as_ref().is_some_and(|request| request
         .headers
         .iter()
         .any(|(name, value)| name == "X-Api-Key" && value == "prowlarr-key")));
+    // The JSON body is announced as such, so Prowlarr binds it rather than
+    // dropping a body it was not told the type of.
+    assert!(sent.is_some_and(|request| request
+        .headers
+        .iter()
+        .any(|(name, value)| name == "Content-Type" && value == "application/json")));
 }
 
 #[tokio::test]

@@ -47,6 +47,10 @@ pub struct Target {
     pub base: String,
     /// The host path to the configuration file holding the generated key.
     pub config: PathBuf,
+    /// The major version of its API — the `/api/vN` segment. Sonarr and Radarr
+    /// are v3, Lidarr and Prowlarr v1, so it travels with the target rather than
+    /// being assumed.
+    pub version: u32,
 }
 
 /// Proves each Servarr-shape service still answers to the key it wrote.
@@ -80,7 +84,13 @@ impl CredentialsCheck {
             return not_started(target);
         };
 
-        let service = Servarr::new(self.http.clone(), &target.base, key, &target.id);
+        let service = Servarr::new(
+            self.http.clone(),
+            &target.base,
+            key,
+            &target.id,
+            target.version,
+        );
         match service.identity().await {
             Ok(identity) => Verdict::Pass {
                 note: Some(format!("{} {}", identity.name, identity.version)),
