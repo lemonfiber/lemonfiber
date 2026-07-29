@@ -5,6 +5,7 @@
 //! its own, which is why the same request behaves identically whether it arrived
 //! as a subcommand, a keypress or an HTTP route.
 
+use std::io::IsTerminal as _;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
-use lemonfiber_core::app::{dispatch, logs, supervise, Command, Ctx, Outcome, WATCH};
+use lemonfiber_core::app::{dispatch, logs, setup, supervise, Command, Ctx, Outcome, WATCH};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, ip_echo_from_env, port_forward_from_env, service_user_from_env, store,
@@ -24,9 +25,12 @@ use lemonfiber_core::model::Envelope;
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::stack::Source;
+use lemonfiber_core::wizard::{offer_setup, Wizard};
 use lemonfiber_core::PRODUCT;
 
+mod prompt;
 mod render;
+use prompt::Terminal;
 use render::{render, watched};
 
 /// The stack this binary carries.
@@ -59,6 +63,8 @@ struct Cli {
 /// What the operator asked for.
 #[derive(Debug, Subcommand)]
 enum Request {
+    /// Set up the stack by answering a few questions.
+    Setup,
     /// Report the versions in play.
     Version,
     /// Start a form, or the union of several.
@@ -205,6 +211,9 @@ async fn main() -> ExitCode {
         // A watch is long-running and produces one report at its end, not a value
         // that arrives once, so like streaming it does not go through dispatch.
         Request::Watch { forms } => return guard(&ctx, &forms, cli.json).await,
+        // Setup is a conversation, not a value that arrives once, so like streaming
+        // and watching it runs its own way rather than through dispatch.
+        Request::Setup => return run_setup(&ctx),
         Request::Version => Command::Version,
         Request::Up { forms } => Command::Up { forms },
         Request::Down { forms } => Command::Down { forms },
@@ -410,6 +419,84 @@ async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// Run the setup wizard on a machine that is not configured yet.
+///
+/// Setup is a conversation and then a write, so it stays on this side of the core:
+/// it decides nothing itself, but reading a line and rendering a question is the
+/// surface's job, and the [`Terminal`] does it. What to ask, what an answer means,
+/// and what to write are all the core's, reached through [`setup::run`].
+fn run_setup(ctx: &Ctx) -> ExitCode {
+    // Applying is the point of it, so there is nothing to rehearse; saying so is
+    // kinder than a wizard that asks every question and then changes nothing.
+    if ctx.dry_run {
+        eprintln!("setup applies your answers, so it has nothing to rehearse.");
+        eprintln!("Run it without --dry-run.");
+        return ExitCode::from(USAGE);
+    }
+
+    let Some(paths) = here() else {
+        eprintln!("error: could not find where to keep {PRODUCT}'s files on this system.");
+        return ExitCode::from(FAILURE);
+    };
+
+    // Setup is for a machine with nothing configured; a configured one is changed
+    // through its settings, not walked back to its first question.
+    if !offer_setup(paths.env_file().exists()) {
+        println!("This machine is already set up.");
+        println!("Change a setting with `{PRODUCT} config set`, or start it with `{PRODUCT} up`.");
+        return ExitCode::from(USAGE);
+    }
+
+    // The questions need someone at a terminal to answer them. A piped or scripted
+    // run has no one, so it is told what it would have been asked rather than left
+    // waiting on input that never comes.
+    if !std::io::stdin().is_terminal() {
+        eprintln!("error: setup asks questions that need a terminal to answer.");
+        eprintln!(
+            "Run it interactively, or set values with `{PRODUCT} config set` and start with `{PRODUCT} up`."
+        );
+        return ExitCode::from(USAGE);
+    }
+
+    let mut wizard = Wizard::new(ctx.environment);
+    let prompt = Terminal::new(ctx.environment, default_data_location());
+
+    match setup::run(&mut wizard, &prompt, &paths, ctx.stack, &stamp()) {
+        Ok(setup::Outcome::Applied) => {
+            println!("\nSetup is done. Start your stack with `{PRODUCT} up tv`.");
+            ExitCode::SUCCESS
+        }
+        Ok(setup::Outcome::Abandoned) => {
+            println!("\nSetup was left here — nothing was written.");
+            ExitCode::SUCCESS
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// The data location setup proposes when the operator does not name one.
+///
+/// A directory under this machine's data base, so a default run lands somewhere
+/// real and writable; an operator with a NAS or a separate disk names that
+/// instead.
+fn default_data_location() -> PathBuf {
+    here().map_or_else(
+        || PathBuf::from("./media"),
+        |paths| paths.data_dir().join("media"),
+    )
+}
+
+/// A timestamp for the change journal — seconds since the epoch, or an empty
+/// string on the absurd clock this reversal has no better answer for.
+fn stamp() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs().to_string())
+        .unwrap_or_default()
 }
 
 /// Where this machine keeps lemonfiber's files.
