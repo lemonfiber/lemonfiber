@@ -118,6 +118,25 @@ impl EnvFile {
         self.trailing_newline = true;
     }
 
+    /// Remove a setting, the last occurrence [`Self::set`] would have rewritten.
+    ///
+    /// The inverse of appending a key: the one line [`Self::set`] added goes, and
+    /// the lines around it — the comments that document the file — stay. A key that
+    /// is not there is left as it is, so this is safe to run against a file that
+    /// never had the key. What it does not restore is the file-level shape a set may
+    /// have changed — appending a key forces a trailing newline that removing it
+    /// does not take back — because the change record holds a key and value, not
+    /// whether the file ended in a newline before.
+    pub fn remove(&mut self, key: &str) {
+        let last = self
+            .lines
+            .iter()
+            .rposition(|line| matches!(line, Line::Entry { key: k, .. } if k == key));
+        if let Some(index) = last {
+            self.lines.remove(index);
+        }
+    }
+
     /// Every key the file sets, in the order it sets them.
     #[must_use]
     pub fn keys(&self) -> Vec<&str> {
@@ -192,6 +211,34 @@ mod tests {
             "the key is declared and waiting to be filled in"
         );
         assert_eq!(file.get("NOT_IN_THE_FILE"), None);
+    }
+
+    #[test]
+    fn removing_a_key_drops_its_line_and_keeps_the_rest() {
+        let mut file = EnvFile::parse("# what B is for\nA=1\nB=2\n");
+        file.remove("A");
+
+        assert_eq!(file.render(), "# what B is for\nB=2\n");
+        assert_eq!(file.get("A"), None);
+    }
+
+    #[test]
+    fn removing_a_key_that_is_not_there_changes_nothing() {
+        let mut file = EnvFile::parse("A=1\n");
+        file.remove("MISSING");
+
+        assert_eq!(file.render(), "A=1\n");
+    }
+
+    #[test]
+    fn removing_a_duplicated_key_drops_the_one_that_takes_effect() {
+        // A hand-edited file with the key twice: `get` and `set` act on the last,
+        // so `remove` must too, leaving the earlier line where it is.
+        let mut file = EnvFile::parse("A=first\nA=second\n");
+        file.remove("A");
+
+        assert_eq!(file.render(), "A=first\n");
+        assert_eq!(file.get("A"), Some("first"));
     }
 
     #[test]
