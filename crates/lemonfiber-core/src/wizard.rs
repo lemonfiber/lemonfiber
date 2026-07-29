@@ -543,10 +543,16 @@ impl Wizard {
         if let Some(path) = &answers.data_location {
             settings.push((DATA_ROOT_KEY.to_owned(), path.display().to_string()));
         }
-        if let Credentials::Given(indexer) = &answers.credentials {
-            settings.push((INDEXER_URL_KEY.to_owned(), indexer.url.clone()));
-            settings.push((INDEXER_APIKEY_KEY.to_owned(), indexer.key.clone()));
-            settings.push((INDEXER_VALIDATED_KEY.to_owned(), on_off(indexer.validated)));
+        // Gated on the step still applying, not only on an indexer being held: an
+        // operator who chose downloads, gave an indexer, then went back and chose
+        // neither protocol leaves a `Given` answer the step no longer wants, and
+        // its key must not be written for a stack that has no service to use it.
+        if self.applies(Step::Credentials) {
+            if let Credentials::Given(indexer) = &answers.credentials {
+                settings.push((INDEXER_URL_KEY.to_owned(), indexer.url.clone()));
+                settings.push((INDEXER_APIKEY_KEY.to_owned(), indexer.key.clone()));
+                settings.push((INDEXER_VALIDATED_KEY.to_owned(), on_off(indexer.validated)));
+            }
         }
         if let Some(Some((uid, gid))) = answers.service_user {
             settings.push((PUID_KEY.to_owned(), uid.to_string()));
@@ -1105,6 +1111,43 @@ mod tests {
         // Distinct from PUID, so a swapped mapping would not pass unnoticed.
         assert_eq!(setting(&plan, "PGID"), Some("1001"));
         assert_eq!(setting(&plan, "JELLYFIN_MODE"), Some("docker"));
+    }
+
+    #[test]
+    fn a_given_indexer_is_planned_but_a_stale_one_is_dropped_when_it_no_longer_applies() {
+        let indexer = Answer::Credentials(Some(super::Indexer {
+            url: "http://indexer.test/api".to_owned(),
+            key: "the-key".to_owned(),
+            validated: true,
+        }));
+
+        // Chosen with a download protocol, the indexer is written.
+        let mut wizard = on_native_linux();
+        wizard
+            .answer(Answer::Protocols(Protocols::both()))
+            .unwrap_or(());
+        wizard.answer(indexer.clone()).unwrap_or(());
+        let plan = wizard.plan();
+        assert_eq!(
+            setting(&plan, "INDEXER_URL"),
+            Some("http://indexer.test/api")
+        );
+        assert_eq!(setting(&plan, "INDEXER_APIKEY"), Some("the-key"));
+        assert_eq!(setting(&plan, "INDEXER_VALIDATED"), Some("on"));
+
+        // Then neither protocol is chosen, so the step no longer applies. The
+        // answer lingers, but its key must not be written for a stack with no
+        // service to use it.
+        wizard
+            .answer(Answer::Protocols(Protocols::none()))
+            .unwrap_or(());
+        let plan = wizard.plan();
+        assert_eq!(setting(&plan, "INDEXER_URL"), None);
+        assert_eq!(
+            setting(&plan, "INDEXER_APIKEY"),
+            None,
+            "no stale key is written"
+        );
     }
 
     #[test]
