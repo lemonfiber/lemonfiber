@@ -22,8 +22,8 @@ use crate::ports::docker::LogQuery;
 /// the graph reads a credential and writes a connection: each media-filing
 /// \*arr's root folders, and its download clients (`SABnzbd` and qBittorrent).
 /// Prowlarr's app sync registers each of those \*arrs back into Prowlarr, so it
-/// pushes them indexers. Bindery and Jellyfin→Seerr wire on the same pattern and
-/// land next.
+/// pushes them indexers. It then makes Jellyfin the identity source for Seerr, so
+/// the household signs in once. Bindery wiring lands next.
 pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     let manifest = ctx
         .stack
@@ -74,6 +74,11 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     // Prowlarr, so it pushes them its indexers. Bindery is left out here — it is
     // not one of Prowlarr's applications and is wired via Torznab instead.
     wirings.extend(seed_applications(ctx, &manifest.services, project.as_deref()).await);
+
+    // Jellyfin as Seerr's identity source: one household account, not two.
+    // Jellyfin has no key to read, so its admin password is minted and recorded
+    // like qBittorrent's, then Seerr is pointed at it.
+    wirings.extend(seed_jellyfin_identity(ctx, &manifest.services).await);
 
     Ok(crate::seed::Report { wirings })
 }
@@ -467,6 +472,98 @@ fn skipped_application(arr: &str, prowlarr: &str) -> crate::seed::Wiring {
         state: crate::seed::State::Skipped {
             reason: format!("{arr} has not written its API key yet; a later run completes it"),
         },
+    }
+}
+
+/// Jellyfin's addresses: where the host reaches its setup, and where Seerr reaches
+/// it across the stack's own network.
+struct JellyfinAddr {
+    loopback: String,
+    network_url: String,
+}
+
+/// Make Jellyfin the identity source for Seerr, so the household signs in once.
+///
+/// Both must be in the stack; without either there is nothing to wire. Jellyfin's
+/// admin password is the one credential minted rather than read — recorded on the
+/// run that mints it and read back on a later run — so the driver is given what
+/// was recorded and hands back a freshly minted one for the surface to record.
+async fn seed_jellyfin_identity(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Vec<crate::seed::Wiring> {
+    let (Some(seerr_base), Some(jellyfin)) = (seerr_service(services), jellyfin_service(services))
+    else {
+        return Vec::new();
+    };
+
+    let jellyfin_client =
+        crate::jellyfin::Jellyfin::new(ctx.http.clone(), &jellyfin.loopback, "jellyfin");
+    let seerr_client = crate::seerr::Seerr::new(ctx.http.clone(), &seerr_base, "seerr");
+    let recorded = recorded_jellyfin_password(ctx);
+
+    let (wiring, minted) = crate::seed::wire_jellyfin_identity(
+        &jellyfin_client,
+        &seerr_client,
+        ctx.random.as_ref(),
+        recorded.as_deref(),
+        &jellyfin.network_url,
+    )
+    .await;
+
+    if let Some(password) = &minted {
+        record_jellyfin_password(ctx, password);
+    }
+    vec![wiring]
+}
+
+/// Where the host reaches Seerr's API, if the stack has it — selected by its api
+/// kind, the way every service lemonfiber speaks to is.
+fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option<String> {
+    services.iter().find_map(|service| {
+        let api = service.api.as_ref()?;
+        if api.kind != lemonfiber_manifest::ApiKind::Seerr {
+            return None;
+        }
+        let port = service.port?;
+        Some(format!("http://127.0.0.1:{port}"))
+    })
+}
+
+/// Jellyfin's addresses, if the stack has it — selected by its api kind, the way
+/// every service lemonfiber speaks to is. Jellyfin's kind carries no key source
+/// of the usual sort: it is the one service lemonfiber sets an account on rather
+/// than reading a key from, so its password is generated.
+fn jellyfin_service(services: &[lemonfiber_manifest::Service]) -> Option<JellyfinAddr> {
+    services.iter().find_map(|service| {
+        let api = service.api.as_ref()?;
+        if api.kind != lemonfiber_manifest::ApiKind::Jellyfin {
+            return None;
+        }
+        let port = service.port?;
+        Some(JellyfinAddr {
+            loopback: format!("http://127.0.0.1:{port}"),
+            network_url: format!("http://{}:{port}", service.id),
+        })
+    })
+}
+
+/// The Jellyfin admin password recorded on the run that minted it, so a later run
+/// can point Seerr at Jellyfin without minting again. Nothing where no env file
+/// holds one; an unreadable file reads the same as an empty one.
+fn recorded_jellyfin_password(ctx: &Ctx) -> Option<String> {
+    let path = ctx.settings.env_file.as_deref()?;
+    let file = store::read(path).unwrap_or_default();
+    let value = file.get(crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
+    (!value.is_empty()).then(|| value.to_owned())
+}
+
+/// Record the minted Jellyfin admin password where a later run reads it back.
+/// Best-effort: a value that could not be written is reported by the next run
+/// re-minting rather than by failing the wiring that did land.
+fn record_jellyfin_password(ctx: &Ctx, password: &str) {
+    if let Some(path) = ctx.settings.env_file.as_deref() {
+        let _ = store::set(path, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY, password);
     }
 }
 
@@ -1397,5 +1494,164 @@ mod tests {
         assert!(applications
             .iter()
             .all(|wiring| wiring.state == crate::seed::State::AlreadyWired));
+    }
+
+    // ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
+
+    /// A Seerr-shape service declaration.
+    fn seerr_api() -> lemonfiber_manifest::Api {
+        lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Seerr,
+            key_source: lemonfiber_manifest::KeySource::ApiSettings,
+            path: None,
+        }
+    }
+
+    fn seerr_svc() -> lemonfiber_manifest::Service {
+        manifest_service("seerr", Some(seerr_api()), Some(5055))
+    }
+
+    fn jellyfin_api() -> lemonfiber_manifest::Api {
+        lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Jellyfin,
+            key_source: lemonfiber_manifest::KeySource::Generated,
+            path: None,
+        }
+    }
+
+    fn jellyfin_svc() -> lemonfiber_manifest::Service {
+        manifest_service("jellyfin", Some(jellyfin_api()), Some(8096))
+    }
+
+    /// A transport standing in for the household pair, routed by path: Jellyfin's
+    /// public info reports whether its wizard has run, its `/Startup/*` calls
+    /// succeed, Seerr's sign-in flips it to initialised, and its public settings
+    /// report that state.
+    struct HouseholdHttp {
+        completed: bool,
+        signed_in: std::sync::Mutex<bool>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::ports::http::Http for HouseholdHttp {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            let url = &request.url;
+            let body = if url.contains("/System/Info/Public") {
+                format!(r#"{{"StartupWizardCompleted":{}}}"#, self.completed)
+            } else if url.contains("/Startup/") || url.contains("/auth/jellyfin") {
+                // Jellyfin's setup calls and Seerr's sign-in succeed but neither
+                // by itself finishes Seerr's setup.
+                String::new()
+            } else if url.contains("/settings/initialize") {
+                // Finishing setup is what marks Seerr initialised.
+                if let Ok(mut signed) = self.signed_in.lock() {
+                    *signed = true;
+                }
+                String::new()
+            } else {
+                let done = self.signed_in.lock().is_ok_and(|signed| *signed);
+                format!(r#"{{"initialized":{done}}}"#)
+            };
+            Ok(crate::ports::http::Response { status: 200, body })
+        }
+    }
+
+    #[tokio::test]
+    async fn identity_does_nothing_without_both_jellyfin_and_seerr() {
+        let ctx = seed_ctx(None, true, Vec::new(), None, None);
+        // Seerr present but no Jellyfin, and the other way round: either alone is
+        // nothing to wire.
+        assert!(super::seed_jellyfin_identity(&ctx, &[seerr_svc()])
+            .await
+            .is_empty());
+        assert!(super::seed_jellyfin_identity(&ctx, &[jellyfin_svc()])
+            .await
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn identity_leaves_an_already_set_up_household_alone() {
+        let env = config_scratch("jellyfin-already");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        // Jellyfin's password was recorded on an earlier run, and both services are
+        // already set up: nothing is minted and nothing re-pointed.
+        let _ = store::set(
+            &env,
+            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(Arc::new(
+            HouseholdHttp {
+                completed: true,
+                signed_in: std::sync::Mutex::new(true),
+            },
+        ));
+
+        let wirings = super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()]).await;
+        assert_eq!(wirings.len(), 1);
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::AlreadyWired)
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn identity_mints_records_and_wires_a_fresh_household() {
+        let env = config_scratch("jellyfin-fresh");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+        let ctx = seed_ctx(
+            None,
+            true,
+            Vec::new(),
+            Some(vec![0x11; 24]),
+            Some(env.clone()),
+        )
+        .with_http(Arc::new(HouseholdHttp {
+            completed: false,
+            signed_in: std::sync::Mutex::new(false),
+        }));
+
+        let wirings = super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()]).await;
+        assert_eq!(wirings.len(), 1);
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Wired),
+            "a fresh household is minted, signed in, and confirmed"
+        );
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            written.contains("JELLYFIN_ADMIN_PASSWORD="),
+            "the minted password is recorded: {written}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn seed_wires_jellyfin_as_seerrs_identity() {
+        // The whole command against the real manifest, which has both services;
+        // Jellyfin reports its wizard done and no password was recorded, so the
+        // household set it up and the identity is skipped for them to complete.
+        let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(Arc::new(HouseholdHttp {
+            completed: true,
+            signed_in: std::sync::Mutex::new(false),
+        }));
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        let identity = report
+            .wirings
+            .iter()
+            .find(|wiring| wiring.connection.contains("Seerr's identity"));
+        assert!(
+            identity.is_some_and(is_skipped),
+            "an externally set-up Jellyfin leaves the identity for the household"
+        );
     }
 }

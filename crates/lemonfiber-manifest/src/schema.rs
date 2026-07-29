@@ -255,6 +255,9 @@ pub enum ApiKind {
     Seerr,
     /// Bindery.
     Bindery,
+    /// Jellyfin — a media server whose account lemonfiber creates rather than a
+    /// key it reads, so it has a `key_source` of `generated`.
+    Jellyfin,
 }
 
 /// Where a service's credential comes from.
