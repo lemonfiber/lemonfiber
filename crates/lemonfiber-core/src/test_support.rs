@@ -34,6 +34,8 @@ impl Runner for Scripted {
             }),
         }
     }
+    // `stream` uses the trait's default (run then replay); a test that drives a
+    // streamed pull exercises it.
 }
 
 /// An engine that reports whatever the test put in it.

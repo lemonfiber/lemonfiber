@@ -7,6 +7,7 @@
 
 use async_trait::async_trait;
 use thiserror::Error;
+use tokio::sync::mpsc::{channel, Receiver};
 
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
@@ -78,7 +79,22 @@ impl Diagnose for Failure {
     }
 }
 
-/// Runs a program to completion.
+/// What a running process emits as it goes: a line of its output, then its exit.
+///
+/// The line half is for a command whose progress the operator should watch happen
+/// — an image pull that would otherwise be a silent multi-minute wait — so the
+/// output is handed back a line at a time rather than in one lump at the end. The
+/// two of a process's streams are merged in arrival order; which one a line came
+/// from does not change what a pull's progress means.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Progress {
+    /// A line the process wrote.
+    Line(String),
+    /// The process ended with this exit status, absent when a signal ended it.
+    Ended(Option<i32>),
+}
+
+/// Runs a program, either to completion or streaming its progress.
 #[async_trait]
 pub trait Runner: Send + Sync {
     /// Run `argv` and wait for it to finish.
@@ -89,6 +105,31 @@ pub trait Runner: Send + Sync {
     /// runs and exits non-zero is a successful call with a failed [`Output`] —
     /// those are different events and the caller decides what each means.
     async fn run(&self, argv: &[String]) -> Result<Output, Failure>;
+
+    /// Spawn `argv` and stream what it emits as it emits it — each line, then the
+    /// exit — for a long command whose progress should be seen rather than waited
+    /// on in silence. The stream ends after the [`Progress::Ended`] event.
+    ///
+    /// The default runs to completion and replays the buffered output as a stream:
+    /// correct, but not live, so an implementation whose whole point is liveness —
+    /// the one that talks to a real process — overrides it to send each line as it
+    /// lands.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the program cannot be spawned at all. A non-zero
+    /// exit arrives as a [`Progress::Ended`] on the stream, not an error here.
+    async fn stream(&self, argv: &[String]) -> Result<Receiver<Progress>, Failure> {
+        let output = self.run(argv).await?;
+        let (sender, receiver) = channel(64);
+        tokio::spawn(async move {
+            for line in output.stdout.lines().chain(output.stderr.lines()) {
+                let _ = sender.send(Progress::Line(line.to_owned())).await;
+            }
+            let _ = sender.send(Progress::Ended(output.status)).await;
+        });
+        Ok(receiver)
+    }
 }
 
 #[cfg(test)]

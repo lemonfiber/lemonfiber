@@ -33,9 +33,10 @@ use crate::platform::Environment;
 use crate::ports::docker::{Engine, LogLine, LogQuery};
 use crate::ports::filesystem::{Presence, Volume};
 use crate::ports::http::Http;
+use crate::ports::process::Progress;
 use crate::ports::random::Random;
 use crate::ports::{Clock, FileSystem, Runner};
-use crate::stack::closure::resolve;
+use crate::stack::closure::{resolve, Plan};
 use crate::stack::compose::{build, Action};
 use crate::stack::Source;
 
@@ -441,6 +442,56 @@ pub async fn logs(
         .map_err(|err| err.problem())
 }
 
+/// Pull the images the named forms need, streaming Compose's progress as it
+/// happens rather than waiting on it in silence.
+///
+/// Like [`logs`], this is a standalone streaming entry point rather than a
+/// command that returns an `Outcome`: its value is the progress arriving over
+/// time, which a one-shot report cannot carry. It drives the very
+/// `docker compose pull` a buffered [`Command::Pull`] runs — same argument vector
+/// from [`build`] — so the two agree on exactly what is pulled, differing only in
+/// whether the output is watched or waited for.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be
+/// resolved or Compose cannot be spawned.
+pub async fn pull_progress(ctx: &Ctx, forms: &[String]) -> Result<Receiver<Progress>, Problem> {
+    let (_, _, command) = compose(ctx, forms, &Action::Pull).map_err(|err| *err)?;
+    ctx.runner
+        .stream(&command)
+        .await
+        .map_err(|err| err.problem())
+}
+
+/// Resolve the named forms to their plan and the `docker compose` argument vector
+/// for `action`, materialising the stack so Compose can read it.
+///
+/// The shared prelude of every lifecycle command and of a streamed pull, so the
+/// two build the exact same invocation for the same forms and their setup
+/// failures — an unreadable manifest, a form that resolves to nothing, a stack
+/// that cannot be written — read the same wherever they surface. The manifest and
+/// plan travel back with the command because a caller that runs it needs them to
+/// report what it did and to wait on what it started.
+fn compose(
+    ctx: &Ctx,
+    forms: &[String],
+    action: &Action,
+) -> Result<(lemonfiber_manifest::Manifest, Plan, Vec<String>), Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+    let plan =
+        resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| Box::new(err.problem()))?;
+    let stack = ctx
+        .stack
+        .materialise(ctx.settings.stack_dir.as_deref())
+        .map_err(|err| Box::new(err.problem()))?;
+    let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
+    Ok((manifest, plan, command))
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -620,17 +671,7 @@ fn configuration(
 /// is the point: `up` from a keypress and `up` from a subcommand reach this same
 /// function with the same arguments.
 async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome, Problem> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
-    let plan = resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| err.problem())?;
-    let stack = ctx
-        .stack
-        .materialise(ctx.settings.stack_dir.as_deref())
-        .map_err(|err| err.problem())?;
-
-    let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
+    let (manifest, plan, command) = compose(ctx, forms, action).map_err(|err| *err)?;
 
     let mut report = LifecycleReport {
         action: action.name().to_owned(),
@@ -846,11 +887,12 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        dispatch, Category, Command, Ctx, Environment, Outcome, Settings, Source, VersionReport,
+        dispatch, pull_progress, Category, Command, Ctx, Environment, Outcome, Settings, Source,
+        VersionReport,
     };
     use crate::docker::{Condition, State as ServiceState};
     use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
-    use crate::ports::process::{Failure, Output};
+    use crate::ports::process::{Failure, Output, Progress};
     use crate::test_support::{refused, spoke, stack, Reporting, Scripted};
     use std::time::Duration;
 
@@ -1151,6 +1193,72 @@ mod tests {
             forms: vec!["library".to_owned()],
         };
         let refusal = dispatch(command, &ctx)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(crate::ports::process::MISSING_PROGRAM));
+    }
+
+    #[tokio::test]
+    async fn pull_progress_streams_composes_output_line_by_line_then_the_exit() {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(Output {
+                status: Some(0),
+                stdout: "library Pulling\nlibrary Pulled\n".to_owned(),
+                stderr: String::new(),
+            }))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            settings,
+            Environment::MacOs,
+        );
+
+        let (closed, silent) = tokio::sync::mpsc::channel(1);
+        drop(closed);
+        let mut progress = pull_progress(&ctx, &["library".to_owned()])
+            .await
+            .unwrap_or(silent);
+        let mut lines = Vec::new();
+        let mut status = None;
+        while let Some(event) = progress.recv().await {
+            match event {
+                Progress::Line(line) => lines.push(line),
+                Progress::Ended(code) => status = code,
+            }
+        }
+        // Each of Compose's per-image lines arrives on the stream, then the exit —
+        // what a surface renders as it happens rather than after.
+        assert_eq!(
+            lines,
+            vec!["library Pulling".to_owned(), "library Pulled".to_owned()]
+        );
+        assert_eq!(status, Some(0));
+    }
+
+    #[tokio::test]
+    async fn a_pull_that_cannot_spawn_compose_is_a_problem_not_a_stream() {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Err(Failure::NotFound {
+                program: "docker".to_owned(),
+            }))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            settings,
+            Environment::MacOs,
+        );
+        let refusal = pull_progress(&ctx, &["library".to_owned()])
             .await
             .err()
             .map(|problem| problem.code);

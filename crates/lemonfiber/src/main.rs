@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{
-    dispatch, logs, recover, setup, supervise, Command, Ctx, Outcome, WATCH,
+    dispatch, logs, pull_progress, recover, setup, supervise, Command, Ctx, Outcome, WATCH,
 };
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
@@ -27,6 +27,8 @@ use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
+// Aliased: `Progress` is also the wizard's resume type, imported below.
+use lemonfiber_core::ports::process::Progress as PullEvent;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::validate::Live;
 use lemonfiber_core::wizard::{
@@ -316,7 +318,9 @@ async fn main() -> ExitCode {
             forms: vec![form],
             services,
         },
-        Request::Pull { forms } => Command::Pull { forms },
+        // A pull is watched as it happens rather than waited on in silence, so like
+        // streaming and watching it runs its own way instead of through dispatch.
+        Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
         Request::Ps { forms } => Command::Ps { forms },
         Request::Config { action } => configuration(action),
         Request::Doctor { only, disruptive } => {
@@ -506,6 +510,91 @@ async fn stream(
         println!("no output");
     }
     ExitCode::SUCCESS
+}
+
+/// Pull the images the forms need, showing each as it downloads.
+///
+/// Image pulls are gigabytes and take minutes; a silent wait reads as a hang, so
+/// the operator is told the wait is coming and then shown Compose's per-image
+/// progress as it arrives.
+async fn pull(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
+    match pull_showing(ctx, forms, json).await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(code) => code,
+    }
+}
+
+/// Stream a pull to the screen, or report why it could not run.
+///
+/// Split from [`pull`] so setup's Start phase can pull-with-progress and, only if
+/// that succeeds, go on to bring the stack up — a `Result` it can branch on rather
+/// than an exit code it cannot compare.
+async fn pull_showing(ctx: &Ctx, forms: &[String], json: bool) -> Result<(), ExitCode> {
+    // A rehearsal reports what would be pulled rather than pulling it; the buffered
+    // path already renders that, so a dry run borrows it rather than streaming.
+    if ctx.dry_run {
+        return pull_rehearsal(ctx, forms, json).await;
+    }
+
+    // The expected-duration statement, before the wait — qualitative, because the
+    // real figure depends on the operator's line and what is already cached.
+    if !json {
+        println!("Pulling images — usually a few minutes, and several gigabytes.");
+    }
+
+    let mut progress = pull_progress(ctx, forms)
+        .await
+        .map_err(|problem| complain(&problem))?;
+    let mut failed = false;
+    while let Some(event) = progress.recv().await {
+        match event {
+            PullEvent::Line(line) => emit_pull_line(&line, json),
+            // A non-zero exit is the pull's own report that an image did not come
+            // down; the operator is told, and a script sees a non-zero code.
+            PullEvent::Ended(status) => failed = status != Some(0),
+        }
+    }
+
+    if failed {
+        if !json {
+            eprintln!("\nSome images could not be pulled — check the output above.");
+        }
+        return Err(ExitCode::from(FAILURE));
+    }
+    Ok(())
+}
+
+/// A dry run's rehearsal: report what a pull would fetch without fetching it,
+/// borrowing the buffered path's rendering rather than streaming a pull that will
+/// not happen.
+async fn pull_rehearsal(ctx: &Ctx, forms: &[String], json: bool) -> Result<(), ExitCode> {
+    match dispatch(
+        Command::Pull {
+            forms: forms.to_vec(),
+        },
+        ctx,
+    )
+    .await
+    {
+        Ok(outcome) => {
+            render(&outcome, json);
+            Ok(())
+        }
+        Err(problem) => Err(complain(&problem)),
+    }
+}
+
+/// Render one line of a pull's progress — wrapped in an envelope under `--json`,
+/// indented beneath the pull for a person to read.
+fn emit_pull_line(line: &str, json: bool) {
+    if !json {
+        println!("  {line}");
+        return;
+    }
+    match Envelope::new("pull", line).to_json() {
+        Some(text) => println!("{text}"),
+        None => eprintln!("this line could not be rendered as JSON"),
+    }
 }
 
 /// Watch the data location until it is lost, then report what was stopped.
@@ -884,11 +973,19 @@ async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
 const STARTER_FORM: &str = "tv";
 
 /// Bring the stack up and report how it settled, the last step of a fresh setup.
+///
+/// The images are pulled first, with their progress on screen, so the several
+/// gigabytes come down where the operator can watch rather than as a silent wait
+/// inside `up`. Only once they are down is the stack brought up and waited on for
+/// health; a pull that failed stops here rather than starting against images that
+/// never arrived.
 async fn start(ctx: &Ctx) -> ExitCode {
-    let up = Command::Up {
-        forms: vec![STARTER_FORM.to_owned()],
-    };
-    match dispatch(up, ctx).await {
+    let forms = vec![STARTER_FORM.to_owned()];
+    if let Err(code) = pull_showing(ctx, &forms, false).await {
+        return code;
+    }
+
+    match dispatch(Command::Up { forms }, ctx).await {
         Ok(outcome) => {
             render(&outcome, false);
             settled(&outcome)
