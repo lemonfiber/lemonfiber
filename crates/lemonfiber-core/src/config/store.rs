@@ -75,16 +75,29 @@ pub fn read(path: &Path) -> Result<EnvFile, Failure> {
 pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Failure> {
     let mut file = read(path)?;
     file.set(key, value);
+    write(path, &file.render())
+}
 
-    // Creating the directory and writing the file are one operation as far as
-    // the operator is concerned, so they share one failure rather than two that
-    // say the same thing.
-    // Written with `if let` rather than `map_err`, and without a block around
-    // the directory. A closure is a function of its own for coverage purposes,
-    // and one that only runs on failure is a symbol no passing test reaches in
-    // every build of this crate. A path with no usable parent — a filesystem
-    // root, or a bare relative name whose parent is the empty string — is
-    // written in the current directory rather than under `create_dir_all("")`.
+/// Write `text` to `path`, creating the directory for it where needed.
+///
+/// The one place a small lemonfiber-owned file is put on disk, so the wizard's
+/// progress and change journal land the same way a setting does — and report the
+/// same [`Failure::NotWritten`] where they cannot.
+///
+/// Creating the directory and writing the file are one operation as far as the
+/// operator is concerned, so they share one failure rather than two that say the
+/// same thing. Written with `if let` rather than `map_err`, and without a block
+/// around the directory: a closure is a function of its own for coverage
+/// purposes, and one that only runs on failure is a symbol no passing test
+/// reaches in every build of this crate. A path with no usable parent — a
+/// filesystem root, or a bare relative name whose parent is the empty string — is
+/// written in the current directory rather than under `create_dir_all("")`.
+///
+/// # Errors
+///
+/// Returns [`Failure::NotWritten`] where the directory could not be created or
+/// the file could not be written.
+pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -92,7 +105,7 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Failure> {
     if let Err(err) = std::fs::create_dir_all(parent) {
         return Err(unwritable(path, &err));
     }
-    if let Err(err) = std::fs::write(path, file.render()) {
+    if let Err(err) = std::fs::write(path, text) {
         return Err(unwritable(path, &err));
     }
     Ok(())
