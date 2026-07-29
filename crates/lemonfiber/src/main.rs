@@ -92,6 +92,21 @@ enum Request {
         /// The indexer's API key.
         #[arg(long, value_name = "KEY")]
         indexer_key: Option<String>,
+        /// The Usenet provider's hostname.
+        #[arg(long, value_name = "HOST")]
+        usenet_host: Option<String>,
+        /// The port the Usenet provider answers on (defaults to 563).
+        #[arg(long, value_name = "PORT")]
+        usenet_port: Option<u16>,
+        /// The Usenet account username.
+        #[arg(long, value_name = "USER")]
+        usenet_user: Option<String>,
+        /// The Usenet account password.
+        #[arg(long, value_name = "PASS")]
+        usenet_pass: Option<String>,
+        /// Whether the Usenet connection uses TLS (defaults to yes).
+        #[arg(long, value_name = "BOOL")]
+        usenet_tls: Option<bool>,
         /// How to serve the library: `docker`, `native`, or `none`.
         #[arg(long, value_name = "MODE")]
         library: Option<String>,
@@ -259,6 +274,11 @@ async fn main() -> ExitCode {
             data_location,
             indexer_url,
             indexer_key,
+            usenet_host,
+            usenet_port,
+            usenet_user,
+            usenet_pass,
+            usenet_tls,
             library,
             service_user,
             household,
@@ -270,6 +290,11 @@ async fn main() -> ExitCode {
                 data_location,
                 indexer_url,
                 indexer_key,
+                usenet_host,
+                usenet_port,
+                usenet_user,
+                usenet_pass,
+                usenet_tls,
                 library,
                 service_user,
                 household,

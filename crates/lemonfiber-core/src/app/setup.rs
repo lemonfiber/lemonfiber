@@ -50,8 +50,8 @@ pub trait Prompt {
     /// operator's to choose.
     fn storage_warning(&self, path: &Path, warning: &StorageWarning) -> bool;
     /// Ask for the indexer's URL and API key, or nothing where the operator has
-    /// none to give now. Setup never prints the key back — the review shows it
-    /// redacted — though a terminal still echoes it as it is typed.
+    /// none to give now. The key is read without echo and never printed back — the
+    /// review shows it redacted.
     fn credential(&self) -> Option<(String, String)>;
     /// The credential was proven — report the capability observed while proving it,
     /// so the operator sees the test succeed rather than a silent pass.
@@ -61,10 +61,10 @@ pub trait Prompt {
     /// leave it unset for now.
     fn credential_failed(&self, outcome: &Validation) -> CredentialChoice;
     /// Ask for the Usenet provider's host, port, login and TLS, or nothing where
-    /// the operator has none to give now. Setup never prints the password back —
-    /// the review shows it redacted — though a terminal echoes it as it is typed.
-    /// Its live test reports through [`Prompt::credential_valid`] and
-    /// [`Prompt::credential_failed`], the same as the indexer's.
+    /// the operator has none to give now. The password is read without echo and
+    /// never printed back — the review shows it redacted. Its live test reports
+    /// through [`Prompt::credential_valid`] and [`Prompt::credential_failed`], the
+    /// same as the indexer's.
     fn usenet_provider(&self) -> Option<ProviderEntry>;
     /// The user and group the containers run as, asked only where ownership shows;
     /// `None` where the operator declines and the image's own default is kept.
