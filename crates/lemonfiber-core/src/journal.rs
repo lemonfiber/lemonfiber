@@ -53,6 +53,13 @@ pub enum Kind {
         /// What it was set to.
         current: String,
     },
+    /// A filesystem path was created — a directory made, a stack written out.
+    /// Undoing removes it. Only a path lemonfiber itself created is ever recorded
+    /// this way, so undoing never removes something that was already there.
+    Made {
+        /// The path that was created.
+        path: String,
+    },
 }
 
 impl Change {
@@ -68,6 +75,7 @@ impl Change {
                 key: key.clone(),
                 value: previous.clone(),
             },
+            Kind::Made { path } => Action::Delete { path: path.clone() },
         };
         Undo {
             target: self.target.clone(),
@@ -101,6 +109,11 @@ pub enum Action {
         key: String,
         /// What to restore it to, or `None` to remove it.
         value: Option<String>,
+    },
+    /// Remove a path that was created.
+    Delete {
+        /// The path to remove.
+        path: String,
     },
 }
 
@@ -160,6 +173,58 @@ mod tests {
                 id: id.to_owned(),
             },
         }
+    }
+
+    fn made(path: &str) -> Change {
+        Change {
+            at: "t".to_owned(),
+            operation: "apply".to_owned(),
+            target: path.to_owned(),
+            kind: Kind::Made {
+                path: path.to_owned(),
+            },
+        }
+    }
+
+    #[test]
+    fn undoing_a_made_path_removes_exactly_it() {
+        assert_eq!(
+            made("/srv/media").undo(),
+            Undo {
+                target: "/srv/media".to_owned(),
+                action: Action::Delete {
+                    path: "/srv/media".to_owned(),
+                },
+            },
+        );
+    }
+
+    #[test]
+    fn rewinding_unwinds_a_made_path_in_its_place() {
+        // A directory made, then a resource registered under it: unwound most
+        // recent first, the resource comes undone before the path it needed is
+        // removed.
+        let mut journal = Journal::new();
+        journal.record(made("/srv/media"));
+        journal.record(created("sonarr", "1"));
+        assert_eq!(
+            journal.rewind(),
+            vec![
+                Undo {
+                    target: "sonarr".to_owned(),
+                    action: Action::Remove {
+                        resource: "downloadclient".to_owned(),
+                        id: "1".to_owned(),
+                    },
+                },
+                Undo {
+                    target: "/srv/media".to_owned(),
+                    action: Action::Delete {
+                        path: "/srv/media".to_owned(),
+                    },
+                },
+            ],
+        );
     }
 
     #[test]
@@ -328,6 +393,7 @@ mod tests {
             set(None),
             set(Some("/old/media")),
             set(Some("")),
+            made("/srv/media"),
         ] {
             let line = serde_json::to_string(&change).unwrap_or_default();
             let read = serde_json::from_str::<Change>(&line).ok();
