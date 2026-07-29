@@ -597,7 +597,16 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard) -> ExitCode {
 
     let prompt = Terminal::new(ctx.environment, default_data_location());
 
-    match setup::run(&mut wizard, &prompt, paths, ctx.stack, &stamp()) {
+    match setup::run(
+        &mut wizard,
+        &prompt,
+        ctx.filesystem.as_ref(),
+        paths,
+        ctx.stack,
+        &stamp(),
+    )
+    .await
+    {
         Ok(setup::Outcome::Applied) => {
             // The settings read at startup predate the file setup just wrote, so
             // they are refreshed before the stack is brought up against them.

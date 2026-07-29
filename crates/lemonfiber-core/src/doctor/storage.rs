@@ -65,13 +65,6 @@ struct Recorded {
 /// well above one file.
 const LOW_SPACE_FLOOR: u64 = 10 * 1024 * 1024 * 1024;
 
-/// The one consequence sentence a lost link means, stated the same way wherever
-/// it is reported — because "hardlinks unsupported" means nothing, and this is
-/// what it means.
-const CONSEQUENCE: &str = "Imports will copy instead of link. Each takes minutes rather than \
-    being instant, uses twice the disk while it runs, and torrents cannot seed from the library \
-    copy.";
-
 /// Whether the data root can hardlink, and what mode that puts the stack in.
 pub struct StorageCheck {
     filesystem: Arc<dyn FileSystem>,
@@ -265,7 +258,7 @@ fn copying(facts: &StorageFacts, regressed: bool) -> Vec<Finding> {
         COPY_ONLY,
         Severity::Warning,
         summary,
-        CONSEQUENCE,
+        storage::COPY_CONSEQUENCE,
         Remedy::new("Choose a location that hardlinks, or continue in copy mode")
             .with_detail("The services are configured to copy so imports still work"),
     )
