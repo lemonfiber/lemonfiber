@@ -20,6 +20,7 @@ use crate::config::Settings;
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
+use crate::doctor::indexer::IndexerCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
@@ -507,11 +508,19 @@ async fn diagnose(
         ctx.filesystem.clone(),
         servarr_targets(&manifest.services, project.as_deref()),
     );
+    // The indexer the operator gave at setup is re-proven the same way it was
+    // first proven — the shared validator over the same HTTP seam — so a key that
+    // has since rotted is a finding rather than an empty search weeks on.
+    let indexer = IndexerCheck::new(
+        Arc::new(crate::validate::Live::new(ctx.http.clone())),
+        ctx.settings.indexer.clone(),
+    );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(storage),
         Box::new(vpn),
         Box::new(credentials),
+        Box::new(indexer),
     ];
 
     Ok(examine(&checks, only).await)

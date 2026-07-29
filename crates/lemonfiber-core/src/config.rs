@@ -182,6 +182,24 @@ pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+/// The indexer the operator configured, where both its URL and key are present.
+///
+/// Only a complete pair is an indexer to re-prove; a half-written one — a URL
+/// with no key — is treated as none rather than a credential to test.
+#[must_use]
+pub fn indexer_from_env(file: &env::EnvFile) -> Option<Indexer> {
+    let present = |key| {
+        file.get(key)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+    };
+    Some(Indexer {
+        url: present(INDEXER_URL_KEY)?,
+        key: present(INDEXER_APIKEY_KEY)?,
+    })
+}
+
 /// The user and group the service containers run as, where both are configured.
 ///
 /// Both or neither: deciding whether that user can write a directory needs the
@@ -320,6 +338,18 @@ pub struct Settings {
     /// Disabled by default: a fresh install has no VPN configured, so the
     /// port-forward check reports that it does not apply rather than a fault.
     pub port_forward: PortForward,
+    /// The indexer the operator gave at setup — its URL and key — so a diagnosis
+    /// can re-prove it live. Absent where none was configured.
+    pub indexer: Option<Indexer>,
+}
+
+/// An indexer credential as configuration holds it: where it is, and the key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Indexer {
+    /// The indexer's API base URL.
+    pub url: String,
+    /// The API key it authenticates with.
+    pub key: String,
 }
 
 impl Default for Settings {
@@ -335,18 +365,50 @@ impl Default for Settings {
             storage_state: None,
             service_user: None,
             port_forward: PortForward::default(),
+            indexer: None,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{env, ip_echo_from_env, Protocol, Protocols, Settings, DEFAULT_IP_ECHO};
+    use super::{
+        env, indexer_from_env, ip_echo_from_env, Indexer, Protocol, Protocols, Settings,
+        DEFAULT_IP_ECHO,
+    };
 
     #[test]
     fn a_fresh_install_has_no_way_to_download_yet() {
         assert!(!Protocols::none().any());
         assert_eq!(Protocols::default(), Protocols::none());
+    }
+
+    #[test]
+    fn an_indexer_is_read_only_when_both_its_url_and_key_are_present() {
+        // Both present: an indexer to re-prove, whitespace trimmed.
+        let file = env::EnvFile::parse("INDEXER_URL= http://idx/api \nINDEXER_APIKEY=abc\n");
+        assert_eq!(
+            indexer_from_env(&file),
+            Some(Indexer {
+                url: "http://idx/api".to_owned(),
+                key: "abc".to_owned(),
+            })
+        );
+
+        // A URL with no key is half-written, so no indexer to test.
+        let url_only = env::EnvFile::parse("INDEXER_URL=http://idx/api\n");
+        assert_eq!(indexer_from_env(&url_only), None);
+
+        // A key with no URL is nowhere to send it, so likewise none.
+        let key_only = env::EnvFile::parse("INDEXER_APIKEY=abc\n");
+        assert_eq!(indexer_from_env(&key_only), None);
+
+        // An empty value counts as absent, not as a blank indexer.
+        let empty = env::EnvFile::parse("INDEXER_URL=\nINDEXER_APIKEY=abc\n");
+        assert_eq!(indexer_from_env(&empty), None);
+
+        // Nothing configured at all.
+        assert_eq!(indexer_from_env(&env::EnvFile::parse("")), None);
     }
 
     #[test]
