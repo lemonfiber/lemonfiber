@@ -8,7 +8,7 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::{CredentialChoice, Prompt, StorageWarning};
+use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
@@ -146,8 +146,8 @@ impl Prompt for Terminal {
         if url.is_empty() {
             return None;
         }
-        // The key is read on its own line and never printed back — only the outcome
-        // of testing it ever reaches the screen.
+        // Setup never prints the key back — the review redacts it, and only the
+        // outcome of testing it reaches the screen.
         let key = ask("Indexer API key:");
         Some((url, key))
     }
@@ -176,6 +176,30 @@ impl Prompt for Terminal {
             "3" => CredentialChoice::Skip,
             _ => CredentialChoice::Retry,
         }
+    }
+
+    fn usenet_provider(&self) -> Option<ProviderEntry> {
+        println!("\nA Usenet provider is where downloads are fetched from.");
+        println!("Leave the host blank to set one up later.");
+        let host = ask("Provider host:");
+        if host.is_empty() {
+            return None;
+        }
+        // 563 is the standard TLS port; TLS is the default because the password
+        // must not cross the wire in the clear.
+        let port = ask("Port [563]:").parse().unwrap_or(563);
+        let user = ask("Username:");
+        // Setup never prints the password back — the review redacts it, and only
+        // the test's outcome reaches the screen.
+        let pass = ask("Password:");
+        let tls = yes_no("Connect over TLS?", true);
+        Some(ProviderEntry {
+            host,
+            port,
+            user,
+            pass,
+            tls,
+        })
     }
 
     fn service_user(&self) -> Option<(u32, u32)> {
@@ -211,10 +235,22 @@ impl Prompt for Terminal {
     fn confirm(&self, plan: &Plan) -> bool {
         println!("\nThis is what setup will write:");
         for (key, value) in plan.settings() {
-            println!("  {key} = {value}");
+            // A secret is shown as present, not in the clear: the review reaches
+            // the screen, scrollback and any session recording, and an API key or
+            // password has no business in any of them.
+            let shown = if is_secret(key) { "********" } else { value };
+            println!("  {key} = {shown}");
         }
         yes_no("\nApply it?", true)
     }
+}
+
+/// Whether a setting's value is a secret, by its key — a password, an API key, a
+/// token. Such a value is never printed, only marked present.
+fn is_secret(key: &str) -> bool {
+    ["PASS", "KEY", "TOKEN", "SECRET"]
+        .iter()
+        .any(|mark| key.contains(mark))
 }
 
 /// Print a question and read the operator's trimmed answer, empty on end-of-input.
@@ -427,6 +463,11 @@ impl Prompt for Flags {
         } else {
             CredentialChoice::Skip
         }
+    }
+    // A Usenet provider is optional (an unset one is a supported end), so a flag
+    // run leaves it unset for now; configuring it from flags is a later addition.
+    fn usenet_provider(&self) -> Option<ProviderEntry> {
+        None
     }
     fn service_user(&self) -> Option<(u32, u32)> {
         self.flags.service_user

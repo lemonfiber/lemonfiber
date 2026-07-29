@@ -325,6 +325,7 @@ mod tests {
             .answer(Answer::DataLocation(data_root.to_path_buf()))
             .unwrap_or(());
         wizard.answer(Answer::Credentials(None)).unwrap_or(());
+        wizard.answer(Answer::Provider(None)).unwrap_or(());
         wizard
             .answer(Answer::ServiceUser(Some((1000, 1000))))
             .unwrap_or(());
