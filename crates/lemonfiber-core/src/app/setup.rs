@@ -15,6 +15,7 @@ use crate::app::apply;
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
 use crate::error::{Code, Problem, Remedy, Severity};
+use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::stack::Source;
 use crate::wizard::{Answer, Library, Phase, Plan, Progress, Rejected, Step, Wizard};
 
@@ -26,6 +27,9 @@ use crate::wizard::{Answer, Library, Phase, Plan, Progress, Rejected, Step, Wiza
 pub trait Prompt {
     /// Which download protocols to use: Usenet, torrents, both, or neither.
     fn protocols(&self) -> Protocols;
+    /// Show the operator the accounts their protocol choice needs, before any is
+    /// asked for — derived from what they chose, and nothing they declined.
+    fn prerequisites(&self, map: &PrerequisiteMap);
     /// Where the library and downloads are kept.
     fn data_location(&self) -> PathBuf;
     /// The user and group the containers run as, asked only where ownership shows;
@@ -158,7 +162,18 @@ fn gather(wizard: &mut Wizard, prompt: &dyn Prompt, paths: &Paths) -> Result<(),
         if !wants(wizard, step) {
             continue;
         }
-        wizard.answer(ask(prompt))?;
+        let answer = ask(prompt);
+
+        // The accounts a protocol needs are shown the moment the protocol is
+        // chosen — derived from that answer, ahead of the questions that follow —
+        // so the operator learns what they must go and obtain while there is still
+        // a run to come back to. Matched off the answer's own variant, so the
+        // choice's value is in hand without reaching back for an optional field.
+        if let Answer::Protocols(protocols) = &answer {
+            prompt.prerequisites(&prerequisites(*protocols));
+        }
+
+        wizard.answer(answer)?;
         save(wizard, paths);
     }
     Ok(())
@@ -220,6 +235,7 @@ mod tests {
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::platform::Environment;
+    use crate::prerequisites::PrerequisiteMap;
     use crate::stack::Source;
     use crate::wizard::{Answer, Library, Phase, Plan, Progress, Wizard};
 
@@ -233,6 +249,9 @@ mod tests {
         household: bool,
         autostart: bool,
         confirm: bool,
+        /// The protocol choices each prerequisites checklist was derived from, in
+        /// the order shown — so a test can prove the checklist reflects the answer.
+        shown_prerequisites: std::cell::RefCell<Vec<Protocols>>,
     }
 
     impl Scripted {
@@ -246,6 +265,7 @@ mod tests {
                 household: true,
                 autostart: false,
                 confirm: true,
+                shown_prerequisites: std::cell::RefCell::new(Vec::new()),
             }
         }
     }
@@ -253,6 +273,9 @@ mod tests {
     impl Prompt for Scripted {
         fn protocols(&self) -> Protocols {
             self.protocols
+        }
+        fn prerequisites(&self, map: &PrerequisiteMap) {
+            self.shown_prerequisites.borrow_mut().push(map.protocols);
         }
         fn data_location(&self) -> PathBuf {
             self.data_location.clone()
@@ -289,6 +312,24 @@ mod tests {
     /// A stack already on disk, so a run does not materialise one.
     fn external() -> Source {
         Source::External(Path::new("/lemonfiber-not-a-real-stack"))
+    }
+
+    #[test]
+    fn the_prerequisites_are_shown_derived_from_the_chosen_protocols() {
+        let dir = scratch("prereqs");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = Scripted::workable(dir.join("data-root"));
+
+        assert!(matches!(
+            run(&mut wizard, &prompt, &paths, external(), "t"),
+            Ok(Outcome::Applied)
+        ));
+
+        // The checklist was shown once, derived from the protocols answered — not a
+        // fixed list, and not before the protocols were chosen.
+        let shown = prompt.shown_prerequisites.borrow();
+        assert_eq!(shown.as_slice(), [Protocols::both()]);
     }
 
     #[test]

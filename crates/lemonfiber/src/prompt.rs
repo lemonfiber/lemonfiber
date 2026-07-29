@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use lemonfiber_core::app::setup::Prompt;
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
+use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::wizard::{Library, Plan};
 
 /// A prompt that reads the operator's answers from the terminal.
@@ -52,6 +53,32 @@ impl Prompt for Terminal {
             },
             _ => Protocols::both(),
         }
+    }
+
+    fn prerequisites(&self, map: &PrerequisiteMap) {
+        // Nothing required is stated first and plainly — a folder of existing media
+        // reaching a working Jellyfin with no accounts is an end state, not a lesser
+        // one. Otherwise each thing is named, explained, costed in a band, and given
+        // the criteria that decide it — no vendors, since those age and vary.
+        if let Some(note) = map.library_only {
+            println!("\n{note}");
+            return;
+        }
+
+        println!("\nBefore the questions that follow, here is what your choices will need.");
+        println!("You can go and get these, then run setup again — it remembers your answers.\n");
+        for item in &map.items {
+            println!("  {}", item.label);
+            println!("    What it is: {}", item.what);
+            println!("    Why:        {}", item.why);
+            println!("    Cost:       {}", item.cost.phrase());
+            println!("    Look for:");
+            for criterion in &item.criteria {
+                println!("      · {criterion}");
+            }
+            println!("    Without it: {}\n", item.without);
+        }
+        let _ = ask("Press enter when you have noted these.");
     }
 
     fn data_location(&self) -> PathBuf {

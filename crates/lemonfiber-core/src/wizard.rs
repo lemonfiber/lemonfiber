@@ -91,8 +91,8 @@ impl Step {
     const ORDER: [Self; 10] = [
         Self::Welcome,
         Self::Preflight,
-        Self::Prerequisites,
         Self::Protocols,
+        Self::Prerequisites,
         Self::DataLocation,
         Self::ServiceUser,
         Self::Library,
@@ -109,8 +109,8 @@ impl Step {
         match self {
             Self::Welcome => 0,
             Self::Preflight => 1,
-            Self::Prerequisites => 2,
-            Self::Protocols => 3,
+            Self::Protocols => 2,
+            Self::Prerequisites => 3,
             Self::DataLocation => 4,
             Self::ServiceUser => 5,
             Self::Library => 6,
