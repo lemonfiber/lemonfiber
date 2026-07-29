@@ -19,7 +19,8 @@ use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::stack::Source;
 use crate::storage::{self, Linked};
-use crate::wizard::{Answer, Library, Phase, Plan, Progress, Rejected, Step, Wizard};
+use crate::validate::{Credential, Validation, Validator};
+use crate::wizard::{Answer, Indexer, Library, Phase, Plan, Progress, Rejected, Step, Wizard};
 
 /// How the operator is asked the questions the wizard cannot answer itself.
 ///
@@ -46,6 +47,16 @@ pub trait Prompt {
     /// asked — it follows from what the location can do; only the location is the
     /// operator's to choose.
     fn storage_warning(&self, path: &Path, warning: &StorageWarning) -> bool;
+    /// Ask for the indexer's URL and API key, or nothing where the operator has
+    /// none to give now. The key is read but never echoed back.
+    fn credential(&self) -> Option<(String, String)>;
+    /// The credential was proven — report the capability observed while proving it,
+    /// so the operator sees the test succeed rather than a silent pass.
+    fn credential_valid(&self, observed: &str);
+    /// The credential could not be proven: show what the live test came to, told
+    /// apart by cause, and ask whether to try again, proceed with it unverified, or
+    /// leave it unset for now.
+    fn credential_failed(&self, outcome: &Validation) -> CredentialChoice;
     /// The user and group the containers run as, asked only where ownership shows;
     /// `None` where the operator declines and the image's own default is kept.
     fn service_user(&self) -> Option<(u32, u32)>;
@@ -79,6 +90,17 @@ pub enum StorageWarning {
     },
 }
 
+/// What the operator does with a credential the live test could not prove.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CredentialChoice {
+    /// Enter it again and test it afresh.
+    Retry,
+    /// Keep it as it is, unverified, and go on — it is their machine to do so.
+    Proceed,
+    /// Leave it unset for now.
+    Skip,
+}
+
 /// How a run of setup ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -101,6 +123,7 @@ pub async fn run(
     wizard: &mut Wizard,
     prompt: &dyn Prompt,
     filesystem: &dyn FileSystem,
+    validator: &dyn Validator,
     paths: &Paths,
     source: Source,
     stamp: &str,
@@ -112,7 +135,7 @@ pub async fn run(
     if wizard.phase() != Phase::InProgress {
         return Err(Box::new(already_underway()));
     }
-    gather(wizard, prompt, filesystem, paths)
+    gather(wizard, prompt, filesystem, validator, paths)
         .await
         .map_err(|rejected| Box::new(does_not_apply(rejected)))?;
 
@@ -179,24 +202,28 @@ enum How {
     Sync(fn(&dyn Prompt) -> Answer),
     /// Ask for a data location and prove what it can do before recording it.
     Location,
+    /// Ask for a credential and prove it against its live service before keeping it.
+    Credential,
 }
 
 async fn gather(
     wizard: &mut Wizard,
     prompt: &dyn Prompt,
     filesystem: &dyn FileSystem,
+    validator: &dyn Validator,
     paths: &Paths,
 ) -> Result<(), Rejected> {
     // Each question is paired with how to ask it, so the walk is one loop: ask,
     // record, and save before moving on, so quitting mid-setup resumes at the
     // question reached rather than restarting. One loop keeps the recording a
     // single `?` rather than one tucked inside each conditional.
-    let questions: [(Step, How); 6] = [
+    let questions: [(Step, How); 7] = [
         (
             Step::Protocols,
             How::Sync(|prompt| Answer::Protocols(prompt.protocols())),
         ),
         (Step::DataLocation, How::Location),
+        (Step::Credentials, How::Credential),
         (
             Step::ServiceUser,
             How::Sync(|prompt| Answer::ServiceUser(prompt.service_user())),
@@ -222,6 +249,7 @@ async fn gather(
         let answer = match how {
             How::Sync(ask) => ask(prompt),
             How::Location => Answer::DataLocation(resolve_location(prompt, filesystem).await),
+            How::Credential => resolve_credentials(prompt, validator).await,
         };
 
         // The accounts a protocol needs are shown the moment the protocol is
@@ -258,6 +286,51 @@ async fn resolve_location(prompt: &dyn Prompt, filesystem: &dyn FileSystem) -> P
                     return chosen;
                 }
             }
+        }
+    }
+}
+
+/// Ask for a credential and prove it against its live service, until one is
+/// settled on — proven, taken unverified, or left for now.
+///
+/// Nothing about the credential is kept before the live test has run (a test is
+/// attempted the moment one is entered), and what the test observed is shown so
+/// the operator sees it succeed rather than a silent pass. A test that does not
+/// prove it is told apart by cause and put back to them: try again, keep it
+/// unverified — recorded as such so a later diagnosis can point at it — or leave
+/// it unset. Entering nothing is a supported end, not a failure to answer.
+async fn resolve_credentials(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
+    loop {
+        let Some((url, key)) = prompt.credential() else {
+            return Answer::Credentials(None);
+        };
+        // Tested once, the moment it is entered: the service is asked, and what it
+        // answered is all the operator is shown or the answer records.
+        let outcome = validator
+            .validate(&Credential::Indexer {
+                url: url.clone(),
+                key: key.clone(),
+            })
+            .await;
+        if let Validation::Valid { observed } = &outcome {
+            prompt.credential_valid(observed);
+            return Answer::Credentials(Some(Indexer {
+                url,
+                key,
+                validated: true,
+            }));
+        }
+        // Not proven — told apart by cause and put back to the operator to act on.
+        match prompt.credential_failed(&outcome) {
+            CredentialChoice::Retry => {}
+            CredentialChoice::Proceed => {
+                return Answer::Credentials(Some(Indexer {
+                    url,
+                    key,
+                    validated: false,
+                }))
+            }
+            CredentialChoice::Skip => return Answer::Credentials(None),
         }
     }
 }
@@ -385,14 +458,50 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{progress_at, run, Outcome, Prompt, StorageWarning};
+    use super::{progress_at, run, CredentialChoice, Outcome, Prompt, StorageWarning};
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::platform::Environment;
     use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
     use crate::prerequisites::PrerequisiteMap;
     use crate::stack::Source;
+    use crate::validate::{Credential, Validation, Validator};
     use crate::wizard::{Answer, Library, Phase, Plan, Progress, Wizard};
+
+    /// A validator that answers with scripted outcomes, so a run is driven with no
+    /// network. Each call takes the next outcome, and the last is repeated once they
+    /// run out — so one failing then passing drives a retry, and a single outcome
+    /// answers however many times it is asked.
+    struct Proving {
+        outcomes: Vec<Validation>,
+        calls: AtomicUsize,
+    }
+
+    impl Proving {
+        fn giving(outcomes: Vec<Validation>) -> Self {
+            Self {
+                outcomes,
+                calls: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl Validator for Proving {
+        async fn validate(&self, _credential: &Credential) -> Validation {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst);
+            let index = call.min(self.outcomes.len() - 1);
+            self.outcomes[index].clone()
+        }
+    }
+
+    /// A validator whose outcome does not matter because the run never enters a
+    /// credential — the credential-free tests skip that step.
+    fn proving() -> Proving {
+        Proving::giving(vec![Validation::Valid {
+            observed: "unused".to_owned(),
+        }])
+    }
 
     /// A filesystem the tests script, so a run is driven without touching a real
     /// disk. It answers the few calls the data-location probe makes; the rest it
@@ -517,10 +626,21 @@ mod tests {
         /// The locations reported as hardlinking, each with whether the result was
         /// inferred from a parent rather than proven on the location itself.
         hardlinked: std::cell::RefCell<Vec<(PathBuf, bool)>>,
+        /// The indexer the operator enters, or none to leave it unset. Returned on
+        /// every `credential` call, so a retry re-enters the same one.
+        credential: Option<(String, String)>,
+        /// What the operator does with a credential the test could not prove.
+        on_failure: CredentialChoice,
+        /// The observed facts of credentials proven, and the outcomes of those that
+        /// were not — so a test can see which path the run took.
+        proven: std::cell::RefCell<Vec<String>>,
+        failures: std::cell::RefCell<Vec<Validation>>,
     }
 
     impl Scripted {
         /// A script that answers every question with a workable choice and confirms.
+        /// It enters no credential, the supported path for a run that is not about
+        /// them — the credential tests set one.
         fn workable(data_location: PathBuf) -> Self {
             Self {
                 protocols: Protocols::both(),
@@ -534,6 +654,10 @@ mod tests {
                 accept: Accept::Elsewhere,
                 warnings: std::cell::RefCell::new(Vec::new()),
                 hardlinked: std::cell::RefCell::new(Vec::new()),
+                credential: None,
+                on_failure: CredentialChoice::Skip,
+                proven: std::cell::RefCell::new(Vec::new()),
+                failures: std::cell::RefCell::new(Vec::new()),
             }
         }
     }
@@ -556,6 +680,16 @@ mod tests {
         fn storage_warning(&self, _path: &Path, warning: &StorageWarning) -> bool {
             self.warnings.borrow_mut().push(warning.clone());
             matches!(self.accept, Accept::Location)
+        }
+        fn credential(&self) -> Option<(String, String)> {
+            self.credential.clone()
+        }
+        fn credential_valid(&self, observed: &str) {
+            self.proven.borrow_mut().push(observed.to_owned());
+        }
+        fn credential_failed(&self, outcome: &Validation) -> CredentialChoice {
+            self.failures.borrow_mut().push(outcome.clone());
+            self.on_failure
         }
         fn service_user(&self) -> Option<(u32, u32)> {
             self.service_user
@@ -603,6 +737,7 @@ mod tests {
                 &mut wizard,
                 &prompt,
                 &ProbeFs::links(),
+                &proving(),
                 &paths,
                 external(),
                 "t"
@@ -628,6 +763,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &ProbeFs::links(),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -664,6 +800,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &ProbeFs::links(),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -687,6 +824,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &ProbeFs::links(),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -714,6 +852,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &ProbeFs::links(),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -775,6 +914,7 @@ mod tests {
         for answer in [
             Answer::Protocols(Protocols::both()),
             Answer::DataLocation(dir.join("data-root")),
+            Answer::Credentials(None),
             Answer::ServiceUser(Some((1000, 1000))),
             Answer::Library(Library::JellyfinDocker),
             Answer::Household(true),
@@ -803,6 +943,7 @@ mod tests {
         for answer in [
             Answer::Protocols(Protocols::both()),
             Answer::DataLocation(dir.join("data-root")),
+            Answer::Credentials(None),
             Answer::ServiceUser(Some((1000, 1000))),
             Answer::Library(Library::JellyfinDocker),
             Answer::Household(true),
@@ -820,6 +961,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &ProbeFs::links(),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -845,6 +987,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &ProbeFs::links(),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -880,6 +1023,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &cannot_link(FsKind::ExFat),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -912,6 +1056,7 @@ mod tests {
             &mut wizard,
             &prompt,
             &cannot_link(FsKind::Linking("ext4".to_owned())),
+            &proving(),
             &paths,
             external(),
             "t",
@@ -946,7 +1091,16 @@ mod tests {
             ..ProbeFs::links()
         };
 
-        let outcome = run(&mut wizard, &prompt, &filesystem, &paths, external(), "t").await;
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &filesystem,
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
 
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         // The declined location was warned about; the one taken was the linking one.
@@ -975,7 +1129,16 @@ mod tests {
             ..ProbeFs::links()
         };
 
-        let outcome = run(&mut wizard, &prompt, &filesystem, &paths, external(), "t").await;
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &filesystem,
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
 
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         // The good result is carried back as inferred, so the operator is not told a
@@ -1000,7 +1163,16 @@ mod tests {
             ..ProbeFs::links()
         };
 
-        let outcome = run(&mut wizard, &prompt, &filesystem, &paths, external(), "t").await;
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &filesystem,
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
 
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         // A location that could not be tested is reported as untested, with why —
@@ -1027,7 +1199,16 @@ mod tests {
             ..ProbeFs::links()
         };
 
-        let outcome = run(&mut wizard, &prompt, &filesystem, &paths, external(), "t").await;
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &filesystem,
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
 
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         let warnings = prompt.warnings.borrow();
@@ -1064,7 +1245,16 @@ mod tests {
             ..ProbeFs::links()
         };
 
-        let outcome = run(&mut wizard, &prompt, &filesystem, &paths, external(), "t").await;
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &filesystem,
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
 
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         let warnings = prompt.warnings.borrow();
@@ -1072,5 +1262,201 @@ mod tests {
             warnings.as_slice(),
             [StorageWarning::Untested { reason }] if reason.contains("could not be confirmed")
         ));
+    }
+
+    /// A prompt that enters the given indexer and answers a failed test the given
+    /// way — everything else the workable defaults.
+    fn entering(dir: &Path, on_failure: CredentialChoice) -> Scripted {
+        Scripted {
+            credential: Some(("http://indexer.test/api".to_owned(), "the-key".to_owned())),
+            on_failure,
+            ..Scripted::workable(dir.join("data-root"))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_credential_proven_is_kept_and_recorded_as_validated() {
+        let dir = scratch("cred-valid");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering(&dir, CredentialChoice::Skip);
+        let validator = Proving::giving(vec![Validation::Valid {
+            observed: "answered a search — 12 result(s) offered".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("INDEXER_APIKEY"), Some("the-key"));
+        assert_eq!(file.get("INDEXER_VALIDATED"), Some("on"));
+        // The operator was shown what the test observed, not a bare pass.
+        assert!(prompt
+            .proven
+            .borrow()
+            .iter()
+            .any(|observed| observed.contains("12 result")));
+    }
+
+    #[tokio::test]
+    async fn a_credential_that_fails_then_passes_on_retry_is_kept() {
+        let dir = scratch("cred-retry");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering(&dir, CredentialChoice::Retry);
+        // The first test refuses the key, the second — after the operator re-enters
+        // it — proves it.
+        let validator = Proving::giving(vec![
+            Validation::Rejected {
+                detail: "the indexer refused the key".to_owned(),
+            },
+            Validation::Valid {
+                observed: "answered a search".to_owned(),
+            },
+        ]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        assert_eq!(prompt.failures.borrow().len(), 1, "one refusal was shown");
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("INDEXER_VALIDATED"), Some("on"));
+    }
+
+    #[tokio::test]
+    async fn a_credential_kept_unverified_records_that_it_was_not_proven() {
+        let dir = scratch("cred-proceed");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering(&dir, CredentialChoice::Proceed);
+        let validator = Proving::giving(vec![Validation::Unreachable {
+            detail: "nothing answered".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        // Kept, so it is not lost — but recorded as unverified so a later diagnosis
+        // can point at it rather than trusting it.
+        assert_eq!(file.get("INDEXER_APIKEY"), Some("the-key"));
+        assert_eq!(file.get("INDEXER_VALIDATED"), Some("off"));
+    }
+
+    #[tokio::test]
+    async fn a_credential_skipped_leaves_the_indexer_unset() {
+        let dir = scratch("cred-skip");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = entering(&dir, CredentialChoice::Skip);
+        let validator = Proving::giving(vec![Validation::Rejected {
+            detail: "refused".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("INDEXER_URL"), None, "nothing was written for it");
+    }
+
+    #[tokio::test]
+    async fn no_indexer_is_a_supported_end_and_persists_nothing_before_a_test() {
+        let dir = scratch("cred-none");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        // The workable prompt enters no credential — a supported path, and one that
+        // never reaches the validator, so nothing about a credential is persisted
+        // without a test having run.
+        let prompt = Scripted::workable(dir.join("data-root"));
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("INDEXER_URL"), None);
+    }
+
+    #[tokio::test]
+    async fn a_library_only_run_is_never_asked_for_a_credential() {
+        let dir = scratch("cred-library-only");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        // Neither protocol chosen, so there is no download service to hold a
+        // credential — the step does not apply and is passed over, even though the
+        // prompt would have offered one.
+        let prompt = Scripted {
+            protocols: Protocols::none(),
+            credential: Some(("http://indexer.test/api".to_owned(), "k".to_owned())),
+            ..Scripted::workable(dir.join("data-root"))
+        };
+        // A validator that would fail if it were ever asked, proving it is not.
+        let validator = Proving::giving(vec![Validation::Rejected {
+            detail: "should never be reached".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        assert!(
+            prompt.failures.borrow().is_empty(),
+            "no credential was tested"
+        );
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("INDEXER_URL"), None);
     }
 }

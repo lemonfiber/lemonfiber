@@ -28,6 +28,7 @@ use lemonfiber_core::model::Envelope;
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::stack::Source;
+use lemonfiber_core::validate::Live;
 use lemonfiber_core::wizard::{
     offer_setup, Choice, Progress, Recovery, Resolution, Status, Wizard,
 };
@@ -597,10 +598,15 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard) -> ExitCode {
 
     let prompt = Terminal::new(ctx.environment, default_data_location());
 
+    // Credentials are proven against their live services as they are entered, over
+    // the same HTTP seam the rest of the stack is reached through.
+    let validator = Live::new(ctx.http.clone());
+
     match setup::run(
         &mut wizard,
         &prompt,
         ctx.filesystem.as_ref(),
+        &validator,
         paths,
         ctx.stack,
         &stamp(),

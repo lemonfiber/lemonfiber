@@ -19,7 +19,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::env::EnvFile;
 use crate::config::{
-    Protocols, DATA_ROOT_KEY, JELLYFIN_MODE_KEY, PGID_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
+    Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, INDEXER_VALIDATED_KEY,
+    JELLYFIN_MODE_KEY, PGID_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
 };
 use crate::journal::{Change, Journal, Kind, Undo};
 use crate::platform::Environment;
@@ -74,6 +75,9 @@ pub enum Step {
     Protocols,
     /// Where downloads and the library are kept.
     DataLocation,
+    /// The indexer credential, tested against the live service. Asked only where a
+    /// download protocol was chosen.
+    Credentials,
     /// The user and group the containers run as. Asked only where it is visible.
     ServiceUser,
     /// Whether to run Jellyfin, and if so how.
@@ -88,12 +92,13 @@ pub enum Step {
 
 impl Step {
     /// The steps in presentation order.
-    const ORDER: [Self; 10] = [
+    const ORDER: [Self; 11] = [
         Self::Welcome,
         Self::Preflight,
         Self::Protocols,
         Self::Prerequisites,
         Self::DataLocation,
+        Self::Credentials,
         Self::ServiceUser,
         Self::Library,
         Self::Household,
@@ -112,11 +117,12 @@ impl Step {
             Self::Protocols => 2,
             Self::Prerequisites => 3,
             Self::DataLocation => 4,
-            Self::ServiceUser => 5,
-            Self::Library => 6,
-            Self::Household => 7,
-            Self::Autostart => 8,
-            Self::Review => 9,
+            Self::Credentials => 5,
+            Self::ServiceUser => 6,
+            Self::Library => 7,
+            Self::Household => 8,
+            Self::Autostart => 9,
+            Self::Review => 10,
         }
     }
 
@@ -130,12 +136,48 @@ impl Step {
             self,
             Self::Protocols
                 | Self::DataLocation
+                | Self::Credentials
                 | Self::ServiceUser
                 | Self::Library
                 | Self::Household
                 | Self::Autostart
         )
     }
+}
+
+/// An indexer credential the operator supplied, and whether it was proven.
+///
+/// `validated` records whether the live test passed before this was kept — an
+/// operator may proceed with one that could not be proven, and a later diagnosis
+/// is owed the knowledge that it went in unverified rather than treating it as
+/// good.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Indexer {
+    /// The indexer's API base URL.
+    pub url: String,
+    /// The API key it authenticates with.
+    pub key: String,
+    /// Whether a live test proved the key before it was kept.
+    pub validated: bool,
+}
+
+/// Where the credentials step stands: not yet reached, reached and left empty, or
+/// answered with an indexer.
+///
+/// A three-state value of its own rather than a nested option, so the "answered
+/// but empty" case survives being written and read back — a plain
+/// `Option<Option<_>>` collapses it to the same `null` as "not answered", and a
+/// resumed run would ask the skipped step again.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Credentials {
+    /// The step has not been reached yet.
+    #[default]
+    Unanswered,
+    /// Reached, and left without an indexer — a supported end, not a gap.
+    Empty,
+    /// Answered with an indexer, proven or not.
+    Given(Indexer),
 }
 
 /// What the operator has answered so far.
@@ -150,6 +192,11 @@ pub struct Answers {
     pub protocols: Option<Protocols>,
     /// Where downloads and the library live.
     pub data_location: Option<PathBuf>,
+    /// The indexer credential, where a download protocol was chosen. Its own
+    /// three-state value so "answered, none given" survives a resume, which a
+    /// nested option would lose. Absent from an older progress file, so defaulted.
+    #[serde(default)]
+    pub credentials: Credentials,
     /// The container user and group, where the platform makes it meaningful.
     ///
     /// Distinguishes "answered: no id needed here" (`Some(None)`) from "not yet
@@ -170,6 +217,9 @@ pub enum Answer {
     Protocols(Protocols),
     /// The data location.
     DataLocation(PathBuf),
+    /// The indexer credential the operator settled on, or none where they entered
+    /// nothing.
+    Credentials(Option<Indexer>),
     /// The container user and group, or none where it is not needed.
     ServiceUser(Option<(u32, u32)>),
     /// How the library is served.
@@ -325,6 +375,9 @@ impl Wizard {
     pub const fn applies(&self, step: Step) -> bool {
         match step {
             Step::ServiceUser => self.environment.ownership_is_real(),
+            // Credentials are for the download services; a library-only run that
+            // chose neither protocol has none to give, so the step is passed over.
+            Step::Credentials => matches!(self.progress.answers.protocols, Some(p) if p.any()),
             _ => true,
         }
     }
@@ -340,6 +393,12 @@ impl Wizard {
         match answer {
             Answer::Protocols(protocols) => self.progress.answers.protocols = Some(protocols),
             Answer::DataLocation(path) => self.progress.answers.data_location = Some(path),
+            Answer::Credentials(indexer) => {
+                self.progress.answers.credentials = match indexer {
+                    Some(indexer) => Credentials::Given(indexer),
+                    None => Credentials::Empty,
+                };
+            }
             Answer::ServiceUser(user) => {
                 if user.is_some() && !self.environment.ownership_is_real() {
                     return Err(Rejected::ServiceUserNotApplicable);
@@ -420,6 +479,7 @@ impl Wizard {
         match step {
             Step::Protocols => answers.protocols.is_some(),
             Step::DataLocation => answers.data_location.is_some(),
+            Step::Credentials => !matches!(answers.credentials, Credentials::Unanswered),
             Step::ServiceUser => answers.service_user.is_some(),
             Step::Library => answers.library.is_some(),
             Step::Household => answers.household.is_some(),
@@ -482,6 +542,17 @@ impl Wizard {
         }
         if let Some(path) = &answers.data_location {
             settings.push((DATA_ROOT_KEY.to_owned(), path.display().to_string()));
+        }
+        // Gated on the step still applying, not only on an indexer being held: an
+        // operator who chose downloads, gave an indexer, then went back and chose
+        // neither protocol leaves a `Given` answer the step no longer wants, and
+        // its key must not be written for a stack that has no service to use it.
+        if self.applies(Step::Credentials) {
+            if let Credentials::Given(indexer) = &answers.credentials {
+                settings.push((INDEXER_URL_KEY.to_owned(), indexer.url.clone()));
+                settings.push((INDEXER_APIKEY_KEY.to_owned(), indexer.key.clone()));
+                settings.push((INDEXER_VALIDATED_KEY.to_owned(), on_off(indexer.validated)));
+            }
         }
         if let Some(Some((uid, gid))) = answers.service_user {
             settings.push((PUID_KEY.to_owned(), uid.to_string()));
@@ -720,6 +791,7 @@ mod tests {
         wizard
             .answer(Answer::DataLocation(PathBuf::from("/srv/media")))
             .unwrap_or(());
+        wizard.answer(Answer::Credentials(None)).unwrap_or(());
         wizard
             .answer(Answer::ServiceUser(Some((1000, 1001))))
             .unwrap_or(());
@@ -780,6 +852,11 @@ mod tests {
     #[test]
     fn advancing_walks_the_steps_in_order() {
         let mut wizard = on_native_linux();
+        // A download protocol is chosen so the credentials step applies and the walk
+        // covers every step; without one it is passed over, as its own test proves.
+        wizard
+            .answer(Answer::Protocols(Protocols::both()))
+            .unwrap_or(());
         let mut visited = vec![wizard.at()];
         while let Some(step) = wizard.advance() {
             visited.push(step);
@@ -802,6 +879,10 @@ mod tests {
     #[test]
     fn going_back_walks_the_steps_in_reverse_and_stops_at_welcome() {
         let mut wizard = on_native_linux();
+        // A protocol is chosen so the credentials step applies both ways.
+        wizard
+            .answer(Answer::Protocols(Protocols::both()))
+            .unwrap_or(());
         while wizard.advance().is_some() {}
         assert_eq!(wizard.at(), Step::Review);
         let mut seen = vec![wizard.at()];
@@ -1030,6 +1111,43 @@ mod tests {
         // Distinct from PUID, so a swapped mapping would not pass unnoticed.
         assert_eq!(setting(&plan, "PGID"), Some("1001"));
         assert_eq!(setting(&plan, "JELLYFIN_MODE"), Some("docker"));
+    }
+
+    #[test]
+    fn a_given_indexer_is_planned_but_a_stale_one_is_dropped_when_it_no_longer_applies() {
+        let indexer = Answer::Credentials(Some(super::Indexer {
+            url: "http://indexer.test/api".to_owned(),
+            key: "the-key".to_owned(),
+            validated: true,
+        }));
+
+        // Chosen with a download protocol, the indexer is written.
+        let mut wizard = on_native_linux();
+        wizard
+            .answer(Answer::Protocols(Protocols::both()))
+            .unwrap_or(());
+        wizard.answer(indexer.clone()).unwrap_or(());
+        let plan = wizard.plan();
+        assert_eq!(
+            setting(&plan, "INDEXER_URL"),
+            Some("http://indexer.test/api")
+        );
+        assert_eq!(setting(&plan, "INDEXER_APIKEY"), Some("the-key"));
+        assert_eq!(setting(&plan, "INDEXER_VALIDATED"), Some("on"));
+
+        // Then neither protocol is chosen, so the step no longer applies. The
+        // answer lingers, but its key must not be written for a stack with no
+        // service to use it.
+        wizard
+            .answer(Answer::Protocols(Protocols::none()))
+            .unwrap_or(());
+        let plan = wizard.plan();
+        assert_eq!(setting(&plan, "INDEXER_URL"), None);
+        assert_eq!(
+            setting(&plan, "INDEXER_APIKEY"),
+            None,
+            "no stale key is written"
+        );
     }
 
     #[test]
