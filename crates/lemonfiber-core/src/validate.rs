@@ -23,6 +23,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::endpoint::API_KEY_HEADER;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::nntp::{Endpoint, Nntp};
 
@@ -227,9 +228,6 @@ impl Validator for Live {
         }
     }
 }
-
-/// The header a Servarr-shape service authenticates a request with.
-const API_KEY_HEADER: &str = "X-Api-Key";
 
 /// Read a service's answer to an authenticated identity request into an outcome.
 ///

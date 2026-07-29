@@ -16,15 +16,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::Endpoint;
+use crate::endpoint::{json_content_type, Endpoint, API_KEY_HEADER};
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
     Client, ClientKind, Credential, DownloadClient, Failure, Identity, RegisteredClient,
     RegisteredFolder, RootFolder,
 };
-
-/// The header every Servarr application authenticates with.
-const API_KEY_HEADER: &str = "X-Api-Key";
 
 /// A client for one Servarr-shape service.
 ///
@@ -60,9 +57,7 @@ impl Servarr {
     /// it rather than refusing it.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
         let mut headers = vec![(API_KEY_HEADER.to_owned(), self.key.clone())];
-        if body.is_some() {
-            headers.push(("Content-Type".to_owned(), "application/json".to_owned()));
-        }
+        headers.extend(json_content_type(body.as_ref()));
         Request {
             method,
             url: self.endpoint.url(&format!("/api/v{}{path}", self.version)),
@@ -123,11 +118,7 @@ impl Client for Servarr {
                 Some(download_client_body(client)),
             ))
             .await?;
-        if response.is_success() {
-            Ok(())
-        } else {
-            Err(self.endpoint.refusal(&response))
-        }
+        self.endpoint.expect_success(&response)
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
@@ -136,11 +127,7 @@ impl Client for Servarr {
             .endpoint
             .send(&self.request(Method::Post, "/rootfolder", Some(body)))
             .await?;
-        if response.is_success() {
-            Ok(())
-        } else {
-            Err(self.endpoint.refusal(&response))
-        }
+        self.endpoint.expect_success(&response)
     }
 
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {

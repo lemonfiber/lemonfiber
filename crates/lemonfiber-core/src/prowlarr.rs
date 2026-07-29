@@ -12,14 +12,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::Endpoint;
+use crate::endpoint::{json_content_type, Endpoint, API_KEY_HEADER};
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
     AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
 };
-
-/// The header Prowlarr authenticates with, the same as every Servarr application.
-const API_KEY_HEADER: &str = "X-Api-Key";
 
 /// A client for one Prowlarr, speaking its application-sync API.
 pub struct Prowlarr {
@@ -48,9 +45,7 @@ impl Prowlarr {
     /// from the media \*arrs'.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
         let mut headers = vec![(API_KEY_HEADER.to_owned(), self.key.clone())];
-        if body.is_some() {
-            headers.push(("Content-Type".to_owned(), "application/json".to_owned()));
-        }
+        headers.extend(json_content_type(body.as_ref()));
         Request {
             method,
             url: self.endpoint.url(&format!("/api/v1{path}")),
@@ -71,11 +66,7 @@ impl AppSync for Prowlarr {
                 Some(application_body(application)),
             ))
             .await?;
-        if response.is_success() {
-            Ok(())
-        } else {
-            Err(self.endpoint.refusal(&response))
-        }
+        self.endpoint.expect_success(&response)
     }
 
     async fn applications(&self) -> Result<Vec<RegisteredApplication>, Failure> {

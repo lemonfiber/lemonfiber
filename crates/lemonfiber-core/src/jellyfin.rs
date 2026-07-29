@@ -13,7 +13,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::Endpoint;
+use crate::endpoint::{json_content_type, Endpoint};
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{Failure, MediaServer};
 
@@ -35,15 +35,10 @@ impl Jellyfin {
     /// there is no key yet, which is the whole reason lemonfiber is here — and a
     /// JSON body is declared as such so it is bound rather than refused.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        let headers = if body.is_some() {
-            vec![("Content-Type".to_owned(), "application/json".to_owned())]
-        } else {
-            Vec::new()
-        };
         Request {
             method,
             url: self.endpoint.url(path),
-            headers,
+            headers: json_content_type(body.as_ref()).into_iter().collect(),
             body,
         }
     }
@@ -76,18 +71,12 @@ impl MediaServer for Jellyfin {
             .endpoint
             .send(&self.request(Method::Post, "/Startup/User", Some(body)))
             .await?;
-        if !created.is_success() {
-            return Err(self.endpoint.refusal(&created));
-        }
+        self.endpoint.expect_success(&created)?;
 
         let completed = self
             .endpoint
             .send(&self.request(Method::Post, "/Startup/Complete", None))
             .await?;
-        if completed.is_success() {
-            Ok(())
-        } else {
-            Err(self.endpoint.refusal(&completed))
-        }
+        self.endpoint.expect_success(&completed)
     }
 }
