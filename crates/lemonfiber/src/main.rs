@@ -13,7 +13,9 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
-use lemonfiber_core::app::{dispatch, logs, setup, supervise, Command, Ctx, Outcome, WATCH};
+use lemonfiber_core::app::{
+    dispatch, logs, recover, setup, supervise, Command, Ctx, Outcome, WATCH,
+};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, ip_echo_from_env, port_forward_from_env, service_user_from_env, store,
@@ -21,11 +23,14 @@ use lemonfiber_core::config::{
 };
 use lemonfiber_core::doctor::{Category, Overall};
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::stack::Source;
-use lemonfiber_core::wizard::{offer_setup, Wizard};
+use lemonfiber_core::wizard::{
+    offer_setup, Choice, Progress, Recovery, Resolution, Status, Wizard,
+};
 use lemonfiber_core::PRODUCT;
 
 mod prompt;
@@ -435,7 +440,7 @@ async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
 /// it decides nothing itself, but reading a line and rendering a question is the
 /// surface's job, and the [`Terminal`] does it. What to ask, what an answer means,
 /// and what to write are all the core's, reached through [`setup::run`].
-async fn run_setup(mut ctx: Ctx) -> ExitCode {
+async fn run_setup(ctx: Ctx) -> ExitCode {
     // Applying is the point of it, so there is nothing to rehearse; saying so is
     // kinder than a wizard that asks every question and then changes nothing.
     if ctx.dry_run {
@@ -449,6 +454,20 @@ async fn run_setup(mut ctx: Ctx) -> ExitCode {
         return ExitCode::from(FAILURE);
     };
 
+    // What a previous run left decides what this one does. An apply that stopped
+    // part-way is offered back before anything else — otherwise the configured-yet
+    // check below would see its half-written settings and call the machine done.
+    let progress = setup::progress_at(&paths.setup_progress());
+    match Status::of(progress.as_ref()) {
+        Status::FailedApply => recover_setup(ctx, &paths, progress).await,
+        // Absent, applied, and the gathering states not yet reached — none is a
+        // stopped apply, so all begin, or decline, a fresh run.
+        _ => fresh_setup(ctx, &paths).await,
+    }
+}
+
+/// Gather answers on a machine with nothing to recover, and apply and start them.
+async fn fresh_setup(mut ctx: Ctx, paths: &Paths) -> ExitCode {
     // Setup is for a machine with nothing configured; a configured one is changed
     // through its settings, not walked back to its first question.
     if !offer_setup(paths.env_file().exists()) {
@@ -471,7 +490,7 @@ async fn run_setup(mut ctx: Ctx) -> ExitCode {
     let mut wizard = Wizard::new(ctx.environment);
     let prompt = Terminal::new(ctx.environment, default_data_location());
 
-    match setup::run(&mut wizard, &prompt, &paths, ctx.stack, &stamp()) {
+    match setup::run(&mut wizard, &prompt, paths, ctx.stack, &stamp()) {
         Ok(setup::Outcome::Applied) => {
             // The settings read at startup predate the file setup just wrote, so
             // they are refreshed before the stack is brought up against them.
@@ -485,6 +504,116 @@ async fn run_setup(mut ctx: Ctx) -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// Offer the operator a way out of a setup whose apply stopped part-way.
+///
+/// It is shown what the interrupted run wrote and given the three ways forward the
+/// wizard keeps recoverable: finish it, undo and redo it, or undo and forget it.
+/// Deciding is not done for a piped run that cannot answer — the state is left as
+/// it is, still recoverable, rather than acted on unasked.
+async fn recover_setup(ctx: Ctx, paths: &Paths, progress: Option<Progress>) -> ExitCode {
+    // A stopped apply always leaves its answers; if they are somehow gone there is
+    // nothing to resume from, so a fresh run is the honest fallback.
+    let Some(progress) = progress else {
+        return fresh_setup(ctx, paths).await;
+    };
+
+    let journal = recover::journal_at(&paths.journal());
+    let recovery = Recovery::of(&journal);
+
+    println!("A previous setup was interrupted part-way through applying.");
+    let written = recovery.written();
+    if written.is_empty() {
+        println!("It had not written anything yet.");
+    } else {
+        println!("It had written:");
+        for change in written {
+            println!("  · {}", describe(change));
+        }
+    }
+
+    if !std::io::stdin().is_terminal() {
+        eprintln!("\nerror: recovering an interrupted setup needs a terminal to choose.");
+        eprintln!("Run `{PRODUCT} setup` interactively to resume, roll back, or start over.");
+        return ExitCode::from(USAGE);
+    }
+
+    let env = paths.env_file();
+    match recovery.resolve(ask_recovery_choice()) {
+        Resolution::Resume => {
+            println!("\nResuming.");
+            resume_and_start(ctx, paths, progress).await
+        }
+        Resolution::RollBack(undos) => {
+            if let Err(problem) = recover::undo(&undos, &env) {
+                return complain(&problem);
+            }
+            println!("\nRolled back. Applying again.");
+            resume_and_start(ctx, paths, progress).await
+        }
+        Resolution::StartOver(undos) => {
+            if let Err(problem) = recover::undo(&undos, &env) {
+                return complain(&problem);
+            }
+            discard(paths);
+            println!("\nStarted over — nothing of the interrupted setup remains.");
+            println!("Run `{PRODUCT} setup` to begin again.");
+            ExitCode::SUCCESS
+        }
+    }
+}
+
+/// Re-apply the answers a stopped setup recorded, then bring the stack up.
+async fn resume_and_start(mut ctx: Ctx, paths: &Paths, progress: Progress) -> ExitCode {
+    let mut wizard = Wizard::resume(ctx.environment, progress);
+    match setup::resume(&mut wizard, paths, ctx.stack, &stamp()) {
+        Ok(()) => {
+            ctx.settings = read_settings();
+            println!("\nSetup is done — bringing your stack up.");
+            start(&ctx).await
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// Which way out of an interrupted setup the operator chooses.
+fn ask_recovery_choice() -> Choice {
+    println!("\nWhat would you like to do?");
+    println!("  1) Resume — finish applying from where it stopped");
+    println!("  2) Roll back — undo what was written, then apply again");
+    println!("  3) Start over — undo it and forget the answers");
+    match read_line("Choose [1]:").as_str() {
+        "2" => Choice::RollBack,
+        "3" => Choice::StartOver,
+        _ => Choice::Resume,
+    }
+}
+
+/// A written change, said plainly enough for the operator to recognise.
+fn describe(change: &Change) -> String {
+    match &change.kind {
+        Kind::Set { key, .. } => format!("the setting {key}"),
+        Kind::Made { path } => format!("the directory {path}"),
+        Kind::Created { resource, .. } => format!("a {resource}"),
+    }
+}
+
+/// Remove what an interrupted setup left, so starting over leaves nothing behind.
+fn discard(paths: &Paths) {
+    let _ = std::fs::remove_file(paths.setup_progress());
+    let _ = std::fs::remove_file(paths.journal());
+}
+
+/// Print a prompt and read the operator's trimmed answer.
+fn read_line(prompt: &str) -> String {
+    use std::io::Write as _;
+
+    print!("{prompt} ");
+    let _ = std::io::stdout().flush();
+    let mut line = String::new();
+    let _ = std::io::stdin().read_line(&mut line);
+    line.trim().to_owned()
 }
 
 /// The form setup brings up once the answers are applied.

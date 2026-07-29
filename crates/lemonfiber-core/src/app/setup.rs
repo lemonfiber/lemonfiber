@@ -9,14 +9,14 @@
 //! Starting the stack and recovering an interrupted apply join this once there is
 //! a surface to show their progress.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::app::apply;
 use crate::config::paths::Paths;
 use crate::config::Protocols;
 use crate::error::{Code, Problem, Remedy, Severity};
 use crate::stack::Source;
-use crate::wizard::{Answer, Library, Phase, Plan, Rejected, Step, Wizard};
+use crate::wizard::{Answer, Library, Phase, Plan, Progress, Rejected, Step, Wizard};
 
 /// How the operator is asked the questions the wizard cannot answer itself.
 ///
@@ -86,6 +86,41 @@ pub fn run(
     wizard.transition(Phase::Reviewing);
     apply::apply(wizard, paths, source, stamp)?;
     Ok(Outcome::Applied)
+}
+
+/// The setup progress saved at `path`, or nothing where none is there or it does
+/// not read.
+///
+/// What a later run reads to tell where a previous one got to — which the wizard's
+/// `Status` classifies, and which a resumed apply is restored from. Absence and an
+/// unreadable or unparsable file are the same "no progress to resume from" answer,
+/// not a fault: a fresh machine has none, and a torn one is better begun again.
+#[must_use]
+pub fn progress_at(path: &Path) -> Option<Progress> {
+    let text = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// Re-apply a setup whose apply was interrupted, from the answers it recorded.
+///
+/// A failed apply leaves the wizard restored to `applying` with every answer
+/// intact — apply persists them before it writes. Rolling that one step back to
+/// review is the wizard's single backward edge, and from review apply carries it
+/// forward again. Apply is idempotent, so this either finishes what the
+/// interrupted run started or leaves the same recoverable marker to try again.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where applying the recorded answers fails, leaving the
+/// marker at `applying` for another attempt.
+pub fn resume(
+    wizard: &mut Wizard,
+    paths: &Paths,
+    source: Source,
+    stamp: &str,
+) -> Result<(), Box<Problem>> {
+    wizard.transition(Phase::Reviewing);
+    apply::apply(wizard, paths, source, stamp)
 }
 
 /// Ask each question the wizard presents here and has no answer for yet, in order.
@@ -163,12 +198,12 @@ pub const ALREADY_UNDERWAY: Code = Code::new("SETUP-6");
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{run, Outcome, Prompt};
+    use super::{progress_at, run, Outcome, Prompt};
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::platform::Environment;
     use crate::stack::Source;
-    use crate::wizard::{Answer, Library, Phase, Plan, Wizard};
+    use crate::wizard::{Answer, Library, Phase, Plan, Progress, Wizard};
 
     /// A prompt that answers from a fixed script, so a run is driven with no
     /// terminal.
@@ -287,6 +322,66 @@ mod tests {
         assert!(matches!(outcome, Ok(Outcome::Applied)));
         let file = store::read(&paths.env_file()).unwrap_or_default();
         assert_eq!(file.get("PUID"), None, "no container user was written");
+    }
+
+    #[test]
+    fn progress_reads_back_what_a_run_saved() {
+        let dir = scratch("progress");
+        let path = dir.join("setup-progress.json");
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        let saved = Progress {
+            phase: Phase::Applying,
+            ..Progress::default()
+        };
+        let text = serde_json::to_string(&saved).unwrap_or_default();
+        assert!(std::fs::write(&path, text).is_ok());
+
+        assert_eq!(progress_at(&path), Some(saved));
+    }
+
+    #[test]
+    fn no_progress_file_reads_as_nothing_to_resume() {
+        assert_eq!(
+            progress_at(Path::new("/lemonfiber/no/such/progress.json")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_torn_progress_file_reads_as_nothing_rather_than_failing() {
+        let dir = scratch("torn-progress");
+        let path = dir.join("setup-progress.json");
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        assert!(std::fs::write(&path, "{ half a wr").is_ok());
+
+        assert_eq!(progress_at(&path), None);
+    }
+
+    #[test]
+    fn resume_carries_an_interrupted_apply_forward_from_its_answers() {
+        let dir = scratch("resume");
+        let paths = layout(&dir);
+        // A wizard left at applying with a complete set of answers — the state a
+        // failed apply persists — is carried forward to applied.
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        for answer in [
+            Answer::Protocols(Protocols::both()),
+            Answer::DataLocation(dir.join("data-root")),
+            Answer::ServiceUser(Some((1000, 1000))),
+            Answer::Library(Library::JellyfinDocker),
+            Answer::Household(true),
+            Answer::Autostart(false),
+        ] {
+            wizard.answer(answer).unwrap_or(());
+        }
+        assert!(wizard.transition(Phase::Reviewing));
+        assert!(wizard.transition(Phase::Applying));
+
+        assert!(super::resume(&mut wizard, &paths, external(), "t").is_ok());
+
+        assert_eq!(wizard.phase(), Phase::Applied);
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("LEMONFIBER_USENET"), Some("on"));
     }
 
     #[test]
