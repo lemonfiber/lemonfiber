@@ -41,6 +41,7 @@ use crate::stack::Source;
 pub mod apply;
 pub mod recover;
 mod seed;
+pub mod setup;
 mod targets;
 
 use targets::{project_directory, servarr_targets};
