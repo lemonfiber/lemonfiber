@@ -460,14 +460,16 @@ async fn run_setup(ctx: Ctx) -> ExitCode {
     let progress = setup::progress_at(&paths.setup_progress());
     match Status::of(progress.as_ref()) {
         Status::FailedApply => recover_setup(ctx, &paths, progress).await,
-        // Absent, applied, and the gathering states not yet reached — none is a
-        // stopped apply, so all begin, or decline, a fresh run.
+        // A run that quit mid-question saved where it reached; pick it back up.
+        Status::InProgress => resume_gather(ctx, &paths, progress).await,
+        // Absent and applied are neither a stopped apply nor a saved run, so they
+        // begin, or decline, a fresh one.
         _ => fresh_setup(ctx, &paths).await,
     }
 }
 
-/// Gather answers on a machine with nothing to recover, and apply and start them.
-async fn fresh_setup(mut ctx: Ctx, paths: &Paths) -> ExitCode {
+/// Gather answers on a machine with nothing to recover or resume.
+async fn fresh_setup(ctx: Ctx, paths: &Paths) -> ExitCode {
     // Setup is for a machine with nothing configured; a configured one is changed
     // through its settings, not walked back to its first question.
     if !offer_setup(paths.env_file().exists()) {
@@ -476,6 +478,24 @@ async fn fresh_setup(mut ctx: Ctx, paths: &Paths) -> ExitCode {
         return ExitCode::from(USAGE);
     }
 
+    let environment = ctx.environment;
+    drive(ctx, paths, Wizard::new(environment)).await
+}
+
+/// Pick a setup back up from the answers a quit run saved.
+async fn resume_gather(ctx: Ctx, paths: &Paths, progress: Option<Progress>) -> ExitCode {
+    // In-progress means a saved run; if it is somehow gone there is nothing to
+    // resume, so a fresh run is the honest fallback.
+    let Some(progress) = progress else {
+        return fresh_setup(ctx, paths).await;
+    };
+    println!("Picking up where a previous setup left off.");
+    let environment = ctx.environment;
+    drive(ctx, paths, Wizard::resume(environment, progress)).await
+}
+
+/// Ask the questions the `wizard` still needs, apply the answers, and start.
+async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard) -> ExitCode {
     // The questions need someone at a terminal to answer them. A piped or scripted
     // run has no one, so it is told what it would have been asked rather than left
     // waiting on input that never comes.
@@ -487,7 +507,6 @@ async fn fresh_setup(mut ctx: Ctx, paths: &Paths) -> ExitCode {
         return ExitCode::from(USAGE);
     }
 
-    let mut wizard = Wizard::new(ctx.environment);
     let prompt = Terminal::new(ctx.environment, default_data_location());
 
     match setup::run(&mut wizard, &prompt, paths, ctx.stack, &stamp()) {
