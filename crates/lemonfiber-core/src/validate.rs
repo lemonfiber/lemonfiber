@@ -36,6 +36,14 @@ pub enum Credential {
         /// The API key the indexer authenticates the query with.
         key: String,
     },
+    /// An existing service to adopt — a Servarr-shape API reached with its key,
+    /// asked to read back its own identity.
+    Service {
+        /// The service's base URL.
+        url: String,
+        /// The API key it authenticates with, sent as `X-Api-Key`.
+        key: String,
+    },
 }
 
 /// What proving a credential against its live service established — never the
@@ -115,6 +123,25 @@ impl Live {
 
         interpret_indexer(response.status, &response.body)
     }
+
+    /// Prove an existing service by reaching its API with the key and reading what
+    /// it says about itself — a refusal is a wrong key, an answer that is not the
+    /// service's own points at the URL.
+    async fn service(&self, url: &str, key: &str) -> Validation {
+        let request = Request {
+            method: Method::Get,
+            url: url.to_owned(),
+            headers: vec![(API_KEY_HEADER.to_owned(), key.to_owned())],
+            body: None,
+        };
+
+        match self.http.send(&request).await {
+            Ok(response) => interpret_service(response.status, &response.body),
+            Err(unreachable) => Validation::Unreachable {
+                detail: unreachable.reason,
+            },
+        }
+    }
 }
 
 #[async_trait]
@@ -122,7 +149,55 @@ impl Validator for Live {
     async fn validate(&self, credential: &Credential) -> Validation {
         match credential {
             Credential::Indexer { url, key } => self.indexer(url, key).await,
+            Credential::Service { url, key } => self.service(url, key).await,
         }
+    }
+}
+
+/// The header a Servarr-shape service authenticates a request with.
+const API_KEY_HEADER: &str = "X-Api-Key";
+
+/// Read a service's answer to an authenticated identity request into an outcome.
+///
+/// A refusing status is the key being wrong; a well-formed identity proves it and
+/// carries what the service said about itself as the observed capability; any
+/// other answer came from something that is not the service's API, which points
+/// at the URL rather than the key.
+fn interpret_service(status: u16, body: &str) -> Validation {
+    if status == UNAUTHORIZED || status == FORBIDDEN {
+        return Validation::Rejected {
+            detail: format!("the service answered {status} — the key was refused"),
+        };
+    }
+    if (200..300).contains(&status) {
+        return Validation::Valid {
+            observed: identity(body),
+        };
+    }
+    Validation::Unreachable {
+        detail: format!("the service answered {status}, not as a reachable API — check the URL"),
+    }
+}
+
+/// What a service says about itself, from the identity it answered with.
+///
+/// A Servarr status names the instance and its version; either alone is worth
+/// reporting, and where neither is there the fact that the key was accepted is
+/// still the observation.
+fn identity(body: &str) -> String {
+    let parsed = serde_json::from_str::<serde_json::Value>(body).ok();
+    let field = |name: &str| {
+        parsed
+            .as_ref()
+            .and_then(|value| value.get(name))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    };
+    match (field("instanceName"), field("version")) {
+        (Some(name), Some(version)) => format!("reached {name}, version {version}"),
+        (Some(name), None) => format!("reached {name}"),
+        (None, Some(version)) => format!("the service accepted the key — version {version}"),
+        (None, None) => "the service accepted the key".to_owned(),
     }
 }
 
@@ -324,6 +399,126 @@ mod tests {
             outcome,
             Validation::Unreachable { detail } if detail.contains("connection refused")
         ));
+    }
+
+    /// The service credential the tests prove.
+    fn service() -> Credential {
+        Credential::Service {
+            url: "http://sonarr.test:8989/api/v3/system/status".to_owned(),
+            key: "abc".to_owned(),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_service_that_answers_its_identity_is_proven_and_names_itself() {
+        let body = r#"{"instanceName":"Sonarr","version":"4.0.1"}"#;
+        let outcome = answering(body).validate(&service()).await;
+        assert!(matches!(
+            outcome,
+            Validation::Valid { observed } if observed.contains("Sonarr") && observed.contains("4.0.1")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_service_that_answers_without_naming_itself_is_still_proven() {
+        // A 2xx with no recognisable identity still proves the key was accepted.
+        let outcome = answering("{}").validate(&service()).await;
+        assert!(matches!(
+            outcome,
+            Validation::Valid { observed } if observed.contains("accepted the key")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_service_that_gives_only_a_version_reports_that() {
+        let outcome = answering(r#"{"version":"4.0.1"}"#)
+            .validate(&service())
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Valid { observed } if observed.contains("version 4.0.1")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_service_that_refuses_the_key_is_rejected() {
+        let outcome = Live::new(Arc::new(Canned(Ok(Response {
+            status: 401,
+            body: String::new(),
+        }))))
+        .validate(&service())
+        .await;
+        assert!(matches!(
+            outcome,
+            Validation::Rejected { detail } if detail.contains("401")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_service_url_that_answers_as_something_else_points_at_the_url() {
+        let outcome = Live::new(Arc::new(Canned(Ok(Response {
+            status: 404,
+            body: "<html>not found</html>".to_owned(),
+        }))))
+        .validate(&service())
+        .await;
+        assert!(matches!(
+            outcome,
+            Validation::Unreachable { detail } if detail.contains("check the URL")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_service_that_does_not_answer_is_unreachable() {
+        let outcome = Live::new(Arc::new(Canned(Err(Unreachable {
+            url: "http://sonarr.test:8989".to_owned(),
+            reason: "connection refused".to_owned(),
+        }))))
+        .validate(&service())
+        .await;
+        assert!(matches!(
+            outcome,
+            Validation::Unreachable { detail } if detail.contains("connection refused")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_service_is_reached_with_its_key_in_the_api_header() {
+        /// A request the fake saw: its URL and the headers it carried.
+        type Seen = (String, Vec<(String, String)>);
+        struct Recording(std::sync::Mutex<Vec<Seen>>);
+        #[async_trait]
+        impl Http for Recording {
+            async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+                self.0
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push((request.url.clone(), request.headers.clone()));
+                Ok(Response {
+                    status: 200,
+                    body: r#"{"instanceName":"Radarr"}"#.to_owned(),
+                })
+            }
+        }
+        let recording = Arc::new(Recording(std::sync::Mutex::new(Vec::new())));
+        let outcome = Live::new(recording.clone()).validate(&service()).await;
+
+        assert!(matches!(outcome, Validation::Valid { .. }));
+        let asked = recording
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (url, headers) = asked.first().cloned().unwrap_or_default();
+        assert!(
+            url.contains("system/status"),
+            "the identity endpoint is reached"
+        );
+        assert!(
+            headers
+                .iter()
+                .any(|(name, value)| name == "X-Api-Key" && value == "abc"),
+            "the key authenticates the request as a header, not a query param"
+        );
     }
 
     #[tokio::test]
