@@ -161,6 +161,15 @@ pub struct RegisteredApplication {
     pub base_url: String,
 }
 
+/// How deep a service's queue is, and how much of it is stuck.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QueueDepth {
+    /// How many items are queued in total.
+    pub total: usize,
+    /// How many of them are stuck — warning or error — rather than progressing.
+    pub stuck: usize,
+}
+
 /// A service refused, or could not be reached.
 #[derive(Debug, Error)]
 pub enum Failure {
@@ -274,6 +283,23 @@ pub trait Client: Send + Sync {
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure>;
+}
+
+/// Reading a service's queue for the dashboard.
+///
+/// A port of its own, not a method on [`Client`], because it is a read-only
+/// telemetry capability the dashboard uses rather than part of the wiring shape
+/// seeding drives — keeping it apart means the fakes that stand in for a service
+/// being wired need not answer for a question they are never asked.
+#[async_trait]
+pub trait Queues: Send + Sync {
+    /// How deep the service's queue is, and how much of it is stuck — the numbers
+    /// the dashboard shows without opening the service's own web UI.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn queue(&self) -> Result<QueueDepth, Failure>;
 }
 
 /// Prowlarr's application sync — the one Servarr-shape service that manages other
