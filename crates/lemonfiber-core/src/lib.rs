@@ -21,6 +21,7 @@
 //! | [`platform`] | Which of the four environments this is |
 //! | [`stack`] | Building and running a slice of the stack |
 //! | [`docker`] | Making sense of what the engine reports |
+//! | [`dashboard`] | One screen of what the stack is doing, assembled honestly |
 //! | [`config`] | What the operator chose, and where it is kept |
 //! | [`doctor`] | Checks that prove things rather than assuming them |
 //! | [`prerequisites`] | What the operator must obtain, from what they chose |
@@ -35,6 +36,7 @@ pub mod adapters;
 pub mod app;
 pub mod backup;
 pub mod config;
+pub mod dashboard;
 pub mod docker;
 pub mod doctor;
 mod endpoint;

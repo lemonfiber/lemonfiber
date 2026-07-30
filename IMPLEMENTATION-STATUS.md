@@ -116,11 +116,19 @@ restores full functionality in under 2 minutes, idempotently.
 
 ---
 
-## M5 — TUI · ☐
+## M5 — TUI · ◐
 
 Second surface over the same core (ratatui, per
 [ADR-0003](https://github.com/lemonfiber/spec/blob/main/00-overview/decisions/0003-rust-ratatui-for-cli.md)).
-Not started.
+Opened by the read-only dashboard slice of 0.3.0.
+
+| Deliverable | Spec | Status | Landing / notes |
+|-------------|------|--------|-----------------|
+| Live dashboard — the read-only model | `B3-R1..R8`, `B3-R11`, `B3-R14`, `B3-R15` | ◐ | The pure shape of the screen landed ahead of any rendering: [`dashboard.rs`](crates/lemonfiber-core/src/dashboard.rs) — "what is my stack doing right now?" assembled rather than fetched, so it runs in a test with no daemon. Its three load-bearing distinctions are types, not rendering conventions, so they cannot be collapsed by accident downstream. A `Reading` keeps a current figure, a stale one from a source since gone quiet, and a never-measured one apart (`B3-R5`) — "0 B/s" and "unknown" are different variants, not the same blank. A `Panel` is either filled or carries the reason its source could not be reached (`B3-R6`/`B3-R11`), so one dead source marks its own region and states why rather than blanking the screen or showing absence as zero — and the honesty is applied consistently: the health summary is itself a `Panel`, so an unreachable service source leaves it unavailable rather than summarising an unknown stack as an idle one, and the volatile figures a source can go quiet on mid-answer (`Transfer.speed`, `Storage.free`) are `Reading`s, so a stalled zero and an unread source stay distinct on the very fields that difference is about. `Standing` reads the whole screen's state from a `Reach` ladder — unconfigured, disconnected, idle, up — so a disconnected engine is never hidden behind a "degraded" that merely means incomplete (`B3-R7`). `Health::of` is the one-line summary — the condition and the count wanting attention (`B3-R2`, G7). The panel content types are the fragments no single service gives: `Vpn` (exit IP, country, forwarded port, and the egress-match that proves traffic leaves through the tunnel — `B3-R3`), `Transfer`, `Queue`, and `Storage` (free space, projected exhaustion, and hardlink status — `B3-R8`). Durations come from one clock and never run backwards: `eta` yields no estimate for a stalled transfer rather than an infinite one, and `percent` clamps past-total skew rather than reporting more-than-finished (`B3-R15`). The ratatui surface that renders this, the 1 Hz non-blocking refresh (`B3-R4`/`B3-R14`), opening by default (`B3-R1`), and the transfers/queue telemetry the panels need are the following slices. |
+
+The rest of M5 — the interactive surfaces (form switcher, log viewer, doctor
+view, wizard-in-TUI) and the full-TUI layout polish (`B3-R9`/`R10`/`R12`/`R13`) —
+is for a later version.
 
 ## M6 — Release engineering · ◐
 
