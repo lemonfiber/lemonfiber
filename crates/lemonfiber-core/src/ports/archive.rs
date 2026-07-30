@@ -11,7 +11,7 @@
 //! The read and extract side a restore needs is added with the restore executor;
 //! this is the write and retention side a capture needs.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
@@ -111,6 +111,56 @@ pub trait Archive: Send + Sync {
     ///
     /// Returns a [`Fault`] where the archive could not be removed.
     async fn remove(&self, dir: &Path, name: &str) -> Result<(), Fault>;
+}
+
+/// Reads a backup archive back — its manifest, and its contents onto disk.
+///
+/// A trait of its own rather than more methods on [`Archive`], as with a
+/// filesystem's watch: a restore reads and never writes a backup, a capture
+/// writes and never reads one, and keeping them apart means each side is driven in
+/// a test by a fake that answers only the question it is asked.
+#[async_trait]
+pub trait Reader: Send + Sync {
+    /// Read the manifest from the archive at `src`, without unpacking it.
+    ///
+    /// This is the verification a restore does before it overwrites anything: an
+    /// archive whose manifest cannot be read is corrupt, and is refused here
+    /// rather than discovered half-way through a restore.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where the archive is missing, unreadable, or does not
+    /// hold a manifest this build understands.
+    async fn read_manifest(&self, src: &Path) -> Result<Manifest, Fault>;
+
+    /// Unpack the archive at `src`, writing each member under the directory its
+    /// area names in `targets`.
+    ///
+    /// Sanitises every real entry itself, independently of any manifest: the
+    /// manifest is read from the same untrusted archive and its member list need
+    /// not match the bytes beside it, so a caller's manifest-level check is no
+    /// guarantee about what unpacking actually writes. Each entry whose path
+    /// contains `..`, is absolute, or is a symlink or hardlink pointing outside its
+    /// target is refused rather than followed — the archive-traversal footgun a
+    /// self-describing manifest cannot close.
+    ///
+    /// An entry whose leading area is not in `targets` is not written to a guessed
+    /// place; a build that meets an area it does not know reports it rather than
+    /// silently dropping it, so a partial restore is never mistaken for a complete
+    /// one.
+    ///
+    /// Atomic against failure, as [`Archive::write`] is: it stages the contents and
+    /// swaps them into place, so a fault part-way leaves the prior configuration
+    /// intact rather than half-overwritten — a restore that fails is worse than one
+    /// that refuses to start. Where a swap is not possible, any partial state left
+    /// is reconciled by the seed a restore is always followed by.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where the archive could not be read, an entry would
+    /// escape its target, an area is unrecognised, or a member could not be
+    /// written.
+    async fn extract(&self, src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault>;
 }
 
 #[cfg(test)]
