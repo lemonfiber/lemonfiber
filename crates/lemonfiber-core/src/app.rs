@@ -39,6 +39,7 @@ use crate::stack::compose::{build, Action};
 use crate::stack::Source;
 
 pub mod apply;
+pub mod backup;
 pub mod recover;
 mod seed;
 pub mod setup;

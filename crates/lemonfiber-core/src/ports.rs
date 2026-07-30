@@ -10,6 +10,7 @@
 //! `ports::Engine` rather than `docker::DockerApi`. See
 //! `.docs/architecture/ports-and-adapters.md`.
 
+pub mod archive;
 pub mod docker;
 pub mod filesystem;
 pub mod http;
@@ -19,6 +20,7 @@ pub mod random;
 pub mod service;
 pub mod time;
 
+pub use archive::Archive;
 pub use docker::Engine;
 pub use filesystem::{FileSystem, Volume};
 pub use http::Http;
