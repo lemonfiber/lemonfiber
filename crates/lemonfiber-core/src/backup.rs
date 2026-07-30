@@ -135,6 +135,21 @@ pub fn plan(paths: &Paths, scope: &Scope) -> Plan {
     }
 }
 
+/// Where each archived area is written back to on this machine's layout.
+///
+/// The mirror of what [`plan`] reads from — the same directory for each area — so
+/// a capture and a restore cannot drift onto different places for the same thing.
+/// The restore hands these to the archive reader, which unpacks each member under
+/// the directory its area names.
+#[must_use]
+pub fn destinations(paths: &Paths) -> Vec<(String, PathBuf)> {
+    vec![
+        (area::CONFIG.to_owned(), paths.config_dir().to_path_buf()),
+        (area::SERVICES.to_owned(), paths.service_config()),
+        (area::STACK.to_owned(), paths.stack()),
+    ]
+}
+
 /// The record written inside an archive, and read back to decide a restore.
 ///
 /// Everything a restore needs to know before it overwrites anything: what made
@@ -516,6 +531,20 @@ mod tests {
             }]
         );
         assert!(plan.sensitive, "a service's config holds its API key");
+    }
+
+    #[test]
+    fn restore_writes_each_area_back_to_where_the_capture_read_it() {
+        let paths = paths();
+        let places: Vec<(String, PathBuf)> = super::destinations(&paths);
+        assert_eq!(
+            places,
+            vec![
+                (area::CONFIG.to_owned(), paths.config_dir().to_path_buf()),
+                (area::SERVICES.to_owned(), paths.service_config()),
+                (area::STACK.to_owned(), paths.stack()),
+            ]
+        );
     }
 
     #[test]

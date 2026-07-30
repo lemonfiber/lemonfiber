@@ -20,7 +20,7 @@ pub mod random;
 pub mod service;
 pub mod time;
 
-pub use archive::Archive;
+pub use archive::{Archive, Reader};
 pub use docker::Engine;
 pub use filesystem::{FileSystem, Volume};
 pub use http::Http;
