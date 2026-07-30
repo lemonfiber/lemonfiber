@@ -5,6 +5,8 @@
 //! what makes one client enough for them — and what lets a fork add a service
 //! that reuses an existing shape with no Rust at all.
 
+use std::time::Duration;
+
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -300,6 +302,45 @@ pub trait Queues: Send + Sync {
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn queue(&self) -> Result<QueueDepth, Failure>;
+}
+
+/// One active download a client is working, normalised to what the dashboard
+/// shows — the point at which each client's own idea of progress becomes the
+/// same three figures.
+///
+/// The protocol is not carried here: it is intrinsic to which client answered —
+/// a torrent from qBittorrent, a Usenet download from `SABnzbd` — so the gatherer
+/// sets it from the target it asked rather than trusting each client to name it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Download {
+    /// What is being downloaded.
+    pub name: String,
+    /// How far along, from zero to a hundred.
+    pub progress: u8,
+    /// The current speed in bytes per second, or `None` where the client reported
+    /// none — kept apart from a reported zero, which is a download that is stalled
+    /// rather than one whose speed is unknown.
+    pub speed: Option<u64>,
+    /// The time left, or `None` where the client gives none because it is stalled
+    /// or cannot estimate one.
+    pub eta: Option<Duration>,
+}
+
+/// Reading a download client's active transfers for the dashboard.
+///
+/// Like [`Queues`], a read-only telemetry port kept off the wiring [`Client`]: the
+/// dashboard asks a download client what it is moving right now, a question
+/// seeding never needs, so the fakes that stand in for wiring need not answer it.
+#[async_trait]
+pub trait Transfers: Send + Sync {
+    /// The downloads the client is working right now — each one's name, progress,
+    /// speed and time left, the figures the dashboard shows without opening the
+    /// client's own web UI.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the client is unreachable or refuses.
+    async fn transfers(&self) -> Result<Vec<Download>, Failure>;
 }
 
 /// Prowlarr's application sync — the one Servarr-shape service that manages other
