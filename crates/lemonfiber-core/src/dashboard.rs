@@ -1,0 +1,505 @@
+//! One screen's worth of "what is my stack doing right now?", assembled rather
+//! than fetched.
+//!
+//! The value of a dashboard is the fragments no single service can give: that the
+//! download client's traffic is genuinely leaving through the tunnel, that imports
+//! are hardlinking rather than copying, that the disk will fill before the queue
+//! drains. This module is the shape of that screen and the rules that keep it
+//! honest — nothing here reaches a daemon or an API. The surface gathers each
+//! source through the ports and hands the pieces in; this decides what they add up
+//! to and, above all, how they read when a source falls silent.
+//!
+//! Three distinctions are load-bearing. A figure that is current, one that is the
+//! last thing a now-silent source said, and one that was never measured are three
+//! different things ([`Reading`]) — "0 B/s" and "unknown" mean opposite things to
+//! someone deciding whether a download is stuck. A panel that is live and one whose
+//! source could not be reached are two different things ([`Panel`]), so one dead
+//! source marks its own region and leaves the rest of the screen alone. And every
+//! duration is computed from one clock and never runs backwards, since a host and a
+//! container disagreeing about the time must not render as a negative countdown.
+
+use std::time::Duration;
+
+use serde::Serialize;
+
+use crate::docker::{condition, Condition, Service};
+
+/// A figure a source reports, kept apart from the two ways it can be missing.
+///
+/// Zero is a value a source gave; stale is the last value a source that has since
+/// gone quiet gave; unknown is a source that never answered at all. Collapsing any
+/// two of them sends an operator after the wrong problem — a stalled download and
+/// a dashboard that simply stopped polling look identical only if the code lets
+/// them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "reading", content = "value")]
+pub enum Reading<T> {
+    /// The source answered this refresh with a value — which may legitimately be
+    /// zero.
+    Known(T),
+    /// The source did not answer this refresh; this is the last value it gave.
+    Stale(T),
+    /// The source has never answered, so nothing can be said about it.
+    Unknown,
+}
+
+impl<T> Reading<T> {
+    /// Whether this reading is current — a `Known`, however small its value.
+    #[must_use]
+    pub const fn is_current(&self) -> bool {
+        matches!(self, Self::Known(_))
+    }
+
+    /// The value, whether current or stale, or `None` where nothing was ever read.
+    #[must_use]
+    pub const fn value(&self) -> Option<&T> {
+        match self {
+            Self::Known(value) | Self::Stale(value) => Some(value),
+            Self::Unknown => None,
+        }
+    }
+}
+
+/// A panel's content, or the reason its source could not fill it.
+///
+/// The difference between "this panel is up to date" and "this panel's source is
+/// unreachable" is the whole of degrading honestly: an unavailable panel says so,
+/// in its own words, rather than showing stale data as current or blank data as
+/// zero — and the panels beside it stay live.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "panel", content = "data")]
+pub enum Panel<T> {
+    /// The source answered; here is the panel.
+    Ready(T),
+    /// The source could not be reached, for this stated reason.
+    Unavailable {
+        /// Why the panel could not be filled, in the operator's terms.
+        reason: String,
+    },
+}
+
+impl<T> Panel<T> {
+    /// A panel whose source could not be reached.
+    #[must_use]
+    pub fn unavailable(reason: impl Into<String>) -> Self {
+        Self::Unavailable {
+            reason: reason.into(),
+        }
+    }
+
+    /// Whether the panel could be filled.
+    #[must_use]
+    pub const fn is_available(&self) -> bool {
+        matches!(self, Self::Ready(_))
+    }
+}
+
+/// The one-line answer to "is everything fine?": the stack's condition and how
+/// many services are asking for attention.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Health {
+    /// What the whole set of services amounts to.
+    pub condition: Condition,
+    /// How many services are in a state an operator needs to act on.
+    pub needing_attention: usize,
+}
+
+impl Health {
+    /// Summarise the health of a set of services.
+    #[must_use]
+    pub fn of(services: &[Service]) -> Self {
+        Self {
+            condition: condition(services),
+            needing_attention: services
+                .iter()
+                .filter(|service| service.state.wants_attention())
+                .count(),
+        }
+    }
+
+    /// Whether everything is fine — nothing is asking for attention and the stack
+    /// is fully up.
+    #[must_use]
+    pub fn is_well(&self) -> bool {
+        self.needing_attention == 0 && self.condition == Condition::Active
+    }
+}
+
+/// Which protocol a transfer is moving over, since the same download reads
+/// differently on each — a Usenet download has no peers, a torrent has no server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Protocol {
+    /// A Usenet download.
+    Usenet,
+    /// A torrent download.
+    Torrent,
+}
+
+/// One active download, as the dashboard shows it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Transfer {
+    /// What is being downloaded.
+    pub name: String,
+    /// How it is being downloaded.
+    pub protocol: Protocol,
+    /// How far along, as a percentage from zero to a hundred.
+    pub progress: u8,
+    /// The current speed in bytes per second — a [`Reading`], because a genuine
+    /// zero (stalled) and a source that has gone quiet mean opposite things here,
+    /// and this is the very figure that difference is about.
+    pub speed: Reading<u64>,
+    /// The time left, or `None` where it is stalled and there is none to give.
+    pub eta: Option<Duration>,
+}
+
+/// One `*arr`'s queue, and how much of it is stuck.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Queue {
+    /// The service whose queue this is.
+    pub service: String,
+    /// How many items are queued.
+    pub depth: usize,
+    /// How many of them are stuck rather than progressing.
+    pub stuck: usize,
+}
+
+/// Whether imports are hardlinking or copying — the difference between an import
+/// that is free and one that doubles the disk it uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Hardlink {
+    /// Imports hardlink, as they should.
+    Linking,
+    /// Imports copy, doubling space and slowing every import.
+    Copying,
+    /// It could not be established which.
+    Unknown,
+}
+
+/// The storage picture: what is free, when it runs out, and whether imports link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Storage {
+    /// Bytes free on the data volume — a [`Reading`], since a volume that could
+    /// not be read this refresh must not render as zero free.
+    pub free: Reading<u64>,
+    /// The time until the disk fills at the current rate of the queue draining
+    /// onto it, or `None` where it is not projected to fill.
+    pub exhaustion: Option<Duration>,
+    /// Whether imports are linking or copying.
+    pub hardlink: Hardlink,
+}
+
+/// What the VPN is doing, and whether the download client is actually behind it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Vpn {
+    /// The tunnel's exit address as the outside world sees it.
+    pub exit_ip: String,
+    /// The country that address is in.
+    pub country: String,
+    /// The port the provider forwards, where forwarding is on.
+    pub forwarded_port: Option<u16>,
+    /// Whether the download client's own egress address matches the tunnel's —
+    /// the one thing that proves traffic is genuinely leaving through it.
+    pub egress_matches: bool,
+}
+
+/// Where the dashboard as a whole stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Standing {
+    /// Telemetry is current and refreshing normally.
+    Live,
+    /// Some sources are unavailable; their panels are marked.
+    Degraded,
+    /// The engine cannot be reached, though the CLI path may still work.
+    Disconnected,
+    /// Configured, but nothing is running.
+    NoStack,
+    /// No configuration; setup is offered instead.
+    Unconfigured,
+}
+
+/// How far the surface got in reaching the stack — the ladder from which the
+/// dashboard's standing is read.
+///
+/// A ladder rather than a handful of booleans, so the states are exclusive by
+/// construction: a machine is at exactly one rung, and there is no way to describe
+/// one that is both unconfigured and running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reach {
+    /// Nothing is configured.
+    Unconfigured,
+    /// Configured, but the engine cannot be reached.
+    Disconnected,
+    /// The engine answers, but nothing is running.
+    Idle,
+    /// The engine answers and services are running.
+    Up,
+}
+
+impl Standing {
+    /// Read the dashboard's standing from how far the surface reached and whether
+    /// any panel's source was down.
+    ///
+    /// Ordered by how much is wrong: no configuration outranks everything, then an
+    /// unreachable engine (telemetry is off but control may not be), then a stack
+    /// that is configured but idle, and only on a running stack does a down panel
+    /// mark the screen degraded rather than live. The order matters — a disconnected
+    /// engine must not be hidden behind a "degraded" that suggests the screen is
+    /// merely incomplete.
+    #[must_use]
+    pub const fn read(reach: Reach, any_panel_down: bool) -> Self {
+        match reach {
+            Reach::Unconfigured => Self::Unconfigured,
+            Reach::Disconnected => Self::Disconnected,
+            Reach::Idle => Self::NoStack,
+            Reach::Up if any_panel_down => Self::Degraded,
+            Reach::Up => Self::Live,
+        }
+    }
+}
+
+/// Everything the dashboard shows at one moment.
+///
+/// Each source's panel is filled or marked unavailable on its own, so one dead
+/// source degrades one region rather than the screen. The surface builds this from
+/// what it gathered; the standing is read from the same facts so it cannot
+/// disagree with the panels.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Snapshot {
+    /// Where the dashboard as a whole stands.
+    pub standing: Standing,
+    /// The one-line health summary, or unavailable where the services it is read
+    /// from could not be reached — so an unknown stack is not summarised as an idle
+    /// one, which is what an always-present `Health::of(&[])` would claim.
+    pub health: Panel<Health>,
+    /// The VPN, or `None` where no VPN is configured and the panel is omitted
+    /// rather than shown permanently red.
+    pub vpn: Option<Panel<Vpn>>,
+    /// The active transfers.
+    pub transfers: Panel<Vec<Transfer>>,
+    /// The per-service queues.
+    pub queue: Panel<Vec<Queue>>,
+    /// The storage picture.
+    pub storage: Panel<Storage>,
+    /// Every service and what it is doing.
+    pub services: Panel<Vec<Service>>,
+}
+
+/// The time to move `remaining` bytes at `speed` bytes per second.
+///
+/// A speed of zero yields no estimate rather than an infinite one: a stalled
+/// download has no ETA, and rendering one as "∞" or as a wildly large number is
+/// less honest than saying there is none.
+#[must_use]
+pub fn eta(remaining: u64, speed: u64) -> Option<Duration> {
+    remaining.checked_div(speed).map(Duration::from_secs)
+}
+
+/// How far `done` is through `total`, as a percentage from zero to a hundred.
+///
+/// Kept in whole percent and integer arithmetic — a progress bar needs no more,
+/// and it sidesteps the precision a float cast of a byte count would quietly lose.
+/// A `total` of zero is complete rather than undefined — there is nothing left to
+/// do — and a `done` past `total`, which clock or accounting skew can produce, is
+/// clamped to a hundred rather than reported as more-than-finished.
+#[must_use]
+pub fn percent(done: u64, total: u64) -> u8 {
+    let pct = u128::from(done)
+        .saturating_mul(100)
+        .checked_div(u128::from(total))
+        .map_or(100, |ratio| ratio.min(100));
+    u8::try_from(pct).unwrap_or(100)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{
+        eta, percent, Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing,
+        Storage, Transfer, Vpn,
+    };
+    use crate::docker::{Condition, Service, State};
+    use lemonfiber_manifest::Criticality;
+
+    #[test]
+    fn a_known_zero_is_current_and_distinct_from_unknown() {
+        let zero: Reading<u64> = Reading::Known(0);
+        let stale: Reading<u64> = Reading::Stale(42);
+        let unknown: Reading<u64> = Reading::Unknown;
+
+        assert!(zero.is_current(), "a known zero is a current value");
+        assert!(!stale.is_current(), "stale is not current");
+        assert!(!unknown.is_current());
+
+        assert_eq!(zero.value(), Some(&0));
+        assert_eq!(
+            stale.value(),
+            Some(&42),
+            "stale still carries its last value"
+        );
+        assert_eq!(unknown.value(), None, "unknown carries nothing");
+    }
+
+    #[test]
+    fn a_panel_is_either_ready_or_states_why_not() {
+        let ready = Panel::Ready(7);
+        let down: Panel<i32> = Panel::unavailable("the service did not answer");
+        assert!(ready.is_available());
+        assert!(!down.is_available());
+        assert!(matches!(down, Panel::Unavailable { reason } if reason.contains("did not answer")));
+    }
+
+    fn service(id: &str, state: State) -> Service {
+        Service {
+            id: id.to_owned(),
+            name: id.to_owned(),
+            profile: "media".to_owned(),
+            state,
+            criticality: Criticality::Core,
+            exit: None,
+        }
+    }
+
+    #[test]
+    fn health_counts_what_wants_attention_and_reads_the_condition() {
+        let services = vec![
+            service("sonarr", State::Healthy),
+            service("radarr", State::Unhealthy),
+            service("qbittorrent", State::Failed),
+        ];
+        let health = Health::of(&services);
+        assert_eq!(
+            health.needing_attention, 2,
+            "unhealthy and failed both want attention"
+        );
+        assert_eq!(health.condition, Condition::Degraded);
+        assert!(!health.is_well());
+    }
+
+    #[test]
+    fn health_is_well_only_when_all_is_up_and_quiet() {
+        let services = vec![service("sonarr", State::Healthy)];
+        let health = Health::of(&services);
+        assert!(
+            health.is_well(),
+            "everything up and nothing wanting attention is well"
+        );
+        assert_eq!(health.needing_attention, 0);
+    }
+
+    #[test]
+    fn the_standing_is_read_in_order_of_how_much_is_wrong() {
+        // Unconfigured outranks all, then a disconnected engine, then an idle stack,
+        // then a degraded panel, then a fully live screen.
+        assert_eq!(
+            Standing::read(Reach::Unconfigured, false),
+            Standing::Unconfigured
+        );
+        assert_eq!(
+            Standing::read(Reach::Disconnected, true),
+            Standing::Disconnected,
+            "a disconnected engine is not hidden behind degraded"
+        );
+        assert_eq!(Standing::read(Reach::Idle, false), Standing::NoStack);
+        assert_eq!(Standing::read(Reach::Up, true), Standing::Degraded);
+        assert_eq!(Standing::read(Reach::Up, false), Standing::Live);
+    }
+
+    #[test]
+    fn an_eta_is_none_when_stalled_and_a_duration_otherwise() {
+        assert_eq!(eta(1_000, 0), None, "a stalled transfer has no ETA");
+        assert_eq!(eta(1_000, 100), Some(Duration::from_secs(10)));
+        assert_eq!(
+            eta(0, 100),
+            Some(Duration::from_secs(0)),
+            "done is zero, not none"
+        );
+    }
+
+    #[test]
+    fn a_percentage_stays_between_zero_and_a_hundred() {
+        assert_eq!(percent(0, 100), 0);
+        assert_eq!(percent(50, 100), 50);
+        assert_eq!(percent(100, 100), 100);
+        assert_eq!(
+            percent(150, 100),
+            100,
+            "past-total skew clamps to a hundred, never more than finished"
+        );
+        assert_eq!(
+            percent(5, 0),
+            100,
+            "nothing to do is complete, not undefined"
+        );
+    }
+
+    #[test]
+    fn the_value_types_serialise_for_the_machine_readable_side() {
+        let reading = Reading::Known(3_u64);
+        let json = serde_json::to_string(&reading).unwrap_or_default();
+        assert!(json.contains("known") && json.contains('3'), "{json}");
+
+        let down: Panel<u8> = Panel::unavailable("offline");
+        let json = serde_json::to_string(&down).unwrap_or_default();
+        assert!(
+            json.contains("unavailable") && json.contains("offline"),
+            "{json}"
+        );
+    }
+
+    #[test]
+    fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
+        // One dead source (the queue) is marked unavailable while the rest are live,
+        // and the whole thing round-trips to the machine-readable form.
+        let snapshot = Snapshot {
+            standing: Standing::Degraded,
+            health: Panel::Ready(Health::of(&[service("sonarr", State::Healthy)])),
+            vpn: Some(Panel::Ready(Vpn {
+                exit_ip: "203.0.113.7".to_owned(),
+                country: "Netherlands".to_owned(),
+                forwarded_port: Some(51413),
+                egress_matches: true,
+            })),
+            transfers: Panel::Ready(vec![Transfer {
+                name: "Some.Release".to_owned(),
+                protocol: Protocol::Torrent,
+                progress: percent(3, 4),
+                speed: Reading::Known(1_048_576),
+                eta: eta(5_000_000, 1_048_576),
+            }]),
+            queue: Panel::unavailable("sonarr did not answer"),
+            storage: Panel::Ready(Storage {
+                free: Reading::Known(42_000_000_000),
+                exhaustion: None,
+                hardlink: Hardlink::Linking,
+            }),
+            services: Panel::Ready(vec![service("sonarr", State::Healthy)]),
+        };
+
+        let json = serde_json::to_string(&snapshot).unwrap_or_default();
+        for expected in [
+            "degraded",
+            "203.0.113.7",
+            "torrent",
+            "linking",
+            "sonarr did not answer",
+        ] {
+            assert!(json.contains(expected), "missing {expected} in {json}");
+        }
+        // The Usenet protocol, a filled queue, and the other hardlink states
+        // serialise too, so every variant's rendering is exercised.
+        let queue = Queue {
+            service: "radarr".to_owned(),
+            depth: 3,
+            stuck: 1,
+        };
+        assert!(serde_json::to_string(&queue).is_ok_and(|json| json.contains("radarr")));
+        for hardlink in [Hardlink::Copying, Hardlink::Unknown] {
+            assert!(serde_json::to_string(&hardlink).is_ok());
+        }
+        assert!(serde_json::to_string(&Protocol::Usenet).is_ok_and(|json| json.contains("usenet")));
+    }
+}
