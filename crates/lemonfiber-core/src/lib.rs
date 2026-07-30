@@ -26,12 +26,14 @@
 //! | [`prerequisites`] | What the operator must obtain, from what they chose |
 //! | [`seed`] | Wiring the services to each other |
 //! | [`journal`] | What was changed, so it can be undone |
+//! | [`backup`] | Making a configuration recoverable from an archive |
 //!
 //! Rust-specific detail lives in this repo's `.docs/architecture/`; the product
 //! decisions behind it live in the specification.
 
 pub mod adapters;
 pub mod app;
+pub mod backup;
 pub mod config;
 pub mod docker;
 pub mod doctor;
