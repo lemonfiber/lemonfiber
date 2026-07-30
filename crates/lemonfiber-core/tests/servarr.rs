@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
-    Category, Client, ClientKind, Credential, DownloadClient, Failure, RegisteredClient,
-    RegisteredFolder, RootFolder,
+    Category, Client, ClientKind, Credential, DownloadClient, Failure, QueueDepth, Queues,
+    RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::servarr::{api_key, Servarr};
 
@@ -539,4 +539,30 @@ async fn a_get_carries_no_content_type() {
         .headers
         .iter()
         .all(|(name, _)| name != "Content-Type")));
+}
+
+#[tokio::test]
+async fn the_queue_depth_and_the_stuck_count_are_read() {
+    // The total is the service's own; the stuck count is read from the records,
+    // counting warning and error as stuck and leaving ok alone.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"{"totalRecords":5,"records":[{"trackedDownloadStatus":"ok"},{"trackedDownloadStatus":"warning"},{"trackedDownloadStatus":"Error"}]}"#,
+    ));
+    let queue = sonarr(&fake).queue().await;
+    assert_eq!(queue.ok(), Some(QueueDepth { total: 5, stuck: 2 }));
+
+    // It asked the queue route, and for a generous page so the count is whole.
+    assert!(fake
+        .request()
+        .is_some_and(|request| request.url.contains("/api/v3/queue?pageSize=")));
+}
+
+#[tokio::test]
+async fn a_queue_that_is_not_answered_is_unavailable() {
+    let fake = Fake::new(Answer::Silent);
+    assert!(matches!(
+        sonarr(&fake).queue().await,
+        Err(Failure::Unavailable { .. })
+    ));
 }

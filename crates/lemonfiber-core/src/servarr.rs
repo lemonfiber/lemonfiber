@@ -19,8 +19,8 @@ use serde::Deserialize;
 use crate::endpoint::{json_content_type, Endpoint, API_KEY_HEADER};
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
-    Client, ClientKind, Credential, DownloadClient, Failure, Identity, RegisteredClient,
-    RegisteredFolder, RootFolder,
+    Client, ClientKind, Credential, DownloadClient, Failure, Identity, QueueDepth,
+    RegisteredClient, RegisteredFolder, RootFolder,
 };
 
 /// A client for one Servarr-shape service.
@@ -160,6 +160,56 @@ impl Client for Servarr {
             .filter_map(ClientResource::endpoint)
             .collect())
     }
+}
+
+#[async_trait]
+impl crate::ports::service::Queues for Servarr {
+    async fn queue(&self) -> Result<QueueDepth, Failure> {
+        // A generous page is asked for so the stuck count is read from the whole
+        // queue rather than the default first page; the total is the service's own
+        // count, independent of the page.
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, "/queue?pageSize=200", None))
+            .await?;
+        let queue: QueueResource = self
+            .endpoint
+            .decode(&response, "the queue could not be read")?;
+        let stuck = queue
+            .records
+            .iter()
+            .filter(|record| is_stuck(&record.tracked_download_status))
+            .count();
+        Ok(QueueDepth {
+            total: queue.total_records,
+            stuck,
+        })
+    }
+}
+
+/// Whether a queue item's tracked status is one that has stopped progressing —
+/// the service's own words for a download that needs attention.
+fn is_stuck(status: &str) -> bool {
+    status.eq_ignore_ascii_case("warning") || status.eq_ignore_ascii_case("error")
+}
+
+/// A page of the queue as the service reports it: its own total, and the records
+/// on this page whose statuses the stuck count is read from.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QueueResource {
+    #[serde(default)]
+    total_records: usize,
+    #[serde(default)]
+    records: Vec<QueueRecord>,
+}
+
+/// One queued item — only its tracked download status matters to the dashboard.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QueueRecord {
+    #[serde(default)]
+    tracked_download_status: String,
 }
 
 /// A download-client resource as the service reports it: the identifier it
