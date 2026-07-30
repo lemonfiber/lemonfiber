@@ -33,6 +33,17 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring"]
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 rustls-pki-types = "1"
 webpki-roots = "1"
+# A backup archive is a gzip-compressed tar: `tar` packs and reads the directory
+# trees, `flate2` compresses them. flate2's default `miniz_oxide` backend is pure
+# Rust, so the static musl release stays free of a system zlib the way rustls keeps
+# it free of system TLS. Reading free space before a capture is `sysinfo`, the same
+# crate the storage diagnostic already uses to measure a volume.
+flate2 = "1"
+tar = "0.4"
+sysinfo = { workspace = true }
+# Reading and writing the manifest that rides inside the archive. The type and its
+# derives live in the core; this only turns it to and from the bytes tar stores.
+serde_json = "1"
 
 [lints]
 workspace = true

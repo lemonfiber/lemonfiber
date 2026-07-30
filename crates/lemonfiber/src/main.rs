@@ -28,6 +28,8 @@ use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
 use lemonfiber_core::stack::Source;
 
+mod archive;
+mod maintain;
 mod nntp;
 mod prompt;
 mod render;
@@ -184,6 +186,24 @@ enum Request {
     },
     /// Wire the stack's services to each other, idempotently.
     Seed,
+    /// Back up your configuration to an archive, so it stops being precious.
+    Backup {
+        /// Back up one service's configuration instead of the whole stack.
+        #[arg(long, value_name = "SERVICE")]
+        service: Option<String>,
+    },
+    /// Restore your configuration from a backup archive.
+    ///
+    /// Verifies the archive and lists what it holds before anything is
+    /// overwritten. A restore onto a different data root is refused until
+    /// `--repoint` accepts moving it to this machine's.
+    Restore {
+        /// The archive to restore from.
+        archive: PathBuf,
+        /// Accept re-pointing to this machine's data root where it differs.
+        #[arg(long)]
+        repoint: bool,
+    },
 }
 
 /// What to do with settings.
@@ -332,6 +352,13 @@ async fn main() -> ExitCode {
             Command::Doctor { only, disruptive }
         }
         Request::Seed => Command::Seed,
+        // Backup and restore drive their own executors over the tar adapter and
+        // render their own reports, like setup — they are not one value from
+        // dispatch. They take the context by value for the settings they read.
+        Request::Backup { service } => return maintain::run_backup(ctx, service, cli.json).await,
+        Request::Restore { archive, repoint } => {
+            return maintain::run_restore(ctx, archive, repoint, cli.json).await
+        }
     };
 
     match dispatch(command, &ctx).await {
