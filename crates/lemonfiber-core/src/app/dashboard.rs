@@ -6,15 +6,22 @@
 //! cannot be reached marks its own panel and leaves the rest), so there is no
 //! error channel through which a dead source could terminate the render loop.
 //!
-//! This first gatherer fills the services and the health read from them; the VPN,
-//! transfers, queue and storage panels have no live source wired yet and say so,
-//! rather than being shown as empty or as zero. Their telemetry arrives in the
-//! slices that follow, each turning one "not gathered yet" into a real panel.
+//! This gatherer fills the services and their health, the storage volume's free
+//! space, and each \*arr's queue; the VPN and transfers panels have no live source
+//! wired yet and say so, rather than being shown as empty or as zero. Their
+//! telemetry arrives in the slices that follow, each turning one "not gathered
+//! yet" into a real panel.
 
 use crate::app::Ctx;
-use crate::dashboard::{Hardlink, Health, Panel, Reach, Reading, Snapshot, Standing, Storage};
+use crate::dashboard::{
+    Hardlink, Health, Panel, Queue, Reach, Reading, Snapshot, Standing, Storage,
+};
 use crate::docker::{condition, survey, Condition, Service};
 use crate::error::Diagnose;
+use crate::ports::service::Queues;
+use crate::servarr::{api_key, Servarr};
+
+use super::targets::{project_directory, servarr_targets};
 
 /// What a panel says while its telemetry has no gatherer yet — stated plainly, so
 /// a not-yet-wired source reads as absent rather than as nothing happening.
@@ -49,10 +56,52 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
         health,
         vpn: None,
         transfers: Panel::unavailable(PENDING),
-        queue: Panel::unavailable(PENDING),
+        queue: queues(ctx).await,
         storage: storage(ctx).await,
         services,
     }
+}
+
+/// Each media-filing \*arr's queue depth and stuck count.
+///
+/// Resolves the Servarr-shape services the same way the credentials check does —
+/// the stack's own bind-mount convention — then reads each one's key from disk and
+/// asks it for its queue. A service still starting (no key written yet) or one
+/// that will not answer is left out of the panel rather than failing it; only a
+/// stack that cannot be read at all leaves the whole panel unavailable, since then
+/// there are no services to ask.
+async fn queues(ctx: &Ctx) -> Panel<Vec<Queue>> {
+    let manifest = match ctx.stack.checked_manifest(ctx.today()) {
+        Ok(manifest) => manifest,
+        Err(err) => return Panel::unavailable(err.problem().summary),
+    };
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let targets = servarr_targets(&manifest.services, project.as_deref());
+
+    let mut depths = Vec::new();
+    for target in &targets {
+        let Some(config) = ctx.filesystem.read(&target.config).await else {
+            continue;
+        };
+        let Some(key) = api_key(&config) else {
+            continue;
+        };
+        let service = Servarr::new(
+            ctx.http.clone(),
+            &target.base,
+            key,
+            &target.id,
+            target.version,
+        );
+        if let Ok(depth) = service.queue().await {
+            depths.push(Queue {
+                service: target.name.clone(),
+                depth: depth.total,
+                stuck: depth.stuck,
+            });
+        }
+    }
+    Panel::Ready(depths)
 }
 
 /// The storage picture: how much is free on the data volume.
@@ -121,6 +170,8 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
+    use async_trait::async_trait;
+
     use super::gather;
     use crate::app::Ctx;
     use crate::config::{Protocols, Settings};
@@ -128,8 +179,31 @@ mod tests {
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
+    use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::stack::Source;
     use crate::test_support::{spoke, stack, Reporting, Scripted, SeedFs};
+
+    /// A transport that answers every request with the same body — a service's
+    /// queue as JSON for the happy path, or something unreadable to stand in for a
+    /// service that will not answer.
+    struct HttpReturning(&'static str);
+
+    #[async_trait]
+    impl Http for HttpReturning {
+        async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
+            Ok(Response {
+                status: 200,
+                body: self.0.to_owned(),
+            })
+        }
+    }
+
+    /// A Servarr config carrying a usable key, and one carrying none.
+    const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
+    const CONFIG_NO_KEY: &str = "<Config><Port>8989</Port></Config>";
+
+    /// A queue as a service reports it: four items, one of them stuck.
+    const QUEUE_JSON: &str = r#"{"totalRecords":4,"records":[{"trackedDownloadStatus":"warning"},{"trackedDownloadStatus":"ok"}]}"#;
 
     /// Storage facts a volume with `total` bytes, `available` free, would report.
     fn facts(available: u64, total: u64) -> StorageFacts {
@@ -199,10 +273,9 @@ mod tests {
             snapshot.vpn.is_none(),
             "the VPN panel is omitted until wired"
         );
-        // Transfers and queue still have no gatherer; each is a different type, so
-        // they are checked one by one.
+        // Transfers still has no gatherer; the queue panel is filled (empty here,
+        // since the real filesystem holds no service keys to read).
         assert!(!snapshot.transfers.is_available());
-        assert!(!snapshot.queue.is_available());
     }
 
     #[tokio::test]
@@ -239,6 +312,67 @@ mod tests {
         let snapshot = gather(&ctx).await;
         assert_eq!(snapshot.standing, Standing::Disconnected);
         assert!(!snapshot.services.is_available());
+        assert!(
+            !snapshot.queue.is_available(),
+            "a stack that cannot be read has no services to ask for a queue"
+        );
+    }
+
+    /// A context configured with a fake filesystem and transport, over the stack
+    /// this repo carries so its \*arr services resolve as queue targets.
+    fn ctx_with(fs: SeedFs, http: HttpReturning) -> Ctx {
+        ctx(Reporting::holding(
+            &LIBRARY,
+            Lifecycle::Running,
+            Health::Healthy,
+        ))
+        .with_filesystem(Arc::new(fs))
+        .with_http(Arc::new(http))
+    }
+
+    #[tokio::test]
+    async fn the_queue_panel_fills_with_each_arrs_depth_and_stuck_count() {
+        let ctx = ctx_with(
+            SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
+            HttpReturning(QUEUE_JSON),
+        );
+        let snapshot = gather(&ctx).await;
+        assert!(
+            matches!(snapshot.queue, Panel::Ready(ref queues)
+                if !queues.is_empty() && queues.iter().all(|q| q.depth == 4 && q.stuck == 1)),
+            "each *arr that answered contributes its depth and stuck count"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_service_still_starting_with_no_key_is_left_out_of_the_queue() {
+        // No config to read: the ordinary first-start case, skipped so the panel is
+        // ready-but-empty rather than failed.
+        let ctx = ctx_with(SeedFs::keyed(None, None), HttpReturning(QUEUE_JSON));
+        let snapshot = gather(&ctx).await;
+        assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn a_service_whose_config_holds_no_key_is_left_out_of_the_queue() {
+        let ctx = ctx_with(
+            SeedFs::keyed(Some(CONFIG_NO_KEY), None),
+            HttpReturning(QUEUE_JSON),
+        );
+        let snapshot = gather(&ctx).await;
+        assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn a_service_that_will_not_answer_its_queue_is_left_out() {
+        // The key reads, but the queue answer is unreadable, so that service is
+        // dropped from the panel rather than failing it.
+        let ctx = ctx_with(
+            SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
+            HttpReturning("not a queue"),
+        );
+        let snapshot = gather(&ctx).await;
+        assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
     }
 
     #[tokio::test]
