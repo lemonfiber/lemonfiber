@@ -40,6 +40,7 @@ use crate::stack::Source;
 
 pub mod apply;
 pub mod backup;
+pub mod dashboard;
 pub mod recover;
 pub mod restore;
 mod seed;
