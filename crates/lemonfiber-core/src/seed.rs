@@ -17,6 +17,8 @@
 //! calling it done, and records each write so it can be undone. The driver
 //! reaches the outside only through the port, so it too runs against a fake.
 
+use std::future::Future;
+
 use serde::Serialize;
 
 use crate::journal::{Change, Journal, Kind};
@@ -180,7 +182,23 @@ pub async fn wire_root_folders(
         let state = if already {
             State::AlreadyWired
         } else {
-            wire_one(client, service, folder, journal, at).await
+            wire_one(
+                client.register_root_folder(folder),
+                client.root_folders(),
+                |rows| {
+                    rows.iter()
+                        .find(|have| same_path(&have.path, &folder.path))
+                        .map(|have| have.id.clone())
+                },
+                Naming {
+                    service,
+                    resource: "rootfolder",
+                    noun: "folder",
+                },
+                journal,
+                at,
+            )
+            .await
         };
         wirings.push(Wiring {
             connection: describe(service, folder),
@@ -190,41 +208,64 @@ pub async fn wire_root_folders(
     wirings
 }
 
-/// Register one folder, confirm it landed by reading it back, and record it.
-async fn wire_one(
-    client: &dyn Client,
-    service: &str,
-    folder: &RootFolder,
+/// Register one connection, confirm it landed by reading the list back, and
+/// record it so it can be undone — the shared body of wiring a folder, a download
+/// client, or an application.
+///
+/// The three differ only in the calls that register and read the list back, how a
+/// landed row is matched to what was wanted and its id read off, and the nouns for
+/// the journal and the read-back failure; those are the parameters, so the
+/// register → read-back → confirm → record shape is written once. The two futures
+/// are made by the caller and awaited here — register first, the read-back only if
+/// it succeeded — which is free, because a future is inert until it is polled and
+/// this keeps the ordering, and the two `unreached` gates, in one place.
+async fn wire_one<T>(
+    register: impl Future<Output = Result<(), Failure>>,
+    read_back: impl Future<Output = Result<Vec<T>, Failure>>,
+    landed: impl FnOnce(&[T]) -> Option<String>,
+    naming: Naming<'_>,
     journal: &mut Journal,
     at: &str,
 ) -> State {
-    if let Err(failure) = client.register_root_folder(folder).await {
+    if let Err(failure) = register.await {
         return unreached(&failure);
     }
-    let registered = match client.root_folders().await {
-        Ok(folders) => folders,
+    let registered = match read_back.await {
+        Ok(rows) => rows,
         Err(failure) => return unreached(&failure),
     };
-    match registered
-        .into_iter()
-        .find(|have| same_path(&have.path, &folder.path))
-    {
-        Some(landed) => {
+    match landed(&registered) {
+        Some(id) => {
             journal.record(Change {
                 at: at.to_owned(),
                 operation: "seed".to_owned(),
-                target: service.to_owned(),
+                target: naming.service.to_owned(),
                 kind: Kind::Created {
-                    resource: "rootfolder".to_owned(),
-                    id: landed.id,
+                    resource: naming.resource.to_owned(),
+                    id,
                 },
             });
             State::Wired
         }
         None => State::Failed {
-            detail: "the folder was accepted but did not appear when read back".to_owned(),
+            detail: format!(
+                "the {} was accepted but did not appear when read back",
+                naming.noun
+            ),
         },
     }
+}
+
+/// How a wired connection is named where it is recorded and where it is missed —
+/// the three labels that are all that differ between wiring a folder, a client and
+/// an application once the register-and-read-back shape is shared.
+struct Naming<'a> {
+    /// The service the connection is recorded against.
+    service: &'a str,
+    /// The resource kind, as the journal stores it — `rootfolder`, and so on.
+    resource: &'a str,
+    /// The noun a read-back miss names the connection by, for the operator.
+    noun: &'a str,
 }
 
 /// Wire a service's download clients: register the ones it lacks, leave the ones
@@ -264,7 +305,25 @@ pub async fn wire_download_clients(
         // is written. Unavailable never reaches here — a read-back failure was
         // handled above — so it folds harmlessly onto `Leave`.
         let state = match intent(observe_client(&existing, want)) {
-            Intent::Wire => wire_one_client(client, service, want, journal, at).await,
+            Intent::Wire => {
+                wire_one(
+                    client.register_download_client(want),
+                    client.download_clients(),
+                    |rows| {
+                        rows.iter()
+                            .find(|have| same_endpoint(have, want))
+                            .map(|have| have.id.clone())
+                    },
+                    Naming {
+                        service,
+                        resource: "downloadclient",
+                        noun: "download client",
+                    },
+                    journal,
+                    at,
+                )
+                .await
+            }
             Intent::Preserve => State::Drifted,
             Intent::Leave | Intent::Skip => State::AlreadyWired,
         };
@@ -294,44 +353,6 @@ fn drifted(have: &RegisteredClient, want: &DownloadClient) -> bool {
     have.category
         .as_ref()
         .is_some_and(|category| category != &want.category)
-}
-
-/// Register one download client, confirm it landed by reading it back, and record
-/// it.
-async fn wire_one_client(
-    client: &dyn Client,
-    service: &str,
-    want: &DownloadClient,
-    journal: &mut Journal,
-    at: &str,
-) -> State {
-    if let Err(failure) = client.register_download_client(want).await {
-        return unreached(&failure);
-    }
-    let registered = match client.download_clients().await {
-        Ok(clients) => clients,
-        Err(failure) => return unreached(&failure),
-    };
-    match registered
-        .into_iter()
-        .find(|have| same_endpoint(have, want))
-    {
-        Some(landed) => {
-            journal.record(Change {
-                at: at.to_owned(),
-                operation: "seed".to_owned(),
-                target: service.to_owned(),
-                kind: Kind::Created {
-                    resource: "downloadclient".to_owned(),
-                    id: landed.id,
-                },
-            });
-            State::Wired
-        }
-        None => State::Failed {
-            detail: "the download client was accepted but did not appear when read back".to_owned(),
-        },
-    }
 }
 
 /// Whether a registered client reaches the same endpoint as a wanted one.
@@ -385,7 +406,23 @@ pub async fn wire_applications(
         let state = if already {
             State::AlreadyWired
         } else {
-            wire_one_application(prowlarr, service, application, journal, at).await
+            wire_one(
+                prowlarr.register_application(application),
+                prowlarr.applications(),
+                |rows| {
+                    rows.iter()
+                        .find(|have| same_base_url(&have.base_url, &application.base_url))
+                        .map(|have| have.id.clone())
+                },
+                Naming {
+                    service,
+                    resource: "application",
+                    noun: "application",
+                },
+                journal,
+                at,
+            )
+            .await
         };
         wirings.push(Wiring {
             connection: describe_application(service, application),
@@ -393,43 +430,6 @@ pub async fn wire_applications(
         });
     }
     wirings
-}
-
-/// Register one application, confirm it landed by reading it back, and record it.
-async fn wire_one_application(
-    prowlarr: &dyn AppSync,
-    service: &str,
-    application: &Application,
-    journal: &mut Journal,
-    at: &str,
-) -> State {
-    if let Err(failure) = prowlarr.register_application(application).await {
-        return unreached(&failure);
-    }
-    let registered = match prowlarr.applications().await {
-        Ok(applications) => applications,
-        Err(failure) => return unreached(&failure),
-    };
-    match registered
-        .into_iter()
-        .find(|have| same_base_url(&have.base_url, &application.base_url))
-    {
-        Some(landed) => {
-            journal.record(Change {
-                at: at.to_owned(),
-                operation: "seed".to_owned(),
-                target: service.to_owned(),
-                kind: Kind::Created {
-                    resource: "application".to_owned(),
-                    id: landed.id,
-                },
-            });
-            State::Wired
-        }
-        None => State::Failed {
-            detail: "the application was accepted but did not appear when read back".to_owned(),
-        },
-    }
 }
 
 /// Whether two application addresses reach the same \*arr.
