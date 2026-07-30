@@ -149,6 +149,10 @@ async fn seed_root_folders(ctx: &Ctx, arr: &Arr) -> Vec<crate::seed::Wiring> {
         &arr.target.id,
         arr.target.version,
     );
+    // The journal seed records each write into is not persisted: seeding is
+    // idempotent, so a partial run is recovered by running it again, not reversed
+    // — see the seed module doc. The record is groundwork for a future service-side
+    // undo the current reversal cannot do.
     let mut journal = crate::journal::Journal::new();
     crate::seed::wire_root_folders(
         &client,
@@ -327,6 +331,10 @@ async fn wire_arr_download_clients(
         &arr.target.id,
         arr.target.version,
     );
+    // The journal seed records each write into is not persisted: seeding is
+    // idempotent, so a partial run is recovered by running it again, not reversed
+    // — see the seed module doc. The record is groundwork for a future service-side
+    // undo the current reversal cannot do.
     let mut journal = crate::journal::Journal::new();
     crate::seed::wire_download_clients(
         &servarr,
@@ -401,6 +409,10 @@ async fn seed_applications(
         prowlarr_key,
         &source.target.id,
     );
+    // The journal seed records each write into is not persisted: seeding is
+    // idempotent, so a partial run is recovered by running it again, not reversed
+    // — see the seed module doc. The record is groundwork for a future service-side
+    // undo the current reversal cannot do.
     let mut journal = crate::journal::Journal::new();
     let mut wirings = crate::seed::wire_applications(
         &client,

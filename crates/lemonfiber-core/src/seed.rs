@@ -8,14 +8,19 @@
 //! has tuned by hand, and it is the resolution of the standing tension between
 //! reproducible and customised.
 //!
-//! Every write is read back to confirm it landed, and recorded so it can be
-//! undone.
+//! Every write is read back to confirm it landed, and recorded as a change. That
+//! record is groundwork, not a live undo: it captures what a future service-side
+//! reversal would need — the resource created and the id the service gave it — but
+//! seeding itself is idempotent, so re-running it is how a partial run is
+//! recovered, and nothing reverses a seed today. The journal each pass records
+//! into is therefore not persisted; `recover`'s reversal is for an interrupted
+//! setup apply, and cannot remove a resource a service created in any case.
 //!
 //! The policy — given what was observed about a connection, what seed intends —
 //! is pure and settled without a service. The driver carries it out: it observes
 //! the service through the port, registers what is missing, reads it back before
-//! calling it done, and records each write so it can be undone. The driver
-//! reaches the outside only through the port, so it too runs against a fake.
+//! calling it done, and records each write as a change. The driver reaches the
+//! outside only through the port, so it too runs against a fake.
 
 use std::future::Future;
 
@@ -145,7 +150,7 @@ impl Report {
 }
 
 /// Wire a service's root folders: register the ones it lacks, leave the ones it
-/// already has, and record each write so it can be undone.
+/// already has, and record each write as a change.
 ///
 /// The service is observed once. If it is not answering, every folder is skipped
 /// so a later run completes them rather than any being called broken; if it
@@ -209,8 +214,8 @@ pub async fn wire_root_folders(
 }
 
 /// Register one connection, confirm it landed by reading the list back, and
-/// record it so it can be undone — the shared body of wiring a folder, a download
-/// client, or an application.
+/// record it as a change — the shared body of wiring a folder, a download client,
+/// or an application.
 ///
 /// The three differ only in the calls that register and read the list back, how a
 /// landed row is matched to what was wanted and its id read off, and the nouns for
@@ -269,7 +274,7 @@ struct Naming<'a> {
 }
 
 /// Wire a service's download clients: register the ones it lacks, leave the ones
-/// it already has, and record each write so it can be undone.
+/// it already has, and record each write as a change.
 ///
 /// The same shape as [`wire_root_folders`], and the same two gates — an
 /// unanswering service skips every client so a later run completes them, a
@@ -370,7 +375,7 @@ fn describe_client(service: &str, client: &DownloadClient) -> String {
 }
 
 /// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave
-/// the ones it already has, and record each write so it can be undone.
+/// the ones it already has, and record each write as a change.
 ///
 /// The same shape as [`wire_root_folders`], matched by the address Prowlarr
 /// reaches an \*arr on rather than by a label, so an application an operator
