@@ -262,6 +262,9 @@ pub(crate) struct SeedFs {
     /// path, so a test can make Prowlarr's key readable while an \*arr's is not —
     /// the case of an \*arr that started after Prowlarr.
     only_prowlarr: bool,
+    /// What a volume describe reports — a zero total by default, which the
+    /// dashboard reads as free space unknown.
+    facts: crate::ports::filesystem::StorageFacts,
 }
 
 impl SeedFs {
@@ -270,12 +273,24 @@ impl SeedFs {
             servarr,
             sabnzbd,
             only_prowlarr: false,
+            facts: crate::ports::filesystem::StorageFacts {
+                kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
+                removable: false,
+                available: 0,
+                total: 0,
+            },
         }
     }
 
     /// The same, but withholding the Servarr key from every path but Prowlarr's.
     pub(crate) fn only_for_prowlarr(mut self) -> Self {
         self.only_prowlarr = true;
+        self
+    }
+
+    /// The same, reporting the given volume facts to a describe.
+    pub(crate) fn with_facts(mut self, facts: crate::ports::filesystem::StorageFacts) -> Self {
+        self.facts = facts;
         self
     }
 }
@@ -323,12 +338,7 @@ impl crate::ports::filesystem::FileSystem for SeedFs {
         None
     }
     async fn describe(&self, _path: &std::path::Path) -> crate::ports::filesystem::StorageFacts {
-        crate::ports::filesystem::StorageFacts {
-            kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
+        self.facts.clone()
     }
 }
 

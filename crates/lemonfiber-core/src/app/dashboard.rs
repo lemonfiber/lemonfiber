@@ -12,7 +12,7 @@
 //! slices that follow, each turning one "not gathered yet" into a real panel.
 
 use crate::app::Ctx;
-use crate::dashboard::{Health, Panel, Reach, Snapshot, Standing};
+use crate::dashboard::{Hardlink, Health, Panel, Reach, Reading, Snapshot, Standing, Storage};
 use crate::docker::{condition, survey, Condition, Service};
 use crate::error::Diagnose;
 
@@ -50,9 +50,35 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
         vpn: None,
         transfers: Panel::unavailable(PENDING),
         queue: Panel::unavailable(PENDING),
-        storage: Panel::unavailable(PENDING),
+        storage: storage(ctx).await,
         services,
     }
+}
+
+/// The storage picture: how much is free on the data volume.
+///
+/// Free space is read afresh each refresh, which is a cheap read. A volume that
+/// could not be attributed to any mount reports a zero total, and its free space
+/// is then unknown rather than zero — "cannot read the volume" and "the disk is
+/// full" are opposite things to an operator, and must not render alike. The
+/// hardlink status and the projected exhaustion have their own telemetry: a
+/// per-refresh hardlink probe would write to disk every second, and exhaustion is
+/// projected against the queue, so neither is gathered here yet.
+async fn storage(ctx: &Ctx) -> Panel<Storage> {
+    let Some(root) = ctx.settings.data_root.as_deref() else {
+        return Panel::unavailable("no data location is configured");
+    };
+    let facts = ctx.filesystem.describe(root).await;
+    let free = if facts.total == 0 {
+        Reading::Unknown
+    } else {
+        Reading::Known(facts.available)
+    };
+    Panel::Ready(Storage {
+        free,
+        exhaustion: None,
+        hardlink: Hardlink::Unknown,
+    })
 }
 
 /// Observe every service the stack declares, or the reason it could not be read.
@@ -98,11 +124,22 @@ mod tests {
     use super::gather;
     use crate::app::Ctx;
     use crate::config::{Protocols, Settings};
-    use crate::dashboard::{Panel, Standing};
+    use crate::dashboard::{Panel, Reading, Standing};
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
+    use crate::ports::filesystem::{FsKind, StorageFacts};
     use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted};
+    use crate::test_support::{spoke, stack, Reporting, Scripted, SeedFs};
+
+    /// Storage facts a volume with `total` bytes, `available` free, would report.
+    fn facts(available: u64, total: u64) -> StorageFacts {
+        StorageFacts {
+            kind: FsKind::Linking("ext4".to_owned()),
+            removable: false,
+            available,
+            total,
+        }
+    }
 
     /// A context whose engine reports whatever the test put in it, configured with
     /// a data root so it is not read as an unconfigured machine.
@@ -162,10 +199,10 @@ mod tests {
             snapshot.vpn.is_none(),
             "the VPN panel is omitted until wired"
         );
-        // Each pending panel is a different type, so they are checked one by one.
+        // Transfers and queue still have no gatherer; each is a different type, so
+        // they are checked one by one.
         assert!(!snapshot.transfers.is_available());
         assert!(!snapshot.queue.is_available());
-        assert!(!snapshot.storage.is_available());
     }
 
     #[tokio::test]
@@ -234,6 +271,38 @@ mod tests {
             settings,
             Environment::MacOs,
         );
-        assert_eq!(gather(&ctx).await.standing, Standing::Unconfigured);
+        let snapshot = gather(&ctx).await;
+        assert_eq!(snapshot.standing, Standing::Unconfigured);
+        assert!(
+            !snapshot.storage.is_available(),
+            "with no data location there is no volume to report free space on"
+        );
+    }
+
+    #[tokio::test]
+    async fn storage_reports_the_free_space_when_the_volume_reads() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let ctx = ctx(engine).with_filesystem(Arc::new(
+            SeedFs::keyed(None, None).with_facts(facts(42, 100)),
+        ));
+        let snapshot = gather(&ctx).await;
+        assert!(
+            matches!(snapshot.storage, Panel::Ready(storage) if storage.free == Reading::Known(42)),
+            "the volume's free space fills the panel"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_volume_reports_free_space_unknown_not_zero() {
+        // A volume attributed to no mount reports a zero total; its free space is
+        // unknown, not a confident zero that reads as a full disk.
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let ctx = ctx(engine)
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(0, 0))));
+        let snapshot = gather(&ctx).await;
+        assert!(
+            matches!(snapshot.storage, Panel::Ready(storage) if storage.free == Reading::Unknown),
+            "a volume that could not be read reports unknown free space, not zero"
+        );
     }
 }
