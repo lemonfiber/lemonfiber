@@ -13,6 +13,8 @@ use lemonfiber_core::app::backup::{capture, Report as BackupReport};
 use lemonfiber_core::app::restore::{inspect, restore, Preview, Report as RestoreReport};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::backup::{Retention, Scope, SCHEMA};
+use lemonfiber_core::config::{self, store};
+use lemonfiber_core::error::Diagnose;
 use lemonfiber_core::ports::docker::Lifecycle;
 
 use crate::archive::Tar;
@@ -100,8 +102,22 @@ pub(crate) async fn run_restore(ctx: Ctx, archive: PathBuf, repoint: bool, json:
     .await
     {
         Ok(report) => {
+            // Complete the re-point the executor recorded: the restored `.env` still
+            // names the data root the backup was taken with, which is not on this
+            // machine, so it is set to this one now that the files are in place —
+            // the adjustment the re-point offered.
+            if let Some(relocation) = &report.relocated {
+                if let Err(failure) =
+                    store::set(&paths.env_file(), config::DATA_ROOT_KEY, &relocation.now)
+                {
+                    return crate::complain(&failure.problem());
+                }
+            }
             render_restore(&report, json);
-            eprintln!("Now reconcile the service wiring:  lemonfiber up <form> && lemonfiber seed");
+            // A restore replaces state while the stack is down, so the wiring between
+            // services and the credentials it holds are reconciled once it is back up.
+            eprintln!("Now bring the stack up and reconcile its wiring:  lemonfiber up <form> && lemonfiber seed");
+            eprintln!("Then check the restored credentials still work:  lemonfiber doctor --only credentials");
             ExitCode::SUCCESS
         }
         Err(problem) => crate::complain(problem.as_ref()),
