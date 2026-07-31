@@ -78,6 +78,10 @@ create-release = false
 # tell cargo-dist not to fail its up-to-date check on it. `just release-workflow`
 # keeps the rest in sync.
 allow-dirty = ["ci"]
+# DRY-RUN ONLY (do not merge): build every platform on this PR and upload the
+# artifacts to the PR run, without creating any release. Reverts to no-build on
+# PRs once this branch is discarded.
+pr-run-mode = "upload"
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Whether to install an updater program
