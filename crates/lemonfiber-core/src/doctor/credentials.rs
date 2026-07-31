@@ -107,6 +107,7 @@ impl CredentialsCheck {
             Err(Failure::Unauthorised { .. }) => Verdict::Fail(rejected(target)),
             Err(Failure::Unavailable { .. }) => unreachable(target),
             Err(Failure::Refused { detail, .. }) => unusable(target, &detail),
+            Err(Failure::Unsupported { detail, .. }) => unsupported(target, &detail),
         }
     }
 }
@@ -175,5 +176,21 @@ fn unusable(target: &Target, detail: &str) -> Verdict {
         reason: format!("{} answered unusably: {detail}", target.name),
         remedy: Remedy::new("Check the service's own logs for why it is not answering normally")
             .with_detail("lemonfiber logs"),
+    }
+}
+
+/// The service answered but does not serve the API version this build speaks, so
+/// the credential cannot be proven through it — the service was upgraded past (or
+/// stands before) the version lemonfiber knows, which aligning the two resolves.
+fn unsupported(target: &Target, detail: &str) -> Verdict {
+    Verdict::Unverified {
+        reason: format!(
+            "{} does not serve the API version this build speaks: {detail}",
+            target.name
+        ),
+        remedy: Remedy::new(
+            "Match the service to the version lemonfiber supports, or update lemonfiber, then check again",
+        )
+        .with_detail("lemonfiber --version"),
     }
 }

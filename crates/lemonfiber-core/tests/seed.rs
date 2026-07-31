@@ -180,6 +180,9 @@ enum Mode {
     /// Lists fine to observe and registers fine, then stops answering on the
     /// read-back that would confirm the write.
     DropsAfterRegister,
+    /// Reachable, but does not serve the API version this build speaks — the
+    /// listing fails as unsupported, a conflict a re-run cannot lift.
+    Unsupported,
 }
 
 /// A service that answers the seed driver from a script.
@@ -308,6 +311,10 @@ impl Client for FakeService {
             Mode::Down => Err(down("sonarr")),
             Mode::RefusesList => Err(Failure::Unauthorised {
                 service: "sonarr".to_owned(),
+            }),
+            Mode::Unsupported => Err(Failure::Unsupported {
+                service: "sonarr".to_owned(),
+                detail: "there is no /api/v3".to_owned(),
             }),
             Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
             _ => Ok(self
@@ -560,6 +567,27 @@ async fn a_service_that_refuses_the_listing_fails() {
         matches!(states.as_slice(), [State::Failed { .. }]),
         "{states:?}"
     );
+}
+
+#[tokio::test]
+async fn a_service_on_an_unsupported_api_version_refuses_its_folders() {
+    // The service answers, but not the API version this build speaks. Its folders
+    // are refused, not skipped or failed: writing to it would be malformed, and a
+    // re-run against the same service cannot lift it — the operator must align the
+    // versions. Nothing is written.
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Unsupported, Vec::new()),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert_eq!(
+        states,
+        vec![State::Refused {
+            reason: "sonarr does not serve the API version this build speaks: there is no /api/v3"
+                .to_owned(),
+        }]
+    );
+    assert_eq!(recorded, 0, "nothing is written to an unsupported version");
 }
 
 #[tokio::test]

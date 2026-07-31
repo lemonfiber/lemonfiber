@@ -174,6 +174,35 @@ async fn a_status_that_names_neither_itself_nor_its_version_is_refused() {
 }
 
 #[tokio::test]
+async fn a_service_that_does_not_serve_the_api_version_is_unsupported() {
+    // A 404 is the whole /api/v{n} prefix not served — the service was upgraded
+    // past (or stands before) the version this build speaks. Reported as
+    // unsupported, naming the version, rather than read as a generic refusal so
+    // seeding refuses it rather than writing something malformed.
+    let fake = Fake::new(Answer::Reply(404, ""));
+    let detail = match sonarr(&fake).identity().await {
+        Err(Failure::Unsupported { detail, .. }) => Some(detail),
+        _ => None,
+    };
+    assert!(
+        detail.is_some_and(|words| words.contains("/api/v3")),
+        "the unsupported version is named"
+    );
+}
+
+#[tokio::test]
+async fn a_read_against_an_unsupported_api_version_is_unsupported_too() {
+    // The seed read path shares the probe, so a 404 on the folder list is the same
+    // unsupported-version signal — and it is the read, before any write, so nothing
+    // malformed is ever posted.
+    let fake = Fake::new(Answer::Reply(404, ""));
+    assert!(matches!(
+        sonarr(&fake).root_folders().await,
+        Err(Failure::Unsupported { .. })
+    ));
+}
+
+#[tokio::test]
 async fn a_root_folder_is_posted_to_its_endpoint() {
     let fake = Fake::new(Answer::Reply(201, ""));
     let folder = RootFolder {
