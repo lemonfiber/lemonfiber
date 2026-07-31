@@ -63,7 +63,10 @@ installers = ["shell", "powershell", "homebrew"]
 # A GitHub repo to push Homebrew formulas to
 tap = "lemonfiber/homebrew-tap"
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
+# Windows (x86_64-pc-windows-msvc) is deferred: the native binary does not yet
+# compile — docker.rs needs a bollard named-pipe path and filesystem.rs uses the
+# nightly-only file_index(). Tracked as L1/M10 work before 1.0.0.
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
 # Whether to enable GitHub Attestations
