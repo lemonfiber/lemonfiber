@@ -53,6 +53,26 @@ pub struct Target {
     pub version: u32,
 }
 
+impl Target {
+    /// A client for this service, or nothing where its config or key cannot be read
+    /// yet — the "still starting, try again later" case every caller skips the same
+    /// way (a missing key is a service that has not written it, not a fault). The
+    /// read-back and the build are one step, so the callers that open a
+    /// Servarr-shape service — the credentials check, the dashboard's queues, and
+    /// seeding — cannot drift on how they do it.
+    pub(crate) async fn open(&self, http: &Arc<dyn Http>, fs: &dyn FileSystem) -> Option<Servarr> {
+        let config = fs.read(&self.config).await?;
+        let key = api_key(&config)?;
+        Some(Servarr::new(
+            http.clone(),
+            &self.base,
+            key,
+            &self.id,
+            self.version,
+        ))
+    }
+}
+
 /// Proves each Servarr-shape service still answers to the key it wrote.
 pub struct CredentialsCheck {
     http: Arc<dyn Http>,
@@ -77,20 +97,9 @@ impl CredentialsCheck {
     /// start, skipped so a later run proves it — not a fault. Beyond that, the
     /// three failures the service can present are kept as three distinct verdicts.
     async fn prove(&self, target: &Target) -> Verdict {
-        let Some(config) = self.filesystem.read(&target.config).await else {
+        let Some(service) = target.open(&self.http, self.filesystem.as_ref()).await else {
             return not_started(target);
         };
-        let Some(key) = api_key(&config) else {
-            return not_started(target);
-        };
-
-        let service = Servarr::new(
-            self.http.clone(),
-            &target.base,
-            key,
-            &target.id,
-            target.version,
-        );
         match service.identity().await {
             Ok(identity) => Verdict::Pass {
                 note: Some(format!("{} {}", identity.name, identity.version)),

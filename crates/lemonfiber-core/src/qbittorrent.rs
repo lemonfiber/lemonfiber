@@ -13,10 +13,15 @@
 //! `200` whether the password was right (`Ok.`) or wrong (`Fails.`).
 
 use std::sync::Arc;
+use std::time::Duration;
 
+use async_trait::async_trait;
+use serde::Deserialize;
+
+use crate::dashboard::percent;
 use crate::endpoint::{describe, Endpoint};
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::Failure;
+use crate::ports::service::{Download, Failure, Transfers};
 
 /// The service name a failure is reported against.
 const SERVICE: &str = "qbittorrent";
@@ -46,14 +51,36 @@ pub fn temporary_password(log: &str) -> Option<String> {
 /// A client for one qBittorrent web UI.
 pub struct Qbittorrent {
     endpoint: Endpoint,
+    /// The durable password to authenticate a read with, where one is held. The
+    /// password-replacement flow is given the current and new passwords per call
+    /// and needs none stored; the dashboard's transfers read holds the recorded
+    /// one, so a client built for one purpose cannot silently be used for the
+    /// other without a password to prove itself.
+    password: Option<String>,
 }
 
 impl Qbittorrent {
-    /// A client for the qBittorrent reached at `base`.
+    /// A client for the qBittorrent reached at `base`, holding no password — for
+    /// the first-run exchange that is handed each password explicitly.
     #[must_use]
     pub fn new(http: Arc<dyn Http>, base: impl Into<String>) -> Self {
         Self {
             endpoint: Endpoint::new(http, base, SERVICE),
+            password: None,
+        }
+    }
+
+    /// A client that can authenticate a read itself, holding the durable password
+    /// lemonfiber recorded — how the dashboard reads its transfers.
+    #[must_use]
+    pub fn authenticated(
+        http: Arc<dyn Http>,
+        base: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
+        Self {
+            endpoint: Endpoint::new(http, base, SERVICE),
+            password: Some(password.into()),
         }
     }
 
@@ -109,6 +136,60 @@ impl Qbittorrent {
     }
 }
 
+/// qBittorrent's sentinel `eta` for "no estimate to give" — 100 days, in seconds.
+/// A stalled torrent reports this rather than a real countdown, so it becomes no
+/// ETA rather than one 100 days out.
+const NO_ETA: u64 = 8_640_000;
+
+/// One torrent as qBittorrent's `torrents/info` reports it.
+///
+/// Progress is read from the byte counts, not the `progress` float, so the
+/// percentage is integer arithmetic that shares the dashboard's own `percent`.
+/// The many other fields qBittorrent sends are ignored.
+#[derive(Deserialize)]
+struct TorrentInfo {
+    name: String,
+    completed: u64,
+    size: u64,
+    dlspeed: u64,
+    eta: u64,
+}
+
+#[async_trait]
+impl Transfers for Qbittorrent {
+    async fn transfers(&self) -> Result<Vec<Download>, Failure> {
+        let Some(password) = self.password.as_deref() else {
+            return Err(self.endpoint.unauthorised());
+        };
+        self.login(password).await?;
+
+        let request = Request {
+            method: Method::Get,
+            url: self
+                .endpoint
+                .url("/api/v2/torrents/info?filter=downloading"),
+            headers: Vec::new(),
+            body: None,
+        };
+        let response = self.endpoint.send(&request).await?;
+        let torrents: Vec<TorrentInfo> = self
+            .endpoint
+            .decode(&response, "the torrent list could not be read")?;
+        Ok(torrents.into_iter().map(download_of).collect())
+    }
+}
+
+/// One torrent as the dashboard's [`Download`]: progress from its byte counts, its
+/// download speed as reported, and the ETA only where qBittorrent gave a real one.
+fn download_of(torrent: TorrentInfo) -> Download {
+    Download {
+        name: torrent.name,
+        progress: percent(torrent.completed, torrent.size),
+        speed: Some(torrent.dlspeed),
+        eta: (torrent.eta < NO_ETA).then(|| Duration::from_secs(torrent.eta)),
+    }
+}
+
 /// Render form fields as an `application/x-www-form-urlencoded` body.
 ///
 /// Infallible by construction, so there is no encoding error to fold into the
@@ -119,4 +200,90 @@ fn encode(fields: &[(&str, &str)]) -> String {
         form.append_pair(name, value);
     }
     form.finish()
+}
+
+#[cfg(test)]
+mod transfers_tests {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use crate::ports::service::{Failure, Transfers};
+    use crate::test_support::{a_password, ScriptedHttp};
+
+    use super::Qbittorrent;
+
+    /// A client whose transport answers each call from `replies` in order — the
+    /// first is the login, the second the torrent list.
+    fn client(replies: Vec<(u16, &'static str)>) -> Qbittorrent {
+        Qbittorrent::authenticated(
+            Arc::new(ScriptedHttp::new(replies)),
+            "http://127.0.0.1:8080",
+            a_password(),
+        )
+    }
+
+    /// Two torrents: one mid-download with a real ETA, one complete and stalled at
+    /// qBittorrent's no-estimate sentinel.
+    const TWO_TORRENTS: &str = r#"[
+        {"name":"Show.S01E01","completed":500,"size":1000,"dlspeed":2048,"eta":600},
+        {"name":"Movie.2024","completed":1000,"size":1000,"dlspeed":0,"eta":8640000}
+    ]"#;
+
+    #[tokio::test]
+    async fn each_torrent_reads_its_progress_speed_and_eta() {
+        let qbit = client(vec![(200, "Ok."), (200, TWO_TORRENTS)]);
+        let transfers = qbit.transfers().await.unwrap_or_default();
+        assert_eq!(transfers.len(), 2);
+        assert!(matches!(
+            transfers.first(),
+            Some(t) if t.name == "Show.S01E01"
+                && t.progress == 50
+                && t.speed == Some(2048)
+                && t.eta == Some(Duration::from_secs(600))
+        ));
+        // The sentinel ETA becomes no estimate, not a countdown 100 days out.
+        assert!(matches!(
+            transfers.get(1),
+            Some(t) if t.progress == 100 && t.speed == Some(0) && t.eta.is_none()
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_client_holding_no_password_cannot_authenticate_a_read() {
+        let qbit = Qbittorrent::new(
+            Arc::new(ScriptedHttp::new(Vec::new())),
+            "http://127.0.0.1:8080",
+        );
+        assert!(matches!(
+            qbit.transfers().await,
+            Err(Failure::Unauthorised { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_rejected_password_is_unauthorised() {
+        let qbit = client(vec![(200, "Fails.")]);
+        assert!(matches!(
+            qbit.transfers().await,
+            Err(Failure::Unauthorised { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_client_that_stops_answering_after_login_is_unavailable() {
+        let qbit = client(vec![(200, "Ok.")]);
+        assert!(matches!(
+            qbit.transfers().await,
+            Err(Failure::Unavailable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_torrent_list_that_will_not_parse_is_refused() {
+        let qbit = client(vec![(200, "Ok."), (200, "not json")]);
+        assert!(matches!(
+            qbit.transfers().await,
+            Err(Failure::Refused { .. })
+        ));
+    }
 }
