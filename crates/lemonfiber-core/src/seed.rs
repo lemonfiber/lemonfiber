@@ -183,14 +183,18 @@ impl Report {
 ///
 /// A folder another \*arr also wants — named in `contested` (from
 /// [`contested_roots`]) — is refused rather than written, because two \*arrs on
-/// one root folder would each manage the other's files. The refusal is made only
-/// once the service is reachable, so a service still starting is skipped and
-/// retried rather than handed a verdict a re-run cannot lift.
+/// one root folder would each manage the other's files. A folder outside `root`,
+/// the data tree lemonfiber mounts, is refused too: the service would file where
+/// its downloads are neither hardlinked to nor visible to the rest of the stack.
+/// Both refusals are made only once the service is reachable, so a service still
+/// starting is skipped and retried rather than handed a verdict a re-run cannot
+/// lift.
 pub async fn wire_root_folders(
     client: &dyn Client,
     service: &str,
     wanted: &[RootFolder],
     contested: &BTreeMap<String, Vec<String>>,
+    root: &str,
     journal: &mut Journal,
     at: &str,
 ) -> Vec<Wiring> {
@@ -214,6 +218,8 @@ pub async fn wire_root_folders(
             .iter()
             .any(|have| same_path(&have.path, &folder.path));
         let state = if let Some(reason) = contest_reason(service, folder, contested) {
+            State::Refused { reason }
+        } else if let Some(reason) = outside_root_reason(folder, root) {
             State::Refused { reason }
         } else if already {
             State::AlreadyWired
@@ -695,6 +701,22 @@ fn contest_reason(
         "{} is also the root folder for {}; two *arrs on one root folder would each manage the other's files",
         folder.path,
         others.join(" and ")
+    ))
+}
+
+/// Why a wanted folder is refused for falling outside the data root: its path, or
+/// `None` where it sits within `root` — as every folder lemonfiber builds does,
+/// under the tree it mounts at `root`. A root folder outside that tree would have
+/// the service file where its downloads are neither hardlinked to nor visible to
+/// the rest of the stack, so it is refused rather than created.
+fn outside_root_reason(folder: &RootFolder, root: &str) -> Option<String> {
+    let within = format!("{}/", canonical_root(root));
+    if canonical_root(&folder.path).starts_with(&within) {
+        return None;
+    }
+    Some(format!(
+        "{} is outside the data root {root}; a root folder there is neither hardlinked to nor visible to the rest of the stack",
+        folder.path
     ))
 }
 

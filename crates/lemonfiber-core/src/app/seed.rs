@@ -160,20 +160,26 @@ async fn seed_root_folders(
         &arr.target.name,
         &wanted,
         contested,
+        DATA_ROOT,
         &mut journal,
         &seed_stamp(ctx),
     )
     .await
 }
 
-/// The root folders an \*arr wants, one per media type it manages, each under
-/// `/data/media`. Shared by the seed pass and the up-front contested-path check,
-/// so both reason about the same set.
+/// Where the operator's data location is mounted inside every service: the tree a
+/// root folder must sit within, so the service files where the downloads are
+/// hardlinked and the rest of the stack can see them.
+const DATA_ROOT: &str = "/data";
+
+/// The root folders an \*arr wants, one per media type it manages, each under the
+/// media directory of the mounted data root. Shared by the seed pass and the
+/// up-front contested-path check, so both reason about the same set.
 fn wanted_roots(media_types: &[String]) -> Vec<crate::ports::service::RootFolder> {
     media_types
         .iter()
         .map(|media| crate::ports::service::RootFolder {
-            path: format!("/data/media/{media}"),
+            path: format!("{DATA_ROOT}/media/{media}"),
             media_type: media.clone(),
         })
         .collect()

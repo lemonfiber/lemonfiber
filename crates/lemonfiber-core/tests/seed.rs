@@ -347,7 +347,18 @@ async fn seed_contested(
     contested: &BTreeMap<String, Vec<String>>,
 ) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_root_folders(&service, "sonarr", wanted, contested, &mut journal, "t").await;
+    // Every folder a test wants is under `/data`, the mounted data root, so none is
+    // refused for falling outside it unless the test deliberately reaches beyond.
+    let wirings = wire_root_folders(
+        &service,
+        "sonarr",
+        wanted,
+        contested,
+        "/data",
+        &mut journal,
+        "t",
+    )
+    .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
 }
@@ -538,6 +549,30 @@ fn one_arr_listing_a_path_twice_does_not_contest_itself() {
         contested.is_empty(),
         "one *arr cannot contest a folder with itself",
     );
+}
+
+#[tokio::test]
+async fn a_root_folder_outside_the_data_root_is_refused_with_an_explanation() {
+    // Every folder lemonfiber builds sits under /data, the mounted data root. One
+    // that does not — reached beyond it — is refused, not created: the service
+    // would file where its downloads are neither hardlinked to nor visible to the
+    // rest of the stack. The refusal names the path and why, and writes nothing.
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Normal, Vec::new()),
+        &[folder("/config/media/tv")],
+    )
+    .await;
+    let reason = match states.as_slice() {
+        [State::Refused { reason }] => Some(reason.clone()),
+        _ => None,
+    };
+    assert!(
+        reason.is_some_and(|reason| {
+            reason.contains("outside the data root") && reason.contains("/config/media/tv")
+        }),
+        "the refusal names the offending path and why: {states:?}"
+    );
+    assert_eq!(recorded, 0, "a refused folder writes nothing");
 }
 
 #[tokio::test]
