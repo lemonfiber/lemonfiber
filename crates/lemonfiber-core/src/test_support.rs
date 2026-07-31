@@ -55,6 +55,23 @@ pub(crate) struct Reporting {
     /// that always did would make the waiting itself untestable.
     settles_after: Option<usize>,
     asked: std::sync::atomic::AtomicUsize,
+    /// What `exec` answers a VPN probe with, where the test scripts one. Absent
+    /// means `exec` has nothing to say and fails, as an engine asked for a
+    /// container it does not know would.
+    tunnel: Option<Tunnel>,
+}
+
+/// What a [`Reporting`] engine answers a VPN exec with: a public address for the
+/// gateway and for the client (told apart by the gateway's service id appearing in
+/// the container), a country, and a forwarded port. A `None` field answers as
+/// absent — the exit code a missing value produces.
+#[derive(Clone)]
+pub(crate) struct Tunnel {
+    pub(crate) gateway: &'static str,
+    pub(crate) gateway_ip: Option<&'static str>,
+    pub(crate) client_ip: Option<&'static str>,
+    pub(crate) country: Option<&'static str>,
+    pub(crate) port: Option<&'static str>,
 }
 
 impl Reporting {
@@ -76,6 +93,7 @@ impl Reporting {
             reachable: true,
             settles_after: None,
             asked: std::sync::atomic::AtomicUsize::new(0),
+            tunnel: None,
         }
     }
 
@@ -96,6 +114,13 @@ impl Reporting {
         self
     }
 
+    /// The same engine, scripted to answer a VPN probe (public address, country,
+    /// forwarded port) so the dashboard's VPN panel can be driven.
+    pub(crate) fn with_tunnel(mut self, tunnel: Tunnel) -> Self {
+        self.tunnel = Some(tunnel);
+        self
+    }
+
     /// An engine that is not there.
     pub(crate) fn absent() -> Self {
         Self {
@@ -104,6 +129,7 @@ impl Reporting {
             reachable: false,
             settles_after: None,
             asked: std::sync::atomic::AtomicUsize::new(0),
+            tunnel: None,
         }
     }
 }
@@ -136,10 +162,27 @@ impl Engine for Reporting {
             .collect())
     }
 
-    async fn exec(&self, container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        Err(EngineFailure::NoSuchContainer {
-            name: container.to_owned(),
-        })
+    async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, EngineFailure> {
+        let Some(tunnel) = &self.tunnel else {
+            return Err(EngineFailure::NoSuchContainer {
+                name: container.to_owned(),
+            });
+        };
+        if argv.first().is_some_and(|arg| arg == "cat") {
+            return Ok(scripted(tunnel.port));
+        }
+        if argv.last().is_some_and(|arg| arg.ends_with("/country-iso")) {
+            return Ok(ExecOutput {
+                status: Some(0),
+                stdout: tunnel.country.unwrap_or_default().to_owned(),
+            });
+        }
+        let ip = if container.contains(tunnel.gateway) {
+            tunnel.gateway_ip
+        } else {
+            tunnel.client_ip
+        };
+        Ok(scripted(ip))
     }
 
     async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
@@ -375,4 +418,20 @@ pub(crate) fn refused(stderr: &str) -> Output {
 /// irrelevant: the fakes accept whatever is sent.
 pub(crate) fn a_password() -> String {
     ('a'..='p').collect()
+}
+
+/// A scripted VPN exec answer: the value with a success code, or an empty
+/// non-success body where there is none — the shape a missing value or an absent
+/// file produces, which the readers treat as absent.
+fn scripted(value: Option<&str>) -> ExecOutput {
+    match value {
+        Some(value) => ExecOutput {
+            status: Some(0),
+            stdout: format!("{value}\n"),
+        },
+        None => ExecOutput {
+            status: Some(1),
+            stdout: String::new(),
+        },
+    }
 }

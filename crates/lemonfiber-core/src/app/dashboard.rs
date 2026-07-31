@@ -7,10 +7,9 @@
 //! error channel through which a dead source could terminate the render loop.
 //!
 //! This gatherer fills the services and their health, the storage volume's free
-//! space, each \*arr's queue, and each download client's active transfers; the VPN
-//! panel has no live source wired yet and says so, rather than being shown as empty
-//! or as zero. Its telemetry arrives in the slices that follow, each turning one
-//! "not gathered yet" into a real panel.
+//! space, each \*arr's queue, each download client's active transfers, and the VPN
+//! tunnel's state. What remains is the hardlink and exhaustion halves of storage,
+//! and the ratatui surface that renders all of it on a refresh loop.
 
 use std::path::Path;
 
@@ -18,9 +17,11 @@ use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::dashboard::{
-    Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing, Storage, Transfer,
+    Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing, Storage,
+    Transfer, Vpn,
 };
 use crate::docker::{condition, survey, Condition, Service};
+use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
 use crate::ports::service::{Download, Queues, Transfers};
 use crate::qbittorrent::Qbittorrent;
@@ -68,7 +69,7 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
         // pending panels below are not-yet-built, not down, so they pass `false`.
         standing: Standing::read(reach, false),
         health,
-        vpn: None,
+        vpn: vpn(ctx, manifest.as_ref()).await,
         transfers: transfers(ctx, manifest.as_ref(), project.as_deref()).await,
         queue: queues(ctx, manifest.as_ref(), project.as_deref()).await,
         storage: storage(ctx).await,
@@ -146,6 +147,45 @@ fn protocol_of(kind: &DownloadKind) -> Protocol {
     match kind {
         DownloadKind::Qbittorrent => Protocol::Torrent,
         DownloadKind::Sabnzbd { .. } => Protocol::Usenet,
+    }
+}
+
+/// What the VPN is doing, and whether the download client is genuinely behind it.
+///
+/// `None` where the stack has no VPN-contained torrent client — the panel does not
+/// apply, rather than showing an empty box. Otherwise the tunnel's exit address,
+/// country and forwarded port, and the egress-match that proves the client's
+/// traffic leaves through it, or the reason none of that could be read. Reuses the
+/// leak check's own containers and exec-reads ([`read_vpn`]) so the panel and the
+/// diagnostic cannot disagree about what the tunnel is doing.
+async fn vpn(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Option<Panel<Vpn>> {
+    let manifest = match manifest {
+        Ok(manifest) => manifest,
+        Err(reason) => return Some(Panel::unavailable(reason.clone())),
+    };
+    let reading = read_vpn(
+        ctx.engine.as_ref(),
+        &ctx.settings.project,
+        manifest,
+        ctx.settings.protocols,
+        ctx.settings.ip_echo.as_deref(),
+        ctx.settings.port_forward.enabled,
+    )
+    .await;
+    match reading {
+        VpnReading::NotApplicable => None,
+        VpnReading::Unavailable(reason) => Some(Panel::unavailable(reason)),
+        VpnReading::Ready {
+            exit_ip,
+            country,
+            forwarded_port,
+            egress_matches,
+        } => Some(Panel::Ready(Vpn {
+            exit_ip,
+            country: country.unwrap_or_default(),
+            forwarded_port,
+            egress_matches,
+        })),
     }
 }
 
@@ -250,17 +290,17 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::gather;
+    use super::{gather, vpn};
     use crate::app::Ctx;
-    use crate::config::{Protocols, Settings};
-    use crate::dashboard::{Panel, Protocol, Reading, Standing};
+    use crate::config::{PortForward, Protocols, Settings};
+    use crate::dashboard::{Panel, Protocol, Reading, Standing, Vpn};
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
     use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::stack::Source;
     use crate::test_support::{
-        a_password, spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs,
+        a_password, spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs, Tunnel,
     };
 
     /// A transport that answers every request with the same body — a service's
@@ -346,15 +386,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_vpn_panel_without_a_gatherer_yet_is_omitted_rather_than_shown_empty() {
+    async fn every_panel_now_has_a_gatherer_rather_than_reading_as_pending() {
         let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
         let snapshot = gather(&ctx(engine)).await;
-        assert!(
-            snapshot.vpn.is_none(),
-            "the VPN panel is omitted until wired"
-        );
-        // The transfers panel now has a gatherer, so it is filled — empty here,
-        // since the real filesystem holds no download-client credentials to read.
+        // The VPN panel is now gathered: this stack declares a torrent client, so it
+        // applies (`Some`), and — with no IP-echo configured here — reports that its
+        // egress cannot be read rather than being omitted.
+        assert!(matches!(snapshot.vpn, Some(Panel::Unavailable { .. })));
+        // The transfers panel is filled — empty here, since the real filesystem holds
+        // no download-client credentials to read.
         assert!(matches!(snapshot.transfers, Panel::Ready(ref active) if active.is_empty()));
     }
 
@@ -674,5 +714,298 @@ mod tests {
         );
         let snapshot = gather(&ctx).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
+    }
+
+    // ── VPN panel ─────────────────────────────────────────────────
+
+    /// A healthy tunnel scripted onto the gluetun/qBittorrent pair the stack
+    /// declares: matching egress, a country, and a forwarded port.
+    fn healthy_tunnel() -> Tunnel {
+        Tunnel {
+            gateway: "gluetun",
+            gateway_ip: Some("203.0.113.7"),
+            client_ip: Some("203.0.113.7"),
+            country: Some("nl"),
+            port: Some("51413"),
+        }
+    }
+
+    /// An engine holding the VPN pair in one lifecycle, optionally scripted to
+    /// answer the probe.
+    fn tunnel_engine(running: bool, tunnel: Option<Tunnel>) -> Reporting {
+        let engine = Reporting::holding(
+            &["gluetun", "qbittorrent"],
+            if running {
+                Lifecycle::Running
+            } else {
+                Lifecycle::Exited
+            },
+            Health::None,
+        );
+        match tunnel {
+            Some(tunnel) => engine.with_tunnel(tunnel),
+            None => engine,
+        }
+    }
+
+    /// Port forwarding, enabled for a provider.
+    fn forwarding() -> PortForward {
+        PortForward {
+            enabled: true,
+            provider: Some("proton".to_owned()),
+        }
+    }
+
+    /// A context that reads the VPN through the given engine, with leak detection
+    /// (the IP-echo) and port forwarding as configured.
+    fn vpn_ctx(
+        engine: Reporting,
+        ip_echo: Option<&str>,
+        port_forward: PortForward,
+        protocols: Protocols,
+    ) -> Ctx {
+        let settings = Settings {
+            protocols,
+            data_root: Some(PathBuf::from("/srv/media")),
+            ip_echo: ip_echo.map(str::to_owned),
+            port_forward,
+            ..Settings::default()
+        };
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(engine),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+        .waiting(Duration::ZERO)
+    }
+
+    /// The VPN panel the way `gather` reads it — the manifest resolved from the
+    /// stack, handed to the driver.
+    async fn vpn_panel(ctx: &Ctx) -> Option<Panel<Vpn>> {
+        let manifest = ctx
+            .stack
+            .checked_manifest(ctx.today())
+            .map_err(|err| crate::error::Diagnose::problem(&err).summary);
+        vpn(ctx, manifest.as_ref()).await
+    }
+
+    #[tokio::test]
+    async fn the_vpn_panel_shows_the_tunnel_when_it_answers() {
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(healthy_tunnel())),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(
+            matches!(vpn_panel(&ctx).await, Some(Panel::Ready(v))
+                if v.exit_ip == "203.0.113.7"
+                    && v.country == "NL"
+                    && v.forwarded_port == Some(51413)
+                    && v.egress_matches),
+            "the tunnel's exit, country, forwarded port, and a matching egress"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_client_whose_egress_differs_from_the_tunnel_is_flagged() {
+        let tunnel = Tunnel {
+            client_ip: Some("198.51.100.9"),
+            ..healthy_tunnel()
+        };
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(tunnel)),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(matches!(vpn_panel(&ctx).await, Some(Panel::Ready(v)) if !v.egress_matches));
+    }
+
+    #[tokio::test]
+    async fn a_tunnel_that_is_not_running_leaves_the_panel_unavailable() {
+        let ctx = vpn_ctx(
+            tunnel_engine(false, Some(healthy_tunnel())),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(matches!(
+            vpn_panel(&ctx).await,
+            Some(Panel::Unavailable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_tunnel_that_returns_no_address_is_unavailable() {
+        let tunnel = Tunnel {
+            gateway_ip: None,
+            ..healthy_tunnel()
+        };
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(tunnel)),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(matches!(
+            vpn_panel(&ctx).await,
+            Some(Panel::Unavailable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_tunnel_the_engine_cannot_exec_is_unavailable() {
+        // The gateway is up but the engine has nothing scripted, so the exec fails.
+        let ctx = vpn_ctx(
+            tunnel_engine(true, None),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(matches!(
+            vpn_panel(&ctx).await,
+            Some(Panel::Unavailable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_engine_leaves_the_vpn_panel_unavailable() {
+        let ctx = vpn_ctx(
+            Reporting::absent(),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(matches!(
+            vpn_panel(&ctx).await,
+            Some(Panel::Unavailable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn leak_detection_switched_off_leaves_the_egress_unreadable() {
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(healthy_tunnel())),
+            None,
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(matches!(
+            vpn_panel(&ctx).await,
+            Some(Panel::Unavailable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_stack_without_a_torrent_client_has_no_vpn_panel() {
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(healthy_tunnel())),
+            Some("https://echo"),
+            forwarding(),
+            Protocols {
+                torrent: false,
+                usenet: true,
+            },
+        );
+        assert!(vpn_panel(&ctx).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn port_forwarding_off_reads_no_forwarded_port() {
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(healthy_tunnel())),
+            Some("https://echo"),
+            PortForward::default(),
+            Protocols::both(),
+        );
+        assert!(
+            matches!(vpn_panel(&ctx).await, Some(Panel::Ready(v)) if v.forwarded_port.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_provider_that_granted_no_port_reads_none() {
+        let tunnel = Tunnel {
+            port: None,
+            ..healthy_tunnel()
+        };
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(tunnel)),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(
+            matches!(vpn_panel(&ctx).await, Some(Panel::Ready(v)) if v.forwarded_port.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_tunnel_without_a_country_still_reads() {
+        let tunnel = Tunnel {
+            country: None,
+            ..healthy_tunnel()
+        };
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(tunnel)),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(matches!(vpn_panel(&ctx).await, Some(Panel::Ready(v)) if v.country.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_leaves_the_vpn_panel_unavailable() {
+        // An unreadable stack: the manifest resolves to a reason, and the driver
+        // carries it into the panel rather than omitting it.
+        let settings = Settings {
+            protocols: Protocols::both(),
+            data_root: Some(PathBuf::from("/srv/media")),
+            ip_echo: Some("https://echo".to_owned()),
+            port_forward: forwarding(),
+            ..Settings::default()
+        };
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(tunnel_engine(true, Some(healthy_tunnel()))),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
+            settings,
+            Environment::MacOs,
+        );
+        assert!(matches!(
+            vpn_panel(&ctx).await,
+            Some(Panel::Unavailable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_torrent_stack_with_no_vpn_pair_does_not_apply() {
+        use crate::doctor::vpn::{read_vpn, VpnReading};
+        let manifest = lemonfiber_manifest::Manifest {
+            schema_version: 1,
+            stack_version: String::new(),
+            min_cli_version: String::new(),
+            profiles: Vec::new(),
+            forms: Vec::new(),
+            services: Vec::new(),
+        };
+        let reading = read_vpn(
+            &Reporting::absent(),
+            "lemonfiber",
+            &manifest,
+            Protocols::both(),
+            Some("https://echo"),
+            true,
+        )
+        .await;
+        assert!(matches!(reading, VpnReading::NotApplicable));
     }
 }
