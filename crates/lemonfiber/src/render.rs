@@ -54,6 +54,10 @@ pub(crate) fn seeding(report: &SeedReport) {
             SeedState::Failed { detail } => {
                 println!("  ✗ {}   {detail}", wiring.connection);
             }
+            SeedState::Refused { reason } => {
+                println!("  ✗ {}   refused", wiring.connection);
+                println!("      {reason}");
+            }
         }
     }
     let outstanding = report.outstanding();
