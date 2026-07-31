@@ -187,6 +187,10 @@ fn download_of(torrent: TorrentInfo) -> Download {
         progress: percent(torrent.completed, torrent.size),
         speed: Some(torrent.dlspeed),
         eta: (torrent.eta < NO_ETA).then(|| Duration::from_secs(torrent.eta)),
+        // What is still to land on disk — the same two byte counts progress reads,
+        // subtracted rather than divided, saturating so a size a hair behind the
+        // completed count never wraps.
+        remaining: Some(torrent.size.saturating_sub(torrent.completed)),
     }
 }
 
@@ -240,11 +244,14 @@ mod transfers_tests {
                 && t.progress == 50
                 && t.speed == Some(2048)
                 && t.eta == Some(Duration::from_secs(600))
+                && t.remaining == Some(500)
         ));
-        // The sentinel ETA becomes no estimate, not a countdown 100 days out.
+        // The sentinel ETA becomes no estimate, not a countdown 100 days out; a
+        // complete torrent has nothing left to land — a definite zero, not unknown.
         assert!(matches!(
             transfers.get(1),
             Some(t) if t.progress == 100 && t.speed == Some(0) && t.eta.is_none()
+                && t.remaining == Some(0)
         ));
     }
 

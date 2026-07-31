@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 use crate::app::Ctx;
 use crate::config::store;
 use crate::doctor::credentials::Target;
+use crate::ports::service::{Download, Transfers};
+use crate::qbittorrent::Qbittorrent;
+use crate::sabnzbd::Sabnzbd;
 use crate::stack::Source;
 
 /// The directory Compose treats as the project root, where the services' config
@@ -158,4 +161,106 @@ pub(super) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
 /// dashboard's transfers authentication and for a later seed run.
 pub(super) fn recorded_qbittorrent_password(ctx: &Ctx) -> Option<String> {
     recorded_secret(ctx, crate::config::QBITTORRENT_PASSWORD_KEY)
+}
+
+/// One client's active downloads, read on its own shape — nothing where it is not
+/// yet seeded or will not answer, so it is left out rather than failing the read.
+///
+/// Shared by the dashboard's transfers panel (which keeps each client's protocol)
+/// and the free-space projection (which only sums what is still to land), so the
+/// two never read a client two different ways.
+pub(super) async fn read_transfers(ctx: &Ctx, target: &DownloadTarget) -> Vec<Download> {
+    match &target.kind {
+        DownloadKind::Qbittorrent => {
+            let Some(password) = recorded_qbittorrent_password(ctx) else {
+                return Vec::new();
+            };
+            Qbittorrent::authenticated(ctx.http.clone(), &target.base, password)
+                .transfers()
+                .await
+                .unwrap_or_default()
+        }
+        DownloadKind::Sabnzbd { config } => {
+            let Some(text) = ctx.filesystem.read(config).await else {
+                return Vec::new();
+            };
+            let Some(key) = crate::sabnzbd::api_key(&text) else {
+                return Vec::new();
+            };
+            Sabnzbd::new(ctx.http.clone(), &target.base, key)
+                .transfers()
+                .await
+                .unwrap_or_default()
+        }
+    }
+}
+
+/// The bytes the stack's download clients still have to write, summed across every
+/// client that answers — the committed content the free-space check projects
+/// exhaustion from.
+///
+/// A client that will not answer, or a stack with no download client at all,
+/// contributes nothing: the figure is made from what could be read. Zero and "no
+/// clients" are one and the same here — both leave nothing to subtract from the
+/// free space — so the projection reads as a plain `0` rather than an absence the
+/// caller would have to fold back to zero anyway.
+pub(super) async fn committed_bytes(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> u64 {
+    let mut downloads = Vec::new();
+    for target in &download_targets(services, project) {
+        downloads.extend(read_transfers(ctx, target).await);
+    }
+    committed_of(&downloads)
+}
+
+/// The bytes a set of active downloads still have to write, saturating so no sum of
+/// client figures can wrap. A download whose client reported no figure contributes
+/// nothing, kept apart from one reporting zero left — the pure half of
+/// [`committed_bytes`], decided without touching a client.
+fn committed_of(downloads: &[Download]) -> u64 {
+    downloads
+        .iter()
+        .filter_map(|download| download.remaining)
+        .fold(0, u64::saturating_add)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::committed_of;
+    use crate::ports::service::Download;
+
+    /// A download with only its bytes-still-to-write set — the one field the
+    /// committed sum reads.
+    fn download(remaining: Option<u64>) -> Download {
+        Download {
+            name: "item".to_owned(),
+            progress: 0,
+            speed: None,
+            eta: None,
+            remaining,
+        }
+    }
+
+    #[test]
+    fn committed_sums_what_each_download_still_has_to_write() {
+        let downloads = [download(Some(300)), download(Some(200))];
+        assert_eq!(committed_of(&downloads), 500);
+    }
+
+    #[test]
+    fn a_download_reporting_no_figure_is_left_out_of_the_sum() {
+        // An unknown is not counted as zero-left; it is simply left out, so a
+        // client that reports no figure never reads as "nothing more to write".
+        let downloads = [download(Some(200)), download(None)];
+        assert_eq!(committed_of(&downloads), 200);
+    }
+
+    #[test]
+    fn the_sum_saturates_rather_than_wrapping() {
+        let downloads = [download(Some(u64::MAX)), download(Some(1))];
+        assert_eq!(committed_of(&downloads), u64::MAX);
+    }
 }

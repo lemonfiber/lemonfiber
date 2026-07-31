@@ -48,7 +48,7 @@ pub mod setup;
 mod targets;
 pub mod watch;
 
-use targets::{project_directory, servarr_targets};
+use targets::{committed_bytes, project_directory, servarr_targets};
 // The data-location watch is a self-contained feature in its own module; these
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, ALREADY_GONE, NOTHING_TO_WATCH, WATCH};
@@ -542,12 +542,21 @@ async fn diagnose(
         .map_err(|err| err.problem())?;
 
     let environment = EnvironmentCheck::new(ctx.runner.clone());
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    // What the download clients still have to write, so the free-space finding
+    // projects exhaustion from the queue rather than only warning on a floor.
+    // Resolved from the same running-stack services the credentials check reaches;
+    // a client that will not answer contributes nothing, so a stack whose clients
+    // are all quiet reads as zero committed and the finding guards the raw free
+    // space.
+    let committed = committed_bytes(ctx, &manifest.services, project.as_deref()).await;
     let storage = StorageCheck::new(
         ctx.filesystem.clone(),
         ctx.settings.data_root.clone(),
         ctx.settings.storage_state.clone(),
         ctx.environment,
         ctx.settings.service_user,
+        Some(committed),
     );
     let vpn = VpnCheck::new(
         ctx.engine.clone(),
@@ -558,7 +567,6 @@ async fn diagnose(
         ctx.settings.port_forward.clone(),
         disruptive,
     );
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let credentials = CredentialsCheck::new(
         ctx.http.clone(),
         ctx.filesystem.clone(),
