@@ -154,6 +154,18 @@ impl Report {
             .filter(|wiring| !wiring.state.is_settled())
             .collect()
     }
+
+    /// The connections refused by policy — a conflict a re-run will not lift,
+    /// unlike the skipped and failed that [`Self::outstanding`] also holds. Named
+    /// apart so the operator is told to resolve the clash rather than merely to
+    /// run again, and so a script can tell "fix your config" from "retry".
+    #[must_use]
+    pub fn refused(&self) -> Vec<&Wiring> {
+        self.wirings
+            .iter()
+            .filter(|wiring| matches!(wiring.state, State::Refused { .. }))
+            .collect()
+    }
 }
 
 /// Wire a service's root folders: register the ones it lacks, leave the ones it

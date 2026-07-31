@@ -384,12 +384,18 @@ fn settled(outcome: &Outcome) -> ExitCode {
             Overall::Broken | Overall::Unknown => ExitCode::from(FAILURE),
         },
         // Seeding is run to make the wiring true, so leaving any of it unmade is a
-        // non-zero result a script can act on by running again.
+        // non-zero result — but the two reasons differ. A refused conflict (two
+        // \*arrs on one root folder) is something the operator wrote that lemonfiber
+        // will not act on until they resolve it, so it earns VALIDATION; work merely
+        // left skipped or failed may complete on a re-run, so it stays FAILURE. A
+        // script can then tell "fix your config" from "wait and retry".
         Outcome::Seed(report) => {
             if report.is_complete() {
                 ExitCode::SUCCESS
-            } else {
+            } else if report.refused().is_empty() {
                 ExitCode::from(FAILURE)
+            } else {
+                ExitCode::from(VALIDATION)
             }
         }
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {

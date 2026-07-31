@@ -102,6 +102,41 @@ fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
 }
 
 #[test]
+fn a_refusal_is_named_apart_from_the_merely_outstanding() {
+    // A refused conflict is outstanding like a skip, but reported apart so the
+    // operator is told to resolve it rather than to run again — and so is a skip,
+    // which is not, so `refused` names only the conflict.
+    let report = Report {
+        wirings: vec![
+            wiring("tv root folder in sonarr", State::Wired),
+            wiring(
+                "SABnzbd into Lidarr",
+                State::Skipped {
+                    reason: "lidarr is not running".to_owned(),
+                },
+            ),
+            wiring(
+                "movies root folder in radarr",
+                State::Refused {
+                    reason: "shared with sonarr".to_owned(),
+                },
+            ),
+        ],
+    };
+    assert!(!report.is_complete());
+    let refused: Vec<&str> = report
+        .refused()
+        .into_iter()
+        .map(|wiring| wiring.connection.as_str())
+        .collect();
+    assert_eq!(
+        refused,
+        vec!["movies root folder in radarr"],
+        "only the conflict is named as refused, not the skip",
+    );
+}
+
+#[test]
 fn the_report_names_each_state_on_the_wire() {
     let report = Report {
         wirings: vec![
