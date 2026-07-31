@@ -89,10 +89,11 @@ impl StorageCheck {
     /// user decide the permission finding: host ownership only gates the services
     /// where Docker does not map it away, and only once a service user is known.
     ///
-    /// `committed` is how many bytes the download clients still have to write, if
-    /// they could be read — what the free-space finding projects exhaustion from.
-    /// `None` where no download client answered, so the finding guards the raw free
-    /// space instead of a projected one.
+    /// `committed` is how many bytes the download clients still have to write — what
+    /// the free-space finding projects exhaustion from. A diagnosis always supplies
+    /// a figure, zero where the clients are quiet or unreachable; `None` is the
+    /// "no projection at all" case a caller with no clients to read passes, and
+    /// guards the raw free space exactly as a zero would.
     #[must_use]
     pub fn new(
         filesystem: Arc<dyn FileSystem>,
@@ -416,10 +417,11 @@ fn service_unverified() -> Finding {
 /// A volume that reports no size at all could not be measured rather than being
 /// empty, so it is unverified rather than reported as full. Otherwise the finding
 /// is a projection: the free space left once the download clients' committed
-/// content has landed, warned on when that projected figure falls under
-/// the floor rather than only when the volume is already nearly full. Where no
-/// client answered, `committed` is `None`, nothing is subtracted, and the same
-/// floor guards the raw free space — the behaviour before a client could be read.
+/// content has landed, warned on when that projected figure falls under the floor
+/// rather than only when the volume is already nearly full. A committed figure of
+/// zero — the clients quiet or unreachable — and `None` — no projection supplied at
+/// all — both subtract nothing, so the same floor guards the raw free space, the
+/// behaviour before a client could be read.
 fn space(facts: &StorageFacts, committed: Option<u64>) -> Finding {
     if facts.total == 0 {
         return finding(
