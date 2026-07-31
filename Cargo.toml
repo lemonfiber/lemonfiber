@@ -58,17 +58,17 @@ pedantic = { level = "warn", priority = -1 }
 cargo-dist-version = "0.32.0"
 # CI backends to support
 ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell", "homebrew"]
-# A GitHub repo to push Homebrew formulas to
-tap = "lemonfiber/homebrew-tap"
+# Only the shell installer for now. Homebrew (L1-R3) needs a HOMEBREW_TAP_TOKEN
+# to push to the tap; PowerShell (L1-R4) installs the Windows binary, which is
+# deferred (see targets). Both return with Windows and the tap token at 1.0.0.
+installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
 # Windows (x86_64-pc-windows-msvc) is deferred: the native binary does not yet
 # compile — docker.rs needs a bollard named-pipe path and filesystem.rs uses the
 # nightly-only file_index(). Tracked as L1/M10 work before 1.0.0.
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
-# Publish jobs to run in CI
-publish-jobs = ["homebrew"]
+# No publish jobs yet — the Homebrew tap publish returns at 1.0.0 (L1-R3).
+publish-jobs = []
 # Whether to enable GitHub Attestations
 github-attestations = true
 # cargo-dist's plan step creates a draft Release and uploads artifacts to it;
@@ -77,10 +77,10 @@ github-attestations = true
 # `--draft=true` so the tag leaves a DRAFT a maintainer publishes (OPS-R1). Always
 # regenerate release.yml via `just release-workflow`, never by hand.
 create-release = false
+allow-dirty = ["ci"]
 # release.yml carries our one hand-applied patch (the `--draft=true` above), so
 # tell cargo-dist not to fail its up-to-date check on it. `just release-workflow`
 # keeps the rest in sync.
-allow-dirty = ["ci"]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Whether to install an updater program
