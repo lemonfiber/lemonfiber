@@ -16,6 +16,23 @@
 //! into is therefore not persisted; `recover`'s reversal is for an interrupted
 //! setup apply, and cannot remove a resource a service created in any case.
 //!
+//! An interruption — a killed run, a service dropping mid-pass — therefore leaves
+//! every connection already made intact and valid: each was written straight to
+//! the service and read back before it was called done, and each is independent of
+//! the rest, so a later run finds the completed ones already present, matched by
+//! their own details, and leaves them untouched while it makes the ones the
+//! interruption never reached. No connection depends on a later one having landed.
+//!
+//! A pass against a healthy stack is quick, well inside the minute the setup owes:
+//! it is a bounded set of calls, one small group per service, with no wait or retry
+//! inside a pass — a service that is not ready is skipped and left to the next run,
+//! not polled until it comes up. Each call is bounded by the transport's own connect
+//! and request timeouts, so even a service that hangs costs only a bounded wait —
+//! a timeout per call it does not answer — before it is set aside rather than
+//! stalling the run without end. Against a healthy stack every call answers at once,
+//! so a pass's time tracks the number of services; only an unhealthy one pays those
+//! timeouts to discover it is not answering.
+//!
 //! The policy — given what was observed about a connection, what seed intends —
 //! is pure and settled without a service. The driver carries it out: it observes
 //! the service through the port, registers what is missing, reads it back before

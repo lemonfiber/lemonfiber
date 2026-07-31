@@ -214,6 +214,15 @@ impl FakeService {
             next_id: Mutex::new(100),
         }
     }
+
+    /// The folders the service is holding — what a run registered and the service
+    /// kept, so a next run can be given the state an interrupted one left behind.
+    fn registered(&self) -> Vec<RegisteredFolder> {
+        self.folders
+            .lock()
+            .map(|folders| folders.clone())
+            .unwrap_or_default()
+    }
 }
 
 fn down(service: &str) -> Failure {
@@ -361,6 +370,57 @@ async fn seed_contested(
     .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
+}
+
+/// Drive the folder wiring against a borrowed service, so one fake can be carried
+/// across two passes — standing in for the state a killed run leaves in the real
+/// service between one run and the next. A fresh journal each pass, as production
+/// keeps none across passes.
+async fn wire_on(service: &FakeService, wanted: &[RootFolder]) -> Vec<State> {
+    let mut journal = Journal::new();
+    wire_root_folders(
+        service,
+        "sonarr",
+        wanted,
+        &BTreeMap::new(),
+        "/data",
+        &mut journal,
+        "t",
+    )
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect()
+}
+
+#[tokio::test]
+async fn a_write_that_landed_before_an_interruption_is_not_duplicated_on_the_next_run() {
+    // The load-bearing interruption: the write reached the service, but the run died
+    // before the read-back could confirm it. `DropsAfterRegister` is exactly that —
+    // the folder is registered (and kept by the service), then the confirming read
+    // fails, so the pass leaves it outstanding rather than calling it done.
+    let interrupted = FakeService::with(Mode::DropsAfterRegister, Vec::new());
+    let first = wire_on(&interrupted, &[folder("/data/media/tv")]).await;
+    assert!(
+        matches!(first.as_slice(), [State::Skipped { .. }]),
+        "an unconfirmed write is left outstanding, not called done: {first:?}"
+    );
+
+    // The service kept the folder the interrupted run registered — the state a
+    // killed run leaves behind. The next run, now answering, must find it already
+    // there and leave it, not register a second copy.
+    let landed = interrupted.registered();
+    assert_eq!(landed.len(), 1, "the write did land at the service");
+    let (states, wrote) = seed(
+        FakeService::with(Mode::Normal, landed),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(
+        wrote, 0,
+        "the connection that survived the interruption is left intact, not duplicated"
+    );
 }
 
 #[tokio::test]
