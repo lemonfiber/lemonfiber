@@ -58,17 +58,26 @@ use crate::secret;
 /// signs Seerr in with. Fixed, and recorded beside the password it mints.
 const ADMIN: &str = "admin";
 
-/// What lemonfiber observed about a connection it wants to make.
+/// What lemonfiber observed about a connection it wants to make — the outcome of
+/// the three-way comparison of what it last wrote, what the service now holds, and
+/// what it would write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Observed {
     /// The prerequisite service is not answering.
     Unavailable,
     /// The connection is not there.
     Absent,
-    /// The connection is there and matches lemonfiber's baseline.
+    /// The connection is there and already at what lemonfiber would write.
     Present,
-    /// The connection is there but differs from the baseline — an operator edit.
+    /// It differs from the baseline while lemonfiber's intent is unchanged — an
+    /// operator's edit, to preserve.
     Drifted,
+    /// It still holds lemonfiber's baseline value, but lemonfiber's intent has moved
+    /// on — its own old value, to bring up to date.
+    Stale,
+    /// Both the service's value and lemonfiber's intent have moved away from the
+    /// baseline — a conflict lemonfiber must not resolve on its own.
+    Conflicted,
 }
 
 /// What seed will do about a connection, decided from what it observed.
@@ -84,14 +93,22 @@ pub enum Intent {
     /// It is there but the operator changed it: preserve their change and report
     /// the drift, rather than reverting it.
     Preserve,
+    /// It is lemonfiber's own value, now behind lemonfiber's intent: it should be
+    /// brought up to date. Reported until an update path exists to apply it.
+    Update,
+    /// Both sides changed: present the conflict and leave the value, never resolving
+    /// it silently.
+    Ask,
 }
 
 /// What seed will do about a connection found in the given state.
 ///
-/// The whole of the idempotent, drift-aware policy in one place: an absent
-/// connection is written, a present-and-correct one is left untouched so a second
-/// run changes nothing, an operator's edit is preserved, and an unavailable
-/// prerequisite is skipped rather than failed so the run stays resumable.
+/// The idempotent, drift-aware policy in one place: an absent connection is
+/// written, a present-and-correct one is left untouched so a second run changes
+/// nothing, an operator's edit is preserved, lemonfiber's own value behind its
+/// intent is brought up to date, a conflict is presented rather than resolved, and
+/// an unavailable prerequisite is skipped rather than failed so the run stays
+/// resumable.
 #[must_use]
 pub const fn intent(observed: Observed) -> Intent {
     match observed {
@@ -99,6 +116,38 @@ pub const fn intent(observed: Observed) -> Intent {
         Observed::Absent => Intent::Wire,
         Observed::Present => Intent::Leave,
         Observed::Drifted => Intent::Preserve,
+        Observed::Stale => Intent::Update,
+        Observed::Conflicted => Intent::Ask,
+    }
+}
+
+/// The three-way comparison of one managed value: what lemonfiber last wrote
+/// (`expected`, `None` where it wrote nothing), what the service now holds
+/// (`actual`, `None` where it holds no value), and what lemonfiber would write
+/// (`desired`).
+///
+/// Like a merge, the three together say what a bare two-way `actual != desired`
+/// cannot: whether a difference is the operator's edit to preserve, lemonfiber's
+/// own value fallen behind its intent, or a genuine conflict. Where there is no
+/// baseline to judge against, a difference is treated as the operator's and
+/// preserved — never overwritten on a guess.
+#[must_use]
+pub fn reconcile(expected: Option<&str>, actual: Option<&str>, desired: &str) -> Observed {
+    if actual == Some(desired) {
+        return Observed::Present;
+    }
+    match expected {
+        // lemonfiber's intent is unchanged from the baseline, so the difference is
+        // the operator's.
+        Some(base) if base == desired => Observed::Drifted,
+        // The service still holds lemonfiber's baseline value; only lemonfiber's
+        // intent has moved.
+        Some(base) if actual == Some(base) => Observed::Stale,
+        // A baseline that matches neither side: both have moved away from it.
+        Some(_) => Observed::Conflicted,
+        // No baseline to judge against: cannot prove lemonfiber's intent moved, so
+        // the difference is taken as the operator's and left rather than overwritten.
+        None => Observed::Drifted,
     }
 }
 
@@ -112,6 +161,14 @@ pub enum State {
     AlreadyWired,
     /// Present but operator-changed; preserved.
     Drifted,
+    /// Present and still lemonfiber's own value, but behind lemonfiber's intent —
+    /// it should be brought up to date. Reported until an update path applies it,
+    /// and never overwritten in the meantime.
+    Stale,
+    /// Both the service's value and lemonfiber's intent moved away from the
+    /// baseline. The conflict is presented and the value left as it is; lemonfiber
+    /// does not resolve it on its own.
+    Conflicted,
     /// Prerequisite unavailable; a later run will complete it.
     Skipped {
         /// Why it could not be attempted.
@@ -134,12 +191,16 @@ pub enum State {
 }
 
 impl State {
-    /// Whether this connection is settled: wired one way or another, or left as
-    /// the operator's own. A skip or a failure is not settled and a re-run must
-    /// return to it.
+    /// Whether this connection is settled: wired one way or another, or left in a
+    /// working state — the operator's own edit, or lemonfiber's own value that is
+    /// merely behind its newer intent. A skip, a failure, a refusal or a conflict is
+    /// not settled: a re-run or an operator's decision must return to it.
     #[must_use]
     pub const fn is_settled(&self) -> bool {
-        matches!(self, Self::Wired | Self::AlreadyWired | Self::Drifted)
+        matches!(
+            self,
+            Self::Wired | Self::AlreadyWired | Self::Drifted | Self::Stale
+        )
     }
 }
 
@@ -176,15 +237,16 @@ impl Report {
             .collect()
     }
 
-    /// The connections refused by policy — a conflict a re-run will not lift,
-    /// unlike the skipped and failed that [`Self::outstanding`] also holds. Named
-    /// apart so the operator is told to resolve the clash rather than merely to
-    /// run again, and so a script can tell "fix your config" from "retry".
+    /// The connections a re-run will not lift — refused by policy, or a conflict
+    /// lemonfiber will not resolve on its own — unlike the skipped and failed that
+    /// [`Self::outstanding`] also holds. Named apart so the operator is told to
+    /// resolve the clash rather than merely to run again, and so a script can tell
+    /// "fix your config" from "retry".
     #[must_use]
-    pub fn refused(&self) -> Vec<&Wiring> {
+    pub fn blocked(&self) -> Vec<&Wiring> {
         self.wirings
             .iter()
-            .filter(|wiring| matches!(wiring.state, State::Refused { .. }))
+            .filter(|wiring| matches!(wiring.state, State::Refused { .. } | State::Conflicted))
             .collect()
     }
 }
@@ -361,20 +423,18 @@ pub async fn wire_download_clients(
 
     let mut wirings = Vec::new();
     for want in wanted {
-        // Whether the service already holds lemonfiber's own value here: present at
-        // the endpoint with the category lemonfiber wants. This is narrower than
-        // "present" — a client the operator left categoryless is present but not
-        // lemonfiber's, so recording lemonfiber's wanted category for it would
-        // fabricate an expected the service does not actually hold.
-        let holds_our_value = existing
-            .iter()
-            .find(|have| same_endpoint(have, want))
-            .is_some_and(|have| have.category.as_ref() == Some(&want.category));
-        // The policy decides from what was observed: a client already there and
-        // correct is left, one the operator re-filed is preserved, an absent one
-        // is written. Unavailable never reaches here — a read-back failure was
-        // handled above — so it folds harmlessly onto `Leave`.
-        let state = match intent(observe_client(&existing, want)) {
+        // What lemonfiber last wrote here, if anything — the expected leg of the
+        // three-way comparison, read from the baseline this run loaded before it
+        // recorded anything into it, and owned so the record below can borrow the
+        // baseline mutably.
+        let field = client_field(want);
+        let expected = baseline.expected(service, &field).map(str::to_owned);
+        // The policy decides from the three-way comparison: an absent client is
+        // written, one already at lemonfiber's value is left, an operator's edit is
+        // preserved, lemonfiber's own value behind its intent is reported stale, and
+        // a two-sided change is presented as a conflict. Unavailable never reaches
+        // here — a read-back failure was handled above — so it folds onto `Leave`.
+        let state = match intent(observe_client(&existing, want, expected.as_deref())) {
             Intent::Wire => {
                 wire_one(
                     client.register_download_client(want),
@@ -395,15 +455,17 @@ pub async fn wire_download_clients(
                 .await
             }
             Intent::Preserve => State::Drifted,
+            Intent::Update => State::Stale,
+            Intent::Ask => State::Conflicted,
             Intent::Leave | Intent::Skip => State::AlreadyWired,
         };
         // Record the category as the expected state only where lemonfiber's value
-        // now stands: a client it just wrote, or one already carrying lemonfiber's
-        // category. A drifted or categoryless client is the operator's, so its
-        // expected stays what lemonfiber last wrote — kept from before this run
-        // rather than overwritten with, or fabricated from, a value not its own.
-        if matches!(state, State::Wired) || holds_our_value {
-            baseline.record(service, &client_field(want), &want.category.value, at);
+        // now stands: a client it just wrote (`Wired`) or one already at what it
+        // wants (`Present` → `AlreadyWired`). A drifted, stale, conflicted or
+        // categoryless client is not lemonfiber's current value, so its expected
+        // stays what lemonfiber last wrote — kept from before this run.
+        if matches!(state, State::Wired | State::AlreadyWired) {
+            baseline.record(service, &field, &want.category.value, at);
         }
         wirings.push(Wiring {
             connection: describe_client(service, want),
@@ -413,24 +475,24 @@ pub async fn wire_download_clients(
     wirings
 }
 
-/// What a seed pass observes about a wanted client against what the service
-/// already holds: absent, present and correct, or present but re-filed by the
-/// operator under a different category.
-fn observe_client(existing: &[RegisteredClient], want: &DownloadClient) -> Observed {
+/// What a seed pass observes about a wanted client against what the service holds
+/// and what lemonfiber last wrote: absent, or the three-way outcome of comparing
+/// the service's category with lemonfiber's baseline and its desired one.
+fn observe_client(
+    existing: &[RegisteredClient],
+    want: &DownloadClient,
+    expected: Option<&str>,
+) -> Observed {
     match existing.iter().find(|have| same_endpoint(have, want)) {
         None => Observed::Absent,
-        Some(have) if drifted(have, want) => Observed::Drifted,
-        Some(_) => Observed::Present,
+        Some(have) => reconcile(
+            expected,
+            have.category
+                .as_ref()
+                .map(|category| category.value.as_str()),
+            &want.category.value,
+        ),
     }
-}
-
-/// Whether a client at the wanted endpoint files under a different category than
-/// seed intends. Only a category the service reported can drift; where it names
-/// none there is nothing to compare, so the connection is taken as it stands.
-fn drifted(have: &RegisteredClient, want: &DownloadClient) -> bool {
-    have.category
-        .as_ref()
-        .is_some_and(|category| category != &want.category)
 }
 
 /// Whether a registered client reaches the same endpoint as a wanted one.

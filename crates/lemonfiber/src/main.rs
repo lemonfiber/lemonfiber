@@ -392,7 +392,7 @@ fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Seed(report) => {
             if report.is_complete() {
                 ExitCode::SUCCESS
-            } else if report.refused().is_empty() {
+            } else if report.blocked().is_empty() {
                 ExitCode::from(FAILURE)
             } else {
                 ExitCode::from(VALIDATION)
