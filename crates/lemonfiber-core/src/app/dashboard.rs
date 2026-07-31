@@ -23,14 +23,11 @@ use crate::dashboard::{
 use crate::docker::{condition, survey, Condition, Service};
 use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
-use crate::ports::service::{Download, Queues, Transfers};
-use crate::qbittorrent::Qbittorrent;
-use crate::sabnzbd::Sabnzbd;
+use crate::ports::service::Queues;
 use crate::storage::{test_link, Linked};
 
 use super::targets::{
-    download_targets, project_directory, recorded_qbittorrent_password, servarr_targets,
-    DownloadKind, DownloadTarget,
+    download_targets, project_directory, read_transfers, servarr_targets, DownloadKind,
 };
 
 /// Gather one snapshot of what the stack is doing right now.
@@ -122,7 +119,7 @@ async fn transfers(
 
     let mut active = Vec::new();
     for target in &targets {
-        let downloads = read(ctx, target).await;
+        let downloads = read_transfers(ctx, target).await;
         let protocol = protocol_of(&target.kind);
         active.extend(downloads.into_iter().map(|download| Transfer {
             name: download.name,
@@ -135,34 +132,6 @@ async fn transfers(
         }));
     }
     Panel::Ready(active)
-}
-
-/// One client's active downloads, read on its own shape — nothing where it is not
-/// yet seeded or will not answer, so it is left out rather than failing the panel.
-async fn read(ctx: &Ctx, target: &DownloadTarget) -> Vec<Download> {
-    match &target.kind {
-        DownloadKind::Qbittorrent => {
-            let Some(password) = recorded_qbittorrent_password(ctx) else {
-                return Vec::new();
-            };
-            Qbittorrent::authenticated(ctx.http.clone(), &target.base, password)
-                .transfers()
-                .await
-                .unwrap_or_default()
-        }
-        DownloadKind::Sabnzbd { config } => {
-            let Some(text) = ctx.filesystem.read(config).await else {
-                return Vec::new();
-            };
-            let Some(key) = crate::sabnzbd::api_key(&text) else {
-                return Vec::new();
-            };
-            Sabnzbd::new(ctx.http.clone(), &target.base, key)
-                .transfers()
-                .await
-                .unwrap_or_default()
-        }
-    }
 }
 
 /// The protocol a client's transfers move over.

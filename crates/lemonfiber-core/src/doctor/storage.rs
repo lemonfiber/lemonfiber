@@ -56,13 +56,14 @@ struct Recorded {
     hardlinks: bool,
 }
 
-/// The free space below which an import is at risk of failing.
+/// The free space a volume must keep clear once the queue has landed.
 ///
-/// A coarse floor rather than the projection the spec ultimately wants: computing
-/// exhaustion from what the download queue holds needs the service client, which
-/// is not built yet, so this catches a volume that is nearly full before that
-/// arrives. A single large import can be tens of gigabytes, so the floor sits
-/// well above one file.
+/// The check projects exhaustion from committed downloads — the free space *minus*
+/// what the download clients still have to write — and warns when that projected
+/// figure falls under this floor. Where no download client is
+/// reachable there is nothing to subtract, so the same floor guards the raw free
+/// space instead. A single large import can be tens of gigabytes and unpacking
+/// needs room beside the file, so the floor sits well above one file.
 const LOW_SPACE_FLOOR: u64 = 10 * 1024 * 1024 * 1024;
 
 /// Whether the data root can hardlink, and what mode that puts the stack in.
@@ -72,6 +73,7 @@ pub struct StorageCheck {
     state: Option<PathBuf>,
     environment: Environment,
     service_user: Option<(u32, u32)>,
+    committed: Option<u64>,
 }
 
 impl StorageCheck {
@@ -86,6 +88,11 @@ impl StorageCheck {
     /// capability that was there before and is now gone. The platform and service
     /// user decide the permission finding: host ownership only gates the services
     /// where Docker does not map it away, and only once a service user is known.
+    ///
+    /// `committed` is how many bytes the download clients still have to write, if
+    /// they could be read — what the free-space finding projects exhaustion from.
+    /// `None` where no download client answered, so the finding guards the raw free
+    /// space instead of a projected one.
     #[must_use]
     pub fn new(
         filesystem: Arc<dyn FileSystem>,
@@ -93,6 +100,7 @@ impl StorageCheck {
         state: Option<PathBuf>,
         environment: Environment,
         service_user: Option<(u32, u32)>,
+        committed: Option<u64>,
     ) -> Self {
         Self {
             filesystem,
@@ -100,6 +108,7 @@ impl StorageCheck {
             state,
             environment,
             service_user,
+            committed,
         }
     }
 
@@ -115,7 +124,7 @@ impl StorageCheck {
     /// recorded for the next run to compare against.
     async fn probe(&self, real: &Path) -> Vec<Finding> {
         let facts = self.filesystem.describe(real).await;
-        let space = space(&facts);
+        let space = space(&facts, self.committed);
         let permissions = self.permissions(real).await;
 
         // The empirical create-link-inspect lives above the filesystem port, in the
@@ -405,17 +414,53 @@ fn service_unverified() -> Finding {
 /// The free-space finding for the volume the data root sits on.
 ///
 /// A volume that reports no size at all could not be measured rather than being
-/// empty, so it is unverified rather than reported as full. This is the raw
-/// figure, not the projection from queued content the spec ultimately wants —
-/// that needs the download client — so it warns on a floor rather than on an
-/// exhaustion date.
-fn space(facts: &StorageFacts) -> Finding {
-    let verdict = if facts.total == 0 {
-        Verdict::Unverified {
-            reason: "the volume's free space could not be read".to_owned(),
-            remedy: Remedy::new("Run the storage check again once the location is reachable"),
+/// empty, so it is unverified rather than reported as full. Otherwise the finding
+/// is a projection: the free space left once the download clients' committed
+/// content has landed, warned on when that projected figure falls under
+/// the floor rather than only when the volume is already nearly full. Where no
+/// client answered, `committed` is `None`, nothing is subtracted, and the same
+/// floor guards the raw free space — the behaviour before a client could be read.
+fn space(facts: &StorageFacts, committed: Option<u64>) -> Finding {
+    if facts.total == 0 {
+        return finding(
+            "storage.space",
+            "Free space",
+            Verdict::Unverified {
+                reason: "the volume's free space could not be read".to_owned(),
+                remedy: Remedy::new("Run the storage check again once the location is reachable"),
+            },
+        );
+    }
+
+    let underway = committed.unwrap_or(0);
+    let projected = facts.available.saturating_sub(underway);
+    let verdict = if projected >= LOW_SPACE_FLOOR {
+        Verdict::Pass {
+            note: Some(free_note(facts, underway)),
         }
-    } else if facts.available < LOW_SPACE_FLOOR {
+    } else if underway > 0 {
+        // Room now, but the queue will consume it: exhaustion the operator is
+        // warned of before it happens rather than once the disk is already full.
+        Verdict::Warn(
+            Problem::new(
+                SPACE_LOW,
+                Severity::Warning,
+                format!(
+                    "Storage is projected to run out — {} of downloads still to land, {} free",
+                    humanize(underway),
+                    humanize(facts.available),
+                ),
+                "Downloads already queued will not fit alongside the room an import and its \
+                 unpacking need, so the disk fills partway through and leaves half a file behind.",
+                Remedy::new(
+                    "Free space on the data location, thin the download queue, or move it to a \
+                     larger volume",
+                ),
+            )
+            .in_state(State::Guided),
+        )
+    } else {
+        // No committed content to project from, but the volume is already low.
         Verdict::Warn(
             Problem::new(
                 SPACE_LOW,
@@ -427,16 +472,24 @@ fn space(facts: &StorageFacts) -> Finding {
             )
             .in_state(State::Guided),
         )
-    } else {
-        Verdict::Pass {
-            note: Some(format!(
-                "{} free of {}",
-                humanize(facts.available),
-                humanize(facts.total)
-            )),
-        }
     };
     finding("storage.space", "Free space", verdict)
+}
+
+/// The passing note: what is free of the whole, and — where downloads are underway
+/// — what is still to land, so a pass that is comfortable only because the queue is
+/// small still says so.
+fn free_note(facts: &StorageFacts, underway: u64) -> String {
+    let free_of_total = format!(
+        "{} free of {}",
+        humanize(facts.available),
+        humanize(facts.total)
+    );
+    if underway > 0 {
+        format!("{free_of_total}, {} still to land", humanize(underway))
+    } else {
+        free_of_total
+    }
 }
 
 /// A byte count as a person reads it, to one decimal place.
@@ -646,6 +699,22 @@ mod tests {
             None,
             Environment::MacOs,
             None,
+            None,
+        )
+        .run()
+        .await
+    }
+
+    /// A run carrying a committed-bytes figure, so the space finding projects
+    /// exhaustion from it rather than guarding the raw free space.
+    async fn run_committed(bench: Bench, root: &str, committed: Option<u64>) -> Vec<Finding> {
+        StorageCheck::new(
+            Arc::new(bench),
+            Some(PathBuf::from(root)),
+            None,
+            Environment::MacOs,
+            None,
+            committed,
         )
         .run()
         .await
@@ -659,6 +728,7 @@ mod tests {
             Some(PathBuf::from(root)),
             Some(PathBuf::from("/state/storage-state.json")),
             Environment::MacOs,
+            None,
             None,
         )
         .run()
@@ -674,6 +744,7 @@ mod tests {
             None,
             Environment::LinuxNative,
             Some(service_user),
+            None,
         )
         .run()
         .await
@@ -838,6 +909,34 @@ mod tests {
         assert!(matches!(
             verdict(&findings, "storage.space"),
             Some(Verdict::Warn(problem)) if problem.code == SPACE_LOW
+        ));
+    }
+
+    #[tokio::test]
+    async fn committed_downloads_that_will_not_fit_project_exhaustion() {
+        // Room now (the healthy bench reports ample free space), but the download
+        // clients still have to write nearly all of it — so what is left once the
+        // queue lands is below the floor, and the warning arrives before the disk
+        // actually fills.
+        let committed = 495 * 1024 * 1024 * 1024;
+        let findings = run_committed(Bench::healthy(), "/data", Some(committed)).await;
+        assert!(matches!(
+            verdict(&findings, "storage.space"),
+            Some(Verdict::Warn(problem))
+                if problem.code == SPACE_LOW && problem.summary.contains("projected to run out")
+        ));
+    }
+
+    #[tokio::test]
+    async fn committed_downloads_that_fit_pass_and_still_name_what_is_coming() {
+        // The queue fits with room to spare: a pass, but the note still states what
+        // is on its way so a comfortable pass that is only comfortable because the
+        // queue is small still says so.
+        let committed = 100 * 1024 * 1024 * 1024;
+        let findings = run_committed(Bench::healthy(), "/data", Some(committed)).await;
+        assert!(matches!(
+            verdict(&findings, "storage.space"),
+            Some(Verdict::Pass { note: Some(note) }) if note.contains("still to land")
         ));
     }
 
@@ -1020,6 +1119,7 @@ mod tests {
             None,
             Environment::LinuxNative,
             None,
+            None,
         )
         .run()
         .await;
@@ -1153,6 +1253,7 @@ mod tests {
             Some(dir.clone()),
             None,
             Environment::MacOs,
+            None,
             None,
         )
         .run()

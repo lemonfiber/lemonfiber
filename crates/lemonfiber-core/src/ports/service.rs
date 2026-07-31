@@ -324,6 +324,12 @@ pub struct Download {
     /// The time left, or `None` where the client gives none because it is stalled
     /// or cannot estimate one.
     pub eta: Option<Duration>,
+    /// The bytes still to be written to disk for this download, or `None` where the
+    /// client reports no figure — kept apart from a reported zero, which is a
+    /// download already complete rather than one whose size is unknown. Summed
+    /// across a stack's clients, this is the committed content the free-space
+    /// projection weighs against what the volume has left.
+    pub remaining: Option<u64>,
 }
 
 /// Reading a download client's active transfers for the dashboard.

@@ -94,6 +94,8 @@ struct Slot {
     percentage: String,
     status: String,
     timeleft: String,
+    #[serde(default)]
+    mbleft: String,
 }
 
 #[async_trait]
@@ -137,7 +139,22 @@ fn download_of(slot: Slot, active_speed: Option<u64>) -> Download {
         eta: seconds_left(&slot.timeleft)
             .filter(|left| *left > 0)
             .map(Duration::from_secs),
+        remaining: bytes_left(&slot.mbleft),
     }
+}
+
+/// `SABnzbd`'s `mbleft` — a decimal string of megabytes still to fetch — as bytes,
+/// or `None` where it will not parse. The whole-megabyte part is taken, matching
+/// [`bytes_per_second`]'s reasoning: sub-megabyte precision is far below the
+/// gigabyte scale the free-space projection weighs, so carrying the fraction would
+/// need a float cast for no difference the operator could see.
+fn bytes_left(mbleft: &str) -> Option<u64> {
+    let whole = mbleft.split_once('.').map_or(mbleft, |(whole, _)| whole);
+    whole
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(|mb| mb.saturating_mul(1024 * 1024))
 }
 
 /// `SABnzbd`'s `kbpersec` — a decimal string of kilobytes per second — as bytes
@@ -250,15 +267,17 @@ mod transfers_tests {
     }
 
     /// One slot downloading with a real speed and countdown, one queued behind it.
+    /// The active slot's `mbleft` carries a fraction (so the whole-megabyte path is
+    /// exercised); the waiting slot's is a bare integer.
     const QUEUE: &str = r#"{"queue":{"kbpersec":"2048.5","slots":[
-        {"filename":"Active.nzb","percentage":"45","status":"Downloading","timeleft":"0:10:00"},
-        {"filename":"Waiting.nzb","percentage":"0","status":"Queued","timeleft":"0:00:00"}
+        {"filename":"Active.nzb","percentage":"45","status":"Downloading","timeleft":"0:10:00","mbleft":"1024.5"},
+        {"filename":"Waiting.nzb","percentage":"0","status":"Queued","timeleft":"0:00:00","mbleft":"512"}
     ]}}"#;
 
     /// Edge values: an unreadable queue speed, a percentage that will not parse and
     /// one over a hundred, an empty and a malformed countdown, a paused slot.
     const QUEUE_EDGES: &str = r#"{"queue":{"kbpersec":"nan","slots":[
-        {"filename":"BadSpeed.nzb","percentage":"oops","status":"Downloading","timeleft":""},
+        {"filename":"BadSpeed.nzb","percentage":"oops","status":"Downloading","timeleft":"","mbleft":"oops"},
         {"filename":"Paused.nzb","percentage":"200","status":"Paused","timeleft":"1:bad:3"}
     ]}}"#;
 
@@ -273,11 +292,14 @@ mod transfers_tests {
                 && t.progress == 45
                 && t.speed == Some(2048 * 1024)
                 && t.eta == Some(Duration::from_secs(600))
+                && t.remaining == Some(1024 * 1024 * 1024)
         ));
-        // A queued slot is not moving: a definite zero, and no estimate to give.
+        // A queued slot is not moving: a definite zero, and no estimate to give —
+        // but its bytes still to fetch count towards what the queue is committed to.
         assert!(matches!(
             transfers.get(1),
             Some(t) if t.progress == 0 && t.speed == Some(0) && t.eta.is_none()
+                && t.remaining == Some(512 * 1024 * 1024)
         ));
     }
 
@@ -287,15 +309,18 @@ mod transfers_tests {
         let transfers = sab.transfers().await.unwrap_or_default();
         assert_eq!(transfers.len(), 2);
         // An unparsable speed is unknown, an unparsable percentage is zero, an
-        // empty countdown is no estimate.
+        // empty countdown is no estimate, and an unparsable `mbleft` is no figure.
         assert!(matches!(
             transfers.first(),
             Some(t) if t.progress == 0 && t.speed.is_none() && t.eta.is_none()
+                && t.remaining.is_none()
         ));
         // A percentage over a hundred is clamped; a malformed field is no estimate.
+        // An absent `mbleft` reads the same as an unparsable one: no figure.
         assert!(matches!(
             transfers.get(1),
             Some(t) if t.progress == 100 && t.speed == Some(0) && t.eta.is_none()
+                && t.remaining.is_none()
         ));
     }
 
