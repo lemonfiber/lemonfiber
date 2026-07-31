@@ -6,10 +6,10 @@
 //! cannot be reached marks its own panel and leaves the rest), so there is no
 //! error channel through which a dead source could terminate the render loop.
 //!
-//! This gatherer fills the services and their health, the storage volume's free
-//! space, each \*arr's queue, each download client's active transfers, and the VPN
-//! tunnel's state. What remains is the hardlink and exhaustion halves of storage,
-//! and the ratatui surface that renders all of it on a refresh loop.
+//! This gatherer fills every read-only panel: the services and their health, the
+//! storage volume (free space, hardlink status, projected exhaustion), each \*arr's
+//! queue, each download client's active transfers, and the VPN tunnel's state. What
+//! remains is the ratatui surface that renders all of it on a refresh loop.
 
 use std::path::Path;
 
@@ -17,7 +17,7 @@ use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::dashboard::{
-    Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing, Storage,
+    eta, Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing, Storage,
     Transfer, Vpn,
 };
 use crate::docker::{condition, survey, Condition, Service};
@@ -26,6 +26,7 @@ use crate::error::Diagnose;
 use crate::ports::service::{Download, Queues, Transfers};
 use crate::qbittorrent::Qbittorrent;
 use crate::sabnzbd::Sabnzbd;
+use crate::storage::{test_link, Linked};
 
 use super::targets::{
     download_targets, project_directory, recorded_qbittorrent_password, servarr_targets,
@@ -64,16 +65,38 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
         ),
     };
 
+    // Storage's exhaustion projection needs the rate downloads are landing on the
+    // disk at, so the transfers are gathered first and their speeds carried into it.
+    let transfers = transfers(ctx, manifest.as_ref(), project.as_deref()).await;
+    let storage = storage(ctx, download_rate(&transfers)).await;
+
     Snapshot {
         // Only a source that genuinely failed marks the screen degraded; the
         // pending panels below are not-yet-built, not down, so they pass `false`.
         standing: Standing::read(reach, false),
         health,
         vpn: vpn(ctx, manifest.as_ref()).await,
-        transfers: transfers(ctx, manifest.as_ref(), project.as_deref()).await,
+        transfers,
         queue: queues(ctx, manifest.as_ref(), project.as_deref()).await,
-        storage: storage(ctx).await,
+        storage,
         services,
+    }
+}
+
+/// The combined rate the active downloads are landing on the disk at — the sum of
+/// the speeds actually reported this refresh, in bytes per second. A source that
+/// went quiet contributes nothing rather than a guess, so a stalled queue projects
+/// no exhaustion rather than a false one.
+fn download_rate(transfers: &Panel<Vec<Transfer>>) -> u64 {
+    match transfers {
+        Panel::Ready(active) => active
+            .iter()
+            .filter_map(|transfer| match transfer.speed {
+                Reading::Known(bytes) => Some(bytes),
+                Reading::Stale(_) | Reading::Unknown => None,
+            })
+            .sum(),
+        Panel::Unavailable { .. } => 0,
     }
 }
 
@@ -224,16 +247,16 @@ async fn queues(
     Panel::Ready(depths)
 }
 
-/// The storage picture: how much is free on the data volume.
+/// The storage picture: how much is free, whether imports link, and when it fills.
 ///
-/// Free space is read afresh each refresh, which is a cheap read. A volume that
-/// could not be attributed to any mount reports a zero total, and its free space
-/// is then unknown rather than zero — "cannot read the volume" and "the disk is
-/// full" are opposite things to an operator, and must not render alike. The
-/// hardlink status and the projected exhaustion have their own telemetry: a
-/// per-refresh hardlink probe would write to disk every second, and exhaustion is
-/// projected against the queue, so neither is gathered here yet.
-async fn storage(ctx: &Ctx) -> Panel<Storage> {
+/// Free space is read afresh each refresh — a cheap read. A volume that could not
+/// be attributed to any mount reports a zero total, and its free space is then
+/// unknown rather than zero: "cannot read the volume" and "the disk is full" are
+/// opposite things to an operator and must not render alike. The hardlink status
+/// comes from the empirical probe, and the exhaustion from the free space against
+/// the rate downloads are landing at (`download_rate`), so a stalled queue
+/// projects no exhaustion rather than one that never arrives.
+async fn storage(ctx: &Ctx, download_rate: u64) -> Panel<Storage> {
     let Some(root) = ctx.settings.data_root.as_deref() else {
         return Panel::unavailable("no data location is configured");
     };
@@ -243,11 +266,33 @@ async fn storage(ctx: &Ctx) -> Panel<Storage> {
     } else {
         Reading::Known(facts.available)
     };
+    // The hardlink test writes — it creates a file, links it, and inspects the two
+    // names — unlike the cheap free-space read. Cheap once, but a per-refresh write;
+    // the refresh loop will run it far less often, and until then it runs each time.
+    let hardlink = hardlink_of(&test_link(ctx.filesystem.as_ref(), root).await);
+    // Exhaustion is the free space divided by the rate it is draining at: a rate of
+    // zero divides to no estimate rather than an infinite one, and a volume that
+    // could not be read projects nothing rather than a wrong time.
+    let exhaustion = match free {
+        Reading::Known(bytes) => eta(bytes, download_rate),
+        Reading::Stale(_) | Reading::Unknown => None,
+    };
     Panel::Ready(Storage {
         free,
-        exhaustion: None,
-        hardlink: Hardlink::Unknown,
+        exhaustion,
+        hardlink,
     })
+}
+
+/// The dashboard's hardlink status from the empirical probe: it links, it copies,
+/// or it could not be established — an unwritable location or an unconfirmed link
+/// is never reported as a met guarantee.
+fn hardlink_of(linked: &Linked) -> Hardlink {
+    match linked {
+        Linked::Yes { .. } => Hardlink::Linking,
+        Linked::No => Hardlink::Copying,
+        Linked::Unwritable { .. } | Linked::Unconfirmed => Hardlink::Unknown,
+    }
 }
 
 /// Observe every service the stack declares, or the reason it could not be read.
@@ -293,7 +338,7 @@ mod tests {
     use super::{gather, vpn};
     use crate::app::Ctx;
     use crate::config::{PortForward, Protocols, Settings};
-    use crate::dashboard::{Panel, Protocol, Reading, Standing, Vpn};
+    use crate::dashboard::{Hardlink, Panel, Protocol, Reading, Standing, Transfer, Vpn};
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
@@ -1007,5 +1052,76 @@ mod tests {
         )
         .await;
         assert!(matches!(reading, VpnReading::NotApplicable));
+    }
+
+    // ── Storage: hardlink & exhaustion ────────────────────────────
+
+    /// A transfer moving at the given speed — the only field the rate reads.
+    fn a_transfer(speed: Reading<u64>) -> Transfer {
+        Transfer {
+            name: "download".to_owned(),
+            protocol: Protocol::Torrent,
+            progress: 0,
+            speed,
+            eta: None,
+        }
+    }
+
+    #[test]
+    fn the_download_rate_sums_the_speeds_actually_reported() {
+        let transfers = Panel::Ready(vec![
+            a_transfer(Reading::Known(1000)),
+            a_transfer(Reading::Known(500)),
+            // A source that went quiet contributes nothing rather than a guess.
+            a_transfer(Reading::Unknown),
+        ]);
+        assert_eq!(super::download_rate(&transfers), 1500);
+        // An unavailable panel has no rate to project exhaustion against.
+        let down: Panel<Vec<Transfer>> = Panel::unavailable("down");
+        assert_eq!(super::download_rate(&down), 0);
+    }
+
+    #[test]
+    fn the_hardlink_status_reflects_the_empirical_probe() {
+        use crate::storage::Linked;
+        assert_eq!(
+            super::hardlink_of(&Linked::Yes { links: 2 }),
+            Hardlink::Linking
+        );
+        assert_eq!(super::hardlink_of(&Linked::No), Hardlink::Copying);
+        // An unwritable location or an unconfirmed link is never a met guarantee.
+        assert_eq!(
+            super::hardlink_of(&Linked::Unwritable {
+                message: "read-only".to_owned()
+            }),
+            Hardlink::Unknown
+        );
+        assert_eq!(super::hardlink_of(&Linked::Unconfirmed), Hardlink::Unknown);
+    }
+
+    #[tokio::test]
+    async fn storage_projects_exhaustion_from_the_download_rate() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let ctx = ctx(engine).with_filesystem(Arc::new(
+            SeedFs::keyed(None, None).with_facts(facts(3600, 10000)),
+        ));
+        // 3600 bytes free, draining at 60 B/s, is a minute until full.
+        assert!(matches!(
+            super::storage(&ctx, 60).await,
+            Panel::Ready(s) if s.exhaustion == Some(Duration::from_secs(60))
+        ));
+    }
+
+    #[tokio::test]
+    async fn storage_projects_no_exhaustion_when_nothing_is_draining() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let ctx = ctx(engine).with_filesystem(Arc::new(
+            SeedFs::keyed(None, None).with_facts(facts(3600, 10000)),
+        ));
+        // A rate of zero divides to no estimate rather than an infinite one.
+        assert!(matches!(
+            super::storage(&ctx, 0).await,
+            Panel::Ready(s) if s.exhaustion.is_none()
+        ));
     }
 }
