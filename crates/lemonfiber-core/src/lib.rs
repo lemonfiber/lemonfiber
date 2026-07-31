@@ -35,6 +35,7 @@
 pub mod adapters;
 pub mod app;
 pub mod backup;
+pub mod baseline;
 pub mod config;
 pub mod dashboard;
 pub mod docker;
