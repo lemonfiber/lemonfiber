@@ -44,6 +44,7 @@ use std::future::Future;
 
 use serde::Serialize;
 
+use crate::baseline::Baseline;
 use crate::journal::{Change, Journal, Kind};
 use crate::ports::random::Random;
 use crate::ports::service::{
@@ -341,6 +342,7 @@ pub async fn wire_download_clients(
     service: &str,
     wanted: &[DownloadClient],
     journal: &mut Journal,
+    baseline: &mut Baseline,
     at: &str,
 ) -> Vec<Wiring> {
     let existing = match client.download_clients().await {
@@ -359,6 +361,15 @@ pub async fn wire_download_clients(
 
     let mut wirings = Vec::new();
     for want in wanted {
+        // Whether the service already holds lemonfiber's own value here: present at
+        // the endpoint with the category lemonfiber wants. This is narrower than
+        // "present" — a client the operator left categoryless is present but not
+        // lemonfiber's, so recording lemonfiber's wanted category for it would
+        // fabricate an expected the service does not actually hold.
+        let holds_our_value = existing
+            .iter()
+            .find(|have| same_endpoint(have, want))
+            .is_some_and(|have| have.category.as_ref() == Some(&want.category));
         // The policy decides from what was observed: a client already there and
         // correct is left, one the operator re-filed is preserved, an absent one
         // is written. Unavailable never reaches here — a read-back failure was
@@ -386,6 +397,14 @@ pub async fn wire_download_clients(
             Intent::Preserve => State::Drifted,
             Intent::Leave | Intent::Skip => State::AlreadyWired,
         };
+        // Record the category as the expected state only where lemonfiber's value
+        // now stands: a client it just wrote, or one already carrying lemonfiber's
+        // category. A drifted or categoryless client is the operator's, so its
+        // expected stays what lemonfiber last wrote — kept from before this run
+        // rather than overwritten with, or fabricated from, a value not its own.
+        if matches!(state, State::Wired) || holds_our_value {
+            baseline.record(service, &client_field(want), &want.category.value, at);
+        }
         wirings.push(Wiring {
             connection: describe_client(service, want),
             state,
@@ -426,6 +445,13 @@ fn same_endpoint(have: &RegisteredClient, want: &DownloadClient) -> bool {
 /// A download-client connection's description for the report.
 fn describe_client(service: &str, client: &DownloadClient) -> String {
     format!("{} into {service}", client.name)
+}
+
+/// The baseline field a download client's value is recorded under: the endpoint it
+/// reaches, host and port, so it is keyed the way the client itself is matched —
+/// by connection, not by the label an operator can rename.
+fn client_field(client: &DownloadClient) -> String {
+    format!("downloadclient:{}:{}", client.host, client.port)
 }
 
 /// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave

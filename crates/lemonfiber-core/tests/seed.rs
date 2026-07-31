@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
+use lemonfiber_core::baseline::Baseline;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{
@@ -752,12 +753,29 @@ fn client(name: &str, host: &str, port: u16) -> DownloadClient {
 }
 
 /// Run the client driver for the wanted clients, returning their resulting states
-/// and the number of changes journalled.
+/// and the number of changes journalled. The baseline it records into is discarded
+/// — the tests that assert on it drive the driver directly.
 async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_download_clients(&service, "sonarr", wanted, &mut journal, "t").await;
+    let mut baseline = Baseline::new();
+    let wirings =
+        wire_download_clients(&service, "sonarr", wanted, &mut journal, &mut baseline, "t").await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
+}
+
+/// Run the client driver, returning the resulting states and the baseline it
+/// recorded into — for the tests that assert what lemonfiber remembered it wrote.
+async fn seed_clients_recording(
+    service: FakeService,
+    wanted: &[DownloadClient],
+) -> (Vec<State>, Baseline) {
+    let mut journal = Journal::new();
+    let mut baseline = Baseline::new();
+    let wirings =
+        wire_download_clients(&service, "sonarr", wanted, &mut journal, &mut baseline, "t").await;
+    let states = wirings.into_iter().map(|wiring| wiring.state).collect();
+    (states, baseline)
 }
 
 #[tokio::test]
@@ -821,6 +839,100 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
     assert_eq!(
         recorded, 0,
         "an operator's own change is preserved, not rewritten"
+    );
+}
+
+#[tokio::test]
+async fn a_wired_client_records_its_category_as_the_expected_baseline() {
+    // What lemonfiber writes it remembers: the category is recorded, keyed by the
+    // client's endpoint, so a later run can tell an operator's re-filing from
+    // lemonfiber's own value.
+    let (states, baseline) = seed_clients_recording(
+        FakeService::with_clients(Mode::Normal, Vec::new()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    assert_eq!(states, vec![State::Wired]);
+    assert_eq!(
+        baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
+        Some("tv"),
+    );
+}
+
+#[tokio::test]
+async fn a_client_already_at_lemonfibers_value_is_recorded_as_the_baseline_too() {
+    // An already-correct client was not written this run, but it is lemonfiber's
+    // value, so it is recorded as expected — which is also how a lost baseline
+    // re-forms from what already matches lemonfiber's intent.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        }),
+    }];
+    let (states, baseline) = seed_clients_recording(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(
+        baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
+        Some("tv"),
+    );
+}
+
+#[tokio::test]
+async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
+    // A drifted client is the operator's edit, not lemonfiber's value, so its
+    // category is not recorded as expected: the baseline keeps what lemonfiber last
+    // wrote — here nothing — which is what lets a later run read the difference as
+    // drift rather than as lemonfiber's own intent.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "my-own-tv".to_owned(),
+        }),
+    }];
+    let (states, baseline) = seed_clients_recording(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    assert_eq!(states, vec![State::Drifted]);
+    assert_eq!(
+        baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
+        None,
+    );
+}
+
+#[tokio::test]
+async fn a_categoryless_client_lemonfiber_leaves_is_not_recorded_as_the_baseline() {
+    // The service holds a client at the endpoint but reports no category, so
+    // lemonfiber leaves it — it wrote nothing. Recording its wanted category would
+    // fabricate an expected the service does not hold, and make a later run read the
+    // operator's eventual category as a conflict rather than as their own value.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: None,
+    }];
+    let (states, baseline) = seed_clients_recording(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(
+        baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
+        None,
     );
 }
 

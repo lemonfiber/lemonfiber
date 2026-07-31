@@ -71,6 +71,12 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
             .iter()
             .map(|(name, roots)| (*name, roots.as_slice())),
     );
+    // The expected-state baseline — what seeding last wrote into each service — is
+    // loaded so this pass records against what earlier ones set, and saved once at
+    // the end. Unlike the per-connection journal, it persists across runs: it is the
+    // only memory of what lemonfiber wrote, which a later run reads to tell an
+    // operator's edit from lemonfiber's own value.
+    let mut baseline = load_baseline(ctx);
     for arr in &arrs {
         wirings.extend(seed_root_folders(ctx, arr, &contested).await);
         wirings.extend(
@@ -79,6 +85,7 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
                 arr,
                 sabnzbd_key.as_deref(),
                 qbittorrent_password.as_deref(),
+                &mut baseline,
             )
             .await,
         );
@@ -94,7 +101,42 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     // like qBittorrent's, then Seerr is pointed at it.
     wirings.extend(seed_jellyfin_identity(ctx, &manifest.services).await);
 
+    // Persist what this pass recorded as the baseline a later run compares against.
+    save_baseline(ctx, &baseline);
+
     Ok(crate::seed::Report { wirings })
+}
+
+/// The expected-state baseline this run compares against, read from where the last
+/// run left it, or an empty one where none has been written yet — the state a first
+/// seed, or a lost baseline, both begin from. It sits beside the environment file
+/// in the configuration directory; without that path (nothing configured) there is
+/// nowhere to have kept one, so an empty baseline stands in.
+fn load_baseline(ctx: &Ctx) -> crate::baseline::Baseline {
+    baseline_path(ctx)
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+/// Write the baseline where the next run will read it. Best-effort, like the other
+/// records seeding keeps: a run that cannot persist it still wired the stack, and
+/// the worst a lost write costs is the next run re-reading current state as the
+/// baseline rather than the prior one.
+fn save_baseline(ctx: &Ctx, baseline: &crate::baseline::Baseline) {
+    if let Some(path) = baseline_path(ctx) {
+        let _ = store::write(&path, &serde_json::to_string(baseline).unwrap_or_default());
+    }
+}
+
+/// Where the baseline is kept: beside the environment file, in the configuration
+/// directory, or nowhere when nothing is configured. Derived from the environment
+/// file — the one path the context carries — and equal to
+/// [`crate::config::paths::Paths::baseline`], which the layout keeps in the same
+/// directory; the two must stay in step if that layout ever moves.
+fn baseline_path(ctx: &Ctx) -> Option<std::path::PathBuf> {
+    let env = ctx.settings.env_file.as_deref()?;
+    Some(env.with_file_name("baseline.json"))
 }
 
 /// A Servarr application that files media: its identity and address (as the
@@ -272,6 +314,7 @@ async fn seed_download_clients(
     arr: &Arr,
     sabnzbd_key: Option<&str>,
     qbittorrent_password: Option<&str>,
+    baseline: &mut crate::baseline::Baseline,
 ) -> Vec<crate::seed::Wiring> {
     let categories: Vec<crate::ports::service::Category> = arr
         .media_types
@@ -286,7 +329,7 @@ async fn seed_download_clients(
         if clients.is_empty() {
             continue;
         }
-        wirings.extend(wire_arr_download_clients(ctx, arr, &clients).await);
+        wirings.extend(wire_arr_download_clients(ctx, arr, &clients, baseline).await);
     }
     wirings
 }
@@ -330,6 +373,7 @@ async fn wire_arr_download_clients(
     ctx: &Ctx,
     arr: &Arr,
     clients: &[crate::ports::service::DownloadClient],
+    baseline: &mut crate::baseline::Baseline,
 ) -> Vec<crate::seed::Wiring> {
     let Some(servarr) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
         return clients
@@ -352,6 +396,7 @@ async fn wire_arr_download_clients(
         &arr.target.name,
         clients,
         &mut journal,
+        baseline,
         &seed_stamp(ctx),
     )
     .await
@@ -1033,6 +1078,31 @@ mod tests {
             .iter()
             .any(|wiring| wiring.state == crate::seed::State::Wired);
         assert!(wired, "the password is set even with nowhere to record it");
+    }
+
+    #[tokio::test]
+    async fn the_baseline_persists_across_runs() {
+        // The baseline is the one seed artifact kept between runs. A value an earlier
+        // run recorded is pre-seeded here; two more passes — neither reaching a
+        // service, so neither changing it — must load it, leave it, and save it back
+        // unchanged, the round trip the drift policy is built to read.
+        let env = config_scratch("baseline-across-runs");
+        let baseline = env.with_file_name("baseline.json");
+        let recorded =
+            r#"{"services":{"sonarr":{"downloadclient:sabnzbd:8080":{"value":"tv","at":"1"}}}}"#;
+        let _ = crate::config::store::write(&baseline, recorded);
+
+        let first = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+        let _ = dispatch(Command::Seed, &first).await;
+        let second = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+        let _ = dispatch(Command::Seed, &second).await;
+
+        let read_back = std::fs::read_to_string(&baseline).unwrap_or_default();
+        assert!(
+            read_back.contains(r#""value":"tv""#) && read_back.contains(r#""at":"1""#),
+            "the recorded value and its timestamp survive both passes unchanged: {read_back}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
     #[tokio::test]

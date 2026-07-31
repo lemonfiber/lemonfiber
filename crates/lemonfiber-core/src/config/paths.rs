@@ -65,6 +65,14 @@ impl Paths {
         self.config.join("setup-progress.json")
     }
 
+    /// The expected-state baseline: what seeding last wrote into each service, so a
+    /// later run can tell an operator's edit from lemonfiber's own value. Unlike the
+    /// journal it persists across runs — it is the only memory of what was written.
+    #[must_use]
+    pub fn baseline(&self) -> PathBuf {
+        self.config.join("baseline.json")
+    }
+
     /// The materialised stack — compose files written where Compose can read
     /// them.
     #[must_use]
@@ -118,7 +126,12 @@ mod tests {
     #[test]
     fn configuration_and_regenerable_data_are_kept_apart() {
         let paths = paths();
-        let config: Vec<PathBuf> = vec![paths.env_file(), paths.journal(), paths.setup_progress()];
+        let config: Vec<PathBuf> = vec![
+            paths.env_file(),
+            paths.journal(),
+            paths.setup_progress(),
+            paths.baseline(),
+        ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),
             paths.service_config(),
@@ -150,6 +163,7 @@ mod tests {
             paths.env_file(),
             paths.journal(),
             paths.setup_progress(),
+            paths.baseline(),
             paths.stack(),
             paths.service_config(),
             paths.backups(),
