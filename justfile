@@ -37,9 +37,9 @@ deny:
 release-workflow:
     python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('allow-dirty = [\"ci\"]\n', ''))"
     dist generate
-    python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('create-release = false\n', 'create-release = false\nallow-dirty = [\"ci\"]\n'))"
-    python3 -c "import pathlib; p=pathlib.Path('.github/workflows/release.yml'); p.write_text(p.read_text().replace('--draft=false', '--draft=true'))"
-    @grep -q -- '--draft=true' .github/workflows/release.yml || (echo "draft patch failed to apply" && exit 1)
+    python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('github-attestations = true\n', 'github-attestations = true\nallow-dirty = [\"ci\"]\n', 1))"
+    python3 -c "import pathlib; p=pathlib.Path('.github/workflows/release.yml'); p.write_text(p.read_text().replace('gh release create \"', 'gh release create --draft \"'))"
+    @grep -q 'gh release create --draft' .github/workflows/release.yml || (echo "draft patch failed to apply" && exit 1)
     @grep -q 'allow-dirty = ' Cargo.toml || (echo "allow-dirty not restored" && exit 1)
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.
