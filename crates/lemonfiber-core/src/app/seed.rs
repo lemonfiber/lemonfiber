@@ -58,12 +58,25 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     // config, qBittorrent's the password minted or recorded above.
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let sabnzbd_key = read_sabnzbd_key(ctx, &manifest.services, project.as_deref()).await;
-    for arr in servarr_arrs(&manifest.services, project.as_deref()) {
-        wirings.extend(seed_root_folders(ctx, &arr).await);
+    let arrs = servarr_arrs(&manifest.services, project.as_deref());
+    // A root folder one \*arr wants and another does too is contested: two \*arrs
+    // on one folder would each rewrite the other's files, so it is refused rather
+    // than wired. Detected across every \*arr up front, before any is wired.
+    let root_claims: Vec<(&str, Vec<crate::ports::service::RootFolder>)> = arrs
+        .iter()
+        .map(|arr| (arr.target.name.as_str(), wanted_roots(&arr.media_types)))
+        .collect();
+    let contested = crate::seed::contested_roots(
+        root_claims
+            .iter()
+            .map(|(name, roots)| (*name, roots.as_slice())),
+    );
+    for arr in &arrs {
+        wirings.extend(seed_root_folders(ctx, arr, &contested).await);
         wirings.extend(
             seed_download_clients(
                 ctx,
-                &arr,
+                arr,
                 sabnzbd_key.as_deref(),
                 qbittorrent_password.as_deref(),
             )
@@ -118,15 +131,12 @@ fn servarr_arrs(services: &[lemonfiber_manifest::Service], project: Option<&Path
 /// `/data/media`. The application's key is read from its configuration; without
 /// it — the application has not finished starting — the folders are skipped for a
 /// re-run rather than failed.
-async fn seed_root_folders(ctx: &Ctx, arr: &Arr) -> Vec<crate::seed::Wiring> {
-    let wanted: Vec<crate::ports::service::RootFolder> = arr
-        .media_types
-        .iter()
-        .map(|media| crate::ports::service::RootFolder {
-            path: format!("/data/media/{media}"),
-            media_type: media.clone(),
-        })
-        .collect();
+async fn seed_root_folders(
+    ctx: &Ctx,
+    arr: &Arr,
+    contested: &std::collections::BTreeMap<String, Vec<String>>,
+) -> Vec<crate::seed::Wiring> {
+    let wanted = wanted_roots(&arr.media_types);
 
     let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
         return wanted
@@ -149,10 +159,24 @@ async fn seed_root_folders(ctx: &Ctx, arr: &Arr) -> Vec<crate::seed::Wiring> {
         &client,
         &arr.target.name,
         &wanted,
+        contested,
         &mut journal,
         &seed_stamp(ctx),
     )
     .await
+}
+
+/// The root folders an \*arr wants, one per media type it manages, each under
+/// `/data/media`. Shared by the seed pass and the up-front contested-path check,
+/// so both reason about the same set.
+fn wanted_roots(media_types: &[String]) -> Vec<crate::ports::service::RootFolder> {
+    media_types
+        .iter()
+        .map(|media| crate::ports::service::RootFolder {
+            path: format!("/data/media/{media}"),
+            media_type: media.clone(),
+        })
+        .collect()
 }
 
 /// A Servarr application's API key, read from the configuration file it wrote it

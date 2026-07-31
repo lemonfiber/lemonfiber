@@ -54,15 +54,32 @@ pub(crate) fn seeding(report: &SeedReport) {
             SeedState::Failed { detail } => {
                 println!("  ✗ {}   {detail}", wiring.connection);
             }
+            SeedState::Refused { reason } => {
+                println!("  ✗ {}   refused", wiring.connection);
+                println!("      {reason}");
+            }
         }
     }
     let outstanding = report.outstanding();
+    let refused = report.refused();
     if outstanding.is_empty() {
         println!("\nEverything is wired.");
-    } else {
+    } else if refused.is_empty() {
         println!(
             "\n{} left to wire — run seed again once ready.",
             outstanding.len()
+        );
+    } else if refused.len() == outstanding.len() {
+        println!(
+            "\n{} refused — resolve the conflict, then seed again.",
+            refused.len()
+        );
+    } else {
+        println!(
+            "\n{} left: {} to wire once ready, {} refused — resolve the conflict first.",
+            outstanding.len(),
+            outstanding.len() - refused.len(),
+            refused.len(),
         );
     }
 }

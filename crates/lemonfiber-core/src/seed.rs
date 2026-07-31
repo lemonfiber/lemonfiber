@@ -22,6 +22,7 @@
 //! calling it done, and records each write as a change. The driver reaches the
 //! outside only through the port, so it too runs against a fake.
 
+use std::collections::BTreeMap;
 use std::future::Future;
 
 use serde::Serialize;
@@ -103,6 +104,12 @@ pub enum State {
         /// What the service said.
         detail: String,
     },
+    /// Refused by lemonfiber before it was attempted, carrying the reason a
+    /// re-run will not resolve — such as two \*arrs pointed at one root folder.
+    Refused {
+        /// Why it was refused, in lemonfiber's own words.
+        reason: String,
+    },
 }
 
 impl State {
@@ -138,13 +145,25 @@ impl Report {
         self.wirings.iter().all(|wiring| wiring.state.is_settled())
     }
 
-    /// The connections a re-run still owes — the skipped and the failed — so the
-    /// report says exactly what is left rather than only that something is.
+    /// The connections not settled — the skipped, the failed and the refused —
+    /// so the report says exactly what is left rather than only that something is.
     #[must_use]
     pub fn outstanding(&self) -> Vec<&Wiring> {
         self.wirings
             .iter()
             .filter(|wiring| !wiring.state.is_settled())
+            .collect()
+    }
+
+    /// The connections refused by policy — a conflict a re-run will not lift,
+    /// unlike the skipped and failed that [`Self::outstanding`] also holds. Named
+    /// apart so the operator is told to resolve the clash rather than merely to
+    /// run again, and so a script can tell "fix your config" from "retry".
+    #[must_use]
+    pub fn refused(&self) -> Vec<&Wiring> {
+        self.wirings
+            .iter()
+            .filter(|wiring| matches!(wiring.state, State::Refused { .. }))
             .collect()
     }
 }
@@ -158,10 +177,17 @@ impl Report {
 /// by path, so a second run writes nothing. Each folder that must be written is
 /// read back before it is called wired, because a write is not done until the
 /// service reports it, and only then is it recorded.
+///
+/// A folder another \*arr also wants — named in `contested` (from
+/// [`contested_roots`]) — is refused rather than written, because two \*arrs on
+/// one root folder would each manage the other's files. The refusal is made only
+/// once the service is reachable, so a service still starting is skipped and
+/// retried rather than handed a verdict a re-run cannot lift.
 pub async fn wire_root_folders(
     client: &dyn Client,
     service: &str,
     wanted: &[RootFolder],
+    contested: &BTreeMap<String, Vec<String>>,
     journal: &mut Journal,
     at: &str,
 ) -> Vec<Wiring> {
@@ -184,7 +210,9 @@ pub async fn wire_root_folders(
         let already = existing
             .iter()
             .any(|have| same_path(&have.path, &folder.path));
-        let state = if already {
+        let state = if let Some(reason) = contest_reason(service, folder, contested) {
+            State::Refused { reason }
+        } else if already {
             State::AlreadyWired
         } else {
             wire_one(
@@ -606,7 +634,60 @@ fn unreached(failure: &Failure) -> State {
 /// this, a folder is re-registered every run and read-back never confirms the
 /// write it just made.
 fn same_path(a: &str, b: &str) -> bool {
-    a.trim_end_matches('/') == b.trim_end_matches('/')
+    canonical_root(a) == canonical_root(b)
+}
+
+/// A root-folder path in the form paths are compared in — the trailing separator
+/// dropped, as [`same_path`] drops it — so one folder wanted by two \*arrs keys to
+/// a single entry however each spells it.
+fn canonical_root(path: &str) -> String {
+    path.trim_end_matches('/').to_owned()
+}
+
+/// Root-folder paths more than one \*arr wants, each mapped to the \*arrs that
+/// want it, named and sorted. Two \*arrs pointed at one root folder would each
+/// manage the other's files, so a shared folder is refused rather than wired; a
+/// path only one \*arr wants is left out, since there is nothing to refuse.
+#[must_use]
+pub fn contested_roots<'a>(
+    claims: impl IntoIterator<Item = (&'a str, &'a [RootFolder])>,
+) -> BTreeMap<String, Vec<String>> {
+    let mut by_path: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (service, folders) in claims {
+        for folder in folders {
+            let services = by_path.entry(canonical_root(&folder.path)).or_default();
+            if !services.iter().any(|name| name == service) {
+                services.push(service.to_owned());
+            }
+        }
+    }
+    for services in by_path.values_mut() {
+        services.sort();
+    }
+    by_path.retain(|_, services| services.len() > 1);
+    by_path
+}
+
+/// Why a wanted folder is refused: the other \*arrs that also claim its path,
+/// named, or `None` where the path is this \*arr's alone. Called only for a
+/// folder this \*arr wants, so where the path is contested this \*arr is one of
+/// its claimants and at least one other remains to name.
+fn contest_reason(
+    service: &str,
+    folder: &RootFolder,
+    contested: &BTreeMap<String, Vec<String>>,
+) -> Option<String> {
+    let others: Vec<&str> = contested
+        .get(&canonical_root(&folder.path))?
+        .iter()
+        .map(String::as_str)
+        .filter(|name| *name != service)
+        .collect();
+    Some(format!(
+        "{} is also the root folder for {}; two *arrs on one root folder would each manage the other's files",
+        folder.path,
+        others.join(" and ")
+    ))
 }
 
 /// A connection's description for the report.

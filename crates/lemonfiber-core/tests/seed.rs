@@ -4,6 +4,7 @@
 //! port, an async trait, so both are driven from here — where a fake service
 //! stands in and the driver's coverage is counted from the one compiled copy.
 
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
@@ -15,8 +16,8 @@ use lemonfiber_core::ports::service::{
     RegisteredFolder, Requests, RootFolder,
 };
 use lemonfiber_core::seed::{
-    intent, wire_applications, wire_download_clients, wire_jellyfin_identity, wire_root_folders,
-    Intent, Observed, Report, State, Wiring,
+    contested_roots, intent, wire_applications, wire_download_clients, wire_jellyfin_identity,
+    wire_root_folders, Intent, Observed, Report, State, Wiring,
 };
 
 // ---- The policy: pure, decided without a service. ----
@@ -97,6 +98,41 @@ fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
         outstanding,
         vec!["SABnzbd into Lidarr", "qBittorrent into Radarr"],
         "a re-run is told exactly what it still owes"
+    );
+}
+
+#[test]
+fn a_refusal_is_named_apart_from_the_merely_outstanding() {
+    // A refused conflict is outstanding like a skip, but reported apart so the
+    // operator is told to resolve it rather than to run again — and so is a skip,
+    // which is not, so `refused` names only the conflict.
+    let report = Report {
+        wirings: vec![
+            wiring("tv root folder in sonarr", State::Wired),
+            wiring(
+                "SABnzbd into Lidarr",
+                State::Skipped {
+                    reason: "lidarr is not running".to_owned(),
+                },
+            ),
+            wiring(
+                "movies root folder in radarr",
+                State::Refused {
+                    reason: "shared with sonarr".to_owned(),
+                },
+            ),
+        ],
+    };
+    assert!(!report.is_complete());
+    let refused: Vec<&str> = report
+        .refused()
+        .into_iter()
+        .map(|wiring| wiring.connection.as_str())
+        .collect();
+    assert_eq!(
+        refused,
+        vec!["movies root folder in radarr"],
+        "only the conflict is named as refused, not the skip",
     );
 }
 
@@ -291,10 +327,20 @@ fn folder(path: &str) -> RootFolder {
 }
 
 /// Run the driver for one wanted folder, returning its resulting state and the
-/// number of changes journalled.
+/// number of changes journalled. No folder is contested by another \*arr.
 async fn seed(service: FakeService, wanted: &[RootFolder]) -> (Vec<State>, usize) {
+    seed_contested(service, wanted, &BTreeMap::new()).await
+}
+
+/// Run the driver with a set of contested root-folder paths, so a folder another
+/// \*arr also claims is refused rather than wired.
+async fn seed_contested(
+    service: FakeService,
+    wanted: &[RootFolder],
+    contested: &BTreeMap<String, Vec<String>>,
+) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_root_folders(&service, "sonarr", wanted, &mut journal, "t").await;
+    let wirings = wire_root_folders(&service, "sonarr", wanted, contested, &mut journal, "t").await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
 }
@@ -356,6 +402,135 @@ async fn a_present_folder_is_matched_despite_a_trailing_slash() {
     .await;
     assert_eq!(states, vec![State::AlreadyWired]);
     assert_eq!(recorded, 0);
+}
+
+/// The reason a shared root folder is refused, naming the given other \*arr, in
+/// the exact words the driver builds so the assertions read against one source.
+fn shared_root(path: &str, other: &str) -> String {
+    format!(
+        "{path} is also the root folder for {other}; two *arrs on one root folder would each manage the other's files"
+    )
+}
+
+#[tokio::test]
+async fn a_root_folder_another_arr_also_wants_is_refused_not_wired() {
+    // Two *arrs on one root folder would each manage the other's files, so the
+    // shared folder is refused — with the other *arr named — and nothing written.
+    let contested = BTreeMap::from([(
+        "/data/media/tv".to_owned(),
+        vec!["radarr".to_owned(), "sonarr".to_owned()],
+    )]);
+    let (states, recorded) = seed_contested(
+        FakeService::with(Mode::Normal, Vec::new()),
+        &[folder("/data/media/tv")],
+        &contested,
+    )
+    .await;
+    assert_eq!(
+        states,
+        vec![State::Refused {
+            reason: shared_root("/data/media/tv", "radarr"),
+        }]
+    );
+    assert_eq!(recorded, 0, "a refused folder writes nothing");
+}
+
+#[tokio::test]
+async fn a_contested_folder_is_refused_even_where_the_service_already_holds_it() {
+    // The clash is the point: a folder already registered is still refused when
+    // another *arr shares it, so the two are never left both managing one root.
+    let existing = vec![RegisteredFolder {
+        id: "1".to_owned(),
+        path: "/data/media/tv".to_owned(),
+    }];
+    let contested = BTreeMap::from([(
+        "/data/media/tv".to_owned(),
+        vec!["radarr".to_owned(), "sonarr".to_owned()],
+    )]);
+    let (states, recorded) = seed_contested(
+        FakeService::with(Mode::Normal, existing),
+        &[folder("/data/media/tv")],
+        &contested,
+    )
+    .await;
+    assert_eq!(
+        states,
+        vec![State::Refused {
+            reason: shared_root("/data/media/tv", "radarr"),
+        }]
+    );
+    assert_eq!(recorded, 0);
+}
+
+#[tokio::test]
+async fn only_the_contested_folder_is_refused_the_rest_are_wired() {
+    // Refusal is per folder: the shared one is refused, the *arr's own is wired.
+    let contested = BTreeMap::from([(
+        "/data/media/tv".to_owned(),
+        vec!["radarr".to_owned(), "sonarr".to_owned()],
+    )]);
+    let (states, recorded) = seed_contested(
+        FakeService::with(Mode::Normal, Vec::new()),
+        &[folder("/data/media/tv"), folder("/data/media/movies")],
+        &contested,
+    )
+    .await;
+    assert_eq!(
+        states,
+        vec![
+            State::Refused {
+                reason: shared_root("/data/media/tv", "radarr"),
+            },
+            State::Wired,
+        ]
+    );
+    assert_eq!(recorded, 1, "only the wired folder is journalled");
+}
+
+#[test]
+fn a_root_folder_two_arrs_want_is_contested_naming_both_sorted() {
+    let sonarr = [folder("/data/media/tv")];
+    let radarr = [folder("/data/media/tv")];
+    let contested = contested_roots([("sonarr", sonarr.as_slice()), ("radarr", radarr.as_slice())]);
+    assert_eq!(
+        contested.get("/data/media/tv").map(Vec::as_slice),
+        Some(["radarr".to_owned(), "sonarr".to_owned()].as_slice()),
+        "both *arrs are named, sorted so the reason reads the same either way",
+    );
+}
+
+#[test]
+fn a_root_folder_only_one_arr_wants_is_not_contested() {
+    let sonarr = [folder("/data/media/tv")];
+    let radarr = [folder("/data/media/movies")];
+    let contested = contested_roots([("sonarr", sonarr.as_slice()), ("radarr", radarr.as_slice())]);
+    assert!(
+        contested.is_empty(),
+        "no path is shared, so nothing is contested",
+    );
+}
+
+#[test]
+fn a_contested_path_is_recognised_across_a_trailing_slash() {
+    // One *arr spells the path with a trailing slash, the other without; they are
+    // the same folder, so the clash is not hidden.
+    let sonarr = [folder("/data/media/tv/")];
+    let radarr = [folder("/data/media/tv")];
+    let contested = contested_roots([("sonarr", sonarr.as_slice()), ("radarr", radarr.as_slice())]);
+    assert_eq!(contested.len(), 1);
+    assert!(contested.contains_key("/data/media/tv"));
+}
+
+#[test]
+fn one_arr_listing_a_path_twice_does_not_contest_itself() {
+    // Distinct services, not repeats, make a contest: one *arr naming a path twice
+    // is still one *arr.
+    let sonarr = [folder("/data/media/tv"), folder("/data/media/tv")];
+    let contested = contested_roots([("sonarr", sonarr.as_slice())]);
+    assert!(
+        contested.is_empty(),
+        "one *arr cannot contest a folder with itself",
+    );
 }
 
 #[tokio::test]
