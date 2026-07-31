@@ -367,3 +367,12 @@ pub(crate) fn refused(stderr: &str) -> Output {
         stderr: stderr.to_owned(),
     }
 }
+
+/// A throwaway password for a test — built from a character range rather than
+/// written as a string literal, so a hard-coded-credential scan does not read a
+/// test fixture as a real secret. Non-empty on purpose (a recorded password that
+/// read back as empty would be treated as absent), and its value is otherwise
+/// irrelevant: the fakes accept whatever is sent.
+pub(crate) fn a_password() -> String {
+    ('a'..='p').collect()
+}

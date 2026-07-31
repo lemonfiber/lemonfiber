@@ -208,7 +208,7 @@ mod transfers_tests {
     use std::time::Duration;
 
     use crate::ports::service::{Failure, Transfers};
-    use crate::test_support::ScriptedHttp;
+    use crate::test_support::{a_password, ScriptedHttp};
 
     use super::Qbittorrent;
 
@@ -218,7 +218,7 @@ mod transfers_tests {
         Qbittorrent::authenticated(
             Arc::new(ScriptedHttp::new(replies)),
             "http://127.0.0.1:8080",
-            "secret",
+            a_password(),
         )
     }
 

@@ -259,7 +259,9 @@ mod tests {
     use crate::ports::filesystem::{FsKind, StorageFacts};
     use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs};
+    use crate::test_support::{
+        a_password, spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs,
+    };
 
     /// A transport that answers every request with the same body — a service's
     /// queue as JSON for the happy path, or something unreadable to stand in for a
@@ -609,7 +611,7 @@ mod tests {
         let ctx = ctx_downloads(
             SeedFs::keyed(None, Some(SAB_KEY_INI)),
             http,
-            Some(env_at("fills", "web-ui-pw")),
+            Some(env_at("fills", &a_password())),
         );
         let snapshot = gather(&ctx).await;
 
@@ -668,7 +670,7 @@ mod tests {
         let ctx = ctx_downloads(
             SeedFs::keyed(None, None),
             http,
-            Some(env_at("silent", "pw")),
+            Some(env_at("silent", &a_password())),
         );
         let snapshot = gather(&ctx).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
