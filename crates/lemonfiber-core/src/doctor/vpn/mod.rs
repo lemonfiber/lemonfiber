@@ -152,39 +152,13 @@ impl VpnCheck {
 
     /// Ask one container for its public address.
     async fn reach(&self, container: Option<&Container>, echo: &str) -> Reach {
-        let Some(container) = container else {
-            return Reach::Down;
-        };
-        if container.lifecycle != Lifecycle::Running {
-            return Reach::Down;
-        }
-        match self
-            .engine
-            .exec(&container.id, &wget(echo.to_owned()))
-            .await
-        {
-            Err(_) => Reach::Unknown,
-            Ok(output) => {
-                let body = output.stdout.trim();
-                if output.status == Some(0) && looks_like_ip(body) {
-                    Reach::Address(body.to_owned())
-                } else {
-                    Reach::Blocked
-                }
-            }
-        }
+        public_address(self.engine.as_ref(), container, echo).await
     }
 
     /// The tunnel's exit country, best effort — reported where the endpoint can
     /// supply it, omitted rather than guessed where it cannot.
     async fn country(&self, container: &Container, echo: &str) -> Option<String> {
-        let url = format!("{}/country-iso", echo.trim_end_matches('/'));
-        match self.engine.exec(&container.id, &wget(url)).await {
-            Ok(output) if output.status == Some(0) && is_country_code(output.stdout.trim()) => {
-                Some(output.stdout.trim().to_ascii_uppercase())
-            }
-            _ => None,
-        }
+        exit_country(self.engine.as_ref(), container, echo).await
     }
 
     /// The port-forward finding: whether a port was granted, where the operator
@@ -223,18 +197,161 @@ impl VpnCheck {
     /// missing, or the zero the release path writes — is a port that was not
     /// granted, which for an enabled provider is the failure this check exists for.
     async fn granted_port(&self, gateway: Option<&Container>) -> Grant {
-        let Some(container) = gateway else {
-            return Grant::Unreadable;
-        };
-        if container.lifecycle != Lifecycle::Running {
-            return Grant::Unreadable;
+        read_grant(self.engine.as_ref(), gateway).await
+    }
+}
+
+/// Ask one container for its public address, from inside its own network
+/// namespace — the exec-based read the leak check and the dashboard's VPN panel
+/// share, so both ask the same way. A container that is absent or not running is
+/// `Down`; an engine that will not answer is `Unknown`; anything that is not an
+/// address is `Blocked`.
+async fn public_address(engine: &dyn Engine, container: Option<&Container>, echo: &str) -> Reach {
+    let Some(container) = container else {
+        return Reach::Down;
+    };
+    if container.lifecycle != Lifecycle::Running {
+        return Reach::Down;
+    }
+    match engine.exec(&container.id, &wget(echo.to_owned())).await {
+        Err(_) => Reach::Unknown,
+        Ok(output) => {
+            let body = output.stdout.trim();
+            if output.status == Some(0) && looks_like_ip(body) {
+                Reach::Address(body.to_owned())
+            } else {
+                Reach::Blocked
+            }
         }
-        // Awaited into a plain value first: a block whose last statement is an
-        // await leaves its own closing brace unmarked by coverage.
-        let result = self.engine.exec(&container.id, &read_port()).await;
-        match result {
-            Err(_) => Grant::Unreadable,
-            Ok(output) => parse_grant(&output.stdout),
+    }
+}
+
+/// The tunnel's exit country, best effort — reported where the endpoint supplies
+/// it, omitted rather than guessed where it cannot.
+async fn exit_country(engine: &dyn Engine, container: &Container, echo: &str) -> Option<String> {
+    let url = format!("{}/country-iso", echo.trim_end_matches('/'));
+    match engine.exec(&container.id, &wget(url)).await {
+        Ok(output) if output.status == Some(0) && is_country_code(output.stdout.trim()) => {
+            Some(output.stdout.trim().to_ascii_uppercase())
+        }
+        _ => None,
+    }
+}
+
+/// Read the granted port from the gateway's own status file. A container that is
+/// not running, or an engine that cannot be reached, makes the answer unknown
+/// rather than absent.
+async fn read_grant(engine: &dyn Engine, gateway: Option<&Container>) -> Grant {
+    let Some(container) = gateway else {
+        return Grant::Unreadable;
+    };
+    if container.lifecycle != Lifecycle::Running {
+        return Grant::Unreadable;
+    }
+    // Awaited into a plain value first: a block whose last statement is an await
+    // leaves its own closing brace unmarked by coverage.
+    let result = engine.exec(&container.id, &read_port()).await;
+    match result {
+        Err(_) => Grant::Unreadable,
+        Ok(output) => parse_grant(&output.stdout),
+    }
+}
+
+/// The dashboard's VPN telemetry, or why it is not available — a small reading the
+/// panel maps directly, kept apart from the leak check's `Verdict`s so the panel
+/// need not read one.
+pub(crate) enum VpnReading {
+    /// This stack has no VPN-contained torrent client, so the panel does not apply.
+    NotApplicable,
+    /// The tunnel could not be read; the reason the panel shows.
+    Unavailable(String),
+    /// The tunnel answered.
+    Ready {
+        /// The tunnel's exit address.
+        exit_ip: String,
+        /// Its country, where the endpoint supplied one.
+        country: Option<String>,
+        /// The provider's forwarded port, where forwarding is on and granted.
+        forwarded_port: Option<u16>,
+        /// Whether the download client's egress matches the tunnel's.
+        egress_matches: bool,
+    },
+}
+
+/// Read what the VPN panel shows: the tunnel's exit address and country, the
+/// forwarded port, and whether the download client's egress matches the tunnel's
+/// — the one thing that proves traffic leaves through it. The same containers and
+/// exec-reads the leak check uses, shaped for a panel rather than a verdict.
+///
+/// Every read costs a round-trip into a container, so on the refresh loop this
+/// wants caching — the tunnel's address changes rarely. That caching arrives with
+/// the loop; until then the panel reads afresh each time.
+pub(crate) async fn read_vpn(
+    engine: &dyn Engine,
+    project: &str,
+    manifest: &Manifest,
+    protocols: Protocols,
+    echo: Option<&str>,
+    port_forward_enabled: bool,
+) -> VpnReading {
+    if !protocols.torrent {
+        return VpnReading::NotApplicable;
+    }
+    let Some(pair) = resolve_pair(manifest) else {
+        return VpnReading::NotApplicable;
+    };
+    let Ok(containers) = engine.list(project).await else {
+        return VpnReading::Unavailable(
+            "the container engine could not be reached, so the VPN could not be asked".to_owned(),
+        );
+    };
+    let gateway_container = find(&containers, &pair.gateway);
+
+    // The forwarded port comes from the gateway's status file, independent of the
+    // IP-echo, so it is read even where leak detection is off — but only where the
+    // operator asked for forwarding at all.
+    let forwarded_port = if port_forward_enabled {
+        match read_grant(engine, gateway_container).await {
+            Grant::Port(port) => Some(port),
+            Grant::Absent | Grant::Unreadable => None,
+        }
+    } else {
+        None
+    };
+
+    let Some(echo) = echo else {
+        return VpnReading::Unavailable(
+            "leak detection is switched off, so the tunnel's egress cannot be read".to_owned(),
+        );
+    };
+
+    let gateway = public_address(engine, gateway_container, echo).await;
+    // The country is the gateway's, asked only where the gateway both answered and
+    // is a container we can ask — the same case that yields an address. The
+    // catch-all absorbs every other combination (including the address-without-a-
+    // container that cannot occur), so there is no unreachable arm to leave
+    // uncovered.
+    let country = match (&gateway, gateway_container) {
+        (Reach::Address(_), Some(container)) => exit_country(engine, container, echo).await,
+        _ => None,
+    };
+    match gateway {
+        Reach::Address(exit_ip) => {
+            let client = public_address(engine, find(&containers, &pair.client), echo).await;
+            let egress_matches = matches!(&client, Reach::Address(ip) if *ip == exit_ip);
+            VpnReading::Ready {
+                exit_ip,
+                country,
+                forwarded_port,
+                egress_matches,
+            }
+        }
+        Reach::Down => VpnReading::Unavailable("the VPN tunnel is not running".to_owned()),
+        Reach::Blocked => {
+            VpnReading::Unavailable("the VPN tunnel did not return an exit address".to_owned())
+        }
+        Reach::Unknown => {
+            VpnReading::Unavailable("the VPN container could not be reached".to_owned())
         }
     }
 }
