@@ -5,8 +5,10 @@ What is built in **this repo** versus what the
 still asks for. Read this before reconstructing state from the source — it exists
 so a new contributor (human or agent) does not have to.
 
-This tracks the `lemonfiber` binary's milestones, **M2–M6**. M0–M1 live in the
-`spec` and `media-stack` repos and are recorded here only for context.
+This tracks the `lemonfiber` binary's milestones, **M2–M10** (one per v1
+version). M0–M1 live in the `spec` and `media-stack` repos and are recorded here
+only for context. Milestones M5, M7, M8 and M9 are not started — their sections
+are stubs pointing at the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
 
 - Update this file **in the same PR** as the work it describes. A tracker in a
   separate change drifts; one that moves with the code cannot.
@@ -82,9 +84,11 @@ misconfigured VPN (the leak half is met).
 
 ---
 
-## M4 — Seed · ◐
+## M4 — Seed & backup · ◐
 
-Wiring services to each other and recording it so it can be undone. The
+Spans `0.3.0` (backup & restore — the E3 rows below, complete) and `0.4.0`
+(auto-wiring & seed). Wiring services to each other and recording it so it can be
+undone. The
 `lemonfiber seed` command exists and wires the first edge — qBittorrent's web UI
 password (`D1-R16`): it reads the temporary password from the container's log,
 replaces it with a generated one through the client, and records the generated
@@ -119,44 +123,73 @@ restores full functionality in under 2 minutes, idempotently.
 
 ---
 
-## M5 — TUI · ◐
+## M5 — Trust checks · ☐
 
-Second surface over the same core (ratatui, per
-[ADR-0003](https://github.com/lemonfiber/spec/blob/main/00-overview/decisions/0003-rust-ratatui-for-cli.md)).
-The milestone is split across two versions, and the table below is grouped
-that way:
+`0.5.0`. The P3 trust pillar made continuous: VPN egress proof beyond setup,
+ongoing storage/hardlink verification, queue and provider health, and safe
+auto-remediation. The setup-time checks (M3) and the dashboard's read-only
+telemetry (M6) exist; the continuous trust lifecycle over them does not. See the
+[spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m5--trust-checks).
 
-- **`0.3.0` (staged) — the read-only dashboard**, including its **render
-  loop**. The model, assembler and every panel's telemetry are in; the ratatui
-  frame loop that renders them (`B3-R1` open-by-default, `B3-R4` async
-  non-blocking refresh, `B3-R14` 1 Hz) is the **one remaining slice before
-  `0.3.0` can ship** — the read side, not yet interactive.
-- **`0.6.0` — the interactive TUI**: form switcher (`B1`), lifecycle control
-  (`B2`), log viewer (`B4`), doctor view (`C1`) and layout polish
-  (`B3-R9/R10/R12/R13`), reached after `0.4.0` (seed) and `0.5.0` (trust
-  checks) land.
+---
 
-So the ratatui surface arrives in two steps a train apart: the read-only
-render loop closes `0.3.0` now; the interactive surfaces are `0.6.0`.
+## M6 — Live TUI · ◐
+
+The second surface over the same core (ratatui, per
+[ADR-0003](https://github.com/lemonfiber/spec/blob/main/00-overview/decisions/0003-rust-ratatui-for-cli.md)),
+all of it one version — **`0.6.0`**. The whole dashboard is here: its render loop
+over the model already built, **and** the interactive surfaces over it. The
+read-only dashboard's model, assembler and every panel's telemetry are in (built
+ahead on `main`, `dashboard.rs` + `app/dashboard.rs`), but nothing renders yet —
+so the milestone is the ratatui surface itself.
+
+> The read-only dashboard requirements (`B3-R1..R8`, `R11`, `R14`, `R15`) were
+> reassigned from `0.3.0` to `0.6.0`: every one is a *display* requirement, none
+> met without the render loop, so `0.3.0` ships backup/restore alone (M4) and the
+> whole TUI lands together here. See spec `0.6.0.toml`.
 
 | Deliverable | Spec | Status | Landing / notes |
 |-------------|------|--------|-----------------|
 | Live dashboard — the read-only model | `B3-R1..R8`, `B3-R11`, `B3-R14`, `B3-R15` | ◐ | The pure shape of the screen landed ahead of any rendering: [`dashboard.rs`](crates/lemonfiber-core/src/dashboard.rs) — "what is my stack doing right now?" assembled rather than fetched, so it runs in a test with no daemon. Its three load-bearing distinctions are types, not rendering conventions, so they cannot be collapsed by accident downstream. A `Reading` keeps a current figure, a stale one from a source since gone quiet, and a never-measured one apart (`B3-R5`) — "0 B/s" and "unknown" are different variants, not the same blank. A `Panel` is either filled or carries the reason its source could not be reached (`B3-R6`/`B3-R11`), so one dead source marks its own region and states why rather than blanking the screen or showing absence as zero — and the honesty is applied consistently: the health summary is itself a `Panel`, so an unreachable service source leaves it unavailable rather than summarising an unknown stack as an idle one, and the volatile figures a source can go quiet on mid-answer (`Transfer.speed`, `Storage.free`) are `Reading`s, so a stalled zero and an unread source stay distinct on the very fields that difference is about. `Standing` reads the whole screen's state from a `Reach` ladder — unconfigured, disconnected, idle, up — so a disconnected engine is never hidden behind a "degraded" that merely means incomplete (`B3-R7`). `Health::of` is the one-line summary — the condition and the count wanting attention (`B3-R2`, G7). The panel content types are the fragments no single service gives: `Vpn` (exit IP, country, forwarded port, and the egress-match that proves traffic leaves through the tunnel — `B3-R3`), `Transfer`, `Queue`, and `Storage` (free space, projected exhaustion, and hardlink status — `B3-R8`). Durations come from one clock and never run backwards: `eta` yields no estimate for a stalled transfer rather than an infinite one, and `percent` clamps past-total skew rather than reporting more-than-finished (`B3-R15`). The **assembler** that fills it from the live stack is now in: [`app/dashboard.rs`](crates/lemonfiber-core/src/app/dashboard.rs)'s `gather` reads the services through the engine and summarises their health, and — crucially — **never fails**, so a source that cannot be reached leaves its own panel unavailable and the standing disconnected rather than terminating anything (`B3-R7`): there is no error channel through which a dead source could kill a render loop. The panel telemetry then filled in one gatherer at a time — a panel with no gatherer yet said so plainly rather than showing empty or zero, and, being not-yet-built rather than a failed source, did not drag the standing down until its gatherer landed. `gather` reads the **storage free space** afresh each refresh through the `FileSystem` port (a cheap read, no per-refresh probe), and — the `B3-R5` distinction made concrete — a volume attributed to no mount reports free space **unknown** rather than a confident zero that would read as a full disk. The **hardlink status and projected exhaustion are now in too**, completing `B3-R8`: the hardlink status reuses the storage check's own empirical [`test_link`](crates/lemonfiber-core/src/storage.rs) probe (create a file, link it, inspect the two names) mapped to a `Hardlink` — an unwritable location or an unconfirmed link reads as unknown, never a met guarantee; and exhaustion is the free space divided by the rate the transfers are landing at (`download_rate` summing the speeds actually reported, so a stalled queue projects no exhaustion via the shared `eta` helper rather than an infinite one). The probe writes, so unlike the free-space read it is a per-refresh write the render loop will run far less often. The **queue panel is now filled**: a dedicated [`Queues`](crates/lemonfiber-core/src/ports/service.rs) port (kept off `Client` so the fakes that stand in for a service being wired need not answer for a read they are never asked) whose [`servarr.rs`](crates/lemonfiber-core/src/servarr.rs) implementation reads `/api/v3/queue` for a service's depth and its count of stuck (warning or error) items (`B3-R2`, `C7`); and `gather`'s `queues` driver, which resolves the Servarr-shape services the same way the credentials check does, reads each one's key from disk, and asks it for its queue — a service still starting (no key yet) or one that will not answer is left out of the panel rather than failing it, and only a stack that cannot be read at all leaves the whole panel unavailable. The **transfers panel is now filled**: a [`Transfers`](crates/lemonfiber-core/src/ports/service.rs) port, kept off `Client` like `Queues`, with a download-client adapter each side of the protocol split — [`qbittorrent.rs`](crates/lemonfiber-core/src/qbittorrent.rs) authenticates with the recorded password and reads `torrents/info` (torrent), [`sabnzbd.rs`](crates/lemonfiber-core/src/sabnzbd.rs) reads `mode=queue` (Usenet) — each normalising its own idea of a download to one `Download`, so the divergence stays out of the dashboard: a torrent's byte counts and a Usenet slot's percentage both become the same `percent`, and qBittorrent's no-estimate sentinel and a paused slot both become no ETA rather than a wrong one. `gather`'s `transfers` driver resolves the download clients to host-side targets the way the queue driver resolves the \*arrs, reads each on its own shape, sets the protocol from which client answered, and keeps a reported-but-zero speed (a stall) apart from an unreported one — a client not yet seeded or one that will not answer is left out rather than failing the panel. Two shapes the panel shared with its neighbours were folded while landing it: the manifest is now read **once per refresh** and passed to every panel rather than re-parsed by each, and the Servarr "read the key, open the client" step is one shared `Target::open` across the queue, credentials and seed paths. The **VPN panel is now filled** (`B3-R3`): the same exec-reads the leak check uses are lifted into shared probes ([`doctor/vpn`](crates/lemonfiber-core/src/doctor/vpn/mod.rs)'s `public_address`/`exit_country`/`read_grant`, and `read_vpn` shaping them for a panel rather than a `Verdict`), so the panel and the diagnostic cannot disagree about what the tunnel is doing. `gather`'s `vpn` driver reports the tunnel's exit IP and country, the forwarded port, and the egress-match that proves the client's traffic leaves through it — `None` where the stack declares no VPN-contained torrent client (the panel does not apply), the reason where the tunnel is down or leak detection is off. Every read is an exec into a container, so the refresh loop will cache it; until then it reads afresh. Every panel's telemetry is now gathered; the ratatui surface that renders all of this, the 1 Hz non-blocking refresh (`B3-R4`/`B3-R14`) and opening by default (`B3-R1`) are the remaining slices. |
-| **`0.3.0`** · Ratatui event loop — async, non-blocking, 1 Hz refresh | `B3-R1`, `B3-R4`, `B3-R14` | ☐ | The frame loop the dashboard renders into: an async, non-blocking refresh that never stalls a frame on Docker I/O (`B3-R4`/`B3-R14`), opening by default (`B3-R1`). The model and every panel's gatherer are in; nothing renders yet — **this is the last slice of the staged `0.3.0`**, the read-only screen over telemetry already gathered. |
-| `0.6.0` · Form switcher — interactive picker with closure preview | `B1-R1` | ☐ | Pick a form (`tv`/`movies`/`music`) and see its composed closure before switching. The pure closure logic exists (M2); the interactive surface does not. |
-| `0.6.0` · Log viewer — streamed, filterable, with scrollback | `B4-R1` | ☐ | Streamed service logs with filtering and scrollback in the TUI. |
-| `0.6.0` · Doctor view — interactive re-run, remedies inline | `C1-R1` | ☐ | The diagnostics as an interactive screen: re-run a check, read its remedy inline. The checks themselves are built (M3); the TUI surface over them is not. |
-| `0.6.0` · Wizard in TUI — same state machine, richer presentation | `A2-R11` | ☐ | The setup wizard presented in the TUI, driving the same resumable state machine the CLI setup already runs. |
-| `0.6.0` · Full-TUI layout polish | `B3-R9`, `B3-R10`, `B3-R12`, `B3-R13` | ☐ | Panel layout, sizing and interaction polish across the full-screen dashboard. |
+| Ratatui event loop — async, non-blocking, 1 Hz refresh | `B3-R1`, `B3-R4`, `B3-R14` | ☐ | The frame loop the dashboard renders into: an async, non-blocking refresh that never stalls a frame on Docker I/O (`B3-R4`/`B3-R14`), opening by default (`B3-R1`). The model and every panel's gatherer are in; nothing renders yet — this is the read-only screen over telemetry already gathered, the first render slice of the TUI. |
+| Form switcher — interactive picker with closure preview | `B1-R1` | ☐ | Pick a form (`tv`/`movies`/`music`) and see its composed closure before switching. The pure closure logic exists (M2); the interactive surface does not. |
+| Log viewer — streamed, filterable, with scrollback | `B4-R1` | ☐ | Streamed service logs with filtering and scrollback in the TUI. |
+| Doctor view — interactive re-run, remedies inline | `C1-R1` | ☐ | The diagnostics as an interactive screen: re-run a check, read its remedy inline. The checks themselves are built (M3); the TUI surface over them is not. |
+| Wizard in TUI — same state machine, richer presentation | `A2-R11` | ☐ | The setup wizard presented in the TUI, driving the same resumable state machine the CLI setup already runs. |
+| Full-TUI layout polish | `B3-R9`, `B3-R10`, `B3-R12`, `B3-R13` | ☐ | Panel layout, sizing and interaction polish across the full-screen dashboard. |
 
 **Exit criteria:** the dashboard sustains a 1 Hz refresh under 2% CPU at idle,
-and input stays responsive while images pull. The read-only model, its assembler,
-and **every panel's telemetry** are in (`0.3.0`); the read-only **render loop**
-(`B3-R1`/`B3-R4`/`B3-R14`) is the one remaining slice to close the staged
-`0.3.0`. Every interactive surface above is `0.6.0`, after `0.4.0` (seed) and
-`0.5.0` (trust checks).
+and input stays responsive while images pull. The read-only model, its assembler
+and every panel's telemetry are in; the ratatui render loop and every interactive
+surface above are the remaining work — all of `0.6.0`.
 
-## M6 — Release engineering · ◐
+## M7 — Web surface & UX · ☐
+
+`0.7.0`. A third surface — a read-only web view over the same core — plus the
+cross-cutting UX (front door, health summary, error model, plain language,
+accessibility, privacy, web-security, support bundle). Not started. See the
+[spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m7--web-surface--ux).
+
+---
+
+## M8 — Household & content · ☐
+
+`0.8.0`. The request flow, one-account identity, approval quotas, parental
+controls, disk-space and bandwidth management, client-app guidance. Not started.
+See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m8--household--content).
+
+---
+
+## M9 — Lifecycle & maintenance · ☐
+
+`0.9.0`. Reconfiguration, migration, uninstall, notifications, remote control,
+autostart & boot persistence, stack and self updates, rollback, and the service
+catalogue. Not started. See the
+[spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m9--lifecycle--maintenance).
+
+---
+
+## M10 — Release engineering · ◐
 
 Signed, multi-platform release automation and the install paths a non-contributor
 follows. The CI hardening and the `cargo-dist` scaffold are in place; the release
