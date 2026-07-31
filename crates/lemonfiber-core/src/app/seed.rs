@@ -50,7 +50,8 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     // value recorded on the run that minted it stands in. Without this an \*arr
     // that came up after the first seed would never learn about qBittorrent,
     // since its password cannot be read back from qBittorrent itself.
-    let qbittorrent_password = qbittorrent_password.or_else(|| recorded_qbittorrent_password(ctx));
+    let qbittorrent_password =
+        qbittorrent_password.or_else(|| super::targets::recorded_qbittorrent_password(ctx));
 
     // Root folders and download clients for each \*arr that files media. The
     // download clients' own credentials are read once: SABnzbd's key from its
@@ -127,28 +128,18 @@ async fn seed_root_folders(ctx: &Ctx, arr: &Arr) -> Vec<crate::seed::Wiring> {
         })
         .collect();
 
-    let Some(key) = read_servarr_key(ctx, &arr.target.config).await else {
+    let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
         return wanted
             .iter()
-            .map(|folder| crate::seed::Wiring {
-                connection: format!("{} root folder in {}", folder.media_type, arr.target.name),
-                state: crate::seed::State::Skipped {
-                    reason: format!(
-                        "{} has not written its API key yet; a later run completes it",
-                        arr.target.name
-                    ),
-                },
+            .map(|folder| {
+                skipped(
+                    format!("{} root folder in {}", folder.media_type, arr.target.name),
+                    &arr.target.name,
+                )
             })
             .collect();
     };
 
-    let client = crate::servarr::Servarr::new(
-        ctx.http.clone(),
-        &arr.target.base,
-        key,
-        &arr.target.id,
-        arr.target.version,
-    );
     // The journal seed records each write into is not persisted: seeding is
     // idempotent, so a partial run is recovered by running it again, not reversed
     // — see the seed module doc. The record is groundwork for a future service-side
@@ -310,27 +301,17 @@ async fn wire_arr_download_clients(
     arr: &Arr,
     clients: &[crate::ports::service::DownloadClient],
 ) -> Vec<crate::seed::Wiring> {
-    let Some(key) = read_servarr_key(ctx, &arr.target.config).await else {
+    let Some(servarr) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
         return clients
             .iter()
-            .map(|client| crate::seed::Wiring {
-                connection: format!("{} into {}", client.name, arr.target.name),
-                state: crate::seed::State::Skipped {
-                    reason: format!(
-                        "{} has not written its API key yet; a later run completes it",
-                        arr.target.name
-                    ),
-                },
+            .map(|client| {
+                skipped(
+                    format!("{} into {}", client.name, arr.target.name),
+                    &arr.target.name,
+                )
             })
             .collect();
     };
-    let servarr = crate::servarr::Servarr::new(
-        ctx.http.clone(),
-        &arr.target.base,
-        key,
-        &arr.target.id,
-        arr.target.version,
-    );
     // The journal seed records each write into is not persisted: seeding is
     // idempotent, so a partial run is recovered by running it again, not reversed
     // — see the seed module doc. The record is groundwork for a future service-side
@@ -489,15 +470,22 @@ fn application_kind(media_types: &[String]) -> Option<crate::ports::service::App
     }
 }
 
-/// An application skipped for a re-run because a key it needs is not written yet,
-/// named as the driver names it so a re-run's report reads consistently.
-fn skipped_application(arr: &str, prowlarr: &str) -> crate::seed::Wiring {
+/// A `Wiring` skipped because the service has not written the key it needs yet — a
+/// re-run completes it. The reason is worded once here so a re-run's report reads
+/// the same across root folders, download clients and application sync; the
+/// `connection` names the specific edge being skipped.
+fn skipped(connection: String, service: &str) -> crate::seed::Wiring {
     crate::seed::Wiring {
-        connection: format!("{arr} indexer sync via {prowlarr}"),
+        connection,
         state: crate::seed::State::Skipped {
-            reason: format!("{arr} has not written its API key yet; a later run completes it"),
+            reason: format!("{service} has not written its API key yet; a later run completes it"),
         },
     }
+}
+
+/// An application skipped for a re-run because Prowlarr's key is not written yet.
+fn skipped_application(arr: &str, prowlarr: &str) -> crate::seed::Wiring {
+    skipped(format!("{arr} indexer sync via {prowlarr}"), arr)
 }
 
 /// Jellyfin's addresses: where the host reaches its setup, and where Seerr reaches
@@ -574,13 +562,9 @@ fn jellyfin_service(services: &[lemonfiber_manifest::Service]) -> Option<Jellyfi
 }
 
 /// The Jellyfin admin password recorded on the run that minted it, so a later run
-/// can point Seerr at Jellyfin without minting again. Nothing where no env file
-/// holds one; an unreadable file reads the same as an empty one.
+/// can point Seerr at Jellyfin without minting again.
 fn recorded_jellyfin_password(ctx: &Ctx) -> Option<String> {
-    let path = ctx.settings.env_file.as_deref()?;
-    let file = store::read(path).unwrap_or_default();
-    let value = file.get(crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
-    (!value.is_empty()).then(|| value.to_owned())
+    super::targets::recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
 }
 
 /// Record the minted Jellyfin admin password where a later run reads it back.
@@ -667,17 +651,6 @@ fn record_qbittorrent_password(ctx: &Ctx, password: &str) {
     }
 }
 
-/// The qBittorrent password recorded on the run that minted it, so a later run
-/// still offers qBittorrent as a download client. Nothing where no env file
-/// holds one yet; an unreadable file reads the same as an empty one, because a
-/// missing password is a missing password however the reading failed.
-fn recorded_qbittorrent_password(ctx: &Ctx) -> Option<String> {
-    let path = ctx.settings.env_file.as_deref()?;
-    let file = store::read(path).unwrap_or_default();
-    let value = file.get(crate::config::QBITTORRENT_PASSWORD_KEY)?;
-    (!value.is_empty()).then(|| value.to_owned())
-}
-
 /// How many lines back to read for qBittorrent's start-up announcement. Its
 /// temporary password is printed once, early, so a generous tail finds it well
 /// after start without pulling the whole log.
@@ -689,9 +662,9 @@ mod tests {
 
     use super::{
         application_kind, category_for, download_clients, prowlarr_source, read_sabnzbd_key,
-        recorded_qbittorrent_password, sabnzbd_config_path, servarr_arrs, syncable_arrs,
+        sabnzbd_config_path, servarr_arrs, syncable_arrs,
     };
-    use crate::app::targets::{project_directory, servarr_targets};
+    use crate::app::targets::{project_directory, recorded_qbittorrent_password, servarr_targets};
     use crate::app::{dispatch, Command, Ctx, Outcome};
     use crate::config::{store, Settings};
     use crate::model::VersionReport;

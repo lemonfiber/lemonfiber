@@ -7,25 +7,29 @@
 //! error channel through which a dead source could terminate the render loop.
 //!
 //! This gatherer fills the services and their health, the storage volume's free
-//! space, and each \*arr's queue; the VPN and transfers panels have no live source
-//! wired yet and say so, rather than being shown as empty or as zero. Their
-//! telemetry arrives in the slices that follow, each turning one "not gathered
-//! yet" into a real panel.
+//! space, each \*arr's queue, and each download client's active transfers; the VPN
+//! panel has no live source wired yet and says so, rather than being shown as empty
+//! or as zero. Its telemetry arrives in the slices that follow, each turning one
+//! "not gathered yet" into a real panel.
+
+use std::path::Path;
+
+use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::dashboard::{
-    Hardlink, Health, Panel, Queue, Reach, Reading, Snapshot, Standing, Storage,
+    Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing, Storage, Transfer,
 };
 use crate::docker::{condition, survey, Condition, Service};
 use crate::error::Diagnose;
-use crate::ports::service::Queues;
-use crate::servarr::{api_key, Servarr};
+use crate::ports::service::{Download, Queues, Transfers};
+use crate::qbittorrent::Qbittorrent;
+use crate::sabnzbd::Sabnzbd;
 
-use super::targets::{project_directory, servarr_targets};
-
-/// What a panel says while its telemetry has no gatherer yet — stated plainly, so
-/// a not-yet-wired source reads as absent rather than as nothing happening.
-const PENDING: &str = "no live source for this panel yet";
+use super::targets::{
+    download_targets, project_directory, recorded_qbittorrent_password, servarr_targets,
+    DownloadKind, DownloadTarget,
+};
 
 /// Gather one snapshot of what the stack is doing right now.
 ///
@@ -35,7 +39,17 @@ const PENDING: &str = "no live source for this panel yet";
 /// down, because a panel nobody has wired is not a source that failed.
 pub async fn gather(ctx: &Ctx) -> Snapshot {
     let configured = ctx.settings.data_root.is_some();
-    let observed = observe(ctx).await;
+    // The manifest every stack-derived panel reads from, resolved once — or the one
+    // reason each reports if it cannot be read. Read once rather than re-parsed and
+    // re-validated by each panel a second apart on the refresh loop, and so a stack
+    // that cannot be read leaves every panel unavailable from the one failure.
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem().summary);
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+
+    let observed = observe(ctx, manifest.as_ref()).await;
     let reach = reach(configured, observed.as_ref());
 
     let (services, health) = match observed {
@@ -55,10 +69,83 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
         standing: Standing::read(reach, false),
         health,
         vpn: None,
-        transfers: Panel::unavailable(PENDING),
-        queue: queues(ctx).await,
+        transfers: transfers(ctx, manifest.as_ref(), project.as_deref()).await,
+        queue: queues(ctx, manifest.as_ref(), project.as_deref()).await,
         storage: storage(ctx).await,
         services,
+    }
+}
+
+/// The active downloads across the stack's download clients.
+///
+/// Resolves the download clients to host-side targets, then reads each on its own
+/// shape — qBittorrent authenticated with the recorded password, `SABnzbd` with the
+/// key it wrote to disk. A client not yet seeded (no password, or no key on disk)
+/// or one that will not answer is left out rather than failing the panel; only a
+/// stack that cannot be read at all leaves the whole panel unavailable, since then
+/// there is nothing to ask. The protocol is set from which client answered, not
+/// trusted from the answer.
+async fn transfers(
+    ctx: &Ctx,
+    manifest: Result<&Manifest, &String>,
+    project: Option<&Path>,
+) -> Panel<Vec<Transfer>> {
+    let manifest = match manifest {
+        Ok(manifest) => manifest,
+        Err(reason) => return Panel::unavailable(reason.clone()),
+    };
+    let targets = download_targets(&manifest.services, project);
+
+    let mut active = Vec::new();
+    for target in &targets {
+        let downloads = read(ctx, target).await;
+        let protocol = protocol_of(&target.kind);
+        active.extend(downloads.into_iter().map(|download| Transfer {
+            name: download.name,
+            protocol,
+            progress: download.progress,
+            // A speed the client reported this refresh is known even at zero (a
+            // stall); one it did not report is unknown, not a confident zero.
+            speed: download.speed.map_or(Reading::Unknown, Reading::Known),
+            eta: download.eta,
+        }));
+    }
+    Panel::Ready(active)
+}
+
+/// One client's active downloads, read on its own shape — nothing where it is not
+/// yet seeded or will not answer, so it is left out rather than failing the panel.
+async fn read(ctx: &Ctx, target: &DownloadTarget) -> Vec<Download> {
+    match &target.kind {
+        DownloadKind::Qbittorrent => {
+            let Some(password) = recorded_qbittorrent_password(ctx) else {
+                return Vec::new();
+            };
+            Qbittorrent::authenticated(ctx.http.clone(), &target.base, password)
+                .transfers()
+                .await
+                .unwrap_or_default()
+        }
+        DownloadKind::Sabnzbd { config } => {
+            let Some(text) = ctx.filesystem.read(config).await else {
+                return Vec::new();
+            };
+            let Some(key) = crate::sabnzbd::api_key(&text) else {
+                return Vec::new();
+            };
+            Sabnzbd::new(ctx.http.clone(), &target.base, key)
+                .transfers()
+                .await
+                .unwrap_or_default()
+        }
+    }
+}
+
+/// The protocol a client's transfers move over.
+fn protocol_of(kind: &DownloadKind) -> Protocol {
+    match kind {
+        DownloadKind::Qbittorrent => Protocol::Torrent,
+        DownloadKind::Sabnzbd { .. } => Protocol::Usenet,
     }
 }
 
@@ -70,29 +157,22 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
 /// that will not answer is left out of the panel rather than failing it; only a
 /// stack that cannot be read at all leaves the whole panel unavailable, since then
 /// there are no services to ask.
-async fn queues(ctx: &Ctx) -> Panel<Vec<Queue>> {
-    let manifest = match ctx.stack.checked_manifest(ctx.today()) {
+async fn queues(
+    ctx: &Ctx,
+    manifest: Result<&Manifest, &String>,
+    project: Option<&Path>,
+) -> Panel<Vec<Queue>> {
+    let manifest = match manifest {
         Ok(manifest) => manifest,
-        Err(err) => return Panel::unavailable(err.problem().summary),
+        Err(reason) => return Panel::unavailable(reason.clone()),
     };
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let targets = servarr_targets(&manifest.services, project.as_deref());
+    let targets = servarr_targets(&manifest.services, project);
 
     let mut depths = Vec::new();
     for target in &targets {
-        let Some(config) = ctx.filesystem.read(&target.config).await else {
+        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
             continue;
         };
-        let Some(key) = api_key(&config) else {
-            continue;
-        };
-        let service = Servarr::new(
-            ctx.http.clone(),
-            &target.base,
-            key,
-            &target.id,
-            target.version,
-        );
         if let Ok(depth) = service.queue().await {
             depths.push(Queue {
                 service: target.name.clone(),
@@ -135,11 +215,8 @@ async fn storage(ctx: &Ctx) -> Panel<Storage> {
 /// The reason is the operator-facing summary of whatever went wrong — an
 /// unreadable stack, an engine that would not answer — so the panel that carries
 /// it says something an operator can act on rather than a bare failure.
-async fn observe(ctx: &Ctx) -> Result<Vec<Service>, String> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| err.problem().summary)?;
+async fn observe(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Result<Vec<Service>, String> {
+    let manifest = manifest.map_err(Clone::clone)?;
     let profiles: Vec<String> = manifest
         .profiles
         .iter()
@@ -150,7 +227,7 @@ async fn observe(ctx: &Ctx) -> Result<Vec<Service>, String> {
         .list(&ctx.settings.project)
         .await
         .map_err(|err| err.problem().summary)?;
-    Ok(survey(&manifest, &profiles, &containers))
+    Ok(survey(manifest, &profiles, &containers))
 }
 
 /// How far the surface reached, from which the standing is read.
@@ -167,6 +244,7 @@ fn reach(configured: bool, observed: Result<&Vec<Service>, &String>) -> Reach {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -175,13 +253,13 @@ mod tests {
     use super::gather;
     use crate::app::Ctx;
     use crate::config::{Protocols, Settings};
-    use crate::dashboard::{Panel, Reading, Standing};
+    use crate::dashboard::{Panel, Protocol, Reading, Standing};
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
     use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted, SeedFs};
+    use crate::test_support::{spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs};
 
     /// A transport that answers every request with the same body — a service's
     /// queue as JSON for the happy path, or something unreadable to stand in for a
@@ -266,16 +344,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_panels_without_a_gatherer_yet_say_so_rather_than_showing_empty() {
+    async fn the_vpn_panel_without_a_gatherer_yet_is_omitted_rather_than_shown_empty() {
         let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
         let snapshot = gather(&ctx(engine)).await;
         assert!(
             snapshot.vpn.is_none(),
             "the VPN panel is omitted until wired"
         );
-        // Transfers still has no gatherer; the queue panel is filled (empty here,
-        // since the real filesystem holds no service keys to read).
-        assert!(!snapshot.transfers.is_available());
+        // The transfers panel now has a gatherer, so it is filled — empty here,
+        // since the real filesystem holds no download-client credentials to read.
+        assert!(matches!(snapshot.transfers, Panel::Ready(ref active) if active.is_empty()));
     }
 
     #[tokio::test]
@@ -315,6 +393,10 @@ mod tests {
         assert!(
             !snapshot.queue.is_available(),
             "a stack that cannot be read has no services to ask for a queue"
+        );
+        assert!(
+            !snapshot.transfers.is_available(),
+            "nor any download client to ask for its transfers"
         );
     }
 
@@ -438,5 +520,157 @@ mod tests {
             matches!(snapshot.storage, Panel::Ready(storage) if storage.free == Reading::Unknown),
             "a volume that could not be read reports unknown free space, not zero"
         );
+    }
+
+    /// A transport that answers each download client on its own path: qBittorrent's
+    /// login and its torrent list, and — anything else being the only other call a
+    /// read makes — `SABnzbd`'s queue.
+    struct Downloads {
+        torrents: &'static str,
+        queue: &'static str,
+    }
+
+    #[async_trait]
+    impl Http for Downloads {
+        async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+            let body = if request.url.contains("/auth/login") {
+                "Ok."
+            } else if request.url.contains("/torrents/info") {
+                self.torrents
+            } else {
+                self.queue
+            };
+            Ok(Response {
+                status: 200,
+                body: body.to_owned(),
+            })
+        }
+    }
+
+    /// One qBittorrent torrent, 30% done at a known speed with an ETA.
+    const QBIT_TORRENTS: &str =
+        r#"[{"name":"Ubuntu.iso","completed":300,"size":1000,"dlspeed":4096,"eta":120}]"#;
+    /// One `SABnzbd` download, whose queue speed will not parse — so its speed reads
+    /// unknown rather than a false zero.
+    const SAB_QUEUE: &str = r#"{"queue":{"kbpersec":"nan","slots":[{"filename":"Linux.nzb","percentage":"20","status":"Downloading","timeleft":"0:05:00"}]}}"#;
+    /// A `sabnzbd.ini` carrying a usable key, and one that has not written it yet.
+    const SAB_KEY_INI: &str = "[misc]\napi_key = sabkey123\n";
+    const SAB_NO_KEY_INI: &str = "[misc]\nhost = 0.0.0.0\n";
+
+    /// A context configured to read download clients: the library stack running, a
+    /// fake filesystem for `SABnzbd`'s key, the given transport, and — where set — an
+    /// env file holding qBittorrent's recorded password.
+    fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> Ctx {
+        let settings = Settings {
+            protocols: Protocols::both(),
+            data_root: Some(PathBuf::from("/srv/media")),
+            env_file,
+            ..Settings::default()
+        };
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::holding(
+                &LIBRARY,
+                Lifecycle::Running,
+                Health::Healthy,
+            )),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+        .waiting(Duration::ZERO)
+        .with_filesystem(Arc::new(fs))
+        .with_http(http)
+    }
+
+    /// A private env file recording qBittorrent's password, at a scratch path
+    /// unique to the test so concurrent tests do not share it.
+    fn env_at(name: &str, password: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-dash-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = dir.join(".env");
+        assert!(
+            crate::config::store::set(&path, crate::config::QBITTORRENT_PASSWORD_KEY, password)
+                .is_ok(),
+            "the scratch env file is written"
+        );
+        path
+    }
+
+    #[tokio::test]
+    async fn the_transfers_panel_fills_from_each_download_client() {
+        let http: Arc<dyn Http> = Arc::new(Downloads {
+            torrents: QBIT_TORRENTS,
+            queue: SAB_QUEUE,
+        });
+        let ctx = ctx_downloads(
+            SeedFs::keyed(None, Some(SAB_KEY_INI)),
+            http,
+            Some(env_at("fills", "web-ui-pw")),
+        );
+        let snapshot = gather(&ctx).await;
+
+        // The torrent client's download: progress from its byte counts, a known
+        // speed even at a value, and its ETA — tagged as a torrent by which client
+        // answered, not by anything the client said.
+        assert!(
+            matches!(&snapshot.transfers, Panel::Ready(active) if active.iter().any(|t|
+                matches!(t.protocol, Protocol::Torrent)
+                    && t.name == "Ubuntu.iso"
+                    && t.progress == 30
+                    && matches!(t.speed, Reading::Known(4096))
+                    && t.eta == Some(Duration::from_secs(120)))),
+            "the torrent client's download fills a torrent transfer"
+        );
+        // The Usenet client's download: a speed the client could not read is
+        // unknown, not a confident zero that would read as a stall.
+        assert!(
+            matches!(&snapshot.transfers, Panel::Ready(active) if active.iter().any(|t|
+                matches!(t.protocol, Protocol::Usenet)
+                    && t.name == "Linux.nzb"
+                    && t.progress == 20
+                    && matches!(t.speed, Reading::Unknown)
+                    && t.eta == Some(Duration::from_secs(300)))),
+            "the Usenet client's download fills a Usenet transfer"
+        );
+        assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.len() == 2));
+    }
+
+    #[tokio::test]
+    async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
+        // No recorded qBittorrent password and no SABnzbd key on disk: both are
+        // still finishing first start, so each is skipped and the panel is
+        // ready-but-empty rather than failed.
+        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let ctx = ctx_downloads(SeedFs::keyed(None, None), http, None);
+        let snapshot = gather(&ctx).await;
+        assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
+        // SABnzbd has written a config but not its key; qBittorrent has no recorded
+        // password. Neither can be read, so neither appears.
+        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let ctx = ctx_downloads(SeedFs::keyed(None, Some(SAB_NO_KEY_INI)), http, None);
+        let snapshot = gather(&ctx).await;
+        assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn a_download_client_that_will_not_answer_is_left_out() {
+        // The password is recorded, but qBittorrent's login goes unanswered, so it
+        // is dropped from the panel rather than failing it.
+        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let ctx = ctx_downloads(
+            SeedFs::keyed(None, None),
+            http,
+            Some(env_at("silent", "pw")),
+        );
+        let snapshot = gather(&ctx).await;
+        assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
     }
 }
