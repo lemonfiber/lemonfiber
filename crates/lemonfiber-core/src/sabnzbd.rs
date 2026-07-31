@@ -286,8 +286,8 @@ mod transfers_tests {
         let sab = client(vec![(200, QUEUE_EDGES)]);
         let transfers = sab.transfers().await.unwrap_or_default();
         assert_eq!(transfers.len(), 2);
-        // Unparseable speed is unknown, unparseable percentage is zero, empty
-        // countdown is no estimate.
+        // An unparsable speed is unknown, an unparsable percentage is zero, an
+        // empty countdown is no estimate.
         assert!(matches!(
             transfers.first(),
             Some(t) if t.progress == 0 && t.speed.is_none() && t.eta.is_none()
