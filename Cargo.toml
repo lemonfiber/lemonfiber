@@ -69,18 +69,15 @@ installers = ["shell"]
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 # No publish jobs yet — the Homebrew tap publish returns at 1.0.0 (L1-R3).
 publish-jobs = []
+# cargo-dist creates and PUBLISHES the GitHub Release on a tag. Governance (OPS-R1)
+# wants a tag to leave a DRAFT a maintainer publishes, and cargo-dist has no config
+# for that, so `just release-workflow` patches the generated `gh release create` to
+# add `--draft`. allow-dirty stops cargo-dist's up-to-date check from failing CI on
+# that patch (it also makes `dist generate` skip release.yml, which the recipe
+# toggles around). Regenerate ONLY via `just release-workflow`, never by hand.
 # Whether to enable GitHub Attestations
 github-attestations = true
-# cargo-dist's plan step creates a draft Release and uploads artifacts to it;
-# with this false it does not create a *published* one from scratch. It still ends
-# by un-drafting (`--draft=false`), which `just release-workflow` flips back to
-# `--draft=true` so the tag leaves a DRAFT a maintainer publishes (OPS-R1). Always
-# regenerate release.yml via `just release-workflow`, never by hand.
-create-release = false
 allow-dirty = ["ci"]
-# release.yml carries our one hand-applied patch (the `--draft=true` above), so
-# tell cargo-dist not to fail its up-to-date check on it. `just release-workflow`
-# keeps the rest in sync.
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Whether to install an updater program
