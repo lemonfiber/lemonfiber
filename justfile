@@ -23,6 +23,17 @@ lint:
 deny:
     cargo deny check
 
+# Regenerate the cargo-dist release workflow, then re-apply our one patch:
+# cargo-dist always ends by publishing the GitHub Release (`--draft=false`), but
+# our governance (OPS-R1) wants the tag to leave a DRAFT a maintainer publishes.
+# cargo-dist has no config for "stay drafted", so flip that one flag after
+# generating. Run this — never hand-edit release.yml — whenever the dist config
+# changes.
+release-workflow:
+    dist generate
+    sed -i '' 's/--draft=false/--draft=true/' .github/workflows/release.yml
+    @grep -q -- '--draft=true' .github/workflows/release.yml || (echo "draft patch failed to apply" && exit 1)
+
 # Coverage, and a merge gate in CI: 100% of applicable lines.
 # main.rs is surface wiring and is excluded by path. Per-item exclusion would
 # need #[coverage(off)], which is nightly-only, so applicable code is instead
