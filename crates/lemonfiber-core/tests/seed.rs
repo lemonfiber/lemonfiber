@@ -17,8 +17,8 @@ use lemonfiber_core::ports::service::{
     RegisteredFolder, Requests, RootFolder,
 };
 use lemonfiber_core::seed::{
-    contested_roots, intent, wire_applications, wire_download_clients, wire_jellyfin_identity,
-    wire_root_folders, Intent, Observed, Report, State, Wiring,
+    contested_roots, intent, reconcile, wire_applications, wire_download_clients,
+    wire_jellyfin_identity, wire_root_folders, Intent, Observed, Report, State, Wiring,
 };
 
 // ---- The policy: pure, decided without a service. ----
@@ -32,13 +32,49 @@ fn the_policy_follows_from_what_was_observed() {
     assert_eq!(intent(Observed::Present), Intent::Leave);
     // Drift-aware: an operator's own change is preserved, never reverted.
     assert_eq!(intent(Observed::Drifted), Intent::Preserve);
+    // lemonfiber's own value behind its intent is brought up to date.
+    assert_eq!(intent(Observed::Stale), Intent::Update);
+    // A two-sided change is presented, never resolved on lemonfiber's own.
+    assert_eq!(intent(Observed::Conflicted), Intent::Ask);
 }
 
 #[test]
-fn only_a_wired_or_preserved_connection_is_settled() {
-    for settled in [State::Wired, State::AlreadyWired, State::Drifted] {
+fn the_three_way_comparison_reads_every_row_of_the_merge_table() {
+    // Actual already at desired: in sync, whoever moved it there.
+    assert_eq!(reconcile(Some("tv"), Some("tv"), "tv"), Observed::Present);
+    assert_eq!(reconcile(Some("old"), Some("tv"), "tv"), Observed::Present);
+    // Actual differs, but lemonfiber's intent is unchanged from the baseline: the
+    // operator's edit, preserved.
+    assert_eq!(reconcile(Some("tv"), Some("mine"), "tv"), Observed::Drifted);
+    // Actual still at the baseline, only lemonfiber's intent moved: stale, its own.
+    assert_eq!(reconcile(Some("tv"), Some("tv"), "tv-hd"), Observed::Stale);
+    // Baseline matches neither side: both moved away — a conflict.
+    assert_eq!(
+        reconcile(Some("tv"), Some("mine"), "tv-hd"),
+        Observed::Conflicted
+    );
+    // No baseline to judge against: the difference is taken as the operator's and
+    // preserved rather than overwritten on a guess.
+    assert_eq!(reconcile(None, Some("mine"), "tv"), Observed::Drifted);
+    // A service holding no value at all is a difference like any other, read the
+    // same three ways.
+    assert_eq!(reconcile(None, None, "tv"), Observed::Drifted);
+    assert_eq!(reconcile(Some("tv"), None, "tv-hd"), Observed::Conflicted);
+}
+
+#[test]
+fn only_a_wired_preserved_or_stale_connection_is_settled() {
+    // Settled: written, already correct, the operator's own edit, or lemonfiber's
+    // own value merely behind its intent — all working states.
+    for settled in [
+        State::Wired,
+        State::AlreadyWired,
+        State::Drifted,
+        State::Stale,
+    ] {
         assert!(settled.is_settled(), "{settled:?} is settled");
     }
+    // Not settled: a re-run or an operator's decision must return to it.
     for unsettled in [
         State::Skipped {
             reason: "lidarr is not in the active form".to_owned(),
@@ -46,6 +82,7 @@ fn only_a_wired_or_preserved_connection_is_settled() {
         State::Failed {
             detail: "rejected".to_owned(),
         },
+        State::Conflicted,
     ] {
         assert!(!unsettled.is_settled(), "{unsettled:?} is not settled");
     }
@@ -103,10 +140,10 @@ fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
 }
 
 #[test]
-fn a_refusal_is_named_apart_from_the_merely_outstanding() {
-    // A refused conflict is outstanding like a skip, but reported apart so the
-    // operator is told to resolve it rather than to run again — and so is a skip,
-    // which is not, so `refused` names only the conflict.
+fn a_blocked_connection_is_named_apart_from_the_merely_outstanding() {
+    // A refusal and a conflict are both outstanding like a skip, but a re-run will
+    // not lift them — the operator must resolve them — so `blocked` names them apart
+    // from a skip, which a later run does complete.
     let report = Report {
         wirings: vec![
             wiring("tv root folder in sonarr", State::Wired),
@@ -122,18 +159,19 @@ fn a_refusal_is_named_apart_from_the_merely_outstanding() {
                     reason: "shared with sonarr".to_owned(),
                 },
             ),
+            wiring("SABnzbd into Sonarr", State::Conflicted),
         ],
     };
     assert!(!report.is_complete());
-    let refused: Vec<&str> = report
-        .refused()
+    let blocked: Vec<&str> = report
+        .blocked()
         .into_iter()
         .map(|wiring| wiring.connection.as_str())
         .collect();
     assert_eq!(
-        refused,
-        vec!["movies root folder in radarr"],
-        "only the conflict is named as refused, not the skip",
+        blocked,
+        vec!["movies root folder in radarr", "SABnzbd into Sonarr"],
+        "a refusal and a conflict are named as blocked; the skip is not",
     );
 }
 
@@ -156,10 +194,20 @@ fn the_report_names_each_state_on_the_wire() {
                     detail: "no".to_owned(),
                 },
             ),
+            wiring("f", State::Stale),
+            wiring("g", State::Conflicted),
         ],
     };
     let json = serde_json::to_string(&report).unwrap_or_default();
-    for state in ["wired", "already-wired", "drifted", "skipped", "failed"] {
+    for state in [
+        "wired",
+        "already-wired",
+        "drifted",
+        "skipped",
+        "failed",
+        "stale",
+        "conflicted",
+    ] {
         assert!(json.contains(&format!(r#""state":"{state}""#)), "{json}");
     }
 }
@@ -739,6 +787,12 @@ async fn a_service_that_stops_answering_after_the_write_is_skipped() {
 // ---- Download clients: the same driver, matched by endpoint not label. ----
 
 fn client(name: &str, host: &str, port: u16) -> DownloadClient {
+    client_with_category(name, host, port, "tv")
+}
+
+/// A wanted client whose category lemonfiber intends to file under `category` —
+/// for the drift tests, where lemonfiber's desired value is the thing that moves.
+fn client_with_category(name: &str, host: &str, port: u16, category: &str) -> DownloadClient {
     DownloadClient {
         name: name.to_owned(),
         host: host.to_owned(),
@@ -747,7 +801,7 @@ fn client(name: &str, host: &str, port: u16) -> DownloadClient {
         credential: Credential::ApiKey("sab-key".to_owned()),
         category: Category {
             field: "tvCategory".to_owned(),
-            value: "tv".to_owned(),
+            value: category.to_owned(),
         },
     }
 }
@@ -913,11 +967,13 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
 }
 
 #[tokio::test]
-async fn a_categoryless_client_lemonfiber_leaves_is_not_recorded_as_the_baseline() {
-    // The service holds a client at the endpoint but reports no category, so
-    // lemonfiber leaves it — it wrote nothing. Recording its wanted category would
-    // fabricate an expected the service does not hold, and make a later run read the
-    // operator's eventual category as a conflict rather than as their own value.
+async fn a_categoryless_client_lemonfiber_never_wrote_is_left_and_not_recorded() {
+    // The service holds a client at the endpoint but reports no category, and there
+    // is no baseline — lemonfiber never wrote it. Its value differs from what
+    // lemonfiber wants, so the three-way comparison, with nothing to judge against,
+    // takes it as the operator's and leaves it (drifted), recording nothing: a later
+    // run then reads the operator's eventual category as their own value, not a
+    // conflict against a baseline lemonfiber never set.
     let existing = vec![RegisteredClient {
         id: "1".to_owned(),
         host: "sabnzbd".to_owned(),
@@ -929,11 +985,82 @@ async fn a_categoryless_client_lemonfiber_leaves_is_not_recorded_as_the_baseline
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
-    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(states, vec![State::Drifted]);
     assert_eq!(
         baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
         None,
     );
+}
+
+#[tokio::test]
+async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
+    // The baseline records lemonfiber last wrote "tv"; the service still holds "tv",
+    // but lemonfiber now wants "tv-hd". Only lemonfiber's intent moved, so the
+    // client is lemonfiber's own value fallen behind — stale, left as it is (never
+    // overwritten) and reported, not preserved as though it were an operator edit.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        }),
+    }];
+    let mut journal = Journal::new();
+    let mut baseline = Baseline::new();
+    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let states: Vec<State> = wire_download_clients(
+        &FakeService::with_clients(Mode::Normal, existing),
+        "sonarr",
+        &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
+        &mut journal,
+        &mut baseline,
+        "2",
+    )
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect();
+    assert_eq!(states, vec![State::Stale]);
+    assert_eq!(
+        journal.changes().len(),
+        0,
+        "a stale value is not overwritten"
+    );
+}
+
+#[tokio::test]
+async fn a_client_both_sides_changed_is_a_conflict() {
+    // The baseline records "tv"; the operator re-filed to "mine" and lemonfiber now
+    // wants "tv-hd". Both moved away from the baseline, so lemonfiber presents the
+    // conflict and leaves the value — it does not resolve it on its own.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "mine".to_owned(),
+        }),
+    }];
+    let mut journal = Journal::new();
+    let mut baseline = Baseline::new();
+    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let states: Vec<State> = wire_download_clients(
+        &FakeService::with_clients(Mode::Normal, existing),
+        "sonarr",
+        &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
+        &mut journal,
+        &mut baseline,
+        "2",
+    )
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect();
+    assert_eq!(states, vec![State::Conflicted]);
+    assert_eq!(journal.changes().len(), 0, "a conflict is not resolved");
 }
 
 #[tokio::test]

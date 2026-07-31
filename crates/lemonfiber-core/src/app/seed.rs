@@ -1315,10 +1315,16 @@ mod tests {
             6,
             "SABnzbd and qBittorrent into each of three arrs"
         );
-        let all_wired = clients
+        // Each client is already registered at its endpoint, so none is written a
+        // second time. The service reports no category for them and there is no
+        // baseline, so the three-way comparison cannot prove they are lemonfiber's
+        // own value: it leaves each as the operator's — drifted, preserved — rather
+        // than overwriting it. The point the test guards is that a present client is
+        // left, never duplicated.
+        let none_rewired = clients
             .iter()
-            .all(|wiring| wiring.state == crate::seed::State::AlreadyWired);
-        assert!(all_wired, "a client already registered is left wired");
+            .all(|wiring| wiring.state == crate::seed::State::Drifted);
+        assert!(none_rewired, "a present client is left, not re-registered");
     }
 
     #[tokio::test]

@@ -47,6 +47,14 @@ pub(crate) fn seeding(report: &SeedReport) {
             SeedState::Wired => println!("  ✓ {}   wired", wiring.connection),
             SeedState::AlreadyWired => println!("  ✓ {}   already wired", wiring.connection),
             SeedState::Drifted => println!("  · {}   left as you set it", wiring.connection),
+            SeedState::Stale => println!(
+                "  · {}   yours for now — a newer default is not yet applied",
+                wiring.connection
+            ),
+            SeedState::Conflicted => println!(
+                "  ✗ {}   conflict — both you and the default changed it; left as you set it",
+                wiring.connection
+            ),
             SeedState::Skipped { reason } => {
                 println!("  ? {}   skipped", wiring.connection);
                 println!("      {reason}");
@@ -61,25 +69,25 @@ pub(crate) fn seeding(report: &SeedReport) {
         }
     }
     let outstanding = report.outstanding();
-    let refused = report.refused();
+    let blocked = report.blocked();
     if outstanding.is_empty() {
         println!("\nEverything is wired.");
-    } else if refused.is_empty() {
+    } else if blocked.is_empty() {
         println!(
             "\n{} left to wire — run seed again once ready.",
             outstanding.len()
         );
-    } else if refused.len() == outstanding.len() {
+    } else if blocked.len() == outstanding.len() {
         println!(
-            "\n{} refused — resolve the conflict, then seed again.",
-            refused.len()
+            "\n{} to resolve — settle the conflict, then seed again.",
+            blocked.len()
         );
     } else {
         println!(
-            "\n{} left: {} to wire once ready, {} refused — resolve the conflict first.",
+            "\n{} left: {} to wire once ready, {} to resolve — settle the conflict first.",
             outstanding.len(),
-            outstanding.len() - refused.len(),
-            refused.len(),
+            outstanding.len() - blocked.len(),
+            blocked.len(),
         );
     }
 }
