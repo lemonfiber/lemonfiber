@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::endpoint::{json_content_type, Endpoint, API_KEY_HEADER};
-use crate::ports::http::{Http, Method, Request};
+use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
     Client, ClientKind, Credential, DownloadClient, Failure, Identity, QueueDepth,
     RegisteredClient, RegisteredFolder, RootFolder,
@@ -65,7 +65,27 @@ impl Servarr {
             body,
         }
     }
+
+    /// Send a request to the versioned API, turning a `404` — the whole
+    /// `/api/v{version}` prefix not served — into an unsupported-version failure
+    /// rather than passing it on as a generic refusal. A service upgraded past (or
+    /// standing before) the version this build speaks is then reported as such and
+    /// never written to, rather than its 404 read as a rejected write.
+    async fn probe(&self, request: &Request) -> Result<Response, Failure> {
+        let response = self.endpoint.send(request).await?;
+        if response.status == NOT_FOUND {
+            return Err(self.endpoint.unsupported(&format!(
+                "there is no /api/v{}; it may have been upgraded past this build",
+                self.version
+            )));
+        }
+        Ok(response)
+    }
 }
+
+/// The status a service returns for a path its API version does not serve — here,
+/// the whole versioned prefix, so it names an unsupported API version.
+const NOT_FOUND: u16 = 404;
 
 /// The fields of `system/status` that identify a service.
 ///
@@ -87,8 +107,7 @@ struct Status {
 impl Client for Servarr {
     async fn identity(&self) -> Result<Identity, Failure> {
         let response = self
-            .endpoint
-            .send(&self.request(Method::Get, "/system/status", None))
+            .probe(&self.request(Method::Get, "/system/status", None))
             .await?;
         let status: Status = self
             .endpoint
@@ -111,8 +130,7 @@ impl Client for Servarr {
 
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
         let response = self
-            .endpoint
-            .send(&self.request(
+            .probe(&self.request(
                 Method::Post,
                 "/downloadclient",
                 Some(download_client_body(client)),
@@ -124,16 +142,14 @@ impl Client for Servarr {
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
         let body = serde_json::json!({ "path": folder.path }).to_string();
         let response = self
-            .endpoint
-            .send(&self.request(Method::Post, "/rootfolder", Some(body)))
+            .probe(&self.request(Method::Post, "/rootfolder", Some(body)))
             .await?;
         self.endpoint.expect_success(&response)
     }
 
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
         let response = self
-            .endpoint
-            .send(&self.request(Method::Get, "/rootfolder", None))
+            .probe(&self.request(Method::Get, "/rootfolder", None))
             .await?;
         let folders: Vec<FolderResource> = self
             .endpoint
@@ -149,8 +165,7 @@ impl Client for Servarr {
 
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
         let response = self
-            .endpoint
-            .send(&self.request(Method::Get, "/downloadclient", None))
+            .probe(&self.request(Method::Get, "/downloadclient", None))
             .await?;
         let clients: Vec<ClientResource> = self
             .endpoint
@@ -169,8 +184,7 @@ impl crate::ports::service::Queues for Servarr {
         // queue rather than the default first page; the total is the service's own
         // count, independent of the page.
         let response = self
-            .endpoint
-            .send(&self.request(Method::Get, "/queue?pageSize=200", None))
+            .probe(&self.request(Method::Get, "/queue?pageSize=200", None))
             .await?;
         let queue: QueueResource = self
             .endpoint

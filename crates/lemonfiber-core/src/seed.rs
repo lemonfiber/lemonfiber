@@ -104,8 +104,11 @@ pub enum State {
         /// What the service said.
         detail: String,
     },
-    /// Refused by lemonfiber before it was attempted, carrying the reason a
-    /// re-run will not resolve — such as two \*arrs pointed at one root folder.
+    /// Refused by lemonfiber's own policy, carrying the reason a re-run will not
+    /// resolve — such as two \*arrs pointed at one root folder, or a service that
+    /// does not serve the API version this build speaks. Either way nothing it
+    /// names was written, whether it was refused before the write or the write
+    /// itself found nothing to land in.
     Refused {
         /// Why it was refused, in lemonfiber's own words.
         reason: String,
@@ -611,7 +614,9 @@ async fn configure_seerr(seerr: &dyn Requests, password: &str, server_url: &str)
 }
 
 /// A failure as the state it leaves a connection in: a service not answering is
-/// skipped and retried; one that refuses is a failure, carrying its own words.
+/// skipped and retried; one that refuses is a failure, carrying its own words; one
+/// that does not serve this build's API version is refused, since a re-run against
+/// the same service will not resolve it — the operator must align the versions.
 fn unreached(failure: &Failure) -> State {
     match failure {
         Failure::Unavailable { .. } => State::Skipped {
@@ -622,6 +627,9 @@ fn unreached(failure: &Failure) -> State {
         },
         Failure::Refused { detail, .. } => State::Failed {
             detail: detail.clone(),
+        },
+        Failure::Unsupported { service, detail } => State::Refused {
+            reason: format!("{service} does not serve the API version this build speaks: {detail}"),
         },
     }
 }

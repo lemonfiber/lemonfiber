@@ -94,6 +94,15 @@ impl Endpoint {
         }
     }
 
+    /// The service does not serve the API version this build speaks — the reason
+    /// a versioned endpoint answered `404`. Reported rather than written to.
+    pub(crate) fn unsupported(&self, detail: &str) -> Failure {
+        Failure::Unsupported {
+            service: self.service.clone(),
+            detail: detail.to_owned(),
+        }
+    }
+
     /// Nothing when the response succeeded, the refusal a non-success status
     /// amounts to otherwise — the answer to "did it take?" for a call whose body
     /// the caller discards. Used with `?` it also serves as a guard partway

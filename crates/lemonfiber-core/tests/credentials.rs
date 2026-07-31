@@ -210,6 +210,25 @@ async fn a_service_answering_unusably_carries_its_own_words() {
 }
 
 #[tokio::test]
+async fn a_service_on_an_unsupported_api_version_is_unverified_with_that_reason() {
+    // A 404 is the versioned API prefix not served: the service was upgraded past
+    // (or stands before) the version this build speaks, so the credential cannot
+    // be proven through it — unverified, pointed at aligning the versions.
+    let config = PathBuf::from("/stack/config/sonarr/config.xml");
+    let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
+    let http = FakeHttp::new(vec![("8989", Answer::Reply(404, ""))]);
+
+    let reason = match only(sonarr(&config), fs, http).await {
+        Verdict::Unverified { reason, .. } => Some(reason),
+        _ => None,
+    };
+    assert!(
+        reason.is_some_and(|reason| reason.contains("API version this build speaks")),
+        "an unsupported API version is unverified, named as a version mismatch"
+    );
+}
+
+#[tokio::test]
 async fn a_service_with_no_config_file_yet_is_skipped() {
     // The file is not there because the service has not finished first start.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");

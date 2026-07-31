@@ -195,6 +195,16 @@ pub enum Failure {
         /// The service's own words.
         detail: String,
     },
+    /// The service answered, but does not serve the API version lemonfiber speaks
+    /// — it has been upgraded past it (or is older than it). Writing to it would
+    /// mean writing something malformed, so it is reported instead.
+    #[error("`{service}` does not serve the API version this build speaks: {detail}")]
+    Unsupported {
+        /// The service that answered.
+        service: String,
+        /// Which version is missing, in lemonfiber's words.
+        detail: String,
+    },
 }
 
 /// Raised when a service is not answering yet.
@@ -205,6 +215,9 @@ pub const SERVICE_UNAUTHORISED: Code = Code::new("SEED-2");
 
 /// Raised when a service answers with something unusable.
 pub const SERVICE_REFUSED: Code = Code::new("SEED-3");
+
+/// Raised when a service does not serve the API version this build speaks.
+pub const SERVICE_UNSUPPORTED: Code = Code::new("SEED-4");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {
@@ -230,6 +243,15 @@ impl Diagnose for Failure {
                 Severity::Error,
                 format!("{service} answered in a way lemonfiber did not expect"),
                 "This is not a failure lemonfiber recognises, so it will not guess at what would fix it.",
+            )
+            .with_detail(detail.clone()),
+            Self::Unsupported { service, detail } => Problem::new(
+                SERVICE_UNSUPPORTED,
+                Severity::Error,
+                format!("{service} does not serve the API version this build speaks"),
+                "The service was upgraded past — or stands before — the API version lemonfiber knows how to speak, so writing to it would mean writing something malformed. Nothing was changed for it.",
+                Remedy::new("Match the service to the version lemonfiber supports, or update lemonfiber, then run seed again")
+                    .with_detail("lemonfiber seed"),
             )
             .with_detail(detail.clone()),
         }
@@ -469,6 +491,21 @@ mod tests {
     }
 
     #[test]
+    fn an_unsupported_api_version_is_reported_with_a_remedy() {
+        let problem = Failure::Unsupported {
+            service: "sonarr".to_owned(),
+            detail: "there is no /api/v3".to_owned(),
+        }
+        .problem();
+        assert_eq!(problem.severity, Severity::Error);
+        assert_eq!(problem.detail.as_deref(), Some("there is no /api/v3"));
+        assert!(
+            !problem.remedies.is_empty(),
+            "aligning the versions is offered as the way out"
+        );
+    }
+
+    #[test]
     fn every_failure_names_the_service_it_is_about() {
         let failures = [
             Failure::Unavailable {
@@ -478,6 +515,10 @@ mod tests {
                 service: "sonarr".to_owned(),
             },
             Failure::Refused {
+                service: "sonarr".to_owned(),
+                detail: "boom".to_owned(),
+            },
+            Failure::Unsupported {
                 service: "sonarr".to_owned(),
                 detail: "boom".to_owned(),
             },
