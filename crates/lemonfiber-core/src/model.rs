@@ -114,6 +114,22 @@ pub struct LifecycleReport {
     pub services: Vec<crate::docker::Service>,
     /// What those services amount to, as one word.
     pub condition: Option<crate::docker::Condition>,
+    /// Stack files the operator has edited, left as they set them rather than
+    /// overwritten with lemonfiber's own. Empty in the ordinary case; a named entry
+    /// warns that an upgrade would change a file they changed, and shows the diff.
+    pub stack_edits: Vec<StackEdit>,
+}
+
+/// A stack file the operator edited, preserved rather than overwritten, with the
+/// change an upgrade would make shown against it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StackEdit {
+    /// The file's path within the stack directory.
+    pub path: String,
+    /// The lines that differ between the operator's file and what lemonfiber would
+    /// write — theirs marked `-`, lemonfiber's `+`, the matching head and tail left
+    /// out. Empty where the two differ only in ways `lines` does not see.
+    pub diff: String,
 }
 
 /// What a diagnostic run found, and what it amounts to.

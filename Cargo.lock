@@ -864,6 +864,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "bollard",
+ "crc32fast",
  "form_urlencoded",
  "futures-util",
  "getrandom 0.2.17",

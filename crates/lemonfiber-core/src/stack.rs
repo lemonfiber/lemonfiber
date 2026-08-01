@@ -26,7 +26,7 @@ pub mod compose;
 
 use std::path::{Path, PathBuf};
 
-use include_dir::Dir;
+use include_dir::{Dir, DirEntry};
 use lemonfiber_manifest::{validate, Date, Manifest};
 use thiserror::Error;
 
@@ -34,6 +34,10 @@ use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// The manifest's filename, at the root of any stack directory.
 const MANIFEST: &str = "stack.toml";
+
+/// One file a stack would write: its path within the stack directory, and its
+/// content.
+pub type StackFile = (PathBuf, &'static [u8]);
 
 /// Where the stack lemonfiber operates is read from.
 #[derive(Debug, Clone, Copy)]
@@ -126,6 +130,20 @@ impl Source {
         }
     }
 
+    /// The files this stack would write, each as its path within the stack
+    /// directory and its content.
+    ///
+    /// Empty for an external stack: it is already on disk and left exactly as it
+    /// is, so there is nothing for lemonfiber to write or to compare against.
+    #[must_use]
+    pub fn files(self) -> Vec<StackFile> {
+        let mut files = Vec::new();
+        if let Self::Embedded(dir) = self {
+            collect(dir, &mut files);
+        }
+        files
+    }
+
     /// The parsed manifest.
     ///
     /// # Errors
@@ -137,6 +155,18 @@ impl Source {
         Manifest::from_toml(&text).map_err(|err| Failure::Unusable {
             reason: err.to_string(),
         })
+    }
+}
+
+/// Gather every file in an embedded directory — its path within the stack and its
+/// content — recursing into subdirectories so a nested compose fragment is
+/// materialised alongside the files at the root.
+fn collect(dir: &'static Dir<'static>, out: &mut Vec<StackFile>) {
+    for entry in dir.entries() {
+        match entry {
+            DirEntry::File(file) => out.push((file.path().to_path_buf(), file.contents())),
+            DirEntry::Dir(sub) => collect(sub, out),
+        }
     }
 }
 
