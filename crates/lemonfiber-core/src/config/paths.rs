@@ -73,6 +73,14 @@ impl Paths {
         self.config.join("baseline.json")
     }
 
+    /// The operator's quality choice: which preset is in force, globally and per
+    /// media type. Kept with configuration so a backup carries it, and so a later
+    /// run applies the same choice rather than falling back to the default.
+    #[must_use]
+    pub fn quality(&self) -> PathBuf {
+        self.config.join("quality.json")
+    }
+
     /// The materialised stack — compose files written where Compose can read
     /// them.
     #[must_use]
@@ -142,6 +150,7 @@ mod tests {
             paths.setup_progress(),
             paths.baseline(),
             paths.materialised(),
+            paths.quality(),
         ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),
@@ -197,6 +206,19 @@ mod tests {
     }
 
     #[test]
+    fn the_quality_choice_sits_beside_the_env_file() {
+        // The quality command derives where it keeps the choice from the environment
+        // file it is handed — `env_file.with_file_name("quality.json")` — the same way
+        // seeding derives the baseline's. This ties that formula to the layout's own
+        // `quality()`, so a backup that captures the configuration directory carries it.
+        let paths = paths();
+        assert_eq!(
+            paths.env_file().with_file_name("quality.json"),
+            paths.quality()
+        );
+    }
+
+    #[test]
     fn every_location_is_distinct() {
         let paths = paths();
         let all = [
@@ -205,6 +227,7 @@ mod tests {
             paths.setup_progress(),
             paths.baseline(),
             paths.materialised(),
+            paths.quality(),
             paths.stack(),
             paths.service_config(),
             paths.backups(),

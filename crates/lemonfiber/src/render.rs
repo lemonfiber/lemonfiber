@@ -11,8 +11,8 @@ use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, StatusReport, SupervisionReport,
-    VersionReport,
+    ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, PresetChoice,
+    QualityReport, StatusReport, SupervisionReport, VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
@@ -34,6 +34,7 @@ pub(crate) fn render(outcome: &Outcome, json: bool) {
     match outcome {
         Outcome::Version(report) => versions(report),
         Outcome::Config(report) => settings(report),
+        Outcome::Quality(report) => quality(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
         Outcome::Doctor(report) => diagnosis(report),
@@ -208,6 +209,46 @@ pub(crate) fn settings(report: &ConfigReport) {
                 "saved"
             }
         );
+    }
+}
+
+/// The quality choice, what each preset means, and what the command did with it.
+pub(crate) fn quality(report: &QualityReport) {
+    for choice in &report.choices {
+        preset_choice(choice);
+    }
+    match report.disposition {
+        // A change is forward-looking, and this is where the operator is told so —
+        // the expectation is often the opposite, that lowering quality shrinks the
+        // library or raising it re-grabs everything.
+        Disposition::Recorded => {
+            println!("\nSaved. This affects future acquisitions only — nothing already downloaded changes.");
+        }
+        Disposition::Rehearsed => {
+            println!(
+                "\nWould save. This affects future acquisitions only — nothing downloaded changes."
+            );
+        }
+        Disposition::Held => {
+            println!(
+                "\nNot saved: this machine would have to transcode this in software, which will not \
+                 play well. Re-run with --confirm to choose it anyway, or run Jellyfin natively."
+            );
+        }
+        // A plain show changes nothing, so it makes no claim about the future.
+        Disposition::Shown => {}
+    }
+}
+
+/// One preset in force: what it applies to, what it means, and what it costs.
+fn preset_choice(choice: &PresetChoice) {
+    println!("{}: {} — {}", choice.scope, choice.preset, choice.means);
+    println!(
+        "  {} · {} · {}",
+        choice.resolution, choice.size_per_hour, choice.transcoding
+    );
+    if choice.needs_transcoding_here {
+        println!("  ⚠ this machine would have to transcode this in software");
     }
 }
 

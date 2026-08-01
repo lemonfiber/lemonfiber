@@ -24,11 +24,12 @@ use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, SettingReport, StackEdit, StatusReport,
-    VersionReport,
+    ConfigReport, DoctorReport, Envelope, LifecycleReport, QualityReport, SettingReport, StackEdit,
+    StatusReport, VersionReport,
 };
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
+use crate::quality::Preset;
 use crate::stack::closure::{resolve, Plan};
 use crate::stack::compose::{build, Action};
 
@@ -37,6 +38,7 @@ pub mod backup;
 mod ctx;
 pub mod dashboard;
 mod materialise;
+mod quality;
 pub mod recover;
 pub mod restore;
 mod seed;
@@ -108,12 +110,32 @@ pub enum Command {
         /// Whether the operator opted into the checks that disturb the system.
         disruptive: bool,
     },
+    /// Show or change the quality preset — how good media should look, and how
+    /// much disk it should cost — in plain language.
+    Quality(QualityAction),
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they
     /// stop reporting as drift and are kept across future seeds and restores. Wires
     /// what is missing as a seed does, and promotes every drifted value to adopted.
     Adopt,
+}
+
+/// What a quality command asks for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QualityAction {
+    /// Show the choice in force and what each preset means and costs.
+    Show,
+    /// Choose a preset — for everything, or for one media type — and record it.
+    Set {
+        /// The preset to choose.
+        preset: Preset,
+        /// The media type it applies to, or the whole library where absent.
+        media_type: Option<String>,
+        /// Whether the operator confirmed a choice this host would have to
+        /// transcode in software, which is otherwise held rather than recorded.
+        confirm: bool,
+    },
 }
 
 /// What dispatching produced.
@@ -125,6 +147,8 @@ pub enum Outcome {
     Lifecycle(LifecycleReport),
     /// The answer to a configuration command.
     Config(ConfigReport),
+    /// The quality choice, what it means, and what a command did with it.
+    Quality(QualityReport),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -141,6 +165,7 @@ impl Outcome {
             Self::Version(_) => "version",
             Self::Lifecycle(_) => "lifecycle",
             Self::Config(_) => "config",
+            Self::Quality(_) => "quality",
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
             Self::Seed(_) => "seed",
@@ -155,6 +180,7 @@ impl serde::Serialize for Outcome {
             Self::Version(report) => report.serialize(serializer),
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
+            Self::Quality(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
@@ -391,6 +417,9 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             configuration(ctx, Some(&key), Some(&value)).map_err(|p| *p)
         }
         Command::ConfigShow => configuration(ctx, None, None).map_err(|p| *p),
+        Command::Quality(action) => quality::quality(ctx, action)
+            .map(Outcome::Quality)
+            .map_err(|problem| *problem),
         Command::Ps { forms } => status(ctx, &forms).await.map(Outcome::Status),
         Command::Doctor { only, disruptive } => {
             diagnose(ctx, only, disruptive).await.map(Outcome::Doctor)
@@ -631,12 +660,15 @@ async fn version(ctx: &Ctx) -> Result<VersionReport, Problem> {
 mod tests {
     use std::sync::Arc;
 
-    use super::{dispatch, pull_progress, Category, Command, Ctx, Outcome, VersionReport};
+    use super::{
+        dispatch, pull_progress, Category, Command, Ctx, Outcome, QualityAction, VersionReport,
+    };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
     use crate::platform::Environment;
     use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
     use crate::ports::process::{Failure, Output, Progress};
+    use crate::quality::Preset;
     use crate::stack::Source;
     use crate::test_support::{refused, spoke, stack, Reporting, Scripted};
     use std::time::Duration;
@@ -651,6 +683,42 @@ mod tests {
             Settings::default(),
             Environment::MacOs,
         )
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_quality_show_serialises_under_its_own_kind() {
+        // Through dispatch, a quality command reaches its outcome, envelope and
+        // serialisation — the arms the handler's own tests, calling it directly,
+        // never touch. With no config the choice is the default, shown.
+        let json = dispatch(Command::Quality(QualityAction::Show), &ctx(Ok(spoke(""))))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"quality\""),
+            "envelope names the kind"
+        );
+        assert!(json.contains("everything"), "the global choice is reported");
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_quality_set_with_nowhere_to_record_is_an_error() {
+        // The dispatch arm unboxes the handler's error: a set with no configured
+        // env file has nowhere to write the choice, so it fails rather than lying.
+        let refused = dispatch(
+            Command::Quality(QualityAction::Set {
+                preset: Preset::Balanced,
+                media_type: None,
+                confirm: false,
+            }),
+            &ctx(Ok(spoke(""))),
+        )
+        .await;
+        assert!(
+            refused.is_err(),
+            "a set with nowhere to record cannot succeed"
+        );
     }
 
     /// What a version report looks like when the engine said `compose`.
@@ -763,6 +831,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Config(_)
+                | Outcome::Quality(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -778,6 +847,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
+                | Outcome::Quality(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_),
             )
@@ -1165,6 +1235,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Lifecycle(_)
+                | Outcome::Quality(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -1612,6 +1683,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
+                | Outcome::Quality(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
             )

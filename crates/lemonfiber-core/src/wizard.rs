@@ -53,6 +53,16 @@ impl Library {
             Self::None => None,
         }
     }
+
+    /// The choice a recorded `JELLYFIN_MODE` stands for — the inverse of
+    /// [`Self::mode`] — or `None` for a value that is neither mode, so a later
+    /// reader draws no conclusion from a setting it does not recognise.
+    #[must_use]
+    pub fn from_mode(mode: &str) -> Option<Self> {
+        [Self::JellyfinDocker, Self::JellyfinNative]
+            .into_iter()
+            .find(|library| library.mode() == Some(mode))
+    }
 }
 
 /// A step of setup, in the order the operator meets it.
@@ -856,6 +866,18 @@ mod tests {
     /// ownership away) but native Jellyfin is offered.
     fn on_macos() -> Wizard {
         Wizard::new(Environment::MacOs)
+    }
+
+    #[test]
+    fn a_recorded_mode_round_trips_back_to_the_library_choice() {
+        for library in [Library::JellyfinDocker, Library::JellyfinNative] {
+            let mode = library.mode().unwrap_or_default();
+            assert_eq!(Library::from_mode(mode), Some(library));
+        }
+        // No media server writes no mode, and an unrecognised value stands for
+        // nothing rather than being guessed at.
+        assert_eq!(Library::None.mode(), None);
+        assert_eq!(Library::from_mode("elsewhere"), None);
     }
 
     /// Answer every applicable question, so the wizard is ready for review.

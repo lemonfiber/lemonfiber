@@ -13,7 +13,7 @@ use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{
-    dispatch, logs, pull_progress, supervise, Command, Ctx, Outcome, WATCH,
+    dispatch, logs, pull_progress, supervise, Command, Ctx, Outcome, QualityAction, WATCH,
 };
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
@@ -22,10 +22,12 @@ use lemonfiber_core::config::{
 };
 use lemonfiber_core::doctor::{Category, Overall};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::Envelope;
+use lemonfiber_core::model::{Disposition, Envelope};
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
+use lemonfiber_core::quality::Preset;
+use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::stack::Source;
 
 mod archive;
@@ -169,6 +171,11 @@ enum Request {
         #[command(subcommand)]
         action: ConfigAction,
     },
+    /// Choose how good your media should look, in plain language.
+    Quality {
+        #[command(subcommand)]
+        action: QualityCommand,
+    },
     /// Run the checks that prove the stack is doing what it should.
     Doctor {
         /// Run only one category of check, such as `vpn`.
@@ -213,6 +220,23 @@ enum Request {
 }
 
 /// What to do with settings.
+#[derive(Debug, Subcommand)]
+enum QualityCommand {
+    /// Show the quality choice in force, and what each preset means and costs.
+    Show,
+    /// Choose a preset — for everything, or for one media type.
+    Set {
+        /// The preset: space-saving, balanced, high-quality, or maximum.
+        preset: String,
+        /// Apply it to one media type (tv or movies) rather than everything.
+        #[arg(long = "for", value_name = "MEDIA_TYPE")]
+        media_type: Option<String>,
+        /// Confirm a choice this machine would have to transcode in software.
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
 #[derive(Debug, Subcommand)]
 enum ConfigAction {
     /// Read one setting.
@@ -343,6 +367,10 @@ async fn main() -> ExitCode {
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
         Request::Ps { forms } => Command::Ps { forms },
         Request::Config { action } => configuration(action),
+        Request::Quality { action } => match quality(action) {
+            Ok(command) => command,
+            Err(code) => return ExitCode::from(code),
+        },
         Request::Doctor { only, disruptive } => {
             let only = match only.as_deref().map(Category::parse) {
                 // A named category that lemonfiber does not know is a mistake to
@@ -405,6 +433,15 @@ fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::from(VALIDATION)
             }
         }
+        // A held quality choice was not recorded — it needs the operator to
+        // confirm a preset this machine would software-transcode, so a script sees
+        // a non-zero result it can act on rather than a false success.
+        Outcome::Quality(report) => match report.disposition {
+            Disposition::Held => ExitCode::from(VALIDATION),
+            Disposition::Shown | Disposition::Recorded | Disposition::Rehearsed => {
+                ExitCode::SUCCESS
+            }
+        },
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
             ExitCode::SUCCESS
         }
@@ -476,6 +513,42 @@ fn configuration(action: ConfigAction) -> Command {
         ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
         ConfigAction::Show => Command::ConfigShow,
     }
+}
+
+/// A quality subcommand, or the exit code for input that cannot be understood.
+///
+/// The preset and the media type are named in plain words the operator types, so a
+/// name that is neither is a mistake to correct rather than a request to run — it
+/// is refused here, before the core is reached, with the valid names spelled out.
+fn quality(action: QualityCommand) -> Result<Command, u8> {
+    let action = match action {
+        QualityCommand::Show => QualityAction::Show,
+        QualityCommand::Set {
+            preset,
+            media_type,
+            confirm,
+        } => {
+            let Some(preset) = Preset::from_label(&preset) else {
+                eprintln!(
+                    "error: no quality preset named `{preset}` \
+                     (try space-saving, balanced, high-quality, or maximum)"
+                );
+                return Err(USAGE);
+            };
+            if let Some(media_type) = &media_type {
+                if !Kind::ALL.iter().any(|kind| kind.media_type() == media_type) {
+                    eprintln!("error: no media type named `{media_type}` (try tv or movies)");
+                    return Err(USAGE);
+                }
+            }
+            QualityAction::Set {
+                preset,
+                media_type,
+                confirm,
+            }
+        }
+    };
+    Ok(Command::Quality(action))
 }
 
 /// Tell the operator what went wrong, and exit in a way a script can branch on.
