@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use lemonfiber_core::baseline::Baseline;
+use lemonfiber_core::baseline::{Baseline, Origin, Record};
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{
@@ -18,7 +18,7 @@ use lemonfiber_core::ports::service::{
 };
 use lemonfiber_core::seed::{
     contested_roots, intent, reconcile, wire_applications, wire_download_clients,
-    wire_jellyfin_identity, wire_root_folders, Intent, Observed, Report, State, Wiring,
+    wire_jellyfin_identity, wire_root_folders, Baselines, Intent, Observed, Report, State, Wiring,
 };
 
 // ---- The policy: pure, decided without a service. ----
@@ -36,41 +36,87 @@ fn the_policy_follows_from_what_was_observed() {
     assert_eq!(intent(Observed::Stale), Intent::Update);
     // A two-sided change is presented, never resolved on lemonfiber's own.
     assert_eq!(intent(Observed::Conflicted), Intent::Ask);
+    // An adopted value is kept; a pre-existing one with no baseline is adopted.
+    assert_eq!(intent(Observed::Adopted), Intent::Keep);
+    assert_eq!(intent(Observed::Unmanaged), Intent::Adopt);
 }
 
 #[test]
 fn the_three_way_comparison_reads_every_row_of_the_merge_table() {
+    // The expected leg carries a value and where it came from; a helper builds each.
+    let written = |value: &str| Record {
+        value: value.to_owned(),
+        at: "1".to_owned(),
+        origin: Origin::Written,
+    };
+    let adopted = |value: &str| Record {
+        value: value.to_owned(),
+        at: "1".to_owned(),
+        origin: Origin::Adopted,
+    };
     // Actual already at desired: in sync, whoever moved it there.
-    assert_eq!(reconcile(Some("tv"), Some("tv"), "tv"), Observed::Present);
-    assert_eq!(reconcile(Some("old"), Some("tv"), "tv"), Observed::Present);
+    assert_eq!(
+        reconcile(Some(&written("tv")), Some("tv"), "tv"),
+        Observed::Present
+    );
+    assert_eq!(
+        reconcile(Some(&written("old")), Some("tv"), "tv"),
+        Observed::Present
+    );
     // Actual differs, but lemonfiber's intent is unchanged from the baseline: the
     // operator's edit, preserved.
-    assert_eq!(reconcile(Some("tv"), Some("mine"), "tv"), Observed::Drifted);
+    assert_eq!(
+        reconcile(Some(&written("tv")), Some("mine"), "tv"),
+        Observed::Drifted
+    );
     // Actual still at the baseline, only lemonfiber's intent moved: stale, its own.
-    assert_eq!(reconcile(Some("tv"), Some("tv"), "tv-hd"), Observed::Stale);
+    assert_eq!(
+        reconcile(Some(&written("tv")), Some("tv"), "tv-hd"),
+        Observed::Stale
+    );
     // Baseline matches neither side: both moved away — a conflict.
     assert_eq!(
-        reconcile(Some("tv"), Some("mine"), "tv-hd"),
+        reconcile(Some(&written("tv")), Some("mine"), "tv-hd"),
         Observed::Conflicted
     );
-    // No baseline to judge against: the difference is taken as the operator's and
-    // preserved rather than overwritten on a guess.
-    assert_eq!(reconcile(None, Some("mine"), "tv"), Observed::Drifted);
-    // A service holding no value at all is a difference like any other, read the
-    // same three ways.
-    assert_eq!(reconcile(None, None, "tv"), Observed::Drifted);
-    assert_eq!(reconcile(Some("tv"), None, "tv-hd"), Observed::Conflicted);
+    assert_eq!(
+        reconcile(Some(&written("tv")), None, "tv-hd"),
+        Observed::Conflicted
+    );
+    // An adopted value the service still holds is kept, even though lemonfiber's
+    // desired differs — it is the operator's, not lemonfiber's own to bring up to
+    // date; changed again, it is a fresh edit to preserve.
+    assert_eq!(
+        reconcile(Some(&adopted("mine")), Some("mine"), "tv"),
+        Observed::Adopted
+    );
+    assert_eq!(
+        reconcile(Some(&adopted("mine")), Some("other"), "tv"),
+        Observed::Drifted
+    );
+    // An adopted value the operator moved to match lemonfiber's desired is in sync.
+    assert_eq!(
+        reconcile(Some(&adopted("mine")), Some("tv"), "tv"),
+        Observed::Present
+    );
+    // No baseline to judge against: the value the service holds is the operator's
+    // own, unmanaged — adopted rather than overwritten on a guess.
+    assert_eq!(reconcile(None, Some("mine"), "tv"), Observed::Unmanaged);
+    assert_eq!(reconcile(None, None, "tv"), Observed::Unmanaged);
 }
 
 #[test]
 fn only_a_wired_preserved_or_stale_connection_is_settled() {
-    // Settled: written, already correct, the operator's own edit, or lemonfiber's
-    // own value merely behind its intent — all working states.
+    // Settled: written, already correct, the operator's own edit, an adopted or
+    // pre-existing value theirs to keep, or lemonfiber's own value merely behind its
+    // intent — all working states.
     for settled in [
         State::Wired,
         State::AlreadyWired,
         State::Drifted,
         State::Stale,
+        State::Adopted,
+        State::Unmanaged,
     ] {
         assert!(settled.is_settled(), "{settled:?} is settled");
     }
@@ -211,6 +257,8 @@ fn the_report_names_each_state_on_the_wire() {
                     ours: "tv-hd".to_owned(),
                 },
             ),
+            wiring("h", State::Adopted),
+            wiring("i", State::Unmanaged),
         ],
     };
     let json = serde_json::to_string(&report).unwrap_or_default();
@@ -222,6 +270,8 @@ fn the_report_names_each_state_on_the_wire() {
         "failed",
         "stale",
         "conflicted",
+        "adopted",
+        "unmanaged",
     ] {
         assert!(json.contains(&format!(r#""state":"{state}""#)), "{json}");
     }
@@ -833,8 +883,11 @@ async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<S
         "sonarr",
         wanted,
         &mut journal,
-        &expected,
-        &mut records,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+        },
         "t",
     )
     .await;
@@ -857,8 +910,11 @@ async fn seed_clients_recording(
         "sonarr",
         wanted,
         &mut journal,
-        &expected,
-        &mut records,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+        },
         "t",
     )
     .await;
@@ -906,9 +962,10 @@ async fn a_client_at_the_same_endpoint_is_left_untouched_despite_a_different_nam
 
 #[tokio::test]
 async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
-    // Same endpoint, but the operator changed the category in the *arr itself.
-    // That is their edit to keep, not a mistake to revert: it is reported as
-    // drift and left exactly as it is, nothing re-registered.
+    // lemonfiber last wrote "tv" and still wants "tv", but the operator changed the
+    // category in the *arr itself. That is their edit to keep, not a mistake to
+    // revert: against the baseline it reports as drift and is left exactly as it is,
+    // nothing re-registered.
     let existing = vec![RegisteredClient {
         id: "1".to_owned(),
         host: "qbittorrent".to_owned(),
@@ -918,14 +975,30 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
             value: "my-own-tv".to_owned(),
         }),
     }];
-    let (states, recorded) = seed_clients(
-        FakeService::with_clients(Mode::Normal, existing),
+    let mut journal = Journal::new();
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
+    let mut records = Baseline::new();
+    let states: Vec<State> = wire_download_clients(
+        &FakeService::with_clients(Mode::Normal, existing),
+        "sonarr",
         &[client("qBittorrent", "qbittorrent", 8080)],
+        &mut journal,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+        },
+        "2",
     )
-    .await;
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect();
     assert_eq!(states, vec![State::Drifted]);
     assert_eq!(
-        recorded, 0,
+        journal.changes().len(),
+        0,
         "an operator's own change is preserved, not rewritten"
     );
 }
@@ -977,7 +1050,7 @@ async fn a_client_already_at_lemonfibers_value_is_recorded_as_the_baseline_too()
 async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
     // A drifted client is the operator's edit, not lemonfiber's value, so its
     // category is not recorded as expected: the baseline keeps what lemonfiber last
-    // wrote — here nothing — which is what lets a later run read the difference as
+    // wrote — here "tv" — which is what lets a later run read the difference as
     // drift rather than as lemonfiber's own intent.
     let existing = vec![RegisteredClient {
         id: "1".to_owned(),
@@ -988,11 +1061,27 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
             value: "my-own-tv".to_owned(),
         }),
     }];
-    let (states, baseline) = seed_clients_recording(
-        FakeService::with_clients(Mode::Normal, existing),
+    let mut journal = Journal::new();
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let mut records = Baseline::new();
+    let states: Vec<State> = wire_download_clients(
+        &FakeService::with_clients(Mode::Normal, existing),
+        "sonarr",
         &[client("SABnzbd", "sabnzbd", 8080)],
+        &mut journal,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+        },
+        "2",
     )
-    .await;
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect();
+    let baseline = records;
     assert_eq!(states, vec![State::Drifted]);
     assert_eq!(
         baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
@@ -1003,11 +1092,11 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
 #[tokio::test]
 async fn a_categoryless_client_lemonfiber_never_wrote_is_left_and_not_recorded() {
     // The service holds a client at the endpoint but reports no category, and there
-    // is no baseline — lemonfiber never wrote it. Its value differs from what
-    // lemonfiber wants, so the three-way comparison, with nothing to judge against,
-    // takes it as the operator's and leaves it (drifted), recording nothing: a later
-    // run then reads the operator's eventual category as their own value, not a
-    // conflict against a baseline lemonfiber never set.
+    // is no baseline — lemonfiber never wrote it. With nothing to judge against it is
+    // the operator's own, pre-existing and unmanaged, left as it is; and with no
+    // value to adopt (the client is categoryless) nothing is recorded, so a later run
+    // reads the operator's eventual category as their own value, not a conflict
+    // against a baseline lemonfiber never set.
     let existing = vec![RegisteredClient {
         id: "1".to_owned(),
         host: "sabnzbd".to_owned(),
@@ -1019,7 +1108,7 @@ async fn a_categoryless_client_lemonfiber_never_wrote_is_left_and_not_recorded()
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
-    assert_eq!(states, vec![State::Drifted]);
+    assert_eq!(states, vec![State::Unmanaged]);
     assert_eq!(
         baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
         None,
@@ -1050,8 +1139,11 @@ async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
         "sonarr",
         &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
         &mut journal,
-        &expected,
-        &mut records,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+        },
         "2",
     )
     .await
@@ -1089,8 +1181,11 @@ async fn a_client_both_sides_changed_is_a_conflict() {
         "sonarr",
         &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
         &mut journal,
-        &expected,
-        &mut records,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+        },
         "2",
     )
     .await
@@ -1108,6 +1203,228 @@ async fn a_client_both_sides_changed_is_a_conflict() {
         }]
     );
     assert_eq!(journal.changes().len(), 0, "a conflict is not resolved");
+}
+
+/// Run the client driver against a given baseline and pass kind, returning the
+/// resulting states, what this run recorded, and the number of changes journalled —
+/// for the adoption tests, which turn on the baseline's origin and the adopt flag.
+async fn seed_clients_with(
+    service: FakeService,
+    wanted: &[DownloadClient],
+    expected: &Baseline,
+    adopt: bool,
+) -> (Vec<State>, Baseline, usize) {
+    let mut journal = Journal::new();
+    let mut records = Baseline::new();
+    let wirings = wire_download_clients(
+        &service,
+        "sonarr",
+        wanted,
+        &mut journal,
+        &mut Baselines {
+            expected,
+            records: &mut records,
+            adopt,
+        },
+        "2",
+    )
+    .await;
+    let states = wirings.into_iter().map(|wiring| wiring.state).collect();
+    (states, records, journal.changes().len())
+}
+
+fn a_pre_existing_client() -> Vec<RegisteredClient> {
+    vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "their-tv".to_owned(),
+        }),
+    }]
+}
+
+#[tokio::test]
+async fn a_pre_existing_value_with_no_baseline_is_reported_unmanaged_not_drift() {
+    // A service already configured before lemonfiber managed it: it holds a value
+    // lemonfiber never wrote, and there is no baseline. An ordinary seed reports it
+    // as unmanaged — the operator's own, outside lemonfiber's scope — rather than as
+    // mass drift, and records nothing: it does not claim the value as lemonfiber's on
+    // its own, so a lost baseline is never silently frozen.
+    let (states, recorded, changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, a_pre_existing_client()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &Baseline::new(),
+        false,
+    )
+    .await;
+    assert_eq!(states, vec![State::Unmanaged]);
+    assert_eq!(
+        changes, 0,
+        "an unmanaged value is not written to the service"
+    );
+    assert_eq!(
+        recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
+        None,
+        "an ordinary seed does not adopt a pre-existing value on its own",
+    );
+}
+
+#[tokio::test]
+async fn an_adopt_pass_takes_on_a_pre_existing_unmanaged_value() {
+    // The deliberate act: adopting an existing setup baselines from what is found.
+    // The same pre-existing value, run through an adopt pass, is taken on — recorded
+    // as the operator's own, marked adopted, with nothing written to the service.
+    let (states, recorded, changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, a_pre_existing_client()),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &Baseline::new(),
+        true,
+    )
+    .await;
+    assert_eq!(states, vec![State::Adopted]);
+    assert_eq!(
+        changes, 0,
+        "adopting what is found writes nothing to the service"
+    );
+    assert_eq!(
+        recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
+        Some(&Record {
+            value: "their-tv".to_owned(),
+            at: "2".to_owned(),
+            origin: Origin::Adopted,
+        }),
+        "the operator's own value is adopted as the baseline",
+    );
+}
+
+#[tokio::test]
+async fn an_adopted_value_lemonfiber_also_wants_stays_adopted_not_re_recorded() {
+    // The case the origin exists to guard: an adopted value that happens to equal what
+    // lemonfiber would write must stay adopted, not be read as merely in-sync and taken
+    // back as lemonfiber's own. It reads as adopted, and this run records nothing over
+    // it — so the adopted baseline is not clobbered with a written one, which a later
+    // run, once lemonfiber's desired moved, would read as stale and revert.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        }),
+    }];
+    let mut expected = Baseline::new();
+    expected.adopt("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let (states, recorded, _changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &expected,
+        false,
+    )
+    .await;
+    assert_eq!(states, vec![State::Adopted]);
+    assert_eq!(
+        recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
+        None,
+        "an adopted value equal to desired is not re-recorded as written",
+    );
+}
+
+#[tokio::test]
+async fn an_adopted_value_the_service_still_holds_is_kept_not_made_stale() {
+    // The run after adoption: the baseline now holds the operator's value, marked
+    // adopted, and the service still holds it, while lemonfiber's desired differs. A
+    // written value here would be stale — lemonfiber's own, to bring up to date — but
+    // an adopted one is theirs to keep, so it is left as it is and not overwritten.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "their-tv".to_owned(),
+        }),
+    }];
+    let mut expected = Baseline::new();
+    expected.adopt("sonarr", "downloadclient:sabnzbd:8080", "their-tv", "1");
+    let (states, _recorded, changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &expected,
+        false,
+    )
+    .await;
+    assert_eq!(states, vec![State::Adopted]);
+    assert_eq!(changes, 0, "an adopted value is not overwritten");
+}
+
+#[tokio::test]
+async fn an_adopt_pass_promotes_a_drifted_value_and_records_it_as_adopted() {
+    // lemonfiber wrote "tv" and still wants it, but the operator changed it: a normal
+    // seed reports drift. An adopt pass instead promotes their edit — reporting it
+    // adopted and recording what the service holds as the accepted baseline, so a
+    // later seed keeps it rather than flagging it again.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "my-own-tv".to_owned(),
+        }),
+    }];
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let (states, recorded, changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &expected,
+        true,
+    )
+    .await;
+    assert_eq!(states, vec![State::Adopted]);
+    assert_eq!(
+        changes, 0,
+        "adopting an edit rewrites nothing in the service"
+    );
+    assert_eq!(
+        recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
+        Some(&Record {
+            value: "my-own-tv".to_owned(),
+            at: "2".to_owned(),
+            origin: Origin::Adopted,
+        }),
+        "the operator's edit is recorded as the adopted baseline",
+    );
+}
+
+#[tokio::test]
+async fn a_seed_after_an_adopt_pass_keeps_the_adopted_edit() {
+    // What the adopt pass recorded above, read on the next ordinary seed: the value
+    // is adopted, so the seed keeps it rather than reverting to lemonfiber's default —
+    // the promotion survives future seeds.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "my-own-tv".to_owned(),
+        }),
+    }];
+    let mut expected = Baseline::new();
+    expected.adopt("sonarr", "downloadclient:sabnzbd:8080", "my-own-tv", "2");
+    let (states, _recorded, changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &expected,
+        false,
+    )
+    .await;
+    assert_eq!(states, vec![State::Adopted]);
+    assert_eq!(changes, 0, "the adopted edit is kept, not reverted");
 }
 
 #[tokio::test]

@@ -109,6 +109,10 @@ pub enum Command {
     },
     /// Wire the stack's services to each other, idempotently.
     Seed,
+    /// Adopt the operator's current edits as lemonfiber's expected state, so they
+    /// stop reporting as drift and are kept across future seeds and restores. Wires
+    /// what is missing as a seed does, and promotes every drifted value to adopted.
+    Adopt,
 }
 
 /// What dispatching produced.
@@ -376,7 +380,8 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::Doctor { only, disruptive } => {
             diagnose(ctx, only, disruptive).await.map(Outcome::Doctor)
         }
-        Command::Seed => seed::seed(ctx).await.map(Outcome::Seed),
+        Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
+        Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
     }
 }
 

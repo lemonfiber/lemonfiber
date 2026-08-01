@@ -47,6 +47,11 @@ pub(crate) fn seeding(report: &SeedReport) {
             SeedState::Wired => println!("  ✓ {}   wired", wiring.connection),
             SeedState::AlreadyWired => println!("  ✓ {}   already wired", wiring.connection),
             SeedState::Drifted => println!("  · {}   left as you set it", wiring.connection),
+            SeedState::Adopted => println!("  ✓ {}   yours, adopted", wiring.connection),
+            SeedState::Unmanaged => println!(
+                "  ✓ {}   found already set — adopted as yours",
+                wiring.connection
+            ),
             SeedState::Stale => println!(
                 "  · {}   yours for now — a newer default is not yet applied",
                 wiring.connection

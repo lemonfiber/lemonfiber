@@ -157,6 +157,22 @@ mod tests {
     }
 
     #[test]
+    fn the_baseline_sits_beside_the_env_file() {
+        // Seeding derives where it writes the baseline from the environment file it is
+        // handed — `env_file.with_file_name("baseline.json")` — while a backup captures
+        // the configuration directory whole, and its restore-survival test checks
+        // against `baseline()`. The two derivations must land on the same file, or an
+        // adopted baseline would be written somewhere a restore does not carry. This
+        // ties them: the layout's own `baseline()` is exactly what the seed's formula
+        // produces from `env_file()`.
+        let paths = paths();
+        assert_eq!(
+            paths.env_file().with_file_name("baseline.json"),
+            paths.baseline()
+        );
+    }
+
+    #[test]
     fn every_location_is_distinct() {
         let paths = paths();
         let all = [

@@ -19,13 +19,46 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// One value lemonfiber wrote into a service, and when it wrote it.
+/// Where a recorded value came from: one lemonfiber wrote itself, or one it
+/// adopted from the operator as the accepted state.
+///
+/// The distinction is what keeps an adopted edit from reading as lemonfiber's own
+/// value fallen behind its intent: a value lemonfiber wrote and later finds its
+/// intent has moved past is stale and to be brought up to date, but a value the
+/// operator set and lemonfiber adopted is theirs to keep — lemonfiber will not push
+/// its default over it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Origin {
+    /// lemonfiber wrote this value into the service.
+    #[default]
+    Written,
+    /// The operator set this value and lemonfiber adopted it as the accepted state.
+    Adopted,
+}
+
+impl Origin {
+    /// Whether this value was adopted from the operator rather than written by
+    /// lemonfiber.
+    #[must_use]
+    pub const fn is_adopted(self) -> bool {
+        matches!(self, Self::Adopted)
+    }
+}
+
+/// One value lemonfiber recorded for a service — one it wrote or one it adopted —
+/// and when it recorded it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Record {
-    /// The value lemonfiber last wrote.
+    /// The value lemonfiber last recorded.
     pub value: String,
-    /// When it wrote it — the seed's own stamp, seconds since the epoch as text.
+    /// When it recorded it — the seed's own stamp, seconds since the epoch as text.
     pub at: String,
+    /// Whether lemonfiber wrote this value or adopted it from the operator. Absent
+    /// in a baseline written before adoption existed, where it reads as `Written` —
+    /// the only kind those runs recorded.
+    #[serde(default)]
+    pub origin: Origin,
 }
 
 /// What lemonfiber last wrote into every service: per service, per field, the
@@ -52,6 +85,22 @@ impl Baseline {
     /// confirmed, so an idempotent re-seed that changes nothing leaves the baseline
     /// — and the file it is stored in — untouched rather than restamped every run.
     pub fn record(&mut self, service: &str, field: &str, value: &str, at: &str) {
+        self.write(service, field, value, at, Origin::Written);
+    }
+
+    /// Adopt a value the operator set as the expected state, so a later run reads it
+    /// as theirs to keep rather than as drift or as lemonfiber's own value to bring
+    /// up to date. It is recorded exactly as [`Self::record`] does, but marked as
+    /// adopted, which is the whole of the difference a comparison later reads.
+    pub fn adopt(&mut self, service: &str, field: &str, value: &str, at: &str) {
+        self.write(service, field, value, at, Origin::Adopted);
+    }
+
+    /// Record a value with the given origin, keeping the original `at` where the
+    /// value is unchanged — the one write path [`Self::record`], [`Self::adopt`] and
+    /// [`Self::merge`] all funnel through, so the keep-the-timestamp rule holds
+    /// however a value is set.
+    fn write(&mut self, service: &str, field: &str, value: &str, at: &str, origin: Origin) {
         let fields = self.services.entry(service.to_owned()).or_default();
         let at = match fields.get(field) {
             Some(existing) if existing.value == value => existing.at.clone(),
@@ -62,20 +111,28 @@ impl Baseline {
             Record {
                 value: value.to_owned(),
                 at,
+                origin,
             },
         );
     }
 
-    /// The value lemonfiber last wrote for a field, or `None` where it wrote none.
-    /// That distinction is the point: a field with no record was never written by
-    /// lemonfiber, so a value the service holds there is the operator's alone, not
+    /// The value lemonfiber last recorded for a field, or `None` where it recorded
+    /// none. That distinction is the point: a field with no record was never written
+    /// by lemonfiber, so a value the service holds there is the operator's alone, not
     /// a difference from anything lemonfiber intended.
     #[must_use]
     pub fn expected(&self, service: &str, field: &str) -> Option<&str> {
-        self.services
-            .get(service)?
-            .get(field)
+        self.entry(service, field)
             .map(|record| record.value.as_str())
+    }
+
+    /// The whole record lemonfiber last kept for a field — value, timestamp and
+    /// whether it was written or adopted — or `None` where it kept none. The
+    /// comparison reads the origin alongside the value, so it needs the record, not
+    /// only the value [`Self::expected`] returns.
+    #[must_use]
+    pub fn entry(&self, service: &str, field: &str) -> Option<&Record> {
+        self.services.get(service)?.get(field)
     }
 
     /// Whether nothing has been recorded yet — the state before a first seed, and
@@ -93,7 +150,7 @@ impl Baseline {
     pub fn merge(&mut self, other: &Baseline) {
         for (service, fields) in &other.services {
             for (field, record) in fields {
-                self.record(service, field, &record.value, &record.at);
+                self.write(service, field, &record.value, &record.at, record.origin);
             }
         }
     }
@@ -101,7 +158,54 @@ impl Baseline {
 
 #[cfg(test)]
 mod tests {
-    use super::Baseline;
+    use super::{Baseline, Origin, Record};
+
+    #[test]
+    fn a_recorded_value_is_written_and_an_adopted_one_is_adopted() {
+        // The origin is the whole of the difference a later comparison reads: what
+        // lemonfiber wrote is written, what it took from the operator is adopted.
+        let mut baseline = Baseline::new();
+        baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+        baseline.adopt("radarr", "downloadclient:qbittorrent:8081", "mine", "1");
+        assert_eq!(
+            baseline
+                .entry("sonarr", "downloadclient:sabnzbd:8080")
+                .map(|record| record.origin),
+            Some(Origin::Written),
+        );
+        let adopted = baseline.entry("radarr", "downloadclient:qbittorrent:8081");
+        assert_eq!(adopted.map(|record| record.origin), Some(Origin::Adopted));
+        assert!(adopted.is_some_and(|record| record.origin.is_adopted()));
+    }
+
+    #[test]
+    fn a_record_without_an_origin_reads_as_written() {
+        // A baseline written before adoption existed has no origin field; it must
+        // deserialize as written, the only kind those runs recorded.
+        let record: Record = serde_json::from_str(r#"{"value":"tv","at":"1"}"#).unwrap_or(Record {
+            value: String::new(),
+            at: String::new(),
+            origin: Origin::Adopted,
+        });
+        assert_eq!(record.origin, Origin::Written);
+        assert!(!record.origin.is_adopted());
+    }
+
+    #[test]
+    fn merging_keeps_each_record_s_origin() {
+        // A record folded in from another baseline keeps whether it was written or
+        // adopted, so an adopted value does not become written on the way back into
+        // the one baseline the run persists.
+        let mut main = Baseline::new();
+        let mut other = Baseline::new();
+        other.adopt("sonarr", "downloadclient:sabnzbd:8080", "mine", "1");
+        main.merge(&other);
+        assert_eq!(
+            main.entry("sonarr", "downloadclient:sabnzbd:8080")
+                .map(|record| record.origin),
+            Some(Origin::Adopted),
+        );
+    }
 
     #[test]
     fn a_recorded_value_is_read_back_as_the_expected_state() {
