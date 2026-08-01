@@ -127,15 +127,18 @@ fn unreadable(path: PathBuf, reason: String) -> Problem {
     store::Failure::Unreadable { path, reason }.problem()
 }
 
-/// The most demanding preset in force, or the default where none is chosen or the
-/// choice cannot be read. Best-effort by design: a storage projection during a
-/// diagnostic run must not fail the whole run over an unreadable choice — unlike a
-/// `set`, it writes nothing, so guessing the default here loses nothing.
+/// The recorded choice, or the default where none is chosen or it cannot be read.
+///
+/// Best-effort by design: a read (a storage projection, an upgrade's cost) must not
+/// fail over an unreadable choice the way a `set` does — it writes nothing, so
+/// falling back to the default loses nothing.
+pub(super) fn recorded_selection(ctx: &Ctx) -> Selection {
+    load_selection(ctx).unwrap_or_else(|_| Selection::everywhere(Preset::default_preset()))
+}
+
+/// The most demanding preset in force — the basis a storage projection turns on.
 pub(super) fn most_demanding_or_default(ctx: &Ctx) -> Preset {
-    load_selection(ctx).map_or_else(
-        |_| Preset::default_preset(),
-        |selection| selection.most_demanding(),
-    )
+    recorded_selection(ctx).most_demanding()
 }
 
 /// Record the choice where the next run — and a backup — will find it.

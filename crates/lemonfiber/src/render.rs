@@ -12,7 +12,7 @@ use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
     ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, PresetChoice,
-    QualityReport, StatusReport, SupervisionReport, VersionReport,
+    QualityReport, StatusReport, SupervisionReport, Triggered, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
@@ -35,6 +35,7 @@ pub(crate) fn render(outcome: &Outcome, json: bool) {
         Outcome::Version(report) => versions(report),
         Outcome::Config(report) => settings(report),
         Outcome::Quality(report) => quality(report),
+        Outcome::Upgrade(report) => upgrade(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
         Outcome::Doctor(report) => diagnosis(report),
@@ -280,6 +281,47 @@ fn preset_choice(choice: &PresetChoice) {
     );
     if choice.needs_transcoding_here {
         println!("  ⚠ this machine would have to transcode this in software");
+    }
+}
+
+/// Upgrading existing content: the cost stated per media type first, then — once
+/// confirmed — what each service was asked to do.
+pub(crate) fn upgrade(report: &UpgradeReport) {
+    if report.media.is_empty() {
+        println!("No television or film service is set up, so there is nothing to upgrade.");
+        return;
+    }
+    if report.confirmed {
+        println!(
+            "Upgrading existing content, each service re-searching against its own quality bar:"
+        );
+    } else {
+        // The cost, and nothing done: a large operation stays behind a deliberate
+        // confirmation.
+        println!(
+            "Upgrading existing content re-downloads your library at the chosen quality — a large, \
+             bandwidth-expensive operation, potentially terabytes and hours to days. It would cost, \
+             per media:"
+        );
+    }
+    for media in &report.media {
+        println!(
+            "  {}: {} — {}",
+            media.media_type, media.preset, media.size_per_hour
+        );
+        match &media.outcome {
+            None => {}
+            Some(Triggered::Started) => println!("    ✓ re-search started"),
+            Some(Triggered::NotStarted) => {
+                println!(
+                    "    · not started — the service is not up yet; run this again once it is"
+                );
+            }
+            Some(Triggered::Failed { detail }) => println!("    ✗ {detail}"),
+        }
+    }
+    if !report.confirmed {
+        println!("\nNothing has been changed. Re-run with --confirm to go ahead.");
     }
 }
 
