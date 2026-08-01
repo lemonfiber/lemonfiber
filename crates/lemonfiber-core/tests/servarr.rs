@@ -10,10 +10,11 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Http, Method, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
-    Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, QueueDepth,
-    Queues, RegisteredClient, RegisteredFolder, RootFolder,
+    Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, MusicQuality,
+    QueueDepth, Queues, RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::servarr::{api_key, Servarr};
 
@@ -620,4 +621,232 @@ async fn a_queue_that_is_not_answered_is_unavailable() {
         sonarr(&fake).queue().await,
         Err(Failure::Unavailable { .. })
     ));
+}
+
+// ---- Lidarr music-quality apply ----
+
+/// A transport that answers by matching a request's method and a substring of its URL,
+/// recording every request so a test can assert what a whole exchange sent.
+struct Router {
+    routes: Vec<(Method, &'static str, u16, String)>,
+    seen: Mutex<Vec<Request>>,
+}
+
+impl Router {
+    fn new(routes: Vec<(Method, &'static str, u16, String)>) -> Arc<Self> {
+        Arc::new(Self {
+            routes,
+            seen: Mutex::new(Vec::new()),
+        })
+    }
+
+    /// Every request the client sent, in order.
+    fn sent(&self) -> Vec<Request> {
+        self.seen
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_default()
+    }
+}
+
+#[async_trait]
+impl Http for Router {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        if let Ok(mut guard) = self.seen.lock() {
+            guard.push(request.clone());
+        }
+        for (method, needle, status, body) in &self.routes {
+            if request.method == *method && request.url.contains(needle) {
+                return Ok(Response {
+                    status: *status,
+                    body: body.clone(),
+                });
+            }
+        }
+        Ok(Response {
+            status: 404,
+            body: String::new(),
+        })
+    }
+}
+
+/// A Lidarr client over the given router — the v1 Lidarr answers at.
+fn lidarr(router: &Arc<Router>) -> Servarr {
+    let http: Arc<dyn Http> = router.clone();
+    Servarr::new(http, "http://lidarr:8686", "the-key", "lidarr", 1)
+}
+
+/// A profile list a GET returns: a stray non-object (skipped), an object with no id
+/// (rewritten but not addressable, so not sent), and a full profile that is updated —
+/// carrying the 24-bit format in its items so a hi-res choice has something to score.
+const PROFILES: &str = r#"[
+    1,
+    {"upgradeAllowed":false,"cutoff":1006,"items":[
+        {"id":1005,"name":"High Quality Lossy","allowed":false,"items":[]},
+        {"id":1006,"name":"Lossless","allowed":false,"items":[]}
+    ]},
+    {"id":2,"upgradeAllowed":false,"cutoff":1006,"cutoffFormatScore":0,
+     "formatItems":[{"format":9,"name":"lemonfiber: 24-bit","score":0}],
+     "items":[
+        {"id":1005,"name":"High Quality Lossy","allowed":false,"items":[]},
+        {"id":1006,"name":"Lossless","allowed":false,"items":[]}
+    ]}
+]"#;
+
+#[tokio::test]
+async fn a_lossless_choice_updates_each_addressable_profile() {
+    let router = Router::new(vec![
+        (Method::Get, "/qualityprofile", 200, PROFILES.to_owned()),
+        (Method::Put, "/qualityprofile", 200, String::new()),
+    ]);
+    let applied = lidarr(&router).apply_music_format(Format::Lossless).await;
+    assert!(applied.is_ok());
+
+    // Only the profile that carries an id is addressed — the stray and the id-less one
+    // are passed over rather than sent nowhere.
+    let puts: Vec<Request> = router
+        .sent()
+        .into_iter()
+        .filter(|request| request.method == Method::Put)
+        .collect();
+    assert_eq!(puts.len(), 1);
+    let put = puts.first();
+    assert!(put.is_some_and(|request| request.url.ends_with("/api/v1/qualityprofile/2")));
+    assert!(put
+        .and_then(|request| request.body.as_deref())
+        .is_some_and(|body| body.contains(r#""upgradeAllowed":true"#)));
+
+    // A non-hi-res choice touches no custom format.
+    assert!(!router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("/customformat")));
+}
+
+#[tokio::test]
+async fn a_compact_choice_updates_the_profile_without_touching_a_custom_format() {
+    let router = Router::new(vec![
+        (Method::Get, "/qualityprofile", 200, PROFILES.to_owned()),
+        (Method::Put, "/qualityprofile", 200, String::new()),
+    ]);
+    let applied = lidarr(&router).apply_music_format(Format::Compact).await;
+    assert!(applied.is_ok());
+    // Compact addresses the profile but, like every non-hi-res choice, leaves custom
+    // formats alone.
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.method == Method::Put));
+    assert!(!router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("/customformat")));
+}
+
+#[tokio::test]
+async fn a_hi_res_choice_creates_the_24_bit_format_and_prefers_it() {
+    let router = Router::new(vec![
+        (Method::Get, "/customformat", 200, "[]".to_owned()),
+        (Method::Post, "/customformat", 201, String::new()),
+        (Method::Get, "/qualityprofile", 200, PROFILES.to_owned()),
+        (Method::Put, "/qualityprofile", 200, String::new()),
+    ]);
+    let applied = lidarr(&router).apply_music_format(Format::HiRes).await;
+    assert!(applied.is_ok());
+
+    // The 24-bit format is created, as a release-title match.
+    let posts: Vec<Request> = router
+        .sent()
+        .into_iter()
+        .filter(|request| request.method == Method::Post && request.url.contains("/customformat"))
+        .collect();
+    assert_eq!(posts.len(), 1);
+    assert!(posts
+        .first()
+        .and_then(|request| request.body.as_deref())
+        .is_some_and(|body| body.contains("ReleaseTitleSpecification")));
+
+    // The profile update prefers it, through a positive cutoff format score.
+    let put = router
+        .sent()
+        .into_iter()
+        .find(|request| request.method == Method::Put);
+    assert!(put
+        .and_then(|request| request.body)
+        .is_some_and(|body| body.contains(r#""cutoffFormatScore":100"#)));
+}
+
+#[tokio::test]
+async fn an_existing_24_bit_format_is_not_created_again() {
+    let router = Router::new(vec![
+        (
+            Method::Get,
+            "/customformat",
+            200,
+            r#"[{"id":9,"name":"lemonfiber: 24-bit"}]"#.to_owned(),
+        ),
+        (Method::Get, "/qualityprofile", 200, PROFILES.to_owned()),
+        (Method::Put, "/qualityprofile", 200, String::new()),
+    ]);
+    let applied = lidarr(&router).apply_music_format(Format::HiRes).await;
+    assert!(applied.is_ok());
+    assert!(
+        !router
+            .sent()
+            .iter()
+            .any(|request| request.method == Method::Post),
+        "the format already existed, so it was not created again"
+    );
+}
+
+#[tokio::test]
+async fn an_unreadable_profile_list_is_a_failure() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/qualityprofile",
+        200,
+        "not json".to_owned(),
+    )]);
+    assert!(lidarr(&router)
+        .apply_music_format(Format::Lossless)
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn a_refused_profile_update_is_a_failure() {
+    let router = Router::new(vec![
+        (Method::Get, "/qualityprofile", 200, PROFILES.to_owned()),
+        (Method::Put, "/qualityprofile", 500, "boom".to_owned()),
+    ]);
+    assert!(lidarr(&router)
+        .apply_music_format(Format::Lossless)
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn an_unreadable_custom_format_list_is_a_failure() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/customformat",
+        200,
+        "not json".to_owned(),
+    )]);
+    assert!(lidarr(&router)
+        .apply_music_format(Format::HiRes)
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn a_refused_custom_format_creation_is_a_failure() {
+    let router = Router::new(vec![
+        (Method::Get, "/customformat", 200, "[]".to_owned()),
+        (Method::Post, "/customformat", 500, "nope".to_owned()),
+    ]);
+    assert!(lidarr(&router)
+        .apply_music_format(Format::HiRes)
+        .await
+        .is_err());
 }

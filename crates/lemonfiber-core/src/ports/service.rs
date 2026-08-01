@@ -466,6 +466,21 @@ pub trait Maintenance: Send + Sync {
     async fn run_command(&self, name: &str) -> Result<(), Failure>;
 }
 
+/// Applying an audio quality to a service that has one — Lidarr, whose quality axis is
+/// a format rather than a resolution and which no community profile configures, so the
+/// choice is carried straight to its own quality profiles.
+#[async_trait]
+pub trait MusicQuality: Send + Sync {
+    /// Set every quality profile to the format, and — for a hi-res choice — ensure the
+    /// 24-bit custom format exists and is preferred. Forward-looking, like every quality
+    /// choice: it decides what is acquired next, not a rewrite of the library on disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses a change.
+    async fn apply_music_format(&self, format: crate::audio::Format) -> Result<(), Failure>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
