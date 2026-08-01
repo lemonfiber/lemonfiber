@@ -11,8 +11,9 @@ use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
-    ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, PresetChoice,
-    QualityReport, StatusReport, SupervisionReport, Triggered, UpgradeReport, VersionReport,
+    ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, MusicChoice, MusicReport,
+    PresetChoice, QualityReport, StatusReport, SupervisionReport, Triggered, UpgradeReport,
+    VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
@@ -36,6 +37,7 @@ pub(crate) fn render(outcome: &Outcome, json: bool) {
         Outcome::Config(report) => settings(report),
         Outcome::Quality(report) => quality(report),
         Outcome::Upgrade(report) => upgrade(report),
+        Outcome::Music(report) => music(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
         Outcome::Doctor(report) => diagnosis(report),
@@ -218,6 +220,9 @@ pub(crate) fn quality(report: &QualityReport) {
     for choice in &report.choices {
         preset_choice(choice);
     }
+    if let Some(choice) = &report.music {
+        music_choice(choice);
+    }
     match report.disposition {
         // A change is forward-looking, and this is where the operator is told so —
         // the expectation is often the opposite, that lowering quality shrinks the
@@ -281,6 +286,44 @@ fn preset_choice(choice: &PresetChoice) {
     );
     if choice.needs_transcoding_here {
         println!("  ⚠ this machine would have to transcode this in software");
+    }
+}
+
+/// One audio-format choice, in the same shape as a preset choice but in format terms —
+/// what it targets, its size, and the caveat worth knowing rather than a resolution.
+fn music_choice(choice: &MusicChoice) {
+    println!("{}: {} — {}", choice.scope, choice.format, choice.means);
+    println!(
+        "  {} · {} · {}",
+        choice.targets, choice.size_per_hour, choice.note
+    );
+}
+
+/// Choosing the audio format for music: the choice, then whether it was recorded or
+/// rehearsed and what became of applying it to the music service.
+pub(crate) fn music(report: &MusicReport) {
+    music_choice(&report.choice);
+    match report.disposition {
+        Disposition::Rehearsed => {
+            println!(
+                "\nWould save. This affects future acquisitions only — nothing downloaded changes."
+            );
+            return;
+        }
+        _ => println!(
+            "\nSaved. This affects future acquisitions only — nothing already downloaded changes."
+        ),
+    }
+    match &report.outcome {
+        None | Some(Triggered::Started) => {
+            println!("Applied to the music service.");
+        }
+        Some(Triggered::NotStarted) => {
+            println!("The music service is not up yet, so it was recorded but not applied — run this again once it is.");
+        }
+        Some(Triggered::Failed { detail }) => {
+            println!("Recorded, but the music service refused the change: {detail}");
+        }
     }
 }
 

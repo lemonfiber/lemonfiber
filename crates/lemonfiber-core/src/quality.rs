@@ -18,6 +18,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::audio::Format;
+
 /// How good the operator wants their media to look, and how much disk they will
 /// spend on it — chosen without ever learning what a custom format is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,6 +168,11 @@ pub struct Selection {
     /// Media types the operator chose a different preset for, keyed by type.
     #[serde(default)]
     per_type: BTreeMap<String, Preset>,
+    /// The audio format chosen for music, where one has been — a separate axis, since
+    /// music has no resolution to set. Absent until the operator chooses; an old
+    /// choice file that predates it reads as absent and falls back to the default.
+    #[serde(default)]
+    music: Option<Format>,
 }
 
 impl Selection {
@@ -175,7 +182,28 @@ impl Selection {
         Self {
             global,
             per_type: BTreeMap::new(),
+            music: None,
         }
+    }
+
+    /// The audio format in force for music: the operator's choice where they made one,
+    /// otherwise the default. Music is a separate axis from the resolution presets, so
+    /// it is read apart from them rather than through [`Selection::for_type`].
+    #[must_use]
+    pub fn music(&self) -> Format {
+        self.music.unwrap_or_else(Format::default_format)
+    }
+
+    /// Whether an audio format has been chosen for music — as opposed to the default
+    /// standing in. Lets a surface show music only where it is genuinely set.
+    #[must_use]
+    pub fn music_chosen(&self) -> bool {
+        self.music.is_some()
+    }
+
+    /// Choose the audio format for music.
+    pub fn set_music(&mut self, format: Format) {
+        self.music = Some(format);
     }
 
     /// The preset in force everywhere a media type has no exception of its own.

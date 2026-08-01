@@ -15,6 +15,7 @@ use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{
     dispatch, logs, pull_progress, supervise, Command, Ctx, Outcome, QualityAction, WATCH,
 };
+use lemonfiber_core::audio::Format;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, indexer_from_env, ip_echo_from_env, port_forward_from_env,
@@ -22,7 +23,7 @@ use lemonfiber_core::config::{
 };
 use lemonfiber_core::doctor::{Category, Overall};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{Disposition, Envelope, Triggered};
+use lemonfiber_core::model::{Disposition, Envelope, Triggered, UpgradeReport};
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
@@ -460,32 +461,45 @@ fn settled(outcome: &Outcome) -> ExitCode {
             | Disposition::Reapplied
             | Disposition::WouldReapply => ExitCode::SUCCESS,
         },
-        // An unconfirmed upgrade stated its cost and did nothing, so a script sees a
-        // non-zero result telling it to confirm. A service that refused is a failure;
-        // a run where nothing was actually started — every service still coming up, or
-        // none present — is a failure too, so success means at least one re-search
-        // began and none was refused.
-        Outcome::Upgrade(report) => {
-            let outcome = |want: fn(&Triggered) -> bool| {
-                report
-                    .media
-                    .iter()
-                    .filter_map(|media| media.outcome.as_ref())
-                    .any(want)
-            };
-            if !report.confirmed {
-                ExitCode::from(VALIDATION)
-            } else if outcome(|state| matches!(state, Triggered::Failed { .. })) {
+        Outcome::Upgrade(report) => upgrade_exit(report),
+        // The music choice is recorded even when the service could not be reached, so
+        // only a service that refused the change is a failure; a rehearsal or a service
+        // still coming up has still recorded the choice.
+        Outcome::Music(report) => {
+            if matches!(report.outcome, Some(Triggered::Failed { .. })) {
                 ExitCode::from(FAILURE)
-            } else if outcome(|state| matches!(state, Triggered::Started)) {
-                ExitCode::SUCCESS
             } else {
-                ExitCode::from(FAILURE)
+                ExitCode::SUCCESS
             }
         }
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
             ExitCode::SUCCESS
         }
+    }
+}
+
+/// The exit code an upgrade earns.
+///
+/// An unconfirmed upgrade stated its cost and did nothing, so a script sees a non-zero
+/// result telling it to confirm. A service that refused is a failure; a run where
+/// nothing was actually started — every service still coming up, or none present — is a
+/// failure too, so success means at least one re-search began and none was refused.
+fn upgrade_exit(report: &UpgradeReport) -> ExitCode {
+    let outcome = |want: fn(&Triggered) -> bool| {
+        report
+            .media
+            .iter()
+            .filter_map(|media| media.outcome.as_ref())
+            .any(want)
+    };
+    if !report.confirmed {
+        ExitCode::from(VALIDATION)
+    } else if outcome(|state| matches!(state, Triggered::Failed { .. })) {
+        ExitCode::from(FAILURE)
+    } else if outcome(|state| matches!(state, Triggered::Started)) {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(FAILURE)
     }
 }
 
@@ -569,6 +583,19 @@ fn quality(action: QualityCommand) -> Result<Command, u8> {
             media_type,
             confirm,
         } => {
+            // Music has no resolution: `--for music` chooses an audio format instead of a
+            // resolution preset, and reaches the service rather than only recording, so it
+            // routes to its own command.
+            if media_type.as_deref() == Some("music") {
+                let Some(format) = Format::from_label(&preset) else {
+                    eprintln!(
+                        "error: no music format named `{preset}` \
+                         (try compact, lossless, or hi-res)"
+                    );
+                    return Err(USAGE);
+                };
+                return Ok(Command::QualityMusic { format });
+            }
             let Some(preset) = Preset::from_label(&preset) else {
                 eprintln!(
                     "error: no quality preset named `{preset}` \
@@ -578,7 +605,9 @@ fn quality(action: QualityCommand) -> Result<Command, u8> {
             };
             if let Some(media_type) = &media_type {
                 if !Kind::ALL.iter().any(|kind| kind.media_type() == media_type) {
-                    eprintln!("error: no media type named `{media_type}` (try tv or movies)");
+                    eprintln!(
+                        "error: no media type named `{media_type}` (try tv, movies, or music)"
+                    );
                     return Err(USAGE);
                 }
             }
