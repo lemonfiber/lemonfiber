@@ -82,7 +82,10 @@ fn only_a_wired_preserved_or_stale_connection_is_settled() {
         State::Failed {
             detail: "rejected".to_owned(),
         },
-        State::Conflicted,
+        State::Conflicted {
+            yours: Some("mine".to_owned()),
+            ours: "tv-hd".to_owned(),
+        },
     ] {
         assert!(!unsettled.is_settled(), "{unsettled:?} is not settled");
     }
@@ -159,7 +162,13 @@ fn a_blocked_connection_is_named_apart_from_the_merely_outstanding() {
                     reason: "shared with sonarr".to_owned(),
                 },
             ),
-            wiring("SABnzbd into Sonarr", State::Conflicted),
+            wiring(
+                "SABnzbd into Sonarr",
+                State::Conflicted {
+                    yours: Some("mine".to_owned()),
+                    ours: "tv-hd".to_owned(),
+                },
+            ),
         ],
     };
     assert!(!report.is_complete());
@@ -195,7 +204,13 @@ fn the_report_names_each_state_on_the_wire() {
                 },
             ),
             wiring("f", State::Stale),
-            wiring("g", State::Conflicted),
+            wiring(
+                "g",
+                State::Conflicted {
+                    yours: Some("mine".to_owned()),
+                    ours: "tv-hd".to_owned(),
+                },
+            ),
         ],
     };
     let json = serde_json::to_string(&report).unwrap_or_default();
@@ -1082,7 +1097,16 @@ async fn a_client_both_sides_changed_is_a_conflict() {
     .into_iter()
     .map(|wiring| wiring.state)
     .collect();
-    assert_eq!(states, vec![State::Conflicted]);
+    // The conflict is presented with both sides — what the operator set beside what
+    // lemonfiber would write — so the operator can see the clash, and nothing is
+    // written: presenting is not resolving.
+    assert_eq!(
+        states,
+        vec![State::Conflicted {
+            yours: Some("mine".to_owned()),
+            ours: "tv-hd".to_owned(),
+        }]
+    );
     assert_eq!(journal.changes().len(), 0, "a conflict is not resolved");
 }
 

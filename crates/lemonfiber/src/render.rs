@@ -51,10 +51,20 @@ pub(crate) fn seeding(report: &SeedReport) {
                 "  · {}   yours for now — a newer default is not yet applied",
                 wiring.connection
             ),
-            SeedState::Conflicted => println!(
-                "  ✗ {}   conflict — both you and the default changed it; left as you set it",
-                wiring.connection
-            ),
+            SeedState::Conflicted { yours, ours } => {
+                println!(
+                    "  ✗ {}   conflict — both you and the default changed it",
+                    wiring.connection
+                );
+                match yours {
+                    Some(yours) => println!(
+                        "      you set “{yours}”, the default is now “{ours}” — left as you set it"
+                    ),
+                    None => println!(
+                        "      you cleared it, the default is now “{ours}” — left as you set it"
+                    ),
+                }
+            }
             SeedState::Skipped { reason } => {
                 println!("  ? {}   skipped", wiring.connection);
                 println!("      {reason}");
