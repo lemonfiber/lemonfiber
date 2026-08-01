@@ -127,6 +127,17 @@ fn unreadable(path: PathBuf, reason: String) -> Problem {
     store::Failure::Unreadable { path, reason }.problem()
 }
 
+/// The most demanding preset in force, or the default where none is chosen or the
+/// choice cannot be read. Best-effort by design: a storage projection during a
+/// diagnostic run must not fail the whole run over an unreadable choice — unlike a
+/// `set`, it writes nothing, so guessing the default here loses nothing.
+pub(super) fn most_demanding_or_default(ctx: &Ctx) -> Preset {
+    load_selection(ctx).map_or_else(
+        |_| Preset::default_preset(),
+        |selection| selection.most_demanding(),
+    )
+}
+
 /// Record the choice where the next run — and a backup — will find it.
 ///
 /// Unlike the baseline seeding keeps best-effort, this is the operator's explicit
@@ -389,6 +400,27 @@ mod tests {
             QualityAction::Show
         )
         .is_err());
+    }
+
+    #[test]
+    fn the_projection_reads_the_recorded_choice() {
+        let env = scratch("projection-recorded");
+        let context = ctx(Some(env), Environment::LinuxNative);
+        let _ = quality(&context, set(Preset::Maximum, None, true));
+        assert_eq!(super::most_demanding_or_default(&context), Preset::Maximum);
+    }
+
+    #[test]
+    fn the_projection_falls_back_to_the_default_on_an_unreadable_choice() {
+        // A corrupt choice must not fail a diagnostic run: the projection quietly
+        // uses the default rather than surfacing, since it writes nothing.
+        let env = scratch("projection-corrupt");
+        let _ = store::write(&env.with_file_name("quality.json"), "not json");
+        let context = ctx(Some(env), Environment::LinuxNative);
+        assert_eq!(
+            super::most_demanding_or_default(&context),
+            Preset::default_preset()
+        );
     }
 
     #[test]
