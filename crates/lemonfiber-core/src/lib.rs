@@ -62,6 +62,7 @@ pub mod stack;
 pub mod storage;
 #[cfg(test)]
 mod test_support;
+pub mod transcoding;
 pub mod validate;
 pub mod wizard;
 

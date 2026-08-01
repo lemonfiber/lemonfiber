@@ -122,6 +122,16 @@ impl Preset {
             },
         }
     }
+
+    /// Whether choosing this preset commonly forces the media server to transcode
+    /// — true only for the 4K HDR maximum, the one whose [`Consequence`] calls
+    /// transcoding a likely cost. It is the gate a host without hardware
+    /// transcoding warns on, so the plain boolean lives beside the prose it agrees
+    /// with rather than being read back out of that prose.
+    #[must_use]
+    pub const fn likely_needs_transcoding(self) -> bool {
+        matches!(self, Self::Maximum)
+    }
 }
 
 /// The operator's quality choice across their media: one preset for everything, with
@@ -248,6 +258,13 @@ mod tests {
                 likely,
                 preset == Preset::Maximum,
                 "{preset:?} misstates whether transcoding is a likely cost",
+            );
+            // The plain boolean the platform check gates on must agree with the
+            // prose, so the two can never drift apart.
+            assert_eq!(
+                preset.likely_needs_transcoding(),
+                likely,
+                "{preset:?} boolean and prose disagree on transcoding",
             );
         }
     }
