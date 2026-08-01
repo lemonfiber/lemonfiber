@@ -24,7 +24,7 @@ use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, SettingReport, StatusReport,
+    ConfigReport, DoctorReport, Envelope, LifecycleReport, SettingReport, StackEdit, StatusReport,
     VersionReport,
 };
 use crate::ports::docker::{LogLine, LogQuery};
@@ -36,6 +36,7 @@ pub mod apply;
 pub mod backup;
 mod ctx;
 pub mod dashboard;
+mod materialise;
 pub mod recover;
 pub mod restore;
 mod seed;
@@ -321,7 +322,7 @@ pub async fn logs(
 /// Returns the [`Problem`] a surface should render when the stack cannot be
 /// resolved or Compose cannot be spawned.
 pub async fn pull_progress(ctx: &Ctx, forms: &[String]) -> Result<Receiver<Progress>, Problem> {
-    let (_, _, command) = compose(ctx, forms, &Action::Pull).map_err(|err| *err)?;
+    let (_, _, command, _) = compose(ctx, forms, &Action::Pull).map_err(|err| *err)?;
     ctx.runner
         .stream(&command)
         .await
@@ -337,23 +338,37 @@ pub async fn pull_progress(ctx: &Ctx, forms: &[String]) -> Result<Receiver<Progr
 /// that cannot be written — read the same wherever they surface. The manifest and
 /// plan travel back with the command because a caller that runs it needs them to
 /// report what it did and to wait on what it started.
-fn compose(
-    ctx: &Ctx,
-    forms: &[String],
-    action: &Action,
-) -> Result<(lemonfiber_manifest::Manifest, Plan, Vec<String>), Box<Problem>> {
+/// What resolving the forms into a runnable Compose command produced: the manifest
+/// and plan a caller needs to report and wait on what it ran, the command itself,
+/// and any stack file the operator had edited that was preserved rather than
+/// overwritten.
+type Composed = (
+    lemonfiber_manifest::Manifest,
+    Plan,
+    Vec<String>,
+    Vec<StackEdit>,
+);
+
+fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
     let plan =
         resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| Box::new(err.problem()))?;
-    let stack = ctx
-        .stack
-        .materialise(ctx.settings.stack_dir.as_deref())
-        .map_err(|err| Box::new(err.problem()))?;
+    let record = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .map(|env| env.with_file_name("materialised.json"));
+    let (stack, edits) = materialise::materialise(
+        ctx.stack,
+        ctx.settings.stack_dir.as_deref(),
+        record.as_deref(),
+    )
+    .map_err(|err| Box::new(err.problem()))?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
-    Ok((manifest, plan, command))
+    Ok((manifest, plan, command, edits))
 }
 
 /// Carry out a command.
@@ -544,7 +559,7 @@ fn configuration(
 /// is the point: `up` from a keypress and `up` from a subcommand reach this same
 /// function with the same arguments.
 async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome, Problem> {
-    let (manifest, plan, command) = compose(ctx, forms, action).map_err(|err| *err)?;
+    let (manifest, plan, command, stack_edits) = compose(ctx, forms, action).map_err(|err| *err)?;
 
     let mut report = LifecycleReport {
         action: action.name().to_owned(),
@@ -555,6 +570,7 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outco
         status: None,
         services: Vec::new(),
         condition: None,
+        stack_edits,
     };
 
     // A rehearsal stops here deliberately: it has already done everything except
@@ -1208,6 +1224,30 @@ mod tests {
             "a rehearsal reports the change it would make, and that it was a rehearsal"
         );
         assert!(!path.exists(), "a rehearsal writes nothing");
+    }
+
+    #[tokio::test]
+    async fn a_lifecycle_command_with_a_config_file_reports_no_edits_for_an_external_stack() {
+        // With an environment file in hand, a lifecycle command derives where it would
+        // keep the materialised-stack record beside it. The stack here is external —
+        // the operator's own on disk — so nothing is written and no edit is reported.
+        let path = config_scratch("lifecycle-config");
+        let ctx = with_config(&path).rehearsing();
+        let outcome = dispatch(
+            Command::Up {
+                forms: vec!["tv".to_owned()],
+            },
+            &ctx,
+        )
+        .await;
+        let edits = report(outcome)
+            .map(|report| report.stack_edits)
+            .unwrap_or_default();
+        assert!(
+            edits.is_empty(),
+            "an external stack is left as it is, so nothing is reported"
+        );
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(std::path::Path::new("/")));
     }
 
     #[tokio::test]

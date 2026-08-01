@@ -11,6 +11,7 @@ repository.workspace = true
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 async-trait = { workspace = true }
 bollard = { workspace = true }
+crc32fast = "1"
 getrandom = { workspace = true }
 include_dir = { workspace = true }
 reqwest = { workspace = true }

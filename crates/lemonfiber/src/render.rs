@@ -231,6 +231,19 @@ pub(crate) fn lifecycle(report: &LifecycleReport) {
         println!("\n{}", describe(condition));
         show(&report.services);
     }
+
+    // Stack files the operator edited, kept as they set them rather than overwritten
+    // on this run. Named with the change an upgrade would make, so the operator can
+    // see what they are holding back before deciding to take it or keep theirs.
+    for edit in &report.stack_edits {
+        println!(
+            "\nkept {} as it is on disk — not overwritten by this version",
+            edit.path
+        );
+        if !edit.diff.is_empty() {
+            print!("{}", edit.diff);
+        }
+    }
 }
 
 /// What each service is doing.

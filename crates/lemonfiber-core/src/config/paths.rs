@@ -80,6 +80,16 @@ impl Paths {
         self.data.join("stack")
     }
 
+    /// The record of what lemonfiber last wrote to the stack directory — a checksum
+    /// per file, so a later run tells an operator's edit from a version it has not
+    /// upgraded yet. Kept with configuration, not beside the stack it describes: it
+    /// is the memory of what was written, which losing would let an edit be
+    /// overwritten, so it belongs with what a backup keeps.
+    #[must_use]
+    pub fn materialised(&self) -> PathBuf {
+        self.config.join("materialised.json")
+    }
+
     /// The baseline the storage check records, to notice when hardlinks stop
     /// working. Regenerable — losing it costs one run's history, nothing more.
     #[must_use]
@@ -131,6 +141,7 @@ mod tests {
             paths.journal(),
             paths.setup_progress(),
             paths.baseline(),
+            paths.materialised(),
         ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),
@@ -173,6 +184,19 @@ mod tests {
     }
 
     #[test]
+    fn the_materialised_record_sits_beside_the_env_file() {
+        // A lifecycle command derives where it keeps the record from the environment
+        // file it is handed — `env_file.with_file_name("materialised.json")` — the same
+        // way seeding derives the baseline's. This ties that formula to the layout's
+        // own `materialised()`, so the two cannot drift onto different files.
+        let paths = paths();
+        assert_eq!(
+            paths.env_file().with_file_name("materialised.json"),
+            paths.materialised()
+        );
+    }
+
+    #[test]
     fn every_location_is_distinct() {
         let paths = paths();
         let all = [
@@ -180,6 +204,7 @@ mod tests {
             paths.journal(),
             paths.setup_progress(),
             paths.baseline(),
+            paths.materialised(),
             paths.stack(),
             paths.service_config(),
             paths.backups(),

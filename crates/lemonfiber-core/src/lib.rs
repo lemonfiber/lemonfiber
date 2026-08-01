@@ -44,6 +44,7 @@ mod endpoint;
 pub mod error;
 pub mod jellyfin;
 pub mod journal;
+pub mod materialised;
 pub mod model;
 pub mod platform;
 pub mod ports;
