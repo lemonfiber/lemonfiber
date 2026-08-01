@@ -166,9 +166,21 @@ pub enum State {
     /// and never overwritten in the meantime.
     Stale,
     /// Both the service's value and lemonfiber's intent moved away from the
-    /// baseline. The conflict is presented and the value left as it is; lemonfiber
-    /// does not resolve it on its own.
-    Conflicted,
+    /// baseline. The conflict is presented — the value the operator set beside the
+    /// one lemonfiber would write — and the value left as it is; lemonfiber does not
+    /// resolve it on its own.
+    ///
+    /// Both values are shown in the report and serialized with it, so a
+    /// secret-bearing field must not report a conflict through this variant: a
+    /// conflict in a secret is to be reported without either value on show, and
+    /// wants a masked shape of its own rather than this one.
+    Conflicted {
+        /// The value the service now holds, as the operator set it; `None` where
+        /// they cleared it.
+        yours: Option<String>,
+        /// The value lemonfiber would write in its place.
+        ours: String,
+    },
     /// Prerequisite unavailable; a later run will complete it.
     Skipped {
         /// Why it could not be attempted.
@@ -246,7 +258,12 @@ impl Report {
     pub fn blocked(&self) -> Vec<&Wiring> {
         self.wirings
             .iter()
-            .filter(|wiring| matches!(wiring.state, State::Refused { .. } | State::Conflicted))
+            .filter(|wiring| {
+                matches!(
+                    wiring.state,
+                    State::Refused { .. } | State::Conflicted { .. }
+                )
+            })
             .collect()
     }
 }
@@ -415,12 +432,16 @@ pub async fn wire_download_clients(
         // the `records` it writes into, so the two do not fight over one borrow.
         let field = client_field(want);
         let base = expected.expected(service, &field);
+        // Match the wanted client to one the service already holds by the endpoint it
+        // reaches, found once so both the three-way observation and, on a conflict,
+        // the value to present beside lemonfiber's are read from the same client.
+        let have = existing.iter().find(|have| same_endpoint(have, want));
         // The policy decides from the three-way comparison: an absent client is
         // written, one already at lemonfiber's value is left, an operator's edit is
         // preserved, lemonfiber's own value behind its intent is reported stale, and
         // a two-sided change is presented as a conflict. Unavailable never reaches
         // here — a read-back failure was handled above — so it folds onto `Leave`.
-        let state = match intent(observe_client(&existing, want, base)) {
+        let state = match intent(observe_client(have, want, base)) {
             Intent::Wire => {
                 wire_one(
                     client.register_download_client(want),
@@ -442,7 +463,15 @@ pub async fn wire_download_clients(
             }
             Intent::Preserve => State::Drifted,
             Intent::Update => State::Stale,
-            Intent::Ask => State::Conflicted,
+            // Present both sides of the conflict: the value the operator set, drawn
+            // from the client already matched above, beside the one lemonfiber would
+            // write. The value is left as it is — presenting is not resolving.
+            Intent::Ask => State::Conflicted {
+                yours: have
+                    .and_then(|have| have.category.as_ref())
+                    .map(|category| category.value.clone()),
+                ours: want.category.value.clone(),
+            },
             Intent::Leave | Intent::Skip => State::AlreadyWired,
         };
         // Record the category as the expected state only where lemonfiber's value
@@ -461,15 +490,16 @@ pub async fn wire_download_clients(
     wirings
 }
 
-/// What a seed pass observes about a wanted client against what the service holds
-/// and what lemonfiber last wrote: absent, or the three-way outcome of comparing
-/// the service's category with lemonfiber's baseline and its desired one.
+/// What a seed pass observes about a wanted client against the one the service
+/// holds at its endpoint (`have`, `None` where it holds none) and what lemonfiber
+/// last wrote: absent, or the three-way outcome of comparing the service's category
+/// with lemonfiber's baseline and its desired one.
 fn observe_client(
-    existing: &[RegisteredClient],
+    have: Option<&RegisteredClient>,
     want: &DownloadClient,
     expected: Option<&str>,
 ) -> Observed {
-    match existing.iter().find(|have| same_endpoint(have, want)) {
+    match have {
         None => Observed::Absent,
         Some(have) => reconcile(
             expected,
