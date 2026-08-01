@@ -276,11 +276,27 @@ pub struct Wiring {
     pub state: State,
 }
 
+/// Whether a pass could assess drift — whether it had the record of what lemonfiber
+/// last wrote to compare against.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Assessment {
+    /// The expected-state record was read, or genuinely absent as on a first seed,
+    /// so each connection was judged against it.
+    #[default]
+    Assessed,
+    /// The expected-state record was there but could not be read — lost. Drift could
+    /// not be judged this pass, and re-baselining from the current state is offered.
+    Unassessable,
+}
+
 /// What a seed pass amounted to.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Report {
     /// Every connection attempted, and how each turned out.
     pub wirings: Vec<Wiring>,
+    /// Whether drift could be assessed, or the expected-state record was lost.
+    pub assessment: Assessment,
 }
 
 impl Report {
