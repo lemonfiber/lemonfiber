@@ -279,7 +279,9 @@ impl Version {
     /// the release it precedes; strict about the three numbers because a version
     /// that cannot be read is a corrupt archive, not a guess to make.
     fn parse(text: &str) -> Option<Self> {
-        let core = text.split('-').next().unwrap_or_default();
+        // `split` always yields at least the whole string, so a version with no
+        // `-` suffix is its own first segment — `unwrap_or(text)` says that plainly.
+        let core = text.split('-').next().unwrap_or(text);
         let mut parts = core.split('.');
         let major = parts.next()?.parse().ok()?;
         let minor = parts.next()?.parse().ok()?;

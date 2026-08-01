@@ -77,18 +77,25 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
     // only memory of what lemonfiber wrote, which a later run reads to tell an
     // operator's edit from lemonfiber's own value.
     let mut baseline = load_baseline(ctx);
-    for arr in &arrs {
-        wirings.extend(seed_root_folders(ctx, arr, &contested).await);
-        wirings.extend(
-            seed_download_clients(
-                ctx,
-                arr,
-                sabnzbd_key.as_deref(),
-                qbittorrent_password.as_deref(),
-                &mut baseline,
-            )
-            .await,
-        );
+    // Each \*arr's wiring is independent of the others, so the \*arrs are seeded at
+    // once rather than in series: a pass's time then tracks the slowest \*arr, not
+    // their sum. Each records what it wrote into its own baseline, read against the
+    // loaded snapshot; the records are folded back into one below, and since a
+    // field key carries the service, no two \*arrs collide.
+    let seeded = futures_util::future::join_all(arrs.iter().map(|arr| {
+        seed_arr(
+            ctx,
+            arr,
+            &contested,
+            sabnzbd_key.as_deref(),
+            qbittorrent_password.as_deref(),
+            &baseline,
+        )
+    }))
+    .await;
+    for (arr_wirings, records) in seeded {
+        wirings.extend(arr_wirings);
+        baseline.merge(&records);
     }
 
     // Prowlarr's app sync: register each of those media-filing \*arrs back into
@@ -173,15 +180,26 @@ fn servarr_arrs(services: &[lemonfiber_manifest::Service], project: Option<&Path
 /// `/data/media`. The application's key is read from its configuration; without
 /// it — the application has not finished starting — the folders are skipped for a
 /// re-run rather than failed.
-async fn seed_root_folders(
+async fn seed_arr(
     ctx: &Ctx,
     arr: &Arr,
     contested: &std::collections::BTreeMap<String, Vec<String>>,
-) -> Vec<crate::seed::Wiring> {
+    sabnzbd_key: Option<&str>,
+    qbittorrent_password: Option<&str>,
+    expected: &crate::baseline::Baseline,
+) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let wanted = wanted_roots(&arr.media_types);
+    let clients = arr_download_clients(arr, sabnzbd_key, qbittorrent_password);
+    // What this \*arr writes is recorded in its own baseline, against the loaded
+    // snapshot, so several \*arrs can be seeded at once without sharing one; the
+    // caller folds them back into one afterwards.
+    let mut records = crate::baseline::Baseline::new();
 
+    // The service's key is read once, opening the client for both its root folders
+    // and its download clients rather than once each. Without it the service has not
+    // finished starting, so both are skipped for a re-run and nothing is recorded.
     let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
-        return wanted
+        let mut wirings: Vec<_> = wanted
             .iter()
             .map(|folder| {
                 skipped(
@@ -190,23 +208,59 @@ async fn seed_root_folders(
                 )
             })
             .collect();
+        wirings.extend(clients.iter().map(|client| {
+            skipped(
+                format!("{} into {}", client.name, arr.target.name),
+                &arr.target.name,
+            )
+        }));
+        return (wirings, records);
     };
 
     // The journal seed records each write into is not persisted: seeding is
     // idempotent, so a partial run is recovered by running it again, not reversed
-    // — see the seed module doc. The record is groundwork for a future service-side
-    // undo the current reversal cannot do.
+    // — see the seed module doc.
+    let at = seed_stamp(ctx);
     let mut journal = crate::journal::Journal::new();
-    crate::seed::wire_root_folders(
+    let mut wirings = crate::seed::wire_root_folders(
         &client,
         &arr.target.name,
         &wanted,
         contested,
         DATA_ROOT,
         &mut journal,
-        &seed_stamp(ctx),
+        &at,
     )
-    .await
+    .await;
+    if !clients.is_empty() {
+        wirings.extend(
+            crate::seed::wire_download_clients(
+                &client,
+                &arr.target.name,
+                &clients,
+                &mut journal,
+                expected,
+                &mut records,
+                &at,
+            )
+            .await,
+        );
+    }
+    (wirings, records)
+}
+
+/// The download clients an \*arr registers — one per credential in hand — under the
+/// category its first media type files as, or none where it manages no category.
+fn arr_download_clients(
+    arr: &Arr,
+    sabnzbd_key: Option<&str>,
+    qbittorrent_password: Option<&str>,
+) -> Vec<crate::ports::service::DownloadClient> {
+    arr.media_types
+        .first()
+        .and_then(|media| category_for(media))
+        .map(|category| download_clients(sabnzbd_key, qbittorrent_password, &category))
+        .unwrap_or_default()
 }
 
 /// Where the operator's data location is mounted inside every service: the tree a
@@ -305,35 +359,6 @@ fn sabnzbd_config_path(
     })
 }
 
-/// Register into an application the download clients whose credentials are in
-/// hand: `SABnzbd` where its key was read, qBittorrent where its password was
-/// minted. Both carry the application's category. Without the application's own
-/// key its clients are skipped for a re-run, as its root folders are.
-async fn seed_download_clients(
-    ctx: &Ctx,
-    arr: &Arr,
-    sabnzbd_key: Option<&str>,
-    qbittorrent_password: Option<&str>,
-    baseline: &mut crate::baseline::Baseline,
-) -> Vec<crate::seed::Wiring> {
-    let categories: Vec<crate::ports::service::Category> = arr
-        .media_types
-        .first()
-        .and_then(|media| category_for(media))
-        .into_iter()
-        .collect();
-
-    let mut wirings = Vec::new();
-    for category in &categories {
-        let clients = download_clients(sabnzbd_key, qbittorrent_password, category);
-        if clients.is_empty() {
-            continue;
-        }
-        wirings.extend(wire_arr_download_clients(ctx, arr, &clients, baseline).await);
-    }
-    wirings
-}
-
 /// The download clients to register, one per credential that is in hand.
 fn download_clients(
     sabnzbd_key: Option<&str>,
@@ -365,41 +390,6 @@ fn download_clients(
         });
     }
     clients
-}
-
-/// Wire the given clients into one application, reading its key first; without it
-/// the application has not finished starting and the clients are skipped.
-async fn wire_arr_download_clients(
-    ctx: &Ctx,
-    arr: &Arr,
-    clients: &[crate::ports::service::DownloadClient],
-    baseline: &mut crate::baseline::Baseline,
-) -> Vec<crate::seed::Wiring> {
-    let Some(servarr) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
-        return clients
-            .iter()
-            .map(|client| {
-                skipped(
-                    format!("{} into {}", client.name, arr.target.name),
-                    &arr.target.name,
-                )
-            })
-            .collect();
-    };
-    // The journal seed records each write into is not persisted: seeding is
-    // idempotent, so a partial run is recovered by running it again, not reversed
-    // — see the seed module doc. The record is groundwork for a future service-side
-    // undo the current reversal cannot do.
-    let mut journal = crate::journal::Journal::new();
-    crate::seed::wire_download_clients(
-        &servarr,
-        &arr.target.name,
-        clients,
-        &mut journal,
-        baseline,
-        &seed_stamp(ctx),
-    )
-    .await
 }
 
 /// Prowlarr as the app-sync source, and the media-filing \*arrs to register into
@@ -646,9 +636,7 @@ fn recorded_jellyfin_password(ctx: &Ctx) -> Option<String> {
 /// Best-effort: a value that could not be written is reported by the next run
 /// re-minting rather than by failing the wiring that did land.
 fn record_jellyfin_password(ctx: &Ctx, password: &str) {
-    if let Some(path) = ctx.settings.env_file.as_deref() {
-        let _ = store::set(path, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY, password);
-    }
+    super::targets::record_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY, password);
 }
 
 /// qBittorrent's address, if the stack has it: the id names the container to read
@@ -721,9 +709,7 @@ async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
 /// that could not be written is reported by the push's own missing-password
 /// message rather than failing the wiring that did land.
 fn record_qbittorrent_password(ctx: &Ctx, password: &str) {
-    if let Some(path) = ctx.settings.env_file.as_deref() {
-        let _ = store::set(path, crate::config::QBITTORRENT_PASSWORD_KEY, password);
-    }
+    super::targets::record_secret(ctx, crate::config::QBITTORRENT_PASSWORD_KEY, password);
 }
 
 /// How many lines back to read for qBittorrent's start-up announcement. Its
@@ -1144,6 +1130,10 @@ mod tests {
     async fn seed_skips_qbittorrent_when_no_password_is_announced() {
         let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None);
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        assert!(
+            !report.wirings.is_empty(),
+            "the run produced wirings to judge, not an empty report from an error"
+        );
         let all_skipped = report.wirings.iter().all(is_skipped);
         assert!(
             all_skipped,
@@ -1155,6 +1145,10 @@ mod tests {
     async fn seed_skips_qbittorrent_when_its_log_cannot_be_read() {
         let ctx = seed_ctx(None, false, Vec::new(), Some(vec![0x11; 24]), None);
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        assert!(
+            !report.wirings.is_empty(),
+            "the run produced wirings to judge, not an empty report from an error"
+        );
         let all_skipped = report.wirings.iter().all(is_skipped);
         assert!(all_skipped, "an unreadable log is skipped, not failed");
     }
@@ -1299,7 +1293,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn seed_wires_each_arrs_download_clients() {
+    async fn seed_leaves_each_arrs_already_present_download_clients() {
         // qBittorrent announces a temporary password, so it is set and its value
         // threaded to the download clients; each arr already holds both clients.
         const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";

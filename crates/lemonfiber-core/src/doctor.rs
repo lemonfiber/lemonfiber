@@ -206,16 +206,25 @@ pub trait Check: Send + Sync {
 /// because the checks are values in a list, one timing out has no bearing on the
 /// next.
 pub async fn examine(checks: &[Box<dyn Check>], only: Option<Category>) -> DoctorReport {
-    let mut findings = Vec::new();
-    for check in checks {
-        if only.is_some_and(|wanted| wanted != check.category()) {
-            continue;
-        }
+    // The checks are independent I/O — process spawns, container execs, HTTP — so
+    // they run at once rather than in series: a run's wall-clock then tracks the
+    // slowest check, not their sum, which matters most on the struggling stack an
+    // operator reaches for `doctor` against. `join_all` preserves the checks' order,
+    // so the report reads the same as when they ran one at a time; each is still
+    // bounded by its own budget, so one hanging has no bearing on the rest.
+    let selected = checks
+        .iter()
+        .filter(|check| only.is_none_or(|wanted| wanted == check.category()));
+    let findings: Vec<Finding> = futures_util::future::join_all(selected.map(|check| async move {
         match tokio::time::timeout(check.budget(), check.run()).await {
-            Ok(mut produced) => findings.append(&mut produced),
-            Err(_elapsed) => findings.push(timed_out(check.as_ref())),
+            Ok(produced) => produced,
+            Err(_elapsed) => vec![timed_out(check.as_ref())],
         }
-    }
+    }))
+    .await
+    .into_iter()
+    .flatten()
+    .collect();
     DoctorReport {
         overall: overall(&findings),
         findings,

@@ -865,6 +865,7 @@ dependencies = [
  "async-trait",
  "bollard",
  "form_urlencoded",
+ "futures-util",
  "getrandom 0.2.17",
  "include_dir",
  "lemonfiber-manifest",

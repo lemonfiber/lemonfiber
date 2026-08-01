@@ -287,6 +287,16 @@ fn remove_any(path: &Path) -> std::io::Result<()> {
 fn stage(src: &Path, plan: &[(&str, &Path, PathBuf)]) -> Result<(), Fault> {
     let file = File::open(src).map_err(fault)?;
     let mut archive = tar::Archive::new(GzDecoder::new(file));
+    // Force every extracted file to owner-only access. A backup's own permission
+    // bits are not trusted: a hostile or tampered archive could store a
+    // secret-bearing file — `config/.env` carries the VPN key and provider
+    // passwords — group- or world-readable or -writable, defeating the 0600 the
+    // rest of the code enforces. The mask clears every group and other bit as each
+    // entry is written (the applied mode is `(archive_mode & 0o777) & !0o077`, owner
+    // bits only), so nothing lands more open than owner-only whatever the archive
+    // claimed; the services reclaim the config permissions they need on the `up` the
+    // restore mandates afterwards.
+    archive.set_mask(0o077);
     for entry in archive.entries().map_err(fault)? {
         let mut entry = entry.map_err(fault)?;
         let path = entry.path().map_err(fault)?.into_owned();
@@ -435,6 +445,19 @@ mod tests {
             "<Radarr/>",
         );
 
+        // Make the backed-up file group- and other-readable so the archive
+        // provably stores those bits regardless of the runner's umask — otherwise a
+        // tight umask would leave it 0600 at the source and the mode assertion below
+        // would pass without the mask having done anything.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let _ = fs::set_permissions(
+                paths.service_config().join("sonarr/config.xml"),
+                std::fs::Permissions::from_mode(0o644),
+            );
+        }
+
         let tar = Tar;
         let plan = backup::plan(
             &paths,
@@ -469,6 +492,22 @@ mod tests {
             Some("<Config/>"),
             "the restored service is back to the backed-up content"
         );
+
+        // A restored file is owner-only, whatever mode the archive stored. The
+        // backed-up source sits at the 0644 umask default (group- and other-
+        // readable); if the restore trusted that mode a secret-bearing file would
+        // land readable to every user on the host. The mask clears those bits.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = fs::metadata(paths.service_config().join("sonarr/config.xml"))
+                .map_or(0o777, |meta| meta.permissions().mode() & 0o777);
+            assert_eq!(
+                mode & 0o077,
+                0,
+                "a restored file carries no group or other permission bits"
+            );
+        }
     }
 
     #[tokio::test]

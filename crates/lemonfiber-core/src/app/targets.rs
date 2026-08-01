@@ -157,6 +157,16 @@ pub(super) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
 }
 
+/// The write side of [`recorded_secret`]: record a credential lemonfiber minted
+/// where a later run — and the dashboard — reads it back, or nowhere when there is
+/// no environment file to keep it in. Best-effort, like the other records seeding
+/// keeps: a run that cannot persist it still set the secret on the service.
+pub(super) fn record_secret(ctx: &Ctx, key: &str, value: &str) {
+    if let Some(path) = ctx.settings.env_file.as_deref() {
+        let _ = store::set(path, key, value);
+    }
+}
+
 /// The qBittorrent web UI password recorded at seeding — read back for the
 /// dashboard's transfers authentication and for a later seed run.
 pub(super) fn recorded_qbittorrent_password(ctx: &Ctx) -> Option<String> {

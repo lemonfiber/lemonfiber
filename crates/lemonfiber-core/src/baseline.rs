@@ -85,6 +85,18 @@ impl Baseline {
     pub fn is_empty(&self) -> bool {
         self.services.is_empty()
     }
+
+    /// Fold another baseline's records into this one — how a seed that recorded each
+    /// service's writes in its own baseline, so the services could be wired at once,
+    /// gathers them back into one. Each record is applied by [`Self::record`], so an
+    /// unchanged value keeps its timestamp exactly as recording it directly would.
+    pub fn merge(&mut self, other: &Baseline) {
+        for (service, fields) in &other.services {
+            for (field, record) in fields {
+                self.record(service, field, &record.value, &record.at);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -157,6 +169,28 @@ mod tests {
         assert!(baseline.is_empty(), "nothing has been written yet");
         baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "100");
         assert!(!baseline.is_empty(), "a written baseline is not empty");
+    }
+
+    #[test]
+    fn merging_gathers_each_baselines_records_and_keeps_timestamps() {
+        let mut main = Baseline::new();
+        main.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+        let mut other = Baseline::new();
+        // Another service's record, and the same service's unchanged value.
+        other.record("radarr", "downloadclient:sabnzbd:8080", "movies", "2");
+        other.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "9");
+        main.merge(&other);
+        assert_eq!(
+            main.expected("radarr", "downloadclient:sabnzbd:8080"),
+            Some("movies"),
+            "the other baseline's records are gathered in"
+        );
+        // The unchanged sonarr value keeps its original timestamp, not the merged one.
+        let json = serde_json::to_string(&main).unwrap_or_default();
+        assert!(
+            json.contains(r#""at":"1""#) && !json.contains(r#""at":"9""#),
+            "an unchanged value keeps its timestamp through a merge: {json}"
+        );
     }
 
     #[test]

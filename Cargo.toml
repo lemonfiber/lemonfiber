@@ -32,6 +32,11 @@ serde = { version = "1", features = ["derive"] }
 # String, not a Result — so there is no error to invent for inputs that cannot
 # fail to encode. Already in the tree via reqwest's url dependency.
 form_urlencoded = "1"
+# `join_all`, for running the independent per-service work a seed or a doctor run
+# does at once rather than in series — its wall-clock then tracks the slowest
+# service, not their sum. Only the combinator is taken (no executor); already in
+# the tree via reqwest, so this adds no crate to the graph.
+futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 sysinfo = { version = "0.39", default-features = false, features = ["disk"] }
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "process", "rt", "sync", "time"] }

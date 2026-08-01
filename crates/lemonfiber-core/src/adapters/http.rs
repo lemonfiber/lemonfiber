@@ -43,6 +43,12 @@ impl Web {
     /// cookies is unaffected by it.
     #[must_use]
     pub fn new() -> Self {
+        // `build` only fails if the TLS backend cannot initialise, which the bundled
+        // rustls provider does not do at runtime — so this is infallible in practice.
+        // The `unwrap_or_default` names that rather than `expect` (which the lints
+        // forbid); were it ever to fire, the default client would drop the cookie
+        // store and timeouts these lines set, so the fallback is a degraded client,
+        // not an equivalent one — acceptable only because it is unreachable.
         Self {
             client: reqwest::Client::builder()
                 .cookie_store(true)

@@ -146,6 +146,16 @@ impl Live {
                 detail: "no Usenet transport is configured to reach the provider".to_owned(),
             };
         };
+        // A password must never cross a plaintext connection. On a non-TLS endpoint
+        // the AUTHINFO PASS below would put the provider's account password on the
+        // wire in the clear, where anyone on the path could read it, so the
+        // credential is left unproven rather than exposed to prove it — the fix is
+        // the operator's, to reach the provider over TLS (usually port 563).
+        if !secure {
+            return Validation::Unreachable {
+                detail: "the provider must be reached over TLS to prove a password; a plaintext connection would send it in the clear, so it was not sent — use the provider's TLS port".to_owned(),
+            };
+        }
         let endpoint = Endpoint {
             host: host.to_owned(),
             port,
@@ -189,7 +199,20 @@ impl Live {
             }
         };
 
-        interpret_indexer(response.status, &response.body)
+        // Torznab authenticates by a key in the query string, so a key proven over
+        // plaintext http rode the wire — and sits in the indexer's access logs — in
+        // the clear. It is still proven, but the exposure is named so the operator
+        // can move to https, where the same key would at least be encrypted in transit.
+        match interpret_indexer(response.status, &response.body) {
+            Validation::Valid { observed } if url.to_ascii_lowercase().starts_with("http://") => {
+                Validation::Valid {
+                    observed: format!(
+                        "{observed} — but the indexer was reached over plaintext http, so its key was exposed on the wire; use an https URL"
+                    ),
+                }
+            }
+            other => other,
+        }
     }
 
     /// Prove an existing service by reaching its API with the key and reading what
@@ -476,6 +499,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_key_proven_over_plaintext_http_is_named_as_exposed() {
+        // The default indexer URL is http://, so a proven key carries the caveat
+        // that it rode the wire in the clear, pointing the operator at https.
+        let feed = "<?xml version=\"1.0\"?><rss><channel><item>a</item></channel></rss>";
+        let outcome = answering(feed).validate(&indexer()).await;
+        assert!(matches!(
+            outcome,
+            Validation::Valid { observed }
+                if observed.contains("plaintext http") && observed.contains("https")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_key_proven_over_https_carries_no_plaintext_caveat() {
+        let feed = "<?xml version=\"1.0\"?><rss><channel><item>a</item></channel></rss>";
+        let secure = Credential::Indexer {
+            url: "https://indexer.test/api".to_owned(),
+            key: "abc".to_owned(),
+        };
+        let outcome = answering(feed).validate(&secure).await;
+        assert!(matches!(
+            outcome,
+            Validation::Valid { observed } if !observed.contains("plaintext")
+        ));
+    }
+
+    #[tokio::test]
     async fn an_error_element_for_a_bad_key_is_a_refusal_with_the_reason() {
         let body = "<error code=\"100\" description=\"Incorrect user credentials\"/>";
         let outcome = answering(body).validate(&indexer()).await;
@@ -723,6 +773,29 @@ mod tests {
         assert!(matches!(
             outcome,
             Validation::Unreachable { detail } if detail.contains("no Usenet transport")
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_plaintext_provider_is_left_unproven_rather_than_exposing_the_password() {
+        // The transport is scripted to accept the login, so were the password sent
+        // the outcome would be Valid. Over a non-TLS endpoint it is refused before
+        // anything is sent — unreachable, naming TLS as the fix — so the password
+        // never reaches the wire.
+        let insecure = Credential::Usenet {
+            host: "news.provider.test".to_owned(),
+            port: 119,
+            secure: false,
+            user: "person".to_owned(),
+            pass: "secret".to_owned(),
+        };
+        let outcome = dialling(&["200 welcome", "381 more", "281 authenticated"])
+            .validate(&insecure)
+            .await;
+        assert!(matches!(
+            outcome,
+            Validation::Unreachable { detail }
+                if detail.contains("TLS") && detail.contains("in the clear")
         ));
     }
 
