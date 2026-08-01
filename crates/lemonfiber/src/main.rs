@@ -22,7 +22,7 @@ use lemonfiber_core::config::{
 };
 use lemonfiber_core::doctor::{Category, Overall};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{Disposition, Envelope};
+use lemonfiber_core::model::{Disposition, Envelope, Triggered};
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
@@ -240,6 +240,17 @@ enum QualityCommand {
     /// An ordinary run keeps your edits; this is the explicit consent to let the
     /// preset win instead.
     Reapply,
+    /// Upgrade existing content to the chosen quality — re-download what is already
+    /// here at the higher quality.
+    ///
+    /// A large, bandwidth-expensive operation, separate from a preset change (which
+    /// only affects future acquisitions). States the cost and does nothing until
+    /// `--confirm`.
+    Upgrade {
+        /// Go ahead and trigger the re-search, having seen the cost.
+        #[arg(long)]
+        confirm: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -449,6 +460,29 @@ fn settled(outcome: &Outcome) -> ExitCode {
             | Disposition::Reapplied
             | Disposition::WouldReapply => ExitCode::SUCCESS,
         },
+        // An unconfirmed upgrade stated its cost and did nothing, so a script sees a
+        // non-zero result telling it to confirm. A service that refused is a failure;
+        // a run where nothing was actually started — every service still coming up, or
+        // none present — is a failure too, so success means at least one re-search
+        // began and none was refused.
+        Outcome::Upgrade(report) => {
+            let outcome = |want: fn(&Triggered) -> bool| {
+                report
+                    .media
+                    .iter()
+                    .filter_map(|media| media.outcome.as_ref())
+                    .any(want)
+            };
+            if !report.confirmed {
+                ExitCode::from(VALIDATION)
+            } else if outcome(|state| matches!(state, Triggered::Failed { .. })) {
+                ExitCode::from(FAILURE)
+            } else if outcome(|state| matches!(state, Triggered::Started)) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(FAILURE)
+            }
+        }
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
             ExitCode::SUCCESS
         }
@@ -555,6 +589,9 @@ fn quality(action: QualityCommand) -> Result<Command, u8> {
             }
         }
         QualityCommand::Reapply => QualityAction::Reapply,
+        // Upgrade is its own command, not a quality action, since it reaches the
+        // services rather than only reading or writing the recorded choice.
+        QualityCommand::Upgrade { confirm } => return Ok(Command::QualityUpgrade { confirm }),
     };
     Ok(Command::Quality(action))
 }

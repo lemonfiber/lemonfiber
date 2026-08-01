@@ -451,6 +451,21 @@ pub trait Requests: Send + Sync {
     ) -> Result<(), Failure>;
 }
 
+/// Asking a Servarr-shape service to run one of its background commands — the
+/// operator-triggered maintenance a stack sometimes needs, such as re-searching
+/// existing content for a better release when the quality bar is raised.
+#[async_trait]
+pub trait Maintenance: Send + Sync {
+    /// Ask the service to run the named command. Returns once the service has
+    /// accepted it; the work itself then runs in the background there, so this is
+    /// the request to start it, not a wait for it to finish.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses the command.
+    async fn run_command(&self, name: &str) -> Result<(), Failure>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

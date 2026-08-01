@@ -27,7 +27,7 @@ use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{
     ConfigReport, DoctorReport, Envelope, LifecycleReport, QualityReport, SettingReport, StackEdit,
-    StatusReport, VersionReport,
+    StatusReport, UpgradeReport, VersionReport,
 };
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
@@ -46,6 +46,7 @@ pub mod restore;
 mod seed;
 pub mod setup;
 mod targets;
+mod upgrade;
 pub mod watch;
 
 pub use ctx::Ctx;
@@ -115,6 +116,15 @@ pub enum Command {
     /// Show or change the quality preset — how good media should look, and how
     /// much disk it should cost — in plain language.
     Quality(QualityAction),
+    /// Upgrade existing content to the chosen preset — a separate, explicit action
+    /// whose bandwidth cost is stated, and which does nothing until confirmed. Its
+    /// own command rather than a quality action because it reaches the services
+    /// asynchronously, where the others only read and write the recorded choice.
+    QualityUpgrade {
+        /// Whether the operator confirmed the cost; without it, only the cost is
+        /// stated and nothing is triggered.
+        confirm: bool,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they
@@ -154,6 +164,8 @@ pub enum Outcome {
     Config(ConfigReport),
     /// The quality choice, what it means, and what a command did with it.
     Quality(QualityReport),
+    /// What upgrading existing content did, or would do, and its stated cost.
+    Upgrade(UpgradeReport),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -171,6 +183,7 @@ impl Outcome {
             Self::Lifecycle(_) => "lifecycle",
             Self::Config(_) => "config",
             Self::Quality(_) => "quality",
+            Self::Upgrade(_) => "upgrade",
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
             Self::Seed(_) => "seed",
@@ -186,6 +199,7 @@ impl serde::Serialize for Outcome {
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
+            Self::Upgrade(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
@@ -445,6 +459,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::ConfigShow => configuration(ctx, None, None).map_err(|p| *p),
         Command::Quality(action) => quality::quality(ctx, action)
             .map(Outcome::Quality)
+            .map_err(|problem| *problem),
+        Command::QualityUpgrade { confirm } => upgrade::upgrade(ctx, confirm)
+            .await
+            .map(Outcome::Upgrade)
             .map_err(|problem| *problem),
         Command::Ps { forms } => status(ctx, &forms).await.map(Outcome::Status),
         Command::Doctor { only, disruptive } => {
@@ -763,6 +781,42 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_dispatched_quality_upgrade_serialises_under_its_own_kind() {
+        // Unconfirmed, it states the cost and reaches no service, so it stays offline
+        // while exercising the dispatch, envelope and serialise arms for its outcome.
+        let json = dispatch(
+            Command::QualityUpgrade { confirm: false },
+            &ctx(Ok(spoke(""))),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"upgrade\""),
+            "envelope names the kind"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_upgrade_over_an_unreadable_stack_is_an_error() {
+        // The dispatch arm unboxes the driver's error: a confirmed upgrade cannot read
+        // an unreadable stack's services, so it fails rather than half-acting.
+        let ctx = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::default()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
+            Settings::default(),
+            Environment::MacOs,
+        );
+        assert!(dispatch(Command::QualityUpgrade { confirm: true }, &ctx)
+            .await
+            .is_err());
+    }
+
     /// What a version report looks like when the engine said `compose`.
     ///
     /// Tests assert against the whole outcome rather than picking it apart. A
@@ -874,6 +928,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
+                | Outcome::Upgrade(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -890,6 +945,7 @@ mod tests {
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
+                | Outcome::Upgrade(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_),
             )
@@ -1312,6 +1368,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Quality(_)
+                | Outcome::Upgrade(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -1764,6 +1821,7 @@ mod tests {
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
+                | Outcome::Upgrade(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
             )

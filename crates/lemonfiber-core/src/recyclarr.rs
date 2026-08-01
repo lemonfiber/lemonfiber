@@ -57,11 +57,23 @@ impl Kind {
         }
     }
 
-    /// The service whose section a top-level `recyclarr.yml` key names, or `None`
-    /// for any other key — so an operator's own additions are left alone.
+    /// The service whose section a top-level `recyclarr.yml` key names — also the
+    /// service a compose id such as `sonarr` names, since the two share the word —
+    /// or `None` for any other key, so an operator's own additions are left alone.
     #[must_use]
-    fn for_section(key: &str) -> Option<Self> {
+    pub fn for_section(key: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| kind.section() == key)
+    }
+
+    /// The Servarr command that re-searches existing content for a better release
+    /// meeting the current quality profile — the "upgrade what is already here"
+    /// action. Named per service, verified against each app's command set.
+    #[must_use]
+    pub const fn upgrade_command(self) -> &'static str {
+        match self {
+            Self::Sonarr => "CutoffUnmetEpisodeSearch",
+            Self::Radarr => "CutoffUnmetMoviesSearch",
+        }
     }
 }
 
@@ -326,6 +338,21 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn each_service_names_its_own_cutoff_unmet_upgrade_command() {
+        // The upgrade action re-searches existing content; the command is named per
+        // service, and a compose id round-trips to the right one.
+        assert_eq!(
+            Kind::for_section("sonarr").map(Kind::upgrade_command),
+            Some("CutoffUnmetEpisodeSearch")
+        );
+        assert_eq!(
+            Kind::for_section("radarr").map(Kind::upgrade_command),
+            Some("CutoffUnmetMoviesSearch")
+        );
+        assert_eq!(Kind::for_section("prowlarr"), None);
     }
 
     #[test]

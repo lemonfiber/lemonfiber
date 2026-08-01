@@ -10,10 +10,10 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use lemonfiber_core::ports::http::{Http, Method, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
-    Category, Client, ClientKind, Credential, DownloadClient, Failure, QueueDepth, Queues,
-    RegisteredClient, RegisteredFolder, RootFolder,
+    Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, QueueDepth,
+    Queues, RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::servarr::{api_key, Servarr};
 
@@ -101,6 +101,32 @@ async fn the_app_name_is_used_when_no_instance_name_is_set() {
     ));
     let identity = sonarr(&fake).identity().await;
     assert_eq!(identity.ok().map(|who| who.name), Some("Radarr".to_owned()));
+}
+
+#[tokio::test]
+async fn a_command_is_posted_by_name_and_accepted() {
+    let fake = Fake::new(Answer::Reply(201, r#"{"name":"CutoffUnmetEpisodeSearch"}"#));
+    let accepted = sonarr(&fake).run_command("CutoffUnmetEpisodeSearch").await;
+    assert!(accepted.is_ok());
+
+    // The command rode a POST to the command route, named in the body.
+    let sent = fake.request();
+    assert!(sent.as_ref().is_some_and(
+        |request| request.method == Method::Post && request.url.ends_with("/api/v3/command")
+    ));
+    assert!(sent.is_some_and(|request| request
+        .body
+        .as_deref()
+        .is_some_and(|body| body.contains("CutoffUnmetEpisodeSearch"))));
+}
+
+#[tokio::test]
+async fn a_command_a_service_refuses_is_a_failure() {
+    let fake = Fake::new(Answer::Reply(500, "boom"));
+    assert!(sonarr(&fake)
+        .run_command("CutoffUnmetEpisodeSearch")
+        .await
+        .is_err());
 }
 
 #[tokio::test]

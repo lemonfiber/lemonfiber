@@ -178,6 +178,17 @@ impl Client for Servarr {
 }
 
 #[async_trait]
+impl crate::ports::service::Maintenance for Servarr {
+    async fn run_command(&self, name: &str) -> Result<(), Failure> {
+        let body = serde_json::json!({ "name": name }).to_string();
+        let response = self
+            .probe(&self.request(Method::Post, "/command", Some(body)))
+            .await?;
+        self.endpoint.expect_success(&response)
+    }
+}
+
+#[async_trait]
 impl crate::ports::service::Queues for Servarr {
     async fn queue(&self) -> Result<QueueDepth, Failure> {
         // A generous page is asked for so the stuck count is read from the whole
