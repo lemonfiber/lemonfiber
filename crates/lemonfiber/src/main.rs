@@ -235,6 +235,11 @@ enum QualityCommand {
         #[arg(long)]
         confirm: bool,
     },
+    /// Re-assert the recorded preset over a Recyclarr config you have hand-edited.
+    ///
+    /// An ordinary run keeps your edits; this is the explicit consent to let the
+    /// preset win instead.
+    Reapply,
 }
 
 #[derive(Debug, Subcommand)]
@@ -438,9 +443,11 @@ fn settled(outcome: &Outcome) -> ExitCode {
         // a non-zero result it can act on rather than a false success.
         Outcome::Quality(report) => match report.disposition {
             Disposition::Held => ExitCode::from(VALIDATION),
-            Disposition::Shown | Disposition::Recorded | Disposition::Rehearsed => {
-                ExitCode::SUCCESS
-            }
+            Disposition::Shown
+            | Disposition::Recorded
+            | Disposition::Rehearsed
+            | Disposition::Reapplied
+            | Disposition::WouldReapply => ExitCode::SUCCESS,
         },
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
             ExitCode::SUCCESS
@@ -547,6 +554,7 @@ fn quality(action: QualityCommand) -> Result<Command, u8> {
                 confirm,
             }
         }
+        QualityCommand::Reapply => QualityAction::Reapply,
     };
     Ok(Command::Quality(action))
 }
