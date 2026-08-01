@@ -29,13 +29,20 @@ const EVERYTHING: &str = "everything";
 /// A rehearsal reports the choice it would record without writing it, and a choice
 /// this host would have to transcode in software is held rather than recorded
 /// unless the operator confirmed it — so `--dry-run` and the confirmation both mean
-/// here what they mean elsewhere.
+/// here what they mean elsewhere. A reapply re-asserts the recorded preset over a
+/// Recyclarr config the operator hand-edited, the explicit consent an ordinary run
+/// withholds.
 pub(super) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport, Box<Problem>> {
     let mut selection = load_selection(ctx)?;
     let playback = playback(ctx);
+    let record = materialised_record(ctx);
+    let into = ctx.settings.stack_dir.as_deref();
 
-    let disposition = match action {
-        QualityAction::Show => Disposition::Shown,
+    let (disposition, customised) = match action {
+        QualityAction::Show => (
+            Disposition::Shown,
+            super::materialise::recyclarr_customised(into, record.as_deref()),
+        ),
         QualityAction::Set {
             preset,
             media_type,
@@ -49,18 +56,47 @@ pub(super) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
             // would software-transcode would not proceed even for real without
             // confirmation, so a rehearsal of it reports that truth — "this needs
             // confirming" — rather than the "would save" it cannot honestly claim.
-            if warn_before_confirming(preset, playback).is_some() && !confirm {
+            let disposition = if warn_before_confirming(preset, playback).is_some() && !confirm {
                 Disposition::Held
             } else if ctx.dry_run {
                 Disposition::Rehearsed
             } else {
                 save_selection(ctx, &selection)?;
                 Disposition::Recorded
-            }
+            };
+            (
+                disposition,
+                super::materialise::recyclarr_customised(into, record.as_deref()),
+            )
+        }
+        QualityAction::Reapply => {
+            let overwrote = super::materialise::reapply_recyclarr(
+                ctx.stack,
+                into,
+                record.as_deref(),
+                &selection,
+                ctx.dry_run,
+            )
+            .map_err(|failure| Box::new(failure.problem()))?;
+            let disposition = if ctx.dry_run {
+                Disposition::WouldReapply
+            } else {
+                Disposition::Reapplied
+            };
+            (disposition, overwrote)
         }
     };
 
-    Ok(report(&selection, playback, disposition))
+    Ok(report(&selection, playback, customised, disposition))
+}
+
+/// Where the record of what lemonfiber last wrote to the stack is kept — beside the
+/// environment file, the same derivation the lifecycle path uses.
+fn materialised_record(ctx: &Ctx) -> Option<PathBuf> {
+    ctx.settings
+        .env_file
+        .as_deref()
+        .map(|env| env.with_file_name("materialised.json"))
 }
 
 /// The choice on record, or the default where none has been made.
@@ -132,13 +168,19 @@ fn current_library(ctx: &Ctx) -> Library {
 
 /// The choice as a report: the global preset first, then each media type set apart
 /// from it, each stating what it means and whether this host can play it smoothly.
-fn report(selection: &Selection, playback: Playback, disposition: Disposition) -> QualityReport {
+fn report(
+    selection: &Selection,
+    playback: Playback,
+    customised: bool,
+    disposition: Disposition,
+) -> QualityReport {
     let mut choices = vec![choice(EVERYTHING, selection.global(), playback)];
     for (media_type, preset) in selection.overrides() {
         choices.push(choice(media_type, preset, playback));
     }
     QualityReport {
         choices,
+        customised,
         disposition,
     }
 }
@@ -163,12 +205,17 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
+    use include_dir::{include_dir, Dir};
+
     use super::{quality, Ctx, QualityAction};
     use crate::config::{store, Settings, JELLYFIN_MODE_KEY};
     use crate::model::{Disposition, PresetChoice, QualityReport};
     use crate::platform::Environment;
     use crate::quality::Preset;
+    use crate::stack::Source;
     use crate::test_support::{spoke, stack, Reporting, Scripted};
+
+    static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
     /// A scratch env-file path unique to this process and test, its directory
     /// cleared so a run starts from nothing.
@@ -375,5 +422,76 @@ mod tests {
 
         let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A context operating the embedded fixture stack, materialised under `into`.
+    fn embedded_ctx(env: Option<PathBuf>, into: Option<PathBuf>) -> Ctx {
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::absent()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            Source::Embedded(&STACKLET),
+            Settings {
+                env_file: env,
+                stack_dir: into,
+                ..Settings::default()
+            },
+            Environment::LinuxNative,
+        )
+    }
+
+    #[test]
+    fn reapply_on_an_external_stack_changes_nothing() {
+        // An external stack is the operator's; there is nothing lemonfiber wrote to
+        // re-assert, so a reapply reports itself and touches nothing.
+        let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Reapply);
+        assert_eq!(report.disposition, Disposition::Reapplied);
+        assert!(!report.customised);
+    }
+
+    #[test]
+    fn a_rehearsed_reapply_reports_it_would_reapply() {
+        let context = ctx(None, Environment::LinuxNative).rehearsing();
+        let report = run(&context, QualityAction::Reapply);
+        assert_eq!(report.disposition, Disposition::WouldReapply);
+    }
+
+    #[test]
+    fn reapply_overwrites_a_customised_config_through_the_command() {
+        let env = scratch("reapply-overwrite");
+        let into = env.with_file_name("stack");
+        let context = embedded_ctx(Some(env), Some(into.clone()));
+
+        // Choose a preset and bring it onto disk, then hand-edit the config.
+        let _ = quality(&context, set(Preset::Maximum, None, true));
+        let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+        // The set records the choice but does not materialise; bring it on disk via a
+        // reapply, then the operator edits it by hand.
+        let _ = quality(&context, QualityAction::Reapply);
+        let _ = std::fs::write(&recyclarr, "# mine\n");
+
+        // The command sees the customisation and, being the explicit consent,
+        // overwrites it with the recorded preset.
+        let report = run(&context, QualityAction::Reapply);
+        assert_eq!(report.disposition, Disposition::Reapplied);
+        assert!(report.customised, "it reports that it overwrote an edit");
+        assert!(std::fs::read_to_string(&recyclarr)
+            .unwrap_or_default()
+            .contains("sonarr-v4-quality-profile-web-2160p"));
+    }
+
+    #[test]
+    fn a_reapply_with_nowhere_to_write_is_reported() {
+        // The embedded stack has a Recyclarr config to re-assert, but no directory it
+        // is materialised into, so the reapply is refused rather than guessing.
+        let refused = quality(
+            &embedded_ctx(scratch("reapply-nowhere").into(), None),
+            QualityAction::Reapply,
+        );
+        assert!(
+            refused.is_err(),
+            "a reapply with nowhere to write is refused"
+        );
     }
 }

@@ -223,6 +223,12 @@ pub(crate) fn quality(report: &QualityReport) {
         // library or raising it re-grabs everything.
         Disposition::Recorded => {
             println!("\nSaved. This affects future acquisitions only — nothing already downloaded changes.");
+            if report.customised {
+                println!(
+                    "Your Recyclarr config is customised, so this preset will not apply on its \
+                     own. Run `{PRODUCT} quality reapply` to let it overwrite your edits."
+                );
+            }
         }
         Disposition::Rehearsed => {
             println!(
@@ -235,8 +241,33 @@ pub(crate) fn quality(report: &QualityReport) {
                  play well. Re-run with --confirm to choose it anyway, or run Jellyfin natively."
             );
         }
-        // A plain show changes nothing, so it makes no claim about the future.
-        Disposition::Shown => {}
+        // Re-asserting the preset over the config: say whether it overwrote an edit.
+        Disposition::Reapplied => {
+            if report.customised {
+                println!("\nReapplied the preset, overwriting your customised Recyclarr config.");
+            } else {
+                println!("\nReapplied the preset. The Recyclarr config was already in step.");
+            }
+        }
+        // A rehearsed reapply: preview whether it would overwrite an edit.
+        Disposition::WouldReapply => {
+            if report.customised {
+                println!(
+                    "\nWould reapply the preset, overwriting your customised Recyclarr config."
+                );
+            } else {
+                println!("\nWould reapply the preset. The Recyclarr config is already in step.");
+            }
+        }
+        // A plain show reports the state; a customised config is worth naming.
+        Disposition::Shown => {
+            if report.customised {
+                println!(
+                    "\nYour Recyclarr config is customised — the preset is no longer authoritative. \
+                     Run `{PRODUCT} quality reapply` to re-assert it over your edits."
+                );
+            }
+        }
     }
 }
 

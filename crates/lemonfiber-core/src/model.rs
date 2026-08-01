@@ -101,6 +101,12 @@ pub enum Disposition {
     /// The choice needs transcoding this host cannot do well, so it was held
     /// rather than recorded without explicit confirmation.
     Held,
+    /// The recorded preset was re-asserted over the Recyclarr config, overwriting
+    /// a hand-edit where an ordinary run would have preserved it.
+    Reapplied,
+    /// A re-assert that was a rehearsal: it reports whether it would overwrite a
+    /// hand-edit, and writes nothing.
+    WouldReapply,
 }
 
 /// One preset in force, and what it means for the media it applies to — the
@@ -130,6 +136,10 @@ pub struct PresetChoice {
 pub struct QualityReport {
     /// The global choice first, then each media type set apart from it.
     pub choices: Vec<PresetChoice>,
+    /// Whether the Recyclarr config has been hand-edited since lemonfiber wrote it —
+    /// the `customised` state, in which the preset is no longer authoritative until
+    /// it is deliberately re-asserted. For a reapply, whether an edit was overwritten.
+    pub customised: bool,
     /// What became of the choice.
     pub disposition: Disposition,
 }

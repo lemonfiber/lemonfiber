@@ -118,6 +118,78 @@ fn carrying_the_choice<'a>(key: &str, content: &'a [u8], selection: &Selection) 
     }
 }
 
+/// Whether the materialised Recyclarr config has been hand-edited since lemonfiber
+/// last wrote it — the `customised` state, in which a preset is no longer
+/// authoritative because the operator has tuned the config by hand.
+///
+/// False where there is nothing to judge against: no record of what lemonfiber
+/// wrote, or no config on disk. It is the same comparison [`decide`] makes — on-disk
+/// against the record — read without writing anything.
+pub(super) fn recyclarr_customised(into: Option<&Path>, record_path: Option<&Path>) -> bool {
+    let Some(into) = into else {
+        return false;
+    };
+    let Some(recorded) = load(record_path).checksum(RECYCLARR_CONFIG) else {
+        return false;
+    };
+    match std::fs::read(into.join(RECYCLARR_CONFIG)) {
+        Ok(bytes) => checksum(&bytes) != recorded,
+        Err(_) => false,
+    }
+}
+
+/// Re-assert the recorded preset over the Recyclarr config, overwriting a hand-edit
+/// where an ordinary run would have preserved it — the operator's explicit consent
+/// to let the preset win. Records the new content so it is recognised as lemonfiber's
+/// own again.
+///
+/// Returns whether it overwrote a customised config, as opposed to one already in
+/// lemonfiber's own hand. A rehearsal reports what it would do and writes nothing. An
+/// external stack, which lemonfiber does not materialise, is left untouched.
+///
+/// # Errors
+///
+/// Returns [`Failure`] when there is nowhere to write, or the config cannot be written.
+pub(super) fn reapply_recyclarr(
+    source: Source,
+    into: Option<&Path>,
+    record_path: Option<&Path>,
+    selection: &Selection,
+    rehearse: bool,
+) -> Result<bool, Failure> {
+    let Some(shipped) = shipped_recyclarr(source) else {
+        // External, or a stack with no Recyclarr config: nothing lemonfiber manages.
+        // This is also the guard that keeps an external stack safe — `into` is the
+        // built-in stack directory, not where an external stack lives, so writing
+        // there would be wrong. An external source has no embedded files, so it
+        // returns here before touching `into`; that invariant is load-bearing.
+        return Ok(false);
+    };
+    let Some(into) = into else {
+        return Err(Failure::NowhereToWrite);
+    };
+    let was_customised = recyclarr_customised(Some(into), record_path);
+    if !rehearse {
+        let desired = crate::recyclarr::rewrite(&String::from_utf8_lossy(shipped), selection);
+        let target = into.join(RECYCLARR_CONFIG);
+        write(&target, desired.as_bytes())?;
+        let mut record = load(record_path);
+        record.record(RECYCLARR_CONFIG, checksum(desired.as_bytes()));
+        save(record_path, &record);
+    }
+    Ok(was_customised)
+}
+
+/// The Recyclarr config this stack ships, or `None` for a stack that has none — an
+/// external stack lemonfiber does not write, or one without the file.
+fn shipped_recyclarr(source: Source) -> Option<&'static [u8]> {
+    source
+        .files()
+        .into_iter()
+        .find(|(relative, _)| relative.to_string_lossy() == RECYCLARR_CONFIG)
+        .map(|(_, content)| content)
+}
+
 /// Read the record of what lemonfiber last wrote, or an empty one where none is
 /// kept. A record that cannot be read leaves an empty one, under which a file that
 /// differs is preserved rather than overwritten — the safe direction when what was
@@ -162,7 +234,7 @@ mod tests {
 
     use include_dir::{include_dir, Dir};
 
-    use super::materialise;
+    use super::{materialise, reapply_recyclarr, recyclarr_customised};
     use crate::quality::{Preset, Selection};
     use crate::stack::{Failure, Source};
 
@@ -371,5 +443,108 @@ mod tests {
             read(&recyclarr).contains("sonarr-v4-quality-profile-web-2160p"),
             "the applied preset is not reverted",
         );
+    }
+
+    #[test]
+    fn a_config_is_customised_only_once_it_differs_from_the_record() {
+        let (into, record) = scratch("customised");
+        // Nothing written yet: nothing to be customised against.
+        assert!(!recyclarr_customised(Some(&into), Some(&record)));
+
+        // Applied and untouched: lemonfiber's own, not customised.
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&balanced()),
+        );
+        assert!(!recyclarr_customised(Some(&into), Some(&record)));
+
+        // The operator tunes it by hand: now it is customised.
+        let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+        let _ = std::fs::write(&recyclarr, "# mine\n");
+        assert!(recyclarr_customised(Some(&into), Some(&record)));
+
+        // Deleted while the record persists: nothing on disk to be customised, so a
+        // reapply would simply write it again.
+        let _ = std::fs::remove_file(&recyclarr);
+        assert!(!recyclarr_customised(Some(&into), Some(&record)));
+    }
+
+    #[test]
+    fn reapply_overwrites_a_customised_config_and_records_it() {
+        let (into, record) = scratch("reapply");
+        let maximum = Selection::everywhere(Preset::Maximum);
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&maximum),
+        );
+        let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+        // The operator hand-edits it.
+        let _ = std::fs::write(&recyclarr, "# mine\n");
+        assert!(recyclarr_customised(Some(&into), Some(&record)));
+
+        // Reapply re-asserts the recorded preset over the edit.
+        let overwrote = reapply_recyclarr(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            &maximum,
+            false,
+        )
+        .unwrap_or(false);
+        assert!(overwrote, "an edit was overwritten");
+        assert!(read(&recyclarr).contains("sonarr-v4-quality-profile-web-2160p"));
+        // Recorded as lemonfiber's own again: no longer customised.
+        assert!(!recyclarr_customised(Some(&into), Some(&record)));
+    }
+
+    #[test]
+    fn a_rehearsed_reapply_writes_nothing() {
+        let (into, record) = scratch("reapply-dry");
+        let maximum = Selection::everywhere(Preset::Maximum);
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&maximum),
+        );
+        let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+        let _ = std::fs::write(&recyclarr, "# mine\n");
+
+        let overwrote = reapply_recyclarr(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            &maximum,
+            true,
+        )
+        .unwrap_or(false);
+        assert!(
+            overwrote,
+            "the rehearsal reports it would overwrite an edit"
+        );
+        // The edit is still on disk: a rehearsal changed nothing.
+        assert_eq!(read(&recyclarr), "# mine\n");
+    }
+
+    #[test]
+    fn reapply_leaves_an_external_stack_alone() {
+        let (into, record) = scratch("reapply-external");
+        let overwrote = reapply_recyclarr(
+            Source::External(Path::new("/some/operator/stack")),
+            Some(&into),
+            Some(&record),
+            &balanced(),
+            false,
+        )
+        .unwrap_or(true);
+        assert!(
+            !overwrote,
+            "an external stack is the operator's, left untouched"
+        );
+        assert!(!into.exists(), "nothing was written for an external stack");
     }
 }
