@@ -15,6 +15,7 @@ use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{
     dispatch, logs, pull_progress, supervise, Command, Ctx, Outcome, QualityAction, WATCH,
 };
+use lemonfiber_core::audio::Format;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, indexer_from_env, ip_echo_from_env, port_forward_from_env,
@@ -483,6 +484,16 @@ fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::from(FAILURE)
             }
         }
+        // The music choice is recorded even when the service could not be reached, so
+        // only a service that refused the change is a failure; a rehearsal or a service
+        // still coming up has still recorded the choice.
+        Outcome::Music(report) => {
+            if matches!(report.outcome, Some(Triggered::Failed { .. })) {
+                ExitCode::from(FAILURE)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
             ExitCode::SUCCESS
         }
@@ -569,6 +580,19 @@ fn quality(action: QualityCommand) -> Result<Command, u8> {
             media_type,
             confirm,
         } => {
+            // Music has no resolution: `--for music` chooses an audio format instead of a
+            // resolution preset, and reaches the service rather than only recording, so it
+            // routes to its own command.
+            if media_type.as_deref() == Some("music") {
+                let Some(format) = Format::from_label(&preset) else {
+                    eprintln!(
+                        "error: no music format named `{preset}` \
+                         (try compact, lossless, or hi-res)"
+                    );
+                    return Err(USAGE);
+                };
+                return Ok(Command::QualityMusic { format });
+            }
             let Some(preset) = Preset::from_label(&preset) else {
                 eprintln!(
                     "error: no quality preset named `{preset}` \
@@ -578,7 +602,9 @@ fn quality(action: QualityCommand) -> Result<Command, u8> {
             };
             if let Some(media_type) = &media_type {
                 if !Kind::ALL.iter().any(|kind| kind.media_type() == media_type) {
-                    eprintln!("error: no media type named `{media_type}` (try tv or movies)");
+                    eprintln!(
+                        "error: no media type named `{media_type}` (try tv, movies, or music)"
+                    );
                     return Err(USAGE);
                 }
             }

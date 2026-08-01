@@ -14,15 +14,20 @@
 use std::path::PathBuf;
 
 use super::{Ctx, QualityAction};
+use crate::audio::Format;
 use crate::config::{store, JELLYFIN_MODE_KEY};
 use crate::error::{Diagnose, Problem};
-use crate::model::{Disposition, PresetChoice, QualityReport};
+use crate::model::{Disposition, MusicChoice, PresetChoice, QualityReport};
 use crate::quality::{Preset, Selection};
 use crate::transcoding::{warn_before_confirming, Playback};
 use crate::wizard::Library;
 
 /// The scope a global choice is reported under, as opposed to a media type's name.
 const EVERYTHING: &str = "everything";
+
+/// The scope the music format is reported under — its own axis, not a resolution
+/// media type.
+const MUSIC: &str = "music";
 
 /// Show or change the quality preset.
 ///
@@ -145,7 +150,7 @@ pub(super) fn most_demanding_or_default(ctx: &Ctx) -> Preset {
 ///
 /// Unlike the baseline seeding keeps best-effort, this is the operator's explicit
 /// action, so a place it cannot be written is reported rather than swallowed.
-fn save_selection(ctx: &Ctx, selection: &Selection) -> Result<(), Box<Problem>> {
+pub(super) fn save_selection(ctx: &Ctx, selection: &Selection) -> Result<(), Box<Problem>> {
     let path = quality_path(ctx).ok_or_else(|| Box::new(store::Failure::Nowhere.problem()))?;
     store::write(&path, &serde_json::to_string(selection).unwrap_or_default())
         .map_err(|failure| Box::new(failure.problem()))
@@ -192,10 +197,28 @@ fn report(
     for (media_type, preset) in selection.overrides() {
         choices.push(choice(media_type, preset, playback));
     }
+    let music = selection
+        .music_chosen()
+        .then(|| music_choice(selection.music()));
     QualityReport {
         choices,
+        music,
         customised,
         disposition,
+    }
+}
+
+/// One audio-format choice as a report — the music equivalent of [`choice`], in format
+/// terms rather than resolution. Shared by showing the choice and by setting it.
+pub(super) fn music_choice(format: Format) -> MusicChoice {
+    let consequence = format.consequence();
+    MusicChoice {
+        scope: MUSIC.to_owned(),
+        format: format.label().to_owned(),
+        means: format.means().to_owned(),
+        targets: consequence.format.to_owned(),
+        size_per_hour: consequence.size_per_hour.to_owned(),
+        note: consequence.note.to_owned(),
     }
 }
 
@@ -319,6 +342,39 @@ mod tests {
             .find(|choice| choice.scope == "movies")
             .map(|choice| choice.preset.as_str());
         assert_eq!(movies, Some(Preset::HighQuality.label()));
+    }
+
+    #[test]
+    fn a_chosen_music_format_is_shown_apart_from_the_resolution_presets() {
+        use crate::audio::Format;
+        use crate::quality::Selection;
+        let env = scratch("music-show");
+        let mut selection = Selection::everywhere(Preset::default_preset());
+        selection.set_music(Format::HiRes);
+        assert!(selection.music_chosen());
+        assert_eq!(selection.music(), Format::HiRes);
+        let _ = store::write(
+            &env.with_file_name("quality.json"),
+            &serde_json::to_string(&selection).unwrap_or_default(),
+        );
+
+        let report = run(
+            &ctx(Some(env), Environment::LinuxNative),
+            QualityAction::Show,
+        );
+        let music = report.music.unwrap_or_default();
+        assert_eq!(music.scope, "music");
+        assert_eq!(music.format, Format::HiRes.label());
+        assert!(!music.means.is_empty());
+        assert!(!music.targets.is_empty());
+    }
+
+    #[test]
+    fn showing_with_no_music_chosen_reports_none() {
+        // The default axis stands in for playback, but music is only reported once the
+        // operator has actually chosen a format — otherwise it is absent, not defaulted.
+        let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show);
+        assert!(report.music.is_none());
     }
 
     #[test]

@@ -14,6 +14,7 @@ use std::time::Duration;
 
 use tokio::sync::mpsc::Receiver;
 
+use crate::audio::Format;
 use crate::config::store;
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::doctor::credentials::CredentialsCheck;
@@ -26,8 +27,8 @@ use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, QualityReport, SettingReport, StackEdit,
-    StatusReport, UpgradeReport, VersionReport,
+    ConfigReport, DoctorReport, Envelope, LifecycleReport, MusicReport, QualityReport,
+    SettingReport, StackEdit, StatusReport, UpgradeReport, VersionReport,
 };
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
@@ -40,6 +41,7 @@ pub mod backup;
 mod ctx;
 pub mod dashboard;
 mod materialise;
+mod music;
 mod quality;
 pub mod recover;
 pub mod restore;
@@ -125,6 +127,13 @@ pub enum Command {
         /// stated and nothing is triggered.
         confirm: bool,
     },
+    /// Choose the audio format for music — media with no resolution — and apply it to
+    /// the music service. Its own command, like the upgrade, because it reaches the
+    /// service asynchronously rather than only recording a choice.
+    QualityMusic {
+        /// The audio format to record and apply.
+        format: Format,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they
@@ -166,6 +175,8 @@ pub enum Outcome {
     Quality(QualityReport),
     /// What upgrading existing content did, or would do, and its stated cost.
     Upgrade(UpgradeReport),
+    /// The music format chosen, and what became of applying it.
+    Music(MusicReport),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -184,6 +195,7 @@ impl Outcome {
             Self::Config(_) => "config",
             Self::Quality(_) => "quality",
             Self::Upgrade(_) => "upgrade",
+            Self::Music(_) => "music",
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
             Self::Seed(_) => "seed",
@@ -200,6 +212,7 @@ impl serde::Serialize for Outcome {
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
             Self::Upgrade(report) => report.serialize(serializer),
+            Self::Music(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
@@ -459,6 +472,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::ConfigShow => configuration(ctx, None, None).map_err(|p| *p),
         Command::Quality(action) => quality::quality(ctx, action)
             .map(Outcome::Quality)
+            .map_err(|problem| *problem),
+        Command::QualityMusic { format } => music::music(ctx, format)
+            .await
+            .map(Outcome::Music)
             .map_err(|problem| *problem),
         Command::QualityUpgrade { confirm } => upgrade::upgrade(ctx, confirm)
             .await
@@ -782,6 +799,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_music_choice_serialises_under_its_own_kind() {
+        // A rehearsal records nothing and reaches no service, so it stays offline while
+        // exercising the dispatch, envelope and serialise arms for its outcome.
+        let mut context = ctx(Ok(spoke("")));
+        context.dry_run = true;
+        let json = dispatch(
+            Command::QualityMusic {
+                format: crate::audio::Format::Lossless,
+            },
+            &context,
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"music\""),
+            "envelope names the kind"
+        );
+    }
+
+    #[tokio::test]
     async fn a_dispatched_quality_upgrade_serialises_under_its_own_kind() {
         // Unconfirmed, it states the cost and reaches no service, so it stays offline
         // while exercising the dispatch, envelope and serialise arms for its outcome.
@@ -929,6 +968,7 @@ mod tests {
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
+                | Outcome::Music(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -946,6 +986,7 @@ mod tests {
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
+                | Outcome::Music(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_),
             )
@@ -1369,6 +1410,7 @@ mod tests {
                 | Outcome::Lifecycle(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
+                | Outcome::Music(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -1822,6 +1864,7 @@ mod tests {
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
+                | Outcome::Music(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
             )
