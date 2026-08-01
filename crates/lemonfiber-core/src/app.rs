@@ -375,6 +375,14 @@ type Composed = (
     Vec<StackEdit>,
 );
 
+/// Whether an action should carry the quality choice into the materialised stack.
+///
+/// Only bringing the stack up or fetching for it applies the operator's preset;
+/// stopping, restarting or resolving leaves the on-disk config exactly as it is.
+fn carries_quality(action: &Action) -> bool {
+    matches!(action, Action::Up | Action::Pull)
+}
+
 fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box<Problem>> {
     let manifest = ctx
         .stack
@@ -387,10 +395,23 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         .env_file
         .as_deref()
         .map(|env| env.with_file_name("materialised.json"));
+    // The quality choice is carried into the Recyclarr config only when a real run
+    // brings the stack up or fetches for it. A teardown or restart has no business
+    // rewriting a config the running container reads, and a rehearsal changes
+    // nothing — so those neither apply the choice nor read it, which keeps a
+    // corrupt choice from ever blocking a stop. An unreadable choice on the paths
+    // that do apply it stops rather than guessing a preset and reverting one
+    // already applied; the command surface is where it is repaired.
+    let quality = if !ctx.dry_run && carries_quality(action) {
+        Some(quality::load_selection(ctx)?)
+    } else {
+        None
+    };
     let (stack, edits) = materialise::materialise(
         ctx.stack,
         ctx.settings.stack_dir.as_deref(),
         record.as_deref(),
+        quality.as_ref(),
     )
     .map_err(|err| Box::new(err.problem()))?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);

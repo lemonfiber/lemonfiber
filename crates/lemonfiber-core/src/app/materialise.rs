@@ -8,12 +8,23 @@
 //! the operator has changed exactly as it is, reporting it with a diff rather than
 //! overwriting it. An external stack is theirs entirely and is left untouched.
 
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use crate::config::store;
 use crate::materialised::{checksum, decide, diff, Decision, Materialised};
 use crate::model::StackEdit;
+use crate::quality::Selection;
 use crate::stack::{Failure, Source};
+
+/// The stack file the quality choice is carried into: Recyclarr's config, whose
+/// `include:` template lists a preset rewrites.
+///
+/// Matched against a file's key, which is its embedded path — baked with forward
+/// slashes on every platform by the stack embedding, the same separator the
+/// materialised record keys already use. It would need revisiting only if the
+/// stack ever came from a real filesystem walk on a back-slash OS.
+const RECYCLARR_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 
 /// Write the stack under `into`, preserving any file the operator has edited, and
 /// return where it lives and which files were left as they set them.
@@ -24,6 +35,15 @@ use crate::stack::{Failure, Source};
 /// not yet upgraded — the edit is preserved and reported, the rest written. The
 /// record of what was written is updated for the next run.
 ///
+/// When a `selection` is given, it is carried into the stack as it is written: the
+/// Recyclarr config's template lists are rewritten to the chosen preset, so what
+/// lemonfiber materialises already reflects the choice. The default selection
+/// rewrites the shipped config to itself, so an unconfigured stack is untouched.
+/// With no selection — a teardown, a restart, a rehearsal — the Recyclarr config
+/// is left exactly as it is on disk rather than being written back to the shipped
+/// default, so an already-applied preset is never reverted by a command that has
+/// no business changing it.
+///
 /// # Errors
 ///
 /// Returns [`Failure`] when there is nowhere to write an embedded stack to, or when
@@ -32,6 +52,7 @@ pub(super) fn materialise(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
+    selection: Option<&Selection>,
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
     let files = source.files();
     if files.is_empty() {
@@ -46,13 +67,20 @@ pub(super) fn materialise(
     let mut edits = Vec::new();
     for (relative, content) in files {
         let key = relative.to_string_lossy();
+        let content = match selection {
+            Some(selection) => carrying_the_choice(&key, content, selection),
+            // No choice to carry, and the Recyclarr config left as it is rather than
+            // written back to the shipped default — which would revert a preset.
+            None if key == RECYCLARR_CONFIG => continue,
+            None => Cow::Borrowed(content),
+        };
         let target = into.join(&relative);
-        let desired = checksum(content);
+        let desired = checksum(&content);
         let on_disk = std::fs::read(&target).ok();
         let actual = on_disk.as_deref().map(checksum);
         match decide(record.checksum(&key), actual, desired) {
             Decision::Write => {
-                write(&target, content)?;
+                write(&target, &content)?;
                 record.record(&key, desired);
             }
             // Already what lemonfiber would write: left, and recorded so the next run
@@ -66,7 +94,7 @@ pub(super) fn materialise(
                     path: key.into_owned(),
                     diff: diff(
                         &String::from_utf8_lossy(&yours),
-                        &String::from_utf8_lossy(content),
+                        &String::from_utf8_lossy(&content),
                     ),
                 });
             }
@@ -74,6 +102,20 @@ pub(super) fn materialise(
     }
     save(record_path, &record);
     Ok((into.to_path_buf(), edits))
+}
+
+/// The content lemonfiber intends for a stack file, given the quality choice: the
+/// Recyclarr config with its template lists rewritten to the preset, every other
+/// file exactly as it ships. The rewrite is what makes the choice take effect on
+/// the next stack write, and the default selection returns the shipped config
+/// unchanged, so a stack no one has chosen a preset for is materialised as before.
+fn carrying_the_choice<'a>(key: &str, content: &'a [u8], selection: &Selection) -> Cow<'a, [u8]> {
+    if key == RECYCLARR_CONFIG {
+        let rewritten = crate::recyclarr::rewrite(&String::from_utf8_lossy(content), selection);
+        Cow::Owned(rewritten.into_bytes())
+    } else {
+        Cow::Borrowed(content)
+    }
 }
 
 /// Read the record of what lemonfiber last wrote, or an empty one where none is
@@ -121,6 +163,7 @@ mod tests {
     use include_dir::{include_dir, Dir};
 
     use super::materialise;
+    use crate::quality::{Preset, Selection};
     use crate::stack::{Failure, Source};
 
     static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
@@ -136,12 +179,18 @@ mod tests {
         std::fs::read_to_string(path).unwrap_or_default()
     }
 
+    /// The default choice, which rewrites the shipped Recyclarr config to itself —
+    /// the selection the file-writing tests use, since it changes nothing.
+    fn balanced() -> Selection {
+        Selection::everywhere(Preset::Balanced)
+    }
+
     #[test]
     fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
         let (into, record) = scratch("write-and-leave");
         let source = Source::Embedded(&STACKLET);
 
-        let first = materialise(source, Some(&into), Some(&record));
+        let first = materialise(source, Some(&into), Some(&record), Some(&balanced()));
         let (path, edits) = first.unwrap_or((PathBuf::new(), Vec::new()));
         assert_eq!(path, into);
         assert!(edits.is_empty(), "a fresh materialise reports no edits");
@@ -155,8 +204,8 @@ mod tests {
         );
 
         // A second run finds every file exactly as it left it: nothing to report.
-        let (_, again) =
-            materialise(source, Some(&into), Some(&record)).unwrap_or((PathBuf::new(), Vec::new()));
+        let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+            .unwrap_or((PathBuf::new(), Vec::new()));
         assert!(again.is_empty(), "an unchanged file is left, not reported");
     }
 
@@ -164,14 +213,14 @@ mod tests {
     fn an_edited_file_is_preserved_and_reported_with_a_diff() {
         let (into, record) = scratch("preserve-edit");
         let source = Source::Embedded(&STACKLET);
-        let _ = materialise(source, Some(&into), Some(&record));
+        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()));
 
         // The operator edits a materialised file by hand.
         let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
         let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-        let (_, edits) =
-            materialise(source, Some(&into), Some(&record)).unwrap_or((PathBuf::new(), Vec::new()));
+        let (_, edits) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+            .unwrap_or((PathBuf::new(), Vec::new()));
         assert_eq!(edits.len(), 1, "only the edited file is reported");
         let edit = edits.first();
         assert!(edit.is_some_and(|edit| edit.path == "compose.yaml"));
@@ -187,8 +236,13 @@ mod tests {
     fn an_external_stack_is_returned_and_nothing_is_written() {
         let (into, record) = scratch("external");
         let external = Path::new("/some/operator/stack");
-        let (path, edits) = materialise(Source::External(external), Some(&into), Some(&record))
-            .unwrap_or((PathBuf::new(), vec![]));
+        let (path, edits) = materialise(
+            Source::External(external),
+            Some(&into),
+            Some(&record),
+            Some(&balanced()),
+        )
+        .unwrap_or((PathBuf::new(), vec![]));
         assert_eq!(path, external, "an external stack is used where it lives");
         assert!(edits.is_empty());
         assert!(!into.exists(), "nothing was written for an external stack");
@@ -196,7 +250,7 @@ mod tests {
 
     #[test]
     fn an_embedded_stack_with_nowhere_to_write_is_refused() {
-        let refusal = materialise(Source::Embedded(&STACKLET), None, None);
+        let refusal = materialise(Source::Embedded(&STACKLET), None, None, Some(&balanced()));
         assert!(matches!(refusal, Err(Failure::NowhereToWrite)));
     }
 
@@ -209,16 +263,113 @@ mod tests {
             let _ = std::fs::create_dir_all(parent);
             let _ = std::fs::write(&into, "not a directory");
         }
-        let failure = materialise(Source::Embedded(&STACKLET), Some(&into), Some(&record));
+        let failure = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&balanced()),
+        );
         assert!(matches!(failure, Err(Failure::NotWritten { .. })));
     }
 
     #[test]
     fn without_a_record_path_the_stack_is_still_written() {
         let (into, _) = scratch("no-record");
-        let (_, edits) = materialise(Source::Embedded(&STACKLET), Some(&into), None)
-            .unwrap_or((PathBuf::new(), vec![]));
+        let (_, edits) = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            None,
+            Some(&balanced()),
+        )
+        .unwrap_or((PathBuf::new(), vec![]));
         assert!(edits.is_empty());
         assert!(read(&into.join("stack.toml")).contains("stacklet"));
+    }
+
+    #[test]
+    fn a_chosen_preset_is_carried_into_the_recyclarr_config() {
+        let (into, record) = scratch("recyclarr-maximum");
+        let maximum = Selection::everywhere(Preset::Maximum);
+
+        let (_, edits) = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&maximum),
+        )
+        .unwrap_or((PathBuf::new(), vec![]));
+        // Written, not reported as an edit: this is lemonfiber's own choice landing.
+        assert!(edits.is_empty());
+        let written = read(&into.join("config/recyclarr/recyclarr.yml"));
+        // The 4K templates are in force, and the Balanced ones the fixture shipped
+        // with are gone.
+        assert!(written.contains("sonarr-v4-quality-profile-web-2160p"));
+        assert!(written.contains("radarr-quality-profile-uhd-bluray-web"));
+        assert!(!written.contains("sonarr-v4-quality-profile-web-1080p"));
+    }
+
+    #[test]
+    fn the_default_choice_leaves_the_shipped_recyclarr_config_untouched() {
+        let (into, record) = scratch("recyclarr-default");
+        let (_, edits) = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&balanced()),
+        )
+        .unwrap_or((PathBuf::new(), vec![]));
+        assert!(edits.is_empty());
+        // The default rewrites the shipped config to itself: byte for byte what the
+        // fixture ships, so a stack no one chose a preset for is materialised as before.
+        let shipped = include_str!("../../tests/fixtures/stacklet/config/recyclarr/recyclarr.yml");
+        assert_eq!(read(&into.join("config/recyclarr/recyclarr.yml")), shipped);
+    }
+
+    #[test]
+    fn no_selection_writes_the_rest_but_skips_the_recyclarr_config() {
+        // A teardown/restart/rehearsal carries no choice: the stack is still
+        // written, but the Recyclarr config is left alone rather than written back
+        // to the shipped default.
+        let (into, record) = scratch("recyclarr-none");
+        let (_, edits) = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            None,
+        )
+        .unwrap_or((PathBuf::new(), vec![]));
+        assert!(edits.is_empty());
+        assert!(read(&into.join("compose.yaml")).contains("image: sonarr"));
+        assert!(
+            !into.join("config/recyclarr/recyclarr.yml").exists(),
+            "the Recyclarr config is left untouched, not written",
+        );
+    }
+
+    #[test]
+    fn no_selection_does_not_revert_an_applied_preset() {
+        let (into, record) = scratch("recyclarr-no-revert");
+        // A preset was applied on a prior up.
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&Selection::everywhere(Preset::Maximum)),
+        );
+        let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+        assert!(read(&recyclarr).contains("sonarr-v4-quality-profile-web-2160p"));
+
+        // A later command carrying no choice leaves the applied preset exactly as it
+        // is — not written back to the shipped default.
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            None,
+        );
+        assert!(
+            read(&recyclarr).contains("sonarr-v4-quality-profile-web-2160p"),
+            "the applied preset is not reverted",
+        );
     }
 }
