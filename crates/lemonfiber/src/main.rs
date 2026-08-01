@@ -186,6 +186,12 @@ enum Request {
     },
     /// Wire the stack's services to each other, idempotently.
     Seed,
+    /// Adopt your current edits as lemonfiber's expected state.
+    ///
+    /// A value you changed by hand reports as drift until you adopt it; once
+    /// adopted it is kept across future seeds and restores. Wires what is missing
+    /// as a seed does, and promotes every drifted value to yours.
+    Adopt,
     /// Back up your configuration to an archive, so it stops being precious.
     Backup {
         /// Back up one service's configuration instead of the whole stack.
@@ -352,6 +358,7 @@ async fn main() -> ExitCode {
             Command::Doctor { only, disruptive }
         }
         Request::Seed => Command::Seed,
+        Request::Adopt => Command::Adopt,
         // Backup and restore drive their own executors over the tar adapter and
         // render their own reports, like setup — they are not one value from
         // dispatch. They take the context by value for the settings they read.

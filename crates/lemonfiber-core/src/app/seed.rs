@@ -24,7 +24,7 @@ use crate::ports::docker::LogQuery;
 /// Prowlarr's app sync registers each of those \*arrs back into Prowlarr, so it
 /// pushes them indexers. It then makes Jellyfin the identity source for Seerr, so
 /// the household signs in once. Bindery wiring lands next.
-pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
+pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Problem> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -90,6 +90,7 @@ pub(super) async fn seed(ctx: &Ctx) -> Result<crate::seed::Report, Problem> {
             sabnzbd_key.as_deref(),
             qbittorrent_password.as_deref(),
             &baseline,
+            adopt,
         )
     }))
     .await;
@@ -187,6 +188,7 @@ async fn seed_arr(
     sabnzbd_key: Option<&str>,
     qbittorrent_password: Option<&str>,
     expected: &crate::baseline::Baseline,
+    adopt: bool,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let wanted = wanted_roots(&arr.media_types);
     let clients = arr_download_clients(arr, sabnzbd_key, qbittorrent_password);
@@ -239,8 +241,11 @@ async fn seed_arr(
                 &arr.target.name,
                 &clients,
                 &mut journal,
-                expected,
-                &mut records,
+                &mut crate::seed::Baselines {
+                    expected,
+                    records: &mut records,
+                    adopt,
+                },
                 &at,
             )
             .await,
@@ -1312,13 +1317,39 @@ mod tests {
         // Each client is already registered at its endpoint, so none is written a
         // second time. The service reports no category for them and there is no
         // baseline, so the three-way comparison cannot prove they are lemonfiber's
-        // own value: it leaves each as the operator's — drifted, preserved — rather
-        // than overwriting it. The point the test guards is that a present client is
-        // left, never duplicated.
+        // own value: it takes each as the operator's own, pre-existing and unmanaged,
+        // and leaves it rather than overwriting it. The point the test guards is that
+        // a present client is left, never duplicated.
         let none_rewired = clients
             .iter()
-            .all(|wiring| wiring.state == crate::seed::State::Drifted);
+            .all(|wiring| wiring.state == crate::seed::State::Unmanaged);
         assert!(none_rewired, "a present client is left, not re-registered");
+    }
+
+    #[tokio::test]
+    async fn adopt_runs_the_wiring_and_reports_each_present_client() {
+        // The adopt command runs the same wiring as a seed. The mock's present clients
+        // report no category and there is no baseline, so each is unmanaged — and with
+        // no value to take on, an adopt pass reports it unmanaged just as a seed does,
+        // never registering it a second time. The point guarded here is that the adopt
+        // command dispatches and reports every present client.
+        const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+        let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x22; 24]), None)
+            .with_http(Arc::new(RoutedHttp))
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+
+        let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
+        let clients = download_client_wirings(&report);
+        assert_eq!(
+            clients.len(),
+            6,
+            "SABnzbd and qBittorrent into each of three arrs"
+        );
+        let all_reported = clients
+            .iter()
+            .all(|wiring| wiring.state == crate::seed::State::Unmanaged);
+        assert!(all_reported, "an adopt pass reports each present client");
     }
 
     #[tokio::test]
