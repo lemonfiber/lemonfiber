@@ -64,7 +64,10 @@ struct Recorded {
 /// reachable there is nothing to subtract, so the same floor guards the raw free
 /// space instead. A single large import can be tens of gigabytes and unpacking
 /// needs room beside the file, so the floor sits well above one file.
-const LOW_SPACE_FLOOR: u64 = 10 * 1024 * 1024 * 1024;
+///
+/// Public so the quality-headroom check can defer to this one below it: a disk this
+/// low is a free-space problem this check already reports, not a quality-fit one.
+pub const LOW_SPACE_FLOOR: u64 = 10 * 1024 * 1024 * 1024;
 
 /// Whether the data root can hardlink, and what mode that puts the stack in.
 pub struct StorageCheck {

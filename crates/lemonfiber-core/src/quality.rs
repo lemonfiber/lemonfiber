@@ -132,6 +132,24 @@ impl Preset {
     pub const fn likely_needs_transcoding(self) -> bool {
         matches!(self, Self::Maximum)
     }
+
+    /// Roughly how many bytes an hour of content at this preset takes — the midpoint
+    /// of the range [`Consequence::size_per_hour`] states in words, a representative
+    /// figure rather than a guarantee. Real sizes vary with the source; what a
+    /// storage projection turns on is the ratio between presets, which the midpoints
+    /// preserve without the systematic over-estimate an upper bound would carry.
+    #[must_use]
+    pub const fn bytes_per_hour(self) -> u64 {
+        // Decimal gigabytes, to read the same as the "GB per hour" the operator sees.
+        // The midpoint of each stated range: 0.5–1 → 0.75, 2–3 → 2.5, 4–6 → 5,
+        // 10–25 → 17.5.
+        match self {
+            Self::SpaceSaving => 750_000_000,
+            Self::Balanced => 2_500_000_000,
+            Self::HighQuality => 5_000_000_000,
+            Self::Maximum => 17_500_000_000,
+        }
+    }
 }
 
 /// The operator's quality choice across their media: one preset for everything, with
@@ -214,6 +232,21 @@ impl Selection {
     pub fn is_overridden(&self) -> bool {
         self.per_type.values().any(|preset| *preset != self.global)
     }
+
+    /// The preset in force that costs the most disk per hour — the global choice, or
+    /// a hungrier per-type exception where one is set. It is the basis for a storage
+    /// projection: if any media is kept at a demanding preset, the disk has to
+    /// accommodate that rate, so the warning turns on the hungriest choice rather
+    /// than an average that would understate the risk.
+    #[must_use]
+    pub fn most_demanding(&self) -> Preset {
+        self.per_type
+            .values()
+            .copied()
+            .chain(std::iter::once(self.global))
+            .max_by_key(|preset| preset.bytes_per_hour())
+            .unwrap_or(self.global)
+    }
 }
 
 #[cfg(test)]
@@ -291,6 +324,32 @@ mod tests {
                 "{preset:?} boolean and prose disagree on transcoding",
             );
         }
+    }
+
+    #[test]
+    fn a_hungrier_preset_costs_more_disk_per_hour() {
+        // The projection turns on the ratio between presets, so the rate must rise
+        // strictly with how demanding the preset is, in the order they are offered.
+        let mut previous = 0;
+        for preset in Preset::ALL {
+            let rate = preset.bytes_per_hour();
+            assert!(
+                rate > previous,
+                "{preset:?} must cost more per hour than the tier below it"
+            );
+            previous = rate;
+        }
+    }
+
+    #[test]
+    fn the_most_demanding_choice_is_the_hungriest_preset_in_force() {
+        let mut selection = Selection::everywhere(Preset::SpaceSaving);
+        assert_eq!(selection.most_demanding(), Preset::SpaceSaving);
+
+        // A hungrier per-type exception raises the basis; a lighter one does not.
+        selection.set_type("movies", Preset::Maximum);
+        selection.set_type("tv", Preset::Balanced);
+        assert_eq!(selection.most_demanding(), Preset::Maximum);
     }
 
     #[test]

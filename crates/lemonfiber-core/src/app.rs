@@ -19,6 +19,7 @@ use crate::docker::{condition, survey, unsettled, Service};
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::guides::GuidesCheck;
+use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
@@ -512,6 +513,16 @@ async fn diagnose(
     // back empty — leaving the profiles in place stale rather than unconfigured — is
     // reported rather than silently missed.
     let guides = GuidesCheck::new(ctx.http.clone());
+    // Whether the disk can plausibly hold a library at the chosen quality, projected
+    // against the free space so an implausible choice is caught before it fills the
+    // disk. The hungriest preset in force is the basis — the one that stresses the
+    // disk most. An unreadable or unset choice falls back to the default rather than
+    // failing the run.
+    let headroom = HeadroomCheck::new(
+        ctx.filesystem.clone(),
+        ctx.settings.data_root.clone(),
+        quality::most_demanding_or_default(ctx),
+    );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(storage),
@@ -519,6 +530,7 @@ async fn diagnose(
         Box::new(credentials),
         Box::new(indexer),
         Box::new(guides),
+        Box::new(headroom),
     ];
 
     Ok(examine(&checks, only).await)
