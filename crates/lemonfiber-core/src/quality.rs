@@ -160,6 +160,12 @@ impl Selection {
         }
     }
 
+    /// The preset in force everywhere a media type has no exception of its own.
+    #[must_use]
+    pub fn global(&self) -> Preset {
+        self.global
+    }
+
     /// The preset in force for a media type: its own exception where it has one,
     /// otherwise the global choice.
     #[must_use]
@@ -168,6 +174,24 @@ impl Selection {
             .get(media_type)
             .copied()
             .unwrap_or(self.global)
+    }
+
+    /// The media types set apart from the global choice, each with its preset —
+    /// only the genuine exceptions, so a redundant entry equal to the global is
+    /// not reported as one.
+    pub fn overrides(&self) -> impl Iterator<Item = (&str, Preset)> {
+        self.per_type
+            .iter()
+            .filter(|(_, preset)| **preset != self.global)
+            .map(|(media_type, preset)| (media_type.as_str(), *preset))
+    }
+
+    /// Change the preset in force where a type has no exception. Any exception that
+    /// now matches the new global stops being one, so raising everything to a
+    /// preset a type was already set to leaves no redundant override behind.
+    pub fn set_global(&mut self, preset: Preset) {
+        self.global = preset;
+        self.per_type.retain(|_, exception| *exception != preset);
     }
 
     /// Set a media type's preset apart from the global choice. Setting it to the
@@ -279,6 +303,33 @@ mod tests {
         assert_eq!(selection.for_type("movies"), Preset::Maximum);
         assert_eq!(selection.for_type("tv"), Preset::Balanced);
         assert!(selection.is_overridden());
+    }
+
+    #[test]
+    fn overrides_reports_the_global_and_only_the_genuine_exceptions() {
+        let mut selection = Selection::everywhere(Preset::Balanced);
+        assert_eq!(selection.global(), Preset::Balanced);
+        assert_eq!(selection.overrides().count(), 0);
+
+        selection.set_type("movies", Preset::Maximum);
+        let overrides: Vec<_> = selection.overrides().collect();
+        assert_eq!(overrides, vec![("movies", Preset::Maximum)]);
+    }
+
+    #[test]
+    fn raising_the_global_drops_an_exception_it_now_matches() {
+        let mut selection = Selection::everywhere(Preset::Balanced);
+        selection.set_type("movies", Preset::Maximum);
+        selection.set_type("tv", Preset::HighQuality);
+
+        selection.set_global(Preset::Maximum);
+        assert_eq!(selection.global(), Preset::Maximum);
+        // Movies matched the new global, so it is no longer an exception; tv still
+        // differs and remains one.
+        assert_eq!(
+            selection.overrides().collect::<Vec<_>>(),
+            vec![("tv", Preset::HighQuality)]
+        );
     }
 
     #[test]

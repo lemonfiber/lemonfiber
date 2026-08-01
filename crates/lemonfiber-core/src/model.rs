@@ -87,6 +87,53 @@ pub struct ConfigReport {
     pub rehearsed: bool,
 }
 
+/// What a quality command did to the stored choice.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Disposition {
+    /// The choice was only shown; nothing was asked to change.
+    #[default]
+    Shown,
+    /// The choice was recorded.
+    Recorded,
+    /// The choice would be recorded; this was a rehearsal, so it was not.
+    Rehearsed,
+    /// The choice needs transcoding this host cannot do well, so it was held
+    /// rather than recorded without explicit confirmation.
+    Held,
+}
+
+/// One preset in force, and what it means for the media it applies to — the
+/// operator's question answered in their own terms, with no scoring vocabulary.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct PresetChoice {
+    /// What this applies to: `everything`, or a specific media type.
+    pub scope: String,
+    /// The preset's plain-language name.
+    pub preset: String,
+    /// What it means, in the operator's terms rather than the tool's.
+    pub means: String,
+    /// The resolution and encode it targets.
+    pub resolution: String,
+    /// Roughly how much disk an hour of it takes.
+    pub size_per_hour: String,
+    /// What playback costs, in plain terms.
+    pub transcoding: String,
+    /// Whether this host would have to transcode it in software — the caution
+    /// stated before a choice a household cannot smoothly play.
+    pub needs_transcoding_here: bool,
+}
+
+/// The operator's quality choice, what each preset means, and what the command
+/// did with it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct QualityReport {
+    /// The global choice first, then each media type set apart from it.
+    pub choices: Vec<PresetChoice>,
+    /// What became of the choice.
+    pub disposition: Disposition,
+}
+
 /// What a lifecycle command did, or would have done.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LifecycleReport {
