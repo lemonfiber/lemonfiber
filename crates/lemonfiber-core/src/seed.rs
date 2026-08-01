@@ -600,14 +600,34 @@ fn observe_client(
 ) -> Observed {
     match have {
         None => Observed::Absent,
+        // The three legs are compared by their canonical form, so a category a service
+        // normalises on write is not read as drift from what lemonfiber holds. The
+        // baseline still keeps the raw value it recorded; only the comparison is
+        // canonicalised, here at the one place that knows the value is a category.
         Some(have) => reconcile(
-            expected,
+            expected
+                .map(|record| crate::baseline::Record {
+                    value: canonical_category(&record.value).to_owned(),
+                    at: record.at.clone(),
+                    origin: record.origin,
+                })
+                .as_ref(),
             have.category
                 .as_ref()
-                .map(|category| category.value.as_str()),
-            &want.category.value,
+                .map(|category| canonical_category(&category.value)),
+            canonical_category(&want.category.value),
         ),
     }
+}
+
+/// A download-client category compared without regard to surrounding whitespace,
+/// which a service may trim on write — so a value differing only by it is not read
+/// as drift, the same way [`same_path`] disregards a trailing slash a service adds.
+/// Case is left as it is: a category can be case-sensitive, and folding it could
+/// merge two the operator means to keep apart, which is worse than a reported
+/// difference.
+fn canonical_category(value: &str) -> &str {
+    value.trim()
 }
 
 /// Whether a registered client reaches the same endpoint as a wanted one.

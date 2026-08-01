@@ -1205,6 +1205,71 @@ async fn a_client_both_sides_changed_is_a_conflict() {
     assert_eq!(journal.changes().len(), 0, "a conflict is not resolved");
 }
 
+#[tokio::test]
+async fn a_category_differing_only_by_whitespace_is_not_drift() {
+    // lemonfiber wrote "tv" and still wants it; the service reports it back with
+    // surrounding whitespace lemonfiber's own value does not carry — the kind of
+    // difference a normalisation on write leaves. Compared by canonical form the two
+    // are the same category, so it reads as already wired, not as drift to preserve.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: " tv ".to_owned(),
+        }),
+    }];
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let (states, _recorded, changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &expected,
+        false,
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(
+        changes, 0,
+        "a value the same but for whitespace is not written again"
+    );
+}
+
+#[tokio::test]
+async fn a_whitespace_only_difference_with_no_baseline_is_lemonfibers_own() {
+    // No baseline, and the service holds what lemonfiber would write but for
+    // surrounding whitespace. Canonically the two are the same, so this is not the
+    // operator's own unmanaged value — it is lemonfiber's, already in place: already
+    // wired, and recorded as written, not adopted.
+    let existing = vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: " tv ".to_owned(),
+        }),
+    }];
+    let (states, recorded, _changes) = seed_clients_with(
+        FakeService::with_clients(Mode::Normal, existing),
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &Baseline::new(),
+        false,
+    )
+    .await;
+    assert_eq!(states, vec![State::AlreadyWired]);
+    assert_eq!(
+        recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
+        Some(&Record {
+            value: "tv".to_owned(),
+            at: "2".to_owned(),
+            origin: Origin::Written,
+        }),
+        "the value is lemonfiber's own, recorded as written not adopted",
+    );
+}
+
 /// Run the client driver against a given baseline and pass kind, returning the
 /// resulting states, what this run recorded, and the number of changes journalled —
 /// for the adoption tests, which turn on the baseline's origin and the adopt flag.
