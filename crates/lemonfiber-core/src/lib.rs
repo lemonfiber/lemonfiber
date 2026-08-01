@@ -34,6 +34,7 @@
 
 pub mod adapters;
 pub mod app;
+pub mod audio;
 pub mod backup;
 pub mod baseline;
 pub mod config;
