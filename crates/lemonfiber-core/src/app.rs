@@ -18,6 +18,7 @@ use crate::config::store;
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
+use crate::doctor::guides::GuidesCheck;
 use crate::doctor::indexer::IndexerCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
@@ -507,12 +508,17 @@ async fn diagnose(
         Arc::new(crate::validate::Live::new(ctx.http.clone())),
         ctx.settings.indexer.clone(),
     );
+    // Whether the upstream quality guides can be reached, so a sync that would come
+    // back empty — leaving the profiles in place stale rather than unconfigured — is
+    // reported rather than silently missed.
+    let guides = GuidesCheck::new(ctx.http.clone());
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(storage),
         Box::new(vpn),
         Box::new(credentials),
         Box::new(indexer),
+        Box::new(guides),
     ];
 
     Ok(examine(&checks, only).await)
@@ -694,7 +700,7 @@ mod tests {
     use crate::ports::process::{Failure, Output, Progress};
     use crate::quality::Preset;
     use crate::stack::Source;
-    use crate::test_support::{refused, spoke, stack, Reporting, Scripted};
+    use crate::test_support::{refused, spoke, stack, Reporting, Scripted, ScriptedHttp};
     use std::time::Duration;
 
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
@@ -912,6 +918,40 @@ mod tests {
                 .findings
                 .iter()
                 .all(|finding| finding.category == Category::Vpn)));
+    }
+
+    #[tokio::test]
+    async fn a_full_doctor_run_includes_the_quality_guide_check() {
+        // The guide-source check is wired into the suite: an unfiltered run carries
+        // its finding. The ctx's offline http makes it unverified rather than
+        // reaching the real upstream.
+        let ctx = watching(Reporting::holding(
+            &LIBRARY,
+            Lifecycle::Running,
+            Health::Healthy,
+        ));
+        let outcome = dispatch(
+            Command::Doctor {
+                only: None,
+                disruptive: false,
+            },
+            &ctx,
+        )
+        .await;
+
+        let names = diagnosis(outcome)
+            .map(|report| {
+                report
+                    .findings
+                    .into_iter()
+                    .map(|finding| finding.check)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        assert!(
+            names.iter().any(|check| check == "services.quality-guides"),
+            "the guide-source check should appear in a full run: {names:?}"
+        );
     }
 
     #[tokio::test]
@@ -1514,6 +1554,10 @@ mod tests {
             settings,
             Environment::MacOs,
         )
+        // An HTTP port that answers nothing, so a diagnostic check reaching one — the
+        // guide-source probe, a credential — resolves to unreachable rather than the
+        // real network. Keeps the doctor tests self-contained and offline.
+        .with_http(Arc::new(ScriptedHttp::new(Vec::new())))
     }
 
     /// Everything the `library` form declares.

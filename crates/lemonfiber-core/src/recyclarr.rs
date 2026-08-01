@@ -372,6 +372,28 @@ mod tests {
     }
 
     #[test]
+    fn every_preset_leaves_each_service_with_templates() {
+        // Whatever the choice, the writer never emits an empty include list: a
+        // rewritten config always carries templates for both services. This is
+        // lemonfiber's half of "never fall back to unconfigured" — the config it
+        // writes is always configured. (Leaving an already-synced profile intact when
+        // the upstream is unreachable is Recyclarr's own behaviour, not this code's.)
+        for preset in Preset::ALL {
+            let config = rewrite(SHIPPED, &Selection::everywhere(preset));
+            for kind in Kind::ALL {
+                let templates = config.lines().filter(|line| {
+                    line.trim().starts_with("- template:") && line.contains(kind.section())
+                });
+                assert_eq!(
+                    templates.count(),
+                    3,
+                    "{preset:?} left {kind:?} misconfigured"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn maximum_swaps_both_services_to_their_4k_templates() {
         let rewritten = rewrite(SHIPPED, &Selection::everywhere(Preset::Maximum));
         assert!(rewritten.contains("sonarr-v4-quality-profile-web-2160p"));

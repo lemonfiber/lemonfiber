@@ -16,6 +16,7 @@
 
 pub mod credentials;
 pub mod environment;
+pub mod guides;
 pub mod indexer;
 pub mod storage;
 pub mod vpn;
