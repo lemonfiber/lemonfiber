@@ -23,7 +23,7 @@ use lemonfiber_core::config::{
 };
 use lemonfiber_core::doctor::{Category, Overall};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{Disposition, Envelope, Triggered};
+use lemonfiber_core::model::{Disposition, Envelope, Triggered, UpgradeReport};
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
@@ -461,29 +461,7 @@ fn settled(outcome: &Outcome) -> ExitCode {
             | Disposition::Reapplied
             | Disposition::WouldReapply => ExitCode::SUCCESS,
         },
-        // An unconfirmed upgrade stated its cost and did nothing, so a script sees a
-        // non-zero result telling it to confirm. A service that refused is a failure;
-        // a run where nothing was actually started — every service still coming up, or
-        // none present — is a failure too, so success means at least one re-search
-        // began and none was refused.
-        Outcome::Upgrade(report) => {
-            let outcome = |want: fn(&Triggered) -> bool| {
-                report
-                    .media
-                    .iter()
-                    .filter_map(|media| media.outcome.as_ref())
-                    .any(want)
-            };
-            if !report.confirmed {
-                ExitCode::from(VALIDATION)
-            } else if outcome(|state| matches!(state, Triggered::Failed { .. })) {
-                ExitCode::from(FAILURE)
-            } else if outcome(|state| matches!(state, Triggered::Started)) {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(FAILURE)
-            }
-        }
+        Outcome::Upgrade(report) => upgrade_exit(report),
         // The music choice is recorded even when the service could not be reached, so
         // only a service that refused the change is a failure; a rehearsal or a service
         // still coming up has still recorded the choice.
@@ -497,6 +475,31 @@ fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
             ExitCode::SUCCESS
         }
+    }
+}
+
+/// The exit code an upgrade earns.
+///
+/// An unconfirmed upgrade stated its cost and did nothing, so a script sees a non-zero
+/// result telling it to confirm. A service that refused is a failure; a run where
+/// nothing was actually started — every service still coming up, or none present — is a
+/// failure too, so success means at least one re-search began and none was refused.
+fn upgrade_exit(report: &UpgradeReport) -> ExitCode {
+    let outcome = |want: fn(&Triggered) -> bool| {
+        report
+            .media
+            .iter()
+            .filter_map(|media| media.outcome.as_ref())
+            .any(want)
+    };
+    if !report.confirmed {
+        ExitCode::from(VALIDATION)
+    } else if outcome(|state| matches!(state, Triggered::Failed { .. })) {
+        ExitCode::from(FAILURE)
+    } else if outcome(|state| matches!(state, Triggered::Started)) {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(FAILURE)
     }
 }
 
