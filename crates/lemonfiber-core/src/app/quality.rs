@@ -68,9 +68,11 @@ pub(super) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
 /// An absent file is a first run and reads as the default. A file that is present
 /// but cannot be read or parsed is not: lemonfiber will not guess at a choice it
 /// cannot read, because guessing the default here and then recording over it would
-/// lose the operator's real choice silently. So it is surfaced, and the caller
-/// refuses to overwrite it — the same stance the settings store takes.
-fn load_selection(ctx: &Ctx) -> Result<Selection, Box<Problem>> {
+/// lose the operator's real choice silently. So it is surfaced — the command
+/// refuses to overwrite it, and a lifecycle apply refuses to guess a preset it
+/// cannot read rather than silently reverting one it already applied — the same
+/// stance the settings store takes.
+pub(super) fn load_selection(ctx: &Ctx) -> Result<Selection, Box<Problem>> {
     let default = || Selection::everywhere(Preset::default_preset());
     let Some(path) = quality_path(ctx) else {
         return Ok(default());
