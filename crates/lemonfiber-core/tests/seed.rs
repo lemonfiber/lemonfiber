@@ -811,25 +811,44 @@ fn client_with_category(name: &str, host: &str, port: u16, category: &str) -> Do
 /// — the tests that assert on it drive the driver directly.
 async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let mut baseline = Baseline::new();
-    let wirings =
-        wire_download_clients(&service, "sonarr", wanted, &mut journal, &mut baseline, "t").await;
+    let expected = Baseline::new();
+    let mut records = Baseline::new();
+    let wirings = wire_download_clients(
+        &service,
+        "sonarr",
+        wanted,
+        &mut journal,
+        &expected,
+        &mut records,
+        "t",
+    )
+    .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
 }
 
 /// Run the client driver, returning the resulting states and the baseline it
 /// recorded into — for the tests that assert what lemonfiber remembered it wrote.
+/// The expected snapshot is empty, as on a first seed.
 async fn seed_clients_recording(
     service: FakeService,
     wanted: &[DownloadClient],
 ) -> (Vec<State>, Baseline) {
     let mut journal = Journal::new();
-    let mut baseline = Baseline::new();
-    let wirings =
-        wire_download_clients(&service, "sonarr", wanted, &mut journal, &mut baseline, "t").await;
+    let expected = Baseline::new();
+    let mut records = Baseline::new();
+    let wirings = wire_download_clients(
+        &service,
+        "sonarr",
+        wanted,
+        &mut journal,
+        &expected,
+        &mut records,
+        "t",
+    )
+    .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
-    (states, baseline)
+    (states, records)
 }
 
 #[tokio::test]
@@ -1008,14 +1027,16 @@ async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
         }),
     }];
     let mut journal = Journal::new();
-    let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
         &FakeService::with_clients(Mode::Normal, existing),
         "sonarr",
         &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
         &mut journal,
-        &mut baseline,
+        &expected,
+        &mut records,
         "2",
     )
     .await
@@ -1045,14 +1066,16 @@ async fn a_client_both_sides_changed_is_a_conflict() {
         }),
     }];
     let mut journal = Journal::new();
-    let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
         &FakeService::with_clients(Mode::Normal, existing),
         "sonarr",
         &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
         &mut journal,
-        &mut baseline,
+        &expected,
+        &mut records,
         "2",
     )
     .await

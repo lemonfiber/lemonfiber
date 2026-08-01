@@ -278,18 +278,11 @@ pub async fn wire_root_folders(
     journal: &mut Journal,
     at: &str,
 ) -> Vec<Wiring> {
-    let existing = match client.root_folders().await {
-        Ok(folders) => folders,
-        Err(failure) => {
-            let state = unreached(&failure);
-            return wanted
-                .iter()
-                .map(|folder| Wiring {
-                    connection: describe(service, folder),
-                    state: state.clone(),
-                })
-                .collect();
-        }
+    let existing = match observe_or_skip(client.root_folders().await, wanted, |folder| {
+        describe(service, folder)
+    }) {
+        Ok(existing) => existing,
+        Err(skipped) => return skipped,
     };
 
     let mut wirings = Vec::new();
@@ -404,37 +397,30 @@ pub async fn wire_download_clients(
     service: &str,
     wanted: &[DownloadClient],
     journal: &mut Journal,
-    baseline: &mut Baseline,
+    expected: &Baseline,
+    records: &mut Baseline,
     at: &str,
 ) -> Vec<Wiring> {
-    let existing = match client.download_clients().await {
-        Ok(clients) => clients,
-        Err(failure) => {
-            let state = unreached(&failure);
-            return wanted
-                .iter()
-                .map(|want| Wiring {
-                    connection: describe_client(service, want),
-                    state: state.clone(),
-                })
-                .collect();
-        }
+    let existing = match observe_or_skip(client.download_clients().await, wanted, |want| {
+        describe_client(service, want)
+    }) {
+        Ok(existing) => existing,
+        Err(skipped) => return skipped,
     };
 
     let mut wirings = Vec::new();
     for want in wanted {
         // What lemonfiber last wrote here, if anything — the expected leg of the
-        // three-way comparison, read from the baseline this run loaded before it
-        // recorded anything into it, and owned so the record below can borrow the
-        // baseline mutably.
+        // three-way comparison, read from the snapshot this run loaded, separate from
+        // the `records` it writes into, so the two do not fight over one borrow.
         let field = client_field(want);
-        let expected = baseline.expected(service, &field).map(str::to_owned);
+        let base = expected.expected(service, &field);
         // The policy decides from the three-way comparison: an absent client is
         // written, one already at lemonfiber's value is left, an operator's edit is
         // preserved, lemonfiber's own value behind its intent is reported stale, and
         // a two-sided change is presented as a conflict. Unavailable never reaches
         // here — a read-back failure was handled above — so it folds onto `Leave`.
-        let state = match intent(observe_client(&existing, want, expected.as_deref())) {
+        let state = match intent(observe_client(&existing, want, base)) {
             Intent::Wire => {
                 wire_one(
                     client.register_download_client(want),
@@ -465,7 +451,7 @@ pub async fn wire_download_clients(
         // categoryless client is not lemonfiber's current value, so its expected
         // stays what lemonfiber last wrote — kept from before this run.
         if matches!(state, State::Wired | State::AlreadyWired) {
-            baseline.record(service, &field, &want.category.value, at);
+            records.record(service, &field, &want.category.value, at);
         }
         wirings.push(Wiring {
             connection: describe_client(service, want),
@@ -531,18 +517,11 @@ pub async fn wire_applications(
     journal: &mut Journal,
     at: &str,
 ) -> Vec<Wiring> {
-    let existing = match prowlarr.applications().await {
-        Ok(applications) => applications,
-        Err(failure) => {
-            let state = unreached(&failure);
-            return wanted
-                .iter()
-                .map(|application| Wiring {
-                    connection: describe_application(service, application),
-                    state: state.clone(),
-                })
-                .collect();
-        }
+    let existing = match observe_or_skip(prowlarr.applications().await, wanted, |application| {
+        describe_application(service, application)
+    }) {
+        Ok(existing) => existing,
+        Err(skipped) => return skipped,
     };
 
     let mut wirings = Vec::new();
@@ -743,6 +722,28 @@ fn unreached(failure: &Failure) -> State {
             reason: format!("{service} does not serve the API version this build speaks: {detail}"),
         },
     }
+}
+
+/// A service's existing resources, observed once — or, where it could not be
+/// reached, every wanted connection as the state that unreachability leaves it in.
+/// Each driver opens the same way; this is that opening, so the three do not each
+/// repeat it: `Ok` yields what the service holds, `Err` yields the wirings to
+/// return in its place, described by the caller's own namer.
+fn observe_or_skip<T, W>(
+    observed: Result<Vec<T>, Failure>,
+    wanted: &[W],
+    describe: impl Fn(&W) -> String,
+) -> Result<Vec<T>, Vec<Wiring>> {
+    observed.map_err(|failure| {
+        let state = unreached(&failure);
+        wanted
+            .iter()
+            .map(|want| Wiring {
+                connection: describe(want),
+                state: state.clone(),
+            })
+            .collect()
+    })
 }
 
 /// Whether two paths name the same folder.

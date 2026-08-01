@@ -49,17 +49,35 @@ what the render loop requires — nothing is shared with a frame, and a slow
 producer delays its own panel and nothing else. A `Receiver` says that in the
 type; a `Stream` would leave it to convention.
 
-It also keeps `futures` out of the dependency graph.
+The streaming ports avoid `Stream` for the reasons above, not to keep `futures`
+out of the graph: seeding and `doctor` take `futures-util`'s `join_all` to run
+each service's independent work at once, so a run's time tracks the slowest
+service rather than their sum. Only the combinator is taken — no executor — and
+it is already in the tree via reqwest, so it adds no crate.
 
-## There is no filesystem port
+## The filesystem port is narrow, and the probe stays real
 
-Deliberately. Paths are injected and tests run against a temporary directory.
+There is a `FileSystem` port, but a deliberately narrow one, and the concern that
+made the early design resist a filesystem port still shapes it. The storage probe
+has to create a file, hard-link it, and compare inode link counts on the
+operator's *actual* volume; a faked filesystem would report that hard-linking
+works on a volume where it does not — precisely the silent degradation the probe
+exists to catch. So the probe's real work runs through the `Disk` adapter against
+the real volume. The port exists so the logic *around* that raw I/O — resolving
+the data root, deciding what a probe result means, reading a service's
+configuration — is settled without touching a disk and driven against a fake,
+while the one measurement that must be real stays real.
 
-Abstracting the filesystem would buy fake confidence in the one place it matters
-most: the storage probe has to create a file, hard-link it, and compare inode
-link counts on the operator's *actual* volume. A faked filesystem would report
-that hard-linking works on a volume where it does not, which is precisely the
-silent degradation the probe exists to catch.
+`ports::filesystem::FileSystem` covers reading, writing, canonicalising and
+ownership; `ports::filesystem::Volume` covers whether the data root is still
+present and still the same volume.
+
+The boundary between the port and raw `std::fs` is deliberate: the port stands in
+for what a *service* owns, where a fake must be able to answer for it; lemonfiber's
+own small records — the config store (`.env`), the drift baseline, the change
+journal, setup progress — are written with `std::fs` and exercised against a real
+temporary directory rather than through the port, since there is nothing a fake
+would add over the real thing and the secret-file mode handling has to be real.
 
 ## What is implemented, and what is not
 
@@ -69,7 +87,9 @@ silent degradation the probe exists to catch.
 | `adapters::time::System` | Real. |
 | `adapters::docker::Daemon` | Real. `bollard`; see [engine-api.md](engine-api.md). |
 | `adapters::filesystem::Disk` | Real. Standard-library I/O; `sysinfo` for the filesystem type. Implements `Volume` too. |
-| `adapters::http` | Not yet — arrives with seeding, on `reqwest`. |
+| `adapters::http::Web` | Real. `reqwest` + `rustls`, with connect and request timeouts and a host-scoped cookie store for session-auth services. |
+| `nntp` (binary crate) | Real. `tokio-rustls` for a TLS-wrapped NNTP dial; lives in the binary crate, not core. |
+| `archive` (binary crate) | Real. `flate2` + `tar` for backup/restore; lives in the binary crate, so core carries no archive dependency. |
 
 The port for the last one is defined, so the logic above it can be written and
 tested first. That ordering is the point of the seam: nothing waits on an

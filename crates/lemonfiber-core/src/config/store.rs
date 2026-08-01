@@ -125,10 +125,33 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
     if let Err(err) = make_private_dir(parent) {
         return Err(unwritable(path, &err));
     }
-    if let Err(err) = std::fs::write(path, text).and_then(|()| make_private(path)) {
+    if let Err(err) = write_owner_only(path, text).and_then(|()| make_private(path)) {
         return Err(unwritable(path, &err));
     }
     Ok(())
+}
+
+/// Write `text`, creating the file owner-only from the outset where the platform
+/// tracks a file mode, so a secret is never even briefly world-readable in the gap
+/// between creation and tightening. `mode` applies only to a file this creates; an
+/// existing one keeps its mode until the [`make_private`] that follows corrects it.
+#[cfg(unix)]
+fn write_owner_only(path: &Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write as _;
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(text.as_bytes())
+}
+
+/// Where the platform has no owner-only mode to set at creation, an ordinary write.
+#[cfg(not(unix))]
+fn write_owner_only(path: &Path, text: &str) -> std::io::Result<()> {
+    std::fs::write(path, text)
 }
 
 /// Create the configuration directory, private to its owner where the platform

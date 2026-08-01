@@ -135,13 +135,72 @@ impl Endpoint {
     }
 }
 
+/// The most of a service's error body carried into a refusal — enough to diagnose,
+/// capped so a large or verbose response (which could echo a field the request
+/// submitted) is not dumped wholesale into operator-facing output.
+const DETAIL_LIMIT: usize = 200;
+
 /// A non-success response as the detail of a refusal: the service's own words
-/// where it gave any, its status code alone otherwise.
+/// where it gave any — clipped to a diagnostic length — its status code alone
+/// otherwise.
 pub(crate) fn describe(response: &Response) -> String {
     let body = response.body.trim();
     if body.is_empty() {
         format!("HTTP {}", response.status)
     } else {
-        format!("HTTP {}: {body}", response.status)
+        format!("HTTP {}: {}", response.status, clip(body, DETAIL_LIMIT))
+    }
+}
+
+/// `text` cut to at most `limit` characters — counted as characters, not bytes, so
+/// a multibyte boundary is never split — and marked where it was cut.
+fn clip(text: &str, limit: usize) -> String {
+    if text.chars().count() <= limit {
+        return text.to_owned();
+    }
+    let kept: String = text.chars().take(limit).collect();
+    format!("{kept}…")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::describe;
+    use crate::ports::http::Response;
+
+    #[test]
+    fn a_short_error_body_is_carried_whole() {
+        let response = Response {
+            status: 500,
+            body: "database is locked".to_owned(),
+        };
+        assert_eq!(describe(&response), "HTTP 500: database is locked");
+    }
+
+    #[test]
+    fn an_empty_error_body_is_just_the_status() {
+        let response = Response {
+            status: 503,
+            body: "   ".to_owned(),
+        };
+        assert_eq!(describe(&response), "HTTP 503");
+    }
+
+    #[test]
+    fn a_long_error_body_is_clipped_and_marked() {
+        // A verbose error page (which could echo a submitted field) is carried only
+        // to a diagnostic length, marked as cut, not folded whole into the refusal.
+        let response = Response {
+            status: 500,
+            body: "x".repeat(500),
+        };
+        let detail = describe(&response);
+        assert!(
+            detail.contains('…'),
+            "clipped detail is marked as cut: {detail}"
+        );
+        assert!(
+            detail.chars().count() < 260,
+            "the 500-char body is not carried whole"
+        );
     }
 }
