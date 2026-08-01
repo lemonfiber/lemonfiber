@@ -20,6 +20,8 @@ pub enum Method {
     Get,
     /// Write.
     Post,
+    /// Replace an existing resource.
+    Put,
 }
 
 /// A request to a service's API.

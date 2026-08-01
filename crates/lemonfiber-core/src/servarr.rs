@@ -189,6 +189,68 @@ impl crate::ports::service::Maintenance for Servarr {
 }
 
 #[async_trait]
+impl crate::ports::service::MusicQuality for Servarr {
+    async fn apply_music_format(&self, format: crate::audio::Format) -> Result<(), Failure> {
+        let prefer = crate::lidarr::prefers_hi_res(format);
+        // A hi-res choice prefers 24-bit through a custom format; ensure it exists before
+        // scoring it, so a profile has something its cutoff score can point at.
+        if prefer {
+            self.ensure_hi_res_format().await?;
+        }
+        let response = self
+            .probe(&self.request(Method::Get, "/qualityprofile", None))
+            .await?;
+        let profiles: Vec<serde_json::Value> = self
+            .endpoint
+            .decode(&response, "the quality profiles could not be read")?;
+        for profile in profiles {
+            let text = serde_json::to_string(&profile).unwrap_or_default();
+            let Some(rewritten) = crate::lidarr::rewrite(&text, format) else {
+                continue;
+            };
+            let body =
+                crate::lidarr::set_hi_res_preference(&rewritten, prefer).unwrap_or(rewritten);
+            let Some(id) = profile.get("id").and_then(serde_json::Value::as_i64) else {
+                continue;
+            };
+            let updated = self
+                .probe(&self.request(Method::Put, &format!("/qualityprofile/{id}"), Some(body)))
+                .await?;
+            self.endpoint.expect_success(&updated)?;
+        }
+        Ok(())
+    }
+}
+
+impl Servarr {
+    /// Create the 24-bit custom format if the service does not already carry it, matched
+    /// by name so a second run does not add a duplicate.
+    async fn ensure_hi_res_format(&self) -> Result<(), Failure> {
+        let response = self
+            .probe(&self.request(Method::Get, "/customformat", None))
+            .await?;
+        let formats: Vec<serde_json::Value> = self
+            .endpoint
+            .decode(&response, "the custom formats could not be read")?;
+        let present = formats.iter().any(|entry| {
+            entry.get("name").and_then(serde_json::Value::as_str)
+                == Some(crate::lidarr::HI_RES_FORMAT)
+        });
+        if present {
+            return Ok(());
+        }
+        let created = self
+            .probe(&self.request(
+                Method::Post,
+                "/customformat",
+                Some(crate::lidarr::hi_res_custom_format()),
+            ))
+            .await?;
+        self.endpoint.expect_success(&created)
+    }
+}
+
+#[async_trait]
 impl crate::ports::service::Queues for Servarr {
     async fn queue(&self) -> Result<QueueDepth, Failure> {
         // A generous page is asked for so the stuck count is read from the whole

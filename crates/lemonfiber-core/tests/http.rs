@@ -167,6 +167,27 @@ async fn a_post_carries_its_headers_and_body() {
 }
 
 #[tokio::test]
+async fn a_put_carries_its_body_to_replace_a_resource() {
+    let server = serve(Reply::Whole(200, "")).await;
+    let request = Request {
+        method: Method::Put,
+        url: format!("{}/api/v1/qualityprofile/1", server.base),
+        headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
+        body: Some(r#"{"id":1,"upgradeAllowed":true}"#.to_owned()),
+    };
+    let response = Web::new().send(&request).await;
+    let sent = server.request();
+    server.stop().await;
+
+    assert_eq!(response.ok().map(|answer| answer.status), Some(200));
+    assert!(sent.starts_with("PUT "), "a PUT was sent: {sent:?}");
+    assert!(
+        sent.contains(r#"{"id":1,"upgradeAllowed":true}"#),
+        "the body was sent"
+    );
+}
+
+#[tokio::test]
 async fn a_refusal_is_a_response_rather_than_a_failure() {
     // A 401 is an answer: the credential was rejected, but the service was
     // reached. That distinction is the whole point of the port.

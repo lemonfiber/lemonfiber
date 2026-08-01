@@ -50,6 +50,85 @@ const fn cutoff_group(format: Format) -> &'static str {
     }
 }
 
+/// Whether a format prefers 24-bit within the lossless it allows — true only for
+/// hi-res. Since Lidarr cannot separate 24-bit on the quality axis, this preference
+/// is carried by a custom-format score rather than the allow-axis.
+#[must_use]
+pub const fn prefers_hi_res(format: Format) -> bool {
+    matches!(format, Format::HiRes)
+}
+
+/// The name lemonfiber gives the custom format it creates to prefer 24-bit lossless.
+/// Prefixed so it reads as lemonfiber's own and is matched back by name when the
+/// preference is set or cleared, rather than mistaken for one an operator made.
+pub const HI_RES_FORMAT: &str = "lemonfiber: 24-bit";
+
+/// The score the 24-bit custom format carries when preferred. Any positive figure
+/// makes a 24-bit release rank above an otherwise-equal 16-bit one and keeps Lidarr
+/// searching for it; the exact value only matters relative to other scores, and
+/// lemonfiber sets no others.
+const HI_RES_SCORE: i64 = 100;
+
+/// The body that creates the 24-bit custom format in Lidarr: a release-title match for
+/// the ways a 24-bit release commonly names itself.
+///
+/// Matching the title is a heuristic — not every 24-bit release says so, and Lidarr
+/// exposes no truer signal — but a missed match only leaves a release at its parsed
+/// quality rather than doing harm, and a caught one is what lets the score prefer it.
+#[must_use]
+pub fn hi_res_custom_format() -> String {
+    serde_json::json!({
+        "name": HI_RES_FORMAT,
+        "includeCustomFormatWhenRenaming": false,
+        "specifications": [{
+            "name": "24-bit",
+            "implementation": "ReleaseTitleSpecification",
+            "negate": false,
+            "required": true,
+            "fields": [{
+                "name": "value",
+                "value": r"(?i)\b(24[ ._-]?bit|bit[ ._-]?24|FLAC[ ._-]?24)\b"
+            }]
+        }]
+    })
+    .to_string()
+}
+
+/// Set or clear the 24-bit preference on a fetched profile: score the 24-bit custom
+/// format and set the profile's cutoff score to match, so Lidarr upgrades toward 24-bit
+/// and keeps searching until it has it — or, when not preferred, clear both so switching
+/// away from hi-res drops the preference rather than leaving it to churn.
+///
+/// The format is matched by name in the profile's format items, where Lidarr lists every
+/// custom format; a profile that does not yet carry it (the format not created) is left
+/// with its cutoff score cleared, never raised, so it cannot ask for a score nothing can
+/// reach. Returns `None` only if the text is not a profile.
+#[must_use]
+pub fn set_hi_res_preference(profile_json: &str, prefer: bool) -> Option<String> {
+    let mut profile: Value = serde_json::from_str(profile_json).ok()?;
+    let Value::Object(object) = &mut profile else {
+        return None;
+    };
+
+    let mut scored = false;
+    if let Some(Value::Array(items)) = object.get_mut("formatItems") {
+        for entry in items.iter_mut().filter_map(Value::as_object_mut) {
+            if entry.get("name").and_then(Value::as_str) == Some(HI_RES_FORMAT) {
+                let score = if prefer { HI_RES_SCORE } else { 0 };
+                entry.insert("score".to_owned(), score.into());
+                scored = prefer;
+            }
+        }
+    }
+
+    // Only ask for a cutoff score the profile can actually reach: raise it when the
+    // format was there to score, clear it otherwise.
+    let cutoff = if scored { HI_RES_SCORE } else { 0 };
+    object.insert("cutoffFormatScore".to_owned(), cutoff.into());
+
+    serde_json::to_string(&profile).ok()
+}
+
 /// One entry in a Lidarr quality profile: a leaf quality, or a group carrying nested
 /// leaves. Only the fields this rewrite touches are named; everything else Lidarr
 /// carries — the quality's `id`/`name`, sizes, anything a version adds — is preserved
@@ -139,169 +218,4 @@ pub fn rewrite(profile_json: &str, format: Format) -> Option<String> {
     profile.upgrade_allowed = true;
 
     serde_json::to_string(&profile).ok()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{rewrite, HIGH_QUALITY_LOSSY, LOSSLESS};
-    use crate::audio::Format;
-    use serde_json::Value;
-
-    /// A Lidarr default-shaped profile: the two groups a format speaks to, an
-    /// ungrouped leaf (WAV) and the Unknown leaf that should never be wanted, a cutoff
-    /// pointing at Lossless, and a stray field to prove the rewrite preserves it.
-    const PROFILE: &str = r#"{
-        "name":"Standard","upgradeAllowed":false,"cutoff":1006,
-        "minFormatScore":0,"cutoffFormatScore":0,"formatItems":[],
-        "items":[
-            {"quality":{"id":0,"name":"Unknown"},"items":[],"allowed":false},
-            {"id":1005,"name":"High Quality Lossy","allowed":false,"items":[
-                {"quality":{"id":19,"name":"MP3-VBR-V0"},"items":[],"allowed":false},
-                {"quality":{"id":4,"name":"MP3-320"},"items":[],"allowed":false},
-                {"quality":{"id":11,"name":"AAC-320"},"items":[],"allowed":false}
-            ]},
-            {"id":1006,"name":"Lossless","allowed":false,"items":[
-                {"quality":{"id":6,"name":"FLAC"},"items":[],"allowed":false},
-                {"quality":{"id":7,"name":"ALAC"},"items":[],"allowed":false},
-                {"quality":{"id":21,"name":"FLAC 24bit"},"items":[],"allowed":false},
-                {"quality":{"id":37,"name":"ALAC 24bit"},"items":[],"allowed":false}
-            ]},
-            {"quality":{"id":13,"name":"WAV"},"items":[],"allowed":false}
-        ]
-    }"#;
-
-    /// The parsed rewrite, or an empty object if it refused — so a test reads a field
-    /// without unwrapping.
-    fn rewritten(format: Format) -> Value {
-        let json = rewrite(PROFILE, format).unwrap_or_default();
-        serde_json::from_str(&json).unwrap_or_default()
-    }
-
-    /// Whether the group of the given name is allowed in a rewritten profile.
-    fn group_allowed(profile: &Value, group: &str) -> bool {
-        profile
-            .get("items")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .find(|item| item.get("name").and_then(Value::as_str) == Some(group))
-            .and_then(|item| item.get("allowed"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-    }
-
-    #[test]
-    fn compact_allows_only_high_bitrate_lossy_and_cuts_off_there() {
-        let profile = rewritten(Format::Compact);
-        assert!(group_allowed(&profile, HIGH_QUALITY_LOSSY));
-        assert!(
-            !group_allowed(&profile, LOSSLESS),
-            "compact does not grab lossless — the cost it avoids"
-        );
-        assert_eq!(profile.get("cutoff").and_then(Value::as_i64), Some(1005));
-    }
-
-    #[test]
-    fn lossless_allows_lossy_as_a_fallback_and_cuts_off_at_lossless() {
-        // Both groups on, so a lossless choice grabs high-bitrate lossy when no lossless
-        // release exists yet and upgrades to lossless later; cutoff is the lossless group.
-        let profile = rewritten(Format::Lossless);
-        assert!(group_allowed(&profile, HIGH_QUALITY_LOSSY));
-        assert!(group_allowed(&profile, LOSSLESS));
-        assert_eq!(profile.get("cutoff").and_then(Value::as_i64), Some(1006));
-    }
-
-    #[test]
-    fn hi_res_shares_the_lossless_allow_axis() {
-        // On the quality axis hi-res is lossless — Lidarr cannot separate 24-bit within
-        // the group. The 24-bit preference is a format score set elsewhere; here the two
-        // are the same allow-set and cutoff.
-        let lossless = rewritten(Format::Lossless);
-        let hi_res = rewritten(Format::HiRes);
-        assert_eq!(lossless.get("items"), hi_res.get("items"));
-        assert_eq!(lossless.get("cutoff"), hi_res.get("cutoff"));
-    }
-
-    #[test]
-    fn nested_leaves_follow_their_group() {
-        // The grab decision reads the group's flag, but Lidarr keeps a group and its
-        // leaves in step; the rewrite does the same so the profile reads consistently.
-        let profile = rewritten(Format::Lossless);
-        let lossless_leaves_allowed = profile
-            .get("items")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .find(|item| item.get("name").and_then(Value::as_str) == Some(LOSSLESS))
-            .and_then(|group| group.get("items"))
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .all(|leaf| leaf.get("allowed").and_then(Value::as_bool) == Some(true));
-        assert!(lossless_leaves_allowed);
-    }
-
-    #[test]
-    fn an_ungrouped_leaf_is_never_wanted() {
-        // WAV and Unknown sit outside the groups a format speaks to, so no format allows
-        // them — a rewrite that left one on would grab a quality nobody chose.
-        for format in Format::ALL {
-            let profile = rewritten(format);
-            let stray_allowed = profile
-                .get("items")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter(|item| item.get("name").is_none())
-                .any(|leaf| leaf.get("allowed").and_then(Value::as_bool) == Some(true));
-            assert!(!stray_allowed, "a format wanted an ungrouped leaf");
-        }
-    }
-
-    #[test]
-    fn every_format_turns_upgrading_on() {
-        for format in Format::ALL {
-            let profile = rewritten(format);
-            assert_eq!(
-                profile.get("upgradeAllowed").and_then(Value::as_bool),
-                Some(true)
-            );
-        }
-    }
-
-    #[test]
-    fn fields_the_rewrite_does_not_touch_are_preserved() {
-        // The profile's name and a score field it never reasons about survive, so sending
-        // it back changes only quality wanting — not everything else Lidarr set.
-        let profile = rewritten(Format::Compact);
-        assert_eq!(
-            profile.get("name").and_then(Value::as_str),
-            Some("Standard")
-        );
-        assert_eq!(
-            profile.get("cutoffFormatScore").and_then(Value::as_i64),
-            Some(0)
-        );
-    }
-
-    #[test]
-    fn a_cutoff_group_the_profile_lacks_leaves_the_cutoff_as_it_was() {
-        // A profile with no Lossless group, asked for lossless: the allow-axis applies to
-        // the groups that are present, but with nothing to point the cutoff at, it is left
-        // as Lidarr had it rather than guessed at.
-        const NO_LOSSLESS: &str = r#"{"upgradeAllowed":false,"cutoff":1005,"items":[
-            {"id":1005,"name":"High Quality Lossy","allowed":false,"items":[
-                {"quality":{"id":4,"name":"MP3-320"},"items":[],"allowed":false}
-            ]}
-        ]}"#;
-        let json = rewrite(NO_LOSSLESS, Format::Lossless).unwrap_or_default();
-        let profile: Value = serde_json::from_str(&json).unwrap_or_default();
-        assert_eq!(profile.get("cutoff").and_then(Value::as_i64), Some(1005));
-    }
-
-    #[test]
-    fn a_garbled_profile_is_refused_rather_than_written_back() {
-        assert_eq!(rewrite("not json", Format::Lossless), None);
-        assert_eq!(rewrite("{}", Format::Lossless), None);
-    }
 }

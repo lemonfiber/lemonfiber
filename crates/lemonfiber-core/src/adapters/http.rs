@@ -72,6 +72,7 @@ impl Http for Web {
         let mut builder = match request.method {
             Method::Get => self.client.get(&request.url),
             Method::Post => self.client.post(&request.url),
+            Method::Put => self.client.put(&request.url),
         };
         for (name, value) in &request.headers {
             builder = builder.header(name, value);
