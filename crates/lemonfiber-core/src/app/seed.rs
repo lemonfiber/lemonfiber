@@ -76,7 +76,19 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // the end. Unlike the per-connection journal, it persists across runs: it is the
     // only memory of what lemonfiber wrote, which a later run reads to tell an
     // operator's edit from lemonfiber's own value.
-    let mut baseline = load_baseline(ctx);
+    // The record may be genuinely absent (a first seed), read, or there but
+    // unreadable — lost. A lost record cannot tell an operator's edit from
+    // lemonfiber's own, so this pass cannot assess drift; rather than guess against an
+    // empty baseline, it says so and offers re-baselining. The deliberate re-baseline
+    // is `adopt`, which takes current state on as the new record, so an adopt pass
+    // proceeds and re-forms it while an ordinary seed leaves the lost record untouched
+    // rather than silently replacing it.
+    let loaded = load_baseline(ctx);
+    let lost = matches!(loaded, Loaded::Lost);
+    let mut baseline = match loaded {
+        Loaded::Formed(baseline) => baseline,
+        Loaded::Fresh | Loaded::Lost => crate::baseline::Baseline::new(),
+    };
     // Each \*arr's wiring is independent of the others, so the \*arrs are seeded at
     // once rather than in series: a pass's time then tracks the slowest \*arr, not
     // their sum. Each records what it wrote into its own baseline, read against the
@@ -109,22 +121,63 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // like qBittorrent's, then Seerr is pointed at it.
     wirings.extend(seed_jellyfin_identity(ctx, &manifest.services).await);
 
-    // Persist what this pass recorded as the baseline a later run compares against.
-    save_baseline(ctx, &baseline);
+    // Persist what this pass recorded as the baseline a later run compares against —
+    // unless the record was lost and this is not an adopt pass, in which case the
+    // lost record is left as it is rather than silently replaced, and re-baselining is
+    // left to the deliberate `adopt`.
+    if !lost || adopt {
+        save_baseline(ctx, &baseline);
+    }
 
-    Ok(crate::seed::Report { wirings })
+    let assessment = if lost && !adopt {
+        crate::seed::Assessment::Unassessable
+    } else {
+        crate::seed::Assessment::Assessed
+    };
+    Ok(crate::seed::Report {
+        wirings,
+        assessment,
+    })
 }
 
-/// The expected-state baseline this run compares against, read from where the last
-/// run left it, or an empty one where none has been written yet — the state a first
-/// seed, or a lost baseline, both begin from. It sits beside the environment file
-/// in the configuration directory; without that path (nothing configured) there is
-/// nowhere to have kept one, so an empty baseline stands in.
-fn load_baseline(ctx: &Ctx) -> crate::baseline::Baseline {
-    baseline_path(ctx)
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+/// How the expected-state record read: genuinely absent, read, or there but
+/// unreadable.
+enum Loaded {
+    /// No record was found — a first seed, or none ever formed, or nothing
+    /// configured. An empty baseline stands in and drift is assessed against it.
+    Fresh,
+    /// The record was read.
+    Formed(crate::baseline::Baseline),
+    /// The record was there but could not be read — its file could not be opened, or
+    /// its contents did not parse. Drift cannot be assessed against it.
+    Lost,
+}
+
+/// Read the expected-state baseline from where the last run left it, telling a
+/// record that is genuinely absent from one that is there but lost.
+///
+/// It sits beside the environment file in the configuration directory; without that
+/// path (nothing configured) there is nowhere to have kept one. A file that is not
+/// there is a first seed; one that is there but cannot be opened or does not parse is
+/// a loss — distinct, because the first is expected and the second must be reported.
+///
+/// Only a plain "not found" is read as a first seed. A read that fails any other way
+/// — a directory in its place, a permission the run does not hold — is taken as a
+/// loss rather than a first seed: the conservative direction, since a record that may
+/// be there but unreadable is safer surfaced for the operator to re-baseline than
+/// silently treated as one that never existed.
+fn load_baseline(ctx: &Ctx) -> Loaded {
+    let Some(path) = baseline_path(ctx) else {
+        return Loaded::Fresh;
+    };
+    match std::fs::read_to_string(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Loaded::Fresh,
+        Err(_) => Loaded::Lost,
+        Ok(text) => match serde_json::from_str(&text) {
+            Ok(baseline) => Loaded::Formed(baseline),
+            Err(_) => Loaded::Lost,
+        },
+    }
 }
 
 /// Write the baseline where the next run will read it. Best-effort, like the other
@@ -1093,6 +1146,65 @@ mod tests {
             read_back.contains(r#""value":"tv""#) && read_back.contains(r#""at":"1""#),
             "the recorded value and its timestamp survive both passes unchanged: {read_back}"
         );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn a_lost_baseline_is_reported_and_left_for_a_deliberate_re_baseline() {
+        // The record is there but does not parse — lost. An ordinary seed cannot judge
+        // drift against it, so it reports that drift could not be assessed and leaves
+        // the record untouched rather than silently replacing it: re-baselining is the
+        // deliberate act of `adopt`, not a side effect of a plain seed.
+        let env = config_scratch("baseline-lost");
+        let baseline = env.with_file_name("baseline.json");
+        let corrupt = "this is not the baseline you are looking for";
+        let _ = crate::config::store::write(&baseline, corrupt);
+
+        let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
+
+        let read_back = std::fs::read_to_string(&baseline).unwrap_or_default();
+        assert_eq!(
+            read_back, corrupt,
+            "a lost record is left untouched by a plain seed"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn an_adopt_pass_re_baselines_over_a_lost_record() {
+        // Re-baselining is offered, and `adopt` is how it is taken: over a lost record
+        // an adopt pass re-forms the baseline from current state, replacing the
+        // unreadable file with a readable one, and assesses cleanly.
+        let env = config_scratch("baseline-rebaseline");
+        let baseline = env.with_file_name("baseline.json");
+        let _ = crate::config::store::write(&baseline, "not parseable");
+
+        let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+        let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
+        assert_eq!(report.assessment, crate::seed::Assessment::Assessed);
+
+        let read_back = std::fs::read_to_string(&baseline).unwrap_or_default();
+        assert!(
+            serde_json::from_str::<crate::baseline::Baseline>(&read_back).is_ok(),
+            "an adopt pass re-forms the lost record into a readable one: {read_back}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn a_baseline_whose_file_cannot_be_read_is_a_loss() {
+        // Not every loss is a parse failure: a record whose file cannot even be opened
+        // — here a directory standing where the file should be — is a loss too, told
+        // apart from a first seed's genuinely absent file.
+        let env = config_scratch("baseline-unreadable");
+        let baseline = env.with_file_name("baseline.json");
+        let _ = std::fs::create_dir_all(&baseline);
+
+        let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 

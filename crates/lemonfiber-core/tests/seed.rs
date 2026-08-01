@@ -18,7 +18,8 @@ use lemonfiber_core::ports::service::{
 };
 use lemonfiber_core::seed::{
     contested_roots, intent, reconcile, wire_applications, wire_download_clients,
-    wire_jellyfin_identity, wire_root_folders, Baselines, Intent, Observed, Report, State, Wiring,
+    wire_jellyfin_identity, wire_root_folders, Assessment, Baselines, Intent, Observed, Report,
+    State, Wiring,
 };
 
 // ---- The policy: pure, decided without a service. ----
@@ -147,6 +148,7 @@ fn wiring(connection: &str, state: State) -> Wiring {
 #[test]
 fn a_pass_where_everything_settled_is_complete() {
     let report = Report {
+        assessment: Assessment::Assessed,
         wirings: vec![
             wiring("SABnzbd into Sonarr", State::Wired),
             wiring("root folder in Radarr", State::AlreadyWired),
@@ -159,6 +161,7 @@ fn a_pass_where_everything_settled_is_complete() {
 #[test]
 fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
     let report = Report {
+        assessment: Assessment::Assessed,
         wirings: vec![
             wiring("SABnzbd into Sonarr", State::Wired),
             wiring(
@@ -194,6 +197,7 @@ fn a_blocked_connection_is_named_apart_from_the_merely_outstanding() {
     // not lift them — the operator must resolve them — so `blocked` names them apart
     // from a skip, which a later run does complete.
     let report = Report {
+        assessment: Assessment::Assessed,
         wirings: vec![
             wiring("tv root folder in sonarr", State::Wired),
             wiring(
@@ -233,6 +237,7 @@ fn a_blocked_connection_is_named_apart_from_the_merely_outstanding() {
 #[test]
 fn the_report_names_each_state_on_the_wire() {
     let report = Report {
+        assessment: Assessment::Assessed,
         wirings: vec![
             wiring("a", State::Wired),
             wiring("b", State::AlreadyWired),

@@ -14,7 +14,9 @@ use lemonfiber_core::model::{
     ConfigReport, DoctorReport, Envelope, LifecycleReport, StatusReport, SupervisionReport,
     VersionReport,
 };
-use lemonfiber_core::seed::{Report as SeedReport, State as SeedState};
+use lemonfiber_core::seed::{
+    Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
+};
 use lemonfiber_core::PRODUCT;
 
 /// Render an outcome, for a person or for a script.
@@ -49,7 +51,7 @@ pub(crate) fn seeding(report: &SeedReport) {
             SeedState::Drifted => println!("  · {}   left as you set it", wiring.connection),
             SeedState::Adopted => println!("  ✓ {}   yours, adopted", wiring.connection),
             SeedState::Unmanaged => println!(
-                "  ✓ {}   found already set — adopted as yours",
+                "  · {}   found already set — yours, left as is (run `{PRODUCT} adopt` to keep it)",
                 wiring.connection
             ),
             SeedState::Stale => println!(
@@ -103,6 +105,13 @@ pub(crate) fn seeding(report: &SeedReport) {
             outstanding.len(),
             outstanding.len() - blocked.len(),
             blocked.len(),
+        );
+    }
+    if matches!(report.assessment, SeedAssessment::Unassessable) {
+        println!(
+            "\nThe record of what lemonfiber last wrote could not be read, so drift \
+             could not be assessed this run. Run `lemonfiber adopt` to re-baseline \
+             from the current state."
         );
     }
 }
