@@ -78,6 +78,13 @@ pub enum Observed {
     /// Both the service's value and lemonfiber's intent have moved away from the
     /// baseline — a conflict lemonfiber must not resolve on its own.
     Conflicted,
+    /// The service holds a value the operator set and lemonfiber adopted as the
+    /// accepted state — theirs to keep, left as it is.
+    Adopted,
+    /// The service holds a value lemonfiber never wrote and has no baseline for — the
+    /// operator's own, pre-existing, to adopt as the baseline rather than report as
+    /// drift from an expectation that was never formed.
+    Unmanaged,
 }
 
 /// What seed will do about a connection, decided from what it observed.
@@ -99,6 +106,12 @@ pub enum Intent {
     /// Both sides changed: present the conflict and leave the value, never resolving
     /// it silently.
     Ask,
+    /// An adopted operator value still stands: keep it, changing nothing — the
+    /// baseline already holds it as the accepted state.
+    Keep,
+    /// A pre-existing operator value with no baseline: adopt what the service holds
+    /// as the baseline, writing nothing to the service.
+    Adopt,
 }
 
 /// What seed will do about a connection found in the given state.
@@ -106,9 +119,10 @@ pub enum Intent {
 /// The idempotent, drift-aware policy in one place: an absent connection is
 /// written, a present-and-correct one is left untouched so a second run changes
 /// nothing, an operator's edit is preserved, lemonfiber's own value behind its
-/// intent is brought up to date, a conflict is presented rather than resolved, and
-/// an unavailable prerequisite is skipped rather than failed so the run stays
-/// resumable.
+/// intent is brought up to date, a conflict is presented rather than resolved, an
+/// adopted edit is kept as the accepted state, a pre-existing value with no baseline
+/// is adopted rather than reported as drift, and an unavailable prerequisite is
+/// skipped rather than failed so the run stays resumable.
 #[must_use]
 pub const fn intent(observed: Observed) -> Intent {
     match observed {
@@ -118,36 +132,59 @@ pub const fn intent(observed: Observed) -> Intent {
         Observed::Drifted => Intent::Preserve,
         Observed::Stale => Intent::Update,
         Observed::Conflicted => Intent::Ask,
+        Observed::Adopted => Intent::Keep,
+        Observed::Unmanaged => Intent::Adopt,
     }
 }
 
-/// The three-way comparison of one managed value: what lemonfiber last wrote
-/// (`expected`, `None` where it wrote nothing), what the service now holds
-/// (`actual`, `None` where it holds no value), and what lemonfiber would write
-/// (`desired`).
+/// The three-way comparison of one managed value: what lemonfiber last recorded
+/// (`expected`, `None` where it recorded nothing — value and whether it was written
+/// or adopted), what the service now holds (`actual`, `None` where it holds no
+/// value), and what lemonfiber would write (`desired`).
 ///
 /// Like a merge, the three together say what a bare two-way `actual != desired`
 /// cannot: whether a difference is the operator's edit to preserve, lemonfiber's
-/// own value fallen behind its intent, or a genuine conflict. Where there is no
-/// baseline to judge against, a difference is treated as the operator's and
-/// preserved — never overwritten on a guess.
+/// own value fallen behind its intent, an adopted value to keep, or a genuine
+/// conflict. Where there is no baseline to judge against, a value the service holds
+/// is the operator's own, pre-existing and unmanaged — adopted rather than
+/// overwritten on a guess.
 #[must_use]
-pub fn reconcile(expected: Option<&str>, actual: Option<&str>, desired: &str) -> Observed {
+pub fn reconcile(
+    expected: Option<&crate::baseline::Record>,
+    actual: Option<&str>,
+    desired: &str,
+) -> Observed {
+    // An adopted value is read before "already at desired": a value the operator
+    // adopted that lemonfiber also happens to want stays adopted — theirs to keep
+    // even once lemonfiber's desired later moves — rather than being taken back as
+    // lemonfiber's own. While the service still holds it, it stands; moved away from
+    // it, in sync if now at desired, otherwise a fresh edit to preserve.
+    if let Some(base) = expected {
+        if base.origin.is_adopted() {
+            return if actual == Some(base.value.as_str()) {
+                Observed::Adopted
+            } else if actual == Some(desired) {
+                Observed::Present
+            } else {
+                Observed::Drifted
+            };
+        }
+    }
     if actual == Some(desired) {
         return Observed::Present;
     }
     match expected {
         // lemonfiber's intent is unchanged from the baseline, so the difference is
         // the operator's.
-        Some(base) if base == desired => Observed::Drifted,
+        Some(base) if base.value == desired => Observed::Drifted,
         // The service still holds lemonfiber's baseline value; only lemonfiber's
         // intent has moved.
-        Some(base) if actual == Some(base) => Observed::Stale,
+        Some(base) if actual == Some(base.value.as_str()) => Observed::Stale,
         // A baseline that matches neither side: both have moved away from it.
         Some(_) => Observed::Conflicted,
-        // No baseline to judge against: cannot prove lemonfiber's intent moved, so
-        // the difference is taken as the operator's and left rather than overwritten.
-        None => Observed::Drifted,
+        // No baseline to judge against: the value the service holds is the operator's
+        // own, never written by lemonfiber, to adopt rather than overwrite on a guess.
+        None => Observed::Unmanaged,
     }
 }
 
@@ -181,6 +218,14 @@ pub enum State {
         /// The value lemonfiber would write in its place.
         ours: String,
     },
+    /// An operator's edit adopted as the accepted state, kept across seeds and
+    /// restores. Settled: lemonfiber leaves it as it is.
+    Adopted,
+    /// A value the service already held that lemonfiber never wrote — the operator's
+    /// own, pre-existing. Adopted as the baseline this run rather than reported as
+    /// drift, so an existing setup is taken on instead of flagged wholesale. Its
+    /// value is not shown, so a secret among the adopted is never put on display.
+    Unmanaged,
     /// Prerequisite unavailable; a later run will complete it.
     Skipped {
         /// Why it could not be attempted.
@@ -204,14 +249,20 @@ pub enum State {
 
 impl State {
     /// Whether this connection is settled: wired one way or another, or left in a
-    /// working state — the operator's own edit, or lemonfiber's own value that is
-    /// merely behind its newer intent. A skip, a failure, a refusal or a conflict is
+    /// working state — the operator's own edit, an adopted or pre-existing value that
+    /// is theirs to keep, or lemonfiber's own value that is merely behind its newer
+    /// intent. A skip, a failure, a refusal or a conflict is
     /// not settled: a re-run or an operator's decision must return to it.
     #[must_use]
     pub const fn is_settled(&self) -> bool {
         matches!(
             self,
-            Self::Wired | Self::AlreadyWired | Self::Drifted | Self::Stale
+            Self::Wired
+                | Self::AlreadyWired
+                | Self::Drifted
+                | Self::Stale
+                | Self::Adopted
+                | Self::Unmanaged
         )
     }
 }
@@ -400,6 +451,21 @@ struct Naming<'a> {
     noun: &'a str,
 }
 
+/// The baseline a drift-aware wiring reads against and records into, and whether
+/// this is an adopt pass. Grouped so the wiring call carries one baseline argument
+/// rather than three: what lemonfiber last recorded, where this run records what it
+/// leaves, and whether an operator's edit is promoted to adopted rather than merely
+/// preserved.
+pub struct Baselines<'a> {
+    /// What lemonfiber last recorded — the expected leg of the comparison.
+    pub expected: &'a Baseline,
+    /// Where this run records what it leaves as the baseline a later run reads.
+    pub records: &'a mut Baseline,
+    /// Whether this pass promotes each drifted value to adopted, recording what the
+    /// service holds as the operator's accepted state.
+    pub adopt: bool,
+}
+
 /// Wire a service's download clients: register the ones it lacks, leave the ones
 /// it already has, and record each write as a change.
 ///
@@ -414,10 +480,13 @@ pub async fn wire_download_clients(
     service: &str,
     wanted: &[DownloadClient],
     journal: &mut Journal,
-    expected: &Baseline,
-    records: &mut Baseline,
+    baselines: &mut Baselines<'_>,
     at: &str,
 ) -> Vec<Wiring> {
+    // The shared expected reference copies out; the mutable `records` stays reached
+    // through `baselines` so the two do not both borrow it at once.
+    let expected = baselines.expected;
+    let adopt = baselines.adopt;
     let existing = match observe_or_skip(client.download_clients().await, wanted, |want| {
         describe_client(service, want)
     }) {
@@ -427,60 +496,90 @@ pub async fn wire_download_clients(
 
     let mut wirings = Vec::new();
     for want in wanted {
-        // What lemonfiber last wrote here, if anything — the expected leg of the
-        // three-way comparison, read from the snapshot this run loaded, separate from
-        // the `records` it writes into, so the two do not fight over one borrow.
+        // What lemonfiber last recorded here, if anything — value and whether it was
+        // written or adopted — the expected leg of the three-way comparison, read from
+        // the snapshot this run loaded, separate from the `records` it writes into so
+        // the two do not fight over one borrow.
         let field = client_field(want);
-        let base = expected.expected(service, &field);
+        let base = expected.entry(service, &field);
         // Match the wanted client to one the service already holds by the endpoint it
-        // reaches, found once so both the three-way observation and, on a conflict,
-        // the value to present beside lemonfiber's are read from the same client.
+        // reaches, found once so the observation, the value to present on a conflict,
+        // and the value to adopt are all read from the same client.
         let have = existing.iter().find(|have| same_endpoint(have, want));
+        let found = have
+            .and_then(|have| have.category.as_ref())
+            .map(|category| category.value.clone());
+        let observed = observe_client(have, want, base);
+        // Adoption is a deliberate act, so only an adopt pass takes a value on: it
+        // promotes what an ordinary seed would merely preserve as drift, and takes on
+        // what a seed would only report as unmanaged, recording the value the service
+        // holds below as the accepted baseline. An ordinary seed reports both and
+        // records neither — it never claims the operator's value as lemonfiber's on
+        // its own, so a lost baseline is not silently frozen as adopted. There must be
+        // a value to adopt: a client the operator cleared has none, so it stays what it
+        // was rather than being reported adopted when nothing was taken on.
+        let adopting =
+            adopt && found.is_some() && matches!(observed, Observed::Drifted | Observed::Unmanaged);
         // The policy decides from the three-way comparison: an absent client is
         // written, one already at lemonfiber's value is left, an operator's edit is
-        // preserved, lemonfiber's own value behind its intent is reported stale, and
-        // a two-sided change is presented as a conflict. Unavailable never reaches
-        // here — a read-back failure was handled above — so it folds onto `Leave`.
-        let state = match intent(observe_client(have, want, base)) {
-            Intent::Wire => {
-                wire_one(
-                    client.register_download_client(want),
-                    client.download_clients(),
-                    |rows| {
-                        rows.iter()
-                            .find(|have| same_endpoint(have, want))
-                            .map(|have| have.id.clone())
-                    },
-                    Naming {
-                        service,
-                        resource: "downloadclient",
-                        noun: "download client",
-                    },
-                    journal,
-                    at,
-                )
-                .await
+        // preserved, lemonfiber's own value behind its intent is reported stale, a
+        // two-sided change is presented as a conflict, an adopted value is kept, and a
+        // pre-existing value with no baseline is reported unmanaged. Unavailable never
+        // reaches here — a read-back failure was handled above — so it folds onto
+        // `Leave`.
+        let state = if adopting {
+            State::Adopted
+        } else {
+            match intent(observed) {
+                Intent::Wire => {
+                    wire_one(
+                        client.register_download_client(want),
+                        client.download_clients(),
+                        |rows| {
+                            rows.iter()
+                                .find(|have| same_endpoint(have, want))
+                                .map(|have| have.id.clone())
+                        },
+                        Naming {
+                            service,
+                            resource: "downloadclient",
+                            noun: "download client",
+                        },
+                        journal,
+                        at,
+                    )
+                    .await
+                }
+                Intent::Preserve => State::Drifted,
+                Intent::Update => State::Stale,
+                // Present both sides of the conflict: the value the operator set, drawn
+                // from the client already matched above, beside the one lemonfiber
+                // would write. The value is left as it is — presenting is not resolving.
+                Intent::Ask => State::Conflicted {
+                    yours: found.clone(),
+                    ours: want.category.value.clone(),
+                },
+                Intent::Keep => State::Adopted,
+                Intent::Adopt => State::Unmanaged,
+                Intent::Leave | Intent::Skip => State::AlreadyWired,
             }
-            Intent::Preserve => State::Drifted,
-            Intent::Update => State::Stale,
-            // Present both sides of the conflict: the value the operator set, drawn
-            // from the client already matched above, beside the one lemonfiber would
-            // write. The value is left as it is — presenting is not resolving.
-            Intent::Ask => State::Conflicted {
-                yours: have
-                    .and_then(|have| have.category.as_ref())
-                    .map(|category| category.value.clone()),
-                ours: want.category.value.clone(),
-            },
-            Intent::Leave | Intent::Skip => State::AlreadyWired,
         };
-        // Record the category as the expected state only where lemonfiber's value
-        // now stands: a client it just wrote (`Wired`) or one already at what it
-        // wants (`Present` → `AlreadyWired`). A drifted, stale, conflicted or
-        // categoryless client is not lemonfiber's current value, so its expected
-        // stays what lemonfiber last wrote — kept from before this run.
+        // Record the expected state this run leaves. A client lemonfiber wrote
+        // (`Wired`) or one already at what it wants (`AlreadyWired`) records the
+        // category lemonfiber set. A value taken on by an adopt pass — an edit promoted
+        // or a pre-existing value adopted — records what the service holds, as the
+        // operator's, marked adopted so a later run keeps it. Everything else leaves
+        // the baseline as it was: a drift or unmanaged value an ordinary seed only
+        // reports, a conflict, an already-adopted value the loaded baseline still
+        // carries, or a categoryless client with nothing to record.
         if matches!(state, State::Wired | State::AlreadyWired) {
-            records.record(service, &field, &want.category.value, at);
+            baselines
+                .records
+                .record(service, &field, &want.category.value, at);
+        } else if adopting {
+            if let Some(value) = &found {
+                baselines.records.adopt(service, &field, value, at);
+            }
         }
         wirings.push(Wiring {
             connection: describe_client(service, want),
@@ -492,23 +591,43 @@ pub async fn wire_download_clients(
 
 /// What a seed pass observes about a wanted client against the one the service
 /// holds at its endpoint (`have`, `None` where it holds none) and what lemonfiber
-/// last wrote: absent, or the three-way outcome of comparing the service's category
-/// with lemonfiber's baseline and its desired one.
+/// last recorded: absent, or the three-way outcome of comparing the service's
+/// category with lemonfiber's baseline and its desired one.
 fn observe_client(
     have: Option<&RegisteredClient>,
     want: &DownloadClient,
-    expected: Option<&str>,
+    expected: Option<&crate::baseline::Record>,
 ) -> Observed {
     match have {
         None => Observed::Absent,
+        // The three legs are compared by their canonical form, so a category a service
+        // normalises on write is not read as drift from what lemonfiber holds. The
+        // baseline still keeps the raw value it recorded; only the comparison is
+        // canonicalised, here at the one place that knows the value is a category.
         Some(have) => reconcile(
-            expected,
+            expected
+                .map(|record| crate::baseline::Record {
+                    value: canonical_category(&record.value).to_owned(),
+                    at: record.at.clone(),
+                    origin: record.origin,
+                })
+                .as_ref(),
             have.category
                 .as_ref()
-                .map(|category| category.value.as_str()),
-            &want.category.value,
+                .map(|category| canonical_category(&category.value)),
+            canonical_category(&want.category.value),
         ),
     }
+}
+
+/// A download-client category compared without regard to surrounding whitespace,
+/// which a service may trim on write — so a value differing only by it is not read
+/// as drift, the same way [`same_path`] disregards a trailing slash a service adds.
+/// Case is left as it is: a category can be case-sensitive, and folding it could
+/// merge two the operator means to keep apart, which is worse than a reported
+/// difference.
+fn canonical_category(value: &str) -> &str {
+    value.trim()
 }
 
 /// Whether a registered client reaches the same endpoint as a wanted one.

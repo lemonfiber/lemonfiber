@@ -485,6 +485,24 @@ mod tests {
     }
 
     #[test]
+    fn a_whole_stack_capture_takes_the_expected_state_baseline() {
+        // An adopted edit is kept in the baseline, and the baseline must survive a
+        // restore for the adoption to. It sits inside the configuration directory the
+        // capture takes whole, so it is carried along by construction — this guards
+        // that the baseline stays under the captured area rather than drifting out.
+        let paths = paths();
+        let plan = plan(&paths, &Scope::WholeStack);
+        let config = plan
+            .items
+            .iter()
+            .find(|item| item.archive_path == area::CONFIG);
+        assert!(
+            config.is_some_and(|item| paths.baseline().starts_with(&item.source)),
+            "the baseline is inside the captured configuration directory",
+        );
+    }
+
+    #[test]
     fn a_whole_stack_capture_reads_from_the_install_layout() {
         let paths = paths();
         let plan = plan(&paths, &Scope::WholeStack);
