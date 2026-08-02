@@ -14,7 +14,7 @@ use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Http, Method, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
     Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, MusicQuality,
-    Pipeline, QueueDepth, Queues, RegisteredClient, RegisteredFolder, RootFolder,
+    Pipeline, QueueDepth, QueueItem, Queues, RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::{api_key, Servarr};
@@ -954,6 +954,81 @@ async fn an_unreadable_history_is_a_failure() {
     let router = Router::new(vec![(Method::Get, "/history", 200, "not json".to_owned())]);
     assert!(sonarr_routed(&router)
         .item_history(Kind::Sonarr, 1)
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn item_queue_reads_a_downloading_item_by_series() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/queue",
+        200,
+        r#"{"records":[
+            {"seriesId":1,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}
+        ]}"#
+        .to_owned(),
+    )]);
+    let queue = sonarr_routed(&router)
+        .item_queue(Kind::Sonarr, 1)
+        .await
+        .unwrap_or_default();
+    assert_eq!(
+        queue,
+        Some(QueueItem {
+            stage: Stage::Downloading,
+            stuck: false
+        })
+    );
+}
+
+#[tokio::test]
+async fn item_queue_reads_a_film_by_movie_and_flags_stuck() {
+    // Radarr matches on movieId; a warning tracked status is stuck, and an unrecognised
+    // state still counts as at least downloading.
+    let router = Router::new(vec![(
+        Method::Get,
+        "/queue",
+        200,
+        r#"{"records":[
+            {"movieId":7,"trackedDownloadState":"stalled","trackedDownloadStatus":"warning"}
+        ]}"#
+        .to_owned(),
+    )]);
+    let radarr = {
+        let http: Arc<dyn Http> = router.clone();
+        Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
+    };
+    let queue = radarr.item_queue(Kind::Radarr, 7).await.unwrap_or_default();
+    assert_eq!(
+        queue,
+        Some(QueueItem {
+            stage: Stage::Downloading,
+            stuck: true
+        })
+    );
+}
+
+#[tokio::test]
+async fn item_queue_holding_nothing_for_the_item_is_none() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/queue",
+        200,
+        r#"{"records":[{"seriesId":99,"trackedDownloadState":"downloading"}]}"#.to_owned(),
+    )]);
+    let queue = sonarr_routed(&router)
+        .item_queue(Kind::Sonarr, 1)
+        .await
+        .unwrap_or_default();
+    assert_eq!(queue, None);
+}
+
+#[tokio::test]
+async fn an_unreadable_queue_is_a_failure() {
+    let router = Router::new(vec![(Method::Get, "/queue", 200, "not json".to_owned())]);
+    assert!(sonarr_routed(&router)
+        .item_queue(Kind::Sonarr, 1)
         .await
         .is_err());
 }

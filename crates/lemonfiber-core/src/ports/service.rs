@@ -523,6 +523,16 @@ pub struct TraceEvent {
     pub at: String,
 }
 
+/// What the download queue currently holds for an item: the stage it is at, and whether
+/// it is stuck — queued but not progressing, the C7 signal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QueueItem {
+    /// The furthest stage the queue shows the item at.
+    pub stage: crate::trace::Stage,
+    /// Whether the item is stuck — a warning or error tracked-download status.
+    pub stuck: bool,
+}
+
 /// Reading one \*arr's fragment of an item's journey — the service that monitors the
 /// item and records its history is the spine a trace is built along; the other services
 /// fill in around it.
@@ -551,6 +561,18 @@ pub trait Pipeline: Send + Sync {
         kind: crate::recyclarr::Kind,
         id: i64,
     ) -> Result<Vec<TraceEvent>, Failure>;
+
+    /// What the download queue holds for an item now, or `None` where it holds nothing —
+    /// the item is not downloading, so the trace reads on from history alone.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn item_queue(
+        &self,
+        kind: crate::recyclarr::Kind,
+        id: i64,
+    ) -> Result<Option<QueueItem>, Failure>;
 }
 
 /// Applying an audio quality to a service that has one — Lidarr, whose quality axis is

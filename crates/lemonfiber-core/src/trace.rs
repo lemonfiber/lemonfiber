@@ -123,6 +123,20 @@ impl Stage {
         }
     }
 
+    /// The stage a download client's tracked state denotes, or `None` for a state that
+    /// is not progress on the pipeline (a failure, an ignore). Named as the \*arr queue
+    /// serialises them.
+    #[must_use]
+    pub fn of_queue_state(state: &str) -> Option<Self> {
+        match state {
+            "downloading" => Some(Self::Downloading),
+            "importPending" => Some(Self::Downloaded),
+            "importing" => Some(Self::Importing),
+            "imported" => Some(Self::Imported),
+            _ => None,
+        }
+    }
+
     /// Why an item that got no further than this stage has stopped, in plain language —
     /// or `None` where stopping here is not a fault: the terminal `Available`, or a
     /// stage that is work in progress rather than a resting point.
@@ -260,6 +274,22 @@ mod tests {
             Stage::of_event("seriesFolderImported"),
             Some(Stage::Imported)
         );
+    }
+
+    #[test]
+    fn queue_states_map_to_the_stage_they_are_at() {
+        assert_eq!(
+            Stage::of_queue_state("downloading"),
+            Some(Stage::Downloading)
+        );
+        assert_eq!(
+            Stage::of_queue_state("importPending"),
+            Some(Stage::Downloaded)
+        );
+        assert_eq!(Stage::of_queue_state("importing"), Some(Stage::Importing));
+        assert_eq!(Stage::of_queue_state("imported"), Some(Stage::Imported));
+        assert_eq!(Stage::of_queue_state("failed"), None);
+        assert_eq!(Stage::of_queue_state(""), None);
     }
 
     #[test]
