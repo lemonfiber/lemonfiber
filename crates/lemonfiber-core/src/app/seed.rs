@@ -11,6 +11,7 @@ use super::{Ctx, Problem};
 use crate::config::store;
 use crate::error::Diagnose;
 use crate::ports::docker::LogQuery;
+use crate::ports::service::Client;
 
 /// Wire the stack's services to each other, idempotently, and report what was
 /// wired and what a re-run still owes.
@@ -305,6 +306,95 @@ async fn seed_arr(
         );
     }
     (wirings, records)
+}
+
+/// Revert every drifted service connection to lemonfiber's own — or, unconfirmed, report
+/// which would be. The connection side of a full reset: for each \*arr, a download-client
+/// category the operator changed is written back through the update op (on confirm) or
+/// only listed (on preview). Read-only until confirmed, so a preview changes nothing.
+pub(super) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::seed::Wiring> {
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        return Vec::new();
+    };
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let sabnzbd_key = read_sabnzbd_key(ctx, &manifest.services, project.as_deref()).await;
+    let qbittorrent_password = super::targets::recorded_qbittorrent_password(ctx);
+    let arrs = servarr_arrs(&manifest.services, project.as_deref());
+    let baseline = match load_baseline(ctx) {
+        Loaded::Formed(baseline) => baseline,
+        Loaded::Fresh | Loaded::Lost => crate::baseline::Baseline::new(),
+    };
+    let mut records = baseline.clone();
+    let at = seed_stamp(ctx);
+
+    let mut wirings = Vec::new();
+    for arr in &arrs {
+        let wanted =
+            arr_download_clients(arr, sabnzbd_key.as_deref(), qbittorrent_password.as_deref());
+        if wanted.is_empty() {
+            continue;
+        }
+        let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+            continue;
+        };
+        if confirm {
+            let mut journal = crate::journal::Journal::new();
+            let reverted = crate::seed::wire_download_clients(
+                &client,
+                &arr.target.name,
+                &wanted,
+                &mut journal,
+                &mut crate::seed::Baselines {
+                    expected: &baseline,
+                    records: &mut records,
+                    adopt: false,
+                    reset: true,
+                },
+                &at,
+            )
+            .await;
+            // On an already-wired stack the only writes a reset makes are its reverts, so a
+            // wired connection here is a drifted value put back to lemonfiber's.
+            wirings.extend(
+                reverted
+                    .into_iter()
+                    .filter(|wiring| matches!(wiring.state, crate::seed::State::Wired)),
+            );
+        } else if let Ok(existing) = client.download_clients().await {
+            for want in &wanted {
+                let field = format!("downloadclient:{}:{}", want.host, want.port);
+                let Some(have) = existing
+                    .iter()
+                    .find(|have| have.host == want.host && have.port == want.port)
+                else {
+                    continue;
+                };
+                // The same three-way comparison the wiring makes, read only: a value that
+                // drifted from lemonfiber's is one a reset would revert.
+                let observed = crate::seed::reconcile(
+                    baseline.entry(&arr.target.name, &field),
+                    have.category.as_ref().map(|category| category.value.trim()),
+                    want.category.value.trim(),
+                );
+                if matches!(
+                    observed,
+                    crate::seed::Observed::Drifted
+                        | crate::seed::Observed::Stale
+                        | crate::seed::Observed::Conflicted
+                        | crate::seed::Observed::Adopted
+                ) {
+                    wirings.push(crate::seed::Wiring {
+                        connection: format!("{} into {}", want.name, arr.target.name),
+                        state: crate::seed::State::Drifted,
+                    });
+                }
+            }
+        }
+    }
+    if confirm {
+        save_baseline(ctx, &records);
+    }
+    wirings
 }
 
 /// The download clients an \*arr registers — one per credential in hand — under the
@@ -1120,6 +1210,58 @@ mod tests {
             "the recorded value and its timestamp survive both passes unchanged: {read_back}"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    #[tokio::test]
+    async fn a_reset_previews_then_reverts_a_drifted_connection() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-reset-conn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let env = dir.join(".env");
+        // A recorded qBittorrent password makes a qBittorrent download client wanted; a
+        // baseline recording lemonfiber's category for it, against the categoryless client
+        // the service now reports, reads as the operator's drift to revert.
+        let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
+        let _ = crate::config::store::write(
+            &dir.join("baseline.json"),
+            r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
+        );
+
+        let context = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::absent()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            },
+            Environment::MacOs,
+        )
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_http(Arc::new(RoutedHttp));
+
+        // Preview: the drifted connection is named, and nothing is written.
+        let preview = super::reset_connections(&context, false).await;
+        assert!(
+            preview
+                .iter()
+                .any(|wiring| wiring.connection.contains("into Sonarr")),
+            "the drifted connection is previewed"
+        );
+
+        // Confirm: it is reverted — the category written back in place, so it reads wired.
+        let confirmed = super::reset_connections(&context, true).await;
+        assert!(
+            confirmed
+                .iter()
+                .any(|wiring| matches!(wiring.state, crate::seed::State::Wired)),
+            "the drifted connection is reverted"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]

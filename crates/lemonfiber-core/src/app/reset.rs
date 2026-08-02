@@ -22,7 +22,7 @@ use super::Ctx;
 ///
 /// Returns the [`Problem`] a surface renders when the recorded choice cannot be read or a
 /// file cannot be written.
-pub(super) fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<Problem>> {
+pub(super) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<Problem>> {
     let selection = super::quality::load_selection(ctx)?;
     let record = super::targets::beside_env(ctx, "materialised.json");
     let into = ctx.settings.stack_dir.as_deref();
@@ -35,8 +35,17 @@ pub(super) fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<Problem
     }
     .map_err(|failure| Box::new(failure.problem()))?;
 
+    // The connections a drifted service value reverts — the download-client categories the
+    // operator changed. Read-only unless confirmed, so a preview lists them without writing.
+    let reverted_connections = super::seed::reset_connections(ctx, confirm)
+        .await
+        .into_iter()
+        .map(|wiring| wiring.connection)
+        .collect();
+
     Ok(ResetReport {
         reverted,
+        reverted_connections,
         confirmed: confirm,
     })
 }
@@ -82,15 +91,17 @@ mod tests {
         )
     }
 
-    #[test]
-    fn a_confirmed_reset_reverts_an_edited_file_to_lemonfibers() {
+    #[tokio::test]
+    async fn a_confirmed_reset_reverts_an_edited_file_to_lemonfibers() {
         let (into, env) = scratch("confirm");
         // Materialise, then the operator edits a file.
-        let _ = reset(&ctx(Some(into.clone()), Some(env.clone())), true);
+        let _ = reset(&ctx(Some(into.clone()), Some(env.clone())), true).await;
         let edited = "services:\n  sonarr:\n    image: my-own\n";
         let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-        let report = reset(&ctx(Some(into.clone()), Some(env)), true).unwrap_or_default();
+        let report = reset(&ctx(Some(into.clone()), Some(env)), true)
+            .await
+            .unwrap_or_default();
         assert!(report.confirmed);
         assert!(
             report
@@ -106,14 +117,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn an_unconfirmed_reset_previews_and_writes_nothing() {
+    #[tokio::test]
+    async fn an_unconfirmed_reset_previews_and_writes_nothing() {
         let (into, env) = scratch("preview");
-        let _ = reset(&ctx(Some(into.clone()), Some(env.clone())), true);
+        let _ = reset(&ctx(Some(into.clone()), Some(env.clone())), true).await;
         let edited = "services:\n  sonarr:\n    image: my-own\n";
         let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-        let report = reset(&ctx(Some(into.clone()), Some(env)), false).unwrap_or_default();
+        let report = reset(&ctx(Some(into.clone()), Some(env)), false)
+            .await
+            .unwrap_or_default();
         assert!(!report.confirmed);
         assert!(report
             .reverted
@@ -126,18 +139,18 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_reset_with_nowhere_to_write_is_an_error() {
+    #[tokio::test]
+    async fn a_reset_with_nowhere_to_write_is_an_error() {
         // An embedded stack with no directory to materialise into cannot be reset.
-        assert!(reset(&ctx(None, None), true).is_err());
+        assert!(reset(&ctx(None, None), true).await.is_err());
     }
 
-    #[test]
-    fn a_reset_over_an_unreadable_choice_is_an_error() {
+    #[tokio::test]
+    async fn a_reset_over_an_unreadable_choice_is_an_error() {
         let (into, env) = scratch("bad-choice");
         // A present-but-corrupt recorded choice cannot be read, so the reset stops rather
         // than guessing the state it would restore.
         let _ = std::fs::write(Path::new(&env).with_file_name("quality.json"), "not json");
-        assert!(reset(&ctx(Some(into), Some(env)), true).is_err());
+        assert!(reset(&ctx(Some(into), Some(env)), true).await.is_err());
     }
 }

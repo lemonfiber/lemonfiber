@@ -371,9 +371,7 @@ async fn an_updated_download_client_is_put_to_its_id_carrying_it() {
             && request.url.ends_with("/api/v3/downloadclient/7")));
     // The document rewrites the one that is there rather than adding a second: it names
     // the id the service assigned.
-    assert!(sent.is_some_and(|request| request
-        .body
-        .is_some_and(|body| body.contains(r#""id":7"#))));
+    assert!(sent.is_some_and(|request| request.body.is_some_and(|body| body.contains(r#""id":7"#))));
 }
 
 #[tokio::test]
@@ -382,7 +380,9 @@ async fn an_update_with_an_id_the_service_did_not_assign_is_refused() {
     // address — refused rather than a malformed request sent.
     let fake = Fake::new(Answer::Reply(200, ""));
     assert!(matches!(
-        sonarr(&fake).update_download_client("not-a-number", &sabnzbd()).await,
+        sonarr(&fake)
+            .update_download_client("not-a-number", &sabnzbd())
+            .await,
         Err(Failure::Refused { .. })
     ));
 }

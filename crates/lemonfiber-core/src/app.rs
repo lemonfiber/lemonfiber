@@ -276,6 +276,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Reset { confirm } => reset::reset(ctx, confirm)
+            .await
             .map(Outcome::Reset)
             .map_err(|p| *p),
     }

@@ -410,22 +410,24 @@ pub(crate) fn trace(report: &TraceReport) {
 /// What a full reset did, or — until confirmed — would do: the edits it reverts to
 /// lemonfiber's own state, named with what is lost, so nothing is discarded unseen.
 pub(crate) fn reset(report: &ResetReport) {
-    if report.reverted.is_empty() {
+    if report.reverted.is_empty() && report.reverted_connections.is_empty() {
         println!("Nothing to reset — the stack is already lemonfiber's own.");
         return;
     }
+    let count = report.reverted.len() + report.reverted_connections.len();
     if report.confirmed {
-        println!(
-            "Reverted {} edit(s) to lemonfiber's state:",
-            report.reverted.len()
-        );
+        println!("Reverted {count} change(s) to lemonfiber's state:");
     } else {
         println!(
-            "A reset would revert these {} edit(s) to lemonfiber's state — run again with \
-             --confirm to do it:",
-            report.reverted.len()
+            "A reset would revert these {count} change(s) to lemonfiber's state — run again \
+             with --confirm to do it:"
         );
     }
+    // The service connections whose category drifted, named as they read in a seed report.
+    for connection in &report.reverted_connections {
+        println!("  · {connection}");
+    }
+    // The hand-edited stack files, each with the diff of what is lost.
     for edit in &report.reverted {
         println!("\n  {}", edit.path);
         if !edit.diff.is_empty() {

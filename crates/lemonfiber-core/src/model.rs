@@ -324,6 +324,9 @@ pub struct ResetReport {
     /// The operator's edits that were reverted — or, unconfirmed, that a reset would
     /// revert — each with the diff of what is lost against what lemonfiber restores.
     pub reverted: Vec<StackEdit>,
+    /// The service connections whose drifted value was reverted to lemonfiber's — or,
+    /// unconfirmed, would be — each named as it reads in a seed report.
+    pub reverted_connections: Vec<String>,
     /// Whether the reset was carried out, or only previewed pending confirmation.
     pub confirmed: bool,
 }

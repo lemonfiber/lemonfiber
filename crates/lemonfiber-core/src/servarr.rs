@@ -410,8 +410,8 @@ fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
     });
     // An update names the client the service already assigned, so the same document
     // rewrites it in place; a create carries no id and the service assigns one.
-    if let Some(id) = id {
-        document["id"] = serde_json::json!(id);
+    if let (Some(id), Some(object)) = (id, document.as_object_mut()) {
+        object.insert("id".to_owned(), serde_json::json!(id));
     }
     document.to_string()
 }
