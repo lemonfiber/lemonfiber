@@ -29,7 +29,7 @@ use crate::doctor::{examine, Category, Check};
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{
     ConfigReport, DoctorReport, Envelope, LifecycleReport, MusicReport, QualityReport,
-    SettingReport, StackEdit, StatusReport, UpgradeReport, VersionReport,
+    SettingReport, StackEdit, StatusReport, TraceReport, UpgradeReport, VersionReport,
 };
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
@@ -49,6 +49,7 @@ pub mod restore;
 mod seed;
 pub mod setup;
 mod targets;
+mod trace;
 mod upgrade;
 pub mod watch;
 
@@ -135,6 +136,12 @@ pub enum Command {
         /// The audio format to record and apply.
         format: Format,
     },
+    /// Follow one item across the services and report where it is — "where is my
+    /// show?" — searched for by a human term rather than an internal id.
+    Trace {
+        /// The show, film, or request to follow.
+        term: String,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they
@@ -178,6 +185,8 @@ pub enum Outcome {
     Upgrade(UpgradeReport),
     /// The music format chosen, and what became of applying it.
     Music(MusicReport),
+    /// Where one item is in the pipeline.
+    Trace(TraceReport),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -197,6 +206,7 @@ impl Outcome {
             Self::Quality(_) => "quality",
             Self::Upgrade(_) => "upgrade",
             Self::Music(_) => "music",
+            Self::Trace(_) => "trace",
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
             Self::Seed(_) => "seed",
@@ -214,6 +224,7 @@ impl serde::Serialize for Outcome {
             Self::Quality(report) => report.serialize(serializer),
             Self::Upgrade(report) => report.serialize(serializer),
             Self::Music(report) => report.serialize(serializer),
+            Self::Trace(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
@@ -477,6 +488,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::QualityMusic { format } => music::music(ctx, format)
             .await
             .map(Outcome::Music)
+            .map_err(|problem| *problem),
+        Command::Trace { term } => trace::trace(ctx, &term)
+            .await
+            .map(Outcome::Trace)
             .map_err(|problem| *problem),
         Command::QualityUpgrade { confirm } => upgrade::upgrade(ctx, confirm)
             .await
@@ -811,6 +826,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_trace_serialises_under_its_own_kind() {
+        // No key opens a target, so no item matches and the trace stays offline while
+        // exercising the dispatch, envelope and serialise arms for its outcome.
+        let json = dispatch(
+            Command::Trace {
+                term: "the expanse".to_owned(),
+            },
+            &ctx(Ok(spoke(""))),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"trace\""),
+            "envelope names the kind"
+        );
+    }
+
+    #[tokio::test]
     async fn a_dispatched_music_choice_serialises_under_its_own_kind() {
         // A rehearsal records nothing and reaches no service, so it stays offline while
         // exercising the dispatch, envelope and serialise arms for its outcome.
@@ -981,6 +1016,7 @@ mod tests {
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
+                | Outcome::Trace(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -999,6 +1035,7 @@ mod tests {
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
+                | Outcome::Trace(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_),
             )
@@ -1423,6 +1460,7 @@ mod tests {
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
+                | Outcome::Trace(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
@@ -1877,6 +1915,7 @@ mod tests {
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
+                | Outcome::Trace(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_),
             )

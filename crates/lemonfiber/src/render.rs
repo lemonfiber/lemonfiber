@@ -12,8 +12,8 @@ use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
     ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, MusicChoice, MusicReport,
-    PresetChoice, QualityReport, StatusReport, SupervisionReport, Triggered, UpgradeReport,
-    VersionReport,
+    PresetChoice, QualityReport, StatusReport, SupervisionReport, TraceReport, Triggered,
+    UpgradeReport, VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
@@ -38,6 +38,7 @@ pub(crate) fn render(outcome: &Outcome, json: bool) {
         Outcome::Quality(report) => quality(report),
         Outcome::Upgrade(report) => upgrade(report),
         Outcome::Music(report) => music(report),
+        Outcome::Trace(report) => trace(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
         Outcome::Doctor(report) => diagnosis(report),
@@ -365,6 +366,28 @@ pub(crate) fn upgrade(report: &UpgradeReport) {
     }
     if !report.confirmed {
         println!("\nNothing has been changed. Re-run with --confirm to go ahead.");
+    }
+}
+
+/// Where one item is in the pipeline: the item, each stage it reached with the service
+/// and time, and — where it plainly stopped — why.
+pub(crate) fn trace(report: &TraceReport) {
+    println!("{}", report.item);
+    if !report.matched {
+        // No monitored item matched — nobody asked for it.
+        if let Some(reason) = &report.stall {
+            println!("  {reason}");
+        }
+        return;
+    }
+    for stage in &report.stages {
+        match &stage.at {
+            Some(at) => println!("  ✓ {}   {}   {at}", stage.stage.label(), stage.service),
+            None => println!("  ✓ {}   {}", stage.stage.label(), stage.service),
+        }
+    }
+    if let Some(reason) = &report.stall {
+        println!("  ✗ stopped: {reason}");
     }
 }
 
