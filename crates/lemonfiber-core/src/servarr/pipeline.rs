@@ -80,20 +80,24 @@ impl Pipeline for Servarr {
 
     async fn stuck_items(&self, kind: Kind) -> Result<Vec<StuckItem>, Failure> {
         // The queue is read with the series and movie included so each stuck record names
-        // the item a trace searches by, not the raw release. An item with no title to
-        // trace by is left out rather than linked to a search that cannot find it.
+        // the item a trace searches by. A series holds one queue record per episode, so
+        // several stuck episodes of one show would list it several times; the item is one
+        // show, so it is listed once — the first stuck record for a title wins, and the
+        // rest are the same trace. An item with no title to trace by is left out rather
+        // than linked to a search that cannot find it.
         let records = self
             .queue_pages("&includeSeries=true&includeMovie=true")
             .await?;
+        let mut seen = std::collections::BTreeSet::new();
         Ok(records
             .iter()
             .filter(|record| super::is_stuck(&record.tracked_download_status))
-            .filter_map(|record| {
-                record.item_title(kind).map(|title| StuckItem {
-                    title,
-                    stage: Stage::of_queue_state(&record.tracked_download_state)
-                        .unwrap_or(Stage::Downloading),
-                })
+            .filter_map(|record| record.item_title(kind).map(|title| (title, record)))
+            .filter(|(title, _)| seen.insert(title.clone()))
+            .map(|(title, record)| StuckItem {
+                title,
+                stage: Stage::of_queue_state(&record.tracked_download_state)
+                    .unwrap_or(Stage::Downloading),
             })
             .collect())
     }

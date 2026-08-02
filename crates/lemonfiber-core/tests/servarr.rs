@@ -1145,17 +1145,18 @@ async fn item_queue_holding_nothing_for_the_item_is_none() {
 }
 
 #[tokio::test]
-async fn stuck_items_names_each_stuck_download_by_its_show() {
-    // Four queued records: a stuck one with the show embedded, a healthy one, a stuck one
-    // with no show but a raw release name, and a stuck one with nothing to name it by.
+async fn stuck_items_names_each_stuck_show_once() {
+    // Five queued records: two stuck episodes of one show, a healthy one, a stuck one whose
+    // embedded title is empty, and a stuck one with no show at all.
     let router = Router::new(vec![(
         Method::Get,
         "/queue",
         200,
         r#"{"records":[
             {"trackedDownloadStatus":"warning","trackedDownloadState":"downloading","series":{"title":"The Expanse"}},
+            {"trackedDownloadStatus":"error","trackedDownloadState":"importPending","series":{"title":"The Expanse"}},
             {"trackedDownloadStatus":"ok","trackedDownloadState":"downloading","series":{"title":"Not Stuck"}},
-            {"trackedDownloadStatus":"error","trackedDownloadState":"importPending","title":"raw.release.name","series":{"title":""}},
+            {"trackedDownloadStatus":"warning","trackedDownloadState":"downloading","series":{"title":""}},
             {"trackedDownloadStatus":"warning","trackedDownloadState":"downloading"}
         ]}"#
         .to_owned(),
@@ -1164,20 +1165,14 @@ async fn stuck_items_names_each_stuck_download_by_its_show() {
         .stuck_items(Kind::Sonarr)
         .await
         .unwrap_or_default();
-    // The stuck ones with a name are named — the show title, or the raw release where none
-    // was embedded; the healthy one is excluded, and the nameless stuck one is left out
-    // rather than linked to a search that could not find it.
+    // The show is listed once though two of its episodes are stuck; the healthy one is
+    // excluded, and the two with nothing to trace by — an empty title and no title — are
+    // left out rather than linked to a search that could not find them.
     let named: Vec<(&str, Stage)> = items
         .iter()
         .map(|item| (item.title.as_str(), item.stage))
         .collect();
-    assert_eq!(
-        named,
-        vec![
-            ("The Expanse", Stage::Downloading),
-            ("raw.release.name", Stage::Downloaded),
-        ]
-    );
+    assert_eq!(named, vec![("The Expanse", Stage::Downloading)]);
     // The queue was read with the item included so each could be named.
     assert!(router
         .sent()

@@ -77,9 +77,11 @@ pub(super) async fn trace(ctx: &Ctx, term: &str) -> Result<TraceReport, Box<Prob
 
 /// The items whose downloads are stuck, across the \*arrs — the landing point queue
 /// health leads to, so "N items stuck" becomes a named list each entry of which traces on
-/// its own. An \*arr whose queue cannot be read marks the list incomplete rather than
-/// being read as nothing stuck, the same honesty a trace keeps about a silence it did not
-/// hear.
+/// its own. An \*arr that answered but whose queue would not read marks the list
+/// incomplete rather than being read as nothing stuck — the same honesty a trace keeps
+/// about a silence it did not hear. One that has not finished starting, its key not yet
+/// readable, is skipped as it is everywhere else: a service still coming up holds nothing
+/// stuck, so its absence understates nothing.
 pub(super) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
     let manifest = ctx
         .stack
