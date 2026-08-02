@@ -12,14 +12,14 @@ use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
     ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, MusicChoice, MusicReport,
-    PresetChoice, QualityReport, ResetReport, StatusReport, SupervisionReport, TraceReport,
-    Triggered, UpgradeReport, VersionReport,
+    PresetChoice, QualityReport, ResetReport, StatusReport, StuckReport, SupervisionReport,
+    TraceReport, Triggered, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
     State as SeedState,
 };
-use lemonfiber_core::trace::{Confidence, HISTORY_HORIZON};
+use lemonfiber_core::trace::{Confidence, Outcome as TraceOutcome, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
 
 /// Render an outcome, for a person or for a script.
@@ -41,6 +41,7 @@ pub(crate) fn render(outcome: &Outcome, json: bool) {
         Outcome::Upgrade(report) => upgrade(report),
         Outcome::Music(report) => music(report),
         Outcome::Trace(report) => trace(report),
+        Outcome::Stuck(report) => stuck(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
         Outcome::Doctor(report) => diagnosis(report),
@@ -409,6 +410,27 @@ pub(crate) fn trace(report: &TraceReport) {
     if let Some(reason) = &report.stall {
         println!("  ✗ stopped: {reason}");
     }
+    // The history of what was tried, shown when it reveals a pattern the linear stages
+    // cannot: a download that failed, a file removed, or the same release grabbed more
+    // than once. A single clean grab-and-import is already told by the stages above, so it
+    // is not repeated here.
+    let grabs = report
+        .history
+        .iter()
+        .filter(|moment| moment.outcome == TraceOutcome::Grabbed)
+        .count();
+    let troubled = report.history.iter().any(|moment| {
+        matches!(
+            moment.outcome,
+            TraceOutcome::DownloadFailed | TraceOutcome::Removed
+        )
+    });
+    if grabs > 1 || troubled {
+        println!("  history:");
+        for moment in &report.history {
+            println!("      {}   {}", moment.outcome.phrase(), moment.at);
+        }
+    }
     // Things worth the operator's attention that are not a point on the pipeline — a
     // service disagreement, or a detail that could not be read and so is reported as
     // unavailable rather than inferred. Each finding's own words say which.
@@ -423,6 +445,34 @@ pub(crate) fn trace(report: &TraceReport) {
     // The history read is bounded; stating the horizon keeps "nothing earlier" honest —
     // an event older than this window is not read, not proof that nothing happened.
     println!("  · reflects the most recent {HISTORY_HORIZON} history events per service");
+}
+
+/// The items whose downloads are stuck, each named so it links straight to its own
+/// trace — the landing point for "N stuck", turning a count into a list the operator can
+/// act on one item at a time.
+pub(crate) fn stuck(report: &StuckReport) {
+    if report.items.is_empty() {
+        println!("Nothing is stuck — every download is progressing.");
+    } else {
+        println!(
+            "{} item(s) stuck — trace any one to see why:",
+            report.items.len()
+        );
+        for item in &report.items {
+            println!(
+                "  ✗ {}   {}   stuck at {}",
+                item.title,
+                item.service,
+                item.stage.label()
+            );
+            println!("      → {PRODUCT} trace \"{}\"", item.title);
+        }
+    }
+    // A queue that could not be read leaves the list possibly short; saying so keeps it
+    // from being read as "nothing else is stuck", the same honesty a trace keeps.
+    if report.incomplete {
+        println!("\nAn *arr's queue could not be read, so this list may be incomplete.");
+    }
 }
 
 /// What a full reset did, or — until confirmed — would do: the edits it reverts to

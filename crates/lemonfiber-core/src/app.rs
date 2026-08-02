@@ -14,7 +14,7 @@ use crate::doctor::Category;
 use crate::error::{Code, Problem};
 use crate::model::{
     ConfigReport, DoctorReport, Envelope, LifecycleReport, MusicReport, QualityReport, ResetReport,
-    StatusReport, TraceReport, UpgradeReport, VersionReport,
+    StatusReport, StuckReport, TraceReport, UpgradeReport, VersionReport,
 };
 use crate::quality::Preset;
 use crate::stack::compose::Action;
@@ -129,6 +129,9 @@ pub enum Command {
         /// The show, film, or request to follow.
         term: String,
     },
+    /// List the items whose downloads are stuck, each named so it links to its own
+    /// trace — the landing point for "N items stuck".
+    Stuck,
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they
@@ -182,6 +185,8 @@ pub enum Outcome {
     Music(MusicReport),
     /// Where one item is in the pipeline.
     Trace(TraceReport),
+    /// The items whose downloads are stuck, each linkable to its trace.
+    Stuck(StuckReport),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -204,6 +209,7 @@ impl Outcome {
             Self::Upgrade(_) => "upgrade",
             Self::Music(_) => "music",
             Self::Trace(_) => "trace",
+            Self::Stuck(_) => "stuck",
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
             Self::Seed(_) => "seed",
@@ -223,6 +229,7 @@ impl serde::Serialize for Outcome {
             Self::Upgrade(report) => report.serialize(serializer),
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),
+            Self::Stuck(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
@@ -264,6 +271,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::Trace { term } => trace::trace(ctx, &term)
             .await
             .map(Outcome::Trace)
+            .map_err(|problem| *problem),
+        Command::Stuck => trace::stuck(ctx)
+            .await
+            .map(Outcome::Stuck)
             .map_err(|problem| *problem),
         Command::QualityUpgrade { confirm } => upgrade::upgrade(ctx, confirm)
             .await
@@ -363,6 +374,21 @@ mod tests {
         .unwrap_or_default();
         assert!(
             json.contains("\"kind\":\"trace\""),
+            "envelope names the kind"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_stuck_serialises_under_its_own_kind() {
+        // No key opens a target, so nothing is stuck — but the command still runs through
+        // dispatch, envelope and serialise for its outcome.
+        let json = dispatch(Command::Stuck, &ctx(Ok(spoke(""))))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"stuck\""),
             "envelope names the kind"
         );
     }
@@ -554,6 +580,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Stuck(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
@@ -574,6 +601,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Stuck(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_),
@@ -1000,6 +1028,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Stuck(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
@@ -1456,6 +1485,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Stuck(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_),

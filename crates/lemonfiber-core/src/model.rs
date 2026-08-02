@@ -248,6 +248,18 @@ pub struct TraceStage {
     pub at: Option<String>,
 }
 
+/// One moment in a traced item's history: what happened and when. Where [`TraceStage`]
+/// is the linear progress, this is the log an \*arr kept — the grabs, the failed
+/// downloads, the import and any later removal — so a repeated attempt is seen as the
+/// pattern it is rather than flattened to a single furthest stage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TraceMoment {
+    /// What happened.
+    pub outcome: crate::trace::Outcome,
+    /// When the service reported it.
+    pub at: String,
+}
+
 /// Where one item is in the pipeline: how far it got, why it stopped if it did, and the
 /// stages it passed through — the answer to "where is my show?".
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -263,6 +275,10 @@ pub struct TraceReport {
     pub stall: Option<String>,
     /// The stages it passed through, in order.
     pub stages: Vec<TraceStage>,
+    /// The notable events in its history, oldest first — the grabs, failed downloads,
+    /// imports and removals. Repeated attempts show here as the pattern they are, which
+    /// the single furthest stage cannot.
+    pub history: Vec<TraceMoment>,
     /// How sure the trace is of the item it followed.
     pub confidence: crate::trace::Confidence,
     /// Disagreements between the services about this item, each in plain language — a
@@ -270,6 +286,29 @@ pub struct TraceReport {
     /// the linear pipeline: not where the item got to, but where two services' views of
     /// it contradict, surfaced rather than silently reconciled.
     pub findings: Vec<String>,
+}
+
+/// One stuck item queue health found, named so it links straight to its own trace.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StuckEntry {
+    /// The item's title — the term a `trace` searches by.
+    pub title: String,
+    /// The \*arr whose queue is holding it.
+    pub service: String,
+    /// The stage its download is stuck at.
+    pub stage: crate::trace::Stage,
+}
+
+/// The items whose downloads are stuck, across the \*arrs — the landing point for "N
+/// items stuck" that queue health reports, each entry naming the item so the operator
+/// goes straight to its per-item trace rather than to a count to investigate.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct StuckReport {
+    /// The stuck items, each linkable to its trace.
+    pub items: Vec<StuckEntry>,
+    /// Whether an \*arr's queue could not be read, so the list may be short — reported
+    /// rather than read as "nothing stuck", the same honesty a trace keeps.
+    pub incomplete: bool,
 }
 
 /// What a lifecycle command did, or would have done.

@@ -201,6 +201,9 @@ enum Request {
         #[arg(required = true)]
         term: Vec<String>,
     },
+    /// List the items whose downloads are stuck — the landing point for "N stuck", each
+    /// named so `lemonfiber trace` follows it on its own.
+    Stuck,
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.
@@ -427,6 +430,7 @@ async fn main() -> ExitCode {
         Request::Trace { term } => Command::Trace {
             term: term.join(" "),
         },
+        Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },
@@ -496,12 +500,13 @@ fn settled(outcome: &Outcome) -> ExitCode {
         // are pending reverts, so either one left unconfirmed is a non-zero result.
         // Confirmed, or with nothing to revert, it succeeded.
         Outcome::Reset(report) => reset_exit(report),
-        // A trace is a query — it answers where an item is; asking is never a failure,
-        // whatever the answer.
+        // A trace or a stuck-item listing is a query — it answers where things are;
+        // asking is never a failure, whatever the answer.
         Outcome::Version(_)
         | Outcome::Lifecycle(_)
         | Outcome::Config(_)
         | Outcome::Trace(_)
+        | Outcome::Stuck(_)
         | Outcome::Status(_) => ExitCode::SUCCESS,
     }
 }

@@ -278,7 +278,10 @@ struct QueueResource {
 }
 
 /// One queued item — its tracked download status (for the dashboard's stuck count) and,
-/// for a per-item trace, which item it belongs to and how far its download has got.
+/// for a per-item trace, which item it belongs to and how far its download has got. When
+/// the queue is read with the series or movie included, it also carries the item's own
+/// title, so a stuck item names the show a trace would search by rather than the raw
+/// release name.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueueRecord {
@@ -290,6 +293,24 @@ struct QueueRecord {
     series_id: Option<i64>,
     #[serde(default)]
     movie_id: Option<i64>,
+    /// The release title — the raw download name, the fallback where no clean item
+    /// title was included.
+    #[serde(default)]
+    title: String,
+    /// The series this record belongs to, where the queue was read with it included.
+    #[serde(default)]
+    series: Option<TitledResource>,
+    /// The movie this record belongs to, where the queue was read with it included.
+    #[serde(default)]
+    movie: Option<TitledResource>,
+}
+
+/// Just the title of a series or movie the queue embeds, for naming a stuck item.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TitledResource {
+    #[serde(default)]
+    title: String,
 }
 
 impl QueueRecord {
@@ -301,6 +322,20 @@ impl QueueRecord {
             crate::recyclarr::Kind::Radarr => self.movie_id,
         };
         owner == Some(id)
+    }
+
+    /// The item's title a trace would search by — the embedded series or movie title for
+    /// the record's kind, or the raw release title where none was included. Nothing where
+    /// neither is set, so an item with no name to trace by is left out rather than linked
+    /// to a search that cannot find it.
+    fn item_title(&self, kind: crate::recyclarr::Kind) -> Option<String> {
+        let embedded = match kind {
+            crate::recyclarr::Kind::Sonarr => self.series.as_ref(),
+            crate::recyclarr::Kind::Radarr => self.movie.as_ref(),
+        }
+        .map(|resource| resource.title.clone())
+        .filter(|title| !title.is_empty());
+        embedded.or_else(|| (!self.title.is_empty()).then(|| self.title.clone()))
     }
 }
 

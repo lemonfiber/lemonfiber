@@ -124,23 +124,6 @@ impl Stage {
         reached.iter().copied().max().unwrap_or(Self::Monitored)
     }
 
-    /// The stage a Servarr history event denotes reaching, or `None` for an event that
-    /// does not advance the pipeline (a failure, a rename, a deletion) — those are read
-    /// for their own meaning elsewhere, not as progress.
-    ///
-    /// Named as the \*arr history API serialises them: `grabbed`, and the several
-    /// folder-import events the television and film services each use.
-    #[must_use]
-    pub fn of_event(event_type: &str) -> Option<Self> {
-        match event_type {
-            "grabbed" => Some(Self::Grabbed),
-            "downloadFolderImported" | "seriesFolderImported" | "movieFolderImported" => {
-                Some(Self::Imported)
-            }
-            _ => None,
-        }
-    }
-
     /// The stage a download client's tracked state denotes, or `None` for a state that
     /// is not progress on the pipeline (a failure, an ignore). Named as the \*arr queue
     /// serialises them.
@@ -183,9 +166,68 @@ impl Stage {
     }
 }
 
+/// A notable thing that happened to an item, as an \*arr's history records it. Where the
+/// furthest stage answers "how far did it get?", the sequence of outcomes answers "what
+/// has been tried?" — a release grabbed more than once, a download that failed and was
+/// tried again, a file imported and later removed. Repeated failed grabs are a pattern
+/// worth seeing, not something a single furthest-stage reading can show.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Outcome {
+    /// A release was sent to the download client.
+    Grabbed,
+    /// The download client failed the release it was handed.
+    DownloadFailed,
+    /// The item was imported to the library on disk.
+    Imported,
+    /// The item's file was removed.
+    Removed,
+}
+
+impl Outcome {
+    /// The outcome an \*arr history event denotes, or `None` for an event that is not a
+    /// notable step in the item's history. Named as the television and film services each
+    /// serialise their history event types.
+    #[must_use]
+    pub fn of_event(event_type: &str) -> Option<Self> {
+        match event_type {
+            "grabbed" => Some(Self::Grabbed),
+            "downloadFailed" => Some(Self::DownloadFailed),
+            "downloadFolderImported" | "seriesFolderImported" | "movieFolderImported" => {
+                Some(Self::Imported)
+            }
+            "episodeFileDeleted" | "movieFileDeleted" => Some(Self::Removed),
+            _ => None,
+        }
+    }
+
+    /// The pipeline stage this outcome carries the item to, or `None` where it is not
+    /// forward progress — a failed download or a removal is history to show, not a stage
+    /// the item reached, so it never advances how far the item got.
+    #[must_use]
+    pub const fn stage(self) -> Option<Stage> {
+        match self {
+            Self::Grabbed => Some(Stage::Grabbed),
+            Self::Imported => Some(Stage::Imported),
+            Self::DownloadFailed | Self::Removed => None,
+        }
+    }
+
+    /// The plain-language phrase a trace's history names this outcome by.
+    #[must_use]
+    pub const fn phrase(self) -> &'static str {
+        match self {
+            Self::Grabbed => "grabbed",
+            Self::DownloadFailed => "download failed",
+            Self::Imported => "imported",
+            Self::Removed => "removed",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Confidence, Stage};
+    use super::{Confidence, Outcome, Stage};
 
     #[test]
     fn the_stages_are_declared_in_pipeline_order() {
@@ -278,20 +320,51 @@ mod tests {
     }
 
     #[test]
-    fn history_events_map_to_the_stage_they_reach() {
-        assert_eq!(Stage::of_event("grabbed"), Some(Stage::Grabbed));
+    fn history_events_map_to_the_outcome_they_denote() {
+        assert_eq!(Outcome::of_event("grabbed"), Some(Outcome::Grabbed));
         assert_eq!(
-            Stage::of_event("downloadFolderImported"),
-            Some(Stage::Imported)
+            Outcome::of_event("downloadFailed"),
+            Some(Outcome::DownloadFailed)
+        );
+        for imported in [
+            "downloadFolderImported",
+            "movieFolderImported",
+            "seriesFolderImported",
+        ] {
+            assert_eq!(Outcome::of_event(imported), Some(Outcome::Imported));
+        }
+        assert_eq!(
+            Outcome::of_event("episodeFileDeleted"),
+            Some(Outcome::Removed)
         );
         assert_eq!(
-            Stage::of_event("movieFolderImported"),
-            Some(Stage::Imported)
+            Outcome::of_event("movieFileDeleted"),
+            Some(Outcome::Removed)
         );
-        assert_eq!(
-            Stage::of_event("seriesFolderImported"),
-            Some(Stage::Imported)
-        );
+    }
+
+    #[test]
+    fn only_a_forward_outcome_advances_the_stage() {
+        // A grab and an import move the item along; a failure or a removal is history to
+        // show, not a stage reached.
+        assert_eq!(Outcome::Grabbed.stage(), Some(Stage::Grabbed));
+        assert_eq!(Outcome::Imported.stage(), Some(Stage::Imported));
+        assert_eq!(Outcome::DownloadFailed.stage(), None);
+        assert_eq!(Outcome::Removed.stage(), None);
+    }
+
+    #[test]
+    fn every_outcome_has_a_plain_phrase() {
+        for outcome in [
+            Outcome::Grabbed,
+            Outcome::DownloadFailed,
+            Outcome::Imported,
+            Outcome::Removed,
+        ] {
+            let phrase = outcome.phrase();
+            assert!(!phrase.is_empty());
+            assert!(phrase.chars().all(|c| c.is_ascii_lowercase() || c == ' '));
+        }
     }
 
     #[test]
@@ -311,12 +384,11 @@ mod tests {
     }
 
     #[test]
-    fn a_non_advancing_event_maps_to_no_stage() {
-        // A failure, rename, or deletion is not progress — it is read for its own
-        // meaning, not as a stage reached.
-        assert_eq!(Stage::of_event("downloadFailed"), None);
-        assert_eq!(Stage::of_event("episodeFileDeleted"), None);
-        assert_eq!(Stage::of_event(""), None);
+    fn an_event_that_is_not_notable_maps_to_no_outcome() {
+        // A rename, a grab-from-interactive-search test, or an unknown event is not one
+        // of the history moments a trace shows.
+        assert_eq!(Outcome::of_event("episodeFileRenamed"), None);
+        assert_eq!(Outcome::of_event(""), None);
     }
 
     #[test]
