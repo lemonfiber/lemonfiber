@@ -16,7 +16,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::{json_content_type, Endpoint, API_KEY_HEADER};
+use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
     Client, ClientKind, Credential, DownloadClient, Failure, Identity, QueueDepth,
@@ -56,14 +56,8 @@ impl Servarr {
     /// and, where it has a JSON body, declaring it as such so the service binds
     /// it rather than refusing it.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        let mut headers = vec![(API_KEY_HEADER.to_owned(), self.key.clone())];
-        headers.extend(json_content_type(body.as_ref()));
-        Request {
-            method,
-            url: self.endpoint.url(&format!("/api/v{}{path}", self.version)),
-            headers,
-            body,
-        }
+        self.endpoint
+            .keyed_request(method, &format!("/api/v{}{path}", self.version), &self.key, body)
     }
 
     /// Send a request to the versioned API, turning a `404` — the whole

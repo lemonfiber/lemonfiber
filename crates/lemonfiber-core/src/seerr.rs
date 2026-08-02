@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::{json_content_type, Endpoint};
+use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{Failure, Requests};
 
@@ -43,12 +43,8 @@ impl Seerr {
     /// such, because Seerr's framework only parses a body it is told is JSON and
     /// silently drops one it is not.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        Request {
-            method,
-            url: self.endpoint.url(&format!("/api/v1{path}")),
-            headers: json_content_type(body.as_ref()).into_iter().collect(),
-            body,
-        }
+        self.endpoint
+            .json_request(method, &format!("/api/v1{path}"), body)
     }
 }
 

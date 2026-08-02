@@ -13,7 +13,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::{json_content_type, Endpoint};
+use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{Failure, Library, MediaServer};
 use crate::recyclarr::Kind;
@@ -70,12 +70,7 @@ impl Jellyfin {
     /// there is no key yet, which is the whole reason lemonfiber is here — and a
     /// JSON body is declared as such so it is bound rather than refused.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        Request {
-            method,
-            url: self.endpoint.url(path),
-            headers: json_content_type(body.as_ref()).into_iter().collect(),
-            body,
-        }
+        self.endpoint.json_request(method, path, body)
     }
 
     /// Sign in as the household admin and return the access token the library reads carry.
