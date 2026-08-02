@@ -501,6 +501,58 @@ pub trait QualityReleases: Send + Sync {
     async fn probe_releases(&self, id_param: &str) -> Result<ReleaseProbe, Failure>;
 }
 
+/// One library item a trace could follow: its id, the title it was found by, and
+/// whether the service is monitoring it — the entry point for "where is my show?".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoundItem {
+    /// The service's own id for the item, used to read its history.
+    pub id: i64,
+    /// The item's title, as a person would name it.
+    pub title: String,
+    /// Whether the service is monitoring it — an unmonitored item is one nobody asked
+    /// for, the first of the stages a trace tells apart.
+    pub monitored: bool,
+}
+
+/// One stage-advancing event in an item's history: the stage it reached and when.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TraceEvent {
+    /// The stage the event denotes reaching.
+    pub stage: crate::trace::Stage,
+    /// When it happened, as the service reported it.
+    pub at: String,
+}
+
+/// Reading one \*arr's fragment of an item's journey — the service that monitors the
+/// item and records its history is the spine a trace is built along; the other services
+/// fill in around it.
+#[async_trait]
+pub trait Pipeline: Send + Sync {
+    /// Find monitored library items whose title matches a human term — a show name or a
+    /// film title, never an internal id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn find_items(
+        &self,
+        kind: crate::recyclarr::Kind,
+        term: &str,
+    ) -> Result<Vec<FoundItem>, Failure>;
+
+    /// Read the stage-advancing history of one item, newest first — the grabs and
+    /// imports that mark how far it got.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn item_history(
+        &self,
+        kind: crate::recyclarr::Kind,
+        id: i64,
+    ) -> Result<Vec<TraceEvent>, Failure>;
+}
+
 /// Applying an audio quality to a service that has one — Lidarr, whose quality axis is
 /// a format rather than a resolution and which no community profile configures, so the
 /// choice is carried straight to its own quality profiles.

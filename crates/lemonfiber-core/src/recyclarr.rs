@@ -86,6 +86,26 @@ impl Kind {
             Self::Radarr => "movieId",
         }
     }
+
+    /// The API path segment listing the service's library — the series it tracks, or the
+    /// films — searched by a human term to find an item to trace.
+    #[must_use]
+    pub const fn library_endpoint(self) -> &'static str {
+        match self {
+            Self::Sonarr => "series",
+            Self::Radarr => "movie",
+        }
+    }
+
+    /// The history query parameter that filters events to one library item, so a trace
+    /// reads only what happened to the item asked about.
+    #[must_use]
+    pub const fn history_filter(self) -> &'static str {
+        match self {
+            Self::Sonarr => "seriesIds",
+            Self::Radarr => "movieIds",
+        }
+    }
 }
 
 /// The three TRaSH-guide templates that carry a preset out for one service: the
@@ -364,6 +384,17 @@ mod tests {
             Some("CutoffUnmetMoviesSearch")
         );
         assert_eq!(Kind::for_section("prowlarr"), None);
+    }
+
+    #[test]
+    fn each_service_names_its_own_search_and_history_endpoints() {
+        // Television is searched and traced by episode; film by movie.
+        assert_eq!(Kind::Sonarr.release_id_param(), "episodeId");
+        assert_eq!(Kind::Radarr.release_id_param(), "movieId");
+        assert_eq!(Kind::Sonarr.library_endpoint(), "series");
+        assert_eq!(Kind::Radarr.library_endpoint(), "movie");
+        assert_eq!(Kind::Sonarr.history_filter(), "seriesIds");
+        assert_eq!(Kind::Radarr.history_filter(), "movieIds");
     }
 
     #[test]

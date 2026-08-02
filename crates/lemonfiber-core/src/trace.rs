@@ -93,6 +93,23 @@ impl Stage {
         matches!(self, Self::Searching | Self::Downloading | Self::Importing)
     }
 
+    /// The stage a Servarr history event denotes reaching, or `None` for an event that
+    /// does not advance the pipeline (a failure, a rename, a deletion) — those are read
+    /// for their own meaning elsewhere, not as progress.
+    ///
+    /// Named as the \*arr history API serialises them: `grabbed`, and the several
+    /// folder-import events the television and film services each use.
+    #[must_use]
+    pub fn of_event(event_type: &str) -> Option<Self> {
+        match event_type {
+            "grabbed" => Some(Self::Grabbed),
+            "downloadFolderImported" | "seriesFolderImported" | "movieFolderImported" => {
+                Some(Self::Imported)
+            }
+            _ => None,
+        }
+    }
+
     /// Why an item that got no further than this stage has stopped, in plain language —
     /// or `None` where stopping here is not a fault: the terminal `Available`, or a
     /// stage that is work in progress rather than a resting point.
@@ -193,6 +210,32 @@ mod tests {
         assert_eq!(json, r#""downloaded""#);
         let back: Option<Stage> = serde_json::from_str(&json).ok();
         assert_eq!(back, Some(Stage::Downloaded));
+    }
+
+    #[test]
+    fn history_events_map_to_the_stage_they_reach() {
+        assert_eq!(Stage::of_event("grabbed"), Some(Stage::Grabbed));
+        assert_eq!(
+            Stage::of_event("downloadFolderImported"),
+            Some(Stage::Imported)
+        );
+        assert_eq!(
+            Stage::of_event("movieFolderImported"),
+            Some(Stage::Imported)
+        );
+        assert_eq!(
+            Stage::of_event("seriesFolderImported"),
+            Some(Stage::Imported)
+        );
+    }
+
+    #[test]
+    fn a_non_advancing_event_maps_to_no_stage() {
+        // A failure, rename, or deletion is not progress — it is read for its own
+        // meaning, not as a stage reached.
+        assert_eq!(Stage::of_event("downloadFailed"), None);
+        assert_eq!(Stage::of_event("episodeFileDeleted"), None);
+        assert_eq!(Stage::of_event(""), None);
     }
 
     #[test]

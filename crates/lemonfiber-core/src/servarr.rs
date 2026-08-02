@@ -251,6 +251,59 @@ impl Servarr {
 }
 
 #[async_trait]
+impl crate::ports::service::Pipeline for Servarr {
+    async fn find_items(
+        &self,
+        kind: crate::recyclarr::Kind,
+        term: &str,
+    ) -> Result<Vec<crate::ports::service::FoundItem>, Failure> {
+        let response = self
+            .probe(&self.request(Method::Get, &format!("/{}", kind.library_endpoint()), None))
+            .await?;
+        let items: Vec<LibraryItem> = self
+            .endpoint
+            .decode(&response, "the library could not be read")?;
+        let needle = term.to_lowercase();
+        Ok(items
+            .into_iter()
+            .filter(|item| item.title.to_lowercase().contains(&needle))
+            .map(|item| crate::ports::service::FoundItem {
+                id: item.id,
+                title: item.title,
+                monitored: item.monitored,
+            })
+            .collect())
+    }
+
+    async fn item_history(
+        &self,
+        kind: crate::recyclarr::Kind,
+        id: i64,
+    ) -> Result<Vec<crate::ports::service::TraceEvent>, Failure> {
+        let path = format!(
+            "/history?page=1&pageSize=100&sortKey=date&sortDirection=descending&{}={id}",
+            kind.history_filter()
+        );
+        let response = self.probe(&self.request(Method::Get, &path, None)).await?;
+        let page: HistoryPage = self
+            .endpoint
+            .decode(&response, "the history could not be read")?;
+        Ok(page
+            .records
+            .into_iter()
+            .filter_map(|record| {
+                crate::trace::Stage::of_event(&record.event_type).map(|stage| {
+                    crate::ports::service::TraceEvent {
+                        stage,
+                        at: record.date,
+                    }
+                })
+            })
+            .collect())
+    }
+}
+
+#[async_trait]
 impl crate::ports::service::QualityReleases for Servarr {
     async fn probe_releases(
         &self,
@@ -367,6 +420,35 @@ struct WantedRecord {
 struct ReleaseResource {
     #[serde(default)]
     rejections: Vec<String>,
+}
+
+/// One library item — a series or a film — as the service lists it, matched by title to
+/// find something to trace.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LibraryItem {
+    id: i64,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    monitored: bool,
+}
+
+/// A page of history: the events on it, newest first.
+#[derive(Deserialize)]
+struct HistoryPage {
+    #[serde(default)]
+    records: Vec<HistoryRecord>,
+}
+
+/// One history event — its type names what happened, the date names when.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryRecord {
+    #[serde(default)]
+    event_type: String,
+    #[serde(default)]
+    date: String,
 }
 
 /// A download-client resource as the service reports it: the identifier it
