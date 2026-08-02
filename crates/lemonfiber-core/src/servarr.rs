@@ -64,8 +64,12 @@ impl Servarr {
     /// and, where it has a JSON body, declaring it as such so the service binds
     /// it rather than refusing it.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        self.endpoint
-            .keyed_request(method, &format!("/api/v{}{path}", self.version), &self.key, body)
+        self.endpoint.keyed_request(
+            method,
+            &format!("/api/v{}{path}", self.version),
+            &self.key,
+            body,
+        )
     }
 
     /// Send a request to the versioned API, turning a `404` — the whole

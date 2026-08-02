@@ -55,7 +55,8 @@ impl Servarr {
             .endpoint
             .decode(&response, "the custom formats could not be read")?;
         let present = formats.iter().any(|entry| {
-            entry.get("name").and_then(serde_json::Value::as_str) == Some(crate::lidarr::HI_RES_FORMAT)
+            entry.get("name").and_then(serde_json::Value::as_str)
+                == Some(crate::lidarr::HI_RES_FORMAT)
         });
         if present {
             return Ok(());
