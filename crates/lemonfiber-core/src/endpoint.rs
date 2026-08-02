@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use crate::ports::http::{Http, Request, Response};
+use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::Failure;
 
 /// The header a Servarr-shape service authenticates with — Sonarr, Radarr,
@@ -53,6 +53,39 @@ impl Endpoint {
     /// the base dropped so the join never doubles it.
     pub(crate) fn url(&self, path: &str) -> String {
         format!("{}{path}", self.base.trim_end_matches('/'))
+    }
+
+    /// A JSON request to `path` — the body declared as JSON where there is one, and no
+    /// API key. The shape the services that authenticate some other way build from: a
+    /// media server driven through its own body-carried credential, a request manager
+    /// signed in through the media server, or a setup endpoint that takes no key yet.
+    pub(crate) fn json_request(&self, method: Method, path: &str, body: Option<String>) -> Request {
+        Request {
+            method,
+            url: self.url(path),
+            headers: json_content_type(body.as_ref()).into_iter().collect(),
+            body,
+        }
+    }
+
+    /// A JSON request that also carries a Servarr-shape API key in its header — the shape
+    /// every keyed service builds from (Sonarr, Radarr, Lidarr, Prowlarr), differing only
+    /// in the path prefix the caller supplies for its API version.
+    pub(crate) fn keyed_request(
+        &self,
+        method: Method,
+        path: &str,
+        key: &str,
+        body: Option<String>,
+    ) -> Request {
+        let mut headers = vec![(API_KEY_HEADER.to_owned(), key.to_owned())];
+        headers.extend(json_content_type(body.as_ref()));
+        Request {
+            method,
+            url: self.url(path),
+            headers,
+            body,
+        }
     }
 
     /// Send a request, turning a transport failure into "not answering".

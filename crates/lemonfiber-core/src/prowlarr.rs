@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::{json_content_type, Endpoint, API_KEY_HEADER};
+use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
     AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
@@ -44,14 +44,8 @@ impl Prowlarr {
     /// than refusing it. The version is the whole reason this is a client apart
     /// from the media \*arrs'.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        let mut headers = vec![(API_KEY_HEADER.to_owned(), self.key.clone())];
-        headers.extend(json_content_type(body.as_ref()));
-        Request {
-            method,
-            url: self.endpoint.url(&format!("/api/v1{path}")),
-            headers,
-            body,
-        }
+        self.endpoint
+            .keyed_request(method, &format!("/api/v1{path}"), &self.key, body)
     }
 }
 

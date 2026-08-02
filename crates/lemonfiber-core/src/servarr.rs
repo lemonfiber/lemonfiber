@@ -10,18 +10,26 @@
 //! answered with something unusable, or — through the port — nothing answering at
 //! all. The service's own words are carried through rather than paraphrased, so
 //! an operator sees what the service said and not a vaguer restatement of it.
+//!
+//! This file holds the client itself and the provisioning shape (identity,
+//! registering clients and folders, queue depth). The reads a trace makes live in
+//! [`pipeline`], and the quality reads and writes in [`quality`], so the two newest
+//! concerns grow apart from the stable provisioning adapter.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::endpoint::{json_content_type, Endpoint, API_KEY_HEADER};
+use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
     Client, ClientKind, Credential, DownloadClient, Failure, Identity, QueueDepth,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
+
+mod pipeline;
+mod quality;
 
 /// A client for one Servarr-shape service.
 ///
@@ -56,14 +64,12 @@ impl Servarr {
     /// and, where it has a JSON body, declaring it as such so the service binds
     /// it rather than refusing it.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        let mut headers = vec![(API_KEY_HEADER.to_owned(), self.key.clone())];
-        headers.extend(json_content_type(body.as_ref()));
-        Request {
+        self.endpoint.keyed_request(
             method,
-            url: self.endpoint.url(&format!("/api/v{}{path}", self.version)),
-            headers,
+            &format!("/api/v{}{path}", self.version),
+            &self.key,
             body,
-        }
+        )
     }
 
     /// Send a request to the versioned API, turning a `404` — the whole
@@ -189,200 +195,6 @@ impl crate::ports::service::Maintenance for Servarr {
 }
 
 #[async_trait]
-impl crate::ports::service::MusicQuality for Servarr {
-    async fn apply_music_format(&self, format: crate::audio::Format) -> Result<(), Failure> {
-        let prefer = crate::lidarr::prefers_hi_res(format);
-        // A hi-res choice prefers 24-bit through a custom format; ensure it exists before
-        // scoring it, so a profile has something its cutoff score can point at.
-        if prefer {
-            self.ensure_hi_res_format().await?;
-        }
-        let response = self
-            .probe(&self.request(Method::Get, "/qualityprofile", None))
-            .await?;
-        let profiles: Vec<serde_json::Value> = self
-            .endpoint
-            .decode(&response, "the quality profiles could not be read")?;
-        for profile in profiles {
-            let text = serde_json::to_string(&profile).unwrap_or_default();
-            let Some(rewritten) = crate::lidarr::rewrite(&text, format) else {
-                continue;
-            };
-            let body =
-                crate::lidarr::set_hi_res_preference(&rewritten, prefer).unwrap_or(rewritten);
-            let Some(id) = profile.get("id").and_then(serde_json::Value::as_i64) else {
-                continue;
-            };
-            let updated = self
-                .probe(&self.request(Method::Put, &format!("/qualityprofile/{id}"), Some(body)))
-                .await?;
-            self.endpoint.expect_success(&updated)?;
-        }
-        Ok(())
-    }
-}
-
-impl Servarr {
-    /// Create the 24-bit custom format if the service does not already carry it, matched
-    /// by name so a second run does not add a duplicate.
-    async fn ensure_hi_res_format(&self) -> Result<(), Failure> {
-        let response = self
-            .probe(&self.request(Method::Get, "/customformat", None))
-            .await?;
-        let formats: Vec<serde_json::Value> = self
-            .endpoint
-            .decode(&response, "the custom formats could not be read")?;
-        let present = formats.iter().any(|entry| {
-            entry.get("name").and_then(serde_json::Value::as_str)
-                == Some(crate::lidarr::HI_RES_FORMAT)
-        });
-        if present {
-            return Ok(());
-        }
-        let created = self
-            .probe(&self.request(
-                Method::Post,
-                "/customformat",
-                Some(crate::lidarr::hi_res_custom_format()),
-            ))
-            .await?;
-        self.endpoint.expect_success(&created)
-    }
-}
-
-#[async_trait]
-impl crate::ports::service::Pipeline for Servarr {
-    async fn find_items(
-        &self,
-        kind: crate::recyclarr::Kind,
-        term: &str,
-    ) -> Result<Vec<crate::ports::service::FoundItem>, Failure> {
-        let response = self
-            .probe(&self.request(Method::Get, &format!("/{}", kind.library_endpoint()), None))
-            .await?;
-        let items: Vec<LibraryItem> = self
-            .endpoint
-            .decode(&response, "the library could not be read")?;
-        let needle = term.to_lowercase();
-        Ok(items
-            .into_iter()
-            .filter(|item| item.title.to_lowercase().contains(&needle))
-            .map(|item| crate::ports::service::FoundItem {
-                id: item.id,
-                title: item.title,
-                monitored: item.monitored,
-            })
-            .collect())
-    }
-
-    async fn item_history(
-        &self,
-        kind: crate::recyclarr::Kind,
-        id: i64,
-    ) -> Result<Vec<crate::ports::service::TraceEvent>, Failure> {
-        let path = format!(
-            "/history?page=1&pageSize=100&sortKey=date&sortDirection=descending&{}={id}",
-            kind.history_filter()
-        );
-        let response = self.probe(&self.request(Method::Get, &path, None)).await?;
-        let page: HistoryPage = self
-            .endpoint
-            .decode(&response, "the history could not be read")?;
-        Ok(page
-            .records
-            .into_iter()
-            .filter_map(|record| {
-                crate::trace::Stage::of_event(&record.event_type).map(|stage| {
-                    crate::ports::service::TraceEvent {
-                        stage,
-                        at: record.date,
-                    }
-                })
-            })
-            .collect())
-    }
-
-    async fn item_queue(
-        &self,
-        kind: crate::recyclarr::Kind,
-        id: i64,
-    ) -> Result<Option<crate::ports::service::QueueItem>, Failure> {
-        let response = self
-            .probe(&self.request(Method::Get, "/queue?pageSize=200", None))
-            .await?;
-        let queue: QueueResource = self
-            .endpoint
-            .decode(&response, "the queue could not be read")?;
-        let mut records = queue
-            .records
-            .iter()
-            .filter(|record| record.is_for(kind, id))
-            .peekable();
-        if records.peek().is_none() {
-            return Ok(None);
-        }
-        // A series may have several episodes queued; the item's furthest download stage
-        // and whether any of its records is stuck are what the trace reads. Being in the
-        // queue at all means at least downloading, even where the state is unrecognised.
-        let stage = records
-            .clone()
-            .filter_map(|record| {
-                crate::trace::Stage::of_queue_state(&record.tracked_download_state)
-            })
-            .max()
-            .unwrap_or(crate::trace::Stage::Downloading);
-        let stuck = records.any(|record| is_stuck(&record.tracked_download_status));
-        Ok(Some(crate::ports::service::QueueItem { stage, stuck }))
-    }
-}
-
-#[async_trait]
-impl crate::ports::service::QualityReleases for Servarr {
-    async fn probe_releases(
-        &self,
-        id_param: &str,
-    ) -> Result<crate::ports::service::ReleaseProbe, Failure> {
-        use crate::ports::service::ReleaseProbe;
-
-        // One wanted item is enough to judge the preset against — search for what the
-        // operator is actually missing rather than a made-up query.
-        let response = self
-            .probe(&self.request(Method::Get, "/wanted/missing?page=1&pageSize=1", None))
-            .await?;
-        let wanted: Wanted = self
-            .endpoint
-            .decode(&response, "the wanted list could not be read")?;
-        let Some(record) = wanted.records.first() else {
-            return Ok(ReleaseProbe::NothingWanted);
-        };
-
-        // A manual search hits the indexers live — the disruptive part the caller gates.
-        let response = self
-            .probe(&self.request(
-                Method::Get,
-                &format!("/release?{id_param}={}", record.id),
-                None,
-            ))
-            .await?;
-        let releases: Vec<ReleaseResource> = self
-            .endpoint
-            .decode(&response, "the release search could not be read")?;
-        if releases.is_empty() {
-            return Ok(ReleaseProbe::NoneFound);
-        }
-        // A release the service left unrejected is one its profile — the quality preset
-        // included — would grab; if every release carries a rejection, the preset wants
-        // none of what is out there.
-        let matching = releases.iter().any(|release| release.rejections.is_empty());
-        Ok(if matching {
-            ReleaseProbe::Matching
-        } else {
-            ReleaseProbe::NoneMatch
-        })
-    }
-}
-
-#[async_trait]
 impl crate::ports::service::Queues for Servarr {
     async fn queue(&self) -> Result<QueueDepth, Failure> {
         // A generous page is asked for so the stuck count is read from the whole
@@ -407,7 +219,8 @@ impl crate::ports::service::Queues for Servarr {
 }
 
 /// Whether a queue item's tracked status is one that has stopped progressing —
-/// the service's own words for a download that needs attention.
+/// the service's own words for a download that needs attention. Shared by the
+/// dashboard's queue depth and a per-item trace.
 fn is_stuck(status: &str) -> bool {
     status.eq_ignore_ascii_case("warning") || status.eq_ignore_ascii_case("error")
 }
@@ -448,59 +261,6 @@ impl QueueRecord {
         };
         owner == Some(id)
     }
-}
-
-/// A page of the wanted/missing list — only the first record's id is needed, to name
-/// what a release search is for.
-#[derive(Deserialize)]
-struct Wanted {
-    #[serde(default)]
-    records: Vec<WantedRecord>,
-}
-
-/// One wanted item: its id, which is the episode (Sonarr) or movie (Radarr) a manual
-/// search is run for.
-#[derive(Deserialize)]
-struct WantedRecord {
-    id: i64,
-}
-
-/// One release a manual search returned — only whether the service's profile rejected
-/// it matters here: an empty list means the profile, quality preset included, would
-/// grab it.
-#[derive(Deserialize)]
-struct ReleaseResource {
-    #[serde(default)]
-    rejections: Vec<String>,
-}
-
-/// One library item — a series or a film — as the service lists it, matched by title to
-/// find something to trace.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct LibraryItem {
-    id: i64,
-    #[serde(default)]
-    title: String,
-    #[serde(default)]
-    monitored: bool,
-}
-
-/// A page of history: the events on it, newest first.
-#[derive(Deserialize)]
-struct HistoryPage {
-    #[serde(default)]
-    records: Vec<HistoryRecord>,
-}
-
-/// One history event — its type names what happened, the date names when.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct HistoryRecord {
-    #[serde(default)]
-    event_type: String,
-    #[serde(default)]
-    date: String,
 }
 
 /// A download-client resource as the service reports it: the identifier it

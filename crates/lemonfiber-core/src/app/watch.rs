@@ -18,7 +18,8 @@ use crate::model::SupervisionReport;
 use crate::ports::filesystem::{Presence, Volume};
 use crate::stack::compose::Action;
 
-use super::{lifecycle, Ctx, Outcome};
+use super::engine::lifecycle;
+use super::{Ctx, Outcome};
 
 /// How often a watch re-checks that the data root is still there.
 ///

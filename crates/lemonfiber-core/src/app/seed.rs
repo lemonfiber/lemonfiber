@@ -196,8 +196,7 @@ fn save_baseline(ctx: &Ctx, baseline: &crate::baseline::Baseline) {
 /// [`crate::config::paths::Paths::baseline`], which the layout keeps in the same
 /// directory; the two must stay in step if that layout ever moves.
 fn baseline_path(ctx: &Ctx) -> Option<std::path::PathBuf> {
-    let env = ctx.settings.env_file.as_deref()?;
-    Some(env.with_file_name("baseline.json"))
+    super::targets::beside_env(ctx, "baseline.json")
 }
 
 /// A Servarr application that files media: its identity and address (as the
@@ -412,8 +411,7 @@ fn sabnzbd_config_path(
         if api.kind != lemonfiber_manifest::ApiKind::Sabnzbd {
             return None;
         }
-        let inside = api.path.as_deref()?.strip_prefix("/config/")?;
-        Some(project.join("config").join(&service.id).join(inside))
+        super::targets::config_path(project, service, api.path.as_deref())
     })
 }
 
@@ -611,13 +609,6 @@ fn skipped_application(arr: &str, prowlarr: &str) -> crate::seed::Wiring {
     skipped(format!("{arr} indexer sync via {prowlarr}"), arr)
 }
 
-/// Jellyfin's addresses: where the host reaches its setup, and where Seerr reaches
-/// it across the stack's own network.
-struct JellyfinAddr {
-    loopback: String,
-    network_url: String,
-}
-
 /// Make Jellyfin the identity source for Seerr, so the household signs in once.
 ///
 /// Both must be in the stack; without either there is nothing to wire. Jellyfin's
@@ -653,35 +644,20 @@ async fn seed_jellyfin_identity(
     vec![wiring]
 }
 
-/// Where the host reaches Seerr's API, if the stack has it — selected by its api
-/// kind, the way every service lemonfiber speaks to is.
+/// Where the host reaches Seerr's API, if the stack has it — resolved the way every
+/// service lemonfiber speaks to is.
 fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option<String> {
-    services.iter().find_map(|service| {
-        let api = service.api.as_ref()?;
-        if api.kind != lemonfiber_manifest::ApiKind::Seerr {
-            return None;
-        }
-        let port = service.port?;
-        Some(format!("http://127.0.0.1:{port}"))
-    })
+    super::targets::service_addr(services, lemonfiber_manifest::ApiKind::Seerr)
+        .map(|addr| addr.loopback)
 }
 
-/// Jellyfin's addresses, if the stack has it — selected by its api kind, the way
-/// every service lemonfiber speaks to is. Jellyfin's kind carries no key source
-/// of the usual sort: it is the one service lemonfiber sets an account on rather
-/// than reading a key from, so its password is generated.
-fn jellyfin_service(services: &[lemonfiber_manifest::Service]) -> Option<JellyfinAddr> {
-    services.iter().find_map(|service| {
-        let api = service.api.as_ref()?;
-        if api.kind != lemonfiber_manifest::ApiKind::Jellyfin {
-            return None;
-        }
-        let port = service.port?;
-        Some(JellyfinAddr {
-            loopback: format!("http://127.0.0.1:{port}"),
-            network_url: format!("http://{}:{port}", service.id),
-        })
-    })
+/// Jellyfin's addresses, if the stack has it. Jellyfin's kind carries no key source of
+/// the usual sort: it is the one service lemonfiber sets an account on rather than reading
+/// a key from, so its password is generated.
+fn jellyfin_service(
+    services: &[lemonfiber_manifest::Service],
+) -> Option<super::targets::ServiceAddr> {
+    super::targets::service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)
 }
 
 /// The Jellyfin admin password recorded on the run that minted it, so a later run
@@ -698,15 +674,11 @@ fn record_jellyfin_password(ctx: &Ctx, password: &str) {
 }
 
 /// qBittorrent's address, if the stack has it: the id names the container to read
-/// a log from, the base is where the host reaches its web UI.
+/// a log from, the base is where the host reaches its web UI. Nothing where it
+/// publishes no port — a client the host cannot reach is no target to wire.
 fn qbittorrent_target(services: &[lemonfiber_manifest::Service]) -> Option<(String, String)> {
-    services.iter().find_map(|service| {
-        let api = service.api.as_ref()?;
-        (api.kind == lemonfiber_manifest::ApiKind::Qbittorrent).then(|| {
-            let port = service.port.unwrap_or(0);
-            (service.id.clone(), format!("http://127.0.0.1:{port}"))
-        })
-    })
+    super::targets::service_addr(services, lemonfiber_manifest::ApiKind::Qbittorrent)
+        .map(|addr| (addr.id, addr.loopback))
 }
 
 /// Replace qBittorrent's temporary web UI password and record the generated one.

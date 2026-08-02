@@ -1010,6 +1010,45 @@ async fn item_queue_reads_a_film_by_movie_and_flags_stuck() {
 }
 
 #[tokio::test]
+async fn item_queue_walks_past_the_first_page_to_find_the_item() {
+    // A full first page of other items, and a total beyond it: the traced item sits on
+    // page two, so reading only the first page would miss it and misreport it as stuck at
+    // grabbed. Two of its records are there at different states, so the furthest shows.
+    // The 200 matches the client's page size, so the first page is full and it reads on.
+    let filler = vec![
+        r#"{"seriesId":99,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}"#;
+        200
+    ]
+    .join(",");
+    let page_one = format!(r#"{{"totalRecords":201,"records":[{filler}]}}"#);
+    let page_two = r#"{"totalRecords":201,"records":[
+        {"seriesId":1,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"},
+        {"seriesId":1,"trackedDownloadState":"importPending","trackedDownloadStatus":"ok"}
+    ]}"#
+    .to_owned();
+    let router = Router::new(vec![
+        (Method::Get, "/queue?page=1", 200, page_one),
+        (Method::Get, "/queue?page=2", 200, page_two),
+    ]);
+    let queue = sonarr_routed(&router)
+        .item_queue(Kind::Sonarr, 1)
+        .await
+        .unwrap_or_default();
+    assert_eq!(
+        queue,
+        Some(QueueItem {
+            stage: Stage::Downloaded,
+            stuck: false
+        })
+    );
+    // The walk did not stop at the first page.
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("page=2")));
+}
+
+#[tokio::test]
 async fn item_queue_holding_nothing_for_the_item_is_none() {
     let router = Router::new(vec![(
         Method::Get,
