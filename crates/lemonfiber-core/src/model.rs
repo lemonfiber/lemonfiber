@@ -317,6 +317,17 @@ pub struct StackEdit {
     pub diff: String,
 }
 
+/// What a full reset did, or — until it is confirmed — would do: the operator edits it
+/// reverts back to lemonfiber's own state, and whether it was carried out or only shown.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct ResetReport {
+    /// The operator's edits that were reverted — or, unconfirmed, that a reset would
+    /// revert — each with the diff of what is lost against what lemonfiber restores.
+    pub reverted: Vec<StackEdit>,
+    /// Whether the reset was carried out, or only previewed pending confirmation.
+    pub confirmed: bool,
+}
+
 /// What a diagnostic run found, and what it amounts to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DoctorReport {

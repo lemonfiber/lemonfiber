@@ -209,6 +209,17 @@ enum Request {
     /// adopted it is kept across future seeds and restores. Wires what is missing
     /// as a seed does, and promotes every drifted value to yours.
     Adopt,
+    /// Put the stack back to lemonfiber's own state, reverting every edit you made.
+    ///
+    /// The opposite of adopt: it discards your hand-edits to the stack files and
+    /// restores lemonfiber's own. Because it throws work away, it names exactly what
+    /// will be lost and does nothing until `--confirm` — run it once to see the diffs,
+    /// again with `--confirm` to reset.
+    Reset {
+        /// Go ahead and revert, having seen what will be lost.
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Back up your configuration to an archive, so it stops being precious.
     Backup {
         /// Back up one service's configuration instead of the whole stack.
@@ -418,6 +429,7 @@ async fn main() -> ExitCode {
         },
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
+        Request::Reset { confirm } => Command::Reset { confirm },
         // Backup and restore drive their own executors over the tar adapter and
         // render their own reports, like setup — they are not one value from
         // dispatch. They take the context by value for the settings they read.
@@ -482,6 +494,16 @@ fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Music(report) => {
             if matches!(report.outcome, Some(Triggered::Failed { .. })) {
                 ExitCode::from(FAILURE)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
+        // A reset run without --confirm that found edits to revert only previewed them —
+        // like a held quality choice, it needs the operator's say-so, so a script sees a
+        // non-zero result to act on. Confirmed, or with nothing to revert, it succeeded.
+        Outcome::Reset(report) => {
+            if !report.confirmed && !report.reverted.is_empty() {
+                ExitCode::from(VALIDATION)
             } else {
                 ExitCode::SUCCESS
             }
