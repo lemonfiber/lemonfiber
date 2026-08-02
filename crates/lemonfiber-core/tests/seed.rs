@@ -12,14 +12,14 @@ use lemonfiber_core::baseline::{Baseline, Origin, Record};
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{
-    AppSync, Application, ApplicationKind, Category, Client, ClientKind, Credential,
+    AppSync, Application, ApplicationKind, Category, Client, ClientKind, ClientProbe, Credential,
     DownloadClient, Failure, Identity, MediaServer, RegisteredApplication, RegisteredClient,
     RegisteredFolder, Requests, RootFolder,
 };
 use lemonfiber_core::seed::{
     contested_roots, intent, reconcile, wire_applications, wire_download_clients,
     wire_jellyfin_identity, wire_root_folders, Assessment, Baselines, Intent, Observed, Report,
-    State, Wiring,
+    Severity, State, Wiring,
 };
 
 // ---- The policy: pure, decided without a service. ----
@@ -139,10 +139,7 @@ fn only_a_wired_preserved_or_stale_connection_is_settled() {
 }
 
 fn wiring(connection: &str, state: State) -> Wiring {
-    Wiring {
-        connection: connection.to_owned(),
-        state,
-    }
+    Wiring::settled(connection.to_owned(), state)
 }
 
 #[test]
@@ -282,6 +279,35 @@ fn the_report_names_each_state_on_the_wire() {
     }
 }
 
+#[test]
+fn the_report_draws_out_the_drifts_that_broke_the_stack() {
+    // A drift raised to a warning is drawn out on its own, while an ordinary drift and
+    // the settled connections are not — so a surface can lead with what must be acted
+    // on. The warning also serialises its severity, breakage and remedy.
+    let mut broken = wiring("broken", State::Drifted);
+    broken.escalate(
+        "the root folder points where nothing exists".to_owned(),
+        "create the directory".to_owned(),
+    );
+    let report = Report {
+        assessment: Assessment::Assessed,
+        wirings: vec![
+            broken,
+            wiring("ordinary", State::Drifted),
+            wiring("fine", State::Wired),
+        ],
+    };
+    let warned: Vec<&str> = report
+        .warnings()
+        .iter()
+        .map(|wiring| wiring.connection.as_str())
+        .collect();
+    assert_eq!(warned, vec!["broken"], "only the broken drift is a warning");
+    let json = serde_json::to_string(&report).unwrap_or_default();
+    assert!(json.contains(r#""severity":"warning""#), "{json}");
+    assert!(json.contains(r#""severity":"informational""#), "{json}");
+}
+
 // ---- The driver: carried out against a fake service. ----
 
 /// How the fake service behaves.
@@ -314,6 +340,10 @@ struct FakeService {
     clients: Mutex<Vec<RegisteredClient>>,
     reads: Mutex<u32>,
     next_id: Mutex<u32>,
+    /// The client-test verdicts to answer with, or `None` to fail the test call —
+    /// the signal a drift-severity escalation reads. Absent by default, since only a
+    /// drift asks for it.
+    probes: Mutex<Option<Vec<ClientProbe>>>,
 }
 
 impl FakeService {
@@ -324,6 +354,7 @@ impl FakeService {
             clients: Mutex::new(Vec::new()),
             reads: Mutex::new(0),
             next_id: Mutex::new(100),
+            probes: Mutex::new(None),
         }
     }
 
@@ -334,6 +365,16 @@ impl FakeService {
             clients: Mutex::new(clients),
             reads: Mutex::new(0),
             next_id: Mutex::new(100),
+            probes: Mutex::new(None),
+        }
+    }
+
+    /// The client-test verdicts this service answers with when its clients are
+    /// tested — how a drift is driven to reachable or unreachable.
+    fn probing(self, probes: Vec<ClientProbe>) -> Self {
+        Self {
+            probes: Mutex::new(Some(probes)),
+            ..self
         }
     }
 
@@ -405,6 +446,16 @@ impl Client for FakeService {
             }
         }
         Ok(())
+    }
+
+    async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
+        // The set verdicts where they were given; a service with none set fails the
+        // test, standing in for one that will not run it.
+        self.probes
+            .lock()
+            .ok()
+            .and_then(|probes| probes.clone())
+            .map_or_else(|| Err(down("sonarr")), Ok)
     }
 
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
@@ -1034,6 +1085,169 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
         0,
         "an operator's own change is preserved, not rewritten"
     );
+}
+
+/// A qBittorrent client the operator re-filed, so it reads as drift — the setup a
+/// severity check reads. Recorded "tv", the service now holds "my-own-tv".
+fn re_filed_client() -> Vec<RegisteredClient> {
+    vec![RegisteredClient {
+        id: "1".to_owned(),
+        host: "qbittorrent".to_owned(),
+        port: 8080,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: "my-own-tv".to_owned(),
+        }),
+    }]
+}
+
+/// Wire the wanted clients against a service holding `existing`, with lemonfiber's own
+/// value recorded for the qBittorrent endpoint so a differing one reads as drift, and
+/// the given test verdicts — `None` to stand in for a service that will not test.
+async fn seed_clients_probed(
+    existing: Vec<RegisteredClient>,
+    wanted: &[DownloadClient],
+    probes: Option<Vec<ClientProbe>>,
+) -> Vec<Wiring> {
+    let mut journal = Journal::new();
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
+    let mut records = Baseline::new();
+    let base = FakeService::with_clients(Mode::Normal, existing);
+    let service = match probes {
+        Some(probes) => base.probing(probes),
+        None => base,
+    };
+    wire_download_clients(
+        &service,
+        "sonarr",
+        wanted,
+        &mut journal,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+            reset: false,
+        },
+        "2",
+    )
+    .await
+}
+
+/// One test verdict for a client, by id.
+fn probe(id: &str, reachable: bool, detail: Option<&str>) -> ClientProbe {
+    ClientProbe {
+        id: id.to_owned(),
+        reachable,
+        detail: detail.map(str::to_owned),
+    }
+}
+
+/// The breakage a wiring's warning names, or nothing where it is informational or
+/// absent — the one place a severity is read, so both arms are exercised across the
+/// warning and the informational tests rather than left dead in either.
+fn breakage(wiring: Option<&Wiring>) -> Option<String> {
+    match wiring.map(|wiring| &wiring.severity) {
+        Some(Severity::Warning { breakage, .. }) => Some(breakage.clone()),
+        Some(Severity::Informational) | None => None,
+    }
+}
+
+/// The single wanted qBittorrent client the drift-severity tests re-file.
+fn one_qbittorrent() -> [DownloadClient; 1] {
+    [client("qBittorrent", "qbittorrent", 8080)]
+}
+
+#[tokio::test]
+async fn a_drifted_client_the_service_cannot_reach_is_raised_to_a_warning() {
+    // A category drift is the operator's own edit, ordinarily just information. But
+    // the same client the service can no longer reach has broken the stack — nothing
+    // downloads through it — so it is raised to a warning naming the service's own
+    // words. A second, freshly-wired client alongside it is not a drift, so it is
+    // never tested and stays informational.
+    let wanted = [
+        client("qBittorrent", "qbittorrent", 8080),
+        client("SABnzbd", "sabnzbd", 8080),
+    ];
+    let wirings = seed_clients_probed(
+        re_filed_client(),
+        &wanted,
+        Some(vec![probe("1", false, Some("connection refused"))]),
+    )
+    .await;
+
+    assert_eq!(
+        wirings.first().map(|wiring| &wiring.state),
+        Some(&State::Drifted)
+    );
+    assert!(
+        breakage(wirings.first()).is_some_and(|breakage| breakage.contains("connection refused")),
+        "the unreachable drift is a warning naming the service's words"
+    );
+    // The freshly-wired SABnzbd client never drifted, so it was never tested.
+    assert_eq!(
+        wirings.get(1).map(|wiring| &wiring.state),
+        Some(&State::Wired)
+    );
+    assert!(breakage(wirings.get(1)).is_none());
+}
+
+#[tokio::test]
+async fn a_drifted_client_the_service_still_reaches_stays_informational() {
+    // A drift the service can still reach has broken nothing — it is the operator's
+    // edit, working — so it is left as the information it is.
+    let wirings = seed_clients_probed(
+        re_filed_client(),
+        &one_qbittorrent(),
+        Some(vec![probe("1", true, None)]),
+    )
+    .await;
+    assert_eq!(
+        wirings.first().map(|wiring| &wiring.state),
+        Some(&State::Drifted)
+    );
+    assert!(breakage(wirings.first()).is_none());
+}
+
+#[tokio::test]
+async fn an_unreachable_client_the_service_gave_no_words_for_names_a_fallback() {
+    // A test that failed without the service saying why still names the breakage, so
+    // the warning is never blank — a fallback stands in for the missing detail.
+    let wirings = seed_clients_probed(
+        re_filed_client(),
+        &one_qbittorrent(),
+        Some(vec![probe("1", false, None)]),
+    )
+    .await;
+    assert!(
+        breakage(wirings.first()).is_some_and(|breakage| breakage.contains("could not reach it")),
+        "the warning names a fallback where the service gave no words"
+    );
+}
+
+#[tokio::test]
+async fn a_drift_the_service_will_not_test_stays_the_information_it_is() {
+    // A service that will not run the test at all proves nothing broken, so the drift
+    // is left as information rather than guessed into a warning.
+    let wirings = seed_clients_probed(re_filed_client(), &one_qbittorrent(), None).await;
+    assert_eq!(
+        wirings.first().map(|wiring| &wiring.state),
+        Some(&State::Drifted)
+    );
+    assert!(breakage(wirings.first()).is_none());
+}
+
+#[tokio::test]
+async fn a_drift_the_test_does_not_cover_stays_informational() {
+    // The service tested its clients but reported nothing for this one — no verdict is
+    // not a failure, so the drift stays the information it is.
+    let wirings = seed_clients_probed(
+        re_filed_client(),
+        &one_qbittorrent(),
+        Some(vec![probe("999", false, Some("some other client"))]),
+    )
+    .await;
+    assert!(breakage(wirings.first()).is_none());
 }
 
 #[tokio::test]

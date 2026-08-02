@@ -397,6 +397,42 @@ async fn a_rejected_download_client_update_is_refused() {
 }
 
 #[tokio::test]
+async fn testing_download_clients_reads_each_services_verdict() {
+    // `testall` answers one result per client: the valid one is reachable with nothing
+    // to say, the one that failed carries the service's joined words, and one that
+    // failed without words carries none — never an error, since a failing client is
+    // the answer wanted, not a fault.
+    let body = r#"[
+        {"id":1,"isValid":true,"validationFailures":[]},
+        {"id":2,"isValid":false,"validationFailures":[
+            {"errorMessage":"unable to connect"},{"errorMessage":"timed out"}]},
+        {"id":3,"isValid":false,"validationFailures":[]}
+    ]"#;
+    let fake = Fake::new(Answer::Reply(200, body));
+    let probes = sonarr(&fake)
+        .test_download_clients()
+        .await
+        .unwrap_or_default();
+
+    // The test is asked of the service's own `testall`.
+    assert!(fake
+        .request()
+        .is_some_and(|request| request.method == Method::Post
+            && request.url.ends_with("/api/v3/downloadclient/testall")));
+
+    let reachable = probes.iter().find(|probe| probe.id == "1");
+    assert!(reachable.is_some_and(|probe| probe.reachable && probe.detail.is_none()));
+    let refused = probes.iter().find(|probe| probe.id == "2");
+    assert!(refused.is_some_and(|probe| !probe.reachable
+        && probe
+            .detail
+            .as_deref()
+            .is_some_and(|detail| detail == "unable to connect; timed out")));
+    let wordless = probes.iter().find(|probe| probe.id == "3");
+    assert!(wordless.is_some_and(|probe| !probe.reachable && probe.detail.is_none()));
+}
+
+#[tokio::test]
 async fn a_rejected_root_folder_registration_is_refused() {
     let fake = Fake::new(Answer::Reply(400, "path already used"));
     let folder = RootFolder {

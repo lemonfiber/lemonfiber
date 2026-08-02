@@ -183,6 +183,17 @@ pub(super) fn recorded_qbittorrent_password(ctx: &Ctx) -> Option<String> {
     recorded_secret(ctx, crate::config::QBITTORRENT_PASSWORD_KEY)
 }
 
+/// The operator's data root on the host, as the environment file records it — the
+/// directory the stack's `/data` mount resolves to. Read so a service's root folder,
+/// a path inside that mount, can be checked against the filesystem it actually files
+/// into: a folder resolving to nothing on the host is a root folder that breaks the
+/// stack. Nothing where no environment file names a data root.
+pub(super) fn data_root(ctx: &Ctx) -> Option<std::path::PathBuf> {
+    let path = ctx.settings.env_file.as_deref()?;
+    let file = store::read(path).unwrap_or_default();
+    crate::config::data_root_from_env(&file)
+}
+
 /// The household's Jellyfin as a reading client, for the last stage of a trace —
 /// whether the item is finally in the library. Present only where the stack has a
 /// Jellyfin and lemonfiber recorded the admin password it minted for it: the read signs

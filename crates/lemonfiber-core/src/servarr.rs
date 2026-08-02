@@ -24,7 +24,7 @@ use serde::Deserialize;
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
-    Client, ClientKind, Credential, DownloadClient, Failure, Identity, QueueDepth,
+    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity, QueueDepth,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 
@@ -168,6 +168,22 @@ impl Client for Servarr {
             ))
             .await?;
         self.endpoint.expect_success(&response)
+    }
+
+    async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
+        // Servarr tests every configured client at once with a POST to `testall`,
+        // answering with one result per client: its id and whether it validated,
+        // with the failure messages where it did not. A client that failed the test
+        // is not an error — it is the very answer wanted — so only a service that
+        // will not run the test at all is a `Failure`.
+        let response = self
+            .probe(&self.request(Method::Post, "/downloadclient/testall", None))
+            .await?;
+        let results: Vec<TestResource> = self.endpoint.decode(
+            &response,
+            "the download-client test results could not be read",
+        )?;
+        Ok(results.into_iter().map(TestResource::probe).collect())
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
@@ -352,6 +368,51 @@ impl ClientResource {
 struct FolderResource {
     id: i64,
     path: String,
+}
+
+/// One entry in a `testall` response: the id of the client tested, whether it
+/// validated, and — where it did not — the failure messages the service gave.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestResource {
+    id: i64,
+    is_valid: bool,
+    #[serde(default)]
+    validation_failures: Vec<TestFailure>,
+}
+
+/// One failure in a test result — the service's own words for why a client did
+/// not answer, joined into the reason a warning names.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestFailure {
+    #[serde(default)]
+    error_message: String,
+}
+
+impl TestResource {
+    /// The test result as a [`ClientProbe`]: reachable where it validated, and — where
+    /// it did not — the joined failure messages as the detail, or nothing where the
+    /// service failed it without saying why.
+    fn probe(self) -> ClientProbe {
+        let detail = if self.is_valid {
+            None
+        } else {
+            let joined = self
+                .validation_failures
+                .into_iter()
+                .map(|failure| failure.error_message)
+                .filter(|message| !message.is_empty())
+                .collect::<Vec<_>>()
+                .join("; ");
+            (!joined.is_empty()).then_some(joined)
+        };
+        ClientProbe {
+            id: self.id.to_string(),
+            reachable: self.is_valid,
+            detail,
+        }
+    }
 }
 
 /// The API key a Servarr application wrote to its configuration, if it has

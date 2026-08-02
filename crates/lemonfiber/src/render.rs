@@ -16,7 +16,8 @@ use lemonfiber_core::model::{
     Triggered, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::seed::{
-    Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
+    Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
+    State as SeedState,
 };
 use lemonfiber_core::trace::{Confidence, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
@@ -91,6 +92,23 @@ pub(crate) fn seeding(report: &SeedReport) {
                 println!("      {reason}");
             }
         }
+        // A drift that broke the stack is raised beneath the line it sits on, naming
+        // what broke and the fix — the warning severity a plain drift never carries.
+        if let SeedSeverity::Warning {
+            breakage,
+            remediation,
+        } = &wiring.severity
+        {
+            println!("      ! {breakage}");
+            println!("        → {remediation}");
+        }
+    }
+    let warnings = report.warnings();
+    if !warnings.is_empty() {
+        println!(
+            "\n{} drifted in a way that breaks the stack — see the ! lines above.",
+            warnings.len()
+        );
     }
     let outstanding = report.outstanding();
     let blocked = report.blocked();

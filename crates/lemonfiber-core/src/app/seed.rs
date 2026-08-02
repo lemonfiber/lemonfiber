@@ -59,6 +59,10 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // config, qBittorrent's the password minted or recorded above.
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let sabnzbd_key = read_sabnzbd_key(ctx, &manifest.services, project.as_deref()).await;
+    // The host data root, read once, so each \*arr's root folders can be checked
+    // against the filesystem they file into and a folder pointing nowhere raised as a
+    // warning.
+    let data_root = super::targets::data_root(ctx);
     let arrs = servarr_arrs(&manifest.services, project.as_deref());
     // A root folder one \*arr wants and another does too is contested: two \*arrs
     // on one folder would each rewrite the other's files, so it is refused rather
@@ -95,18 +99,16 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // their sum. Each records what it wrote into its own baseline, read against the
     // loaded snapshot; the records are folded back into one below, and since a
     // field key carries the service, no two \*arrs collide.
-    let seeded = futures_util::future::join_all(arrs.iter().map(|arr| {
-        seed_arr(
-            ctx,
-            arr,
-            &contested,
-            sabnzbd_key.as_deref(),
-            qbittorrent_password.as_deref(),
-            &baseline,
-            adopt,
-        )
-    }))
-    .await;
+    let seeding = ArrSeeding {
+        contested: &contested,
+        sabnzbd_key: sabnzbd_key.as_deref(),
+        qbittorrent_password: qbittorrent_password.as_deref(),
+        data_root: data_root.as_deref(),
+        expected: &baseline,
+        adopt,
+    };
+    let seeded =
+        futures_util::future::join_all(arrs.iter().map(|arr| seed_arr(ctx, arr, &seeding))).await;
     for (arr_wirings, records) in seeded {
         wirings.extend(arr_wirings);
         baseline.merge(&records);
@@ -234,17 +236,33 @@ fn servarr_arrs(services: &[lemonfiber_manifest::Service], project: Option<&Path
 /// `/data/media`. The application's key is read from its configuration; without
 /// it — the application has not finished starting — the folders are skipped for a
 /// re-run rather than failed.
+/// The inputs a seed pass reads once and hands to every \*arr it seeds: the
+/// cross-\*arr contested-root map, the download-client credentials, the host data
+/// root each root folder is checked against, the loaded baseline to compare with, and
+/// whether this is an adopt pass. Grouped so seeding one \*arr takes the pass and the
+/// \*arr rather than a long list that only `arr` varies across.
+struct ArrSeeding<'a> {
+    /// Root-folder paths more than one \*arr wants — refused rather than wired.
+    contested: &'a std::collections::BTreeMap<String, Vec<String>>,
+    /// `SABnzbd`'s API key, where it has written one.
+    sabnzbd_key: Option<&'a str>,
+    /// qBittorrent's web UI password, minted this run or recorded on an earlier one.
+    qbittorrent_password: Option<&'a str>,
+    /// The host directory `/data` resolves to, for the root-folder existence check.
+    data_root: Option<&'a Path>,
+    /// What lemonfiber last recorded — the expected leg of the drift comparison.
+    expected: &'a crate::baseline::Baseline,
+    /// Whether this pass adopts each drifted value as the accepted baseline.
+    adopt: bool,
+}
+
 async fn seed_arr(
     ctx: &Ctx,
     arr: &Arr,
-    contested: &std::collections::BTreeMap<String, Vec<String>>,
-    sabnzbd_key: Option<&str>,
-    qbittorrent_password: Option<&str>,
-    expected: &crate::baseline::Baseline,
-    adopt: bool,
+    seeding: &ArrSeeding<'_>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let wanted = wanted_roots(&arr.media_types);
-    let clients = arr_download_clients(arr, sabnzbd_key, qbittorrent_password);
+    let clients = arr_download_clients(arr, seeding.sabnzbd_key, seeding.qbittorrent_password);
     // What this \*arr writes is recorded in its own baseline, against the loaded
     // snapshot, so several \*arrs can be seeded at once without sharing one; the
     // caller folds them back into one afterwards.
@@ -281,10 +299,21 @@ async fn seed_arr(
         &client,
         &arr.target.name,
         &wanted,
-        contested,
+        seeding.contested,
         DATA_ROOT,
         &mut journal,
         &at,
+    )
+    .await;
+    // Before the download clients are appended, `wirings` holds exactly one entry per
+    // wanted root folder in order, so each is escalated against the folder it reports
+    // on: one the \*arr files into that resolves to nothing on the host is a root
+    // folder pointing where nothing exists — a drift that breaks the stack.
+    escalate_broken_roots(
+        ctx.filesystem.as_ref(),
+        seeding.data_root,
+        &wanted,
+        &mut wirings,
     )
     .await;
     if !clients.is_empty() {
@@ -295,9 +324,9 @@ async fn seed_arr(
                 &clients,
                 &mut journal,
                 &mut crate::seed::Baselines {
-                    expected,
+                    expected: seeding.expected,
                     records: &mut records,
-                    adopt,
+                    adopt: seeding.adopt,
                     reset: false,
                 },
                 &at,
@@ -383,10 +412,10 @@ pub(super) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
                         | crate::seed::Observed::Conflicted
                         | crate::seed::Observed::Adopted
                 ) {
-                    wirings.push(crate::seed::Wiring {
-                        connection: format!("{} into {}", want.name, arr.target.name),
-                        state: crate::seed::State::Drifted,
-                    });
+                    wirings.push(crate::seed::Wiring::settled(
+                        format!("{} into {}", want.name, arr.target.name),
+                        crate::seed::State::Drifted,
+                    ));
                 }
             }
         }
@@ -395,6 +424,52 @@ pub(super) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
         save_baseline(ctx, &records);
     }
     wirings
+}
+
+/// Raise each wired root folder the host cannot back to a warning.
+///
+/// A root folder the \*arr files into must resolve to a directory on the host, where
+/// the container's `/data` mount is rooted. One that resolves to nothing — the
+/// operator repointed the data root, or the media directory was never created — is a
+/// root folder pointing where nothing exists: the \*arr imports into a void. That
+/// breaks the stack, so the folder's wiring is raised from information to a warning
+/// naming the missing path and how to fix it.
+///
+/// Only folders the \*arr actually holds are checked — the wired and the
+/// already-wired. A skipped or refused folder is not one the \*arr files into, so a
+/// missing path there is not yet a break. Nothing is checked where no data root is
+/// known, since without it the host path cannot be resolved to confirm or deny.
+async fn escalate_broken_roots(
+    filesystem: &dyn crate::ports::filesystem::FileSystem,
+    data_root: Option<&Path>,
+    wanted: &[crate::ports::service::RootFolder],
+    wirings: &mut [crate::seed::Wiring],
+) {
+    let Some(data_root) = data_root else {
+        return;
+    };
+    for (folder, wiring) in wanted.iter().zip(wirings.iter_mut()) {
+        if !matches!(
+            wiring.state,
+            crate::seed::State::Wired | crate::seed::State::AlreadyWired
+        ) {
+            continue;
+        }
+        // The host directory backing the container path — the `media/<type>` layout
+        // `wanted_roots` builds, resolved against the operator's data root. A path that
+        // does not resolve is one nothing is there to answer for.
+        let host = data_root.join("media").join(&folder.media_type);
+        if filesystem.canonicalize(&host).await.is_err() {
+            wiring.escalate(
+                format!(
+                    "the root folder points where nothing exists: {}",
+                    host.display()
+                ),
+                "create the directory, or point the folder at a path under the data root"
+                    .to_owned(),
+            );
+        }
+    }
 }
 
 /// The download clients an \*arr registers — one per credential in hand — under the
@@ -687,12 +762,12 @@ fn application_kind(media_types: &[String]) -> Option<crate::ports::service::App
 /// the same across root folders, download clients and application sync; the
 /// `connection` names the specific edge being skipped.
 fn skipped(connection: String, service: &str) -> crate::seed::Wiring {
-    crate::seed::Wiring {
+    crate::seed::Wiring::settled(
         connection,
-        state: crate::seed::State::Skipped {
+        crate::seed::State::Skipped {
             reason: format!("{service} has not written its API key yet; a later run completes it"),
         },
-    }
+    )
 }
 
 /// An application skipped for a re-run because Prowlarr's key is not written yet.
@@ -786,12 +861,12 @@ async fn seed_qbittorrent_password(
     let connection = "qBittorrent web UI password".to_owned();
 
     let Some(temporary) = read_temporary_password(ctx, id).await else {
-        let wiring = crate::seed::Wiring {
+        let wiring = crate::seed::Wiring::settled(
             connection,
-            state: crate::seed::State::Skipped {
+            crate::seed::State::Skipped {
                 reason: "qBittorrent has not announced a temporary password yet; a later run completes it".to_owned(),
             },
-        };
+        );
         return (wiring, None);
     };
 
@@ -843,8 +918,8 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        application_kind, category_for, download_clients, prowlarr_source, read_sabnzbd_key,
-        sabnzbd_config_path, servarr_arrs, syncable_arrs,
+        application_kind, category_for, download_clients, escalate_broken_roots, prowlarr_source,
+        read_sabnzbd_key, sabnzbd_config_path, servarr_arrs, syncable_arrs,
     };
     use crate::app::targets::{project_directory, recorded_qbittorrent_password, servarr_targets};
     use crate::app::{dispatch, Command, Ctx, Outcome};
@@ -852,6 +927,8 @@ mod tests {
     use crate::model::VersionReport;
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
+    use crate::ports::service::RootFolder;
+    use crate::seed::{Severity, State, Wiring};
     use crate::stack::Source;
     use crate::test_support::{
         spoke, stack, FixedRandom, Reporting, RoutedHttp, Scripted, ScriptedHttp, SeedFs,
@@ -1210,6 +1287,105 @@ mod tests {
             "the recorded value and its timestamp survive both passes unchanged: {read_back}"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A wanted root folder for a media type — the container path `wanted_roots` builds.
+    fn root(media: &str) -> RootFolder {
+        RootFolder {
+            path: format!("/data/media/{media}"),
+            media_type: media.to_owned(),
+        }
+    }
+
+    /// The breakage the first wiring's warning names, or nothing where it is
+    /// informational or absent — the one severity reader, so both arms are exercised
+    /// across the escalation tests rather than left dead in either.
+    fn broken(wirings: &[Wiring]) -> Option<String> {
+        match wirings.first().map(|wiring| &wiring.severity) {
+            Some(Severity::Warning { breakage, .. }) => Some(breakage.clone()),
+            Some(Severity::Informational) | None => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_wired_root_folder_the_host_cannot_back_is_a_warning() {
+        // The *arr files into `/data/media/tv`, but the host directory it resolves to
+        // is not there — the operator repointed the data root, or the media directory
+        // was never made. The *arr imports into a void, so the folder is raised to a
+        // warning naming the missing path.
+        let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+        let wanted = [root("tv")];
+        let mut wirings = vec![Wiring::settled(
+            "tv root folder in Sonarr".to_owned(),
+            State::Wired,
+        )];
+        escalate_broken_roots(
+            &filesystem,
+            Some(std::path::Path::new("/srv/media")),
+            &wanted,
+            &mut wirings,
+        )
+        .await;
+        assert!(
+            broken(&wirings).is_some_and(|breakage| breakage.contains("media/tv")),
+            "the warning names the path that resolves to nothing"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_wired_root_folder_backed_on_disk_stays_informational() {
+        // The host directory is there, so the folder files where it should — nothing is
+        // broken, and it stays the settled connection it is.
+        let filesystem = SeedFs::keyed(None, None);
+        let wanted = [root("tv")];
+        let mut wirings = vec![Wiring::settled(
+            "tv root folder in Sonarr".to_owned(),
+            State::AlreadyWired,
+        )];
+        escalate_broken_roots(
+            &filesystem,
+            Some(std::path::Path::new("/srv/media")),
+            &wanted,
+            &mut wirings,
+        )
+        .await;
+        assert!(broken(&wirings).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_root_folder_check_without_a_data_root_escalates_nothing() {
+        // Without a data root the host path cannot be resolved, so nothing can be
+        // confirmed or denied — the check escalates nothing rather than guessing.
+        let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+        let wanted = [root("tv")];
+        let mut wirings = vec![Wiring::settled(
+            "tv root folder in Sonarr".to_owned(),
+            State::Wired,
+        )];
+        escalate_broken_roots(&filesystem, None, &wanted, &mut wirings).await;
+        assert!(broken(&wirings).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_root_folder_not_wired_is_not_warned_even_where_the_path_is_missing() {
+        // A skipped folder is not one the *arr files into, so a missing path there is
+        // not yet a break — only the folders the *arr actually holds are checked.
+        let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+        let wanted = [root("tv")];
+        let mut wirings = vec![Wiring::settled(
+            "tv root folder in Sonarr".to_owned(),
+            State::Skipped {
+                reason: "later".to_owned(),
+            },
+        )];
+        escalate_broken_roots(
+            &filesystem,
+            Some(std::path::Path::new("/srv/media")),
+            &wanted,
+            &mut wirings,
+        )
+        .await;
+        assert!(broken(&wirings).is_none());
     }
 
     #[tokio::test]

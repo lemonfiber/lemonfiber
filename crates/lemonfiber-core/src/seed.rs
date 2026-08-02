@@ -268,6 +268,39 @@ impl State {
     }
 }
 
+/// How serious a reported connection is.
+///
+/// Drift is normal and usually the operator's own harmless edit, so it is reported
+/// as information rather than a failure. It escalates to a warning only when the
+/// drift breaks the stack — a root folder pointing where nothing exists, a download
+/// client that no longer answers — and a warning that cannot be acted on is noise,
+/// so a warning always names both what broke and what to do about it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(tag = "severity", rename_all = "kebab-case")]
+pub enum Severity {
+    /// Nothing is broken: the connection is settled, or its drift is the operator's
+    /// own edit that still works.
+    #[default]
+    Informational,
+    /// The connection breaks the stack. Both the breakage and a remediation are
+    /// named, because a warning the operator cannot act on is noise.
+    Warning {
+        /// What is broken, in the operator's terms.
+        breakage: String,
+        /// What to do about it.
+        remediation: String,
+    },
+}
+
+impl Severity {
+    /// Whether this is a warning — a drift that broke something, not the ordinary
+    /// informational kind.
+    #[must_use]
+    pub const fn is_warning(&self) -> bool {
+        matches!(self, Self::Warning { .. })
+    }
+}
+
 /// One connection, and how it turned out.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Wiring {
@@ -275,6 +308,31 @@ pub struct Wiring {
     pub connection: String,
     /// How it turned out.
     pub state: State,
+    /// How serious the outcome is — information by default, a warning where the
+    /// connection breaks the stack.
+    pub severity: Severity,
+}
+
+impl Wiring {
+    /// A connection reported at the ordinary, informational severity — the common
+    /// case, and the shape every wiring starts as before anything escalates it.
+    #[must_use]
+    pub fn settled(connection: String, state: State) -> Self {
+        Self {
+            connection,
+            state,
+            severity: Severity::Informational,
+        }
+    }
+
+    /// Escalate this connection to a warning, naming what broke and how to fix it.
+    /// Applied to a drift a later check found to break the stack.
+    pub fn escalate(&mut self, breakage: String, remediation: String) {
+        self.severity = Severity::Warning {
+            breakage,
+            remediation,
+        };
+    }
 }
 
 /// Whether a pass could assess drift — whether it had the record of what lemonfiber
@@ -332,6 +390,18 @@ impl Report {
                     State::Refused { .. } | State::Conflicted { .. }
                 )
             })
+            .collect()
+    }
+
+    /// The connections a drift broke — reported at warning severity, each naming
+    /// what broke and its remediation. Drawn out on their own so a surface can raise
+    /// the ones the operator must act on above the ordinary informational drift the
+    /// rest of the report carries.
+    #[must_use]
+    pub fn warnings(&self) -> Vec<&Wiring> {
+        self.wirings
+            .iter()
+            .filter(|wiring| wiring.severity.is_warning())
             .collect()
     }
 }
@@ -400,10 +470,7 @@ pub async fn wire_root_folders(
             )
             .await
         };
-        wirings.push(Wiring {
-            connection: describe(service, folder),
-            state,
-        });
+        wirings.push(Wiring::settled(describe(service, folder), state));
     }
     wirings
 }
@@ -517,6 +584,11 @@ pub async fn wire_download_clients(
     };
 
     let mut wirings = Vec::new();
+    // The id of the service's client behind each drifted wiring, parallel to
+    // `wirings` — `None` where the wiring is not a drift. Kept alongside so a drift
+    // the service can no longer reach can be raised from information to a warning
+    // once the loop has decided every state, without a second three-way pass.
+    let mut drifted_ids: Vec<Option<String>> = Vec::new();
     for want in wanted {
         // What lemonfiber last recorded here, if anything — value and whether it was
         // written or adopted — the expected leg of the three-way comparison, read from
@@ -625,12 +697,58 @@ pub async fn wire_download_clients(
                 baselines.records.adopt(service, &field, value, at);
             }
         }
-        wirings.push(Wiring {
-            connection: describe_client(service, want),
-            state,
-        });
+        // A drift is the operator's edit, so it carries the id of the client it sits
+        // on — the one to ask the service about below. Every other state carries none.
+        let drifted_id = if matches!(state, State::Drifted) {
+            have.map(|have| have.id.clone())
+        } else {
+            None
+        };
+        wirings.push(Wiring::settled(describe_client(service, want), state));
+        drifted_ids.push(drifted_id);
     }
+    escalate_unreachable(client, &mut wirings, &drifted_ids).await;
     wirings
+}
+
+/// Raise each drifted download client the service can no longer reach from
+/// information to a warning.
+///
+/// A drift is the operator's own edit and reported as information; but a drifted
+/// client the service's own test finds unreachable has broken the stack — nothing
+/// downloads through it — so it is raised with the failure named and a remediation
+/// offered. The service is asked to test its clients only when a drift was found,
+/// and a service that will not run the test at all leaves the drifts as the
+/// information they already are, since nothing was proven broken.
+async fn escalate_unreachable(
+    client: &dyn Client,
+    wirings: &mut [Wiring],
+    drifted_ids: &[Option<String>],
+) {
+    let wanted: Vec<&String> = drifted_ids.iter().flatten().collect();
+    if wanted.is_empty() {
+        return;
+    }
+    let Ok(probes) = client.test_download_clients().await else {
+        return;
+    };
+    for (wiring, drifted_id) in wirings.iter_mut().zip(drifted_ids) {
+        let Some(id) = drifted_id else { continue };
+        let Some(probe) = probes.iter().find(|probe| &probe.id == id) else {
+            continue;
+        };
+        if probe.reachable {
+            continue;
+        }
+        let detail = probe
+            .detail
+            .clone()
+            .unwrap_or_else(|| "the service could not reach it".to_owned());
+        wiring.escalate(
+            format!("the download client is unreachable: {detail}"),
+            "check the client is running and reachable at the address the service uses".to_owned(),
+        );
+    }
 }
 
 /// What a seed pass observes about a wanted client against the one the service
@@ -743,10 +861,10 @@ pub async fn wire_applications(
             )
             .await
         };
-        wirings.push(Wiring {
-            connection: describe_application(service, application),
+        wirings.push(Wiring::settled(
+            describe_application(service, application),
             state,
-        });
+        ));
     }
     wirings
 }
@@ -784,31 +902,19 @@ pub async fn wire_qbittorrent_password(
     let connection = "qBittorrent web UI password".to_owned();
     let Some(password) = secret::generate(random) else {
         return (
-            Wiring {
+            Wiring::settled(
                 connection,
-                state: State::Failed {
+                State::Failed {
                     detail: "no randomness was available to generate a password".to_owned(),
                 },
-            },
+            ),
             None,
         );
     };
 
     match client.replace_password(temporary, &password).await {
-        Ok(()) => (
-            Wiring {
-                connection,
-                state: State::Wired,
-            },
-            Some(password),
-        ),
-        Err(failure) => (
-            Wiring {
-                connection,
-                state: unreached(&failure),
-            },
-            None,
-        ),
+        Ok(()) => (Wiring::settled(connection, State::Wired), Some(password)),
+        Err(failure) => (Wiring::settled(connection, unreached(&failure)), None),
     }
 }
 
@@ -834,10 +940,10 @@ pub async fn wire_jellyfin_identity(
     let connection = "Jellyfin as Seerr's identity".to_owned();
     let (password, minted) = match jellyfin_admin(jellyfin, random, recorded_password).await {
         Ok(pair) => pair,
-        Err(state) => return (Wiring { connection, state }, None),
+        Err(state) => return (Wiring::settled(connection, state), None),
     };
     let state = configure_seerr(seerr, &password, server_url).await;
-    (Wiring { connection, state }, minted)
+    (Wiring::settled(connection, state), minted)
 }
 
 /// The Jellyfin admin credential, and the password to record if it was newly
@@ -931,10 +1037,7 @@ fn observe_or_skip<T, W>(
         let state = unreached(&failure);
         wanted
             .iter()
-            .map(|want| Wiring {
-                connection: describe(want),
-                state: state.clone(),
-            })
+            .map(|want| Wiring::settled(describe(want), state.clone()))
             .collect()
     })
 }
