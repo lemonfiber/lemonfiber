@@ -17,7 +17,7 @@ use lemonfiber_core::ports::service::{
     RegisteredFolder, Requests, RootFolder,
 };
 use lemonfiber_core::seed::{
-    contested_roots, intent, reconcile, wire_applications, wire_download_clients,
+    contested_roots, intent, reconcile, wholesale_drift, wire_applications, wire_download_clients,
     wire_jellyfin_identity, wire_root_folders, Assessment, Baselines, Intent, Observed, Report,
     Severity, State, Wiring,
 };
@@ -1248,6 +1248,58 @@ async fn a_drift_the_test_does_not_cover_stays_informational() {
     )
     .await;
     assert!(breakage(wirings.first()).is_none());
+}
+
+/// A client the service holds under a category, for the wholesale-drift checks.
+fn holding(id: &str, host: &str, port: u16, category: &str) -> RegisteredClient {
+    RegisteredClient {
+        id: id.to_owned(),
+        host: host.to_owned(),
+        port,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: category.to_owned(),
+        }),
+    }
+}
+
+#[test]
+fn every_client_drifted_at_once_reads_as_wholesale() {
+    // lemonfiber recorded "tv"; the one client the service holds now reads "shows".
+    // With every managed value moved together, this is a schema change, not the
+    // operator editing each by hand.
+    let existing = vec![holding("1", "qbittorrent", 8080, "shows")];
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
+    let wanted = [client("qBittorrent", "qbittorrent", 8080)];
+    assert!(wholesale_drift(&existing, &wanted, &expected, "sonarr"));
+}
+
+#[test]
+fn one_client_still_at_lemonfibers_value_is_not_wholesale() {
+    // Two clients the service holds: one drifted, one still at lemonfiber's value. Not
+    // every managed value moved, so it is the operator's edits — reported as drift, not
+    // re-baselined.
+    let existing = vec![
+        holding("1", "qbittorrent", 8080, "shows"),
+        holding("2", "sabnzbd", 8080, "tv"),
+    ];
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let wanted = [
+        client("qBittorrent", "qbittorrent", 8080),
+        client("SABnzbd", "sabnzbd", 8080),
+    ];
+    assert!(!wholesale_drift(&existing, &wanted, &expected, "sonarr"));
+}
+
+#[test]
+fn a_service_holding_none_of_the_wanted_clients_is_not_wholesale() {
+    // Nothing present drifted, so there is no wholesale drift to read — a client not
+    // there yet does not, on its own, stand in for a schema change.
+    let wanted = [client("qBittorrent", "qbittorrent", 8080)];
+    assert!(!wholesale_drift(&[], &wanted, &Baseline::new(), "sonarr"));
 }
 
 #[tokio::test]

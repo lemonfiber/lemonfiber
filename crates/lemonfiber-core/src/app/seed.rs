@@ -295,6 +295,38 @@ async fn seed_arr(
     // — see the seed module doc.
     let at = seed_stamp(ctx);
     let mut journal = crate::journal::Journal::new();
+
+    // A schema change re-baselines rather than reporting mass drift. The service's own
+    // version, read from its status, is compared with the one lemonfiber last recorded:
+    // a change, taken with every download client drifted at once, is a service that
+    // renamed its fields on upgrade — not the operator hand-editing each — so the
+    // current shape is adopted as the new baseline instead of every field reported as
+    // drift. A version change alone, with only some fields drifted, is left as the
+    // genuine operator edits it is. The live version is recorded either way, so the
+    // next run compares against what the service is now on.
+    let live_version = client
+        .identity()
+        .await
+        .ok()
+        .map(|identity| identity.version);
+    let version_changed = match (
+        &live_version,
+        seeding
+            .expected
+            .expected(&arr.target.name, SCHEMA_VERSION_FIELD),
+    ) {
+        (Some(live), Some(recorded)) => live != recorded,
+        _ => false,
+    };
+    let re_baseline = version_changed
+        && !clients.is_empty()
+        && client.download_clients().await.is_ok_and(|existing| {
+            crate::seed::wholesale_drift(&existing, &clients, seeding.expected, &arr.target.name)
+        });
+    if let Some(live) = &live_version {
+        records.record(&arr.target.name, SCHEMA_VERSION_FIELD, live, &at);
+    }
+
     let mut wirings = crate::seed::wire_root_folders(
         &client,
         &arr.target.name,
@@ -326,7 +358,7 @@ async fn seed_arr(
                 &mut crate::seed::Baselines {
                     expected: seeding.expected,
                     records: &mut records,
-                    adopt: seeding.adopt,
+                    adopt: seeding.adopt || re_baseline,
                     reset: false,
                 },
                 &at,
@@ -490,6 +522,13 @@ fn arr_download_clients(
 /// root folder must sit within, so the service files where the downloads are
 /// hardlinked and the rest of the stack can see them.
 const DATA_ROOT: &str = "/data";
+
+/// The baseline field a service's own version is recorded under — a reserved key
+/// that cannot collide with a download client's (keyed by endpoint) or any other
+/// managed value, so the version rides in the same per-service record without a
+/// separate store. Read on a later run to tell a service that upgraded its schema
+/// from one still on the version lemonfiber last saw.
+const SCHEMA_VERSION_FIELD: &str = "schema:version";
 
 /// The root folders an \*arr wants, one per media type it manages, each under the
 /// media directory of the mounted data root. Shared by the seed pass and the
@@ -1440,6 +1479,273 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// The Servarr routing, but answering `system/status` with a set version and
+    /// holding each download client under a drifted category — so a schema change
+    /// (version bumped, every client moved) can be driven end to end.
+    struct VersionedRoutedHttp {
+        version: &'static str,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::ports::http::Http for VersionedRoutedHttp {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            let body = if request.url.contains("system/status") {
+                format!(r#"{{"appName":"Sonarr","version":"{}"}}"#, self.version)
+            } else if request.url.contains("/downloadclient/testall") {
+                "[]".to_owned()
+            } else if request.url.contains("/downloadclient") {
+                r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080},{"name":"tvCategory","value":"shows"}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#.to_owned()
+            } else {
+                return RoutedHttp.send(request).await;
+            };
+            Ok(crate::ports::http::Response { status: 200, body })
+        }
+    }
+
+    /// A context seeding the real stack over the given transport, with a
+    /// qBittorrent password recorded and the given baseline written beside it.
+    fn schema_ctx(dir: &std::path::Path, baseline: &str, http: VersionedRoutedHttp) -> Ctx {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let _ = std::fs::create_dir_all(dir);
+        let env = dir.join(".env");
+        let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
+        let _ = crate::config::store::write(&dir.join("baseline.json"), baseline);
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::absent()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            Settings {
+                env_file: Some(env),
+                ..Settings::default()
+            },
+            Environment::MacOs,
+        )
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_http(Arc::new(http))
+    }
+
+    /// The state of the `qBittorrent into Sonarr` wiring in a seed report.
+    fn qbittorrent_into_sonarr(report: &crate::seed::Report) -> Option<&crate::seed::State> {
+        report
+            .wirings
+            .iter()
+            .find(|wiring| wiring.connection == "qBittorrent into Sonarr")
+            .map(|wiring| &wiring.state)
+    }
+
+    #[tokio::test]
+    async fn a_schema_change_re_baselines_rather_than_reporting_mass_drift() {
+        // Sonarr moved from version 4 to 5, and its one managed download client now
+        // reads a different category — every managed value moved at once. That is the
+        // upgrade renaming fields, not the operator editing each, so the current shape
+        // is adopted as the new baseline and the wiring reads adopted, not drifted.
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-schema-adopt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"4","at":"1"},"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#;
+        let ctx = schema_ctx(&dir, baseline, VersionedRoutedHttp { version: "5" });
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        assert_eq!(
+            qbittorrent_into_sonarr(&report),
+            Some(&crate::seed::State::Adopted),
+            "a schema change adopts the current shape rather than reporting drift"
+        );
+        // The new version is recorded, so the next run compares against it.
+        let saved = std::fs::read_to_string(dir.join("baseline.json")).unwrap_or_default();
+        assert!(
+            saved.contains(r#""schema:version""#) && saved.contains(r#""value":"5""#),
+            "the service's new version is recorded: {saved}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_version_change_with_only_some_drift_is_left_as_the_operators_edits() {
+        // The version changed, but Sonarr never recorded this client — so it reads as
+        // the operator's own, unmanaged, not as drift. Not every managed value moved,
+        // so it is not a schema change: it is left as it is rather than re-baselined.
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-schema-partial-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"4","at":"1"}}}}"#;
+        let ctx = schema_ctx(&dir, baseline, VersionedRoutedHttp { version: "5" });
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        assert_eq!(
+            qbittorrent_into_sonarr(&report),
+            Some(&crate::seed::State::Unmanaged),
+            "a version change alone does not re-baseline a value that did not wholesale-drift"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn an_unchanged_version_leaves_a_drift_as_the_drift_it_is() {
+        // Sonarr is on the version lemonfiber last recorded, so nothing upgraded — the
+        // client that differs is the operator's edit, reported as drift and preserved,
+        // not re-baselined.
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-schema-same-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"5","at":"1"},"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#;
+        let ctx = schema_ctx(&dir, baseline, VersionedRoutedHttp { version: "5" });
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+        assert_eq!(
+            qbittorrent_into_sonarr(&report),
+            Some(&crate::seed::State::Drifted),
+            "an unchanged version leaves a drift as drift"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A transport whose download-client list is set per test — a body to return, or
+    /// nothing to fail the read — with every other call answered plainly. For the
+    /// reset-connection edge cases, where what the service holds decides the preview.
+    struct ClientsHttp {
+        clients: Option<&'static str>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::ports::http::Http for ClientsHttp {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            if request.url.contains("/downloadclient") {
+                return match self.clients {
+                    Some(body) => Ok(crate::ports::http::Response {
+                        status: 200,
+                        body: body.to_owned(),
+                    }),
+                    None => Err(crate::ports::http::Unreachable {
+                        url: request.url.clone(),
+                        reason: "the list could not be read".to_owned(),
+                    }),
+                };
+            }
+            Ok(crate::ports::http::Response {
+                status: 200,
+                body: "Ok.".to_owned(),
+            })
+        }
+    }
+
+    /// A context for the reset-connection edge cases: the real stack, a recorded
+    /// qBittorrent password so a client is wanted, keys per `filesystem`, over `http`.
+    fn reset_ctx(
+        dir: &std::path::Path,
+        filesystem: Arc<SeedFs>,
+        http: Arc<dyn crate::ports::http::Http>,
+    ) -> Ctx {
+        let _ = std::fs::create_dir_all(dir);
+        let env = dir.join(".env");
+        let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::absent()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            Settings {
+                env_file: Some(env),
+                ..Settings::default()
+            },
+            Environment::MacOs,
+        )
+        .with_filesystem(filesystem)
+        .with_http(http)
+    }
+
+    #[tokio::test]
+    async fn a_reset_skips_an_arr_that_has_not_written_its_key() {
+        // A client is wanted, but the \*arr's key is not readable — it has not finished
+        // starting — so there is nothing to open and it is passed over rather than reset.
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-reset-noopen-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let ctx = reset_ctx(
+            &dir,
+            Arc::new(SeedFs::keyed(None, None)),
+            Arc::new(RoutedHttp),
+        );
+        assert!(super::reset_connections(&ctx, false).await.is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_reset_preview_passes_over_a_client_the_service_does_not_hold() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        // The service holds none of the wanted clients, so there is nothing whose drift
+        // to preview — each wanted one is passed over rather than reported.
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-reset-absent-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let ctx = reset_ctx(
+            &dir,
+            Arc::new(SeedFs::keyed(Some(KEYED), None)),
+            Arc::new(ClientsHttp {
+                clients: Some("[]"),
+            }),
+        );
+        assert!(super::reset_connections(&ctx, false).await.is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_reset_preview_names_a_client_whose_category_the_operator_changed() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        // The service holds the wanted client under a category the operator changed from
+        // lemonfiber's recorded one — a drift the preview names as one a reset would
+        // revert, reading the category the service now holds to judge it.
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-reset-drift-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let held = r#"[{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#;
+        let ctx = reset_ctx(
+            &dir,
+            Arc::new(SeedFs::keyed(Some(KEYED), None)),
+            Arc::new(ClientsHttp {
+                clients: Some(held),
+            }),
+        );
+        let _ = crate::config::store::write(
+            &dir.join("baseline.json"),
+            r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
+        );
+        let preview = super::reset_connections(&ctx, false).await;
+        assert!(
+            preview
+                .iter()
+                .any(|wiring| wiring.connection.contains("into Sonarr")),
+            "a category the operator changed is previewed as a revert"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_reset_preview_reads_nothing_where_the_client_list_cannot_be_read() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        // The service will not answer its client list, so the preview has nothing to
+        // compare against and reports nothing rather than guessing.
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-reset-unread-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let ctx = reset_ctx(
+            &dir,
+            Arc::new(SeedFs::keyed(Some(KEYED), None)),
+            Arc::new(ClientsHttp { clients: None }),
+        );
+        assert!(super::reset_connections(&ctx, false).await.is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[tokio::test]
     async fn a_lost_baseline_is_reported_and_left_for_a_deliberate_re_baseline() {
         // The record is there but does not parse — lost. An ordinary seed cannot judge
@@ -1572,14 +1878,16 @@ mod tests {
 
     #[tokio::test]
     async fn seed_wires_each_arrs_root_folders() {
-        // Each application already holds the folders, so each is left as wired.
-        // qBittorrent announces no password, so the only calls are the arrs'.
+        // Each application already holds the folders, so each is left as wired. Each
+        // \*arr also reads its version for the schema check first; that read decodes a
+        // folder list as no status, so a spare reply per \*arr covers it and the
+        // version is simply not learned — the folders are what this test reads.
         const FOLDERS: &str = r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#;
         const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
         let ctx = seed_ctx(
             None,
             true,
-            vec![(200, FOLDERS), (200, FOLDERS), (200, FOLDERS)],
+            vec![(200, FOLDERS); 6],
             Some(vec![0x11; 24]),
             None,
         )

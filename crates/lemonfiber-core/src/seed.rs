@@ -751,6 +751,36 @@ async fn escalate_unreachable(
     }
 }
 
+/// Whether every download client the service holds for the wanted set reads as
+/// drift at once.
+///
+/// One drift is the operator's edit; every managed value of a service drifting
+/// together is the shape of a schema change — a service upgrade renamed the fields
+/// under lemonfiber, so what it wrote no longer matches where it reads, not the
+/// operator hand-editing each. Taken with a version change, this is the sign to
+/// re-baseline rather than report mass drift. False where the service holds none of
+/// the wanted clients, since nothing drifted; only the ones actually present are
+/// judged, so a client not there yet is not counted as un-drifted and does not veto
+/// the re-baseline.
+#[must_use]
+pub fn wholesale_drift(
+    existing: &[RegisteredClient],
+    wanted: &[DownloadClient],
+    expected: &Baseline,
+    service: &str,
+) -> bool {
+    let present: Vec<&DownloadClient> = wanted
+        .iter()
+        .filter(|want| existing.iter().any(|have| same_endpoint(have, want)))
+        .collect();
+    !present.is_empty()
+        && present.iter().all(|want| {
+            let have = existing.iter().find(|have| same_endpoint(have, want));
+            let base = expected.entry(service, &client_field(want));
+            matches!(observe_client(have, want, base), Observed::Drifted)
+        })
+}
+
 /// What a seed pass observes about a wanted client against the one the service
 /// holds at its endpoint (`have`, `None` where it holds none) and what lemonfiber
 /// last recorded: absent, or the three-way outcome of comparing the service's
