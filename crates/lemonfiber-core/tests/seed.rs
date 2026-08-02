@@ -302,6 +302,9 @@ enum Mode {
     /// Reachable, but does not serve the API version this build speaks — the
     /// listing fails as unsupported, a conflict a re-run cannot lift.
     Unsupported,
+    /// Lists fine, but refuses an in-place update — the failure a reset's revert meets
+    /// when the service will not take lemonfiber's category back.
+    RefusesUpdate,
 }
 
 /// A service that answers the seed driver from a script.
@@ -387,17 +390,21 @@ impl Client for FakeService {
         id: &str,
         client: &DownloadClient,
     ) -> Result<(), Failure> {
-        match self.mode {
-            Mode::Down => Err(down("sonarr")),
-            _ => {
-                if let Ok(mut clients) = self.clients.lock() {
-                    if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
-                        existing.category = Some(client.category.clone());
-                    }
-                }
-                Ok(())
+        if matches!(self.mode, Mode::Down) {
+            return Err(down("sonarr"));
+        }
+        if matches!(self.mode, Mode::RefusesUpdate) {
+            return Err(Failure::Refused {
+                service: "sonarr".to_owned(),
+                detail: "HTTP 400: cannot update".to_owned(),
+            });
+        }
+        if let Ok(mut clients) = self.clients.lock() {
+            if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
+                existing.category = Some(client.category.clone());
             }
         }
+        Ok(())
     }
 
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
@@ -910,6 +917,7 @@ async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<S
             expected: &expected,
             records: &mut records,
             adopt: false,
+            reset: false,
         },
         "t",
     )
@@ -937,6 +945,7 @@ async fn seed_clients_recording(
             expected: &expected,
             records: &mut records,
             adopt: false,
+            reset: false,
         },
         "t",
     )
@@ -1011,6 +1020,7 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
             expected: &expected,
             records: &mut records,
             adopt: false,
+            reset: false,
         },
         "2",
     )
@@ -1097,6 +1107,7 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
             expected: &expected,
             records: &mut records,
             adopt: false,
+            reset: false,
         },
         "2",
     )
@@ -1109,6 +1120,96 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
     assert_eq!(
         baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
         None,
+    );
+}
+
+#[tokio::test]
+async fn a_reset_reverts_a_drifted_category_to_lemonfibers() {
+    // The same drift as above — the operator changed the category — but a reset writes
+    // lemonfiber's own back over it: the client is updated in place, the connection reads
+    // wired again, and the reverted value is recorded so the drift is gone.
+    let service = FakeService::with_clients(
+        Mode::Normal,
+        vec![RegisteredClient {
+            id: "1".to_owned(),
+            host: "sabnzbd".to_owned(),
+            port: 8080,
+            category: Some(Category {
+                field: "tvCategory".to_owned(),
+                value: "my-own-tv".to_owned(),
+            }),
+        }],
+    );
+    let mut journal = Journal::new();
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let mut records = Baseline::new();
+    let states: Vec<State> = wire_download_clients(
+        &service,
+        "sonarr",
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &mut journal,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+            reset: true,
+        },
+        "2",
+    )
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect();
+    assert_eq!(states, vec![State::Wired], "the drift is reverted to wired");
+    // lemonfiber's value is recorded, so a later run reads no drift.
+    assert_eq!(
+        records.expected("sonarr", "downloadclient:sabnzbd:8080"),
+        Some("tv"),
+    );
+}
+
+#[tokio::test]
+async fn a_reset_a_service_refuses_is_reported_as_failed_not_recorded() {
+    // A reset whose in-place update the service will not take leaves the drift reported
+    // as a failure rather than falsely recorded as reverted.
+    let service = FakeService::with_clients(
+        Mode::RefusesUpdate,
+        vec![RegisteredClient {
+            id: "1".to_owned(),
+            host: "sabnzbd".to_owned(),
+            port: 8080,
+            category: Some(Category {
+                field: "tvCategory".to_owned(),
+                value: "my-own-tv".to_owned(),
+            }),
+        }],
+    );
+    let mut journal = Journal::new();
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    let mut records = Baseline::new();
+    let wirings = wire_download_clients(
+        &service,
+        "sonarr",
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &mut journal,
+        &mut Baselines {
+            expected: &expected,
+            records: &mut records,
+            adopt: false,
+            reset: true,
+        },
+        "2",
+    )
+    .await;
+    assert!(matches!(
+        wirings.first().map(|wiring| &wiring.state),
+        Some(State::Failed { .. })
+    ));
+    assert_eq!(
+        records.expected("sonarr", "downloadclient:sabnzbd:8080"),
+        None
     );
 }
 
@@ -1166,6 +1267,7 @@ async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
             expected: &expected,
             records: &mut records,
             adopt: false,
+            reset: false,
         },
         "2",
     )
@@ -1208,6 +1310,7 @@ async fn a_client_both_sides_changed_is_a_conflict() {
             expected: &expected,
             records: &mut records,
             adopt: false,
+            reset: false,
         },
         "2",
     )
@@ -1313,6 +1416,7 @@ async fn seed_clients_with(
             expected,
             records: &mut records,
             adopt,
+            reset: false,
         },
         "2",
     )

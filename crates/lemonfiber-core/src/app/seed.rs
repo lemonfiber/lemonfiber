@@ -297,6 +297,7 @@ async fn seed_arr(
                     expected,
                     records: &mut records,
                     adopt,
+                    reset: false,
                 },
                 &at,
             )

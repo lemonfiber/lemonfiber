@@ -481,6 +481,10 @@ pub struct Baselines<'a> {
     /// Whether this pass promotes each drifted value to adopted, recording what the
     /// service holds as the operator's accepted state.
     pub adopt: bool,
+    /// Whether this pass reverts each drifted value to lemonfiber's own — the opposite of
+    /// adopt: it writes lemonfiber's category over the operator's edit rather than keeping
+    /// it, the connection side of a full reset. Never set with `adopt`.
+    pub reset: bool,
 }
 
 /// Wire a service's download clients: register the ones it lacks, leave the ones
@@ -504,6 +508,7 @@ pub async fn wire_download_clients(
     // through `baselines` so the two do not both borrow it at once.
     let expected = baselines.expected;
     let adopt = baselines.adopt;
+    let reset = baselines.reset;
     let existing = match observe_or_skip(client.download_clients().await, wanted, |want| {
         describe_client(service, want)
     }) {
@@ -537,6 +542,20 @@ pub async fn wire_download_clients(
         // was rather than being reported adopted when nothing was taken on.
         let adopting =
             adopt && found.is_some() && matches!(observed, Observed::Drifted | Observed::Unmanaged);
+        // A reset reverts what an ordinary seed would preserve or report: the operator's
+        // edit, lemonfiber's own value fallen behind, a two-sided conflict, or a value
+        // previously adopted. Each is addressed by the id the service assigned the client,
+        // which a drifted value always has — its state was read from a client that is
+        // there. lemonfiber's own value is written back over the operator's below.
+        let drifted_from_ours = matches!(
+            observed,
+            Observed::Drifted | Observed::Stale | Observed::Conflicted | Observed::Adopted
+        );
+        let reverting_id = if reset && drifted_from_ours {
+            have.map(|have| have.id.clone())
+        } else {
+            None
+        };
         // The policy decides from the three-way comparison: an absent client is
         // written, one already at lemonfiber's value is left, an operator's edit is
         // preserved, lemonfiber's own value behind its intent is reported stale, a
@@ -544,7 +563,15 @@ pub async fn wire_download_clients(
         // pre-existing value with no baseline is reported unmanaged. Unavailable never
         // reaches here — a read-back failure was handled above — so it folds onto
         // `Leave`.
-        let state = if adopting {
+        let state = if let Some(id) = reverting_id {
+            // Write lemonfiber's category back over the operator's, in place. A revert
+            // that lands records lemonfiber's value below, so the drift is gone; one the
+            // service refuses leaves the value as it was, reported as the failure it is.
+            match client.update_download_client(&id, want).await {
+                Ok(()) => State::Wired,
+                Err(failure) => unreached(&failure),
+            }
+        } else if adopting {
             State::Adopted
         } else {
             match intent(observed) {
