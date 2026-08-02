@@ -55,8 +55,9 @@ use crate::qbittorrent::Qbittorrent;
 use crate::secret;
 
 /// The administrator account name lemonfiber creates on the media server and
-/// signs Seerr in with. Fixed, and recorded beside the password it mints.
-const ADMIN: &str = "admin";
+/// signs Seerr in with — one source of truth, so a trace's later library read
+/// authenticates under the same name it was created with.
+const ADMIN: &str = crate::config::JELLYFIN_ADMIN_USER;
 
 /// What lemonfiber observed about a connection it wants to make — the outcome of
 /// the three-way comparison of what it last wrote, what the service now holds, and

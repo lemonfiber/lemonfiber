@@ -575,6 +575,25 @@ pub trait Pipeline: Send + Sync {
     ) -> Result<Option<QueueItem>, Failure>;
 }
 
+/// Reading a media server's library to answer the last question a trace has left — is
+/// the item finally visible and playable? Jellyfin, the one service lemonfiber holds the
+/// household's own admin credential for, so it can ask on the household's behalf.
+///
+/// A title is the only join across to the media server — it shares no id with the \*arr
+/// that traced the item this far — so a match here is a fuzzy one, and the trace marks
+/// the availability it yields uncertain rather than claim a title-guess as fact.
+#[async_trait]
+pub trait Library: Send + Sync {
+    /// Whether an item whose title matches `term` is present in the library, for the
+    /// media type `kind` names — a series for television, a movie for film.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the media server is unreachable or refuses — which a
+    /// trace reads as "cannot tell", never as "not there".
+    async fn has_item(&self, kind: crate::recyclarr::Kind, term: &str) -> Result<bool, Failure>;
+}
+
 /// Applying an audio quality to a service that has one — Lidarr, whose quality axis is
 /// a format rather than a resolution and which no community profile configures, so the
 /// choice is carried straight to its own quality profiles.

@@ -131,8 +131,15 @@ pub const QBITTORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 /// Jellyfin generates no key on disk and asks for an account to be created, so
 /// seeding mints this password, sets it by driving Jellyfin's own first-run
 /// setup, and records it here — the same shape as qBittorrent's, and the
-/// credential the Seerr identity wiring reads back. The account name is `admin`.
+/// credential the Seerr identity wiring reads back. The account name is
+/// [`JELLYFIN_ADMIN_USER`].
 pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
+
+/// The name of the Jellyfin administrator account lemonfiber creates at setup — the
+/// household's own account, one source of truth for the name so the first-run driver
+/// creates it, the Seerr identity wiring signs in with it, and a trace's library read
+/// authenticates as it, all under the same name.
+pub const JELLYFIN_ADMIN_USER: &str = "admin";
 
 /// A recorded value with the whitespace and surrounding quotes a person might
 /// add stripped, its case left alone — so a hand-edited `"https://IP.example"`

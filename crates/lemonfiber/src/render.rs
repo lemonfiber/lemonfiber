@@ -18,6 +18,7 @@ use lemonfiber_core::model::{
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
 };
+use lemonfiber_core::trace::Confidence;
 use lemonfiber_core::PRODUCT;
 
 /// Render an outcome, for a person or for a script.
@@ -388,6 +389,11 @@ pub(crate) fn trace(report: &TraceReport) {
     }
     if let Some(reason) = &report.stall {
         println!("  ✗ stopped: {reason}");
+    }
+    // A trace joined to the library by title alone may not be the item asked for; saying
+    // so is the honest thing — better a marked guess than one presented as fact.
+    if report.confidence == Confidence::Uncertain {
+        println!("  ~ matched to the library by title — this may not be the item you meant");
     }
 }
 
