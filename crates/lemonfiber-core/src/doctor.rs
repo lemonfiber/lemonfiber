@@ -19,6 +19,7 @@ pub mod environment;
 pub mod guides;
 pub mod headroom;
 pub mod indexer;
+pub mod releases;
 pub mod storage;
 pub mod vpn;
 

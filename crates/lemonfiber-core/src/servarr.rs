@@ -251,6 +251,52 @@ impl Servarr {
 }
 
 #[async_trait]
+impl crate::ports::service::QualityReleases for Servarr {
+    async fn probe_releases(
+        &self,
+        id_param: &str,
+    ) -> Result<crate::ports::service::ReleaseProbe, Failure> {
+        use crate::ports::service::ReleaseProbe;
+
+        // One wanted item is enough to judge the preset against — search for what the
+        // operator is actually missing rather than a made-up query.
+        let response = self
+            .probe(&self.request(Method::Get, "/wanted/missing?page=1&pageSize=1", None))
+            .await?;
+        let wanted: Wanted = self
+            .endpoint
+            .decode(&response, "the wanted list could not be read")?;
+        let Some(record) = wanted.records.first() else {
+            return Ok(ReleaseProbe::NothingWanted);
+        };
+
+        // A manual search hits the indexers live — the disruptive part the caller gates.
+        let response = self
+            .probe(&self.request(
+                Method::Get,
+                &format!("/release?{id_param}={}", record.id),
+                None,
+            ))
+            .await?;
+        let releases: Vec<ReleaseResource> = self
+            .endpoint
+            .decode(&response, "the release search could not be read")?;
+        if releases.is_empty() {
+            return Ok(ReleaseProbe::NoneFound);
+        }
+        // A release the service left unrejected is one its profile — the quality preset
+        // included — would grab; if every release carries a rejection, the preset wants
+        // none of what is out there.
+        let matching = releases.iter().any(|release| release.rejections.is_empty());
+        Ok(if matching {
+            ReleaseProbe::Matching
+        } else {
+            ReleaseProbe::NoneMatch
+        })
+    }
+}
+
+#[async_trait]
 impl crate::ports::service::Queues for Servarr {
     async fn queue(&self) -> Result<QueueDepth, Failure> {
         // A generous page is asked for so the stuck count is read from the whole
@@ -297,6 +343,30 @@ struct QueueResource {
 struct QueueRecord {
     #[serde(default)]
     tracked_download_status: String,
+}
+
+/// A page of the wanted/missing list — only the first record's id is needed, to name
+/// what a release search is for.
+#[derive(Deserialize)]
+struct Wanted {
+    #[serde(default)]
+    records: Vec<WantedRecord>,
+}
+
+/// One wanted item: its id, which is the episode (Sonarr) or movie (Radarr) a manual
+/// search is run for.
+#[derive(Deserialize)]
+struct WantedRecord {
+    id: i64,
+}
+
+/// One release a manual search returned — only whether the service's profile rejected
+/// it matters here: an empty list means the profile, quality preset included, would
+/// grab it.
+#[derive(Deserialize)]
+struct ReleaseResource {
+    #[serde(default)]
+    rejections: Vec<String>,
 }
 
 /// A download-client resource as the service reports it: the identifier it

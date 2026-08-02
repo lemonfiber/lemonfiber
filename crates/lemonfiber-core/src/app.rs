@@ -22,6 +22,7 @@ use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
+use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
@@ -558,6 +559,16 @@ async fn diagnose(
         ctx.settings.data_root.clone(),
         quality::most_demanding_or_default(ctx),
     );
+    // Whether the chosen quality actually finds releases — a demanding preset can ask
+    // for what the indexers do not carry, which reads as an indexer fault unless the two
+    // are told apart. It searches for wanted content live, so it only does so on a
+    // disruptive run; otherwise it reports skipped.
+    let releases = ReleasesCheck::new(
+        ctx.http.clone(),
+        ctx.filesystem.clone(),
+        servarr_targets(&manifest.services, project.as_deref()),
+        disruptive,
+    );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(storage),
@@ -566,6 +577,7 @@ async fn diagnose(
         Box::new(indexer),
         Box::new(guides),
         Box::new(headroom),
+        Box::new(releases),
     ];
 
     Ok(examine(&checks, only).await)

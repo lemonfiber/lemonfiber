@@ -75,6 +75,17 @@ impl Kind {
             Self::Radarr => "CutoffUnmetMoviesSearch",
         }
     }
+
+    /// The query parameter naming what a manual release search is for — an episode for
+    /// television, a movie for film. A wanted item's own id fills it, so a search asks
+    /// the indexers for exactly what the operator is missing.
+    #[must_use]
+    pub const fn release_id_param(self) -> &'static str {
+        match self {
+            Self::Sonarr => "episodeId",
+            Self::Radarr => "movieId",
+        }
+    }
 }
 
 /// The three TRaSH-guide templates that carry a preset out for one service: the
