@@ -223,9 +223,33 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
         });
     }
 
-    // Where two services hold contradictory views of the item, that is not a point on the
-    // pipeline but a disagreement to surface on its own, so an operator sees it rather than
-    // having it silently reconciled away.
+    TraceReport {
+        item: title.to_owned(),
+        matched: monitored,
+        furthest,
+        stall: stall_reason(furthest, queue, library, history_read, queue_read),
+        stages,
+        history,
+        findings: trace_findings(unmanaged_but_present, history_read, queue_read),
+        // A presence found by matching titles across to the media server — the two ends
+        // share no id — may not be the item asked for, so it is marked, never claimed.
+        confidence: if present {
+            Confidence::Uncertain
+        } else {
+            Confidence::Certain
+        },
+    }
+}
+
+/// The disagreements and unreadable-fragment notes a trace surfaces on their own, apart
+/// from the linear pipeline: a media server holding what nothing monitors, and each read
+/// that failed reported as unavailable rather than inferred as nothing — the honesty the
+/// trace keeps about a silence it did not actually hear.
+fn trace_findings(
+    unmanaged_but_present: bool,
+    history_read: bool,
+    queue_read: bool,
+) -> Vec<String> {
     let mut findings = Vec::new();
     if unmanaged_but_present {
         findings.push(
@@ -234,8 +258,6 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
                 .to_owned(),
         );
     }
-    // A read that failed is reported as unavailable, never inferred as nothing: the trace
-    // says so rather than letting a history it could not read stand as "never found".
     if !history_read {
         findings.push(
             "this service's history could not be read, so how far the item got may be \
@@ -250,23 +272,7 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
                 .to_owned(),
         );
     }
-
-    TraceReport {
-        item: title.to_owned(),
-        matched: monitored,
-        furthest,
-        stall: stall_reason(furthest, queue, library, history_read, queue_read),
-        stages,
-        history,
-        // A presence found by matching titles across to the media server — the two ends
-        // share no id — may not be the item asked for, so it is marked, never claimed.
-        confidence: if present {
-            Confidence::Uncertain
-        } else {
-            Confidence::Certain
-        },
-        findings,
-    }
+    findings
 }
 
 /// Why the item stopped where it did, in plain language — or `None` where nothing proves
