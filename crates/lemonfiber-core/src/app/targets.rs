@@ -55,13 +55,22 @@ pub(super) fn servarr_targets(
 /// so its `api.path` of `/config/<inside>` is read from there. Nothing where the api
 /// names no such path — the one place the convention is spelled, for every service
 /// whose credential is read from disk.
-fn config_path(
+pub(super) fn config_path(
     project: &Path,
     service: &lemonfiber_manifest::Service,
     api_path: Option<&str>,
 ) -> Option<PathBuf> {
     let inside = api_path?.strip_prefix("/config/")?;
     Some(project.join("config").join(&service.id).join(inside))
+}
+
+/// A file kept beside the environment file — the one durable location the context
+/// carries, so every record lemonfiber persists (the drift baseline, the materialised
+/// checksums, the recorded quality choice) is placed the same way rather than each
+/// re-deriving the directory. Nothing where no environment file is configured.
+pub(super) fn beside_env(ctx: &Ctx, name: &str) -> Option<PathBuf> {
+    let env = ctx.settings.env_file.as_deref()?;
+    Some(env.with_file_name(name))
 }
 
 /// One service as a target to prove, or nothing where it cannot be one.
@@ -185,27 +194,47 @@ pub(super) fn jellyfin_reader(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Option<Jellyfin> {
-    let base = jellyfin_base(services)?;
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
     let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
     Some(Jellyfin::authenticated(
         ctx.http.clone(),
-        base,
+        addr.loopback,
         "jellyfin",
         crate::config::JELLYFIN_ADMIN_USER,
         password,
     ))
 }
 
-/// Where the host reaches the stack's Jellyfin, if it has one — the loopback port every
-/// service lemonfiber speaks to on the host is reached on, selected by its api kind.
-fn jellyfin_base(services: &[lemonfiber_manifest::Service]) -> Option<String> {
+/// Where a service is reached — on the host, and across the stack's own network — the
+/// two forms every service address is wanted in.
+pub(super) struct ServiceAddr {
+    /// The service's compose id: names the container, and is the host in a network URL.
+    pub id: String,
+    /// Where the host reaches it: `http://127.0.0.1:{port}`.
+    pub loopback: String,
+    /// Where another container reaches it across the stack network: `http://{id}:{port}`.
+    pub network_url: String,
+}
+
+/// The address of the one service of a given api kind, or nothing where the stack has
+/// none or it publishes no port to reach it on. The single place the "find the service
+/// by its kind, format where it is reached" step lives, so every caller that speaks to a
+/// named service resolves it the same way rather than re-deriving the URLs.
+pub(super) fn service_addr(
+    services: &[lemonfiber_manifest::Service],
+    kind: lemonfiber_manifest::ApiKind,
+) -> Option<ServiceAddr> {
     services.iter().find_map(|service| {
         let api = service.api.as_ref()?;
-        if api.kind != lemonfiber_manifest::ApiKind::Jellyfin {
+        if api.kind != kind {
             return None;
         }
         let port = service.port?;
-        Some(format!("http://127.0.0.1:{port}"))
+        Some(ServiceAddr {
+            id: service.id.clone(),
+            loopback: format!("http://127.0.0.1:{port}"),
+            network_url: format!("http://{}:{port}", service.id),
+        })
     })
 }
 
