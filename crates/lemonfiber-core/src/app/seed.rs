@@ -398,64 +398,100 @@ pub(super) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
         let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
             continue;
         };
-        if confirm {
-            let mut journal = crate::journal::Journal::new();
-            let reverted = crate::seed::wire_download_clients(
+        wirings.extend(
+            reset_arr_connections(
                 &client,
                 &arr.target.name,
                 &wanted,
-                &mut journal,
-                &mut crate::seed::Baselines {
-                    expected: &baseline,
-                    records: &mut records,
-                    adopt: false,
-                    reset: true,
-                },
+                confirm,
+                &baseline,
+                &mut records,
                 &at,
             )
-            .await;
-            // On an already-wired stack the only writes a reset makes are its reverts, so a
-            // wired connection here is a drifted value put back to lemonfiber's.
-            wirings.extend(
-                reverted
-                    .into_iter()
-                    .filter(|wiring| matches!(wiring.state, crate::seed::State::Wired)),
-            );
-        } else if let Ok(existing) = client.download_clients().await {
-            for want in &wanted {
-                let field = format!("downloadclient:{}:{}", want.host, want.port);
-                let Some(have) = existing
-                    .iter()
-                    .find(|have| have.host == want.host && have.port == want.port)
-                else {
-                    continue;
-                };
-                // The same three-way comparison the reverting pass makes, read only,
-                // through the one shared observer — so the preview and the confirm judge
-                // drift identically rather than by two hand-inlined comparisons: a value
-                // that drifted from lemonfiber's is one a reset would revert.
-                let observed = crate::seed::observe_client(
-                    Some(have),
-                    want,
-                    baseline.entry(&arr.target.name, &field),
-                );
-                if matches!(
-                    observed,
-                    crate::seed::Observed::Drifted
-                        | crate::seed::Observed::Stale
-                        | crate::seed::Observed::Conflicted
-                        | crate::seed::Observed::Adopted
-                ) {
-                    wirings.push(crate::seed::Wiring::settled(
-                        format!("{} into {}", want.name, arr.target.name),
-                        crate::seed::State::Drifted,
-                    ));
-                }
-            }
-        }
+            .await,
+        );
     }
     if confirm {
         save_baseline(ctx, &records);
+    }
+    wirings
+}
+
+/// One \*arr's side of a connection reset: on confirm, revert each drifted
+/// download-client category in place and report only the reverts that landed; on a
+/// preview, read the clients and report which categories would be reverted, writing
+/// nothing.
+async fn reset_arr_connections(
+    client: &dyn crate::ports::service::Client,
+    arr_name: &str,
+    wanted: &[crate::ports::service::DownloadClient],
+    confirm: bool,
+    baseline: &crate::baseline::Baseline,
+    records: &mut crate::baseline::Baseline,
+    at: &str,
+) -> Vec<crate::seed::Wiring> {
+    if confirm {
+        let mut journal = crate::journal::Journal::new();
+        let reverted = crate::seed::wire_download_clients(
+            client,
+            arr_name,
+            wanted,
+            &mut journal,
+            &mut crate::seed::Baselines {
+                expected: baseline,
+                records,
+                adopt: false,
+                reset: true,
+            },
+            at,
+        )
+        .await;
+        // A reset writes only its reverts, so a wired connection here is a drifted value
+        // put back to lemonfiber's — the only outcome the report names.
+        reverted
+            .into_iter()
+            .filter(|wiring| matches!(wiring.state, crate::seed::State::Wired))
+            .collect()
+    } else if let Ok(existing) = client.download_clients().await {
+        preview_reverts(&existing, wanted, arr_name, baseline)
+    } else {
+        Vec::new()
+    }
+}
+
+/// The connections a reset would revert, read only: each wanted client the service
+/// holds whose category drifted from lemonfiber's. The same three-way comparison the
+/// reverting pass makes, through the one shared observer, so a preview and a confirm
+/// judge drift identically rather than by two hand-inlined comparisons.
+fn preview_reverts(
+    existing: &[crate::ports::service::RegisteredClient],
+    wanted: &[crate::ports::service::DownloadClient],
+    arr_name: &str,
+    baseline: &crate::baseline::Baseline,
+) -> Vec<crate::seed::Wiring> {
+    let mut wirings = Vec::new();
+    for want in wanted {
+        let field = format!("downloadclient:{}:{}", want.host, want.port);
+        let Some(have) = existing
+            .iter()
+            .find(|have| have.host == want.host && have.port == want.port)
+        else {
+            continue;
+        };
+        let observed =
+            crate::seed::observe_client(Some(have), want, baseline.entry(arr_name, &field));
+        if matches!(
+            observed,
+            crate::seed::Observed::Drifted
+                | crate::seed::Observed::Stale
+                | crate::seed::Observed::Conflicted
+                | crate::seed::Observed::Adopted
+        ) {
+            wirings.push(crate::seed::Wiring::settled(
+                format!("{} into {arr_name}", want.name),
+                crate::seed::State::Drifted,
+            ));
+        }
     }
     wirings
 }

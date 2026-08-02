@@ -571,11 +571,6 @@ pub async fn wire_download_clients(
     baselines: &mut Baselines<'_>,
     at: &str,
 ) -> Vec<Wiring> {
-    // The shared expected reference copies out; the mutable `records` stays reached
-    // through `baselines` so the two do not both borrow it at once.
-    let expected = baselines.expected;
-    let adopt = baselines.adopt;
-    let reset = baselines.reset;
     let existing = match observe_or_skip(client.download_clients().await, wanted, |want| {
         describe_client(service, want)
     }) {
@@ -590,137 +585,180 @@ pub async fn wire_download_clients(
     // once the loop has decided every state, without a second three-way pass.
     let mut drifted_ids: Vec<Option<String>> = Vec::new();
     for want in wanted {
-        // What lemonfiber last recorded here, if anything — value and whether it was
-        // written or adopted — the expected leg of the three-way comparison, read from
-        // the snapshot this run loaded, separate from the `records` it writes into so
-        // the two do not fight over one borrow.
-        let field = client_field(want);
-        let base = expected.entry(service, &field);
-        // Match the wanted client to one the service already holds by the endpoint it
-        // reaches, found once so the observation, the value to present on a conflict,
-        // and the value to adopt are all read from the same client.
-        let have = existing.iter().find(|have| same_endpoint(have, want));
-        let found = have
-            .and_then(|have| have.category.as_ref())
-            .map(|category| category.value.clone());
-        let observed = observe_client(have, want, base);
-        // Adoption is a deliberate act, so only an adopt pass takes a value on: it
-        // promotes what an ordinary seed would merely preserve as drift, and takes on
-        // what a seed would only report as unmanaged, recording the value the service
-        // holds below as the accepted baseline. An ordinary seed reports both and
-        // records neither — it never claims the operator's value as lemonfiber's on
-        // its own, so a lost baseline is not silently frozen as adopted. There must be
-        // a value to adopt: a client the operator cleared has none, so it stays what it
-        // was rather than being reported adopted when nothing was taken on.
-        let adopting =
-            adopt && found.is_some() && matches!(observed, Observed::Drifted | Observed::Unmanaged);
-        // A reset reverts what an ordinary seed would preserve or report: the operator's
-        // edit, lemonfiber's own value fallen behind, a two-sided conflict, or a value
-        // previously adopted. Each is addressed by the id the service assigned the client,
-        // which a drifted value always has — its state was read from a client that is
-        // there. lemonfiber's own value is written back over the operator's below.
-        let drifted_from_ours = matches!(
-            observed,
-            Observed::Drifted | Observed::Stale | Observed::Conflicted | Observed::Adopted
-        );
-        let reverting_id = if reset && drifted_from_ours {
-            have.map(|have| have.id.clone())
-        } else {
-            None
-        };
-        // The policy decides from the three-way comparison: an absent client is
-        // written, one already at lemonfiber's value is left, an operator's edit is
-        // preserved, lemonfiber's own value behind its intent is reported stale, a
-        // two-sided change is presented as a conflict, an adopted value is kept, and a
-        // pre-existing value with no baseline is reported unmanaged. Unavailable never
-        // reaches here — a read-back failure was handled above — so it folds onto
-        // `Leave`.
-        let state = if let Some(id) = reverting_id {
-            // Write lemonfiber's category back over the operator's, in place. A revert
-            // that lands records lemonfiber's value below, so the drift is gone; one the
-            // service refuses leaves the value as it was, reported as the failure it is.
-            match client.update_download_client(&id, want).await {
-                Ok(()) => State::Wired,
-                Err(failure) => unreached(&failure),
-            }
-        } else if reset {
-            // A reset reverts drift and only drift. A client that is not a drift to
-            // revert — absent, already at lemonfiber's value, or the operator's own
-            // unmanaged one — is left exactly as it is: never registered, adopted or
-            // recorded anew, so a confirmed reset does no more than the preview showed.
-            State::AlreadyWired
-        } else if adopting {
-            State::Adopted
-        } else {
-            match intent(observed) {
-                Intent::Wire => {
-                    wire_one(
-                        client.register_download_client(want),
-                        client.download_clients(),
-                        |rows| {
-                            rows.iter()
-                                .find(|have| same_endpoint(have, want))
-                                .map(|have| have.id.clone())
-                        },
-                        Naming {
-                            service,
-                            resource: "downloadclient",
-                            noun: "download client",
-                        },
-                        journal,
-                        at,
-                    )
-                    .await
-                }
-                Intent::Preserve => State::Drifted,
-                Intent::Update => State::Stale,
-                // Present both sides of the conflict: the value the operator set, drawn
-                // from the client already matched above, beside the one lemonfiber
-                // would write. The value is left as it is — presenting is not resolving.
-                Intent::Ask => State::Conflicted {
-                    yours: found.clone(),
-                    ours: want.category.value.clone(),
-                },
-                Intent::Keep => State::Adopted,
-                Intent::Adopt => State::Unmanaged,
-                Intent::Leave | Intent::Skip => State::AlreadyWired,
-            }
-        };
-        // Record the expected state this run leaves. An ordinary pass records the
-        // category lemonfiber set for a client it wrote (`Wired`) or found already at
-        // that value (`AlreadyWired`). A reset records only the value a revert actually
-        // wrote back — a landed revert is the sole `Wired` a reset produces, since a
-        // non-drift it leaves is `AlreadyWired` and must keep whatever the loaded
-        // baseline already held rather than re-recording a value for a client it did
-        // not touch (or, when absent, does not exist). A value taken on by an adopt
-        // pass records what the service holds, marked adopted. Everything else leaves
-        // the baseline as it was.
-        let records_ours = if reset {
-            matches!(state, State::Wired)
-        } else {
-            matches!(state, State::Wired | State::AlreadyWired)
-        };
-        if records_ours {
-            baselines
-                .records
-                .record(service, &field, &want.category.value, at);
-        } else if adopting {
-            if let Some(value) = &found {
-                baselines.records.adopt(service, &field, value, at);
-            }
-        }
-        // A drift is the operator's edit, so it carries the id of the client it sits
-        // on — the one to ask the service about below. Every other state carries none.
-        let drifted_id = if matches!(state, State::Drifted) {
-            have.map(|have| have.id.clone())
-        } else {
-            None
-        };
-        wirings.push(Wiring::settled(describe_client(service, want), state));
+        let (wiring, drifted_id) =
+            wire_one_client(client, service, want, &existing, baselines, journal, at).await;
+        wirings.push(wiring);
         drifted_ids.push(drifted_id);
     }
     escalate_unreachable(client, &mut wirings, &drifted_ids).await;
     wirings
+}
+
+/// Wire one download client against what the service holds, returning how it turned
+/// out and — where it is a drift — the id of the client it sits on, so a later pass
+/// can ask the service whether that drift left the client unreachable.
+async fn wire_one_client(
+    client: &dyn Client,
+    service: &str,
+    want: &DownloadClient,
+    existing: &[RegisteredClient],
+    baselines: &mut Baselines<'_>,
+    journal: &mut Journal,
+    at: &str,
+) -> (Wiring, Option<String>) {
+    // What lemonfiber last recorded here — the expected leg of the three-way
+    // comparison, read before the pass writes into `records` so the two do not both
+    // borrow it. The wanted client is matched to one the service already holds by the
+    // endpoint it reaches, found once so the observation, the value to present on a
+    // conflict, and the value to adopt are all read from the same client.
+    let field = client_field(want);
+    let base = baselines.expected.entry(service, &field);
+    let have = existing.iter().find(|have| same_endpoint(have, want));
+    let found = have
+        .and_then(|have| have.category.as_ref())
+        .map(|category| category.value.clone());
+    let observed = observe_client(have, want, base);
+    // Adoption is deliberate, so only an adopt pass takes a value on, and only where
+    // there is one to take: it promotes a drift or an unmanaged value to the accepted
+    // baseline; an ordinary seed reports both and records neither.
+    let adopting = baselines.adopt
+        && found.is_some()
+        && matches!(observed, Observed::Drifted | Observed::Unmanaged);
+    // A reset reverts what an ordinary seed would preserve or report — an edit,
+    // lemonfiber's own value fallen behind, a conflict, or a previously adopted value
+    // — by the id the drifted client carries, which it always has.
+    let drifted_from_ours = matches!(
+        observed,
+        Observed::Drifted | Observed::Stale | Observed::Conflicted | Observed::Adopted
+    );
+    let reverting_id = if baselines.reset && drifted_from_ours {
+        have.map(|have| have.id.clone())
+    } else {
+        None
+    };
+    let state = if let Some(id) = reverting_id {
+        // Write lemonfiber's category back over the operator's, in place. A revert that
+        // lands records lemonfiber's value below; one the service refuses leaves the
+        // value as it was, reported as the failure it is.
+        match client.update_download_client(&id, want).await {
+            Ok(()) => State::Wired,
+            Err(failure) => unreached(&failure),
+        }
+    } else if baselines.reset {
+        // A reset reverts drift and only drift. A client that is not a drift to revert
+        // — absent, already at lemonfiber's value, or the operator's own unmanaged one
+        // — is left exactly as it is: never registered, adopted or recorded anew, so a
+        // confirmed reset does no more than the preview showed.
+        State::AlreadyWired
+    } else if adopting {
+        State::Adopted
+    } else {
+        wire_by_intent(client, service, want, observed, found.as_ref(), journal, at).await
+    };
+    record_outcome(
+        baselines,
+        service,
+        want,
+        &state,
+        adopting,
+        found.as_ref(),
+        at,
+    );
+    // A drift carries the id of the client it sits on — the one to ask the service
+    // about below. Every other state carries none.
+    let drifted_id = if matches!(state, State::Drifted) {
+        have.map(|have| have.id.clone())
+    } else {
+        None
+    };
+    (
+        Wiring::settled(describe_client(service, want), state),
+        drifted_id,
+    )
+}
+
+/// The seed policy's verdict for a client that is neither being reverted nor adopted:
+/// an absent one is written, one already at lemonfiber's value is left, an operator's
+/// edit is preserved, lemonfiber's own value behind its intent is reported stale, a
+/// two-sided change is presented as a conflict, an adopted value is kept, and a
+/// pre-existing value with no baseline is reported unmanaged. Unavailable never
+/// reaches here — a read-back failure was handled above — so it folds onto `Leave`.
+async fn wire_by_intent(
+    client: &dyn Client,
+    service: &str,
+    want: &DownloadClient,
+    observed: Observed,
+    found: Option<&String>,
+    journal: &mut Journal,
+    at: &str,
+) -> State {
+    match intent(observed) {
+        Intent::Wire => {
+            wire_one(
+                client.register_download_client(want),
+                client.download_clients(),
+                |rows| {
+                    rows.iter()
+                        .find(|have| same_endpoint(have, want))
+                        .map(|have| have.id.clone())
+                },
+                Naming {
+                    service,
+                    resource: "downloadclient",
+                    noun: "download client",
+                },
+                journal,
+                at,
+            )
+            .await
+        }
+        Intent::Preserve => State::Drifted,
+        Intent::Update => State::Stale,
+        // Present both sides of the conflict: the value the operator set, drawn from the
+        // client already matched above, beside the one lemonfiber would write. The value
+        // is left as it is — presenting is not resolving.
+        Intent::Ask => State::Conflicted {
+            yours: found.cloned(),
+            ours: want.category.value.clone(),
+        },
+        Intent::Keep => State::Adopted,
+        Intent::Adopt => State::Unmanaged,
+        Intent::Leave | Intent::Skip => State::AlreadyWired,
+    }
+}
+
+/// Record the expected state a client's wiring leaves. An ordinary pass records the
+/// category lemonfiber set for a client it wrote (`Wired`) or found already at that
+/// value (`AlreadyWired`). A reset records only the value a revert actually wrote back
+/// — a landed revert is the sole `Wired` a reset produces, since a non-drift it leaves
+/// is `AlreadyWired` and must keep whatever the loaded baseline held rather than
+/// re-recording a value for a client it did not touch (or, when absent, does not
+/// exist). A value an adopt pass took on records what the service holds, marked
+/// adopted. Everything else leaves the baseline as it was.
+fn record_outcome(
+    baselines: &mut Baselines<'_>,
+    service: &str,
+    want: &DownloadClient,
+    state: &State,
+    adopting: bool,
+    found: Option<&String>,
+    at: &str,
+) {
+    let field = client_field(want);
+    let records_ours = if baselines.reset {
+        matches!(state, State::Wired)
+    } else {
+        matches!(state, State::Wired | State::AlreadyWired)
+    };
+    if records_ours {
+        baselines
+            .records
+            .record(service, &field, &want.category.value, at);
+    } else if adopting {
+        if let Some(value) = found {
+            baselines.records.adopt(service, &field, value, at);
+        }
+    }
 }
 
 /// Raise each drifted download client the service can no longer reach from
