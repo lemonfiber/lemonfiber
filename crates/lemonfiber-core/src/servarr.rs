@@ -301,6 +301,39 @@ impl crate::ports::service::Pipeline for Servarr {
             })
             .collect())
     }
+
+    async fn item_queue(
+        &self,
+        kind: crate::recyclarr::Kind,
+        id: i64,
+    ) -> Result<Option<crate::ports::service::QueueItem>, Failure> {
+        let response = self
+            .probe(&self.request(Method::Get, "/queue?pageSize=200", None))
+            .await?;
+        let queue: QueueResource = self
+            .endpoint
+            .decode(&response, "the queue could not be read")?;
+        let mut records = queue
+            .records
+            .iter()
+            .filter(|record| record.is_for(kind, id))
+            .peekable();
+        if records.peek().is_none() {
+            return Ok(None);
+        }
+        // A series may have several episodes queued; the item's furthest download stage
+        // and whether any of its records is stuck are what the trace reads. Being in the
+        // queue at all means at least downloading, even where the state is unrecognised.
+        let stage = records
+            .clone()
+            .filter_map(|record| {
+                crate::trace::Stage::of_queue_state(&record.tracked_download_state)
+            })
+            .max()
+            .unwrap_or(crate::trace::Stage::Downloading);
+        let stuck = records.any(|record| is_stuck(&record.tracked_download_status));
+        Ok(Some(crate::ports::service::QueueItem { stage, stuck }))
+    }
 }
 
 #[async_trait]
@@ -390,12 +423,31 @@ struct QueueResource {
     records: Vec<QueueRecord>,
 }
 
-/// One queued item — only its tracked download status matters to the dashboard.
+/// One queued item — its tracked download status (for the dashboard's stuck count) and,
+/// for a per-item trace, which item it belongs to and how far its download has got.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueueRecord {
     #[serde(default)]
     tracked_download_status: String,
+    #[serde(default)]
+    tracked_download_state: String,
+    #[serde(default)]
+    series_id: Option<i64>,
+    #[serde(default)]
+    movie_id: Option<i64>,
+}
+
+impl QueueRecord {
+    /// Whether this record is for the given item — matched on the id field the item's
+    /// kind files under.
+    fn is_for(&self, kind: crate::recyclarr::Kind, id: i64) -> bool {
+        let owner = match kind {
+            crate::recyclarr::Kind::Sonarr => self.series_id,
+            crate::recyclarr::Kind::Radarr => self.movie_id,
+        };
+        owner == Some(id)
+    }
 }
 
 /// A page of the wanted/missing list — only the first record's id is needed, to name
