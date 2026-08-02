@@ -643,6 +643,12 @@ pub async fn wire_download_clients(
                 Ok(()) => State::Wired,
                 Err(failure) => unreached(&failure),
             }
+        } else if reset {
+            // A reset reverts drift and only drift. A client that is not a drift to
+            // revert — absent, already at lemonfiber's value, or the operator's own
+            // unmanaged one — is left exactly as it is: never registered, adopted or
+            // recorded anew, so a confirmed reset does no more than the preview showed.
+            State::AlreadyWired
         } else if adopting {
             State::Adopted
         } else {
@@ -680,15 +686,21 @@ pub async fn wire_download_clients(
                 Intent::Leave | Intent::Skip => State::AlreadyWired,
             }
         };
-        // Record the expected state this run leaves. A client lemonfiber wrote
-        // (`Wired`) or one already at what it wants (`AlreadyWired`) records the
-        // category lemonfiber set. A value taken on by an adopt pass — an edit promoted
-        // or a pre-existing value adopted — records what the service holds, as the
-        // operator's, marked adopted so a later run keeps it. Everything else leaves
-        // the baseline as it was: a drift or unmanaged value an ordinary seed only
-        // reports, a conflict, an already-adopted value the loaded baseline still
-        // carries, or a categoryless client with nothing to record.
-        if matches!(state, State::Wired | State::AlreadyWired) {
+        // Record the expected state this run leaves. An ordinary pass records the
+        // category lemonfiber set for a client it wrote (`Wired`) or found already at
+        // that value (`AlreadyWired`). A reset records only the value a revert actually
+        // wrote back — a landed revert is the sole `Wired` a reset produces, since a
+        // non-drift it leaves is `AlreadyWired` and must keep whatever the loaded
+        // baseline already held rather than re-recording a value for a client it did
+        // not touch (or, when absent, does not exist). A value taken on by an adopt
+        // pass records what the service holds, marked adopted. Everything else leaves
+        // the baseline as it was.
+        let records_ours = if reset {
+            matches!(state, State::Wired)
+        } else {
+            matches!(state, State::Wired | State::AlreadyWired)
+        };
+        if records_ours {
             baselines
                 .records
                 .record(service, &field, &want.category.value, at);
@@ -785,7 +797,11 @@ pub fn wholesale_drift(
 /// holds at its endpoint (`have`, `None` where it holds none) and what lemonfiber
 /// last recorded: absent, or the three-way outcome of comparing the service's
 /// category with lemonfiber's baseline and its desired one.
-fn observe_client(
+///
+/// Shared with a reset's preview so the read-only "what would revert" and the pass
+/// that reverts it judge drift the same way — the same canonicalised three-way
+/// comparison, not two hand-inlined ones that could drift apart.
+pub(crate) fn observe_client(
     have: Option<&RegisteredClient>,
     want: &DownloadClient,
     expected: Option<&crate::baseline::Record>,

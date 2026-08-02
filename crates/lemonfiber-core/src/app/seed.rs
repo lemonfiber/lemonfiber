@@ -430,12 +430,14 @@ pub(super) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
                 else {
                     continue;
                 };
-                // The same three-way comparison the wiring makes, read only: a value that
-                // drifted from lemonfiber's is one a reset would revert.
-                let observed = crate::seed::reconcile(
+                // The same three-way comparison the reverting pass makes, read only,
+                // through the one shared observer — so the preview and the confirm judge
+                // drift identically rather than by two hand-inlined comparisons: a value
+                // that drifted from lemonfiber's is one a reset would revert.
+                let observed = crate::seed::observe_client(
+                    Some(have),
+                    want,
                     baseline.entry(&arr.target.name, &field),
-                    have.category.as_ref().map(|category| category.value.trim()),
-                    want.category.value.trim(),
                 );
                 if matches!(
                     observed,

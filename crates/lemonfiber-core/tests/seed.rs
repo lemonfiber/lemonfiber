@@ -1480,6 +1480,47 @@ async fn a_reset_a_service_refuses_is_reported_as_failed_not_recorded() {
 }
 
 #[tokio::test]
+async fn a_reset_registers_nothing_a_preview_did_not_show() {
+    // A reset reverts drift and only drift. A client the service does not hold — never
+    // registered, so absent — is not a drift to revert, so a reset leaves it: it is not
+    // registered, not reported as wired, and not recorded. A confirmed reset must do no
+    // more than its preview showed, which listed no absent connection.
+    let service = FakeService::with_clients(Mode::Normal, Vec::new());
+    let mut journal = Journal::new();
+    let mut records = Baseline::new();
+    let wirings = wire_download_clients(
+        &service,
+        "sonarr",
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &mut journal,
+        &mut Baselines {
+            expected: &Baseline::new(),
+            records: &mut records,
+            adopt: false,
+            reset: true,
+        },
+        "2",
+    )
+    .await;
+    assert!(
+        !wirings
+            .iter()
+            .any(|wiring| matches!(wiring.state, State::Wired)),
+        "an absent client is never registered by a reset"
+    );
+    assert_eq!(
+        journal.changes().len(),
+        0,
+        "a reset writes nothing for a client that was never there"
+    );
+    assert_eq!(
+        records.expected("sonarr", "downloadclient:sabnzbd:8080"),
+        None,
+        "a reset records nothing for a client it did not touch"
+    );
+}
+
+#[tokio::test]
 async fn a_categoryless_client_lemonfiber_never_wrote_is_left_and_not_recorded() {
     // The service holds a client at the endpoint but reports no category, and there
     // is no baseline — lemonfiber never wrote it. With nothing to judge against it is
