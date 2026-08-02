@@ -120,9 +120,13 @@ mod tests {
         .with_http(Arc::new(ScriptedHttp::new(replies)))
     }
 
-    /// A context with a writable choice file, so recording succeeds.
-    fn recording_ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>) -> Ctx {
-        let dir = std::env::temp_dir().join(format!("lemonfiber-music-{}", std::process::id()));
+    /// A context with a writable choice file, so recording succeeds. `tag` names a
+    /// directory of this test's own: the choice file is a real file on disk, so tests
+    /// sharing one directory would race on it when run in parallel — the tag keeps each
+    /// test's `.env` to itself.
+    fn recording_ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>, tag: &str) -> Ctx {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-music-{tag}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let mut context = ctx(fs, replies);
         context.settings.env_file = Some(dir.join(".env"));
@@ -146,6 +150,7 @@ mod tests {
             &recording_ctx(
                 Arc::new(SeedFs::keyed(Some(KEYED), None)),
                 vec![(200, PROFILE), (200, "")],
+                "applied",
             ),
             Format::Lossless,
         )
@@ -160,7 +165,7 @@ mod tests {
         // No key on disk: the target does not open, so nothing is applied — but the
         // choice is still recorded.
         let report = music(
-            &recording_ctx(Arc::new(SeedFs::keyed(None, None)), vec![]),
+            &recording_ctx(Arc::new(SeedFs::keyed(None, None)), vec![], "not-started"),
             Format::Compact,
         )
         .await
@@ -175,6 +180,7 @@ mod tests {
             &recording_ctx(
                 Arc::new(SeedFs::keyed(Some(KEYED), None)),
                 vec![(200, PROFILE), (500, "boom")],
+                "refused",
             ),
             Format::HiRes,
         )
