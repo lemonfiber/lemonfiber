@@ -46,21 +46,29 @@ pub(super) async fn trace(ctx: &Ctx, term: &str) -> Result<TraceReport, Box<Prob
         let Some(item) = items.into_iter().next() else {
             continue;
         };
-        let events = service
-            .item_history(kind, item.id)
-            .await
-            .unwrap_or_default();
-        // The queue is read best-effort: it enriches the trace with what is downloading
-        // now, but a trace still stands on history where the queue cannot be read.
-        let queue = service.item_queue(kind, item.id).await.unwrap_or_default();
+        // Each read that can fail is kept as read-or-not, never collapsed to empty: a
+        // history or queue that could not be read is not "nothing happened", so the trace
+        // must not infer a stall from a silence it never actually heard.
+        let (events, history_read) = match service.item_history(kind, item.id).await {
+            Ok(events) => (events, true),
+            Err(_) => (Vec::new(), false),
+        };
+        let (queue, queue_read) = match service.item_queue(kind, item.id).await {
+            Ok(queue) => (queue, true),
+            Err(_) => (None, false),
+        };
         let library = library_presence(jellyfin.as_ref(), kind, &item.title).await;
         return Ok(assemble(
             &target.name,
             &item.title,
             item.monitored,
-            events,
-            queue,
-            library,
+            Fragments {
+                events,
+                queue,
+                library,
+                history_read,
+                queue_read,
+            },
         ));
     }
 
@@ -83,17 +91,29 @@ async fn library_presence(
     }
 }
 
-/// Build the trace from what one \*arr knows and what the media server confirms: the
-/// stages its history records, what its queue is doing now, whether it is finally in the
-/// library, the furthest reached, and — where a record proves it — why it stopped.
-fn assemble(
-    service: &str,
-    title: &str,
-    monitored: bool,
+/// What the services could tell about the item: the stage-advancing events, what the queue
+/// holds now, whether the media server has it — and, for each read that can fail, whether
+/// it was actually read. An unreadable fragment is not an empty one, so the trace can tell
+/// "nothing happened" apart from "this could not be read".
+struct Fragments {
     events: Vec<TraceEvent>,
     queue: Option<QueueItem>,
     library: Option<Presence>,
-) -> TraceReport {
+    history_read: bool,
+    queue_read: bool,
+}
+
+/// Build the trace from what one \*arr knows and what the media server confirms: the
+/// stages its history records, what its queue is doing now, whether it is finally in the
+/// library, the furthest reached, and — where a record proves it — why it stopped.
+fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -> TraceReport {
+    let Fragments {
+        events,
+        queue,
+        library,
+        history_read,
+        queue_read,
+    } = fragments;
     // Presence in the media server only means something for availability once an \*arr is
     // monitoring the item; for one nobody asked for, "not monitored" is the whole answer,
     // and a library match is not availability but a disagreement — surfaced below as a
@@ -163,12 +183,28 @@ fn assemble(
                 .to_owned(),
         );
     }
+    // A read that failed is reported as unavailable, never inferred as nothing: the trace
+    // says so rather than letting a history it could not read stand as "never found".
+    if !history_read {
+        findings.push(
+            "this service's history could not be read, so how far the item got may be \
+             understated — reported as unavailable, not read as nothing happened"
+                .to_owned(),
+        );
+    }
+    if !queue_read {
+        findings.push(
+            "the download queue could not be read, so whether it is downloading now is \
+             unknown — reported as unavailable, not read as stopped"
+                .to_owned(),
+        );
+    }
 
     TraceReport {
         item: title.to_owned(),
         matched: monitored,
         furthest,
-        stall: stall_reason(furthest, queue, library),
+        stall: stall_reason(furthest, queue, library, history_read, queue_read),
         stages,
         // A presence found by matching titles across to the media server — the two ends
         // share no id — may not be the item asked for, so it is marked, never claimed.
@@ -190,6 +226,8 @@ fn stall_reason(
     furthest: Stage,
     queue: Option<QueueItem>,
     library: Option<Presence>,
+    history_read: bool,
+    queue_read: bool,
 ) -> Option<String> {
     if queue.is_some_and(|item| item.stuck) {
         // The C7 signal: queued but not progressing — a real problem the operator can act
@@ -200,15 +238,18 @@ fn stall_reason(
                 .to_owned(),
         );
     }
-    // A grab that never made the queue and never imported is now provably stuck at grabbed;
-    // the not-monitored and never-found stalls stand as before. Imported but confirmed
-    // absent from the library is now provably still awaiting a scan — a reason only the
-    // media server can supply, so it stands only on a confirmed absence, never on one that
-    // could not be asked.
+    // A stall claimed from an absence stands only where that absence was actually read.
+    // Imported but confirmed absent from the library is provably awaiting a scan — a reason
+    // only the media server can supply, so it stands only on a confirmed absence.
     match furthest {
-        Stage::NotMonitored | Stage::Monitored | Stage::Grabbed => {
-            furthest.stall().map(str::to_owned)
-        }
+        // Nobody asked — settled from the monitored flag alone, always known.
+        Stage::NotMonitored => furthest.stall().map(str::to_owned),
+        // Monitored and nothing since — but a "never found" is a claim about an empty
+        // history, so only where the history was actually read, not where it could not be.
+        Stage::Monitored if history_read => furthest.stall().map(str::to_owned),
+        // Grabbed and not in the queue — a claim about an empty queue, so only where the
+        // queue was actually read.
+        Stage::Grabbed if queue_read => furthest.stall().map(str::to_owned),
         Stage::Imported if library == Some(Presence::Absent) => {
             Stage::Imported.stall().map(str::to_owned)
         }
@@ -235,7 +276,7 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{assemble, library_presence, trace, Ctx};
+    use super::{assemble, library_presence, trace, Ctx, Fragments};
     use crate::config::Settings;
     use crate::jellyfin::Jellyfin;
     use crate::platform::Environment;
@@ -311,6 +352,22 @@ mod tests {
         }
     }
 
+    /// Fragments from services that all answered — the ordinary case the pure-assembly
+    /// tests build on, with the read-failure flags set apart in their own tests.
+    fn frags(
+        events: Vec<TraceEvent>,
+        queue: Option<QueueItem>,
+        library: Option<Presence>,
+    ) -> Fragments {
+        Fragments {
+            events,
+            queue,
+            library,
+            history_read: true,
+            queue_read: true,
+        }
+    }
+
     /// A context over the real stack, a filesystem that opens the \*arrs, and a transport
     /// answering the given reads.
     fn ctx_with(fake: Fake) -> Ctx {
@@ -367,9 +424,11 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            vec![event(Stage::Imported), event(Stage::Grabbed)],
-            None,
-            None,
+            frags(
+                vec![event(Stage::Imported), event(Stage::Grabbed)],
+                None,
+                None,
+            ),
         );
         assert!(report.matched);
         assert_eq!(report.furthest, Stage::Imported);
@@ -387,7 +446,7 @@ mod tests {
 
     #[test]
     fn a_monitored_item_with_no_history_stalls_as_never_found() {
-        let report = assemble("Sonarr", "The Expanse", true, Vec::new(), None, None);
+        let report = assemble("Sonarr", "The Expanse", true, frags(Vec::new(), None, None));
         assert_eq!(report.furthest, Stage::Monitored);
         assert!(report
             .stall
@@ -397,7 +456,12 @@ mod tests {
 
     #[test]
     fn an_unmonitored_item_is_reported_as_nobody_asked() {
-        let report = assemble("Sonarr", "The Expanse", false, Vec::new(), None, None);
+        let report = assemble(
+            "Sonarr",
+            "The Expanse",
+            false,
+            frags(Vec::new(), None, None),
+        );
         assert!(!report.matched);
         assert_eq!(report.furthest, Stage::NotMonitored);
         assert!(report.stall.is_some());
@@ -411,9 +475,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            vec![event(Stage::Grabbed)],
-            None,
-            None,
+            frags(vec![event(Stage::Grabbed)], None, None),
         );
         assert_eq!(report.furthest, Stage::Grabbed);
         assert!(report
@@ -430,12 +492,14 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            vec![event(Stage::Grabbed)],
-            Some(QueueItem {
-                stage: Stage::Downloading,
-                stuck: false,
-            }),
-            None,
+            frags(
+                vec![event(Stage::Grabbed)],
+                Some(QueueItem {
+                    stage: Stage::Downloading,
+                    stuck: false,
+                }),
+                None,
+            ),
         );
         assert_eq!(report.furthest, Stage::Downloading);
         assert_eq!(
@@ -451,12 +515,14 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            vec![event(Stage::Grabbed)],
-            Some(QueueItem {
-                stage: Stage::Downloading,
-                stuck: true,
-            }),
-            None,
+            frags(
+                vec![event(Stage::Grabbed)],
+                Some(QueueItem {
+                    stage: Stage::Downloading,
+                    stuck: true,
+                }),
+                None,
+            ),
         );
         assert!(report
             .stall
@@ -472,9 +538,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            vec![event(Stage::Imported)],
-            None,
-            Some(Presence::Present),
+            frags(vec![event(Stage::Imported)], None, Some(Presence::Present)),
         );
         assert_eq!(report.furthest, Stage::Available);
         assert_eq!(
@@ -494,9 +558,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            vec![event(Stage::Imported)],
-            None,
-            Some(Presence::Absent),
+            frags(vec![event(Stage::Imported)], None, Some(Presence::Absent)),
         );
         assert_eq!(report.furthest, Stage::Imported);
         assert_eq!(report.confidence, crate::trace::Confidence::Certain);
@@ -516,9 +578,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             false,
-            Vec::new(),
-            None,
-            Some(Presence::Present),
+            frags(Vec::new(), None, Some(Presence::Present)),
         );
         assert_eq!(report.furthest, Stage::NotMonitored);
         assert_eq!(report.confidence, crate::trace::Confidence::Certain);
@@ -540,12 +600,58 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            vec![event(Stage::Imported)],
-            None,
-            Some(Presence::Present),
+            frags(vec![event(Stage::Imported)], None, Some(Presence::Present)),
         );
         assert_eq!(report.furthest, Stage::Available);
         assert!(report.findings.is_empty());
+    }
+
+    #[test]
+    fn an_unreadable_history_is_not_read_as_never_found() {
+        // The history could not be read: an empty result must not be taken as "indexers
+        // returned nothing" — the gap is reported as unavailable, not inferred as nothing.
+        let report = assemble(
+            "Sonarr",
+            "The Expanse",
+            true,
+            Fragments {
+                events: Vec::new(),
+                queue: None,
+                library: None,
+                history_read: false,
+                queue_read: true,
+            },
+        );
+        assert_eq!(report.furthest, Stage::Monitored);
+        assert!(report.stall.is_none());
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.contains("history could not be read")));
+    }
+
+    #[test]
+    fn an_unreadable_queue_does_not_prove_a_grab_stuck() {
+        // Grabbed in history, but the queue could not be read: "the client never took it"
+        // is a claim about an empty queue, so it is not made — the gap is reported instead.
+        let report = assemble(
+            "Sonarr",
+            "The Expanse",
+            true,
+            Fragments {
+                events: vec![event(Stage::Grabbed)],
+                queue: None,
+                library: None,
+                history_read: true,
+                queue_read: false,
+            },
+        );
+        assert_eq!(report.furthest, Stage::Grabbed);
+        assert!(report.stall.is_none());
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.contains("queue could not be read")));
     }
 
     #[tokio::test]
@@ -559,6 +665,27 @@ mod tests {
         let report = trace(&context, "expanse").await.unwrap_or_default();
         assert!(report.matched);
         assert_eq!(report.furthest, Stage::Downloading);
+    }
+
+    #[tokio::test]
+    async fn a_matched_item_whose_reads_fail_reports_them_unavailable() {
+        // The item is found, but its history and queue come back unreadable: the trace
+        // reports both as unavailable rather than inferring the item stalled.
+        let context = ctx(
+            r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
+            "not json",
+            "not json",
+        );
+        let report = trace(&context, "expanse").await.unwrap_or_default();
+        assert!(report.matched);
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.contains("history could not be read")));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.contains("queue could not be read")));
     }
 
     #[tokio::test]

@@ -35,7 +35,8 @@ impl Pipeline for Servarr {
 
     async fn item_history(&self, kind: Kind, id: i64) -> Result<Vec<TraceEvent>, Failure> {
         let path = format!(
-            "/history?page=1&pageSize=100&sortKey=date&sortDirection=descending&{}={id}",
+            "/history?page=1&pageSize={}&sortKey=date&sortDirection=descending&{}={id}",
+            crate::trace::HISTORY_HORIZON,
             kind.history_filter()
         );
         let response = self.probe(&self.request(Method::Get, &path, None)).await?;
@@ -55,32 +56,52 @@ impl Pipeline for Servarr {
     }
 
     async fn item_queue(&self, kind: Kind, id: i64) -> Result<Option<QueueItem>, Failure> {
-        let response = self
-            .probe(&self.request(Method::Get, "/queue?pageSize=200", None))
-            .await?;
-        let queue: super::QueueResource = self
-            .endpoint
-            .decode(&response, "the queue could not be read")?;
-        let mut records = queue
-            .records
-            .iter()
-            .filter(|record| record.is_for(kind, id))
-            .peekable();
-        if records.peek().is_none() {
+        // A series may have several episodes queued, and a busy stack's queue can run to
+        // more than one page — so read through the pages rather than only the first, or an
+        // item sitting past page one reads as absent and is misreported as stuck at
+        // grabbed. The service's own total bounds the walk.
+        let mut found = false;
+        let mut stage: Option<Stage> = None;
+        let mut stuck = false;
+        let mut page = 1;
+        loop {
+            let path = format!("/queue?page={page}&pageSize={QUEUE_PAGE}");
+            let response = self.probe(&self.request(Method::Get, &path, None)).await?;
+            let queue: super::QueueResource = self
+                .endpoint
+                .decode(&response, "the queue could not be read")?;
+            let on_this_page = queue.records.len();
+            for record in queue
+                .records
+                .iter()
+                .filter(|record| record.is_for(kind, id))
+            {
+                found = true;
+                // Being in the queue at all means at least downloading, even where the
+                // state is unrecognised; the furthest of the item's records is what shows.
+                if let Some(reached) = Stage::of_queue_state(&record.tracked_download_state) {
+                    stage = Some(stage.map_or(reached, |far| far.max(reached)));
+                }
+                stuck |= super::is_stuck(&record.tracked_download_status);
+            }
+            if on_this_page < QUEUE_PAGE || page * QUEUE_PAGE >= queue.total_records {
+                break;
+            }
+            page += 1;
+        }
+        if !found {
             return Ok(None);
         }
-        // A series may have several episodes queued; the item's furthest download stage
-        // and whether any of its records is stuck are what the trace reads. Being in the
-        // queue at all means at least downloading, even where the state is unrecognised.
-        let stage = records
-            .clone()
-            .filter_map(|record| Stage::of_queue_state(&record.tracked_download_state))
-            .max()
-            .unwrap_or(Stage::Downloading);
-        let stuck = records.any(|record| super::is_stuck(&record.tracked_download_status));
-        Ok(Some(QueueItem { stage, stuck }))
+        Ok(Some(QueueItem {
+            stage: stage.unwrap_or(Stage::Downloading),
+            stuck,
+        }))
     }
 }
+
+/// How many queue records are read per page — a generous page so most stacks answer in
+/// one request, walked further only where the service's total says there is more.
+const QUEUE_PAGE: usize = 200;
 
 /// One library item — a series or a film — as the service lists it, matched by title to
 /// find something to trace.

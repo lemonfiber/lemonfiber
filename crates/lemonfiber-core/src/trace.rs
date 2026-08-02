@@ -14,6 +14,11 @@
 
 use serde::{Deserialize, Serialize};
 
+/// How many of an item's most recent history events a trace reads — the bounded horizon
+/// on retained detail. Stating it keeps "nothing earlier" honest: an event older than this
+/// window is simply not read, which is not proof that nothing happened before it.
+pub const HISTORY_HORIZON: usize = 100;
+
 /// A stage in an item's journey, ordered from "nobody asked for it" to "playable". The
 /// declaration order is the pipeline order, so one stage compares less than a later one.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
