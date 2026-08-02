@@ -14,9 +14,11 @@ use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Http, Method, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
     Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, MusicQuality,
-    QueueDepth, Queues, RegisteredClient, RegisteredFolder, RootFolder,
+    Pipeline, QueueDepth, Queues, RegisteredClient, RegisteredFolder, RootFolder,
 };
+use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::{api_key, Servarr};
+use lemonfiber_core::trace::Stage;
 
 /// What the fake transport answers with.
 enum Answer {
@@ -847,6 +849,111 @@ async fn a_refused_custom_format_creation_is_a_failure() {
     ]);
     assert!(lidarr(&router)
         .apply_music_format(Format::HiRes)
+        .await
+        .is_err());
+}
+
+// ---- Pipeline (item trace fragment) ----
+
+/// A Sonarr client (v3) over the given router.
+fn sonarr_routed(router: &Arc<Router>) -> Servarr {
+    let http: Arc<dyn Http> = router.clone();
+    Servarr::new(http, "http://sonarr:8989", "the-key", "sonarr", 3)
+}
+
+#[tokio::test]
+async fn find_items_matches_the_library_by_human_title() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/series",
+        200,
+        r#"[{"id":1,"title":"The Expanse","monitored":true},
+            {"id":2,"title":"Foundation","monitored":false}]"#
+            .to_owned(),
+    )]);
+    // Case-insensitive substring of the title, never an internal id.
+    let found = sonarr_routed(&router)
+        .find_items(Kind::Sonarr, "expanse")
+        .await
+        .unwrap_or_default();
+    assert_eq!(found.len(), 1);
+    let item = found.first();
+    assert_eq!(item.map(|i| i.id), Some(1));
+    assert_eq!(item.map(|i| i.title.as_str()), Some("The Expanse"));
+    assert_eq!(item.map(|i| i.monitored), Some(true));
+}
+
+#[tokio::test]
+async fn find_items_reads_the_library_for_the_service_kind() {
+    // Radarr's library is movies, not series — the endpoint follows the kind.
+    let router = Router::new(vec![(
+        Method::Get,
+        "/movie",
+        200,
+        r#"[{"id":7,"title":"Dune","monitored":true}]"#.to_owned(),
+    )]);
+    let radarr = {
+        let http: Arc<dyn Http> = router.clone();
+        Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
+    };
+    let found = radarr
+        .find_items(Kind::Radarr, "dune")
+        .await
+        .unwrap_or_default();
+    assert_eq!(found.len(), 1);
+    // The request went to the movie endpoint.
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.url.ends_with("/api/v3/movie")));
+}
+
+#[tokio::test]
+async fn item_history_keeps_stage_events_and_drops_the_rest() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/history",
+        200,
+        r#"{"records":[
+            {"eventType":"downloadFolderImported","date":"2026-01-02T00:00:00Z"},
+            {"eventType":"downloadFailed","date":"2026-01-01T12:00:00Z"},
+            {"eventType":"grabbed","date":"2026-01-01T00:00:00Z"}
+        ]}"#
+        .to_owned(),
+    )]);
+    let events = sonarr_routed(&router)
+        .item_history(Kind::Sonarr, 1)
+        .await
+        .unwrap_or_default();
+    // The import and the grab are stages; the failure is not stage-advancing, so it is
+    // dropped here (read for its own meaning elsewhere).
+    assert_eq!(events.len(), 2);
+    assert_eq!(
+        events.first().map(|event| event.stage),
+        Some(Stage::Imported)
+    );
+    assert!(events.iter().any(|event| event.stage == Stage::Grabbed));
+    // It filtered by the item, on the kind's own history parameter.
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("seriesIds=1")));
+}
+
+#[tokio::test]
+async fn an_unreadable_library_is_a_failure() {
+    let router = Router::new(vec![(Method::Get, "/series", 200, "not json".to_owned())]);
+    assert!(sonarr_routed(&router)
+        .find_items(Kind::Sonarr, "x")
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn an_unreadable_history_is_a_failure() {
+    let router = Router::new(vec![(Method::Get, "/history", 200, "not json".to_owned())]);
+    assert!(sonarr_routed(&router)
+        .item_history(Kind::Sonarr, 1)
         .await
         .is_err());
 }
