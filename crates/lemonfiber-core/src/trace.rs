@@ -16,10 +16,11 @@ use serde::{Deserialize, Serialize};
 
 /// A stage in an item's journey, ordered from "nobody asked for it" to "playable". The
 /// declaration order is the pipeline order, so one stage compares less than a later one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Stage {
     /// Nobody has asked for it — no \*arr is monitoring it.
+    #[default]
     NotMonitored,
     /// Monitored, waiting to be searched for.
     Monitored,
@@ -43,10 +44,11 @@ pub enum Stage {
 
 /// How sure the correlation behind a trace is — a release renamed between services can
 /// only be matched fuzzily, and a guess presented as fact is worse than a marked one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Confidence {
     /// Joined on identifiers the services agree on.
+    #[default]
     Certain,
     /// Joined by fuzzy matching; the trace may not be the item asked for.
     Uncertain,
@@ -91,6 +93,17 @@ impl Stage {
     #[must_use]
     pub const fn in_progress(self) -> bool {
         matches!(self, Self::Searching | Self::Downloading | Self::Importing)
+    }
+
+    /// The furthest stage an item reached, from whether it is monitored and the stages
+    /// its history records. Unmonitored is the floor — nobody asked for it; otherwise it
+    /// is the latest stage seen, or merely `Monitored` where nothing has happened yet.
+    #[must_use]
+    pub fn furthest(monitored: bool, reached: &[Self]) -> Self {
+        if !monitored {
+            return Self::NotMonitored;
+        }
+        reached.iter().copied().max().unwrap_or(Self::Monitored)
     }
 
     /// The stage a Servarr history event denotes reaching, or `None` for an event that
@@ -210,6 +223,26 @@ mod tests {
         assert_eq!(json, r#""downloaded""#);
         let back: Option<Stage> = serde_json::from_str(&json).ok();
         assert_eq!(back, Some(Stage::Downloaded));
+    }
+
+    #[test]
+    fn the_furthest_stage_is_the_latest_reached() {
+        assert_eq!(Stage::furthest(false, &[]), Stage::NotMonitored);
+        // Unmonitored floors even if history somehow shows more.
+        assert_eq!(
+            Stage::furthest(false, &[Stage::Grabbed]),
+            Stage::NotMonitored
+        );
+        assert_eq!(Stage::furthest(true, &[]), Stage::Monitored);
+        assert_eq!(
+            Stage::furthest(true, &[Stage::Grabbed, Stage::Imported]),
+            Stage::Imported
+        );
+        // Order of the events does not matter — the furthest is a max.
+        assert_eq!(
+            Stage::furthest(true, &[Stage::Imported, Stage::Grabbed]),
+            Stage::Imported
+        );
     }
 
     #[test]

@@ -192,6 +192,15 @@ enum Request {
         #[arg(required = true)]
         forms: Vec<String>,
     },
+    /// Follow one show or film across the services — "where is my show?".
+    ///
+    /// Searched for the way you would name it, not by an internal id. Reports how far
+    /// it got and, where it plainly stopped, why.
+    Trace {
+        /// The show or film to follow, named as you would say it.
+        #[arg(required = true)]
+        term: Vec<String>,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.
@@ -402,6 +411,11 @@ async fn main() -> ExitCode {
             };
             Command::Doctor { only, disruptive }
         }
+        // The term is taken as words so it can be typed unquoted; joined back into the
+        // title as said.
+        Request::Trace { term } => Command::Trace {
+            term: term.join(" "),
+        },
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         // Backup and restore drive their own executors over the tar adapter and
@@ -472,9 +486,13 @@ fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::SUCCESS
             }
         }
-        Outcome::Version(_) | Outcome::Lifecycle(_) | Outcome::Config(_) | Outcome::Status(_) => {
-            ExitCode::SUCCESS
-        }
+        // A trace is a query — it answers where an item is; asking is never a failure,
+        // whatever the answer.
+        Outcome::Version(_)
+        | Outcome::Lifecycle(_)
+        | Outcome::Config(_)
+        | Outcome::Trace(_)
+        | Outcome::Status(_) => ExitCode::SUCCESS,
     }
 }
 

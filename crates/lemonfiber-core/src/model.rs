@@ -235,6 +235,38 @@ pub struct UpgradeReport {
     pub media: Vec<UpgradeMedia>,
 }
 
+/// One stage a traced item reached, named as the operator would read it: the stage,
+/// the service that recorded it, and when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TraceStage {
+    /// The stage reached.
+    pub stage: crate::trace::Stage,
+    /// The service that recorded it.
+    pub service: String,
+    /// When it happened, as the service reported it — absent for a stage inferred
+    /// rather than timed, such as being monitored.
+    pub at: Option<String>,
+}
+
+/// Where one item is in the pipeline: how far it got, why it stopped if it did, and the
+/// stages it passed through — the answer to "where is my show?".
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct TraceReport {
+    /// The term the item was searched for by.
+    pub item: String,
+    /// Whether a monitored item matched the term at all — a false here is itself the
+    /// answer: nobody asked for it.
+    pub matched: bool,
+    /// The furthest stage the item reached.
+    pub furthest: crate::trace::Stage,
+    /// Why it stopped, where it plainly has — or absent where it is progressing or done.
+    pub stall: Option<String>,
+    /// The stages it passed through, in order.
+    pub stages: Vec<TraceStage>,
+    /// How sure the trace is of the item it followed.
+    pub confidence: crate::trace::Confidence,
+}
+
 /// What a lifecycle command did, or would have done.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LifecycleReport {
