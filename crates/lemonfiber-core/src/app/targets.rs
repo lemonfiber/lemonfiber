@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use crate::app::Ctx;
 use crate::config::store;
 use crate::doctor::credentials::Target;
+use crate::jellyfin::Jellyfin;
 use crate::ports::service::{Download, Transfers};
 use crate::qbittorrent::Qbittorrent;
 use crate::sabnzbd::Sabnzbd;
@@ -171,6 +172,41 @@ pub(super) fn record_secret(ctx: &Ctx, key: &str, value: &str) {
 /// dashboard's transfers authentication and for a later seed run.
 pub(super) fn recorded_qbittorrent_password(ctx: &Ctx) -> Option<String> {
     recorded_secret(ctx, crate::config::QBITTORRENT_PASSWORD_KEY)
+}
+
+/// The household's Jellyfin as a reading client, for the last stage of a trace —
+/// whether the item is finally in the library. Present only where the stack has a
+/// Jellyfin and lemonfiber recorded the admin password it minted for it: the read signs
+/// in with the household's own credential, so without it there is nothing to sign in as.
+///
+/// A trace treats its absence as one more thing it cannot tell rather than a fault, so
+/// either gap simply leaves the availability question unanswered.
+pub(super) fn jellyfin_reader(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<Jellyfin> {
+    let base = jellyfin_base(services)?;
+    let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
+    Some(Jellyfin::authenticated(
+        ctx.http.clone(),
+        base,
+        "jellyfin",
+        crate::config::JELLYFIN_ADMIN_USER,
+        password,
+    ))
+}
+
+/// Where the host reaches the stack's Jellyfin, if it has one — the loopback port every
+/// service lemonfiber speaks to on the host is reached on, selected by its api kind.
+fn jellyfin_base(services: &[lemonfiber_manifest::Service]) -> Option<String> {
+    services.iter().find_map(|service| {
+        let api = service.api.as_ref()?;
+        if api.kind != lemonfiber_manifest::ApiKind::Jellyfin {
+            return None;
+        }
+        let port = service.port?;
+        Some(format!("http://127.0.0.1:{port}"))
+    })
 }
 
 /// One client's active downloads, read on its own shape — nothing where it is not

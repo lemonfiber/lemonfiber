@@ -54,6 +54,19 @@ pub enum Confidence {
     Uncertain,
 }
 
+/// What the media server says about an item being in the library — the final stage, the
+/// one no \*arr can see. Read as a three-way answer because "not in the library" is only
+/// meaningful when the media server actually answered: where it could not be reached the
+/// presence is simply unknown, and a trace never infers an availability it cannot confirm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Presence {
+    /// The media server has it — visible and playable, the item is available.
+    Present,
+    /// The media server answered and does not have it — genuinely not yet visible, so an
+    /// item imported to disk is now provably still waiting for the library to be scanned.
+    Absent,
+}
+
 impl Stage {
     /// Every stage, in pipeline order.
     pub const ALL: [Self; 10] = [

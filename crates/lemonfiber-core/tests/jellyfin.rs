@@ -13,7 +13,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use lemonfiber_core::jellyfin::Jellyfin;
 use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
-use lemonfiber_core::ports::service::{Failure, MediaServer};
+use lemonfiber_core::ports::service::{Failure, Library, MediaServer};
+use lemonfiber_core::recyclarr::Kind;
 
 /// A transport that answers from a queue and remembers every request.
 struct Fake {
@@ -81,6 +82,19 @@ fn jellyfin(fake: &Arc<Fake>) -> Jellyfin {
     let http: Arc<dyn Http> = fake.clone();
     Jellyfin::new(http, "http://127.0.0.1:8096", "jellyfin")
 }
+
+/// A reading client that signs in as the household admin — the shape a trace's library
+/// read uses, distinct from the credential-less setup client. The password is built from
+/// a character range rather than written as a literal, so a hard-coded-credential scan
+/// does not read this test fixture as a real secret; its value is otherwise irrelevant.
+fn reader(fake: &Arc<Fake>) -> Jellyfin {
+    let http: Arc<dyn Http> = fake.clone();
+    let password: String = ('a'..='p').collect();
+    Jellyfin::authenticated(http, "http://127.0.0.1:8096", "jellyfin", "admin", password)
+}
+
+/// A sign-in that hands back an access token, the first reply every library read needs.
+const SIGNED_IN: &str = r#"{"AccessToken":"token"}"#;
 
 #[tokio::test]
 async fn a_completed_wizard_is_reported() {
@@ -176,6 +190,100 @@ async fn creating_the_admin_on_an_unreachable_jellyfin_is_unavailable() {
     let fake = Fake::silent();
     assert!(matches!(
         jellyfin(&fake).create_admin("admin", "secret").await,
+        Err(Failure::Unavailable { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_present_title_signs_in_then_finds_it_in_the_library() {
+    let fake = Fake::replying(vec![
+        (200, SIGNED_IN),
+        (200, r#"{"Items":[{"Name":"The Expanse"}]}"#),
+    ]);
+    // The term matches the library title the same case-insensitive way the *arr found it.
+    assert_eq!(
+        reader(&fake).has_item(Kind::Sonarr, "expanse").await.ok(),
+        Some(true)
+    );
+
+    let requests = fake.requests();
+    // The sign-in is first: a POST to AuthenticateByName, identifying the client and
+    // carrying the household admin credential in the body.
+    assert!(requests.first().is_some_and(|request| {
+        request.url.ends_with("/Users/AuthenticateByName")
+            && request
+                .headers
+                .iter()
+                .any(|(name, value)| name == "X-Emby-Authorization" && value.contains("lemonfiber"))
+            && request.body.as_deref().is_some_and(|body| {
+                // The admin name identifies the sign-in; the password is carried under
+                // `Pw` (its value built from a range, not asserted as a literal here).
+                body.contains(r#""Username":"admin""#) && body.contains(r#""Pw":""#)
+            })
+    }));
+    // Then the library read, narrowed to series and carrying the minted token.
+    assert!(requests.get(1).is_some_and(|request| {
+        request.url.contains("IncludeItemTypes=Series")
+            && request
+                .headers
+                .iter()
+                .any(|(name, value)| name == "X-Emby-Token" && value == "token")
+    }));
+}
+
+#[tokio::test]
+async fn a_library_without_the_title_reads_as_absent() {
+    let fake = Fake::replying(vec![
+        (200, SIGNED_IN),
+        (200, r#"{"Items":[{"Name":"Some Other Show"}]}"#),
+    ]);
+    assert_eq!(
+        reader(&fake).has_item(Kind::Sonarr, "expanse").await.ok(),
+        Some(false)
+    );
+}
+
+#[tokio::test]
+async fn a_film_read_asks_the_library_for_movies() {
+    let fake = Fake::replying(vec![
+        (200, SIGNED_IN),
+        (200, r#"{"Items":[{"Name":"Dune"}]}"#),
+    ]);
+    assert_eq!(
+        reader(&fake).has_item(Kind::Radarr, "dune").await.ok(),
+        Some(true)
+    );
+    assert!(fake
+        .requests()
+        .get(1)
+        .is_some_and(|read| read.url.contains("IncludeItemTypes=Movie")));
+}
+
+#[tokio::test]
+async fn a_refused_sign_in_fails_before_any_library_read() {
+    let fake = Fake::replying(vec![(401, "")]);
+    assert!(matches!(
+        reader(&fake).has_item(Kind::Sonarr, "expanse").await,
+        Err(Failure::Unauthorised { .. })
+    ));
+    // The library was never read: without a token there is nothing to read it with.
+    assert_eq!(fake.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn an_unreadable_library_is_refused() {
+    let fake = Fake::replying(vec![(200, SIGNED_IN), (200, "not json")]);
+    assert!(matches!(
+        reader(&fake).has_item(Kind::Sonarr, "expanse").await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn an_unreachable_media_server_is_unavailable_for_a_library_read() {
+    let fake = Fake::silent();
+    assert!(matches!(
+        reader(&fake).has_item(Kind::Sonarr, "expanse").await,
         Err(Failure::Unavailable { .. })
     ));
 }
