@@ -265,6 +265,11 @@ pub struct TraceReport {
     pub stages: Vec<TraceStage>,
     /// How sure the trace is of the item it followed.
     pub confidence: crate::trace::Confidence,
+    /// Disagreements between the services about this item, each in plain language — a
+    /// media server holding what no service is monitoring, and the like. Orthogonal to
+    /// the linear pipeline: not where the item got to, but where two services' views of
+    /// it contradict, surfaced rather than silently reconciled.
+    pub findings: Vec<String>,
 }
 
 /// What a lifecycle command did, or would have done.

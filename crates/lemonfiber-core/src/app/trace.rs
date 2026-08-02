@@ -94,9 +94,11 @@ fn assemble(
     queue: Option<QueueItem>,
     library: Option<Presence>,
 ) -> TraceReport {
-    // Presence in the media server only means something once an \*arr is monitoring the
-    // item; for one nobody asked for, "not monitored" is the whole answer, and a stray
-    // library match is a service disagreement left to a later slice, not availability.
+    // Presence in the media server only means something for availability once an \*arr is
+    // monitoring the item; for one nobody asked for, "not monitored" is the whole answer,
+    // and a library match is not availability but a disagreement — surfaced below as a
+    // finding, never folded into how far the item got.
+    let unmanaged_but_present = !monitored && library == Some(Presence::Present);
     let library = monitored.then_some(library).flatten();
 
     let max_history = events.iter().map(|event| event.stage).max();
@@ -150,37 +152,23 @@ fn assemble(
         });
     }
 
-    let stuck = queue.is_some_and(|item| item.stuck);
-    let stall = if stuck {
-        // The C7 signal: queued but not progressing — a real problem the operator can act
-        // on, distinct from a download merely still running.
-        Some(
-            "the download is in the queue but not progressing — the download client needs \
-             attention"
+    // Where two services hold contradictory views of the item, that is not a point on the
+    // pipeline but a disagreement to surface on its own, so an operator sees it rather than
+    // having it silently reconciled away.
+    let mut findings = Vec::new();
+    if unmanaged_but_present {
+        findings.push(
+            "the media server has this, but no service is monitoring it — it will not be \
+             maintained, upgraded, or repaired if it is lost"
                 .to_owned(),
-        )
-    } else {
-        // A grab that never made the queue and never imported is now provably stuck at
-        // grabbed; the not-monitored and never-found stalls stand as before. Imported but
-        // confirmed absent from the library is now provably still awaiting a scan — a
-        // reason only the media server can supply, so it stands only on a confirmed
-        // absence, never on a media server that could not be asked.
-        match furthest {
-            Stage::NotMonitored | Stage::Monitored | Stage::Grabbed => {
-                furthest.stall().map(str::to_owned)
-            }
-            Stage::Imported if library == Some(Presence::Absent) => {
-                Stage::Imported.stall().map(str::to_owned)
-            }
-            _ => None,
-        }
-    };
+        );
+    }
 
     TraceReport {
         item: title.to_owned(),
         matched: monitored,
         furthest,
-        stall,
+        stall: stall_reason(furthest, queue, library),
         stages,
         // A presence found by matching titles across to the media server — the two ends
         // share no id — may not be the item asked for, so it is marked, never claimed.
@@ -189,6 +177,42 @@ fn assemble(
         } else {
             Confidence::Certain
         },
+        findings,
+    }
+}
+
+/// Why the item stopped where it did, in plain language — or `None` where nothing proves
+/// it stopped. The generic reason a resting stage carries, sharpened by what only the live
+/// reads can settle: a stuck queue names the download client; an import confirmed absent
+/// from the library names the missing scan; downloading and beyond are otherwise either in
+/// progress or beyond what the \*arr alone can judge.
+fn stall_reason(
+    furthest: Stage,
+    queue: Option<QueueItem>,
+    library: Option<Presence>,
+) -> Option<String> {
+    if queue.is_some_and(|item| item.stuck) {
+        // The C7 signal: queued but not progressing — a real problem the operator can act
+        // on, distinct from a download merely still running.
+        return Some(
+            "the download is in the queue but not progressing — the download client needs \
+             attention"
+                .to_owned(),
+        );
+    }
+    // A grab that never made the queue and never imported is now provably stuck at grabbed;
+    // the not-monitored and never-found stalls stand as before. Imported but confirmed
+    // absent from the library is now provably still awaiting a scan — a reason only the
+    // media server can supply, so it stands only on a confirmed absence, never on one that
+    // could not be asked.
+    match furthest {
+        Stage::NotMonitored | Stage::Monitored | Stage::Grabbed => {
+            furthest.stall().map(str::to_owned)
+        }
+        Stage::Imported if library == Some(Presence::Absent) => {
+            Stage::Imported.stall().map(str::to_owned)
+        }
+        _ => None,
     }
 }
 
@@ -201,6 +225,7 @@ fn not_matched(term: &str) -> TraceReport {
         stall: Stage::NotMonitored.stall().map(str::to_owned),
         stages: Vec::new(),
         confidence: Confidence::Certain,
+        findings: Vec::new(),
     }
 }
 
@@ -482,10 +507,11 @@ mod tests {
     }
 
     #[test]
-    fn a_library_match_for_an_unmonitored_item_is_not_availability() {
-        // Nobody asked for it, yet the library has something by that title: that is a
-        // service disagreement, left to a later slice — "not monitored" is still the
-        // whole answer, and the stray match never promotes it to available.
+    fn a_library_match_for_an_unmonitored_item_is_a_disagreement_not_availability() {
+        // Nobody asked for it, yet the library has something by that title: the services
+        // disagree. "Not monitored" is still how far it got — the stray match never
+        // promotes it to available or marks the trace uncertain — but the contradiction is
+        // surfaced as a finding rather than reconciled away.
         let report = assemble(
             "Sonarr",
             "The Expanse",
@@ -500,6 +526,26 @@ mod tests {
             .stall
             .as_deref()
             .is_some_and(|reason| reason.contains("nobody has asked")));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.contains("no service is monitoring it")));
+    }
+
+    #[test]
+    fn agreeing_services_raise_no_disagreement() {
+        // Monitored and present: the services agree, so there is no finding — a disagreement
+        // is only raised where two views genuinely contradict.
+        let report = assemble(
+            "Sonarr",
+            "The Expanse",
+            true,
+            vec![event(Stage::Imported)],
+            None,
+            Some(Presence::Present),
+        );
+        assert_eq!(report.furthest, Stage::Available);
+        assert!(report.findings.is_empty());
     }
 
     #[tokio::test]

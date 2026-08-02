@@ -390,6 +390,11 @@ pub(crate) fn trace(report: &TraceReport) {
     if let Some(reason) = &report.stall {
         println!("  ✗ stopped: {reason}");
     }
+    // Services that disagree about the item — surfaced, not reconciled away, so the
+    // operator decides what to do about the contradiction.
+    for finding in &report.findings {
+        println!("  ! disagreement: {finding}");
+    }
     // A trace joined to the library by title alone may not be the item asked for; saying
     // so is the honest thing — better a marked guess than one presented as fact.
     if report.confidence == Confidence::Uncertain {
