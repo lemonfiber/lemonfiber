@@ -13,7 +13,7 @@ use crate::audio::Format;
 use crate::doctor::Category;
 use crate::error::{Code, Problem};
 use crate::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, MusicReport, QualityReport,
+    ConfigReport, DoctorReport, Envelope, LifecycleReport, MusicReport, QualityReport, ResetReport,
     StatusReport, TraceReport, UpgradeReport, VersionReport,
 };
 use crate::quality::Preset;
@@ -28,6 +28,7 @@ mod materialise;
 mod music;
 mod quality;
 pub mod recover;
+mod reset;
 pub mod restore;
 mod seed;
 pub mod setup;
@@ -134,6 +135,14 @@ pub enum Command {
     /// stop reporting as drift and are kept across future seeds and restores. Wires
     /// what is missing as a seed does, and promotes every drifted value to adopted.
     Adopt,
+    /// Put the stack back to lemonfiber's own state, reverting every operator edit — the
+    /// opposite of adopt. Because it discards their work, it names what will be lost and
+    /// does nothing until confirmed: unconfirmed it only previews the reverts.
+    Reset {
+        /// Whether the operator confirmed the loss; without it, only the reverts are
+        /// shown and nothing is written.
+        confirm: bool,
+    },
 }
 
 /// What a quality command asks for.
@@ -179,6 +188,8 @@ pub enum Outcome {
     Doctor(DoctorReport),
     /// What seeding wired, and what it left for a re-run.
     Seed(crate::seed::Report),
+    /// What a full reset did, or would do — the operator edits reverted to lemonfiber's.
+    Reset(ResetReport),
 }
 
 impl Outcome {
@@ -196,6 +207,7 @@ impl Outcome {
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
             Self::Seed(_) => "seed",
+            Self::Reset(_) => "reset",
         };
         Envelope::new(kind, self)
     }
@@ -214,6 +226,7 @@ impl serde::Serialize for Outcome {
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
+            Self::Reset(report) => report.serialize(serializer),
         }
     }
 }
@@ -262,6 +275,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             .map(Outcome::Doctor),
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
+        Command::Reset { confirm } => reset::reset(ctx, confirm)
+            .await
+            .map(Outcome::Reset)
+            .map_err(|p| *p),
     }
 }
 
@@ -346,6 +363,21 @@ mod tests {
         .unwrap_or_default();
         assert!(
             json.contains("\"kind\":\"trace\""),
+            "envelope names the kind"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_reset_serialises_under_its_own_kind() {
+        // The test stack is external, so a reset reverts nothing — but the command still
+        // runs through dispatch, envelope and serialise for its outcome.
+        let json = dispatch(Command::Reset { confirm: false }, &ctx(Ok(spoke(""))))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"reset\""),
             "envelope names the kind"
         );
     }
@@ -524,7 +556,8 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
-                | Outcome::Seed(_),
+                | Outcome::Seed(_)
+                | Outcome::Reset(_),
             )
             | Err(_) => None,
         }
@@ -542,7 +575,8 @@ mod tests {
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
                 | Outcome::Status(_)
-                | Outcome::Seed(_),
+                | Outcome::Seed(_)
+                | Outcome::Reset(_),
             )
             | Err(_) => None,
         }
@@ -968,7 +1002,8 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
-                | Outcome::Seed(_),
+                | Outcome::Seed(_)
+                | Outcome::Reset(_),
             )
             | Err(_) => None,
         }
@@ -1422,7 +1457,8 @@ mod tests {
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
                 | Outcome::Doctor(_)
-                | Outcome::Seed(_),
+                | Outcome::Seed(_)
+                | Outcome::Reset(_),
             )
             | Err(_) => None,
         }

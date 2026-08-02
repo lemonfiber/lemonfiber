@@ -305,6 +305,10 @@ pub(crate) struct SeedFs {
     /// path, so a test can make Prowlarr's key readable while an \*arr's is not —
     /// the case of an \*arr that started after Prowlarr.
     only_prowlarr: bool,
+    /// Path fragments a canonicalize should fail for, standing in for host
+    /// directories that are not there — so a root folder's existence check can be
+    /// driven to missing. Every path resolves when empty.
+    missing: Vec<&'static str>,
     /// What a volume describe reports — a zero total by default, which the
     /// dashboard reads as free space unknown.
     facts: crate::ports::filesystem::StorageFacts,
@@ -316,6 +320,7 @@ impl SeedFs {
             servarr,
             sabnzbd,
             only_prowlarr: false,
+            missing: Vec::new(),
             facts: crate::ports::filesystem::StorageFacts {
                 kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
                 removable: false,
@@ -336,6 +341,13 @@ impl SeedFs {
         self.facts = facts;
         self
     }
+
+    /// The same, but failing to canonicalize any path carrying one of these
+    /// fragments — a host directory that is not there, for a root-folder check.
+    pub(crate) fn missing(mut self, fragments: Vec<&'static str>) -> Self {
+        self.missing = fragments;
+        self
+    }
 }
 
 #[async_trait]
@@ -344,6 +356,10 @@ impl crate::ports::filesystem::FileSystem for SeedFs {
         &self,
         path: &std::path::Path,
     ) -> Result<std::path::PathBuf, crate::ports::filesystem::Fault> {
+        let text = path.to_string_lossy();
+        if self.missing.iter().any(|fragment| text.contains(fragment)) {
+            return Err(crate::ports::filesystem::Fault::new("no such path"));
+        }
         Ok(path.to_path_buf())
     }
     async fn touch(&self, _path: &std::path::Path) -> Result<(), crate::ports::filesystem::Fault> {

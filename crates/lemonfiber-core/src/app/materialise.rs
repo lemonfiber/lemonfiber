@@ -54,6 +54,64 @@ pub(super) fn materialise(
     record_path: Option<&Path>,
     selection: Option<&Selection>,
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
+    write_stack(source, into, record_path, selection, Pass::Materialise)
+}
+
+/// Overwrite the stack back to lemonfiber's own version, reverting every file the
+/// operator had edited — the write side of a full reset. Returns where the stack lives
+/// and, as [`StackEdit`]s, the edits that were reverted (the diff of what was lost). A
+/// reset is the explicit consent to let lemonfiber's state win, so the record is brought
+/// to what was written and the reverted file is no longer read as drift.
+///
+/// # Errors
+///
+/// Returns [`Failure`] when there is nowhere to write to, or a file cannot be written.
+pub(super) fn reset_stack(
+    source: Source,
+    into: Option<&Path>,
+    record_path: Option<&Path>,
+    selection: Option<&Selection>,
+) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
+    write_stack(source, into, record_path, selection, Pass::Reset)
+}
+
+/// The edits a reset would revert, without touching a thing — the operator's hand-edited
+/// stack files, each with the diff of what would be lost. The preview a reset shows before
+/// it is confirmed.
+///
+/// # Errors
+///
+/// Returns [`Failure`] only where there is nowhere the stack could live to read from.
+pub(super) fn pending_reverts(
+    source: Source,
+    into: Option<&Path>,
+    record_path: Option<&Path>,
+    selection: Option<&Selection>,
+) -> Result<Vec<StackEdit>, Failure> {
+    write_stack(source, into, record_path, selection, Pass::Preview).map(|(_, edits)| edits)
+}
+
+/// Which pass over the stack this is: an ordinary materialise (write lemonfiber's, keep
+/// the operator's edits), a reset (write lemonfiber's over the operator's edits too), or a
+/// preview (touch nothing, only report what a reset would revert).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Pass {
+    Materialise,
+    Reset,
+    Preview,
+}
+
+/// The one walk behind materialise, reset and its preview: decide each file three ways,
+/// and act per `pass` — writing lemonfiber's version, preserving or reverting an edit, or
+/// only collecting what a reset would revert. An operator's edit is always returned with
+/// its diff; the pass decides whether it was preserved, reverted, or merely previewed.
+fn write_stack(
+    source: Source,
+    into: Option<&Path>,
+    record_path: Option<&Path>,
+    selection: Option<&Selection>,
+    pass: Pass,
+) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
     let files = source.files();
     if files.is_empty() {
         // External, or nothing to write: left exactly as it is.
@@ -63,6 +121,7 @@ pub(super) fn materialise(
         return Err(Failure::NowhereToWrite);
     };
 
+    let writing = pass != Pass::Preview;
     let mut record = load(record_path);
     let mut edits = Vec::new();
     for (relative, content) in files {
@@ -79,17 +138,25 @@ pub(super) fn materialise(
         let on_disk = std::fs::read(&target).ok();
         let actual = on_disk.as_deref().map(checksum);
         match decide(record.checksum(&key), actual, desired) {
-            Decision::Write => {
+            Decision::Write if writing => {
                 write(&target, &content)?;
                 record.record(&key, desired);
             }
-            // Already what lemonfiber would write: left, and recorded so the next run
-            // reads it as lemonfiber's own rather than the operator's.
-            Decision::Fresh => record.record(&key, desired),
-            // The operator's edit: left as it is, its record kept at what lemonfiber
-            // last wrote so it goes on being recognised, and shown with a diff.
+            // Already what lemonfiber would write: recorded so the next run reads it as
+            // lemonfiber's own rather than the operator's.
+            Decision::Fresh if writing => record.record(&key, desired),
+            // A preview touches nothing and records nothing.
+            Decision::Write | Decision::Fresh => {}
+            // The operator's edit. An ordinary materialise leaves it, its record kept at
+            // what lemonfiber last wrote so it goes on being recognised; a reset writes
+            // lemonfiber's version over it and records that; a preview does neither.
+            // Either way it is returned with a diff — held back, reverted, or previewed.
             Decision::Preserve => {
                 let yours = on_disk.unwrap_or_default();
+                if pass == Pass::Reset {
+                    write(&target, &content)?;
+                    record.record(&key, desired);
+                }
                 edits.push(StackEdit {
                     path: key.into_owned(),
                     diff: diff(
@@ -100,7 +167,9 @@ pub(super) fn materialise(
             }
         }
     }
-    save(record_path, &record);
+    if writing {
+        save(record_path, &record);
+    }
     Ok((into.to_path_buf(), edits))
 }
 
@@ -234,7 +303,9 @@ mod tests {
 
     use include_dir::{include_dir, Dir};
 
-    use super::{materialise, reapply_recyclarr, recyclarr_customised};
+    use super::{
+        materialise, pending_reverts, reapply_recyclarr, recyclarr_customised, reset_stack,
+    };
     use crate::quality::{Preset, Selection};
     use crate::stack::{Failure, Source};
 
@@ -301,6 +372,51 @@ mod tests {
             "the diff shows both sides",
         );
         // The operator's edit is left exactly as they made it, not overwritten.
+        assert_eq!(read(&into.join("compose.yaml")), edited);
+    }
+
+    #[test]
+    fn a_reset_reverts_an_edited_file_to_lemonfibers_and_names_it() {
+        let (into, record) = scratch("reset-revert");
+        let source = Source::Embedded(&STACKLET);
+        let (_, _) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+            .unwrap_or((PathBuf::new(), Vec::new()));
+        let shipped = read(&into.join("compose.yaml"));
+
+        // The operator edits a file, then resets.
+        let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
+        let _ = std::fs::write(into.join("compose.yaml"), edited);
+
+        let (_, reverted) = reset_stack(source, Some(&into), Some(&record), Some(&balanced()))
+            .unwrap_or((PathBuf::new(), Vec::new()));
+        assert_eq!(reverted.len(), 1, "the reverted edit is named");
+        assert!(reverted
+            .first()
+            .is_some_and(|edit| edit.path == "compose.yaml"));
+        // The edit is gone: the file is lemonfiber's own again.
+        assert_eq!(read(&into.join("compose.yaml")), shipped);
+        // And a following materialise sees no drift — the reset re-recorded it.
+        let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+            .unwrap_or((PathBuf::new(), Vec::new()));
+        assert!(
+            again.is_empty(),
+            "the reverted file is no longer read as drift"
+        );
+    }
+
+    #[test]
+    fn a_preview_names_the_reverts_but_writes_nothing() {
+        let (into, record) = scratch("reset-preview");
+        let source = Source::Embedded(&STACKLET);
+        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()));
+
+        let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
+        let _ = std::fs::write(into.join("compose.yaml"), edited);
+
+        let pending = pending_reverts(source, Some(&into), Some(&record), Some(&balanced()))
+            .unwrap_or_default();
+        assert_eq!(pending.len(), 1, "the edit that would be reverted is named");
+        // The preview touched nothing: the operator's edit is still there.
         assert_eq!(read(&into.join("compose.yaml")), edited);
     }
 

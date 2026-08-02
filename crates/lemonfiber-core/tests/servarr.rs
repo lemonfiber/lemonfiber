@@ -357,6 +357,82 @@ async fn a_download_client_is_posted_to_its_endpoint() {
 }
 
 #[tokio::test]
+async fn an_updated_download_client_is_put_to_its_id_carrying_it() {
+    let fake = Fake::new(Answer::Reply(200, ""));
+    assert!(sonarr(&fake)
+        .update_download_client("7", &sabnzbd())
+        .await
+        .is_ok());
+
+    let sent = fake.request();
+    assert!(sent
+        .as_ref()
+        .is_some_and(|request| request.method == Method::Put
+            && request.url.ends_with("/api/v3/downloadclient/7")));
+    // The document rewrites the one that is there rather than adding a second: it names
+    // the id the service assigned.
+    assert!(sent.is_some_and(|request| request.body.is_some_and(|body| body.contains(r#""id":7"#))));
+}
+
+#[tokio::test]
+async fn an_update_with_an_id_the_service_did_not_assign_is_refused() {
+    // A non-numeric id is not one a Servarr service assigns, so there is nothing to
+    // address — refused rather than a malformed request sent.
+    let fake = Fake::new(Answer::Reply(200, ""));
+    assert!(matches!(
+        sonarr(&fake)
+            .update_download_client("not-a-number", &sabnzbd())
+            .await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_rejected_download_client_update_is_refused() {
+    let fake = Fake::new(Answer::Reply(400, "cannot update"));
+    assert!(matches!(
+        sonarr(&fake).update_download_client("7", &sabnzbd()).await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn testing_download_clients_reads_each_services_verdict() {
+    // `testall` answers one result per client: the valid one is reachable with nothing
+    // to say, the one that failed carries the service's joined words, and one that
+    // failed without words carries none — never an error, since a failing client is
+    // the answer wanted, not a fault.
+    let body = r#"[
+        {"id":1,"isValid":true,"validationFailures":[]},
+        {"id":2,"isValid":false,"validationFailures":[
+            {"errorMessage":"unable to connect"},{"errorMessage":"timed out"}]},
+        {"id":3,"isValid":false,"validationFailures":[]}
+    ]"#;
+    let fake = Fake::new(Answer::Reply(200, body));
+    let probes = sonarr(&fake)
+        .test_download_clients()
+        .await
+        .unwrap_or_default();
+
+    // The test is asked of the service's own `testall`.
+    assert!(fake
+        .request()
+        .is_some_and(|request| request.method == Method::Post
+            && request.url.ends_with("/api/v3/downloadclient/testall")));
+
+    let reachable = probes.iter().find(|probe| probe.id == "1");
+    assert!(reachable.is_some_and(|probe| probe.reachable && probe.detail.is_none()));
+    let refused = probes.iter().find(|probe| probe.id == "2");
+    assert!(refused.is_some_and(|probe| !probe.reachable
+        && probe
+            .detail
+            .as_deref()
+            .is_some_and(|detail| detail == "unable to connect; timed out")));
+    let wordless = probes.iter().find(|probe| probe.id == "3");
+    assert!(wordless.is_some_and(|probe| !probe.reachable && probe.detail.is_none()));
+}
+
+#[tokio::test]
 async fn a_rejected_root_folder_registration_is_refused() {
     let fake = Fake::new(Answer::Reply(400, "path already used"));
     let folder = RootFolder {

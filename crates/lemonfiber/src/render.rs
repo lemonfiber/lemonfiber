@@ -12,11 +12,12 @@ use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
     ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, MusicChoice, MusicReport,
-    PresetChoice, QualityReport, StatusReport, SupervisionReport, TraceReport, Triggered,
-    UpgradeReport, VersionReport,
+    PresetChoice, QualityReport, ResetReport, StatusReport, SupervisionReport, TraceReport,
+    Triggered, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::seed::{
-    Assessment as SeedAssessment, Report as SeedReport, State as SeedState,
+    Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
+    State as SeedState,
 };
 use lemonfiber_core::trace::{Confidence, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
@@ -44,6 +45,7 @@ pub(crate) fn render(outcome: &Outcome, json: bool) {
         Outcome::Status(report) => status(report),
         Outcome::Doctor(report) => diagnosis(report),
         Outcome::Seed(report) => seeding(report),
+        Outcome::Reset(report) => reset(report),
     }
 }
 
@@ -90,6 +92,23 @@ pub(crate) fn seeding(report: &SeedReport) {
                 println!("      {reason}");
             }
         }
+        // A drift that broke the stack is raised beneath the line it sits on, naming
+        // what broke and the fix — the warning severity a plain drift never carries.
+        if let SeedSeverity::Warning {
+            breakage,
+            remediation,
+        } = &wiring.severity
+        {
+            println!("      ! {breakage}");
+            println!("        → {remediation}");
+        }
+    }
+    let warnings = report.warnings();
+    if !warnings.is_empty() {
+        println!(
+            "\n{} drifted in a way that breaks the stack — see the ! lines above.",
+            warnings.len()
+        );
     }
     let outstanding = report.outstanding();
     let blocked = report.blocked();
@@ -404,6 +423,35 @@ pub(crate) fn trace(report: &TraceReport) {
     // The history read is bounded; stating the horizon keeps "nothing earlier" honest —
     // an event older than this window is not read, not proof that nothing happened.
     println!("  · reflects the most recent {HISTORY_HORIZON} history events per service");
+}
+
+/// What a full reset did, or — until confirmed — would do: the edits it reverts to
+/// lemonfiber's own state, named with what is lost, so nothing is discarded unseen.
+pub(crate) fn reset(report: &ResetReport) {
+    if report.reverted.is_empty() && report.reverted_connections.is_empty() {
+        println!("Nothing to reset — the stack is already lemonfiber's own.");
+        return;
+    }
+    let count = report.reverted.len() + report.reverted_connections.len();
+    if report.confirmed {
+        println!("Reverted {count} change(s) to lemonfiber's state:");
+    } else {
+        println!(
+            "A reset would revert these {count} change(s) to lemonfiber's state — run again \
+             with --confirm to do it:"
+        );
+    }
+    // The service connections whose category drifted, named as they read in a seed report.
+    for connection in &report.reverted_connections {
+        println!("  · {connection}");
+    }
+    // The hand-edited stack files, each with the diff of what is lost.
+    for edit in &report.reverted {
+        println!("\n  {}", edit.path);
+        if !edit.diff.is_empty() {
+            print!("{}", edit.diff);
+        }
+    }
 }
 
 /// What a lifecycle command did, or would have done.

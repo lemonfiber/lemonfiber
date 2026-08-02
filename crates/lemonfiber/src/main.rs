@@ -23,7 +23,7 @@ use lemonfiber_core::config::{
 };
 use lemonfiber_core::doctor::{Category, Overall};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{Disposition, Envelope, Triggered, UpgradeReport};
+use lemonfiber_core::model::{Disposition, Envelope, ResetReport, Triggered, UpgradeReport};
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
@@ -209,6 +209,17 @@ enum Request {
     /// adopted it is kept across future seeds and restores. Wires what is missing
     /// as a seed does, and promotes every drifted value to yours.
     Adopt,
+    /// Put the stack back to lemonfiber's own state, reverting every edit you made.
+    ///
+    /// The opposite of adopt: it discards your hand-edits to the stack files and
+    /// restores lemonfiber's own. Because it throws work away, it names exactly what
+    /// will be lost and does nothing until `--confirm` — run it once to see the diffs,
+    /// again with `--confirm` to reset.
+    Reset {
+        /// Go ahead and revert, having seen what will be lost.
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Back up your configuration to an archive, so it stops being precious.
     Backup {
         /// Back up one service's configuration instead of the whole stack.
@@ -418,6 +429,7 @@ async fn main() -> ExitCode {
         },
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
+        Request::Reset { confirm } => Command::Reset { confirm },
         // Backup and restore drive their own executors over the tar adapter and
         // render their own reports, like setup — they are not one value from
         // dispatch. They take the context by value for the settings they read.
@@ -455,15 +467,7 @@ fn settled(outcome: &Outcome) -> ExitCode {
         // will not act on until they resolve it, so it earns VALIDATION; work merely
         // left skipped or failed may complete on a re-run, so it stays FAILURE. A
         // script can then tell "fix your config" from "wait and retry".
-        Outcome::Seed(report) => {
-            if report.is_complete() {
-                ExitCode::SUCCESS
-            } else if report.blocked().is_empty() {
-                ExitCode::from(FAILURE)
-            } else {
-                ExitCode::from(VALIDATION)
-            }
-        }
+        Outcome::Seed(report) => seed_exit(report),
         // A held quality choice was not recorded — it needs the operator to
         // confirm a preset this machine would software-transcode, so a script sees
         // a non-zero result it can act on rather than a false success.
@@ -486,6 +490,12 @@ fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::SUCCESS
             }
         }
+        // A reset run without --confirm that found edits to revert only previewed them —
+        // like a held quality choice, it needs the operator's say-so, so a script sees a
+        // non-zero result to act on. Both an edited stack file and a drifted connection
+        // are pending reverts, so either one left unconfirmed is a non-zero result.
+        // Confirmed, or with nothing to revert, it succeeded.
+        Outcome::Reset(report) => reset_exit(report),
         // A trace is a query — it answers where an item is; asking is never a failure,
         // whatever the answer.
         Outcome::Version(_)
@@ -493,6 +503,36 @@ fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Config(_)
         | Outcome::Trace(_)
         | Outcome::Status(_) => ExitCode::SUCCESS,
+    }
+}
+
+/// The exit code a seed earns. Seeding is run to make the wiring true, so leaving any
+/// of it unmade is a non-zero result — but the two reasons differ. A refused conflict
+/// (two \*arrs on one root folder) is something the operator wrote that lemonfiber will
+/// not act on until they resolve it, so it earns VALIDATION; work merely left skipped
+/// or failed may complete on a re-run, so it stays FAILURE. A script can then tell "fix
+/// your config" from "wait and retry".
+fn seed_exit(report: &lemonfiber_core::seed::Report) -> ExitCode {
+    if report.is_complete() {
+        ExitCode::SUCCESS
+    } else if report.blocked().is_empty() {
+        ExitCode::from(FAILURE)
+    } else {
+        ExitCode::from(VALIDATION)
+    }
+}
+
+/// The exit code a reset earns. A reset without --confirm that found edits to revert
+/// only previewed them — like a held quality choice, it needs the operator's say-so, so
+/// a script sees a non-zero result to act on. Both an edited stack file and a drifted
+/// connection are pending reverts, so either one left unconfirmed is a non-zero result.
+/// Confirmed, or with nothing to revert, it succeeded.
+fn reset_exit(report: &ResetReport) -> ExitCode {
+    let pending = !report.reverted.is_empty() || !report.reverted_connections.is_empty();
+    if !report.confirmed && pending {
+        ExitCode::from(VALIDATION)
+    } else {
+        ExitCode::SUCCESS
     }
 }
 

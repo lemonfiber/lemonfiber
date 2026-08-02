@@ -124,6 +124,21 @@ pub struct RegisteredClient {
     pub category: Option<Category>,
 }
 
+/// How a download client the service holds answered its reachability test —
+/// the service's own verdict on whether the client it connects to is working,
+/// keyed by the id the service assigned it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClientProbe {
+    /// The id of the client tested, matching a [`RegisteredClient::id`].
+    pub id: String,
+    /// Whether the client answered — `true` where the service reached it,
+    /// `false` where the test failed.
+    pub reachable: bool,
+    /// What the service said when the test failed, where it said anything —
+    /// carried so a warning can name why the client did not answer.
+    pub detail: Option<String>,
+}
+
 /// Which media-filing \*arr a Prowlarr application entry syncs to, selecting the
 /// field schema Prowlarr files it under and the release categories it syncs —
 /// see the Prowlarr-application contract in the spec.
@@ -285,6 +300,37 @@ pub trait Client: Send + Sync {
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure>;
+
+    /// Rewrite a download client the service already holds to lemonfiber's settings,
+    /// named by the id the service assigned it — the update a reset makes to revert a
+    /// drifted category to the one lemonfiber files under, in place rather than as a
+    /// second client.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn update_download_client(
+        &self,
+        id: &str,
+        client: &DownloadClient,
+    ) -> Result<(), Failure>;
+
+    /// Ask the service to test every download client it holds, reporting whether
+    /// each answered — the service's own verdict, one entry per client keyed by id.
+    ///
+    /// The service is the authority on whether its download client is reachable: it
+    /// is the one that connects to the client, not lemonfiber, which sits on the host
+    /// and cannot reach the client's in-network address. Tested all at once because
+    /// the service tests them together, and read only where a drift is found, to
+    /// escalate a drifted client to a warning solely when the drift left it
+    /// unreachable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service itself is unreachable or refuses the
+    /// request — distinct from a client that answered the test as unreachable, which
+    /// is a per-client [`ClientProbe`] with `reachable` false, not an error.
+    async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure>;
 
     /// Tell the service where to file what it imports.
     ///
