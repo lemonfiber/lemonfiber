@@ -357,6 +357,46 @@ async fn a_download_client_is_posted_to_its_endpoint() {
 }
 
 #[tokio::test]
+async fn an_updated_download_client_is_put_to_its_id_carrying_it() {
+    let fake = Fake::new(Answer::Reply(200, ""));
+    assert!(sonarr(&fake)
+        .update_download_client("7", &sabnzbd())
+        .await
+        .is_ok());
+
+    let sent = fake.request();
+    assert!(sent
+        .as_ref()
+        .is_some_and(|request| request.method == Method::Put
+            && request.url.ends_with("/api/v3/downloadclient/7")));
+    // The document rewrites the one that is there rather than adding a second: it names
+    // the id the service assigned.
+    assert!(sent.is_some_and(|request| request
+        .body
+        .is_some_and(|body| body.contains(r#""id":7"#))));
+}
+
+#[tokio::test]
+async fn an_update_with_an_id_the_service_did_not_assign_is_refused() {
+    // A non-numeric id is not one a Servarr service assigns, so there is nothing to
+    // address — refused rather than a malformed request sent.
+    let fake = Fake::new(Answer::Reply(200, ""));
+    assert!(matches!(
+        sonarr(&fake).update_download_client("not-a-number", &sabnzbd()).await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
+async fn a_rejected_download_client_update_is_refused() {
+    let fake = Fake::new(Answer::Reply(400, "cannot update"));
+    assert!(matches!(
+        sonarr(&fake).update_download_client("7", &sabnzbd()).await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
 async fn a_rejected_root_folder_registration_is_refused() {
     let fake = Fake::new(Answer::Reply(400, "path already used"));
     let folder = RootFolder {

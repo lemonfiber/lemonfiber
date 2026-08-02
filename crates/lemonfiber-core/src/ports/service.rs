@@ -286,6 +286,20 @@ pub trait Client: Send + Sync {
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure>;
 
+    /// Rewrite a download client the service already holds to lemonfiber's settings,
+    /// named by the id the service assigned it — the update a reset makes to revert a
+    /// drifted category to the one lemonfiber files under, in place rather than as a
+    /// second client.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn update_download_client(
+        &self,
+        id: &str,
+        client: &DownloadClient,
+    ) -> Result<(), Failure>;
+
     /// Tell the service where to file what it imports.
     ///
     /// # Errors

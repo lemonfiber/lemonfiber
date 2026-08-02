@@ -382,6 +382,24 @@ impl Client for FakeService {
         }
     }
 
+    async fn update_download_client(
+        &self,
+        id: &str,
+        client: &DownloadClient,
+    ) -> Result<(), Failure> {
+        match self.mode {
+            Mode::Down => Err(down("sonarr")),
+            _ => {
+                if let Ok(mut clients) = self.clients.lock() {
+                    if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
+                        existing.category = Some(client.category.clone());
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
         let count = match self.reads.lock() {
             Ok(mut reads) => {

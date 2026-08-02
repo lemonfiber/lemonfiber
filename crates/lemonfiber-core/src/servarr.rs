@@ -139,7 +139,32 @@ impl Client for Servarr {
             .probe(&self.request(
                 Method::Post,
                 "/downloadclient",
-                Some(download_client_body(client)),
+                Some(download_client_body(client, None)),
+            ))
+            .await?;
+        self.endpoint.expect_success(&response)
+    }
+
+    async fn update_download_client(
+        &self,
+        id: &str,
+        client: &DownloadClient,
+    ) -> Result<(), Failure> {
+        // Servarr updates a client with a PUT to its own id, carrying the same
+        // registration document a create does but with the id set, so it rewrites the
+        // one that is there rather than adding a second. An id the service did not
+        // assign as an integer is one this cannot address, so it is refused rather than
+        // guessed at.
+        let Ok(numeric) = id.parse::<i64>() else {
+            return Err(self
+                .endpoint
+                .refused("the download client's id is not one this service assigns"));
+        };
+        let response = self
+            .probe(&self.request(
+                Method::Put,
+                &format!("/downloadclient/{id}"),
+                Some(download_client_body(client, Some(numeric))),
             ))
             .await?;
         self.endpoint.expect_success(&response)
@@ -354,7 +379,7 @@ pub fn api_key(config_xml: &str) -> Option<String> {
 /// contract: the `implementation` and `configContract` that select the schema,
 /// the protocol, and the `fields` array carrying the connection, the credential
 /// the client uses, and the category the target application files under.
-fn download_client_body(client: &DownloadClient) -> String {
+fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
     let (implementation, config_contract, protocol) = match client.kind {
         ClientKind::Sabnzbd => ("Sabnzbd", "SabnzbdSettings", "usenet"),
         ClientKind::Qbittorrent => ("QBittorrent", "QBittorrentSettings", "torrent"),
@@ -375,13 +400,18 @@ fn download_client_body(client: &DownloadClient) -> String {
         }
     }
 
-    serde_json::json!({
+    let mut document = serde_json::json!({
         "enable": true,
         "protocol": protocol,
         "name": client.name,
         "implementation": implementation,
         "configContract": config_contract,
         "fields": fields,
-    })
-    .to_string()
+    });
+    // An update names the client the service already assigned, so the same document
+    // rewrites it in place; a create carries no id and the service assigns one.
+    if let Some(id) = id {
+        document["id"] = serde_json::json!(id);
+    }
+    document.to_string()
 }
