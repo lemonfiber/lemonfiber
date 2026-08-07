@@ -596,16 +596,20 @@ mod tests {
         let outstanding: Vec<u32> = season.outstanding.iter().map(|p| p.number).collect();
         assert_eq!(outstanding, vec![2, 3]);
         // Each carries its own stage, so a download in flight is told apart from a stall.
-        assert_eq!(season.outstanding[0].stage, Stage::Downloading);
-        assert_eq!(season.outstanding[1].stage, Stage::Monitored);
+        let stages: Vec<Stage> = season.outstanding.iter().map(|part| part.stage).collect();
+        assert_eq!(stages, vec![Stage::Downloading, Stage::Monitored]);
     }
 
     #[test]
     fn a_season_is_complete_when_every_wanted_part_is_here() {
-        let coverage = Coverage::of(vec![part(1, 1, Stage::Imported), part(1, 2, Stage::Imported)]);
+        let coverage = Coverage::of(vec![
+            part(1, 1, Stage::Imported),
+            part(1, 2, Stage::Imported),
+        ]);
         assert!(coverage.complete());
-        assert!(coverage.seasons[0].complete());
-        assert_eq!(coverage.seasons[0].wanted, 2);
+        let only = coverage.seasons.first().cloned().unwrap_or_default();
+        assert!(only.complete());
+        assert_eq!(only.wanted, 2);
     }
 
     #[test]
@@ -614,8 +618,9 @@ mod tests {
         // is nothing to be complete, and reporting it complete would be a lie of shape.
         let coverage = Coverage::of(vec![part(1, 1, Stage::NotMonitored)]);
         assert!(!coverage.complete());
-        assert!(!coverage.seasons[0].complete());
-        assert_eq!(coverage.seasons[0].unmonitored, 1);
+        let only = coverage.seasons.first().cloned().unwrap_or_default();
+        assert!(!only.complete());
+        assert_eq!(only.unmonitored, 1);
         // And an item with no parts at all — a film — is not a complete series either.
         assert!(!Coverage::of(Vec::new()).complete());
     }

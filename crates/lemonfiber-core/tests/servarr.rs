@@ -1166,17 +1166,30 @@ async fn item_parts_reads_the_episodes_of_a_series() {
         .item_parts(Kind::Sonarr, 1, None)
         .await
         .unwrap_or_default();
-    assert_eq!(parts.len(), 3);
-    assert_eq!(parts[0].id, 11);
-    assert_eq!(parts[0].season, 1);
-    assert_eq!(parts[0].number, 1);
-    assert_eq!(parts[0].title, "Dulcinea");
-    assert!(parts[0].has_file);
-    assert!(parts[1].grabbed);
-    // A record missing the flags entirely reads as unmonitored and absent rather than
-    // failing the whole read.
-    assert!(!parts[2].monitored);
-    assert!(!parts[2].has_file);
+    let read: Vec<(i64, u32, u32, &str, bool, bool, bool)> = parts
+        .iter()
+        .map(|part| {
+            (
+                part.id,
+                part.season,
+                part.number,
+                part.title.as_str(),
+                part.monitored,
+                part.has_file,
+                part.grabbed,
+            )
+        })
+        .collect();
+    // The third record carries none of the flags: it reads as unmonitored and absent
+    // rather than failing the whole read.
+    assert_eq!(
+        read,
+        vec![
+            (11, 1, 1, "Dulcinea", true, true, false),
+            (12, 1, 2, "The Big Empty", true, false, true),
+            (13, 0, 1, "A Special", false, false, false),
+        ]
+    );
     // The listing was narrowed to the one series asked about.
     assert!(router
         .sent()

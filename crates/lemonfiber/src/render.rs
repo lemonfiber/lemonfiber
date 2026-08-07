@@ -19,7 +19,7 @@ use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
     State as SeedState,
 };
-use lemonfiber_core::trace::{Confidence, Outcome as TraceOutcome, HISTORY_HORIZON};
+use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
 
 /// Render an outcome, for a person or for a script.
@@ -390,6 +390,48 @@ pub(crate) fn upgrade(report: &UpgradeReport) {
     }
 }
 
+/// How much of a series is actually here, season by season — the answer the single
+/// furthest stage cannot give, since a show is "imported" the moment one episode lands.
+///
+/// A complete season is one line; an incomplete one names each episode still outstanding
+/// and what it is waiting on, because that is the part an operator can act on. Episodes
+/// nobody asked for are counted apart from the totals and said so plainly, so a season of
+/// specials never reads as a fault to go and chase.
+fn seasons(coverage: &Coverage) {
+    println!("  {} of {} episode(s) here", coverage.have, coverage.wanted);
+    for season in &coverage.seasons {
+        // Season zero is where a service files specials, which is not a season anyone
+        // names that way.
+        let name = if season.season == 0 {
+            "specials".to_owned()
+        } else {
+            format!("season {}", season.season)
+        };
+        if season.wanted == 0 {
+            println!("      {name}   {} not asked for", season.unmonitored);
+            continue;
+        }
+        let complete = if season.complete() { "   complete" } else { "" };
+        println!(
+            "      {name}   {} of {}{complete}",
+            season.have, season.wanted
+        );
+        if season.unmonitored > 0 {
+            println!("          ({} more not asked for)", season.unmonitored);
+        }
+        for part in &season.outstanding {
+            let waiting = part
+                .stage
+                .stall()
+                .map_or_else(|| part.stage.label().to_owned(), str::to_owned);
+            println!(
+                "          S{:02}E{:02}   {waiting}",
+                part.season, part.number
+            );
+        }
+    }
+}
+
 /// Where one item is in the pipeline: the item, each stage it reached with the service
 /// and time, and — where it plainly stopped — why.
 pub(crate) fn trace(report: &TraceReport) {
@@ -430,6 +472,9 @@ pub(crate) fn trace(report: &TraceReport) {
         for moment in &report.history {
             println!("      {}   {}", moment.outcome.phrase(), moment.at);
         }
+    }
+    if let Some(coverage) = &report.coverage {
+        seasons(coverage);
     }
     // Things worth the operator's attention that are not a point on the pipeline — a
     // service disagreement, or a detail that could not be read and so is reported as
