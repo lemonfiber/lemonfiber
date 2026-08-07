@@ -20,7 +20,7 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@75a348306ce8f67c0b06fc62c32a8546140ba955 # cargo-llvm-cov
       - name: Coverage (100% on applicable code — Q-R61)
-        run: cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(archive|main|maintain|nntp|prompt|setup)\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+        run: cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|maintain|nntp|prompt|setup)\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
       - name: SonarQube Cloud scan
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:

@@ -52,4 +52,4 @@ release-workflow:
 # a test cannot reach.
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(archive|main|maintain|nntp|prompt|setup)\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|maintain|nntp|prompt|setup)\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
