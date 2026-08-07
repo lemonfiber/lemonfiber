@@ -124,26 +124,22 @@ impl Stage {
         reached.iter().copied().max().unwrap_or(Self::Monitored)
     }
 
-    /// The stage one part of an item rests at, from what the service records about it
-    /// now rather than from its history. A file on disk, a release already grabbed and a
-    /// monitored flag are current facts, so a part's stage does not depend on how far
-    /// back the bounded history horizon reaches — which matters most for exactly the long
-    /// series whose early events fall outside it.
+    /// The stage one part of an item rests at on the service's own current record: its
+    /// file and its monitored flag. This is where a part starts from, before what was
+    /// tried for it is folded in.
     ///
     /// A part already on disk is here whether or not anyone is still monitoring it: the
     /// file is the fact, and calling it "nobody asked for it" would be a worse answer
     /// than the truth. Only a part that is both unmonitored and absent is one nobody
     /// asked for.
     #[must_use]
-    pub const fn of_part(monitored: bool, has_file: bool, grabbed: bool) -> Self {
+    pub const fn of_part(monitored: bool, has_file: bool) -> Self {
         if has_file {
             Self::Imported
-        } else if !monitored {
-            Self::NotMonitored
-        } else if grabbed {
-            Self::Grabbed
-        } else {
+        } else if monitored {
             Self::Monitored
+        } else {
+            Self::NotMonitored
         }
     }
 
@@ -544,23 +540,22 @@ mod tests {
 
     #[test]
     fn a_part_on_disk_is_here_whoever_stopped_monitoring_it() {
-        // The file is the fact. An episode grabbed and then unmonitored is still here,
+        // The file is the fact. An episode fetched and then unmonitored is still here,
         // and calling it "nobody asked for it" would be the worse answer.
-        assert_eq!(Stage::of_part(false, true, false), Stage::Imported);
-        assert_eq!(Stage::of_part(true, true, false), Stage::Imported);
+        assert_eq!(Stage::of_part(false, true), Stage::Imported);
+        assert_eq!(Stage::of_part(true, true), Stage::Imported);
     }
 
     #[test]
     fn an_unmonitored_absent_part_is_one_nobody_asked_for() {
-        assert_eq!(Stage::of_part(false, false, false), Stage::NotMonitored);
-        // Monitoring stopped mid-flight still means nobody is asking for it now.
-        assert_eq!(Stage::of_part(false, false, true), Stage::NotMonitored);
+        assert_eq!(Stage::of_part(false, false), Stage::NotMonitored);
     }
 
     #[test]
-    fn a_wanted_part_reads_from_whether_it_was_grabbed() {
-        assert_eq!(Stage::of_part(true, false, true), Stage::Grabbed);
-        assert_eq!(Stage::of_part(true, false, false), Stage::Monitored);
+    fn a_wanted_part_with_no_file_rests_at_monitored() {
+        // Where it starts from: what was tried for it is folded in by the caller, which
+        // holds the history and queue this knows nothing about.
+        assert_eq!(Stage::of_part(true, false), Stage::Monitored);
     }
 
     #[test]

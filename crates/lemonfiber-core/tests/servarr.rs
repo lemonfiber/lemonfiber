@@ -991,9 +991,9 @@ async fn item_history_keeps_the_notable_events_and_drops_the_rest() {
         "/history",
         200,
         r#"{"records":[
-            {"eventType":"downloadFolderImported","date":"2026-01-02T00:00:00Z"},
+            {"eventType":"downloadFolderImported","date":"2026-01-02T00:00:00Z","episodeId":42},
             {"eventType":"downloadFailed","date":"2026-01-01T12:00:00Z"},
-            {"eventType":"grabbed","date":"2026-01-01T00:00:00Z"},
+            {"eventType":"grabbed","date":"2026-01-01T00:00:00Z","episodeId":42},
             {"eventType":"episodeFileRenamed","date":"2025-12-31T00:00:00Z"}
         ]}"#
         .to_owned(),
@@ -1014,6 +1014,17 @@ async fn item_history_keeps_the_notable_events_and_drops_the_rest() {
         .iter()
         .any(|event| event.outcome == Outcome::DownloadFailed));
     assert!(events.iter().any(|event| event.outcome == Outcome::Grabbed));
+    // Each event names the episode it happened to, where the service records one — the
+    // only proof a trace has that a particular episode was ever grabbed, since the
+    // episode listing's own grabbed flag is never populated.
+    assert_eq!(
+        events.first().and_then(|event| event.part),
+        Some(42),
+        "the episode a history event names is carried through"
+    );
+    assert!(events
+        .iter()
+        .any(|event| event.outcome == Outcome::DownloadFailed && event.part.is_none()));
     // It filtered by the item, on the kind's own history parameter.
     assert!(router
         .sent()
@@ -1156,8 +1167,8 @@ async fn item_parts_reads_the_episodes_of_a_series() {
         "/episode",
         200,
         r#"[
-            {"id":11,"seasonNumber":1,"episodeNumber":1,"title":"Dulcinea","monitored":true,"hasFile":true,"grabbed":false},
-            {"id":12,"seasonNumber":1,"episodeNumber":2,"title":"The Big Empty","monitored":true,"hasFile":false,"grabbed":true},
+            {"id":11,"seasonNumber":1,"episodeNumber":1,"title":"Dulcinea","monitored":true,"hasFile":true},
+            {"id":12,"seasonNumber":1,"episodeNumber":2,"title":"The Big Empty","monitored":true,"hasFile":false},
             {"id":13,"seasonNumber":0,"episodeNumber":1,"title":"A Special"}
         ]"#
         .to_owned(),
@@ -1166,7 +1177,7 @@ async fn item_parts_reads_the_episodes_of_a_series() {
         .item_parts(Kind::Sonarr, 1, None)
         .await
         .unwrap_or_default();
-    let read: Vec<(i64, u32, u32, &str, bool, bool, bool)> = parts
+    let read: Vec<(i64, u32, u32, &str, bool, bool)> = parts
         .iter()
         .map(|part| {
             (
@@ -1176,7 +1187,6 @@ async fn item_parts_reads_the_episodes_of_a_series() {
                 part.title.as_str(),
                 part.monitored,
                 part.has_file,
-                part.grabbed,
             )
         })
         .collect();
@@ -1185,9 +1195,9 @@ async fn item_parts_reads_the_episodes_of_a_series() {
     assert_eq!(
         read,
         vec![
-            (11, 1, 1, "Dulcinea", true, true, false),
-            (12, 1, 2, "The Big Empty", true, false, true),
-            (13, 0, 1, "A Special", false, false, false),
+            (11, 1, 1, "Dulcinea", true, true),
+            (12, 1, 2, "The Big Empty", true, false),
+            (13, 0, 1, "A Special", false, false),
         ]
     );
     // The listing was narrowed to the one series asked about.

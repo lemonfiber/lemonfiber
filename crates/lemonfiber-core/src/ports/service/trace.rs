@@ -29,6 +29,9 @@ pub struct TraceEvent {
     pub outcome: crate::trace::Outcome,
     /// When it happened, as the service reported it.
     pub at: String,
+    /// The part of the item it happened to — an episode — where the service files its
+    /// history that way. A film's history names no part.
+    pub part: Option<i64>,
 }
 
 /// One record the download queue holds for an item: the stage it is at, and whether it is
@@ -49,8 +52,11 @@ pub struct QueueItem {
 }
 
 /// One part of a library item as the service records it now — an episode of a series.
-/// These are current facts rather than history, so a part's stage does not depend on how
-/// far back the bounded history horizon reaches.
+///
+/// Only what the listing genuinely carries: the file and the monitored flag. Whether a
+/// release was grabbed is deliberately not here — the television service defines such a
+/// field on its episode type but never populates it on this listing, so reading it would
+/// have reported every grabbed episode as one the indexers never found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemPart {
     /// The service's own id for the part, which its queue records name.
@@ -65,8 +71,6 @@ pub struct ItemPart {
     pub monitored: bool,
     /// Whether its file is on disk.
     pub has_file: bool,
-    /// Whether a release for it has been grabbed and is not yet imported.
-    pub grabbed: bool,
 }
 
 /// A stuck item the queue is holding — one queue health reports so it can be traced. Its

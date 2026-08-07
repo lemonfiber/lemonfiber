@@ -16,7 +16,7 @@ use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceMoment, TraceReport, TraceStage};
 use crate::ports::service::{ItemPart, Library, Pipeline, QueueItem, TraceEvent};
 use crate::recyclarr::Kind;
-use crate::trace::{Confidence, Coverage, Part, Presence, Stage};
+use crate::trace::{Confidence, Coverage, Outcome, Part, Presence, Stage};
 
 /// Trace one item by a human term, across the resolution services.
 ///
@@ -206,6 +206,13 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
         .filter_map(|event| event.outcome.stage())
         .collect();
     let max_history = advancing.iter().copied().max();
+    // Built while the events are still to hand: a part is placed by its own history and
+    // queue records, not by the item-wide stages those collapse into.
+    //
+    // Only an item made of parts has coverage to report. A film is the whole item, and one
+    // whose parts could not be read reports that as a finding rather than as a series with
+    // nothing in it.
+    let coverage = (!parts.is_empty()).then(|| coverage_of(parts, &queue, &events));
     let mut reached = advancing;
     reached.extend(queue_stage);
     // The library is the last word on how far an item got: confirmed present, it is
@@ -270,10 +277,7 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
         stall: stall_reason(furthest, queue_stuck, library, reads),
         stages,
         history,
-        // Only an item made of parts has coverage to report. A film is the whole item,
-        // and one with no parts read is one whose parts could not be read — reported as
-        // unavailable below, never as a series with nothing in it.
-        coverage: (!parts.is_empty()).then(|| coverage_of(parts, &queue)),
+        coverage,
         findings: trace_findings(unmanaged_but_present, reads),
         // A presence found by matching titles across to the media server — the two ends
         // share no id — may not be the item asked for, so it is marked, never claimed.
@@ -292,26 +296,52 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
 /// its own record, been handed to a download client that never took it — but a queue record
 /// for that same part says it is downloading right now. Without the join, every episode in
 /// flight would read as a stalled grab, which is the one reading a trace exists to prevent.
-fn coverage_of(parts: Vec<ItemPart>, queue: &[QueueItem]) -> Coverage {
+fn coverage_of(parts: Vec<ItemPart>, queue: &[QueueItem], events: &[TraceEvent]) -> Coverage {
     Coverage::of(
         parts
             .into_iter()
-            .map(|part| {
-                let resting = Stage::of_part(part.monitored, part.has_file, part.grabbed);
-                let live = queue
-                    .iter()
-                    .filter(|record| record.part == Some(part.id))
-                    .map(|record| record.stage)
-                    .max();
-                Part {
-                    season: part.season,
-                    number: part.number,
-                    title: part.title,
-                    stage: live.map_or(resting, |stage| resting.max(stage)),
-                }
+            .map(|part| Part {
+                stage: part_stage(&part, queue, events),
+                season: part.season,
+                number: part.number,
+                title: part.title,
             })
             .collect(),
     )
+}
+
+/// How far one part got: where the service's current record puts it, lifted by what the
+/// queue holds for it now and what its history proves was tried.
+///
+/// A file on disk settles it — the file is the fact, and an import recorded in a history
+/// the file no longer backs is stale news rather than a part that is here.
+///
+/// Otherwise a live queue record lifts any part, since a download under way is a fact
+/// whoever is monitoring it, while a grab from the history lifts only a part someone is
+/// still asking for: an old grab against a part nobody monitors explains nothing worth
+/// chasing. The grab has to come from the history because the episode listing carries no
+/// such flag — the one it defines is never populated there.
+fn part_stage(part: &ItemPart, queue: &[QueueItem], events: &[TraceEvent]) -> Stage {
+    let resting = Stage::of_part(part.monitored, part.has_file);
+    if resting == Stage::Imported {
+        return resting;
+    }
+    let mut stage = resting;
+    if let Some(live) = queue
+        .iter()
+        .filter(|record| record.part == Some(part.id))
+        .map(|record| record.stage)
+        .max()
+    {
+        stage = stage.max(live);
+    }
+    let attempted = events
+        .iter()
+        .any(|event| event.part == Some(part.id) && event.outcome == Outcome::Grabbed);
+    if resting == Stage::Monitored && attempted {
+        stage = stage.max(Stage::Grabbed);
+    }
+    stage
 }
 
 /// The disagreements and unreadable-fragment notes a trace surfaces on their own, apart
@@ -504,6 +534,15 @@ mod tests {
         TraceEvent {
             outcome,
             at: "2026-01-01T00:00:00Z".to_owned(),
+            part: None,
+        }
+    }
+
+    /// The same, recorded against one part — an episode's own history event.
+    fn part_event(outcome: Outcome, part: i64) -> TraceEvent {
+        TraceEvent {
+            part: Some(part),
+            ..event(outcome)
         }
     }
 
@@ -902,7 +941,6 @@ mod tests {
             title: format!("S{season:02}E{number:02}"),
             monitored,
             has_file,
-            grabbed: false,
         }
     }
 
@@ -939,7 +977,7 @@ mod tests {
         // says it is downloading right now. Without the lift, every episode in flight
         // would report as a fault.
         let mut fragments = frags(
-            Vec::new(),
+            vec![part_event(Outcome::Grabbed, 12)],
             vec![QueueItem {
                 part: Some(12),
                 stage: Stage::Downloading,
@@ -947,9 +985,10 @@ mod tests {
             }],
             None,
         );
-        let mut in_flight = episode(12, 1, 2, true, false);
-        in_flight.grabbed = true;
-        fragments.parts = vec![episode(11, 1, 1, true, true), in_flight];
+        fragments.parts = vec![
+            episode(11, 1, 1, true, true),
+            episode(12, 1, 2, true, false),
+        ];
         let report = assemble("Sonarr", "The Expanse", true, fragments);
         let coverage = report.coverage.unwrap_or_default();
         assert_eq!(outstanding(&coverage), vec![(1, 2, Stage::Downloading)]);
@@ -960,10 +999,8 @@ mod tests {
     #[test]
     fn a_grabbed_episode_the_queue_never_took_keeps_its_stall() {
         // The other side of the same join: grabbed, and the queue holds nothing for it.
-        let mut fragments = frags(Vec::new(), Vec::new(), None);
-        let mut lost = episode(12, 1, 2, true, false);
-        lost.grabbed = true;
-        fragments.parts = vec![lost];
+        let mut fragments = frags(vec![part_event(Outcome::Grabbed, 12)], Vec::new(), None);
+        fragments.parts = vec![episode(12, 1, 2, true, false)];
         let report = assemble("Sonarr", "The Expanse", true, fragments);
         let coverage = report.coverage.unwrap_or_default();
         assert_eq!(outstanding(&coverage), vec![(1, 2, Stage::Grabbed)]);

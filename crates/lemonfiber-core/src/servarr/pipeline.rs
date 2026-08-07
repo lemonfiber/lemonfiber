@@ -52,6 +52,7 @@ impl Pipeline for Servarr {
                 crate::trace::Outcome::of_event(&record.event_type).map(|outcome| TraceEvent {
                     outcome,
                     at: record.date,
+                    part: record.episode_id,
                 })
             })
             .collect())
@@ -100,7 +101,6 @@ impl Pipeline for Servarr {
                 title: part.title,
                 monitored: part.monitored,
                 has_file: part.has_file,
-                grabbed: part.grabbed,
             })
             .collect())
     }
@@ -172,9 +172,9 @@ struct LibraryItem {
     monitored: bool,
 }
 
-/// One part of a library item — an episode — as the service lists it. Its monitored flag,
-/// its file and whether a release is already grabbed are the current facts a part's stage
-/// reads from, none of which depend on the history horizon.
+/// One part of a library item — an episode — as the service lists it. Only the fields the
+/// listing genuinely carries: the service defines a `grabbed` flag on this type but leaves
+/// it unset here and unserialised, so it is not read.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PartResource {
@@ -189,8 +189,6 @@ struct PartResource {
     monitored: bool,
     #[serde(default)]
     has_file: bool,
-    #[serde(default)]
-    grabbed: bool,
 }
 
 /// A page of history: the events on it, newest first.
@@ -208,4 +206,7 @@ struct HistoryRecord {
     event_type: String,
     #[serde(default)]
     date: String,
+    /// The episode it happened to, where the service files its history per episode.
+    #[serde(default)]
+    episode_id: Option<i64>,
 }

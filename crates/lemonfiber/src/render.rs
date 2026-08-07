@@ -398,6 +398,15 @@ pub(crate) fn upgrade(report: &UpgradeReport) {
 /// nobody asked for are counted apart from the totals and said so plainly, so a season of
 /// specials never reads as a fault to go and chase.
 fn seasons(coverage: &Coverage) {
+    // Nothing asked for is not "none of nothing here" — with no denominator the counts
+    // say nothing, and the honest reading is that no episode is being maintained.
+    if coverage.wanted == 0 {
+        println!(
+            "  no episode(s) asked for — {} not monitored, none on disk",
+            coverage.unmonitored
+        );
+        return;
+    }
     println!("  {} of {} episode(s) here", coverage.have, coverage.wanted);
     for season in &coverage.seasons {
         // Season zero is where a service files specials, which is not a season anyone
