@@ -78,48 +78,8 @@ enum Request {
     /// the confirmation. A non-interactive run missing a flag it needs is told
     /// which, rather than left waiting on input that will not come.
     Setup {
-        /// Apply without a prompt to confirm — required for an unattended run.
-        #[arg(long)]
-        yes: bool,
-        /// How to fetch content: `both`, `usenet`, `torrent`, or `none`.
-        #[arg(long, value_name = "PROTOCOLS")]
-        protocols: Option<String>,
-        /// Where the library and downloads live.
-        #[arg(long, value_name = "PATH")]
-        data_location: Option<PathBuf>,
-        /// An indexer's API base URL.
-        #[arg(long, value_name = "URL")]
-        indexer_url: Option<String>,
-        /// The indexer's API key.
-        #[arg(long, value_name = "KEY")]
-        indexer_key: Option<String>,
-        /// The Usenet provider's hostname.
-        #[arg(long, value_name = "HOST")]
-        usenet_host: Option<String>,
-        /// The port the Usenet provider answers on (defaults to 563).
-        #[arg(long, value_name = "PORT")]
-        usenet_port: Option<u16>,
-        /// The Usenet account username.
-        #[arg(long, value_name = "USER")]
-        usenet_user: Option<String>,
-        /// The Usenet account password.
-        #[arg(long, value_name = "PASS")]
-        usenet_pass: Option<String>,
-        /// Whether the Usenet connection uses TLS (defaults to yes).
-        #[arg(long, value_name = "BOOL")]
-        usenet_tls: Option<bool>,
-        /// How to serve the library: `docker`, `native`, or `none`.
-        #[arg(long, value_name = "MODE")]
-        library: Option<String>,
-        /// The container user, as `UID:GID`.
-        #[arg(long, value_name = "UID:GID")]
-        service_user: Option<String>,
-        /// Whether others in the home will use it.
-        #[arg(long, value_name = "BOOL")]
-        household: Option<bool>,
-        /// Whether to start the stack when the machine boots.
-        #[arg(long, value_name = "BOOL")]
-        autostart: Option<bool>,
+        #[command(flatten)]
+        flags: prompt::RawSetup,
     },
     /// Report the versions in play.
     Version,
@@ -367,40 +327,10 @@ async fn main() -> ExitCode {
         // Setup is a conversation and then a stack coming up, not a value that
         // arrives once, so like streaming and watching it runs its own way. It
         // takes the context by value because it rewrites the settings mid-run.
-        Request::Setup {
-            yes,
-            protocols,
-            data_location,
-            indexer_url,
-            indexer_key,
-            usenet_host,
-            usenet_port,
-            usenet_user,
-            usenet_pass,
-            usenet_tls,
-            library,
-            service_user,
-            household,
-            autostart,
-        } => {
-            let raw = prompt::RawSetup {
-                yes,
-                protocols,
-                data_location,
-                indexer_url,
-                indexer_key,
-                usenet_host,
-                usenet_port,
-                usenet_user,
-                usenet_pass,
-                usenet_tls,
-                library,
-                service_user,
-                household,
-                autostart,
-            };
-            return setup_from(ctx, raw).await;
-        }
+        // Setup is a conversation and then a stack coming up, not a value that
+        // arrives once, so like streaming and watching it runs its own way. It
+        // takes the context by value because it rewrites the settings mid-run.
+        Request::Setup { flags } => return setup_from(ctx, flags).await,
         Request::Version => Command::Version,
         Request::Up { forms } => Command::Up { forms },
         Request::Down { forms } => Command::Down { forms },
@@ -445,9 +375,17 @@ async fn main() -> ExitCode {
         // Backup and restore drive their own executors over the tar adapter and
         // render their own reports, like setup — they are not one value from
         // dispatch. They take the context by value for the settings they read.
-        Request::Backup { service } => return maintain::run_backup(ctx, service, cli.json).await,
+        Request::Backup { service } => {
+            let Some(paths) = here() else {
+                return no_config_home();
+            };
+            return maintain::run_backup(ctx, paths, service, cli.json).await;
+        }
         Request::Restore { archive, repoint } => {
-            return maintain::run_restore(ctx, archive, repoint, cli.json).await
+            let Some(paths) = here() else {
+                return no_config_home();
+            };
+            return maintain::run_restore(ctx, paths, archive, repoint, cli.json).await;
         }
     };
 
@@ -902,6 +840,14 @@ pub(crate) fn read_line(prompt: &str) -> String {
 /// the operating system, and there is nothing about it a test could catch that
 /// running it would not. The layout beneath those bases is the core's, and is
 /// tested there.
+/// Refuse an operation that needs to know where the configuration is kept, when
+/// this platform will not say. The one message for it, so both callers word it the
+/// same way.
+fn no_config_home() -> ExitCode {
+    eprintln!("error: lemonfiber could not find where its configuration is kept");
+    ExitCode::FAILURE
+}
+
 fn here() -> Option<Paths> {
     use etcetera::BaseStrategy as _;
 

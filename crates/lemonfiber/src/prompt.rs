@@ -311,34 +311,53 @@ pub struct SetupFlags {
 
 /// The setup flags exactly as the command line gives them, before they are typed
 /// and checked — a plain carrier so the parse is one argument, not a dozen.
+///
+/// This is also the command line's own declaration of them, flattened into the
+/// subcommand: one list of flags rather than a definition here and a copy there,
+/// which is a copy that only ever falls out of step in one direction.
+#[derive(Debug, Default, clap::Args)]
 pub struct RawSetup {
-    /// `--yes`: standing consent to apply without a prompt.
+    /// Apply without a prompt to confirm — required for an unattended run.
+    #[arg(long)]
     pub yes: bool,
-    /// `--protocols`.
+    /// How to fetch content: `both`, `usenet`, `torrent`, or `none`.
+    #[arg(long, value_name = "PROTOCOLS")]
     pub protocols: Option<String>,
-    /// `--data-location`.
+    /// Where the library and downloads live.
+    #[arg(long, value_name = "PATH")]
     pub data_location: Option<PathBuf>,
-    /// `--indexer-url`.
+    /// An indexer's API base URL.
+    #[arg(long, value_name = "URL")]
     pub indexer_url: Option<String>,
-    /// `--indexer-key`.
+    /// The indexer's API key.
+    #[arg(long, value_name = "KEY")]
     pub indexer_key: Option<String>,
-    /// `--usenet-host`.
+    /// The Usenet provider's hostname.
+    #[arg(long, value_name = "HOST")]
     pub usenet_host: Option<String>,
-    /// `--usenet-port`.
+    /// The port the Usenet provider answers on (defaults to 563).
+    #[arg(long, value_name = "PORT")]
     pub usenet_port: Option<u16>,
-    /// `--usenet-user`.
+    /// The Usenet account username.
+    #[arg(long, value_name = "USER")]
     pub usenet_user: Option<String>,
-    /// `--usenet-pass`.
+    /// The Usenet account password.
+    #[arg(long, value_name = "PASS")]
     pub usenet_pass: Option<String>,
-    /// `--usenet-tls`.
+    /// Whether the Usenet connection uses TLS (defaults to yes).
+    #[arg(long, value_name = "BOOL")]
     pub usenet_tls: Option<bool>,
-    /// `--library`.
+    /// How to serve the library: `docker`, `native`, or `none`.
+    #[arg(long, value_name = "MODE")]
     pub library: Option<String>,
-    /// `--service-user`.
+    /// The container user, as `UID:GID`.
+    #[arg(long, value_name = "UID:GID")]
     pub service_user: Option<String>,
-    /// `--household`.
+    /// Whether others in the home will use it.
+    #[arg(long, value_name = "BOOL")]
     pub household: Option<bool>,
-    /// `--autostart`.
+    /// Whether to start the stack when the machine boots.
+    #[arg(long, value_name = "BOOL")]
     pub autostart: Option<bool>,
 }
 

@@ -45,25 +45,25 @@ pub(crate) struct Lines(Vec<String>);
 
 impl Lines {
     /// One line.
-    fn put(&mut self, line: impl Into<String>) {
+    pub(crate) fn put(&mut self, line: impl Into<String>) {
         self.0.push(line.into());
     }
 
     /// A blank line, then the given one — the separated closing remark most answers end
     /// on, kept as one call so the spacing is uniform rather than re-decided each time.
-    fn spaced(&mut self, line: impl Into<String>) {
+    pub(crate) fn spaced(&mut self, line: impl Into<String>) {
         self.0.push(String::new());
         self.0.push(line.into());
     }
 
     /// Text that already carries its own line breaks — a diff — split into the lines it
     /// is made of, so a block and a built line are the same kind of thing from here on.
-    fn block(&mut self, text: &str) {
+    pub(crate) fn block(&mut self, text: &str) {
         self.0.extend(text.lines().map(str::to_owned));
     }
 
     /// Everything another renderer built, appended.
-    fn extend(&mut self, other: Self) {
+    pub(crate) fn extend(&mut self, other: Self) {
         self.0.extend(other.0);
     }
 
@@ -73,10 +73,18 @@ impl Lines {
         self.0.join("\n")
     }
 
-    /// Put them on the terminal. The one place this module reaches it.
-    fn print(&self) {
+    /// Put them on the terminal. The one place this crate reaches stdout.
+    pub(crate) fn print(&self) {
         for line in &self.0 {
             println!("{line}");
+        }
+    }
+
+    /// Put them on the error stream — what an operator is told about a refusal,
+    /// which belongs beside the answer rather than in it.
+    pub(crate) fn eprint(&self) {
+        for line in &self.0 {
+            eprintln!("{line}");
         }
     }
 }

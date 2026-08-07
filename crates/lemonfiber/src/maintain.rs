@@ -12,23 +12,29 @@ use std::process::ExitCode;
 use lemonfiber_core::app::backup::{capture, Report as BackupReport};
 use lemonfiber_core::app::restore::{inspect, restore, Preview, Report as RestoreReport};
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::backup::{Retention, Scope, SCHEMA};
+use lemonfiber_core::backup::{Relocation, Retention, Scope, SCHEMA};
+use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{self, store};
 use lemonfiber_core::error::Diagnose;
-use lemonfiber_core::ports::docker::Lifecycle;
+use lemonfiber_core::ports::docker::{Container, Failure, Lifecycle};
 
 use crate::archive::Tar;
+use crate::render::Lines;
+
+/// What stands in for a report that could not be turned into JSON — a value rather
+/// than an unreachable branch, for the reason the renderer's own fallback is.
+const UNSERIALISABLE: &str = r#"{"error":"this report could not be rendered as JSON"}"#;
 
 /// How many backups of each scope are kept before the oldest are pruned.
 const KEEP: usize = 5;
 
 /// Capture the configuration to a backup archive.
-pub(crate) async fn run_backup(ctx: Ctx, service: Option<String>, json: bool) -> ExitCode {
-    let Some(paths) = crate::here() else {
-        eprintln!("error: lemonfiber could not find where its configuration is kept");
-        return ExitCode::FAILURE;
-    };
-
+pub(crate) async fn run_backup(
+    ctx: Ctx,
+    paths: Paths,
+    service: Option<String>,
+    json: bool,
+) -> ExitCode {
     if let Some(code) = require_stopped(&ctx, "backup").await {
         return code;
     }
@@ -57,7 +63,7 @@ pub(crate) async fn run_backup(ctx: Ctx, service: Option<String>, json: bool) ->
     .await
     {
         Ok(report) => {
-            render_backup(&report, json);
+            render_backup(&report, json).print();
             ExitCode::SUCCESS
         }
         Err(problem) => crate::complain(problem.as_ref()),
@@ -65,11 +71,13 @@ pub(crate) async fn run_backup(ctx: Ctx, service: Option<String>, json: bool) ->
 }
 
 /// Restore the configuration from a backup archive.
-pub(crate) async fn run_restore(ctx: Ctx, archive: PathBuf, repoint: bool, json: bool) -> ExitCode {
-    let Some(paths) = crate::here() else {
-        eprintln!("error: lemonfiber could not find where its configuration is kept");
-        return ExitCode::FAILURE;
-    };
+pub(crate) async fn run_restore(
+    ctx: Ctx,
+    paths: Paths,
+    archive: PathBuf,
+    repoint: bool,
+    json: bool,
+) -> ExitCode {
     let current_root = ctx.settings.data_root.clone().unwrap_or_default();
 
     // Verify and list what the archive holds before anything is overwritten.
@@ -82,7 +90,7 @@ pub(crate) async fn run_restore(ctx: Ctx, archive: PathBuf, repoint: bool, json:
     )
     .await
     {
-        Ok(preview) => render_preview(&preview, json),
+        Ok(preview) => render_preview(&preview, json).print(),
         Err(problem) => return crate::complain(problem.as_ref()),
     }
 
@@ -106,18 +114,17 @@ pub(crate) async fn run_restore(ctx: Ctx, archive: PathBuf, repoint: bool, json:
             // names the data root the backup was taken with, which is not on this
             // machine, so it is set to this one now that the files are in place —
             // the adjustment the re-point offered.
-            if let Some(relocation) = &report.relocated {
-                if let Err(failure) =
-                    store::set(&paths.env_file(), config::DATA_ROOT_KEY, &relocation.now)
-                {
-                    return crate::complain(&failure.problem());
-                }
+            if let Some(code) = report
+                .relocated
+                .as_ref()
+                .and_then(|relocation| repoint_env(&paths, relocation))
+            {
+                return code;
             }
-            render_restore(&report, json);
+            render_restore(&report, json).print();
             // A restore replaces state while the stack is down, so the wiring between
             // services and the credentials it holds are reconciled once it is back up.
-            eprintln!("Now bring the stack up and reconcile its wiring:  lemonfiber up <form> && lemonfiber seed");
-            eprintln!("Then check the restored credentials still work:  lemonfiber doctor --only credentials");
+            next_steps().eprint();
             ExitCode::SUCCESS
         }
         Err(problem) => crate::complain(problem.as_ref()),
@@ -136,7 +143,12 @@ enum Stack {
 
 /// Ask the engine whether the stack is running.
 async fn stack_state(ctx: &Ctx) -> Stack {
-    match ctx.engine.list(&ctx.settings.project).await {
+    stack_from(ctx.engine.list(&ctx.settings.project).await)
+}
+
+/// What a container listing means for whether anything may be writing to a database.
+fn stack_from(listed: Result<Vec<Container>, Failure>) -> Stack {
+    match listed {
         Ok(containers) => {
             if containers
                 .iter()
@@ -159,26 +171,57 @@ async fn stack_state(ctx: &Ctx) -> Stack {
 /// service is mid-write to is the corruption a backup exists to prevent, so an
 /// uncertain answer is refused as firmly as a running one rather than assumed safe.
 async fn require_stopped(ctx: &Ctx, operation: &str) -> Option<ExitCode> {
-    match stack_state(ctx).await {
-        Stack::Stopped => None,
+    let refusal = refuse(&stack_state(ctx).await, operation)?;
+    refusal.eprint();
+    Some(ExitCode::FAILURE)
+}
+
+/// What to tell the operator about a state that will not permit the operation, or
+/// nothing at all where it may go ahead.
+fn refuse(stack: &Stack, operation: &str) -> Option<Lines> {
+    let mut lines = Lines::default();
+    match stack {
+        Stack::Stopped => return None,
         Stack::Running => {
-            eprintln!(
+            lines.put(format!(
                 "A {operation} touches the service databases, which must not happen while the \
                  services are running and writing to them."
-            );
-            eprintln!("Stop the stack first:  lemonfiber down <form>");
-            Some(ExitCode::FAILURE)
+            ));
+            lines.put("Stop the stack first:  lemonfiber down <form>");
         }
         Stack::Unknown => {
-            eprintln!(
+            lines.put(format!(
                 "lemonfiber could not reach the container engine, so it cannot confirm the stack \
                  is stopped — and will not risk a {operation} over a database a service may be \
                  writing."
-            );
-            eprintln!("Make sure Docker is running and the stack is down, then try again.");
-            Some(ExitCode::FAILURE)
+            ));
+            lines.put("Make sure Docker is running and the stack is down, then try again.");
         }
     }
+    Some(lines)
+}
+
+/// Point the restored environment file at this machine's data root, or the code to
+/// end on where it will not take it.
+///
+/// The file that landed still names the root the backup was taken against, which is
+/// not on this machine; this is the adjustment the re-point offered, applied once
+/// the files are in place.
+fn repoint_env(paths: &Paths, relocation: &Relocation) -> Option<ExitCode> {
+    let failure = store::set(&paths.env_file(), config::DATA_ROOT_KEY, &relocation.now).err()?;
+    Some(crate::complain(&failure.problem()))
+}
+
+/// What a restore leaves the operator to do, once the files are back in place.
+fn next_steps() -> Lines {
+    let mut lines = Lines::default();
+    lines.put(
+        "Now bring the stack up and reconcile its wiring:  lemonfiber up <form> && lemonfiber seed",
+    );
+    lines.put(
+        "Then check the restored credentials still work:  lemonfiber doctor --only credentials",
+    );
+    lines
 }
 
 /// A timestamp for a backup — seconds since the epoch, filename-safe and sorting
@@ -200,82 +243,615 @@ fn scope_name(scope: &Scope) -> String {
     }
 }
 
-fn render_backup(report: &BackupReport, json: bool) {
+fn render_backup(report: &BackupReport, json: bool) -> Lines {
+    let mut lines = Lines::default();
     if json {
-        if let Ok(line) = serde_json::to_string(report) {
-            println!("{line}");
-        }
-        return;
+        // Built eagerly, like the envelope's: a report of owned values cannot fail
+        // to serialise, so a lazy fallback would be a line no test could reach.
+        lines.put(serde_json::to_string(report).unwrap_or(UNSERIALISABLE.to_owned()));
+        return lines;
     }
-    println!(
+    lines.put(format!(
         "Backed up {} to {}",
         scope_name(&report.scope),
         report.path.display()
-    );
+    ));
     if report.sensitive {
-        println!(
+        lines.put(
             "This backup contains credentials — the VPN key, provider passwords and API keys. \
-             Keep it as private as the secrets inside it."
+             Keep it as private as the secrets inside it.",
         );
     }
     if !report.pruned.is_empty() {
-        println!("Pruned {} older backup(s).", report.pruned.len());
+        lines.put(format!("Pruned {} older backup(s).", report.pruned.len()));
     }
+    lines
 }
 
-fn render_preview(preview: &Preview, json: bool) {
+fn render_preview(preview: &Preview, json: bool) -> Lines {
+    let mut lines = Lines::default();
     if json {
         // The preview's own type is not yet serialised; report the essentials.
-        println!(
+        lines.put(format!(
             r#"{{"kind":"restore-preview","version":{version:?},"scope":{scope:?},"downgrade":{downgrade}}}"#,
             version = preview.manifest.product_version,
             scope = scope_name(&preview.manifest.scope),
             downgrade = preview.downgrade,
-        );
-        return;
+        ));
+        return lines;
     }
-    println!(
+    lines.put(format!(
         "This backup holds {}, taken by lemonfiber {} on {}.",
         scope_name(&preview.manifest.scope),
         preview.manifest.product_version,
         preview.manifest.created_at,
-    );
+    ));
     for member in &preview.manifest.members {
-        println!("  - {}", member.label);
+        lines.put(format!("  - {}", member.label));
     }
     if preview.downgrade {
-        println!(
+        lines.put(
             "It is from an older major version; restoring it is allowed but may need a further \
-             reconcile."
+             reconcile.",
         );
     }
     if let Some(relocation) = &preview.relocation {
-        println!(
+        lines.put(format!(
             "It was taken against a different data root ({} → {}); re-run with --repoint to \
              restore onto this machine's.",
             relocation.was, relocation.now
-        );
+        ));
     }
+    lines
 }
 
-fn render_restore(report: &RestoreReport, json: bool) {
+fn render_restore(report: &RestoreReport, json: bool) -> Lines {
+    let mut lines = Lines::default();
     if json {
-        println!(
+        lines.put(format!(
             r#"{{"kind":"restore","from_version":{version:?},"scope":{scope:?}}}"#,
             version = report.from_version,
             scope = scope_name(&report.scope),
-        );
-        return;
+        ));
+        return lines;
     }
-    println!(
+    lines.put(format!(
         "Restored {} from a backup taken by lemonfiber {}.",
         scope_name(&report.scope),
         report.from_version
-    );
+    ));
     if let Some(relocation) = &report.relocated {
-        println!(
+        lines.put(format!(
             "Re-pointed the data root from {} to {}.",
             relocation.was, relocation.now
+        ));
+    }
+    lines
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+    use lemonfiber_core::backup::{Manifest, Member, Relocation, Scope};
+    use lemonfiber_core::config::Settings;
+    use lemonfiber_core::platform::Environment;
+    use lemonfiber_core::ports::docker::{
+        Container, Engine, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Stats,
+    };
+    use lemonfiber_core::stack::Source;
+    use tokio::sync::mpsc::Receiver;
+
+    use super::{
+        next_steps, refuse, render_backup, render_preview, render_restore, scope_name, stack_from,
+        stamp, Ctx, ExitCode, Paths, Preview, Stack,
+    };
+
+    /// An engine that answers a listing however a test needs, and nothing else —
+    /// the only capability a backup's refusal actually consults.
+    struct FakeEngine(Option<Lifecycle>);
+
+    #[async_trait]
+    impl Engine for FakeEngine {
+        async fn list(&self, _project: &str) -> Result<Vec<Container>, Failure> {
+            let Some(lifecycle) = self.0 else {
+                return Err(Failure::Unreachable {
+                    reason: "no engine".to_owned(),
+                });
+            };
+            Ok(vec![a_container(lifecycle)])
+        }
+
+        async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, Failure> {
+            Err(unused())
+        }
+
+        async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
+            Err(unused())
+        }
+
+        async fn logs(
+            &self,
+            _project: &str,
+            _services: &[String],
+            _query: LogQuery,
+        ) -> Result<Receiver<LogLine>, Failure> {
+            Err(unused())
+        }
+    }
+
+    /// The refusal the capabilities a backup never reaches for answer with, so the
+    /// fake states plainly that they are not part of this decision.
+    fn unused() -> Failure {
+        Failure::Unreachable {
+            reason: "a backup never asks this".to_owned(),
+        }
+    }
+
+    fn a_container(lifecycle: Lifecycle) -> Container {
+        Container {
+            id: "abc".to_owned(),
+            project: "lemonfiber".to_owned(),
+            service: "sonarr".to_owned(),
+            lifecycle,
+            health: Health::None,
+            exit: None,
+        }
+    }
+
+    fn ctx_with(engine: FakeEngine) -> Ctx {
+        Ctx::new(
+            Arc::new(lemonfiber_core::adapters::Local),
+            Arc::new(engine),
+            Arc::new(lemonfiber_core::adapters::System),
+            Arc::new(lemonfiber_core::adapters::Disk),
+            Source::Embedded(&crate::STACK),
+            Settings::default(),
+            Environment::MacOs,
+        )
+    }
+
+    fn a_manifest() -> Manifest {
+        Manifest {
+            schema: 1,
+            product_version: "0.3.0".to_owned(),
+            created_at: "1700000000".to_owned(),
+            data_root: "/srv/media".to_owned(),
+            scope: Scope::WholeStack,
+            sensitive: true,
+            members: vec![Member {
+                label: "the configuration".to_owned(),
+                archive_path: "config".to_owned(),
+            }],
+        }
+    }
+
+    /// A scratch install with something in each area, unique to this test.
+    fn install(name: &str) -> Paths {
+        let root =
+            std::env::temp_dir().join(format!("lemonfiber-maintain-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let paths = Paths::rooted(&root.join("config"), &root.join("data"));
+        for (path, contents) in [
+            (paths.env_file(), "DATA_ROOT=/srv/media\n"),
+            (
+                paths.service_config().join("sonarr/config.xml"),
+                "<Config/>",
+            ),
+            (paths.stack().join("compose.yaml"), "services: {}"),
+        ] {
+            let _ = path.parent().map(std::fs::create_dir_all);
+            let _ = std::fs::write(&path, contents);
+        }
+        paths
+    }
+
+    /// A context over a stack the engine says is stopped, so an operation proceeds.
+    fn stopped() -> Ctx {
+        ctx_with(FakeEngine(Some(Lifecycle::Exited)))
+    }
+
+    #[tokio::test]
+    async fn a_backup_of_a_stopped_stack_writes_an_archive_and_then_restores_it() {
+        let paths = install("round-trip");
+        // Capture: the engine says nothing is running, so it goes ahead.
+        let code = super::run_backup(stopped(), paths.clone(), None, false).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+
+        let written = std::fs::read_dir(paths.backups())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.path())
+            .next();
+        let archive = written.unwrap_or_default();
+        assert!(archive.exists(), "a backup was written");
+
+        // Restore it back over the same install: the preview is shown, then the
+        // files are put back and the operator is told what follows.
+        let restored = super::run_restore(stopped(), paths, archive, false, false).await;
+        assert_eq!(format!("{restored:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn a_backup_scoped_to_one_service_reports_as_json_when_asked() {
+        let paths = install("one-service");
+        let code = super::run_backup(stopped(), paths, Some("sonarr".to_owned()), true).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn a_running_stack_refuses_both_operations_before_touching_anything() {
+        let paths = install("running");
+        let running = || ctx_with(FakeEngine(Some(Lifecycle::Running)));
+        let backup = super::run_backup(running(), paths.clone(), None, false).await;
+        assert_eq!(format!("{backup:?}"), format!("{:?}", ExitCode::FAILURE));
+        // Nothing was written: the refusal comes before the capture.
+        assert!(std::fs::read_dir(paths.backups()).is_err());
+    }
+
+    #[tokio::test]
+    async fn an_archive_that_is_not_there_is_refused_before_the_stack_is_consulted() {
+        let paths = install("no-archive");
+        let missing = paths.backups().join("nothing.tar.gz");
+        let code = super::run_restore(stopped(), paths, missing, false, false).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+    }
+
+    #[tokio::test]
+    async fn the_capabilities_a_backup_never_asks_for_answer_that_plainly() {
+        // The fake stands in for a whole engine, and a backup consults only its
+        // listing. Exercised so the fake cannot quietly grow a wrong answer.
+        let engine = FakeEngine(None);
+        assert!(engine.exec("c", &[]).await.is_err());
+        assert!(engine.stats("p").await.is_err());
+        assert!(engine.logs("p", &[], LogQuery::recent(10)).await.is_err());
+        assert!(engine.list("p").await.is_err());
+    }
+
+    /// A context over a stopped stack that reports the given data root.
+    fn stopped_at(data_root: &str) -> Ctx {
+        let mut ctx = stopped();
+        ctx.settings.data_root = Some(std::path::PathBuf::from(data_root));
+        ctx
+    }
+
+    #[tokio::test]
+    async fn a_capture_that_cannot_be_written_is_reported_rather_than_claimed() {
+        let paths = install("blocked");
+        // A file where the backups directory belongs: the capture cannot create it,
+        // and says so rather than reporting a backup nobody has.
+        let _ = paths.backups().parent().map(std::fs::create_dir_all);
+        let _ = std::fs::write(paths.backups(), "not a directory");
+        let code = super::run_backup(stopped(), paths, None, false).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+    }
+
+    #[tokio::test]
+    async fn a_restore_over_a_running_stack_is_refused_after_the_preview() {
+        let paths = install("restore-running");
+        assert_eq!(
+            format!(
+                "{:?}",
+                super::run_backup(stopped(), paths.clone(), None, false).await
+            ),
+            format!("{:?}", ExitCode::SUCCESS)
         );
+        let archive = one_backup(&paths);
+
+        // The preview still runs — it overwrites nothing — but the restore itself
+        // is refused while something may be writing.
+        let running = ctx_with(FakeEngine(Some(Lifecycle::Running)));
+        let code = super::run_restore(running, paths, archive, false, false).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+    }
+
+    #[tokio::test]
+    async fn a_restore_onto_a_different_data_root_repoints_the_env_it_put_back() {
+        let paths = install("repoint");
+        assert_eq!(
+            format!(
+                "{:?}",
+                super::run_backup(stopped_at("/old/media"), paths.clone(), None, false).await
+            ),
+            format!("{:?}", ExitCode::SUCCESS)
+        );
+        let archive = one_backup(&paths);
+
+        // Restored on a machine whose data root is elsewhere, with the re-point the
+        // preview offered: the archive's own env named the old root, and the file
+        // that lands has to name this machine's.
+        let code = super::run_restore(
+            stopped_at("/new/media"),
+            paths.clone(),
+            archive,
+            true,
+            false,
+        )
+        .await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        let env = std::fs::read_to_string(paths.env_file()).unwrap_or_default();
+        assert!(
+            env.contains("/new/media"),
+            "the data root was re-pointed: {env}"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_archive_that_verifies_but_will_not_unpack_is_reported() {
+        // Its manifest reads, so the preview passes; the bytes beside it name an
+        // area this build does not know, so unpacking refuses. The manifest and the
+        // members are not the same evidence, which is the whole reason both are
+        // checked.
+        let paths = install("bad-member");
+        let archive = paths.backups().join("forged.tar.gz");
+        let _ = archive.parent().map(std::fs::create_dir_all);
+        let manifest = Manifest {
+            data_root: String::new(),
+            product_version: env!("CARGO_PKG_VERSION").to_owned(),
+            ..a_manifest()
+        };
+        let _ = write_forged(
+            &archive,
+            &manifest,
+            &[("secrets/leak", tar::EntryType::Regular)],
+        );
+
+        let code = super::run_restore(stopped(), paths, archive, false, false).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+    }
+
+    /// The single archive a capture left in the backups directory.
+    fn one_backup(paths: &Paths) -> std::path::PathBuf {
+        std::fs::read_dir(paths.backups())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.path())
+            .next()
+            .unwrap_or_default()
+    }
+
+    /// An archive whose manifest is sound but whose members are whatever a test
+    /// needs — the manifest and the bytes beside it are not the same evidence, which
+    /// is the whole reason a restore checks both.
+    fn write_forged(
+        dest: &std::path::Path,
+        manifest: &Manifest,
+        members: &[(&str, tar::EntryType)],
+    ) -> Option<()> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+
+        let file = std::fs::File::create(dest).ok()?;
+        let mut builder = tar::Builder::new(GzEncoder::new(file, Compression::default()));
+        let json = serde_json::to_vec(manifest).unwrap_or_default();
+        let mut header = tar::Header::new_gnu();
+        header.set_size(json.len() as u64);
+        header.set_mode(0o600);
+        header.set_cksum();
+        let _ = builder.append_data(&mut header, "manifest.json", json.as_slice());
+        for (path, kind) in members {
+            let mut header = tar::Header::new_gnu();
+            header.set_entry_type(*kind);
+            header.set_size(0);
+            header.set_mode(0o600);
+            header.set_cksum();
+            let _ = builder.append_data(&mut header, path, std::io::empty());
+        }
+        builder.into_inner().ok()?.finish().ok().map(|_| ())
+    }
+
+    #[test]
+    fn a_repoint_that_cannot_be_written_is_reported_rather_than_passed_over() {
+        // The restored files are in place but the environment file cannot be
+        // written, so the data root would silently still name the old machine's.
+        // Reported instead — a restore that half-landed is worse than one refused.
+        let paths = install("repoint-blocked");
+        let _ = std::fs::remove_file(paths.env_file());
+        // A directory where the file belongs: writing it cannot succeed.
+        let _ = std::fs::create_dir_all(paths.env_file());
+        let code = super::repoint_env(
+            &paths,
+            &Relocation {
+                was: "/old".to_owned(),
+                now: "/new".to_owned(),
+            },
+        );
+        assert!(code.is_some());
+    }
+
+    #[tokio::test]
+    async fn a_restore_that_lands_but_cannot_be_repointed_says_so() {
+        // The files come back, but the environment file that landed is a directory,
+        // so the data root cannot be set to this machine's. Reported rather than
+        // passed over: an install still naming another machine's root is the
+        // half-landed restore the re-point exists to finish.
+        let paths = install("repoint-fails");
+        let archive = paths.backups().join("odd.tar.gz");
+        let _ = archive.parent().map(std::fs::create_dir_all);
+        let manifest = Manifest {
+            data_root: "/old/media".to_owned(),
+            product_version: env!("CARGO_PKG_VERSION").to_owned(),
+            ..a_manifest()
+        };
+        let _ = write_forged(
+            &archive,
+            &manifest,
+            &[("config/.env", tar::EntryType::Directory)],
+        );
+
+        let code = super::run_restore(stopped_at("/new/media"), paths, archive, true, false).await;
+        // The code is whichever the problem's own severity earns; what matters is
+        // that it is not a success.
+        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[test]
+    fn a_scope_reads_as_what_it_covers() {
+        assert_eq!(scope_name(&Scope::WholeStack), "the whole stack");
+        assert_eq!(
+            scope_name(&Scope::Service {
+                name: "sonarr".to_owned()
+            }),
+            "service sonarr"
+        );
+    }
+
+    #[test]
+    fn a_stamp_is_a_sortable_number_of_seconds() {
+        let stamped = stamp();
+        assert!(!stamped.is_empty());
+        assert!(stamped.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn a_listing_says_whether_anything_could_be_writing() {
+        // Anything running means a database may be mid-write.
+        assert!(matches!(
+            stack_from(Ok(vec![a_container(Lifecycle::Running)])),
+            Stack::Running
+        ));
+        // Everything stopped, and nothing at all, both mean nothing is writing.
+        assert!(matches!(
+            stack_from(Ok(vec![a_container(Lifecycle::Exited)])),
+            Stack::Stopped
+        ));
+        assert!(matches!(stack_from(Ok(Vec::new())), Stack::Stopped));
+        // An engine that will not answer cannot prove anything, so it is unknown.
+        assert!(matches!(
+            stack_from(Err(Failure::Unreachable {
+                reason: "down".to_owned()
+            })),
+            Stack::Unknown
+        ));
+    }
+
+    #[test]
+    fn the_refusal_fails_closed_on_anything_but_a_confirmed_stop() {
+        // Confirmed stopped is the only state that proceeds.
+        assert!(refuse(&Stack::Stopped, "backup").is_none());
+        let running = refuse(&Stack::Running, "backup").unwrap_or_default().text();
+        assert!(running.contains("must not happen while the"));
+        assert!(running.contains("lemonfiber down"));
+        // An engine that will not answer is refused as firmly as a running stack:
+        // it cannot prove nothing is writing, and a guess is the corruption a
+        // backup exists to prevent.
+        let unknown = refuse(&Stack::Unknown, "restore")
+            .unwrap_or_default()
+            .text();
+        assert!(unknown.contains("could not reach the container engine"));
+        assert!(unknown.contains("will not risk a restore"));
+    }
+
+    #[tokio::test]
+    async fn a_running_or_unreachable_stack_stops_a_backup_before_it_starts() {
+        use super::require_stopped;
+        assert!(
+            require_stopped(&ctx_with(FakeEngine(Some(Lifecycle::Exited))), "backup")
+                .await
+                .is_none()
+        );
+        assert!(
+            require_stopped(&ctx_with(FakeEngine(Some(Lifecycle::Running))), "backup")
+                .await
+                .is_some()
+        );
+        // The engine that answers nothing at all.
+        assert!(require_stopped(&ctx_with(FakeEngine(None)), "restore")
+            .await
+            .is_some());
+    }
+
+    #[test]
+    fn a_backup_report_names_what_it_took_and_warns_what_is_in_it() {
+        use lemonfiber_core::app::backup::Report as BackupReport;
+        let report = BackupReport {
+            scope: Scope::WholeStack,
+            path: std::path::PathBuf::from("/backups/b.tar.gz"),
+            sensitive: true,
+            pruned: vec!["old.tar.gz".to_owned()],
+        };
+        let text = render_backup(&report, false).text();
+        assert!(text.contains("Backed up the whole stack to /backups/b.tar.gz"));
+        assert!(text.contains("contains credentials"));
+        assert!(text.contains("Pruned 1 older backup(s)."));
+
+        // Nothing sensitive and nothing pruned says neither.
+        let plain = BackupReport {
+            sensitive: false,
+            pruned: Vec::new(),
+            ..report.clone()
+        };
+        let quiet = render_backup(&plain, false).text();
+        assert!(!quiet.contains("credentials"));
+        assert!(!quiet.contains("Pruned"));
+
+        // As JSON it is one line a script can parse.
+        assert!(render_backup(&report, true).text().contains("\"scope\""));
+    }
+
+    #[test]
+    fn a_preview_lists_what_the_archive_holds_before_anything_is_overwritten() {
+        let preview = Preview {
+            manifest: a_manifest(),
+            downgrade: true,
+            relocation: Some(Relocation {
+                was: "/old".to_owned(),
+                now: "/new".to_owned(),
+            }),
+        };
+        let text = render_preview(&preview, false).text();
+        assert!(text.contains("holds the whole stack, taken by lemonfiber 0.3.0"));
+        assert!(text.contains("- the configuration"));
+        assert!(text.contains("older major version"));
+        assert!(text.contains("--repoint"));
+
+        // Same version, same data root: neither caveat is raised.
+        let matching = Preview {
+            manifest: a_manifest(),
+            downgrade: false,
+            relocation: None,
+        };
+        let quiet = render_preview(&matching, false).text();
+        assert!(!quiet.contains("older major version"));
+        assert!(!quiet.contains("--repoint"));
+
+        assert!(render_preview(&preview, true)
+            .text()
+            .contains(r#""kind":"restore-preview""#));
+    }
+
+    #[test]
+    fn a_restore_report_says_what_came_back_and_where_it_was_pointed() {
+        use lemonfiber_core::app::restore::Report as RestoreReport;
+        let report = RestoreReport {
+            scope: Scope::WholeStack,
+            from_version: "0.3.0".to_owned(),
+            relocated: Some(Relocation {
+                was: "/old".to_owned(),
+                now: "/new".to_owned(),
+            }),
+        };
+        let text = render_restore(&report, false).text();
+        assert!(text.contains("Restored the whole stack"));
+        assert!(text.contains("Re-pointed the data root from /old to /new."));
+
+        let stayed = RestoreReport {
+            relocated: None,
+            ..report.clone()
+        };
+        assert!(!render_restore(&stayed, false).text().contains("Re-pointed"));
+        assert!(render_restore(&report, true)
+            .text()
+            .contains(r#""kind":"restore""#));
+    }
+
+    #[test]
+    fn a_restore_leaves_the_operator_the_two_steps_that_follow_it() {
+        let text = next_steps().text();
+        assert!(text.contains("lemonfiber up <form> && lemonfiber seed"));
+        assert!(text.contains("doctor --only credentials"));
     }
 }
