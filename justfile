@@ -45,6 +45,11 @@ release-workflow:
 # Coverage, and a merge gate in CI: 100% of applicable lines.
 # The binary crate is coming under the gate a file at a time; what is still
 # listed here has not been made testable yet, and the list only ever shrinks.
+# nntp.rs is the exception: it is well covered by its own tests, but the binary
+# is compiled twice (bin and bin-test) and three of its lines are counted from
+# the copy no test executes, which no test can fix. Moving the adapter into
+# lemonfiber-core — where every other adapter already lives, single-mapped —
+# is the fix; see .docs/architecture/module-layout.md.
 # render.rs is already in, which is why it builds its lines and hands them back
 # rather than printing them. Per-item exclusion would need #[coverage(off)],
 # which is nightly-only, so applicable code is instead kept coverable — see
