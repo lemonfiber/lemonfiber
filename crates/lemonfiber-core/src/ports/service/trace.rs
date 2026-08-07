@@ -19,11 +19,14 @@ pub struct FoundItem {
     pub monitored: bool,
 }
 
-/// One stage-advancing event in an item's history: the stage it reached and when.
+/// One notable event in an item's history: what happened and when. The forward-moving
+/// outcomes — a grab, an import — mark how far the item got; the rest — a failed
+/// download, a removal — are the history of what has been tried, shown even though they
+/// advance no stage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceEvent {
-    /// The stage the event denotes reaching.
-    pub stage: crate::trace::Stage,
+    /// What happened.
+    pub outcome: crate::trace::Outcome,
     /// When it happened, as the service reported it.
     pub at: String,
 }
@@ -36,6 +39,17 @@ pub struct QueueItem {
     pub stage: crate::trace::Stage,
     /// Whether the item is stuck — a warning or error tracked-download status.
     pub stuck: bool,
+}
+
+/// A stuck item the queue is holding — one queue health reports so it can be traced. Its
+/// title is the human term a trace searches by, so "3 items stuck" leads straight to the
+/// per-item explanation rather than to a count the operator must go and investigate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StuckItem {
+    /// The item's title, as a person would name it — the term its trace is searched by.
+    pub title: String,
+    /// The stage its download is stuck at.
+    pub stage: crate::trace::Stage,
 }
 
 /// Reading one \*arr's fragment of an item's journey — the service that monitors the
@@ -55,8 +69,8 @@ pub trait Pipeline: Send + Sync {
         term: &str,
     ) -> Result<Vec<FoundItem>, Failure>;
 
-    /// Read the stage-advancing history of one item, newest first — the grabs and
-    /// imports that mark how far it got.
+    /// Read the notable history of one item, newest first — the grabs, failed downloads,
+    /// imports and removals that show both how far it got and what has been tried.
     ///
     /// # Errors
     ///
@@ -78,6 +92,15 @@ pub trait Pipeline: Send + Sync {
         kind: crate::recyclarr::Kind,
         id: i64,
     ) -> Result<Option<QueueItem>, Failure>;
+
+    /// The items the queue is holding that are stuck — each named by its title so it links
+    /// to its own trace. The bridge from "queue health says N are stuck" to the per-item
+    /// explanation each one has.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn stuck_items(&self, kind: crate::recyclarr::Kind) -> Result<Vec<StuckItem>, Failure>;
 }
 
 /// Reading a media server's library to answer the last question a trace has left — is

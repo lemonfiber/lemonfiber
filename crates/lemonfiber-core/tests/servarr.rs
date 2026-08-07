@@ -18,7 +18,7 @@ use lemonfiber_core::ports::service::{
 };
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::{api_key, Servarr};
-use lemonfiber_core::trace::Stage;
+use lemonfiber_core::trace::{Outcome, Stage};
 
 /// What the fake transport answers with.
 enum Answer {
@@ -985,7 +985,7 @@ async fn find_items_reads_the_library_for_the_service_kind() {
 }
 
 #[tokio::test]
-async fn item_history_keeps_stage_events_and_drops_the_rest() {
+async fn item_history_keeps_the_notable_events_and_drops_the_rest() {
     let router = Router::new(vec![(
         Method::Get,
         "/history",
@@ -993,7 +993,8 @@ async fn item_history_keeps_stage_events_and_drops_the_rest() {
         r#"{"records":[
             {"eventType":"downloadFolderImported","date":"2026-01-02T00:00:00Z"},
             {"eventType":"downloadFailed","date":"2026-01-01T12:00:00Z"},
-            {"eventType":"grabbed","date":"2026-01-01T00:00:00Z"}
+            {"eventType":"grabbed","date":"2026-01-01T00:00:00Z"},
+            {"eventType":"episodeFileRenamed","date":"2025-12-31T00:00:00Z"}
         ]}"#
         .to_owned(),
     )]);
@@ -1001,14 +1002,18 @@ async fn item_history_keeps_stage_events_and_drops_the_rest() {
         .item_history(Kind::Sonarr, 1)
         .await
         .unwrap_or_default();
-    // The import and the grab are stages; the failure is not stage-advancing, so it is
-    // dropped here (read for its own meaning elsewhere).
-    assert_eq!(events.len(), 2);
+    // The import, the failed download and the grab are all notable history — the failure
+    // shows even though it advances no stage; the rename is not notable, so it is dropped.
+    // Newest first.
+    assert_eq!(events.len(), 3);
     assert_eq!(
-        events.first().map(|event| event.stage),
-        Some(Stage::Imported)
+        events.first().map(|event| event.outcome),
+        Some(Outcome::Imported)
     );
-    assert!(events.iter().any(|event| event.stage == Stage::Grabbed));
+    assert!(events
+        .iter()
+        .any(|event| event.outcome == Outcome::DownloadFailed));
+    assert!(events.iter().any(|event| event.outcome == Outcome::Grabbed));
     // It filtered by the item, on the kind's own history parameter.
     assert!(router
         .sent()
@@ -1137,6 +1142,63 @@ async fn item_queue_holding_nothing_for_the_item_is_none() {
         .await
         .unwrap_or_default();
     assert_eq!(queue, None);
+}
+
+#[tokio::test]
+async fn stuck_items_names_each_stuck_show_once() {
+    // Five queued records: two stuck episodes of one show, a healthy one, a stuck one whose
+    // embedded title is empty, and a stuck one with no show at all.
+    let router = Router::new(vec![(
+        Method::Get,
+        "/queue",
+        200,
+        r#"{"records":[
+            {"trackedDownloadStatus":"warning","trackedDownloadState":"downloading","series":{"title":"The Expanse"}},
+            {"trackedDownloadStatus":"error","trackedDownloadState":"importPending","series":{"title":"The Expanse"}},
+            {"trackedDownloadStatus":"ok","trackedDownloadState":"downloading","series":{"title":"Not Stuck"}},
+            {"trackedDownloadStatus":"warning","trackedDownloadState":"downloading","series":{"title":""}},
+            {"trackedDownloadStatus":"warning","trackedDownloadState":"downloading"}
+        ]}"#
+        .to_owned(),
+    )]);
+    let items = sonarr_routed(&router)
+        .stuck_items(Kind::Sonarr)
+        .await
+        .unwrap_or_default();
+    // The show is listed once though two of its episodes are stuck; the healthy one is
+    // excluded, and the two with nothing to trace by — an empty title and no title — are
+    // left out rather than linked to a search that could not find them.
+    let named: Vec<(&str, Stage)> = items
+        .iter()
+        .map(|item| (item.title.as_str(), item.stage))
+        .collect();
+    assert_eq!(named, vec![("The Expanse", Stage::Downloading)]);
+    // The queue was read with the item included so each could be named.
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("includeSeries=true")));
+}
+
+#[tokio::test]
+async fn stuck_items_names_a_stuck_film_by_its_movie() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/queue",
+        200,
+        r#"{"records":[{"trackedDownloadStatus":"error","trackedDownloadState":"downloading","movie":{"title":"Dune"}}]}"#
+            .to_owned(),
+    )]);
+    let radarr = {
+        let http: Arc<dyn Http> = router.clone();
+        Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
+    };
+    let items = radarr.stuck_items(Kind::Radarr).await.unwrap_or_default();
+    assert_eq!(items.first().map(|item| item.title.as_str()), Some("Dune"));
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("includeMovie=true")));
 }
 
 #[tokio::test]

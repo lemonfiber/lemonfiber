@@ -13,7 +13,7 @@
 use super::targets::{jellyfin_reader, project_directory, servarr_targets};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
-use crate::model::{TraceReport, TraceStage};
+use crate::model::{StuckEntry, StuckReport, TraceMoment, TraceReport, TraceStage};
 use crate::ports::service::{Library, Pipeline, QueueItem, TraceEvent};
 use crate::recyclarr::Kind;
 use crate::trace::{Confidence, Presence, Stage};
@@ -75,6 +75,41 @@ pub(super) async fn trace(ctx: &Ctx, term: &str) -> Result<TraceReport, Box<Prob
     Ok(not_matched(term))
 }
 
+/// The items whose downloads are stuck, across the \*arrs — the landing point queue
+/// health leads to, so "N items stuck" becomes a named list each entry of which traces on
+/// its own. An \*arr that answered but whose queue would not read marks the list
+/// incomplete rather than being read as nothing stuck — the same honesty a trace keeps
+/// about a silence it did not hear. One that has not finished starting, its key not yet
+/// readable, is skipped as it is everywhere else: a service still coming up holds nothing
+/// stuck, so its absence understates nothing.
+pub(super) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+
+    let mut items = Vec::new();
+    let mut incomplete = false;
+    for target in servarr_targets(&manifest.services, project.as_deref()) {
+        let Some(kind) = Kind::for_section(&target.id) else {
+            continue;
+        };
+        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+            continue;
+        };
+        match service.stuck_items(kind).await {
+            Ok(stuck) => items.extend(stuck.into_iter().map(|item| StuckEntry {
+                title: item.title,
+                service: target.name.clone(),
+                stage: item.stage,
+            })),
+            Err(_) => incomplete = true,
+        }
+    }
+    Ok(StuckReport { items, incomplete })
+}
+
 /// Ask the media server whether the item is in the library, as the three-way answer a
 /// trace folds in: present, provably absent, or — where there is no media server to ask,
 /// or it will not answer — unknown, which the trace reads as "cannot tell" rather than
@@ -121,8 +156,15 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
     let unmanaged_but_present = !monitored && library == Some(Presence::Present);
     let library = monitored.then_some(library).flatten();
 
-    let max_history = events.iter().map(|event| event.stage).max();
-    let mut reached: Vec<Stage> = events.iter().map(|event| event.stage).collect();
+    // The stages the history advances the item through — a grab, an import. A failed
+    // download or a removal is history to show but advances no stage, so it is left out of
+    // how far the item got.
+    let advancing: Vec<Stage> = events
+        .iter()
+        .filter_map(|event| event.outcome.stage())
+        .collect();
+    let max_history = advancing.iter().copied().max();
+    let mut reached = advancing;
     if let Some(item) = queue {
         reached.push(item.stage);
     }
@@ -143,12 +185,21 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
         });
     }
     // The reader gives history newest-first; a trace reads oldest-first, the order things
-    // happened.
+    // happened — building both the stages it advanced through and the full log of what was
+    // tried, so a repeated grab or a download that failed is seen rather than flattened
+    // into the single furthest stage.
+    let mut history = Vec::new();
     for event in events.into_iter().rev() {
-        stages.push(TraceStage {
-            stage: event.stage,
-            service: service.to_owned(),
-            at: Some(event.at),
+        if let Some(stage) = event.outcome.stage() {
+            stages.push(TraceStage {
+                stage,
+                service: service.to_owned(),
+                at: Some(event.at.clone()),
+            });
+        }
+        history.push(TraceMoment {
+            outcome: event.outcome,
+            at: event.at,
         });
     }
     // The queue is the live state; add it only where it carries the item past what its
@@ -172,9 +223,33 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
         });
     }
 
-    // Where two services hold contradictory views of the item, that is not a point on the
-    // pipeline but a disagreement to surface on its own, so an operator sees it rather than
-    // having it silently reconciled away.
+    TraceReport {
+        item: title.to_owned(),
+        matched: monitored,
+        furthest,
+        stall: stall_reason(furthest, queue, library, history_read, queue_read),
+        stages,
+        history,
+        findings: trace_findings(unmanaged_but_present, history_read, queue_read),
+        // A presence found by matching titles across to the media server — the two ends
+        // share no id — may not be the item asked for, so it is marked, never claimed.
+        confidence: if present {
+            Confidence::Uncertain
+        } else {
+            Confidence::Certain
+        },
+    }
+}
+
+/// The disagreements and unreadable-fragment notes a trace surfaces on their own, apart
+/// from the linear pipeline: a media server holding what nothing monitors, and each read
+/// that failed reported as unavailable rather than inferred as nothing — the honesty the
+/// trace keeps about a silence it did not actually hear.
+fn trace_findings(
+    unmanaged_but_present: bool,
+    history_read: bool,
+    queue_read: bool,
+) -> Vec<String> {
     let mut findings = Vec::new();
     if unmanaged_but_present {
         findings.push(
@@ -183,8 +258,6 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
                 .to_owned(),
         );
     }
-    // A read that failed is reported as unavailable, never inferred as nothing: the trace
-    // says so rather than letting a history it could not read stand as "never found".
     if !history_read {
         findings.push(
             "this service's history could not be read, so how far the item got may be \
@@ -199,22 +272,7 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
                 .to_owned(),
         );
     }
-
-    TraceReport {
-        item: title.to_owned(),
-        matched: monitored,
-        furthest,
-        stall: stall_reason(furthest, queue, library, history_read, queue_read),
-        stages,
-        // A presence found by matching titles across to the media server — the two ends
-        // share no id — may not be the item asked for, so it is marked, never claimed.
-        confidence: if present {
-            Confidence::Uncertain
-        } else {
-            Confidence::Certain
-        },
-        findings,
-    }
+    findings
 }
 
 /// Why the item stopped where it did, in plain language — or `None` where nothing proves
@@ -265,6 +323,7 @@ fn not_matched(term: &str) -> TraceReport {
         furthest: Stage::NotMonitored,
         stall: Stage::NotMonitored.stall().map(str::to_owned),
         stages: Vec::new(),
+        history: Vec::new(),
         confidence: Confidence::Certain,
         findings: Vec::new(),
     }
@@ -285,7 +344,7 @@ mod tests {
     use crate::recyclarr::Kind;
     use crate::stack::Source;
     use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs};
-    use crate::trace::{Presence, Stage};
+    use crate::trace::{Outcome, Presence, Stage};
 
     /// A Servarr config that opens a target, carrying a readable key.
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -345,9 +404,9 @@ mod tests {
         }
     }
 
-    fn event(stage: Stage) -> TraceEvent {
+    fn event(outcome: Outcome) -> TraceEvent {
         TraceEvent {
-            stage,
+            outcome,
             at: "2026-01-01T00:00:00Z".to_owned(),
         }
     }
@@ -425,7 +484,7 @@ mod tests {
             "The Expanse",
             true,
             frags(
-                vec![event(Stage::Imported), event(Stage::Grabbed)],
+                vec![event(Outcome::Imported), event(Outcome::Grabbed)],
                 None,
                 None,
             ),
@@ -455,6 +514,53 @@ mod tests {
     }
 
     #[test]
+    fn a_repeated_attempt_shows_in_the_history_the_furthest_stage_flattens() {
+        // Grabbed, the download failed, grabbed again: the furthest stage is a single
+        // "grabbed" — a failure advances nothing — but the history keeps all three, oldest
+        // first, so the repeated attempt is the pattern it is rather than one flat stage.
+        let report = assemble(
+            "Sonarr",
+            "The Expanse",
+            true,
+            frags(
+                vec![
+                    event(Outcome::Grabbed),
+                    event(Outcome::DownloadFailed),
+                    event(Outcome::Grabbed),
+                ],
+                None,
+                None,
+            ),
+        );
+        assert_eq!(report.furthest, Stage::Grabbed);
+        let outcomes: Vec<Outcome> = report.history.iter().map(|moment| moment.outcome).collect();
+        assert_eq!(
+            outcomes,
+            vec![Outcome::Grabbed, Outcome::DownloadFailed, Outcome::Grabbed]
+        );
+    }
+
+    #[test]
+    fn a_removal_after_an_import_shows_in_the_history() {
+        // Imported then the file was removed: the history shows the full story including
+        // the removal, though "removed" is not a stage the pipeline advances to, so the
+        // furthest reached is still imported.
+        let report = assemble(
+            "Sonarr",
+            "The Expanse",
+            true,
+            frags(
+                vec![event(Outcome::Removed), event(Outcome::Imported)],
+                None,
+                None,
+            ),
+        );
+        assert_eq!(report.furthest, Stage::Imported);
+        let outcomes: Vec<Outcome> = report.history.iter().map(|moment| moment.outcome).collect();
+        assert_eq!(outcomes, vec![Outcome::Imported, Outcome::Removed]);
+    }
+
+    #[test]
     fn an_unmonitored_item_is_reported_as_nobody_asked() {
         let report = assemble(
             "Sonarr",
@@ -475,7 +581,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            frags(vec![event(Stage::Grabbed)], None, None),
+            frags(vec![event(Outcome::Grabbed)], None, None),
         );
         assert_eq!(report.furthest, Stage::Grabbed);
         assert!(report
@@ -493,7 +599,7 @@ mod tests {
             "The Expanse",
             true,
             frags(
-                vec![event(Stage::Grabbed)],
+                vec![event(Outcome::Grabbed)],
                 Some(QueueItem {
                     stage: Stage::Downloading,
                     stuck: false,
@@ -516,7 +622,7 @@ mod tests {
             "The Expanse",
             true,
             frags(
-                vec![event(Stage::Grabbed)],
+                vec![event(Outcome::Grabbed)],
                 Some(QueueItem {
                     stage: Stage::Downloading,
                     stuck: true,
@@ -538,7 +644,11 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            frags(vec![event(Stage::Imported)], None, Some(Presence::Present)),
+            frags(
+                vec![event(Outcome::Imported)],
+                None,
+                Some(Presence::Present),
+            ),
         );
         assert_eq!(report.furthest, Stage::Available);
         assert_eq!(
@@ -558,7 +668,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            frags(vec![event(Stage::Imported)], None, Some(Presence::Absent)),
+            frags(vec![event(Outcome::Imported)], None, Some(Presence::Absent)),
         );
         assert_eq!(report.furthest, Stage::Imported);
         assert_eq!(report.confidence, crate::trace::Confidence::Certain);
@@ -600,7 +710,11 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            frags(vec![event(Stage::Imported)], None, Some(Presence::Present)),
+            frags(
+                vec![event(Outcome::Imported)],
+                None,
+                Some(Presence::Present),
+            ),
         );
         assert_eq!(report.furthest, Stage::Available);
         assert!(report.findings.is_empty());
@@ -639,7 +753,7 @@ mod tests {
             "The Expanse",
             true,
             Fragments {
-                events: vec![event(Stage::Grabbed)],
+                events: vec![event(Outcome::Grabbed)],
                 queue: None,
                 library: None,
                 history_read: true,
@@ -774,5 +888,68 @@ mod tests {
             Environment::MacOs,
         );
         assert!(trace(&bad, "anything").await.is_err());
+    }
+
+    /// A queue holding one stuck download, the show embedded so it can be named.
+    const STUCK_QUEUE: &str = r#"{"records":[{"trackedDownloadStatus":"warning","trackedDownloadState":"downloading","series":{"title":"The Expanse"}}]}"#;
+
+    #[tokio::test]
+    async fn stuck_lists_each_stuck_item_tagged_with_its_service() {
+        // Sonarr's queue holds a stuck series; Radarr's holds nothing it can name (a series
+        // record, no movie title) and Lidarr is not a traceable kind — so the one stuck
+        // item is listed, tagged with the service holding it, and the list is complete.
+        let report = super::stuck(&ctx("", "", STUCK_QUEUE))
+            .await
+            .unwrap_or_default();
+        assert!(report
+            .items
+            .iter()
+            .any(|entry| entry.title == "The Expanse" && entry.service == "Sonarr"));
+        assert!(!report.incomplete);
+    }
+
+    #[tokio::test]
+    async fn stuck_marks_the_list_incomplete_where_a_queue_cannot_be_read() {
+        // An \*arr whose queue will not decode is reported as leaving the list possibly
+        // short, rather than read as nothing stuck.
+        let report = super::stuck(&ctx("", "", "not json"))
+            .await
+            .unwrap_or_default();
+        assert!(report.items.is_empty());
+        assert!(report.incomplete);
+    }
+
+    #[tokio::test]
+    async fn stuck_over_arrs_that_have_not_started_finds_nothing() {
+        // No key is readable, so no \*arr opens: nothing was asked, so the list is empty
+        // and complete rather than incomplete.
+        let context = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::absent()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            Settings::default(),
+            Environment::MacOs,
+        )
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
+        .with_http(Arc::new(Fake::arr("", "", EMPTY_QUEUE)));
+        let report = super::stuck(&context).await.unwrap_or_default();
+        assert!(report.items.is_empty());
+        assert!(!report.incomplete);
+    }
+
+    #[tokio::test]
+    async fn a_stuck_query_over_an_unreadable_stack_is_an_error() {
+        let bad = Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::absent()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
+            Settings::default(),
+            Environment::MacOs,
+        );
+        assert!(super::stuck(&bad).await.is_err());
     }
 }
