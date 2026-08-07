@@ -5,7 +5,6 @@
 //! a line on the terminal and a typed line back. It offers only the choices that
 //! apply where it runs, so an answer the wizard would reject is never gathered.
 
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
@@ -16,19 +15,63 @@ use lemonfiber_core::storage::COPY_CONSEQUENCE;
 use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Library, Plan, Step, Wizard};
 
+/// Where the answers to these questions come from.
+///
+/// A person at a keyboard, in a real run. The distinction exists so that what to
+/// ask, and what an answer means, can be proven against a script — the terminal
+/// itself is the one part of this that no test can stand in for, and it is kept
+/// behind here in [`crate::keyboard`].
+pub trait Answers {
+    /// Show a question and read the trimmed answer, empty at end of input.
+    fn ask(&self, question: &str) -> String;
+
+    /// Read a secret, without it appearing as it is typed.
+    fn secret(&self, prompt: &str) -> String;
+}
+
 /// A prompt that reads the operator's answers from the terminal.
 pub struct Terminal {
     environment: Environment,
     default_data: PathBuf,
+    answers: Box<dyn Answers>,
 }
 
 impl Terminal {
     /// A terminal prompt for `environment`, proposing `default_data` where the
     /// operator does not name a data location of their own.
-    pub const fn new(environment: Environment, default_data: PathBuf) -> Self {
+    pub fn new(environment: Environment, default_data: PathBuf) -> Self {
+        Self::answered_by(
+            environment,
+            default_data,
+            Box::new(crate::keyboard::Keyboard),
+        )
+    }
+
+    /// The same, reading its answers from somewhere else — a script, in a test.
+    pub fn answered_by(
+        environment: Environment,
+        default_data: PathBuf,
+        answers: Box<dyn Answers>,
+    ) -> Self {
         Self {
             environment,
             default_data,
+            answers,
+        }
+    }
+
+    /// Ask a yes-or-no question, taking the default where the answer is neither.
+    fn yes_no(&self, question: &str, default: bool) -> bool {
+        let hint = if default { "[Y/n]" } else { "[y/N]" };
+        match self
+            .answers
+            .ask(&format!("{question} {hint}:"))
+            .to_lowercase()
+            .as_str()
+        {
+            "y" | "yes" => true,
+            "n" | "no" => false,
+            _ => default,
         }
     }
 }
@@ -40,7 +83,7 @@ impl Prompt for Terminal {
         println!("  2) Torrents only");
         println!("  3) Both");
         println!("  4) Neither — serve an existing library only");
-        match ask("Choose [3]:").as_str() {
+        match self.answers.ask("Choose [3]:").as_str() {
             "1" => Protocols {
                 usenet: true,
                 torrent: false,
@@ -80,12 +123,12 @@ impl Prompt for Terminal {
             }
             println!("    Without it: {}\n", item.without);
         }
-        let _ = ask("Press enter when you have noted these.");
+        let _ = self.answers.ask("Press enter when you have noted these.");
     }
 
     fn data_location(&self) -> PathBuf {
         let shown = self.default_data.display();
-        let answer = ask(&format!(
+        let answer = self.answers.ask(&format!(
             "\nWhere should the library and downloads live? [{shown}]:"
         ));
         if answer.is_empty() {
@@ -136,19 +179,19 @@ impl Prompt for Terminal {
         }
         // Defaulting to no nudges the operator toward a location that links,
         // without taking the choice away — some know their setup and mean it.
-        yes_no("\nUse this location anyway?", false)
+        self.yes_no("\nUse this location anyway?", false)
     }
 
     fn credential(&self) -> Option<(String, String)> {
         println!("\nAn indexer is where the stack searches for content.");
         println!("Leave the URL blank to set one up later.");
-        let url = ask("Indexer URL:");
+        let url = self.answers.ask("Indexer URL:");
         if url.is_empty() {
             return None;
         }
         // Read without echo and never printed back — the review redacts it, so the
         // key reaches neither the screen as it is typed nor the summary after.
-        let key = ask_secret("Indexer API key:");
+        let key = self.answers.secret("Indexer API key:");
         Some((url, key))
     }
 
@@ -171,7 +214,7 @@ impl Prompt for Terminal {
         println!("  1) Try again — re-enter it and test afresh");
         println!("  2) Use it anyway — keep it unverified");
         println!("  3) Skip — leave the indexer unset for now");
-        match ask("Choose [1]:").as_str() {
+        match self.answers.ask("Choose [1]:").as_str() {
             "2" => CredentialChoice::Proceed,
             "3" => CredentialChoice::Skip,
             _ => CredentialChoice::Retry,
@@ -181,17 +224,17 @@ impl Prompt for Terminal {
     fn usenet_provider(&self) -> Option<ProviderEntry> {
         println!("\nA Usenet provider is where downloads are fetched from.");
         println!("Leave the host blank to set one up later.");
-        let host = ask("Provider host:");
+        let host = self.answers.ask("Provider host:");
         if host.is_empty() {
             return None;
         }
         // 563 is the standard TLS port; TLS is the default because the password
         // must not cross the wire in the clear.
-        let port = ask("Port [563]:").parse().unwrap_or(563);
-        let user = ask("Username:");
+        let port = self.answers.ask("Port [563]:").parse().unwrap_or(563);
+        let user = self.answers.ask("Username:");
         // Read without echo and never printed back — the review redacts it.
-        let pass = ask_secret("Password:");
-        let tls = yes_no("Connect over TLS?", true);
+        let pass = self.answers.secret("Password:");
+        let tls = self.yes_no("Connect over TLS?", true);
         Some(ProviderEntry {
             host,
             port,
@@ -203,9 +246,11 @@ impl Prompt for Terminal {
 
     fn service_user(&self) -> Option<(u32, u32)> {
         println!("\nThe containers can run as a chosen user, so the files they create are yours.");
-        parse_ids(&ask(
-            "User and group as UID:GID, or blank to keep the image default:",
-        ))
+        parse_ids(
+            &self
+                .answers
+                .ask("User and group as UID:GID, or blank to keep the image default:"),
+        )
     }
 
     fn library(&self) -> Library {
@@ -216,7 +261,7 @@ impl Prompt for Terminal {
             println!("  2) Yes, on the host — reaches a hardware transcoder the container cannot");
         }
         println!("  3) No media server");
-        match ask("Choose [1]:").as_str() {
+        match self.answers.ask("Choose [1]:").as_str() {
             "2" if native => Library::JellyfinNative,
             "3" => Library::None,
             _ => Library::JellyfinDocker,
@@ -224,11 +269,11 @@ impl Prompt for Terminal {
     }
 
     fn household(&self) -> bool {
-        yes_no("\nWill others in your home use it?", false)
+        self.yes_no("\nWill others in your home use it?", false)
     }
 
     fn autostart(&self) -> bool {
-        yes_no("\nStart the stack when this machine boots?", false)
+        self.yes_no("\nStart the stack when this machine boots?", false)
     }
 
     fn confirm(&self, plan: &Plan) -> bool {
@@ -240,7 +285,7 @@ impl Prompt for Terminal {
             let shown = if is_secret(key) { "********" } else { value };
             println!("  {key} = {shown}");
         }
-        yes_no("\nApply it?", true)
+        self.yes_no("\nApply it?", true)
     }
 }
 
@@ -250,38 +295,6 @@ fn is_secret(key: &str) -> bool {
     ["PASS", "KEY", "TOKEN", "SECRET"]
         .iter()
         .any(|mark| key.contains(mark))
-}
-
-/// Print a question and read the operator's trimmed answer, empty on end-of-input.
-fn ask(question: &str) -> String {
-    print!("{question} ");
-    let _ = std::io::stdout().flush();
-    let mut line = String::new();
-    let _ = std::io::stdin().read_line(&mut line);
-    line.trim().to_owned()
-}
-
-/// Ask a yes-or-no question, taking the default where the answer is neither.
-fn yes_no(question: &str, default: bool) -> bool {
-    let hint = if default { "[Y/n]" } else { "[y/N]" };
-    match ask(&format!("{question} {hint}:")).to_lowercase().as_str() {
-        "y" | "yes" => true,
-        "n" | "no" => false,
-        _ => default,
-    }
-}
-
-/// Read a secret without echoing it, its surrounding whitespace trimmed.
-///
-/// A password shown as it is typed reaches scrollback and any shoulder or screen
-/// recording, so it is read with the terminal's echo suppressed. The trim is the
-/// same the other fields get: a pasted key's stray newline is the common error,
-/// and removing it serves the operator.
-fn ask_secret(prompt: &str) -> String {
-    rpassword::prompt_password(format!("{prompt} "))
-        .unwrap_or_default()
-        .trim()
-        .to_owned()
 }
 
 /// Read a `UID:GID` pair, or nothing where it is blank or malformed.
@@ -578,10 +591,452 @@ fn parse_library(value: &str) -> Result<Library, String> {
 #[cfg(test)]
 mod tests {
     use super::{Flags, RawSetup, SetupFlags};
-    use lemonfiber_core::app::setup::{Prompt, ProviderEntry};
+    use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry};
     use lemonfiber_core::platform::Environment;
     use lemonfiber_core::wizard::Wizard;
     use std::path::PathBuf;
+
+    // ---- The terminal's own questions, answered by a script. ----
+
+    use super::{is_secret, parse_ids, Answers, Terminal};
+    use lemonfiber_core::app::setup::StorageWarning;
+    use lemonfiber_core::config::Protocols;
+    use lemonfiber_core::prerequisites::prerequisites;
+    use lemonfiber_core::validate::Validation;
+    use lemonfiber_core::wizard::{Answer, Indexer, Library, Step};
+    use std::cell::RefCell;
+    use std::path::Path;
+
+    /// Answers handed out in order, so a test reads as the conversation it is.
+    /// A question past the end is answered with nothing, which is what a person
+    /// pressing enter — or an input that has ended — gives.
+    struct Script {
+        lines: RefCell<Vec<String>>,
+    }
+
+    impl Script {
+        fn of(lines: &[&str]) -> Self {
+            Self {
+                lines: RefCell::new(lines.iter().rev().map(|line| (*line).to_owned()).collect()),
+            }
+        }
+    }
+
+    impl Answers for Script {
+        fn ask(&self, _question: &str) -> String {
+            self.lines.borrow_mut().pop().unwrap_or_default()
+        }
+
+        fn secret(&self, prompt: &str) -> String {
+            self.ask(prompt)
+        }
+    }
+
+    /// A terminal answered by the given script, on a platform that offers a native
+    /// media server so the choice that depends on it can be reached.
+    fn answered(lines: &[&str]) -> Terminal {
+        Terminal::answered_by(
+            Environment::MacOs,
+            PathBuf::from("/srv/media"),
+            Box::new(Script::of(lines)),
+        )
+    }
+
+    #[test]
+    fn a_flag_run_answers_from_what_it_was_given() {
+        // The very same walk drives this as drives the terminal, so a flag run and
+        // an interactive one cannot answer differently.
+        // Everything a non-interactive run can be told, so each answer comes from
+        // a flag rather than from a default.
+        let given = RawSetup {
+            indexer_url: Some("http://indexer.test".to_owned()),
+            indexer_key: Some("the-key".to_owned()),
+            usenet_host: Some("news.test".to_owned()),
+            usenet_user: Some("me".to_owned()),
+            usenet_pass: Some("secret".to_owned()),
+            service_user: Some("1000:1000".to_owned()),
+            autostart: Some(true),
+            ..workable()
+        };
+        let flags = SetupFlags::parse(given).unwrap_or(SetupFlags::none());
+        let prompt = Flags::new(flags, PathBuf::from("/elsewhere"));
+        assert_eq!(
+            prompt.protocols(),
+            Protocols {
+                usenet: true,
+                torrent: true
+            }
+        );
+        // Named, so the flag wins over the default this was built with.
+        assert_eq!(prompt.data_location(), PathBuf::from("/srv/media"));
+        assert_eq!(
+            prompt.credential(),
+            Some(("http://indexer.test".to_owned(), "the-key".to_owned()))
+        );
+        assert!(prompt.usenet_provider().is_some());
+        assert_eq!(prompt.service_user(), Some((1000, 1000)));
+        assert!(matches!(prompt.library(), Library::JellyfinDocker));
+        assert!(prompt.household());
+        assert!(prompt.autostart());
+        // Consent given up front is what stands in for a person confirming.
+        assert!(prompt.confirm(&wizard().plan()));
+        assert!(prompt.storage_warning(
+            Path::new("/data"),
+            &StorageWarning::CopyOnly { limitation: None }
+        ));
+        assert!(matches!(
+            prompt.credential_failed(&Validation::Rejected {
+                detail: "401".to_owned()
+            }),
+            CredentialChoice::Proceed
+        ));
+        // The interactive courtesies are nothing at all without a person.
+        prompt.prerequisites(&prerequisites(Protocols::both()));
+        prompt.hardlinks(Path::new("/data"), None);
+        prompt.credential_valid("Prowlarr");
+    }
+
+    #[test]
+    fn a_flag_run_without_consent_keeps_nothing_it_could_not_prove() {
+        // No `--yes`: an unproven credential is left unset rather than stored, and
+        // a location that cannot hardlink is not used on someone's behalf.
+        let prompt = Flags::new(SetupFlags::none(), PathBuf::from("/srv/media"));
+        assert!(matches!(
+            prompt.credential_failed(&Validation::Unreachable {
+                detail: "no answer".to_owned()
+            }),
+            CredentialChoice::Skip
+        ));
+        assert!(!prompt.storage_warning(
+            Path::new("/srv/media"),
+            &StorageWarning::Untested {
+                reason: "absent".to_owned()
+            }
+        ));
+        assert!(!prompt.confirm(&wizard().plan()));
+        // What was not given falls back to the same defaults the terminal offers.
+        assert_eq!(prompt.data_location(), PathBuf::from("/srv/media"));
+        assert_eq!(prompt.credential(), None);
+        assert_eq!(prompt.usenet_provider(), None);
+        assert_eq!(prompt.service_user(), None);
+        assert!(!prompt.household());
+        assert!(!prompt.autostart());
+        assert!(matches!(prompt.library(), Library::JellyfinDocker));
+        assert_eq!(
+            prompt.protocols(),
+            Protocols {
+                usenet: true,
+                torrent: true
+            }
+        );
+    }
+
+    #[test]
+    fn each_library_choice_can_be_named_on_the_command_line() {
+        for (given, expected) in [
+            ("docker", Library::JellyfinDocker),
+            ("native", Library::JellyfinNative),
+            ("NONE", Library::None),
+        ] {
+            let flags = SetupFlags::parse(RawSetup {
+                library: Some(given.to_owned()),
+                ..raw()
+            });
+            let chosen = flags.ok().and_then(|flags| flags.library);
+            assert_eq!(
+                format!("{chosen:?}"),
+                format!("{:?}", Some(expected)),
+                "--library {given}"
+            );
+        }
+    }
+
+    #[test]
+    fn each_way_of_fetching_content_can_be_named_on_the_command_line() {
+        for (given, usenet, torrent) in [
+            ("both", true, true),
+            ("usenet", true, false),
+            ("torrent", false, true),
+            ("TORRENTS", false, true),
+            ("none", false, false),
+            ("neither", false, false),
+        ] {
+            let flags = SetupFlags::parse(RawSetup {
+                protocols: Some(given.to_owned()),
+                ..raw()
+            });
+            assert_eq!(
+                flags.ok().and_then(|flags| flags.protocols),
+                Some(Protocols { usenet, torrent }),
+                "--protocols {given}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_choice_the_command_line_does_not_offer_names_what_it_expected() {
+        // The message has to say what would have worked, or the operator is left
+        // guessing at a vocabulary nothing shows them.
+        let protocols = SetupFlags::parse(RawSetup {
+            protocols: Some("carrier pigeon".to_owned()),
+            ..raw()
+        });
+        assert!(protocols
+            .err()
+            .is_some_and(|message| message.contains("both, usenet, torrent or none")));
+        let library = SetupFlags::parse(RawSetup {
+            library: Some("plex".to_owned()),
+            ..raw()
+        });
+        assert!(library
+            .err()
+            .is_some_and(|message| message.contains("docker, native or none")));
+    }
+
+    #[test]
+    fn a_container_user_that_is_not_a_pair_names_what_was_expected() {
+        let flags = SetupFlags::parse(RawSetup {
+            service_user: Some("me".to_owned()),
+            ..raw()
+        });
+        assert!(flags
+            .err()
+            .is_some_and(|message| message.contains("must be UID:GID")));
+    }
+
+    #[test]
+    fn a_step_that_is_no_question_asks_for_no_flag() {
+        // Only a question can be answered by a flag; the rest of the walk is work,
+        // and naming a flag for it would be nonsense.
+        assert_eq!(SetupFlags::none().flag_for(Step::Welcome), None);
+    }
+
+    #[test]
+    fn the_review_shows_each_setting_with_a_secret_marked_present_only() {
+        // A review reaches the screen, scrollback and any session recording, so a
+        // key has no business appearing in it — it is shown as present instead.
+        let mut wizard = wizard();
+        let _ = wizard.answer(Answer::Protocols(Protocols::both()));
+        let _ = wizard.answer(Answer::DataLocation(PathBuf::from("/srv/media")));
+        let _ = wizard.answer(Answer::Credentials(Some(Indexer {
+            url: "http://indexer.test".to_owned(),
+            key: "the-key".to_owned(),
+            validated: true,
+        })));
+        let plan = wizard.plan();
+        assert!(
+            !plan.settings().is_empty(),
+            "the plan carries what was answered"
+        );
+        assert!(answered(&[""]).confirm(&plan));
+    }
+
+    #[test]
+    fn a_terminal_reads_from_the_keyboard_unless_told_otherwise() {
+        // Constructing it asks nothing — the keyboard is only reached when a
+        // question is actually put, which is why this is safe to build here and
+        // why nothing is asked of it: a real question would read real input and
+        // the test would sit there forever.
+        drop(Terminal::new(
+            Environment::MacOs,
+            PathBuf::from("/srv/media"),
+        ));
+    }
+
+    #[test]
+    fn each_way_of_fetching_content_can_be_chosen() {
+        for (answer, usenet, torrent) in [
+            ("1", true, false),
+            ("2", false, true),
+            ("3", true, true),
+            ("4", false, false),
+            // Anything else takes the default, which is both.
+            ("", true, true),
+        ] {
+            let chosen = answered(&[answer]).protocols();
+            assert_eq!(
+                chosen,
+                Protocols { usenet, torrent },
+                "answering {answer:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_prerequisites_are_listed_and_waited_on() {
+        // A library-only run needs nothing, and is told so rather than shown an
+        // empty list — an end state, not a lesser one.
+        answered(&[]).prerequisites(&prerequisites(Protocols::none()));
+        // Otherwise each item is named, costed, and the operator is waited on.
+        answered(&[""]).prerequisites(&prerequisites(Protocols::both()));
+    }
+
+    #[test]
+    fn the_data_location_takes_the_default_when_it_is_not_named() {
+        assert_eq!(answered(&[""]).data_location(), PathBuf::from("/srv/media"));
+        assert_eq!(
+            answered(&["/mnt/big"]).data_location(),
+            PathBuf::from("/mnt/big")
+        );
+    }
+
+    #[test]
+    fn what_hardlinking_means_is_said_either_way() {
+        let terminal = answered(&[]);
+        // Proven on the location itself.
+        terminal.hardlinks(Path::new("/srv/media"), None);
+        // Inferred from the parent, and said to be inferred.
+        terminal.hardlinks(Path::new("/srv/media"), Some(Path::new("/srv")));
+    }
+
+    #[test]
+    fn a_location_that_cannot_hardlink_is_explained_and_still_offered() {
+        // Defaulting to no, so the operator is nudged toward one that links —
+        // without the choice being taken away.
+        assert!(!answered(&[""]).storage_warning(
+            Path::new("/srv/media"),
+            &StorageWarning::CopyOnly {
+                limitation: Some("it is a network share".to_owned())
+            }
+        ));
+        assert!(answered(&["y"]).storage_warning(
+            Path::new("/srv/media"),
+            &StorageWarning::CopyOnly { limitation: None }
+        ));
+        // One that could not be tested is a different sentence.
+        assert!(!answered(&["n"]).storage_warning(
+            Path::new("/srv/media"),
+            &StorageWarning::Untested {
+                reason: "the path does not exist".to_owned()
+            }
+        ));
+    }
+
+    #[test]
+    fn a_blank_indexer_url_sets_none_up_at_all() {
+        assert_eq!(answered(&[""]).credential(), None);
+        assert_eq!(
+            answered(&["http://indexer.test", "the-key"]).credential(),
+            Some(("http://indexer.test".to_owned(), "the-key".to_owned()))
+        );
+    }
+
+    #[test]
+    fn a_credential_that_did_not_prove_offers_the_three_ways_out() {
+        let rejected = Validation::Rejected {
+            detail: "401".to_owned(),
+        };
+        assert!(matches!(
+            answered(&["1"]).credential_failed(&rejected),
+            CredentialChoice::Retry
+        ));
+        assert!(matches!(
+            answered(&["2"]).credential_failed(&rejected),
+            CredentialChoice::Proceed
+        ));
+        assert!(matches!(
+            answered(&["3"]).credential_failed(&rejected),
+            CredentialChoice::Skip
+        ));
+        // Each cause is named as itself, because their remedies differ.
+        for outcome in [
+            Validation::Unreachable {
+                detail: "no answer".to_owned(),
+            },
+            Validation::Degraded {
+                detail: "no search capability".to_owned(),
+            },
+            Validation::Valid {
+                observed: "Prowlarr".to_owned(),
+            },
+        ] {
+            let _ = answered(&["1"]).credential_failed(&outcome);
+        }
+        // And one that proved is simply said so.
+        answered(&[]).credential_valid("Prowlarr 1.2");
+    }
+
+    #[test]
+    fn a_blank_provider_host_sets_none_up_at_all() {
+        assert_eq!(answered(&[""]).usenet_provider(), None);
+    }
+
+    #[test]
+    fn a_provider_takes_the_standard_port_and_tls_unless_told_otherwise() {
+        let entry = answered(&["news.test", "", "me", "secret", ""]).usenet_provider();
+        assert_eq!(
+            entry,
+            Some(ProviderEntry {
+                host: "news.test".to_owned(),
+                port: 563,
+                user: "me".to_owned(),
+                pass: "secret".to_owned(),
+                tls: true,
+            })
+        );
+        // Named otherwise, both are taken as given.
+        let plain = answered(&["news.test", "119", "me", "secret", "n"]).usenet_provider();
+        assert!(plain.is_some_and(|entry| entry.port == 119 && !entry.tls));
+    }
+
+    #[test]
+    fn the_container_user_is_read_as_a_pair_or_left_to_the_image() {
+        assert_eq!(answered(&["1000:1000"]).service_user(), Some((1000, 1000)));
+        assert_eq!(answered(&[""]).service_user(), None);
+        assert_eq!(parse_ids("1000:1000"), Some((1000, 1000)));
+        assert_eq!(parse_ids("1000"), None);
+        assert_eq!(parse_ids("x:y"), None);
+    }
+
+    #[test]
+    fn the_library_choice_offers_the_native_option_only_where_it_applies() {
+        assert!(matches!(
+            answered(&["1"]).library(),
+            Library::JellyfinDocker
+        ));
+        assert!(matches!(answered(&["3"]).library(), Library::None));
+        // macOS offers a native media server, so choosing it is possible.
+        assert!(matches!(
+            answered(&["2"]).library(),
+            Library::JellyfinNative
+        ));
+        // Where it is not offered, the same answer falls back rather than taking a
+        // choice this platform never showed.
+        let linux = Terminal::answered_by(
+            Environment::LinuxNative,
+            PathBuf::from("/srv/media"),
+            Box::new(Script::of(&["2"])),
+        );
+        assert!(matches!(linux.library(), Library::JellyfinDocker));
+    }
+
+    #[test]
+    fn the_yes_or_no_questions_take_their_own_defaults() {
+        // Household defaults to no, autostart to no; a bare enter takes each.
+        assert!(!answered(&[""]).household());
+        assert!(answered(&["yes"]).household());
+        assert!(!answered(&[""]).autostart());
+        assert!(answered(&["y"]).autostart());
+        // An answer that is neither takes the default.
+        assert!(!answered(&["maybe"]).household());
+    }
+
+    #[test]
+    fn the_review_shows_every_setting_and_never_a_secret_in_the_clear() {
+        let plan = Wizard::new(Environment::MacOs).plan();
+        // Confirmed by default: a bare enter applies.
+        assert!(answered(&[""]).confirm(&plan));
+        assert!(!answered(&["n"]).confirm(&plan));
+    }
+
+    #[test]
+    fn a_key_a_password_or_a_token_is_a_secret_by_its_name() {
+        assert!(is_secret("INDEXER_KEY"));
+        assert!(is_secret("USENET_PASS"));
+        assert!(is_secret("SOME_TOKEN"));
+        assert!(is_secret("A_SECRET"));
+        assert!(!is_secret("DATA_ROOT"));
+    }
 
     /// A macOS wizard, where the container-user step does not apply, so the
     /// required set is the questions that do.
@@ -658,10 +1113,10 @@ mod tests {
         // default, so a run without them is complete.
         let flags = SetupFlags::parse(workable())
             .ok()
-            .unwrap_or_else(SetupFlags::none);
-        let missing = flags.missing(&wizard());
-        assert!(!missing.iter().any(|flag| flag.contains("indexer")));
-        assert!(!missing.iter().any(|flag| flag.contains("service-user")));
+            .unwrap_or(SetupFlags::none());
+        // Compared whole rather than searched: a workable run is missing nothing at
+        // all, and a search over an empty list proves nothing about either one.
+        assert_eq!(flags.missing(&wizard()), Vec::<&str>::new());
     }
 
     #[test]
