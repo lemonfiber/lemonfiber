@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use super::targets::{project_directory, seerr_reader, servarr_targets};
+use super::targets::{open_servarrs, seerr_reader};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
@@ -90,23 +90,14 @@ async fn library_titles(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> (BTreeMap<(&'static str, i64), String>, bool) {
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let mut titles = BTreeMap::new();
     let mut named = true;
-    for target in servarr_targets(services, project.as_deref()) {
-        let Some(kind) = Kind::for_section(&target.id) else {
-            continue;
-        };
-        // A service that has not finished starting is skipped rather than counted as a
-        // failed read, the same as everywhere else: it holds nothing to name yet.
-        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
-            continue;
-        };
-        match service.library(kind).await {
+    for arr in open_servarrs(ctx, services).await {
+        match arr.service.library(arr.kind).await {
             Ok(items) => titles.extend(
                 items
                     .into_iter()
-                    .map(|item| ((kind.section(), item.id), item.title)),
+                    .map(|item| ((arr.kind.section(), item.id), item.title)),
             ),
             Err(_) => named = false,
         }

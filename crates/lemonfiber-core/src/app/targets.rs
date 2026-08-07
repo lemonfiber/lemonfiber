@@ -11,8 +11,10 @@ use crate::doctor::credentials::Target;
 use crate::jellyfin::Jellyfin;
 use crate::ports::service::{Download, Transfers};
 use crate::qbittorrent::Qbittorrent;
+use crate::recyclarr::Kind;
 use crate::sabnzbd::Sabnzbd;
 use crate::seerr::Seerr;
+use crate::servarr::Servarr;
 use crate::stack::Source;
 
 /// The directory Compose treats as the project root, where the services' config
@@ -215,6 +217,45 @@ pub(super) fn jellyfin_reader(
         crate::config::JELLYFIN_ADMIN_USER,
         password,
     ))
+}
+
+/// One \*arr a read can be made against: the service it files, a client already carrying
+/// its key, and the name a report calls it by.
+pub(super) struct OpenArr {
+    /// The service's display name, as a report names where a fact came from.
+    pub name: String,
+    /// Which of the two media services it is.
+    pub kind: Kind,
+    /// A client carrying the key it wrote.
+    pub service: Servarr,
+}
+
+/// Every \*arr whose key could be read, ready to be asked something.
+///
+/// One that has not finished starting has not written its key yet, so it cannot be opened
+/// and is left out. That is deliberately not a failed read: a service still coming up
+/// holds nothing to report, so its absence understates nothing — the convention every
+/// caller here follows, stated once rather than re-derived at each of them.
+pub(super) async fn open_servarrs(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Vec<OpenArr> {
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let mut open = Vec::new();
+    for target in servarr_targets(services, project.as_deref()) {
+        let Some(kind) = Kind::for_section(&target.id) else {
+            continue;
+        };
+        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+            continue;
+        };
+        open.push(OpenArr {
+            name: target.name.clone(),
+            kind,
+            service,
+        });
+    }
+    open
 }
 
 /// What reading the household's requests needs: the request service, and the media-server

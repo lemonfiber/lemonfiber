@@ -391,6 +391,15 @@ pub(crate) fn upgrade(report: &UpgradeReport) {
     }
 }
 
+/// The exact command that traces one item, printed beneath the line that names it.
+///
+/// Shared by every surface that leads to a trace so the two cannot drift apart: the term
+/// is what the trace searches by, and a link that no longer matches how the trace matches
+/// would send an operator to a search that finds nothing.
+fn trace_link(title: &str) {
+    println!("      → {PRODUCT} trace \"{title}\"");
+}
+
 /// What the household asked for, grouped by whoever asked.
 ///
 /// A member's own words rather than the services': where a request stands, and — for one
@@ -417,7 +426,7 @@ pub(crate) fn household(report: &HouseholdReport) {
             // Only a named request can be traced: the trace searches by title, so a link
             // for one with no name would lead to a search that finds nothing.
             if let Some(title) = &request.title {
-                println!("      → {PRODUCT} trace \"{title}\"");
+                trace_link(title);
             }
         }
     }
@@ -570,7 +579,7 @@ pub(crate) fn stuck(report: &StuckReport) {
                 item.service,
                 item.stage.label()
             );
-            println!("      → {PRODUCT} trace \"{}\"", item.title);
+            trace_link(&item.title);
         }
     }
     // A queue that could not be read leaves the list possibly short; saying so keeps it

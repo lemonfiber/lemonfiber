@@ -10,7 +10,7 @@
 //! services that can, in a later slice; this never over-claims the reason for a stall it
 //! cannot prove.
 
-use super::targets::{jellyfin_reader, project_directory, servarr_targets};
+use super::targets::{jellyfin_reader, open_servarrs};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceMoment, TraceReport, TraceStage};
@@ -32,18 +32,12 @@ pub(super) async fn trace(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     // The media server is resolved once, ahead of the match: the last stage of a trace is
     // the same read whichever \*arr the item turns up in.
     let jellyfin = jellyfin_reader(ctx, &manifest.services);
 
-    for target in servarr_targets(&manifest.services, project.as_deref()) {
-        let Some(kind) = Kind::for_section(&target.id) else {
-            continue;
-        };
-        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
-            continue;
-        };
+    for arr in open_servarrs(ctx, &manifest.services).await {
+        let (kind, service) = (arr.kind, arr.service);
         let Ok(items) = service.find_items(kind, term).await else {
             continue;
         };
@@ -75,7 +69,7 @@ pub(super) async fn trace(
         };
         let library = library_presence(jellyfin.as_ref(), kind, &item.title).await;
         return Ok(assemble(
-            &target.name,
+            &arr.name,
             &item.title,
             item.monitored,
             Fragments {
@@ -103,21 +97,13 @@ pub(super) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-
     let mut items = Vec::new();
     let mut incomplete = false;
-    for target in servarr_targets(&manifest.services, project.as_deref()) {
-        let Some(kind) = Kind::for_section(&target.id) else {
-            continue;
-        };
-        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
-            continue;
-        };
-        match service.stuck_items(kind).await {
+    for arr in open_servarrs(ctx, &manifest.services).await {
+        match arr.service.stuck_items(arr.kind).await {
             Ok(stuck) => items.extend(stuck.into_iter().map(|item| StuckEntry {
                 title: item.title,
-                service: target.name.clone(),
+                service: arr.name.clone(),
                 stage: item.stage,
             })),
             Err(_) => incomplete = true,
