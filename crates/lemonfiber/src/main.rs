@@ -195,11 +195,15 @@ enum Request {
     /// Follow one show or film across the services — "where is my show?".
     ///
     /// Searched for the way you would name it, not by an internal id. Reports how far
-    /// it got and, where it plainly stopped, why.
+    /// it got and, where it plainly stopped, why. A show is reported season by season:
+    /// how many episodes are here, and what each one that is not is waiting on.
     Trace {
         /// The show or film to follow, named as you would say it.
         #[arg(required = true)]
         term: Vec<String>,
+        /// Narrow to one season, instead of every season of the show.
+        #[arg(long)]
+        season: Option<u32>,
     },
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
@@ -427,8 +431,9 @@ async fn main() -> ExitCode {
         }
         // The term is taken as words so it can be typed unquoted; joined back into the
         // title as said.
-        Request::Trace { term } => Command::Trace {
+        Request::Trace { term, season } => Command::Trace {
             term: term.join(" "),
+            season,
         },
         Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,

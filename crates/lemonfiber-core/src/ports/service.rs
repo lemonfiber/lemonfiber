@@ -16,7 +16,7 @@ mod quality;
 mod trace;
 
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
-pub use trace::{FoundItem, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
+pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 
 /// Who a service says it is, once it answers.
 #[derive(Debug, Clone, PartialEq, Eq)]

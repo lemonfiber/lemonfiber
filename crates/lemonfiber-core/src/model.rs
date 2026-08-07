@@ -279,6 +279,12 @@ pub struct TraceReport {
     /// imports and removals. Repeated attempts show here as the pattern they are, which
     /// the single furthest stage cannot.
     pub history: Vec<TraceMoment>,
+    /// How much of the item is actually here, season by season — present for an item
+    /// made of parts, absent for a film, which is the whole item and has none.
+    ///
+    /// The furthest stage alone cannot answer this: a series is "imported" the moment one
+    /// episode lands, which reads as done while the rest are missing.
+    pub coverage: Option<crate::trace::Coverage>,
     /// How sure the trace is of the item it followed.
     pub confidence: crate::trace::Confidence,
     /// Disagreements between the services about this item, each in plain language — a

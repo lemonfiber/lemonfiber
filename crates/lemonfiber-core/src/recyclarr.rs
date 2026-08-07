@@ -106,6 +106,26 @@ impl Kind {
             Self::Radarr => "movieIds",
         }
     }
+
+    /// The API path segment listing the parts a library item is made of — the episodes of
+    /// a series — or `None` for a service whose items have no parts. A film is the whole
+    /// item, so there is nothing to aggregate and nothing to ask for.
+    #[must_use]
+    pub const fn parts_endpoint(self) -> Option<&'static str> {
+        match self {
+            Self::Sonarr => Some("episode"),
+            Self::Radarr => None,
+        }
+    }
+
+    /// The query parameter that narrows the parts listing to one library item.
+    #[must_use]
+    pub const fn parts_filter(self) -> &'static str {
+        match self {
+            Self::Sonarr => "seriesId",
+            Self::Radarr => "movieId",
+        }
+    }
 }
 
 /// The three TRaSH-guide templates that carry a preset out for one service: the
@@ -395,6 +415,11 @@ mod tests {
         assert_eq!(Kind::Radarr.library_endpoint(), "movie");
         assert_eq!(Kind::Sonarr.history_filter(), "seriesIds");
         assert_eq!(Kind::Radarr.history_filter(), "movieIds");
+        // Only television files its items in parts; a film is the whole item.
+        assert_eq!(Kind::Sonarr.parts_endpoint(), Some("episode"));
+        assert_eq!(Kind::Radarr.parts_endpoint(), None);
+        assert_eq!(Kind::Sonarr.parts_filter(), "seriesId");
+        assert_eq!(Kind::Radarr.parts_filter(), "movieId");
     }
 
     #[test]

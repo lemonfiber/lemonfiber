@@ -14,16 +14,20 @@ use super::targets::{jellyfin_reader, project_directory, servarr_targets};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceMoment, TraceReport, TraceStage};
-use crate::ports::service::{Library, Pipeline, QueueItem, TraceEvent};
+use crate::ports::service::{ItemPart, Library, Pipeline, QueueItem, TraceEvent};
 use crate::recyclarr::Kind;
-use crate::trace::{Confidence, Presence, Stage};
+use crate::trace::{Confidence, Coverage, Part, Presence, Stage};
 
 /// Trace one item by a human term, across the resolution services.
 ///
 /// Searches each \*arr's library for a title matching the term; the first match is
 /// followed. No match at all is itself the answer — nobody asked for it, the first stage
 /// the trace tells apart.
-pub(super) async fn trace(ctx: &Ctx, term: &str) -> Result<TraceReport, Box<Problem>> {
+pub(super) async fn trace(
+    ctx: &Ctx,
+    term: &str,
+    season: Option<u32>,
+) -> Result<TraceReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -55,7 +59,14 @@ pub(super) async fn trace(ctx: &Ctx, term: &str) -> Result<TraceReport, Box<Prob
         };
         let (queue, queue_read) = match service.item_queue(kind, item.id).await {
             Ok(queue) => (queue, true),
-            Err(_) => (None, false),
+            Err(_) => (Vec::new(), false),
+        };
+        // An item made of parts — a series — is aggregated per part, so "the show is
+        // imported" cannot stand on one episode having landed. A service whose items have
+        // no parts answers with none, and the trace reads as it always did.
+        let (parts, parts_read) = match service.item_parts(kind, item.id, season).await {
+            Ok(parts) => (parts, true),
+            Err(_) => (Vec::new(), false),
         };
         let library = library_presence(jellyfin.as_ref(), kind, &item.title).await;
         return Ok(assemble(
@@ -65,9 +76,11 @@ pub(super) async fn trace(ctx: &Ctx, term: &str) -> Result<TraceReport, Box<Prob
             Fragments {
                 events,
                 queue,
+                parts,
                 library,
                 history_read,
                 queue_read,
+                parts_read,
             },
         ));
     }
@@ -132,10 +145,12 @@ async fn library_presence(
 /// "nothing happened" apart from "this could not be read".
 struct Fragments {
     events: Vec<TraceEvent>,
-    queue: Option<QueueItem>,
+    queue: Vec<QueueItem>,
+    parts: Vec<ItemPart>,
     library: Option<Presence>,
     history_read: bool,
     queue_read: bool,
+    parts_read: bool,
 }
 
 /// Build the trace from what one \*arr knows and what the media server confirms: the
@@ -145,9 +160,11 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
     let Fragments {
         events,
         queue,
+        parts,
         library,
         history_read,
         queue_read,
+        parts_read,
     } = fragments;
     // Presence in the media server only means something for availability once an \*arr is
     // monitoring the item; for one nobody asked for, "not monitored" is the whole answer,
@@ -155,6 +172,12 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
     // finding, never folded into how far the item got.
     let unmanaged_but_present = !monitored && library == Some(Presence::Present);
     let library = monitored.then_some(library).flatten();
+
+    // The queue holds one record per part, so the item as a whole is the furthest any of
+    // them reached and stuck if any one of them is. The per-part detail is kept for the
+    // coverage below, where it is what tells a download in flight from a grab gone quiet.
+    let queue_stage = queue.iter().map(|record| record.stage).max();
+    let queue_stuck = queue.iter().any(|record| record.stuck);
 
     // The stages the history advances the item through — a grab, an import. A failed
     // download or a removal is history to show but advances no stage, so it is left out of
@@ -165,9 +188,7 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
         .collect();
     let max_history = advancing.iter().copied().max();
     let mut reached = advancing;
-    if let Some(item) = queue {
-        reached.push(item.stage);
-    }
+    reached.extend(queue_stage);
     // The library is the last word on how far an item got: confirmed present, it is
     // available whatever the \*arr's own record stops at.
     let present = library == Some(Presence::Present);
@@ -204,10 +225,10 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
     }
     // The queue is the live state; add it only where it carries the item past what its
     // history already shows, so it is the current step rather than a repeat.
-    if let Some(item) = queue {
-        if max_history.is_none_or(|reached| item.stage > reached) {
+    if let Some(stage) = queue_stage {
+        if max_history.is_none_or(|reached| stage > reached) {
             stages.push(TraceStage {
-                stage: item.stage,
+                stage,
                 service: service.to_owned(),
                 at: None,
             });
@@ -227,10 +248,14 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
         item: title.to_owned(),
         matched: monitored,
         furthest,
-        stall: stall_reason(furthest, queue, library, history_read, queue_read),
+        stall: stall_reason(furthest, queue_stuck, library, history_read, queue_read),
         stages,
         history,
-        findings: trace_findings(unmanaged_but_present, history_read, queue_read),
+        // Only an item made of parts has coverage to report. A film is the whole item,
+        // and one with no parts read is one whose parts could not be read — reported as
+        // unavailable below, never as a series with nothing in it.
+        coverage: (!parts.is_empty()).then(|| coverage_of(parts, &queue)),
+        findings: trace_findings(unmanaged_but_present, history_read, queue_read, parts_read),
         // A presence found by matching titles across to the media server — the two ends
         // share no id — may not be the item asked for, so it is marked, never claimed.
         confidence: if present {
@@ -241,6 +266,35 @@ fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -
     }
 }
 
+/// Aggregate an item's parts into per-season coverage, each part's resting stage lifted by
+/// what the queue is doing with it now.
+///
+/// The lift is the point: a part the service records as grabbed and nothing more has, on
+/// its own record, been handed to a download client that never took it — but a queue record
+/// for that same part says it is downloading right now. Without the join, every episode in
+/// flight would read as a stalled grab, which is the one reading a trace exists to prevent.
+fn coverage_of(parts: Vec<ItemPart>, queue: &[QueueItem]) -> Coverage {
+    Coverage::of(
+        parts
+            .into_iter()
+            .map(|part| {
+                let resting = Stage::of_part(part.monitored, part.has_file, part.grabbed);
+                let live = queue
+                    .iter()
+                    .filter(|record| record.part == Some(part.id))
+                    .map(|record| record.stage)
+                    .max();
+                Part {
+                    season: part.season,
+                    number: part.number,
+                    title: part.title,
+                    stage: live.map_or(resting, |stage| resting.max(stage)),
+                }
+            })
+            .collect(),
+    )
+}
+
 /// The disagreements and unreadable-fragment notes a trace surfaces on their own, apart
 /// from the linear pipeline: a media server holding what nothing monitors, and each read
 /// that failed reported as unavailable rather than inferred as nothing — the honesty the
@@ -249,6 +303,7 @@ fn trace_findings(
     unmanaged_but_present: bool,
     history_read: bool,
     queue_read: bool,
+    parts_read: bool,
 ) -> Vec<String> {
     let mut findings = Vec::new();
     if unmanaged_but_present {
@@ -272,6 +327,13 @@ fn trace_findings(
                 .to_owned(),
         );
     }
+    if !parts_read {
+        findings.push(
+            "the episodes could not be read, so how much of this is here is unknown — \
+             reported as unavailable, not read as a series with nothing in it"
+                .to_owned(),
+        );
+    }
     findings
 }
 
@@ -282,12 +344,12 @@ fn trace_findings(
 /// progress or beyond what the \*arr alone can judge.
 fn stall_reason(
     furthest: Stage,
-    queue: Option<QueueItem>,
+    queue_stuck: bool,
     library: Option<Presence>,
     history_read: bool,
     queue_read: bool,
 ) -> Option<String> {
-    if queue.is_some_and(|item| item.stuck) {
+    if queue_stuck {
         // The C7 signal: queued but not progressing — a real problem the operator can act
         // on, distinct from a download merely still running.
         return Some(
@@ -324,6 +386,7 @@ fn not_matched(term: &str) -> TraceReport {
         stall: Stage::NotMonitored.stall().map(str::to_owned),
         stages: Vec::new(),
         history: Vec::new(),
+        coverage: None,
         confidence: Confidence::Certain,
         findings: Vec::new(),
     }
@@ -415,16 +478,27 @@ mod tests {
     /// tests build on, with the read-failure flags set apart in their own tests.
     fn frags(
         events: Vec<TraceEvent>,
-        queue: Option<QueueItem>,
+        queue: Vec<QueueItem>,
         library: Option<Presence>,
     ) -> Fragments {
         Fragments {
             events,
             queue,
+            parts: Vec::new(),
             library,
             history_read: true,
             queue_read: true,
+            parts_read: true,
         }
+    }
+
+    /// One queue record for the item as a whole — a film's shape, naming no part.
+    fn queued(stage: Stage, stuck: bool) -> Vec<QueueItem> {
+        vec![QueueItem {
+            part: None,
+            stage,
+            stuck,
+        }]
     }
 
     /// A context over the real stack, a filesystem that opens the \*arrs, and a transport
@@ -485,7 +559,7 @@ mod tests {
             true,
             frags(
                 vec![event(Outcome::Imported), event(Outcome::Grabbed)],
-                None,
+                Vec::new(),
                 None,
             ),
         );
@@ -505,7 +579,7 @@ mod tests {
 
     #[test]
     fn a_monitored_item_with_no_history_stalls_as_never_found() {
-        let report = assemble("Sonarr", "The Expanse", true, frags(Vec::new(), None, None));
+        let report = assemble("Sonarr", "The Expanse", true, frags(Vec::new(), Vec::new(), None));
         assert_eq!(report.furthest, Stage::Monitored);
         assert!(report
             .stall
@@ -528,7 +602,7 @@ mod tests {
                     event(Outcome::DownloadFailed),
                     event(Outcome::Grabbed),
                 ],
-                None,
+                Vec::new(),
                 None,
             ),
         );
@@ -551,7 +625,7 @@ mod tests {
             true,
             frags(
                 vec![event(Outcome::Removed), event(Outcome::Imported)],
-                None,
+                Vec::new(),
                 None,
             ),
         );
@@ -566,7 +640,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             false,
-            frags(Vec::new(), None, None),
+            frags(Vec::new(), Vec::new(), None),
         );
         assert!(!report.matched);
         assert_eq!(report.furthest, Stage::NotMonitored);
@@ -581,7 +655,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            frags(vec![event(Outcome::Grabbed)], None, None),
+            frags(vec![event(Outcome::Grabbed)], Vec::new(), None),
         );
         assert_eq!(report.furthest, Stage::Grabbed);
         assert!(report
@@ -600,10 +674,7 @@ mod tests {
             true,
             frags(
                 vec![event(Outcome::Grabbed)],
-                Some(QueueItem {
-                    stage: Stage::Downloading,
-                    stuck: false,
-                }),
+                queued(Stage::Downloading, false),
                 None,
             ),
         );
@@ -623,10 +694,7 @@ mod tests {
             true,
             frags(
                 vec![event(Outcome::Grabbed)],
-                Some(QueueItem {
-                    stage: Stage::Downloading,
-                    stuck: true,
-                }),
+                queued(Stage::Downloading, true),
                 None,
             ),
         );
@@ -646,7 +714,7 @@ mod tests {
             true,
             frags(
                 vec![event(Outcome::Imported)],
-                None,
+                Vec::new(),
                 Some(Presence::Present),
             ),
         );
@@ -668,7 +736,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             true,
-            frags(vec![event(Outcome::Imported)], None, Some(Presence::Absent)),
+            frags(vec![event(Outcome::Imported)], Vec::new(), Some(Presence::Absent)),
         );
         assert_eq!(report.furthest, Stage::Imported);
         assert_eq!(report.confidence, crate::trace::Confidence::Certain);
@@ -688,7 +756,7 @@ mod tests {
             "Sonarr",
             "The Expanse",
             false,
-            frags(Vec::new(), None, Some(Presence::Present)),
+            frags(Vec::new(), Vec::new(), Some(Presence::Present)),
         );
         assert_eq!(report.furthest, Stage::NotMonitored);
         assert_eq!(report.confidence, crate::trace::Confidence::Certain);
@@ -712,7 +780,7 @@ mod tests {
             true,
             frags(
                 vec![event(Outcome::Imported)],
-                None,
+                Vec::new(),
                 Some(Presence::Present),
             ),
         );
@@ -730,10 +798,12 @@ mod tests {
             true,
             Fragments {
                 events: Vec::new(),
-                queue: None,
+                queue: Vec::new(),
+                parts: Vec::new(),
                 library: None,
                 history_read: false,
                 queue_read: true,
+                parts_read: true,
             },
         );
         assert_eq!(report.furthest, Stage::Monitored);
@@ -754,10 +824,12 @@ mod tests {
             true,
             Fragments {
                 events: vec![event(Outcome::Grabbed)],
-                queue: None,
+                queue: Vec::new(),
+                parts: Vec::new(),
                 library: None,
                 history_read: true,
                 queue_read: false,
+                parts_read: true,
             },
         );
         assert_eq!(report.furthest, Stage::Grabbed);
@@ -776,7 +848,7 @@ mod tests {
             r#"{"records":[{"eventType":"grabbed","date":"2026-01-01T00:00:00Z"}]}"#,
             r#"{"records":[{"seriesId":1,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}]}"#,
         );
-        let report = trace(&context, "expanse").await.unwrap_or_default();
+        let report = trace(&context, "expanse", None).await.unwrap_or_default();
         assert!(report.matched);
         assert_eq!(report.furthest, Stage::Downloading);
     }
@@ -790,7 +862,7 @@ mod tests {
             "not json",
             "not json",
         );
-        let report = trace(&context, "expanse").await.unwrap_or_default();
+        let report = trace(&context, "expanse", None).await.unwrap_or_default();
         assert!(report.matched);
         assert!(report
             .findings
@@ -805,7 +877,7 @@ mod tests {
     #[tokio::test]
     async fn tracing_a_term_no_item_matches_is_not_monitored() {
         let context = ctx("[]", "{}", EMPTY_QUEUE);
-        let report = trace(&context, "nothing here").await.unwrap_or_default();
+        let report = trace(&context, "nothing here", None).await.unwrap_or_default();
         assert!(!report.matched);
         assert_eq!(report.furthest, Stage::NotMonitored);
     }
@@ -814,7 +886,7 @@ mod tests {
     async fn tracing_passes_over_a_service_whose_library_cannot_be_read() {
         // A service that answers nonsense to the library read is passed over rather than
         // failing the whole trace; with every service unreadable, nothing matched.
-        let report = trace(&ctx("not json", "{}", EMPTY_QUEUE), "expanse")
+        let report = trace(&ctx("not json", "{}", EMPTY_QUEUE), "expanse", None)
             .await
             .unwrap_or_default();
         assert!(!report.matched);
@@ -835,7 +907,7 @@ mod tests {
             },
             "available",
         );
-        let report = trace(&context, "expanse").await.unwrap_or_default();
+        let report = trace(&context, "expanse", None).await.unwrap_or_default();
         assert_eq!(report.furthest, Stage::Available);
         assert_eq!(report.confidence, crate::trace::Confidence::Uncertain);
         assert!(report
@@ -887,7 +959,7 @@ mod tests {
             Settings::default(),
             Environment::MacOs,
         );
-        assert!(trace(&bad, "anything").await.is_err());
+        assert!(trace(&bad, "anything", None).await.is_err());
     }
 
     /// A queue holding one stuck download, the show embedded so it can be named.

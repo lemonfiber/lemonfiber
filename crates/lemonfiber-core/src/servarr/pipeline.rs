@@ -8,7 +8,9 @@ use serde::Deserialize;
 
 use super::Servarr;
 use crate::ports::http::Method;
-use crate::ports::service::{Failure, FoundItem, Pipeline, QueueItem, StuckItem, TraceEvent};
+use crate::ports::service::{
+    Failure, FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent,
+};
 use crate::recyclarr::Kind;
 use crate::trace::Stage;
 
@@ -55,27 +57,52 @@ impl Pipeline for Servarr {
             .collect())
     }
 
-    async fn item_queue(&self, kind: Kind, id: i64) -> Result<Option<QueueItem>, Failure> {
+    async fn item_queue(&self, kind: Kind, id: i64) -> Result<Vec<QueueItem>, Failure> {
         let records = self.queue_pages("").await?;
-        let mut found = false;
-        let mut stage: Option<Stage> = None;
-        let mut stuck = false;
-        for record in records.iter().filter(|record| record.is_for(kind, id)) {
-            found = true;
-            // Being in the queue at all means at least downloading, even where the state is
-            // unrecognised; the furthest of the item's records is what shows.
-            if let Some(reached) = Stage::of_queue_state(&record.tracked_download_state) {
-                stage = Some(stage.map_or(reached, |far| far.max(reached)));
-            }
-            stuck |= super::is_stuck(&record.tracked_download_status);
-        }
-        if !found {
-            return Ok(None);
-        }
-        Ok(Some(QueueItem {
-            stage: stage.unwrap_or(Stage::Downloading),
-            stuck,
-        }))
+        Ok(records
+            .iter()
+            .filter(|record| record.is_for(kind, id))
+            .map(|record| QueueItem {
+                part: record.episode_id,
+                // Being in the queue at all means at least downloading, even where the
+                // state is unrecognised — a record the service is holding is work under
+                // way, whatever it calls the step.
+                stage: Stage::of_queue_state(&record.tracked_download_state)
+                    .unwrap_or(Stage::Downloading),
+                stuck: super::is_stuck(&record.tracked_download_status),
+            })
+            .collect())
+    }
+
+    async fn item_parts(
+        &self,
+        kind: Kind,
+        id: i64,
+        season: Option<u32>,
+    ) -> Result<Vec<ItemPart>, Failure> {
+        // A film is the whole item — there is nothing to aggregate, and asking a service
+        // that files nothing per part would be a request with no answer.
+        let Some(endpoint) = kind.parts_endpoint() else {
+            return Ok(Vec::new());
+        };
+        let season = season.map_or_else(String::new, |number| format!("&seasonNumber={number}"));
+        let path = format!("/{endpoint}?{}={id}{season}", kind.parts_filter());
+        let response = self.probe(&self.request(Method::Get, &path, None)).await?;
+        let parts: Vec<PartResource> = self
+            .endpoint
+            .decode(&response, "the episodes could not be read")?;
+        Ok(parts
+            .into_iter()
+            .map(|part| ItemPart {
+                id: part.id,
+                season: part.season_number,
+                number: part.episode_number,
+                title: part.title,
+                monitored: part.monitored,
+                has_file: part.has_file,
+                grabbed: part.grabbed,
+            })
+            .collect())
     }
 
     async fn stuck_items(&self, kind: Kind) -> Result<Vec<StuckItem>, Failure> {
@@ -143,6 +170,27 @@ struct LibraryItem {
     title: String,
     #[serde(default)]
     monitored: bool,
+}
+
+/// One part of a library item — an episode — as the service lists it. Its monitored flag,
+/// its file and whether a release is already grabbed are the current facts a part's stage
+/// reads from, none of which depend on the history horizon.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartResource {
+    id: i64,
+    #[serde(default)]
+    season_number: u32,
+    #[serde(default)]
+    episode_number: u32,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    monitored: bool,
+    #[serde(default)]
+    has_file: bool,
+    #[serde(default)]
+    grabbed: bool,
 }
 
 /// A page of history: the events on it, newest first.
