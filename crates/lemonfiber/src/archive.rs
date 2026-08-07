@@ -229,14 +229,18 @@ impl Reader for Tar {
             .iter()
             .map(|(area, target)| (area.as_str(), target.as_path(), staging_for(target)))
             .collect();
+        // Cleared whatever shape an interrupted run left it in. A stop part-way can
+        // leave a staging that is a file rather than a directory, and clearing only
+        // directories would wedge every later restore of that area: `stage` would
+        // then be creating directories underneath a regular file.
         for (_, _, staging) in &plan {
-            let _ = fs::remove_dir_all(staging);
+            let _ = remove_any(staging);
         }
 
         let staged = stage(src, &plan);
         if let Err(error) = staged {
             for (_, _, staging) in &plan {
-                let _ = fs::remove_dir_all(staging);
+                let _ = remove_any(staging);
             }
             return Err(error);
         }
@@ -344,9 +348,11 @@ fn stage(src: &Path, plan: &[(&str, &Path, PathBuf)]) -> Result<(), Fault> {
         if entry.header().entry_type() == tar::EntryType::Directory {
             fs::create_dir_all(&out).map_err(fault)?;
         } else {
-            if let Some(parent) = out.parent() {
-                fs::create_dir_all(parent).map_err(fault)?;
-            }
+            // Statement-level rather than `if let`: a joined path always has a
+            // parent, so the absent arm would be a line no test could reach.
+            out.parent()
+                .map_or(Ok(()), fs::create_dir_all)
+                .map_err(fault)?;
             entry.unpack(&out).map_err(fault)?;
         }
     }
@@ -360,7 +366,7 @@ mod tests {
 
     use flate2::write::GzEncoder;
     use flate2::Compression;
-    use lemonfiber_core::backup::{self, Manifest, Scope};
+    use lemonfiber_core::backup::{self, Item, Manifest, Scope};
     use lemonfiber_core::config::paths::Paths;
     use lemonfiber_core::ports::archive::{Archive, Reader};
 
@@ -375,9 +381,7 @@ mod tests {
     }
 
     fn write_file(path: &Path, contents: &str) {
-        if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
+        let _ = path.parent().map(fs::create_dir_all);
         let _ = fs::write(path, contents);
     }
 
@@ -560,18 +564,12 @@ mod tests {
     /// Write a gzip tar at `dest` built by `build`, so a hostile archive can be
     /// forged for the refusal tests. A create that fails leaves `dest` absent, and
     /// the test's own assertions fail on the missing archive rather than here.
-    fn forge(dest: &Path, build: impl FnOnce(&mut tar::Builder<GzEncoder<File>>)) {
-        if let Some(parent) = dest.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        let Ok(file) = File::create(dest) else {
-            return;
-        };
+    fn forge(dest: &Path, build: impl FnOnce(&mut tar::Builder<GzEncoder<File>>)) -> Option<()> {
+        let _ = dest.parent().map(fs::create_dir_all);
+        let file = File::create(dest).ok()?;
         let mut builder = tar::Builder::new(GzEncoder::new(file, Compression::default()));
         build(&mut builder);
-        if let Ok(encoder) = builder.into_inner() {
-            let _ = encoder.finish();
-        }
+        builder.into_inner().ok()?.finish().ok().map(|_| ())
     }
 
     fn regular(builder: &mut tar::Builder<GzEncoder<File>>, path: &str, data: &[u8]) {
@@ -580,6 +578,211 @@ mod tests {
         header.set_mode(0o644);
         header.set_cksum();
         let _ = builder.append_data(&mut header, path, data);
+    }
+
+    #[test]
+    fn a_path_with_no_final_name_still_gets_a_staging_sibling() {
+        use super::{staging_for, write_staging};
+        // A target that ends in `..` has no file name to build a sibling from, so a
+        // fixed one stands in rather than the path being left un-staged.
+        let odd = Path::new("/srv/media/..");
+        assert!(staging_for(odd).to_string_lossy().contains("restoring"));
+        assert!(write_staging(odd).to_string_lossy().contains("backup"));
+        // The ordinary case names the sibling after the target itself.
+        let plain = Path::new("/srv/config");
+        assert!(staging_for(plain)
+            .to_string_lossy()
+            .ends_with("config.restoring"));
+        assert!(write_staging(plain).to_string_lossy().contains("config."));
+    }
+
+    #[test]
+    fn what_cannot_be_measured_contributes_nothing_rather_than_stopping_the_count() {
+        use super::tree_size;
+        let root = scratch("tree-size");
+        // Absent: nothing to measure, and the estimate simply omits it.
+        assert_eq!(tree_size(&root.join("absent")), 0);
+        // A file counts its own length.
+        write_file(&root.join("a/file"), "12345");
+        assert_eq!(tree_size(&root.join("a/file")), 5);
+        // A directory counts everything beneath it.
+        assert_eq!(tree_size(&root.join("a")), 5);
+        // Something that is neither a file nor a directory contributes nothing: a
+        // symlink is not followed, so a loop cannot make the estimate diverge.
+        #[cfg(unix)]
+        {
+            let link = root.join("a/link");
+            let _ = std::os::unix::fs::symlink(root.join("a/file"), &link);
+            assert_eq!(tree_size(&link), 0);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_directory_that_will_not_open_contributes_nothing() {
+        use std::os::unix::fs::PermissionsExt;
+
+        use super::tree_size;
+        let root = scratch("unreadable");
+        write_file(&root.join("shut/inside"), "12345");
+        let shut = root.join("shut");
+        let _ = fs::set_permissions(&shut, fs::Permissions::from_mode(0o000));
+        // Best effort: an entry that cannot be read is left out of the estimate
+        // rather than aborting the measurement the caller's headroom absorbs.
+        let measured = tree_size(&shut);
+        // Restore access so the scratch directory can be cleaned up later.
+        let _ = fs::set_permissions(&shut, fs::Permissions::from_mode(0o755));
+        assert_eq!(measured, 0);
+    }
+
+    #[tokio::test]
+    async fn an_archive_that_is_not_there_is_a_fault_in_the_platforms_own_words() {
+        // The one place a platform error becomes an archive fault, exercised so the
+        // words the operator sees are the platform's rather than a paraphrase.
+        let tar = Tar;
+        let missing = scratch("no-archive").join("nothing.tar.gz");
+        let fault = tar.read_manifest(&missing).await.err();
+        assert!(fault.is_some_and(|fault| !fault.message.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn a_directory_item_is_packed_whole_and_comes_back() {
+        let root = scratch("dir-item");
+        let paths = install(&root);
+        let dest = root.join("backups/dir.tar.gz");
+        let tar = Tar;
+        // A whole tree as one item, rather than the single files the other tests use.
+        let items = vec![Item {
+            source: paths.service_config(),
+            archive_path: "services".to_owned(),
+            label: "services".to_owned(),
+        }];
+        let plan = backup::plan(&paths, &Scope::WholeStack);
+        let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+        assert!(tar.write(&dest, &manifest, &items).await.is_ok());
+
+        let back = scratch("dir-item-back");
+        let restored = install(&back);
+        let targets = backup::destinations(&restored);
+        assert!(tar.extract(&dest, &targets).await.is_ok());
+        assert!(restored.service_config().join("sonarr/config.xml").exists());
+    }
+
+    #[tokio::test]
+    async fn an_archive_root_marker_is_not_taken_for_a_member() {
+        let root = scratch("root-marker");
+        let restored = install(&root);
+        let dest = root.join("marker.tar.gz");
+        // `.` is the archive's own root, not something to place under an area.
+        let _ = forge(&dest, |builder| {
+            let mut header = tar::Header::new_gnu();
+            header.set_entry_type(tar::EntryType::Directory);
+            header.set_size(0);
+            header.set_cksum();
+            let _ = builder.append_data(&mut header, "./", std::io::empty());
+            regular(builder, "./config/.env", b"DATA_ROOT=/srv\n");
+        });
+
+        let tar = Tar;
+        let targets = backup::destinations(&restored);
+        assert!(tar.extract(&dest, &targets).await.is_ok());
+        // The leading `./` was dropped rather than the entry being skipped, so the
+        // member landed where its area says — the partial-restore hazard.
+        assert!(restored.env_file().exists());
+    }
+
+    #[tokio::test]
+    async fn a_nested_entry_has_its_parents_made_for_it() {
+        let root = scratch("nested");
+        let restored = install(&root);
+        let dest = root.join("nested.tar.gz");
+        // No directory entries, only a deep file: unpacking has to make its parents
+        // or the write fails on a path that does not exist yet.
+        let _ = forge(&dest, |builder| {
+            regular(builder, "services/sonarr/deep/config.xml", b"<Config/>");
+        });
+
+        let tar = Tar;
+        let targets = backup::destinations(&restored);
+        assert!(tar.extract(&dest, &targets).await.is_ok());
+        assert!(restored
+            .service_config()
+            .join("sonarr/deep/config.xml")
+            .exists());
+    }
+
+    #[tokio::test]
+    async fn a_staging_left_by_an_interrupted_restore_is_cleared_first() {
+        let root = scratch("stale-staging");
+        let restored = install(&root);
+        let dest = root.join("clean.tar.gz");
+        let _ = forge(&dest, |builder| regular(builder, "config/.env", b"NEW=1\n"));
+
+        // Both shapes an interrupted run can leave behind: a directory and a file.
+        let stale_dir = super::staging_for(restored.config_dir());
+        let _ = fs::create_dir_all(stale_dir.join("left-over"));
+        let stale_file = super::staging_for(&restored.service_config());
+        write_file(&stale_file, "half a restore");
+
+        let tar = Tar;
+        let targets = backup::destinations(&restored);
+        assert!(tar.extract(&dest, &targets).await.is_ok());
+        assert!(!stale_dir.join("left-over").exists());
+    }
+
+    #[tokio::test]
+    async fn an_item_whose_source_is_not_there_is_left_out_rather_than_failing() {
+        // A stack an operator runs from their own directory, or a service that has
+        // not written its configuration yet, simply is not in the archive — the
+        // capture still succeeds.
+        let root = scratch("absent-item");
+        let paths = install(&root);
+        let dest = root.join("backups/partial.tar.gz");
+        let plan = backup::plan(&paths, &Scope::WholeStack);
+        let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+        let items = vec![Item {
+            source: root.join("never-written"),
+            archive_path: "services".to_owned(),
+            label: "services".to_owned(),
+        }];
+
+        let tar = Tar;
+        assert!(tar.write(&dest, &manifest, &items).await.is_ok());
+        // It wrote an archive holding the manifest and nothing else.
+        assert!(tar.read_manifest(&dest).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn an_entry_that_would_escape_its_area_is_refused() {
+        // tar refuses to *write* a traversing path, so the name is put into the
+        // header's raw bytes the way another tool's archive could carry it — which
+        // is the whole reason the guard reads paths back rather than trusting them.
+        let root = scratch("traversal");
+        let restored = install(&root);
+        let dest = root.join("evil.tar.gz");
+        let _ = forge(&dest, |builder| {
+            let data = b"pwned";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(data.len() as u64);
+            header.set_mode(0o644);
+            let name = b"../../etc/passwd";
+            // Written into the header's raw name bytes: `set_path` refuses a
+            // traversing name, which is exactly why an archive from another tool
+            // can carry one and the guard has to read it back.
+            if let Some(slot) = header.as_old_mut().name.get_mut(..name.len()) {
+                slot.copy_from_slice(name);
+            }
+            header.set_cksum();
+            let _ = builder.append(&header, &data[..]);
+        });
+
+        let tar = Tar;
+        let targets = backup::destinations(&restored);
+        let refused = tar.extract(&dest, &targets).await;
+        assert!(
+            refused.is_err_and(|fault| fault.message.contains("outside its area")),
+            "a traversing entry is refused rather than written"
+        );
     }
 
     #[test]
@@ -600,7 +803,7 @@ mod tests {
         let root = scratch("symlink");
         let restored = install(&root);
         let dest = root.join("linky.tar.gz");
-        forge(&dest, |builder| {
+        let _ = forge(&dest, |builder| {
             let mut header = tar::Header::new_gnu();
             header.set_entry_type(tar::EntryType::Symlink);
             header.set_size(0);
@@ -620,7 +823,7 @@ mod tests {
         let root = scratch("unknown-area");
         let restored = install(&root);
         let dest = root.join("odd.tar.gz");
-        forge(&dest, |builder| regular(builder, "secrets/leak", b"x"));
+        let _ = forge(&dest, |builder| regular(builder, "secrets/leak", b"x"));
 
         let tar = Tar;
         let targets = backup::destinations(&restored);
@@ -634,7 +837,7 @@ mod tests {
     async fn a_missing_manifest_is_reported() {
         let root = scratch("no-manifest");
         let dest = root.join("bare.tar.gz");
-        forge(&dest, |builder| regular(builder, "config/.env", b"x"));
+        let _ = forge(&dest, |builder| regular(builder, "config/.env", b"x"));
         let tar = Tar;
         assert!(tar.read_manifest(&dest).await.is_err());
     }
