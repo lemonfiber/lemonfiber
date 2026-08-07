@@ -124,6 +124,29 @@ impl Stage {
         reached.iter().copied().max().unwrap_or(Self::Monitored)
     }
 
+    /// The stage one part of an item rests at, from what the service records about it
+    /// now rather than from its history. A file on disk, a release already grabbed and a
+    /// monitored flag are current facts, so a part's stage does not depend on how far
+    /// back the bounded history horizon reaches — which matters most for exactly the long
+    /// series whose early events fall outside it.
+    ///
+    /// A part already on disk is here whether or not anyone is still monitoring it: the
+    /// file is the fact, and calling it "nobody asked for it" would be a worse answer
+    /// than the truth. Only a part that is both unmonitored and absent is one nobody
+    /// asked for.
+    #[must_use]
+    pub const fn of_part(monitored: bool, has_file: bool, grabbed: bool) -> Self {
+        if has_file {
+            Self::Imported
+        } else if !monitored {
+            Self::NotMonitored
+        } else if grabbed {
+            Self::Grabbed
+        } else {
+            Self::Monitored
+        }
+    }
+
     /// The stage a download client's tracked state denotes, or `None` for a state that
     /// is not progress on the pipeline (a failure, an ignore). Named as the \*arr queue
     /// serialises them.
@@ -163,6 +186,124 @@ impl Stage {
             }
             Self::Searching | Self::Downloading | Self::Importing | Self::Available => None,
         }
+    }
+}
+
+/// One part of a traced item — an episode of a series. A film has no parts: the item is
+/// the whole, and a trace of it says all there is to say. A series does not, which is the
+/// gap this closes: "the show is imported" is true the moment one episode lands, and reads
+/// as done while nine are still missing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Part {
+    /// Which season it belongs to.
+    pub season: u32,
+    /// Its number within that season.
+    pub number: u32,
+    /// Its title, as a person would name it.
+    pub title: String,
+    /// How far this one part got, on the same scale as the item as a whole.
+    pub stage: Stage,
+}
+
+impl Part {
+    /// Whether this part is here — imported to the library on disk or beyond.
+    #[must_use]
+    pub fn here(&self) -> bool {
+        self.stage >= Stage::Imported
+    }
+
+    /// Whether nobody asked for this part — unmonitored and not already on disk. Kept
+    /// apart from the parts that are merely missing, because the two need opposite things
+    /// from an operator: one is a fault to chase, the other is a choice already made.
+    #[must_use]
+    pub fn unasked(&self) -> bool {
+        self.stage == Stage::NotMonitored
+    }
+}
+
+/// How much of one season is actually here, and what is outstanding — the season-level
+/// answer, which for a series is the one an operator can act on.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct SeasonCoverage {
+    /// The season number. Season zero is where a service files specials.
+    pub season: u32,
+    /// How many of the wanted parts are here.
+    pub have: usize,
+    /// How many parts were asked for, or are already here — the denominator. Parts
+    /// nobody asked for are counted separately rather than inflating this, so a season
+    /// with every wanted episode present reads as complete even where specials are not.
+    pub wanted: usize,
+    /// How many parts nobody asked for — unmonitored and not on disk.
+    pub unmonitored: usize,
+    /// The wanted parts that are not here yet, each carrying the stage it rests at, so
+    /// one that stalled is told apart from one still downloading.
+    pub outstanding: Vec<Part>,
+}
+
+/// How much of a traced series is here, season by season — the aggregate that turns a
+/// single furthest stage into an answer about the whole. The counts are of parts someone
+/// asked for; what nobody asked for is reported beside them, never folded in.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Coverage {
+    /// Each season, in order.
+    pub seasons: Vec<SeasonCoverage>,
+    /// How many wanted parts are here, across every season.
+    pub have: usize,
+    /// How many parts were asked for, across every season.
+    pub wanted: usize,
+    /// How many parts nobody asked for, across every season.
+    pub unmonitored: usize,
+}
+
+impl Coverage {
+    /// Aggregate the parts of an item into the per-season summary. Seasons come out in
+    /// number order whatever order the service listed the parts in, so the reading is
+    /// stable; a part nobody asked for counts toward `unmonitored` and toward nothing
+    /// else.
+    #[must_use]
+    pub fn of(parts: Vec<Part>) -> Self {
+        let mut by_season: std::collections::BTreeMap<u32, Vec<Part>> =
+            std::collections::BTreeMap::new();
+        for part in parts {
+            by_season.entry(part.season).or_default().push(part);
+        }
+
+        let mut coverage = Self::default();
+        for (season, mut parts) in by_season {
+            parts.sort_by_key(|part| part.number);
+            let unmonitored = parts.iter().filter(|part| part.unasked()).count();
+            let have = parts.iter().filter(|part| part.here()).count();
+            let wanted = parts.len() - unmonitored;
+            coverage.seasons.push(SeasonCoverage {
+                season,
+                have,
+                wanted,
+                unmonitored,
+                outstanding: parts
+                    .into_iter()
+                    .filter(|part| !part.here() && !part.unasked())
+                    .collect(),
+            });
+            coverage.have += have;
+            coverage.wanted += wanted;
+            coverage.unmonitored += unmonitored;
+        }
+        coverage
+    }
+
+    /// Whether every wanted part is here — the plain "is it complete?" a household asks.
+    /// A series nothing is monitored on is not complete; there is nothing to be complete.
+    #[must_use]
+    pub fn complete(&self) -> bool {
+        self.wanted > 0 && self.have == self.wanted
+    }
+}
+
+impl SeasonCoverage {
+    /// Whether every wanted part of this season is here.
+    #[must_use]
+    pub fn complete(&self) -> bool {
+        self.wanted > 0 && self.have == self.wanted
     }
 }
 
@@ -227,7 +368,7 @@ impl Outcome {
 
 #[cfg(test)]
 mod tests {
-    use super::{Confidence, Outcome, Stage};
+    use super::{Confidence, Coverage, Outcome, Part, Stage};
 
     #[test]
     fn the_stages_are_declared_in_pipeline_order() {
@@ -389,6 +530,103 @@ mod tests {
         // of the history moments a trace shows.
         assert_eq!(Outcome::of_event("episodeFileRenamed"), None);
         assert_eq!(Outcome::of_event(""), None);
+    }
+
+    /// A part at a given season, number and stage — the shape the aggregation groups.
+    fn part(season: u32, number: u32, stage: Stage) -> Part {
+        Part {
+            season,
+            number,
+            title: format!("S{season:02}E{number:02}"),
+            stage,
+        }
+    }
+
+    #[test]
+    fn a_part_on_disk_is_here_whoever_stopped_monitoring_it() {
+        // The file is the fact. An episode grabbed and then unmonitored is still here,
+        // and calling it "nobody asked for it" would be the worse answer.
+        assert_eq!(Stage::of_part(false, true, false), Stage::Imported);
+        assert_eq!(Stage::of_part(true, true, false), Stage::Imported);
+    }
+
+    #[test]
+    fn an_unmonitored_absent_part_is_one_nobody_asked_for() {
+        assert_eq!(Stage::of_part(false, false, false), Stage::NotMonitored);
+        // Monitoring stopped mid-flight still means nobody is asking for it now.
+        assert_eq!(Stage::of_part(false, false, true), Stage::NotMonitored);
+    }
+
+    #[test]
+    fn a_wanted_part_reads_from_whether_it_was_grabbed() {
+        assert_eq!(Stage::of_part(true, false, true), Stage::Grabbed);
+        assert_eq!(Stage::of_part(true, false, false), Stage::Monitored);
+    }
+
+    #[test]
+    fn coverage_counts_what_was_asked_for_and_reports_the_rest_apart() {
+        // A season of three wanted episodes, one here — plus a special nobody asked for,
+        // which must not drag the denominator to four and read as a fault.
+        let coverage = Coverage::of(vec![
+            part(1, 2, Stage::Monitored),
+            part(1, 1, Stage::Imported),
+            part(1, 3, Stage::Downloading),
+            part(0, 1, Stage::NotMonitored),
+        ]);
+        assert_eq!(coverage.have, 1);
+        assert_eq!(coverage.wanted, 3);
+        assert_eq!(coverage.unmonitored, 1);
+        // Seasons come out in number order, specials first as season zero.
+        let numbers: Vec<u32> = coverage.seasons.iter().map(|s| s.season).collect();
+        assert_eq!(numbers, vec![0, 1]);
+    }
+
+    #[test]
+    fn outstanding_parts_are_the_wanted_ones_not_here_yet_in_order() {
+        let coverage = Coverage::of(vec![
+            part(2, 3, Stage::Monitored),
+            part(2, 1, Stage::Imported),
+            part(2, 2, Stage::Downloading),
+            part(2, 4, Stage::NotMonitored),
+        ]);
+        let season = coverage.seasons.first().cloned().unwrap_or_default();
+        // Sorted by number whatever order the service listed them in, so the reading is
+        // stable; the one nobody asked for is not outstanding, and the one already here
+        // is not either.
+        let outstanding: Vec<u32> = season.outstanding.iter().map(|p| p.number).collect();
+        assert_eq!(outstanding, vec![2, 3]);
+        // Each carries its own stage, so a download in flight is told apart from a stall.
+        assert_eq!(season.outstanding[0].stage, Stage::Downloading);
+        assert_eq!(season.outstanding[1].stage, Stage::Monitored);
+    }
+
+    #[test]
+    fn a_season_is_complete_when_every_wanted_part_is_here() {
+        let coverage = Coverage::of(vec![part(1, 1, Stage::Imported), part(1, 2, Stage::Imported)]);
+        assert!(coverage.complete());
+        assert!(coverage.seasons[0].complete());
+        assert_eq!(coverage.seasons[0].wanted, 2);
+    }
+
+    #[test]
+    fn a_series_nobody_monitors_is_not_complete() {
+        // Nothing wanted is not the same as everything here — with no denominator there
+        // is nothing to be complete, and reporting it complete would be a lie of shape.
+        let coverage = Coverage::of(vec![part(1, 1, Stage::NotMonitored)]);
+        assert!(!coverage.complete());
+        assert!(!coverage.seasons[0].complete());
+        assert_eq!(coverage.seasons[0].unmonitored, 1);
+        // And an item with no parts at all — a film — is not a complete series either.
+        assert!(!Coverage::of(Vec::new()).complete());
+    }
+
+    #[test]
+    fn a_part_reports_whether_it_is_here_and_whether_it_was_asked_for() {
+        assert!(part(1, 1, Stage::Imported).here());
+        assert!(part(1, 1, Stage::Available).here());
+        assert!(!part(1, 1, Stage::Downloading).here());
+        assert!(part(1, 1, Stage::NotMonitored).unasked());
+        assert!(!part(1, 1, Stage::Monitored).unasked());
     }
 
     #[test]
