@@ -43,9 +43,13 @@ release-workflow:
     @grep -q 'allow-dirty = ' Cargo.toml || (echo "allow-dirty not restored" && exit 1)
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.
-# main.rs is surface wiring and is excluded by path. Per-item exclusion would
-# need #[coverage(off)], which is nightly-only, so applicable code is instead
-# kept coverable — see .docs/architecture/error-model.md on writing assertions
-# that leave no branch a test cannot reach.
+# The binary crate is coming under the gate a file at a time; what is still
+# listed here has not been made testable yet, and the list only ever shrinks.
+# render.rs is already in, which is why it builds its lines and hands them back
+# rather than printing them. Per-item exclusion would need #[coverage(off)],
+# which is nightly-only, so applicable code is instead kept coverable — see
+# .docs/architecture/error-model.md on writing assertions that leave no branch
+# a test cannot reach.
+# NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/)' --fail-under-lines 100 --lcov --output-path lcov.info
+    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(archive|main|maintain|nntp|prompt|setup)\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info

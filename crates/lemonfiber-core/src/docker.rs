@@ -15,7 +15,12 @@
 
 use std::collections::BTreeMap;
 
-use lemonfiber_manifest::{Criticality, Manifest};
+use lemonfiber_manifest::Manifest;
+
+// `Service` exposes a criticality as a public field, so the type has to be nameable by
+// whoever reads one. It is the manifest's, re-exported here rather than left reachable
+// only through a crate a consumer may not depend on.
+pub use lemonfiber_manifest::Criticality;
 use serde::Serialize;
 
 use crate::ports::docker::{Container, Health, Lifecycle};
