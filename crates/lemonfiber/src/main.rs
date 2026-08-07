@@ -32,6 +32,7 @@ use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::stack::Source;
 
 mod archive;
+mod keyboard;
 mod maintain;
 mod prompt;
 mod render;
