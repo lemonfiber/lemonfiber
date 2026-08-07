@@ -29,16 +29,48 @@ pub struct TraceEvent {
     pub outcome: crate::trace::Outcome,
     /// When it happened, as the service reported it.
     pub at: String,
+    /// The part of the item it happened to — an episode — where the service files its
+    /// history that way. A film's history names no part.
+    pub part: Option<i64>,
 }
 
-/// What the download queue currently holds for an item: the stage it is at, and whether
-/// it is stuck — queued but not progressing, the C7 signal.
+/// One record the download queue holds for an item: the stage it is at, and whether it is
+/// stuck — queued but not progressing, the C7 signal.
+///
+/// A series holds one record per episode, so this is per-record rather than collapsed to
+/// the item: an episode downloading now and one grabbed and lost look identical once
+/// flattened, and telling those apart is the whole value of a trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QueueItem {
-    /// The furthest stage the queue shows the item at.
+    /// The part of the item this record is for — an episode — where the service names
+    /// one. A film's queue record names no part; the record is for the whole item.
+    pub part: Option<i64>,
+    /// The furthest stage the queue shows this record at.
     pub stage: crate::trace::Stage,
-    /// Whether the item is stuck — a warning or error tracked-download status.
+    /// Whether it is stuck — a warning or error tracked-download status.
     pub stuck: bool,
+}
+
+/// One part of a library item as the service records it now — an episode of a series.
+///
+/// Only what the listing genuinely carries: the file and the monitored flag. Whether a
+/// release was grabbed is deliberately not here — the television service defines such a
+/// field on its episode type but never populates it on this listing, so reading it would
+/// have reported every grabbed episode as one the indexers never found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemPart {
+    /// The service's own id for the part, which its queue records name.
+    pub id: i64,
+    /// The season it belongs to. Season zero is where a service files specials.
+    pub season: u32,
+    /// Its number within that season.
+    pub number: u32,
+    /// Its title, as a person would name it.
+    pub title: String,
+    /// Whether the service is monitoring it — whether anyone asked for this part.
+    pub monitored: bool,
+    /// Whether its file is on disk.
+    pub has_file: bool,
 }
 
 /// A stuck item the queue is holding — one queue health reports so it can be traced. Its
@@ -81,8 +113,9 @@ pub trait Pipeline: Send + Sync {
         id: i64,
     ) -> Result<Vec<TraceEvent>, Failure>;
 
-    /// What the download queue holds for an item now, or `None` where it holds nothing —
-    /// the item is not downloading, so the trace reads on from history alone.
+    /// What the download queue holds for an item now, one entry per record — empty where
+    /// it holds nothing, so the trace reads on from history alone. A series in flight
+    /// yields one entry per episode, each naming the part it is for.
     ///
     /// # Errors
     ///
@@ -91,7 +124,21 @@ pub trait Pipeline: Send + Sync {
         &self,
         kind: crate::recyclarr::Kind,
         id: i64,
-    ) -> Result<Option<QueueItem>, Failure>;
+    ) -> Result<Vec<QueueItem>, Failure>;
+
+    /// The parts of one item — the episodes of a series, narrowed to one season where
+    /// `season` names one. A film has no parts and yields none: the item is the whole,
+    /// and a trace of it already says all there is to say.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn item_parts(
+        &self,
+        kind: crate::recyclarr::Kind,
+        id: i64,
+        season: Option<u32>,
+    ) -> Result<Vec<ItemPart>, Failure>;
 
     /// The items the queue is holding that are stuck — each named by its title so it links
     /// to its own trace. The bridge from "queue health says N are stuck" to the per-item

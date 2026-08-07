@@ -128,6 +128,8 @@ pub enum Command {
     Trace {
         /// The show, film, or request to follow.
         term: String,
+        /// The season to narrow the per-part coverage to, or every season where absent.
+        season: Option<u32>,
     },
     /// List the items whose downloads are stuck, each named so it links to its own
     /// trace — the landing point for "N items stuck".
@@ -268,7 +270,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             .await
             .map(Outcome::Music)
             .map_err(|problem| *problem),
-        Command::Trace { term } => trace::trace(ctx, &term)
+        Command::Trace { term, season } => trace::trace(ctx, &term, season)
             .await
             .map(Outcome::Trace)
             .map_err(|problem| *problem),
@@ -365,6 +367,7 @@ mod tests {
         let json = dispatch(
             Command::Trace {
                 term: "the expanse".to_owned(),
+                season: None,
             },
             &ctx(Ok(spoke(""))),
         )

@@ -991,9 +991,9 @@ async fn item_history_keeps_the_notable_events_and_drops_the_rest() {
         "/history",
         200,
         r#"{"records":[
-            {"eventType":"downloadFolderImported","date":"2026-01-02T00:00:00Z"},
+            {"eventType":"downloadFolderImported","date":"2026-01-02T00:00:00Z","episodeId":42},
             {"eventType":"downloadFailed","date":"2026-01-01T12:00:00Z"},
-            {"eventType":"grabbed","date":"2026-01-01T00:00:00Z"},
+            {"eventType":"grabbed","date":"2026-01-01T00:00:00Z","episodeId":42},
             {"eventType":"episodeFileRenamed","date":"2025-12-31T00:00:00Z"}
         ]}"#
         .to_owned(),
@@ -1014,6 +1014,17 @@ async fn item_history_keeps_the_notable_events_and_drops_the_rest() {
         .iter()
         .any(|event| event.outcome == Outcome::DownloadFailed));
     assert!(events.iter().any(|event| event.outcome == Outcome::Grabbed));
+    // Each event names the episode it happened to, where the service records one — the
+    // only proof a trace has that a particular episode was ever grabbed, since the
+    // episode listing's own grabbed flag is never populated.
+    assert_eq!(
+        events.first().and_then(|event| event.part),
+        Some(42),
+        "the episode a history event names is carried through"
+    );
+    assert!(events
+        .iter()
+        .any(|event| event.outcome == Outcome::DownloadFailed && event.part.is_none()));
     // It filtered by the item, on the kind's own history parameter.
     assert!(router
         .sent()
@@ -1046,7 +1057,7 @@ async fn item_queue_reads_a_downloading_item_by_series() {
         "/queue",
         200,
         r#"{"records":[
-            {"seriesId":1,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}
+            {"seriesId":1,"episodeId":42,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}
         ]}"#
         .to_owned(),
     )]);
@@ -1054,12 +1065,15 @@ async fn item_queue_reads_a_downloading_item_by_series() {
         .item_queue(Kind::Sonarr, 1)
         .await
         .unwrap_or_default();
+    // The record names the episode it is for, so a series' queue can be read per episode
+    // rather than flattened to one state for the whole show.
     assert_eq!(
         queue,
-        Some(QueueItem {
+        vec![QueueItem {
+            part: Some(42),
             stage: Stage::Downloading,
             stuck: false
-        })
+        }]
     );
 }
 
@@ -1081,12 +1095,14 @@ async fn item_queue_reads_a_film_by_movie_and_flags_stuck() {
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
     let queue = radarr.item_queue(Kind::Radarr, 7).await.unwrap_or_default();
+    // A film's record names no part — the record is for the whole item.
     assert_eq!(
         queue,
-        Some(QueueItem {
+        vec![QueueItem {
+            part: None,
             stage: Stage::Downloading,
             stuck: true
-        })
+        }]
     );
 }
 
@@ -1115,13 +1131,13 @@ async fn item_queue_walks_past_the_first_page_to_find_the_item() {
         .item_queue(Kind::Sonarr, 1)
         .await
         .unwrap_or_default();
+    // Both of the item's records come back, so the furthest is the caller's to take —
+    // which for the item as a whole is the import pending on page two.
     assert_eq!(
-        queue,
-        Some(QueueItem {
-            stage: Stage::Downloaded,
-            stuck: false
-        })
+        queue.iter().map(|record| record.stage).max(),
+        Some(Stage::Downloaded)
     );
+    assert_eq!(queue.len(), 2);
     // The walk did not stop at the first page.
     assert!(router
         .sent()
@@ -1130,7 +1146,7 @@ async fn item_queue_walks_past_the_first_page_to_find_the_item() {
 }
 
 #[tokio::test]
-async fn item_queue_holding_nothing_for_the_item_is_none() {
+async fn item_queue_holding_nothing_for_the_item_is_empty() {
     let router = Router::new(vec![(
         Method::Get,
         "/queue",
@@ -1141,7 +1157,95 @@ async fn item_queue_holding_nothing_for_the_item_is_none() {
         .item_queue(Kind::Sonarr, 1)
         .await
         .unwrap_or_default();
-    assert_eq!(queue, None);
+    assert!(queue.is_empty());
+}
+
+#[tokio::test]
+async fn item_parts_reads_the_episodes_of_a_series() {
+    let router = Router::new(vec![(
+        Method::Get,
+        "/episode",
+        200,
+        r#"[
+            {"id":11,"seasonNumber":1,"episodeNumber":1,"title":"Dulcinea","monitored":true,"hasFile":true},
+            {"id":12,"seasonNumber":1,"episodeNumber":2,"title":"The Big Empty","monitored":true,"hasFile":false},
+            {"id":13,"seasonNumber":0,"episodeNumber":1,"title":"A Special"}
+        ]"#
+        .to_owned(),
+    )]);
+    let parts = sonarr_routed(&router)
+        .item_parts(Kind::Sonarr, 1, None)
+        .await
+        .unwrap_or_default();
+    let read: Vec<(i64, u32, u32, &str, bool, bool)> = parts
+        .iter()
+        .map(|part| {
+            (
+                part.id,
+                part.season,
+                part.number,
+                part.title.as_str(),
+                part.monitored,
+                part.has_file,
+            )
+        })
+        .collect();
+    // The third record carries none of the flags: it reads as unmonitored and absent
+    // rather than failing the whole read.
+    assert_eq!(
+        read,
+        vec![
+            (11, 1, 1, "Dulcinea", true, true),
+            (12, 1, 2, "The Big Empty", true, false),
+            (13, 0, 1, "A Special", false, false),
+        ]
+    );
+    // The listing was narrowed to the one series asked about.
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("seriesId=1")));
+}
+
+#[tokio::test]
+async fn item_parts_narrows_to_one_season_at_the_service() {
+    let router = Router::new(vec![(Method::Get, "/episode", 200, "[]".to_owned())]);
+    let parts = sonarr_routed(&router)
+        .item_parts(Kind::Sonarr, 1, Some(2))
+        .await
+        .unwrap_or_default();
+    assert!(parts.is_empty());
+    // The season filter is the service's own, not a slice taken after reading them all.
+    assert!(router
+        .sent()
+        .iter()
+        .any(|request| request.url.contains("seasonNumber=2")));
+}
+
+#[tokio::test]
+async fn a_film_has_no_parts_and_is_never_asked_for_them() {
+    // A film is the whole item. Asking a service that files nothing per part would be a
+    // request with no answer, so none is made.
+    let router = Router::new(Vec::new());
+    let radarr = {
+        let http: Arc<dyn Http> = router.clone();
+        Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
+    };
+    let parts = radarr
+        .item_parts(Kind::Radarr, 7, None)
+        .await
+        .unwrap_or_default();
+    assert!(parts.is_empty());
+    assert!(router.sent().is_empty());
+}
+
+#[tokio::test]
+async fn unreadable_episodes_are_a_failure() {
+    let router = Router::new(vec![(Method::Get, "/episode", 200, "not json".to_owned())]);
+    assert!(sonarr_routed(&router)
+        .item_parts(Kind::Sonarr, 1, None)
+        .await
+        .is_err());
 }
 
 #[tokio::test]

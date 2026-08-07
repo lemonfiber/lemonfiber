@@ -292,6 +292,9 @@ struct QueueRecord {
     series_id: Option<i64>,
     #[serde(default)]
     movie_id: Option<i64>,
+    /// The episode this record is for, where the service files its queue per episode.
+    #[serde(default)]
+    episode_id: Option<i64>,
     /// The series this record belongs to, where the queue was read with it included.
     #[serde(default)]
     series: Option<TitledResource>,
