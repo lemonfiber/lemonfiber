@@ -89,8 +89,16 @@ pub struct StuckItem {
 /// fill in around it.
 #[async_trait]
 pub trait Pipeline: Send + Sync {
-    /// Find monitored library items whose title matches a human term — a show name or a
-    /// film title, never an internal id.
+    /// Every item the service's library holds — the one read a title is found through,
+    /// whether by a human term or by the id another service knows the item as.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn library(&self, kind: crate::recyclarr::Kind) -> Result<Vec<FoundItem>, Failure>;
+
+    /// Find library items whose title matches a human term — a show name or a film
+    /// title, never an internal id.
     ///
     /// # Errors
     ///

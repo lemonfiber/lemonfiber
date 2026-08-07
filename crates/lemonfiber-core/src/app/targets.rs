@@ -12,6 +12,7 @@ use crate::jellyfin::Jellyfin;
 use crate::ports::service::{Download, Transfers};
 use crate::qbittorrent::Qbittorrent;
 use crate::sabnzbd::Sabnzbd;
+use crate::seerr::Seerr;
 use crate::stack::Source;
 
 /// The directory Compose treats as the project root, where the services' config
@@ -214,6 +215,42 @@ pub(super) fn jellyfin_reader(
         crate::config::JELLYFIN_ADMIN_USER,
         password,
     ))
+}
+
+/// What reading the household's requests needs: the request service, and the media-server
+/// credential the sign-in is made with. Seerr authenticates its household against Jellyfin,
+/// so the account lemonfiber holds a password for is how it asks — as the owner, whose
+/// session sees every member's requests.
+pub(super) struct HouseholdAccess {
+    /// The request service, reached on the host.
+    pub seerr: Seerr,
+    /// Where the request service reaches the media server, across the stack's own
+    /// network — the sign-in names the server it authenticates against, and Seerr is the
+    /// one doing the reaching, so this is its address for it rather than the host's.
+    pub server_url: String,
+    /// The media-server admin password lemonfiber minted and recorded.
+    pub password: String,
+}
+
+/// The request service and the credential to read it with, or nothing where the stack has
+/// no request service, no media server to authenticate against, or no recorded password
+/// to sign in with.
+///
+/// The household view treats any of those as nothing to report rather than a fault: a
+/// stack without a request service has no household requests, and one whose password was
+/// never recorded has no way to ask for them.
+pub(super) fn seerr_reader(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<HouseholdAccess> {
+    let seerr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
+    let jellyfin = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
+    let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
+    Some(HouseholdAccess {
+        seerr: Seerr::new(ctx.http.clone(), seerr.loopback, "seerr"),
+        server_url: jellyfin.network_url,
+        password,
+    })
 }
 
 /// Where a service is reached — on the host, and across the stack's own network — the

@@ -107,6 +107,16 @@ impl Kind {
         }
     }
 
+    /// The plain word for what this service files, as a household would say it — the
+    /// noun a request is named by where its title could not be found.
+    #[must_use]
+    pub const fn noun(self) -> &'static str {
+        match self {
+            Self::Sonarr => "series",
+            Self::Radarr => "film",
+        }
+    }
+
     /// The API path segment listing the parts a library item is made of — the episodes of
     /// a series — or `None` for a service whose items have no parts. A film is the whole
     /// item, so there is nothing to aggregate and nothing to ask for.
@@ -420,6 +430,9 @@ mod tests {
         assert_eq!(Kind::Radarr.parts_endpoint(), None);
         assert_eq!(Kind::Sonarr.parts_filter(), "seriesId");
         assert_eq!(Kind::Radarr.parts_filter(), "movieId");
+        // The words a household uses, not the services' own.
+        assert_eq!(Kind::Sonarr.noun(), "series");
+        assert_eq!(Kind::Radarr.noun(), "film");
     }
 
     #[test]
