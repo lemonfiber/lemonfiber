@@ -476,8 +476,33 @@ pub trait MediaServer: Send + Sync {
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
 }
 
-/// A request manager's identity setup — Seerr, configured to authenticate its
-/// household against the media server rather than against accounts of its own.
+/// One thing a household member asked for, as the request service records it.
+///
+/// The two statuses are carried as the service's own numbers rather than folded here:
+/// what became of the request and what became of the media it asked for are separate
+/// facts, and turning the pair into one word a member reads is a decision for
+/// [`crate::household::State`], not for the code that reads them off the wire.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HouseholdRequest {
+    /// The member who asked, by the name the request service shows them under.
+    pub member: String,
+    /// Which service files the media — television or film — or `None` where the
+    /// request service names a media type this build does not know.
+    pub kind: Option<crate::recyclarr::Kind>,
+    /// The id the \*arr filing this media knows it by, where the request service has
+    /// handed it over yet. Nothing for a request still awaiting approval, which no
+    /// \*arr has been told about — so the item cannot be named from the library, and
+    /// is not claimed to be.
+    pub item: Option<i64>,
+    /// What became of the request, as the service numbers them.
+    pub request_status: u8,
+    /// What became of the media it asked for, as the service numbers them.
+    pub media_status: u8,
+}
+
+/// A request manager's identity setup and the household's own requests — Seerr,
+/// configured to authenticate its household against the media server rather than
+/// against accounts of its own.
 #[async_trait]
 pub trait Requests: Send + Sync {
     /// Whether it has already been initialised — the gate that never re-points a
@@ -501,6 +526,33 @@ pub trait Requests: Send + Sync {
         password: &str,
         server_url: &str,
     ) -> Result<(), Failure>;
+
+    /// Sign in through the media server reached at `server_url`, as `username` with
+    /// `password`, leaving the session the later reads are made under.
+    ///
+    /// Signing in is what [`Requests::configure_identity`] does first; this is that step
+    /// on its own, for a read that must not also finish somebody's setup.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn sign_in(
+        &self,
+        username: &str,
+        password: &str,
+        server_url: &str,
+    ) -> Result<(), Failure>;
+
+    /// Every request the household has made, across its members.
+    ///
+    /// Read as the owner, whose session sees the whole household: the members
+    /// themselves have no way to run this, so the one account lemonfiber holds a
+    /// credential for asks on their behalf.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure>;
 }
 
 /// Asking a Servarr-shape service to run one of its background commands — the

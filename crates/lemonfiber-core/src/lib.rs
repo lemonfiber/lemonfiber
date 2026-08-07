@@ -43,6 +43,7 @@ pub mod docker;
 pub mod doctor;
 mod endpoint;
 pub mod error;
+pub mod household;
 pub mod jellyfin;
 pub mod journal;
 pub mod lidarr;

@@ -188,3 +188,106 @@ async fn an_unreachable_seerr_is_unavailable_on_the_sign_in() {
         Err(Failure::Unavailable { .. })
     ));
 }
+
+#[tokio::test]
+async fn signing_in_opens_a_session_without_finishing_setup() {
+    // The read path signs in only: finishing setup is somebody else's business, and a
+    // read must never complete a household's configuration as a side effect.
+    let fake = Fake::replying(vec![(200, "")]);
+    assert!(seerr(&fake)
+        .sign_in("admin", "secret", "http://jellyfin:8096")
+        .await
+        .is_ok());
+    let requests = fake.requests();
+    assert_eq!(requests.len(), 1);
+    assert!(requests
+        .first()
+        .is_some_and(|request| request.url.ends_with("/api/v1/auth/jellyfin")));
+}
+
+#[tokio::test]
+async fn the_households_requests_are_read_with_who_asked_and_what_became_of_each() {
+    let page = r#"{
+        "pageInfo":{"pages":1,"page":1,"results":3,"pageSize":100},
+        "results":[
+            {"status":2,"type":"tv","media":{"status":4,"externalServiceId":11},
+             "requestedBy":{"displayName":"Alex"}},
+            {"status":1,"type":"movie","media":{"status":1},
+             "requestedBy":{"displayName":"Sam"}},
+            {"status":5,"type":"movie","media":{"status":5,"externalServiceId":7},
+             "requestedBy":{"displayName":"Alex"}}
+        ]
+    }"#;
+    let fake = Fake::replying(vec![(200, page)]);
+    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    let read: Vec<(&str, bool, Option<i64>, u8, u8)> = requests
+        .iter()
+        .map(|request| {
+            (
+                request.member.as_str(),
+                request.kind.is_some(),
+                request.item,
+                request.request_status,
+                request.media_status,
+            )
+        })
+        .collect();
+    // The two statuses are carried as the service's own numbers; a request no service
+    // holds yet names no item, which is what leaves it with no title to find.
+    assert_eq!(
+        read,
+        vec![
+            ("Alex", true, Some(11), 2, 4),
+            ("Sam", true, None, 1, 1),
+            ("Alex", true, Some(7), 5, 5),
+        ]
+    );
+    // Read newest first, so a household with more than the horizon keeps the requests
+    // still worth asking about.
+    assert!(fake
+        .requests()
+        .first()
+        .is_some_and(|request| request.url.contains("sortDirection=desc")));
+}
+
+#[tokio::test]
+async fn a_media_type_this_build_does_not_know_names_no_service() {
+    let page = r#"{"pageInfo":{"results":1},"results":[
+        {"status":2,"type":"music","media":{"status":3},"requestedBy":{"displayName":"Sam"}}
+    ]}"#;
+    let fake = Fake::replying(vec![(200, page)]);
+    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    // Reported as a request whose kind is unknown rather than guessed into one of the
+    // two this build files.
+    assert_eq!(requests.first().map(|request| request.kind), Some(None));
+}
+
+#[tokio::test]
+async fn the_requests_walk_past_the_first_page() {
+    // A full first page and a total beyond it: a household with more requests than one
+    // page would otherwise report only its newest.
+    let filler = vec![
+        r#"{"status":2,"type":"movie","media":{"status":5},"requestedBy":{"displayName":"Alex"}}"#;
+        100
+    ]
+    .join(",");
+    let page_one = Box::leak(
+        format!(r#"{{"pageInfo":{{"results":101}},"results":[{filler}]}}"#).into_boxed_str(),
+    );
+    let page_two = r#"{"pageInfo":{"results":101},"results":[
+        {"status":2,"type":"tv","media":{"status":5},"requestedBy":{"displayName":"Sam"}}
+    ]}"#;
+    let fake = Fake::replying(vec![(200, page_one), (200, page_two)]);
+    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    assert_eq!(requests.len(), 101);
+    assert!(fake
+        .requests()
+        .iter()
+        .any(|request| request.url.contains("skip=100")));
+}
+
+#[tokio::test]
+async fn an_unreadable_request_record_is_a_failure() {
+    let fake = Fake::replying(vec![(200, "not json")]);
+    assert!(seerr(&fake).requests().await.is_err());
+}

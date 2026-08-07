@@ -11,9 +11,9 @@ use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
-    ConfigReport, Disposition, DoctorReport, Envelope, LifecycleReport, MusicChoice, MusicReport,
-    PresetChoice, QualityReport, ResetReport, StatusReport, StuckReport, SupervisionReport,
-    TraceReport, Triggered, UpgradeReport, VersionReport,
+    ConfigReport, Disposition, DoctorReport, Envelope, HouseholdReport, LifecycleReport,
+    MusicChoice, MusicReport, PresetChoice, QualityReport, ResetReport, StatusReport, StuckReport,
+    SupervisionReport, TraceReport, Triggered, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
@@ -41,6 +41,7 @@ pub(crate) fn render(outcome: &Outcome, json: bool) {
         Outcome::Upgrade(report) => upgrade(report),
         Outcome::Music(report) => music(report),
         Outcome::Trace(report) => trace(report),
+        Outcome::Household(report) => household(report),
         Outcome::Stuck(report) => stuck(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Status(report) => status(report),
@@ -390,6 +391,65 @@ pub(crate) fn upgrade(report: &UpgradeReport) {
     }
 }
 
+/// The exact command that traces one item, printed beneath the line that names it.
+///
+/// Shared by every surface that leads to a trace so the two cannot drift apart: the term
+/// is what the trace searches by, and a link that no longer matches how the trace matches
+/// would send an operator to a search that finds nothing.
+fn trace_link(title: &str) {
+    println!("      → {PRODUCT} trace \"{title}\"");
+}
+
+/// What the household asked for, grouped by whoever asked.
+///
+/// A member's own words rather than the services': where a request stands, and — for one
+/// that has a name to search by — the trace that says why in the services' terms. The
+/// deep answer stays where it already lives; this is the way in to it.
+pub(crate) fn household(report: &HouseholdReport) {
+    for member in &report.members {
+        println!("{}", member.name);
+        for request in &member.requests {
+            // A request no service holds yet has no title to print. Naming it by what it
+            // is keeps the line honest rather than inventing something to call it.
+            let name = request.title.clone().unwrap_or_else(|| {
+                request
+                    .media
+                    .clone()
+                    .map_or_else(|| "something".to_owned(), |media| format!("a {media}"))
+            });
+            match request.state {
+                Some(state) => println!("  {name}   {}", state.phrase()),
+                None => println!(
+                    "  {name}   the request service reports a state this build does not know"
+                ),
+            }
+            // Only a named request can be traced: the trace searches by title, so a link
+            // for one with no name would lead to a search that finds nothing.
+            if let Some(title) = &request.title {
+                trace_link(title);
+            }
+        }
+    }
+
+    if report.members.is_empty() && report.available {
+        println!("Nobody has asked for anything yet.");
+    } else if !report.members.is_empty() {
+        let requests: usize = report
+            .members
+            .iter()
+            .map(|member| member.requests.len())
+            .sum();
+        println!(
+            "\n{} member(s), {requests} request(s).",
+            report.members.len()
+        );
+    }
+    // What could not be read, said rather than left to look like an empty household.
+    for finding in &report.findings {
+        println!("  ! {finding}");
+    }
+}
+
 /// How much of a series is actually here, season by season — the answer the single
 /// furthest stage cannot give, since a show is "imported" the moment one episode lands.
 ///
@@ -519,7 +579,7 @@ pub(crate) fn stuck(report: &StuckReport) {
                 item.service,
                 item.stage.label()
             );
-            println!("      → {PRODUCT} trace \"{}\"", item.title);
+            trace_link(&item.title);
         }
     }
     // A queue that could not be read leaves the list possibly short; saying so keeps it

@@ -16,22 +16,32 @@ use crate::trace::Stage;
 
 #[async_trait]
 impl Pipeline for Servarr {
-    async fn find_items(&self, kind: Kind, term: &str) -> Result<Vec<FoundItem>, Failure> {
+    async fn library(&self, kind: Kind) -> Result<Vec<FoundItem>, Failure> {
         let response = self
             .probe(&self.request(Method::Get, &format!("/{}", kind.library_endpoint()), None))
             .await?;
         let items: Vec<LibraryItem> = self
             .endpoint
             .decode(&response, "the library could not be read")?;
-        let needle = term.to_lowercase();
         Ok(items
             .into_iter()
-            .filter(|item| item.title.to_lowercase().contains(&needle))
             .map(|item| FoundItem {
                 id: item.id,
                 title: item.title,
                 monitored: item.monitored,
             })
+            .collect())
+    }
+
+    async fn find_items(&self, kind: Kind, term: &str) -> Result<Vec<FoundItem>, Failure> {
+        // Matching is over the one library read rather than a search of its own: the
+        // service has no title search, so the whole library comes back either way.
+        let needle = term.to_lowercase();
+        Ok(self
+            .library(kind)
+            .await?
+            .into_iter()
+            .filter(|item| item.title.to_lowercase().contains(&needle))
             .collect())
     }
 

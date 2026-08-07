@@ -205,6 +205,15 @@ enum Request {
         #[arg(long)]
         season: Option<u32>,
     },
+    /// Show what the household asked for, and where each request stands.
+    ///
+    /// Grouped by whoever asked, in the words they would use rather than the
+    /// services' own. Each named request links to its full trace.
+    Household {
+        /// Narrow to one member, named the way you would say it.
+        #[arg(long)]
+        member: Option<String>,
+    },
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,
@@ -390,14 +399,7 @@ async fn main() -> ExitCode {
                 household,
                 autostart,
             };
-            let flags = match SetupFlags::parse(raw) {
-                Ok(flags) => flags,
-                Err(message) => {
-                    eprintln!("error: {message}");
-                    return ExitCode::from(USAGE);
-                }
-            };
-            return run_setup(ctx, flags).await;
+            return setup_from(ctx, raw).await;
         }
         Request::Version => Command::Version,
         Request::Up { forms } => Command::Up { forms },
@@ -435,6 +437,7 @@ async fn main() -> ExitCode {
             term: term.join(" "),
             season,
         },
+        Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
@@ -505,12 +508,13 @@ fn settled(outcome: &Outcome) -> ExitCode {
         // are pending reverts, so either one left unconfirmed is a non-zero result.
         // Confirmed, or with nothing to revert, it succeeded.
         Outcome::Reset(report) => reset_exit(report),
-        // A trace or a stuck-item listing is a query — it answers where things are;
-        // asking is never a failure, whatever the answer.
+        // A trace, a stuck-item listing or the household's requests is a query — it
+        // answers where things are; asking is never a failure, whatever the answer.
         Outcome::Version(_)
         | Outcome::Lifecycle(_)
         | Outcome::Config(_)
         | Outcome::Trace(_)
+        | Outcome::Household(_)
         | Outcome::Stuck(_)
         | Outcome::Status(_) => ExitCode::SUCCESS,
     }
@@ -643,6 +647,21 @@ fn configuration(action: ConfigAction) -> Command {
 /// The preset and the media type are named in plain words the operator types, so a
 /// name that is neither is a mistake to correct rather than a request to run — it
 /// is refused here, before the core is reached, with the valid names spelled out.
+/// Run setup from what the command line carried, or refuse it with a usage code.
+///
+/// The flags are validated before anything is applied, so a contradictory pair is a
+/// mistake to name rather than a half-configured stack — the same shape as `quality`
+/// below, which turns its own subcommand into a value or a code to exit with.
+async fn setup_from(ctx: Ctx, raw: prompt::RawSetup) -> ExitCode {
+    match SetupFlags::parse(raw) {
+        Ok(flags) => run_setup(ctx, flags).await,
+        Err(message) => {
+            eprintln!("error: {message}");
+            ExitCode::from(USAGE)
+        }
+    }
+}
+
 fn quality(action: QualityCommand) -> Result<Command, u8> {
     let action = match action {
         QualityCommand::Show => QualityAction::Show,

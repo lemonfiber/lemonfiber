@@ -9,3 +9,5 @@ node_modules/
 .DS_Store
 # coverage report, produced by `just coverage`
 lcov.info
+# agent tooling scratch — session state and throwaway worktrees, never the repo's
+.claude/

@@ -13,8 +13,9 @@ use crate::audio::Format;
 use crate::doctor::Category;
 use crate::error::{Code, Problem};
 use crate::model::{
-    ConfigReport, DoctorReport, Envelope, LifecycleReport, MusicReport, QualityReport, ResetReport,
-    StatusReport, StuckReport, TraceReport, UpgradeReport, VersionReport,
+    ConfigReport, DoctorReport, Envelope, HouseholdReport, LifecycleReport, MusicReport,
+    QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
+    VersionReport,
 };
 use crate::quality::Preset;
 use crate::stack::compose::Action;
@@ -24,6 +25,7 @@ pub mod backup;
 mod ctx;
 pub mod dashboard;
 mod engine;
+mod household;
 mod materialise;
 mod music;
 mod quality;
@@ -131,6 +133,12 @@ pub enum Command {
         /// The season to narrow the per-part coverage to, or every season where absent.
         season: Option<u32>,
     },
+    /// Report what the household has asked for and where each request stands, in the
+    /// words the member who asked would use rather than the services' own.
+    Household {
+        /// The member to narrow to, or every member where absent.
+        member: Option<String>,
+    },
     /// List the items whose downloads are stuck, each named so it links to its own
     /// trace — the landing point for "N items stuck".
     Stuck,
@@ -187,6 +195,8 @@ pub enum Outcome {
     Music(MusicReport),
     /// Where one item is in the pipeline.
     Trace(TraceReport),
+    /// What the household asked for, member by member.
+    Household(HouseholdReport),
     /// The items whose downloads are stuck, each linkable to its trace.
     Stuck(StuckReport),
     /// What each service is doing.
@@ -211,6 +221,7 @@ impl Outcome {
             Self::Upgrade(_) => "upgrade",
             Self::Music(_) => "music",
             Self::Trace(_) => "trace",
+            Self::Household(_) => "household",
             Self::Stuck(_) => "stuck",
             Self::Status(_) => "status",
             Self::Doctor(_) => "doctor",
@@ -231,6 +242,7 @@ impl serde::Serialize for Outcome {
             Self::Upgrade(report) => report.serialize(serializer),
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),
+            Self::Household(report) => report.serialize(serializer),
             Self::Stuck(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
@@ -273,6 +285,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
         Command::Trace { term, season } => trace::trace(ctx, &term, season)
             .await
             .map(Outcome::Trace)
+            .map_err(|problem| *problem),
+        Command::Household { member } => household::household(ctx, member.as_deref())
+            .await
+            .map(Outcome::Household)
             .map_err(|problem| *problem),
         Command::Stuck => trace::stuck(ctx)
             .await
@@ -377,6 +393,21 @@ mod tests {
         .unwrap_or_default();
         assert!(
             json.contains("\"kind\":\"trace\""),
+            "envelope names the kind"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_household_serialises_under_its_own_kind() {
+        // Nothing is recorded to sign in with, so the view reports itself unavailable —
+        // which still exercises the dispatch, envelope and serialise arms for its outcome.
+        let json = dispatch(Command::Household { member: None }, &ctx(Ok(spoke(""))))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"household\""),
             "envelope names the kind"
         );
     }
@@ -583,6 +614,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Household(_)
                 | Outcome::Stuck(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
@@ -604,6 +636,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Household(_)
                 | Outcome::Stuck(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_)
@@ -1031,6 +1064,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Household(_)
                 | Outcome::Stuck(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
@@ -1488,6 +1522,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Household(_)
                 | Outcome::Stuck(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)

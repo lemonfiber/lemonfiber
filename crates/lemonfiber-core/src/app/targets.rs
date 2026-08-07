@@ -11,7 +11,10 @@ use crate::doctor::credentials::Target;
 use crate::jellyfin::Jellyfin;
 use crate::ports::service::{Download, Transfers};
 use crate::qbittorrent::Qbittorrent;
+use crate::recyclarr::Kind;
 use crate::sabnzbd::Sabnzbd;
+use crate::seerr::Seerr;
+use crate::servarr::Servarr;
 use crate::stack::Source;
 
 /// The directory Compose treats as the project root, where the services' config
@@ -214,6 +217,81 @@ pub(super) fn jellyfin_reader(
         crate::config::JELLYFIN_ADMIN_USER,
         password,
     ))
+}
+
+/// One \*arr a read can be made against: the service it files, a client already carrying
+/// its key, and the name a report calls it by.
+pub(super) struct OpenArr {
+    /// The service's display name, as a report names where a fact came from.
+    pub name: String,
+    /// Which of the two media services it is.
+    pub kind: Kind,
+    /// A client carrying the key it wrote.
+    pub service: Servarr,
+}
+
+/// Every \*arr whose key could be read, ready to be asked something.
+///
+/// One that has not finished starting has not written its key yet, so it cannot be opened
+/// and is left out. That is deliberately not a failed read: a service still coming up
+/// holds nothing to report, so its absence understates nothing — the convention every
+/// caller here follows, stated once rather than re-derived at each of them.
+pub(super) async fn open_servarrs(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Vec<OpenArr> {
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let mut open = Vec::new();
+    for target in servarr_targets(services, project.as_deref()) {
+        let Some(kind) = Kind::for_section(&target.id) else {
+            continue;
+        };
+        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+            continue;
+        };
+        open.push(OpenArr {
+            name: target.name.clone(),
+            kind,
+            service,
+        });
+    }
+    open
+}
+
+/// What reading the household's requests needs: the request service, and the media-server
+/// credential the sign-in is made with. Seerr authenticates its household against Jellyfin,
+/// so the account lemonfiber holds a password for is how it asks — as the owner, whose
+/// session sees every member's requests.
+pub(super) struct HouseholdAccess {
+    /// The request service, reached on the host.
+    pub seerr: Seerr,
+    /// Where the request service reaches the media server, across the stack's own
+    /// network — the sign-in names the server it authenticates against, and Seerr is the
+    /// one doing the reaching, so this is its address for it rather than the host's.
+    pub server_url: String,
+    /// The media-server admin password lemonfiber minted and recorded.
+    pub password: String,
+}
+
+/// The request service and the credential to read it with, or nothing where the stack has
+/// no request service, no media server to authenticate against, or no recorded password
+/// to sign in with.
+///
+/// The household view treats any of those as nothing to report rather than a fault: a
+/// stack without a request service has no household requests, and one whose password was
+/// never recorded has no way to ask for them.
+pub(super) fn seerr_reader(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<HouseholdAccess> {
+    let seerr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
+    let jellyfin = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
+    let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
+    Some(HouseholdAccess {
+        seerr: Seerr::new(ctx.http.clone(), seerr.loopback, "seerr"),
+        server_url: jellyfin.network_url,
+        password,
+    })
 }
 
 /// Where a service is reached — on the host, and across the stack's own network — the

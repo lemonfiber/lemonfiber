@@ -14,7 +14,8 @@ use serde::Deserialize;
 
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::{Failure, Requests};
+use crate::ports::service::{Failure, HouseholdRequest, Requests};
+use crate::recyclarr::Kind;
 
 /// The address a fresh Seerr owner is filed under. Seerr requires an address on
 /// the initialising sign-in but derives the real one from Jellyfin, so a stable
@@ -69,14 +70,15 @@ impl Requests for Seerr {
         Ok(settings.initialized)
     }
 
-    async fn configure_identity(
+    async fn sign_in(
         &self,
         username: &str,
         password: &str,
         server_url: &str,
     ) -> Result<(), Failure> {
-        // Signing in through Jellyfin creates the owner and sets the media server,
-        // but it does not finish setup — Seerr still reports itself uninitialised.
+        // Signing in through Jellyfin creates the owner and sets the media server on the
+        // first call, and on every later one simply opens a session. The session cookie
+        // it sets is carried by the transport, which is what authorises what follows.
         let body = serde_json::json!({
             "username": username,
             "password": password,
@@ -89,14 +91,126 @@ impl Requests for Seerr {
             .endpoint
             .send(&self.request(Method::Post, "/auth/jellyfin", Some(body)))
             .await?;
-        self.endpoint.expect_success(&signed_in)?;
+        self.endpoint.expect_success(&signed_in)
+    }
 
-        // Finishing setup is the step that marks Seerr initialised. The session
-        // cookie the sign-in set, carried by the transport, is what authorises it.
+    async fn configure_identity(
+        &self,
+        username: &str,
+        password: &str,
+        server_url: &str,
+    ) -> Result<(), Failure> {
+        // Signing in creates the owner and sets the media server, but it does not finish
+        // setup — Seerr still reports itself uninitialised until told to.
+        self.sign_in(username, password, server_url).await?;
+
+        // Finishing setup is the step that marks Seerr initialised.
         let finished = self
             .endpoint
             .send(&self.request(Method::Post, "/settings/initialize", None))
             .await?;
         self.endpoint.expect_success(&finished)
+    }
+
+    async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure> {
+        // The owner's session sees every member's requests; a member's own would see
+        // only theirs. Read newest first, so a household with more than the horizon
+        // keeps the requests still worth asking about rather than its oldest.
+        let mut requests = Vec::new();
+        let mut skip = 0;
+        loop {
+            let path =
+                format!("/request?take={REQUEST_PAGE}&skip={skip}&sort=added&sortDirection=desc");
+            let response = self
+                .endpoint
+                .send(&self.request(Method::Get, &path, None))
+                .await?;
+            let page: RequestPage = self
+                .endpoint
+                .decode(&response, "the household's requests could not be read")?;
+            let on_this_page = page.results.len();
+            requests.extend(page.results.into_iter().map(RequestRecord::into_request));
+            if on_this_page < REQUEST_PAGE || requests.len() >= page.page_info.results {
+                break;
+            }
+            skip += REQUEST_PAGE;
+        }
+        Ok(requests)
+    }
+}
+
+/// How many requests are read per page. Seerr answers ten at a time unless told
+/// otherwise, so a household of any size would take a walk; this asks for a generous
+/// page and walks on only where the service's own total says there is more.
+const REQUEST_PAGE: usize = 100;
+
+/// A page of the household's requests, and the totals that say whether there are more.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RequestPage {
+    #[serde(default)]
+    page_info: PageInfo,
+    #[serde(default)]
+    results: Vec<RequestRecord>,
+}
+
+/// How many requests there are in total, so the walk knows when it has them all.
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PageInfo {
+    #[serde(default)]
+    results: usize,
+}
+
+/// One request as Seerr records it: what became of it, what became of the media it
+/// asked for, who asked, and — once it has been handed over — which \*arr item it is.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RequestRecord {
+    #[serde(default)]
+    status: u8,
+    #[serde(default, rename = "type")]
+    media_type: String,
+    #[serde(default)]
+    media: MediaRecord,
+    #[serde(default)]
+    requested_by: MemberRecord,
+}
+
+/// The media a request asked for. It carries no title — Seerr looks those up from a
+/// metadata service rather than storing them — but it does carry the id the \*arr
+/// filing it knows it by, which is the exact join a name is found through.
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MediaRecord {
+    #[serde(default)]
+    status: u8,
+    #[serde(default)]
+    external_service_id: Option<i64>,
+}
+
+/// The member who asked, under the display name Seerr shows them by.
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MemberRecord {
+    #[serde(default)]
+    display_name: String,
+}
+
+impl RequestRecord {
+    /// The request as the port carries it, with the media type read into the service
+    /// that files it — television or film, or nothing for a kind this build does not know.
+    fn into_request(self) -> HouseholdRequest {
+        HouseholdRequest {
+            member: self.requested_by.display_name,
+            kind: match self.media_type.as_str() {
+                "tv" => Some(Kind::Sonarr),
+                "movie" => Some(Kind::Radarr),
+                _ => None,
+            },
+            item: self.media.external_service_id,
+            request_status: self.status,
+            media_status: self.media.status,
+        }
     }
 }

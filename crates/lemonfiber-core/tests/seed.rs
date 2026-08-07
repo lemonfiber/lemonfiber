@@ -13,8 +13,8 @@ use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{
     AppSync, Application, ApplicationKind, Category, Client, ClientKind, ClientProbe, Credential,
-    DownloadClient, Failure, Identity, MediaServer, RegisteredApplication, RegisteredClient,
-    RegisteredFolder, Requests, RootFolder,
+    DownloadClient, Failure, HouseholdRequest, Identity, MediaServer, RegisteredApplication,
+    RegisteredClient, RegisteredFolder, Requests, RootFolder,
 };
 use lemonfiber_core::seed::{
     contested_roots, intent, reconcile, wholesale_drift, wire_applications, wire_download_clients,
@@ -2329,6 +2329,23 @@ impl Requests for FakeReq {
         } else {
             Self::reading(&self.readback)
         }
+    }
+
+    /// Signing in is the first half of configuring identity, and fails the same way.
+    async fn sign_in(
+        &self,
+        username: &str,
+        password: &str,
+        server_url: &str,
+    ) -> Result<(), Failure> {
+        self.configure_identity(username, password, server_url)
+            .await
+    }
+
+    /// The seeding driver never reads the household's requests; the household view is
+    /// driven from its own tests.
+    async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure> {
+        Ok(Vec::new())
     }
 
     async fn configure_identity(
