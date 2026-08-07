@@ -33,7 +33,6 @@ use lemonfiber_core::stack::Source;
 
 mod archive;
 mod maintain;
-mod nntp;
 mod prompt;
 mod render;
 mod setup;

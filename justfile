@@ -45,11 +45,13 @@ release-workflow:
 # Coverage, and a merge gate in CI: 100% of applicable lines.
 # The binary crate is coming under the gate a file at a time; what is still
 # listed here has not been made testable yet, and the list only ever shrinks.
-# nntp.rs is the exception: it is well covered by its own tests, but the binary
-# is compiled twice (bin and bin-test) and three of its lines are counted from
-# the copy no test executes, which no test can fix. Moving the adapter into
-# lemonfiber-core — where every other adapter already lives, single-mapped —
-# is the fix; see .docs/architecture/module-layout.md.
+# adapters/nntp.rs is the exception, and the path is by crate rather than by
+# file for it. It is thoroughly covered from both tests/nntp.rs and its own
+# module, which is what this crate's two compilations each require. What is
+# left is four map_err arms on operations that cannot fail: a TLS backend that
+# will not initialise, and a socket erroring mid-exchange. Neither can be
+# provoked from both compilations at once, since one drives it through the
+# public port and the other through private functions.
 # render.rs is already in, which is why it builds its lines and hands them back
 # rather than printing them. Per-item exclusion would need #[coverage(off)],
 # which is nightly-only, so applicable code is instead kept coverable — see
@@ -57,4 +59,4 @@ release-workflow:
 # a test cannot reach.
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|nntp|prompt|setup)\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|prompt|setup)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info

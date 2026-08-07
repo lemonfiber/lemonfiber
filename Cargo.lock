@@ -848,14 +848,10 @@ dependencies = [
  "lemonfiber-core",
  "lemonfiber-manifest",
  "rpassword",
- "rustls",
- "rustls-pki-types",
  "serde_json",
  "sysinfo",
  "tar",
  "tokio",
- "tokio-rustls",
- "webpki-roots",
 ]
 
 [[package]]
@@ -871,12 +867,16 @@ dependencies = [
  "include_dir",
  "lemonfiber-manifest",
  "reqwest",
+ "rustls",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "sysinfo",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "tokio-stream",
+ "webpki-roots",
 ]
 
 [[package]]
