@@ -24,11 +24,11 @@ use lemonfiber_core::wizard::{
 use lemonfiber_core::PRODUCT;
 
 use crate::prompt::{Flags, SetupFlags, Terminal};
+use crate::read_line;
 use crate::render::render;
 use crate::{
     complain, context, here, pull_showing, read_settings, settled, FAILURE, PREFLIGHT, USAGE,
 };
-use crate::{nntp, read_line};
 
 /// Meet an operator who typed `lemonfiber` with nothing after it.
 ///
@@ -193,7 +193,10 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard, flags: SetupFlag
     // Credentials are proven against their live services as they are entered — the
     // indexer and any existing service over HTTP, a Usenet provider over a real,
     // TLS-wrapped NNTP connection.
-    let validator = Live::with_nntp(ctx.http.clone(), Arc::new(nntp::Dialer::new()));
+    let validator = Live::with_nntp(
+        ctx.http.clone(),
+        Arc::new(lemonfiber_core::adapters::Dialer::new()),
+    );
 
     // A terminal answers the questions; without one the flags do, and where a flag
     // a question needs is missing the run is told which rather than left waiting on

@@ -14,6 +14,7 @@
 pub mod docker;
 pub mod filesystem;
 pub mod http;
+pub mod nntp;
 pub mod process;
 pub mod random;
 pub mod time;
@@ -21,6 +22,7 @@ pub mod time;
 pub use docker::Daemon;
 pub use filesystem::Disk;
 pub use http::Web;
+pub use nntp::Dialer;
 pub use process::Local;
 pub use random::Os;
 pub use time::System;

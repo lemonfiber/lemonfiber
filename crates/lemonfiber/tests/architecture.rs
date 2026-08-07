@@ -93,7 +93,7 @@ fn the_core_has_no_user_interface_dependency() {
 /// to the network fails the build.
 #[test]
 fn talking_to_the_outside_world_only_happens_in_adapters() {
-    let confined: [(&str, &[&str]); 5] = [
+    let confined: [(&str, &[&str]); 7] = [
         ("tokio::process", &["adapters/process.rs"]),
         ("std::process::Command", &["adapters/process.rs"]),
         (
@@ -102,6 +102,10 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         ),
         ("reqwest", &["adapters/http.rs"]),
         ("sysinfo", &["adapters/filesystem.rs"]),
+        // The HTTP adapter names it too: it is reqwest's TLS backend, and the
+        // reason a static Linux build carries no system TLS. Both are its homes.
+        ("rustls", &["adapters/nntp.rs", "adapters/http.rs"]),
+        ("webpki_roots", &["adapters/nntp.rs"]),
     ];
 
     for (crate_name, permitted) in confined {
