@@ -37,6 +37,7 @@ pub mod app;
 pub mod audio;
 pub mod backup;
 pub mod baseline;
+pub mod condition;
 pub mod config;
 pub mod dashboard;
 pub mod docker;
