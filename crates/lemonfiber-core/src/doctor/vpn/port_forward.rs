@@ -1,7 +1,8 @@
 //! The pure port-forward logic: reading the gateway's status file and deciding
 //! what a missing port can honestly be called.
 
-use super::{finding, NOT_ENABLED};
+use super::findings::finding;
+use super::NOT_ENABLED;
 use crate::config::PortForward;
 use crate::doctor::{Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
