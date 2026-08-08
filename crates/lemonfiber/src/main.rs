@@ -27,9 +27,10 @@ use cli::{Cli, Request};
 use context::{context, here};
 use engine::{guard, pull, stream};
 use exit::{complain, no_config_home, settled, USAGE};
+use keyboard::Console;
 use prompt::SetupFlags;
 use render::render;
-use setup::{greet, run_setup};
+use setup::{greeting, setting_up};
 use translate::{configuration, quality};
 
 #[tokio::main]
@@ -37,7 +38,14 @@ async fn main() -> ExitCode {
     let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {
-        return greet(cli.stack_dir.take(), cli.dry_run).await;
+        let ctx = context(cli.stack_dir.take(), cli.dry_run);
+        let Some(paths) = here() else {
+            // With nowhere to keep its files there is nothing to offer and nothing
+            // to point at, so the plain pointer is the only honest thing left.
+            println!("lemonfiber — run `lemonfiber --help` to see what it can do");
+            return ExitCode::SUCCESS;
+        };
+        return greeting(ctx, &paths, &Console).await;
     };
 
     let ctx = context(cli.stack_dir.take(), cli.dry_run);
@@ -140,11 +148,15 @@ async fn main() -> ExitCode {
 /// mistake to name rather than a half-configured stack — the same shape as `quality`
 /// below, which turns its own subcommand into a value or a code to exit with.
 async fn setup_from(ctx: Ctx, raw: prompt::RawSetup) -> ExitCode {
-    match SetupFlags::parse(raw) {
-        Ok(flags) => run_setup(ctx, flags).await,
+    let flags = match SetupFlags::parse(raw) {
+        Ok(flags) => flags,
         Err(message) => {
             eprintln!("error: {message}");
-            ExitCode::from(USAGE)
+            return ExitCode::from(USAGE);
         }
-    }
+    };
+    let Some(paths) = here() else {
+        return no_config_home();
+    };
+    setting_up(ctx, &paths, &Console, flags).await
 }

@@ -1,0 +1,19 @@
+# A stack with a form and a profile and no services at all.
+#
+# Enough for a real `up` to build its command, run it and settle, without the
+# fifteen containers the shipped stack would have the engine waited on.
+
+schema_version  = 1
+stack_version   = "0.1.0"
+min_cli_version = "0.1.0"
+
+[[profile]]
+id = "tv"
+name = "Television"
+description = "TV automation"
+
+[[form]]
+id = "tv"
+name = "Television"
+description = "The form a first run brings up."
+profiles = ["tv"]

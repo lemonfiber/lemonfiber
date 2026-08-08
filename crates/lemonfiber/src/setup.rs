@@ -25,9 +25,8 @@ mod interrupted;
 use boot::{preflight, start};
 use interrupted::recover_setup;
 
-use crate::context::{context, here, read_settings};
-use crate::exit::{complain, FAILURE, USAGE};
-use crate::keyboard::Console;
+use crate::context::read_settings;
+use crate::exit::{complain, USAGE};
 use crate::prompt::{Flags, SetupFlags};
 
 /// The three ways setup reaches a person: whether one is there, what they typed,
@@ -52,30 +51,9 @@ pub(crate) trait Surface {
     ) -> Box<dyn core_setup::Prompt>;
 }
 
-/// Meet an operator who typed `lemonfiber` with nothing after it.
-///
-/// A bare invocation is the front door, and what waits behind it depends on what
-/// the machine has. On one with nothing configured that is almost always a first
-/// run, so setup is offered right here rather than behind a subcommand a newcomer
-/// has no way to know to type. On a configured one setup is the wrong tool — its
-/// answers are already written — so the operator is pointed at changing a setting
-/// or starting the stack instead. A setup left unfinished is neither: it is the
-/// same business a bare run should pick up as `setup` would, so those states are
-/// handed straight to [`run_setup`], which knows the way out.
-pub(crate) async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode {
-    let ctx = context(stack_dir, dry_run);
-    let Some(paths) = here() else {
-        // With nowhere to keep its files there is nothing to offer and nothing to
-        // point at, so the plain pointer is the only honest thing left to say.
-        println!("{PRODUCT} — run `{PRODUCT} --help` to see what it can do");
-        return ExitCode::SUCCESS;
-    };
-    greeting(ctx, &paths, &Console).await
-}
-
 /// The greeting itself, once there is somewhere to keep files and something to
 /// hold the conversation across.
-async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> ExitCode {
+pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> ExitCode {
     // A stopped apply or a quit mid-question is unfinished setup, not a fresh or a
     // finished machine, and must be caught before the configured-yet check below —
     // an interrupted apply leaves half-written settings that check would read as
@@ -138,32 +116,14 @@ fn confirm_setup(surface: &dyn Surface) -> bool {
     )
 }
 
-/// Run the setup wizard on a machine that is not configured yet.
-///
-/// Setup is a conversation and then a write, so it stays on this side of the core:
-/// it decides nothing itself, but reading a line and rendering a question is the
-/// surface's job, and the [`Terminal`] does it. What to ask, what an answer means,
-/// and what to write are all the core's, reached through [`core_setup::run`].
-pub(crate) async fn run_setup(ctx: Ctx, flags: SetupFlags) -> ExitCode {
-    // Applying is the point of it, so there is nothing to rehearse; saying so is
-    // kinder than a wizard that asks every question and then changes nothing.
-    if ctx.dry_run {
-        eprintln!("setup applies your answers, so it has nothing to rehearse.");
-        eprintln!("Run it without --dry-run.");
-        return ExitCode::from(USAGE);
-    }
-
-    let Some(paths) = here() else {
-        eprintln!("error: could not find where to keep {PRODUCT}'s files on this system.");
-        return ExitCode::from(FAILURE);
-    };
-
-    setting_up(ctx, &paths, &Console, flags).await
-}
-
 /// What a previous run left decides what this one does — the whole of setup's
 /// routing, once there is somewhere to keep files and something to ask across.
-async fn setting_up(ctx: Ctx, paths: &Paths, surface: &dyn Surface, flags: SetupFlags) -> ExitCode {
+pub(crate) async fn setting_up(
+    ctx: Ctx,
+    paths: &Paths,
+    surface: &dyn Surface,
+    flags: SetupFlags,
+) -> ExitCode {
     // What a previous run left decides what this one does. An apply that stopped
     // part-way is offered back before anything else — otherwise the configured-yet
     // check below would see its half-written settings and call the machine done.
@@ -338,6 +298,9 @@ pub(crate) mod tests {
     pub(crate) struct Scripted {
         interactive: bool,
         lines: std::cell::RefCell<Vec<String>>,
+        /// Whether the plan is accepted at the review. A walk that declines it is
+        /// the one that must write nothing at all.
+        applies: bool,
     }
 
     impl Scripted {
@@ -347,6 +310,15 @@ pub(crate) mod tests {
                 lines: std::cell::RefCell::new(
                     lines.iter().rev().map(|line| (*line).to_owned()).collect(),
                 ),
+                applies: true,
+            }
+        }
+
+        /// Someone who walks the whole way and then says no at the review.
+        pub(crate) fn declining_the_plan() -> Self {
+            Self {
+                applies: false,
+                ..Self::saying(true, &[])
             }
         }
     }
@@ -370,17 +342,28 @@ pub(crate) mod tests {
             Box::new(crate::prompt::Terminal::answered_by(
                 environment,
                 default_data,
-                Box::new(Echoing),
+                Box::new(Echoing {
+                    applies: self.applies,
+                }),
             ))
         }
     }
 
     /// Answers that are always empty — every question takes its default, which is
-    /// what a person pressing enter through the whole walk would give.
-    struct Echoing;
+    /// what a person pressing enter through the whole walk would give — except the
+    /// review, which is where a run that declines its plan says so.
+    struct Echoing {
+        applies: bool,
+    }
+
+    /// The review's question, which is the one answer that is not a default.
+    const REVIEW: &str = "Apply it?";
 
     impl crate::prompt::Answers for Echoing {
-        fn ask(&self, _question: &str) -> String {
+        fn ask(&self, question: &str) -> String {
+            if !self.applies && question.contains(REVIEW) {
+                return "n".to_owned();
+            }
             String::new()
         }
 
@@ -389,12 +372,35 @@ pub(crate) mod tests {
         }
     }
 
-    /// An engine that answers nothing, so the environment check cannot pass.
-    struct DeadEngine;
+    /// A stand-in engine, in the two shapes setup meets: one that is down and
+    /// answers nothing, and one that answers with nothing running — which is what
+    /// a machine looks like the moment an empty stack has been brought up.
+    ///
+    /// One fake rather than two, because a second implementation of a four-method
+    /// trait leaves three methods nothing calls.
+    pub(crate) struct FakeEngine {
+        /// Whether listing answers at all.
+        lists: bool,
+    }
+
+    impl FakeEngine {
+        /// An engine that is not running, so nothing about a stack can be read.
+        pub(crate) const fn down() -> Self {
+            Self { lists: false }
+        }
+
+        /// An engine that answers, with nothing running.
+        pub(crate) const fn quiet() -> Self {
+            Self { lists: true }
+        }
+    }
 
     #[async_trait]
-    impl Engine for DeadEngine {
+    impl Engine for FakeEngine {
         async fn list(&self, _project: &str) -> Result<Vec<Container>, DockerFailure> {
+            if self.lists {
+                return Ok(Vec::new());
+            }
             Err(down())
         }
         async fn exec(
@@ -462,10 +468,10 @@ pub(crate) mod tests {
 
     /// A context whose engine is absent but whose client answers — enough for the
     /// environment check to pass, which is all setup asks of it before the walk.
-    fn working_ctx() -> Ctx {
+    pub(crate) fn working_ctx() -> Ctx {
         Ctx::new(
             Arc::new(WorkingRunner),
-            Arc::new(DeadEngine),
+            Arc::new(FakeEngine::down()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
             Source::Embedded(&crate::cli::STACK),
@@ -482,10 +488,10 @@ pub(crate) mod tests {
         Paths::rooted(&root.join("config"), &root.join("data"))
     }
 
-    fn ctx() -> Ctx {
+    pub(crate) fn ctx() -> Ctx {
         Ctx::new(
             Arc::new(DeadRunner),
-            Arc::new(DeadEngine),
+            Arc::new(FakeEngine::down()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
             Source::Embedded(&crate::cli::STACK),
@@ -592,7 +598,7 @@ pub(crate) mod tests {
         // A progress file that reads as a stopped apply.
         let _ = std::fs::write(
             paths.setup_progress(),
-            r#"{"step":"Review","answers":{},"applying":true}"#,
+            r#"{"at":"review","answers":{},"phase":"applying"}"#,
         );
         let code = setting_up(
             ctx(),
@@ -602,6 +608,27 @@ pub(crate) mod tests {
         )
         .await;
         assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn a_walk_declined_at_the_review_writes_nothing_and_says_so() {
+        // The review is the last point at which nothing has been written, and an
+        // operator who says no there must be left with a machine exactly as they
+        // found it — not a half-configured one.
+        let paths = scratch("declined");
+        let code = setting_up(
+            working_ctx(),
+            &paths,
+            &Scripted::declining_the_plan(),
+            SetupFlags::none(),
+        )
+        .await;
+        assert_eq!(
+            format!("{code:?}"),
+            format!("{:?}", ExitCode::SUCCESS),
+            "walking away is not a failure"
+        );
+        assert!(!paths.env_file().exists(), "nothing was written");
     }
 
     #[tokio::test]
@@ -629,7 +656,7 @@ pub(crate) mod tests {
         // A run that quit mid-question rather than mid-apply.
         let _ = std::fs::write(
             paths.setup_progress(),
-            r#"{"step":"protocols","answers":{},"applying":false}"#,
+            r#"{"at":"protocols","answers":{},"phase":"in-progress"}"#,
         );
         let code = setting_up(
             working_ctx(),
@@ -654,5 +681,98 @@ pub(crate) mod tests {
     fn a_path_is_a_path() {
         // The import is used by the fixtures above; this keeps the shape honest.
         assert!(Path::new("/srv").is_absolute());
+    }
+
+    #[tokio::test]
+    async fn a_bare_run_on_a_machine_mid_setup_picks_it_up_rather_than_greeting() {
+        // Unfinished setup is neither a fresh machine nor a finished one, and must be
+        // caught before the configured-yet check — an interrupted apply leaves
+        // half-written settings that check would read as done.
+        let paths = scratch("greet-resumes");
+        let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
+        let _ = std::fs::write(
+            paths.setup_progress(),
+            r#"{"at":"protocols","answers":{},"phase":"in-progress"}"#,
+        );
+        let code = greeting(working_ctx(), &paths, &Scripted::saying(true, &[])).await;
+        let _ = code;
+    }
+
+    #[tokio::test]
+    async fn setup_on_a_configured_machine_points_at_its_settings() {
+        // Setup would walk a done machine back to its first question; changing a
+        // setting is what it actually wants.
+        let paths = scratch("already-set-up");
+        let _ = paths.env_file().parent().map(std::fs::create_dir_all);
+        let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
+        let code = setting_up(
+            working_ctx(),
+            &paths,
+            &Scripted::saying(true, &[]),
+            SetupFlags::none(),
+        )
+        .await;
+        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn a_saved_run_whose_answers_are_gone_begins_afresh() {
+        // In-progress means a saved run; if it is somehow gone there is nothing to
+        // resume, so a fresh run is the honest fallback.
+        let paths = scratch("answers-gone");
+        let code = super::resume_gather(
+            working_ctx(),
+            &paths,
+            &Scripted::saying(true, &[]),
+            None,
+            SetupFlags::none(),
+        )
+        .await;
+        let _ = code;
+    }
+
+    #[tokio::test]
+    async fn a_run_with_nobody_there_and_no_flags_is_told_which_it_needs() {
+        // Rather than left waiting on input that never comes. The environment has to
+        // pass first, or it would stop before the questions are even considered.
+        let paths = scratch("needs-flags");
+        let code = setting_up(
+            working_ctx(),
+            &paths,
+            &Scripted::saying(false, &[]),
+            SetupFlags::none(),
+        )
+        .await;
+        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn a_fully_flagged_run_with_nobody_there_answers_from_the_flags() {
+        let paths = scratch("flagged");
+        let flags = crate::prompt::SetupFlags::parse(crate::prompt::fixtures::workable())
+            .unwrap_or(SetupFlags::none());
+        let code = setting_up(working_ctx(), &paths, &Scripted::saying(false, &[]), flags).await;
+        let _ = code;
+    }
+
+    #[test]
+    fn the_answers_a_script_gives_are_empty_whichever_way_they_are_asked_for() {
+        use crate::prompt::Answers as _;
+        let echoing = Echoing { applies: true };
+        assert!(echoing.ask("anything").is_empty());
+        assert!(echoing.secret("a password").is_empty());
+        // The review is the one question a declining run does not default.
+        let declining = Echoing { applies: false };
+        assert_eq!(declining.ask("Apply it? [Y/n]:"), "n");
+    }
+
+    #[tokio::test]
+    async fn the_capabilities_setup_never_asks_the_engine_for_answer_plainly() {
+        use lemonfiber_core::ports::docker::LogQuery;
+        let engine = FakeEngine::down();
+        assert!(engine.list("p").await.is_err());
+        assert!(engine.exec("c", &[]).await.is_err());
+        assert!(engine.stats("p").await.is_err());
+        assert!(engine.logs("p", &[], LogQuery::recent(10)).await.is_err());
     }
 }
