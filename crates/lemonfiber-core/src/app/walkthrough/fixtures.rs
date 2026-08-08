@@ -114,57 +114,64 @@ impl Default for Fake {
     }
 }
 
+/// What the world says this stack's address is — the same address the tunnel fixture has
+/// both ends of the pair reporting, so nothing is leaking.
+const EGRESS: &str = "203.0.113.7";
+
+impl Fake {
+    /// What answers a request to `url`.
+    ///
+    /// A table rather than a chain of tests, because the chain was one long branch per
+    /// service and read as a decision when it is really a lookup. Ordered most specific
+    /// first: several of these paths are prefixes of each other, and a catalogue lookup is
+    /// a `/series` request with more on the end.
+    fn answer(&self, url: &str) -> &'static str {
+        let routes = [
+            ("echo.example", EGRESS),
+            ("mode=queue", self.transfers),
+            ("/AuthenticateByName", self.sign_in),
+            ("/Library/Refresh", "{}"),
+            ("/Items", self.library),
+            ("lookup", self.lookup),
+            ("/rootfolder", self.folders),
+            ("/qualityprofile", self.profiles),
+            ("/indexer", self.indexers),
+            ("/wanted/missing", self.wanted),
+            ("/release", self.releases),
+            ("/history", self.history),
+            ("/queue", self.queue),
+        ];
+        routes
+            .iter()
+            .find(|(at, _)| url.contains(at))
+            // Everything else is the add, which is a write to the library path itself.
+            .map_or(self.added, |(_, body)| body)
+    }
+
+    /// Why a request fails, where this fake is set up to refuse it.
+    fn refusal(&self, request: &Request) -> Option<&'static str> {
+        if self.refuses_writes && request.method == crate::ports::http::Method::Post {
+            return Some("the service would not take it on");
+        }
+        if request.url.contains(self.refuses) {
+            return Some("nothing answered");
+        }
+        None
+    }
+}
+
 #[async_trait]
 impl Http for Fake {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if self.refuses_writes && request.method == crate::ports::http::Method::Post {
+        if let Some(reason) = self.refusal(request) {
             return Err(Unreachable {
                 url: request.url.clone(),
-                reason: "the service would not take it on".to_owned(),
+                reason: reason.to_owned(),
             });
         }
-        if request.url.contains(self.refuses) {
-            return Err(Unreachable {
-                url: request.url.clone(),
-                reason: "nothing answered".to_owned(),
-            });
-        }
-        // Ordered most specific first: several of these paths are prefixes of each other,
-        // and a lookup is a `/series` request with more on the end.
-        let body = if request.url.contains("echo.example") {
-            // What the world says this stack's address is — the same address the tunnel
-            // fixture has both ends of the pair reporting, so nothing is leaking.
-            "203.0.113.7"
-        } else if request.url.contains("mode=queue") {
-            self.transfers
-        } else if request.url.contains("/AuthenticateByName") {
-            self.sign_in
-        } else if request.url.contains("/Library/Refresh") {
-            "{}"
-        } else if request.url.contains("/Items") {
-            self.library
-        } else if request.url.contains("lookup") {
-            self.lookup
-        } else if request.url.contains("/rootfolder") {
-            self.folders
-        } else if request.url.contains("/qualityprofile") {
-            self.profiles
-        } else if request.url.contains("/indexer") {
-            self.indexers
-        } else if request.url.contains("/wanted/missing") {
-            self.wanted
-        } else if request.url.contains("/release") {
-            self.releases
-        } else if request.url.contains("/history") {
-            self.history
-        } else if request.url.contains("/queue") {
-            self.queue
-        } else {
-            self.added
-        };
         Ok(Response {
             status: 200,
-            body: body.to_owned(),
+            body: self.answer(&request.url).to_owned(),
         })
     }
 }
