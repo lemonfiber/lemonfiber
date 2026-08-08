@@ -151,34 +151,6 @@ fn isolated(pair: &Pair) -> Problem {
     .in_state(crate::error::State::Guided)
 }
 
-/// The killswitch finding: unverified either way, because proving a killswitch
-/// works means breaking the tunnel and confirming traffic stops.
-///
-/// An untested fail-closed guarantee reported as passing would be exactly the
-/// comfortable falsehood this feature exists to eliminate, so it is never a pass.
-/// Where the operator opted into the disruptive checks, it says plainly that the
-/// tunnel-drop test is not yet built rather than pointing back at the flag they
-/// already gave — a remedy that led in a circle would be worse than an honest gap.
-pub(super) fn killswitch_verdict(disruptive: bool) -> Verdict {
-    if disruptive {
-        return Verdict::Unverified {
-            reason: "the disruptive killswitch test — dropping the tunnel to confirm \
-                     traffic stops — is not yet built"
-                .to_owned(),
-            remedy: Remedy::new(
-                "Until it lands, confirm the tunnel container's own killswitch is enabled",
-            ),
-        };
-    }
-    Verdict::Unverified {
-        reason: "the killswitch has not been tested; proving it works means dropping \
-                 the tunnel and confirming traffic stops, which interrupts transfers"
-            .to_owned(),
-        remedy: Remedy::new("Run the disruptive check when transfers can be interrupted")
-            .with_detail("lemonfiber doctor --only vpn --disruptive"),
-    }
-}
-
 /// Whether a response is an address rather than an error page.
 ///
 /// Parsed as an address rather than pattern-matched, so an error body that

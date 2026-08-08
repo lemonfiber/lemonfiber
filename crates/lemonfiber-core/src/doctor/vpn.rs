@@ -13,8 +13,11 @@
 //!
 //! See `.docs/architecture/module-layout.md`.
 
+mod findings;
+mod killswitch;
 mod leak;
 mod port_forward;
+mod probe;
 
 use std::sync::Arc;
 
@@ -24,14 +27,15 @@ use lemonfiber_manifest::{Manifest, Protocol};
 use super::{Category, Check, Finding, Verdict};
 use crate::config::{PortForward, Protocols};
 use crate::error::Remedy;
-use crate::ports::docker::{Container, Engine, Lifecycle};
+use crate::ports::docker::{Container, Engine};
 
-use leak::{
-    egress_verdict, is_country_code, killswitch_verdict, labelled, looks_like_ip, tunnel_verdict,
-    Reach,
-};
-use port_forward::{no_port, parse_grant, port_forward_offline, Grant};
+use findings::{assemble, finding, killswitch_findings, skipped, unreachable_engine};
+use killswitch::{not_attempted, Held};
+use leak::{labelled, Reach};
+use port_forward::{no_port, port_forward_offline, Grant};
+use probe::{exit_country, find, public_address, read_grant, running};
 
+pub use killswitch::{KILLSWITCH_LEAKS, TUNNEL_NOT_RESTORED};
 pub use leak::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
 pub use port_forward::NO_FORWARDED_PORT;
 
@@ -190,6 +194,92 @@ impl VpnCheck {
         finding("vpn.port-forward", "forwarded port", verdict)
     }
 
+    /// Prove the killswitch: take the tunnel away, ask the client whether it can
+    /// still reach the internet, and put the tunnel back.
+    ///
+    /// Only where the operator asked for the disruptive checks, and only where
+    /// there is something to prove — a client that is not reaching the internet
+    /// right now would answer "blocked" whatever the killswitch does, and calling
+    /// that a pass would be the comfortable falsehood again in a new place.
+    ///
+    /// Whatever the probe finds, the tunnel goes back up. That restoration is
+    /// attempted unconditionally and then confirmed; a tunnel this check took away
+    /// and could not return is reported as the fault it is rather than left for
+    /// the operator to discover.
+    async fn killswitch_held(
+        &self,
+        gateway: Option<&Container>,
+        client: Option<&Container>,
+        echo: &str,
+        client_now: &Reach,
+    ) -> Held {
+        if !self.disruptive {
+            return Held::NotAttempted {
+                reason: killswitch::NOT_ASKED_FOR.to_owned(),
+            };
+        }
+        let Some(gateway) = running(gateway) else {
+            return not_attempted(true, "the tunnel container is not running");
+        };
+        let Some(client) = running(client) else {
+            return not_attempted(true, "the download client is not running");
+        };
+        // Nothing to prove against: a client already unable to reach the internet
+        // answers "blocked" whether or not the killswitch had anything to do with
+        // it, and reading that as a pass would prove nothing at all.
+        if !matches!(client_now, Reach::Address(_)) {
+            return not_attempted(
+                true,
+                "the download client is not reaching the internet right now, so stopping it \
+                 would prove nothing",
+            );
+        }
+        let Some(device) = self.tunnel_device(gateway).await else {
+            return not_attempted(
+                true,
+                "the tunnel container carries no default route to drop",
+            );
+        };
+        if !self.set_link(gateway, &device, false).await {
+            return not_attempted(true, "the tunnel device could not be taken down");
+        }
+
+        // From here the stack is disturbed, so every path restores before it
+        // returns — the probe's own answer is held until that has happened.
+        //
+        // The CLIENT is asked, not the gateway. The gateway's own traffic is not
+        // the question; whether the container behind it still reaches the world
+        // with the tunnel gone is the entire test.
+        let held = killswitch::held_from(&self.reach(Some(client), echo).await);
+        let restored = self.set_link(gateway, &device, true).await
+            && self.tunnel_device(gateway).await.is_some();
+        if restored {
+            held
+        } else {
+            Held::NotRestored
+        }
+    }
+
+    /// Which device carries the gateway's default route — the tunnel, whatever it
+    /// is called.
+    async fn tunnel_device(&self, gateway: &Container) -> Option<String> {
+        let output = self
+            .engine
+            .exec(&gateway.id, &killswitch::read_route())
+            .await
+            .ok()?;
+        killswitch::tunnel_device(&output.stdout)
+    }
+
+    /// Take the gateway's tunnel device down, or put it back. Whether the engine
+    /// carried the command out at all.
+    async fn set_link(&self, gateway: &Container, device: &str, up: bool) -> bool {
+        self.engine
+            .exec(&gateway.id, &killswitch::set_link(device, up))
+            .await
+            .is_ok_and(|output| output.status == Some(0))
+    }
+
     /// Read the granted port from the gateway's own status file.
     ///
     /// A container that is not running, or an engine that cannot be reached, makes
@@ -198,62 +288,6 @@ impl VpnCheck {
     /// granted, which for an enabled provider is the failure this check exists for.
     async fn granted_port(&self, gateway: Option<&Container>) -> Grant {
         read_grant(self.engine.as_ref(), gateway).await
-    }
-}
-
-/// Ask one container for its public address, from inside its own network
-/// namespace — the exec-based read the leak check and the dashboard's VPN panel
-/// share, so both ask the same way. A container that is absent or not running is
-/// `Down`; an engine that will not answer is `Unknown`; anything that is not an
-/// address is `Blocked`.
-async fn public_address(engine: &dyn Engine, container: Option<&Container>, echo: &str) -> Reach {
-    let Some(container) = container else {
-        return Reach::Down;
-    };
-    if container.lifecycle != Lifecycle::Running {
-        return Reach::Down;
-    }
-    match engine.exec(&container.id, &wget(echo.to_owned())).await {
-        Err(_) => Reach::Unknown,
-        Ok(output) => {
-            let body = output.stdout.trim();
-            if output.status == Some(0) && looks_like_ip(body) {
-                Reach::Address(body.to_owned())
-            } else {
-                Reach::Blocked
-            }
-        }
-    }
-}
-
-/// The tunnel's exit country, best effort — reported where the endpoint supplies
-/// it, omitted rather than guessed where it cannot.
-async fn exit_country(engine: &dyn Engine, container: &Container, echo: &str) -> Option<String> {
-    let url = format!("{}/country-iso", echo.trim_end_matches('/'));
-    match engine.exec(&container.id, &wget(url)).await {
-        Ok(output) if output.status == Some(0) && is_country_code(output.stdout.trim()) => {
-            Some(output.stdout.trim().to_ascii_uppercase())
-        }
-        _ => None,
-    }
-}
-
-/// Read the granted port from the gateway's own status file. A container that is
-/// not running, or an engine that cannot be reached, makes the answer unknown
-/// rather than absent.
-async fn read_grant(engine: &dyn Engine, gateway: Option<&Container>) -> Grant {
-    let Some(container) = gateway else {
-        return Grant::Unreadable;
-    };
-    if container.lifecycle != Lifecycle::Running {
-        return Grant::Unreadable;
-    }
-    // Awaited into a plain value first: a block whose last statement is an await
-    // leaves its own closing brace unmarked by coverage.
-    let result = engine.exec(&container.id, &read_port()).await;
-    match result {
-        Err(_) => Grant::Unreadable,
-        Ok(output) => parse_grant(&output.stdout),
     }
 }
 
@@ -357,31 +391,6 @@ pub(crate) async fn read_vpn(
 }
 
 /// The findings for an active check, given both containers' answers.
-fn assemble(
-    pair: &Pair,
-    gateway: &Reach,
-    client: &Reach,
-    note: Option<String>,
-    disruptive: bool,
-) -> Vec<Finding> {
-    vec![
-        finding(
-            "vpn.tunnel",
-            &format!("{} tunnel", pair.gateway),
-            tunnel_verdict(gateway, &pair.gateway, note),
-        ),
-        finding(
-            "vpn.egress-match",
-            &format!("{} egress", pair.client),
-            egress_verdict(gateway, client, pair),
-        ),
-        finding(
-            "vpn.killswitch",
-            "killswitch",
-            killswitch_verdict(disruptive),
-        ),
-    ]
-}
 
 #[async_trait]
 impl Check for VpnCheck {
@@ -449,67 +458,11 @@ impl Check for VpnCheck {
             _ => None,
         };
 
-        let mut findings = assemble(pair, &gateway, &client, note, self.disruptive);
+        let held = self
+            .killswitch_held(gateway_container, client_container, echo, &client)
+            .await;
+        let mut findings = assemble(pair, &gateway, &client, note, killswitch_findings(&held));
         findings.push(port_forward);
         findings
     }
-}
-
-/// The command that asks an endpoint for the caller's address, run inside a
-/// container.
-fn wget(url: String) -> Vec<String> {
-    vec!["wget".to_owned(), "-qO-".to_owned(), url]
-}
-
-/// The command that reads the gateway's forwarded-port status file from inside
-/// the container.
-fn read_port() -> Vec<String> {
-    vec!["cat".to_owned(), FORWARDED_PORT_FILE.to_owned()]
-}
-
-/// The container implementing a service, where it is present.
-fn find<'a>(containers: &'a [Container], service: &str) -> Option<&'a Container> {
-    containers
-        .iter()
-        .find(|container| container.service == service)
-}
-
-/// A finding in the VPN category.
-pub(super) fn finding(check: &str, title: &str, verdict: Verdict) -> Finding {
-    Finding::in_category(Category::Vpn, check, title, verdict)
-}
-
-/// A single finding for a check that does not apply.
-pub(super) fn skipped(reason: String) -> Finding {
-    finding("vpn", "VPN verification", Verdict::Skipped { reason })
-}
-
-/// The findings when the engine could not be reached: the runtime checks could
-/// not run, so they are unverified rather than reported either way.
-fn unreachable_engine(pair: &Pair, port_forward: &PortForward, disruptive: bool) -> Vec<Finding> {
-    let reason = "the container engine could not be reached, so the containers \
-                  could not be asked"
-        .to_owned();
-    let remedy = Remedy::new("Start the container engine, then run this again");
-    vec![
-        finding(
-            "vpn.tunnel",
-            &format!("{} tunnel", pair.gateway),
-            Verdict::Unverified {
-                reason: reason.clone(),
-                remedy: remedy.clone(),
-            },
-        ),
-        finding(
-            "vpn.egress-match",
-            &format!("{} egress", pair.client),
-            Verdict::Unverified { reason, remedy },
-        ),
-        finding(
-            "vpn.killswitch",
-            "killswitch",
-            killswitch_verdict(disruptive),
-        ),
-        port_forward_offline(port_forward),
-    ]
 }

@@ -49,10 +49,43 @@ impl Behavior {
     }
 }
 
+/// How the tunnel container answers the killswitch test, and what the client
+/// sees while the tunnel is down.
+#[derive(Debug, Clone, Copy)]
+struct Link {
+    /// The device the default route names, or nothing where there is no route.
+    device: Option<&'static str>,
+    /// Whether `ip link set` succeeds.
+    movable: bool,
+    /// Whether putting the device back up succeeds.
+    restores: bool,
+    /// What the client's address probe answers while the tunnel is down. `None`
+    /// is traffic that stopped, which is the killswitch holding.
+    leaks_as: Option<&'static str>,
+}
+
+impl Link {
+    /// A tunnel that drops and comes back, and a client whose traffic stops with
+    /// it — the stack the killswitch is supposed to produce.
+    const fn holding() -> Self {
+        Self {
+            device: Some("tun0"),
+            movable: true,
+            restores: true,
+            leaks_as: None,
+        }
+    }
+}
+
 /// An engine that answers exec and list from a fixed script.
 struct Fake {
     reachable: bool,
     behaviors: Vec<Behavior>,
+    /// How the killswitch probe is answered, where a test scripts it. Absent is
+    /// an image with no `ip` in it.
+    link: Option<Link>,
+    /// Whether the tunnel device is down right now.
+    dropped: std::sync::atomic::AtomicBool,
 }
 
 impl Fake {
@@ -60,6 +93,56 @@ impl Fake {
         Self {
             reachable: true,
             behaviors,
+            link: None,
+            dropped: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    /// The same, answering the killswitch test as `link` says.
+    fn linked(behaviors: Vec<Behavior>, link: Link) -> Self {
+        Self {
+            link: Some(link),
+            ..Self::new(behaviors)
+        }
+    }
+
+    /// Whether the tunnel device is currently down.
+    fn is_dropped(&self) -> bool {
+        self.dropped.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// The tunnel container's answer to an `ip` command.
+    fn answer_ip(&self, argv: &[String]) -> ExecOutput {
+        let Some(link) = self.link else {
+            // An image with no `ip` in it — a fork this test cannot be run against.
+            return ExecOutput {
+                status: Some(127),
+                stdout: String::new(),
+            };
+        };
+        if argv.get(1).is_some_and(|arg| arg == "route") {
+            // A dropped device carries no default route, which is also how the
+            // check confirms the restore took.
+            let device = if self.is_dropped() { None } else { link.device };
+            return ExecOutput {
+                status: Some(0),
+                stdout: device.map_or_else(String::new, |device| {
+                    format!("default via 10.8.0.1 dev {device} proto static")
+                }),
+            };
+        }
+        let up = argv.last().is_some_and(|arg| arg == "up");
+        if !link.movable || (up && !link.restores) {
+            return ExecOutput {
+                status: Some(2),
+                stdout: String::new(),
+            };
+        }
+        self.dropped
+            .store(!up, std::sync::atomic::Ordering::Relaxed);
+        ExecOutput {
+            status: Some(0),
+            stdout: String::new(),
         }
     }
 }
@@ -106,6 +189,9 @@ impl Engine for Fake {
         // The forwarded-port read: `cat` of the status file. A container with a
         // port answers it; one without makes `cat` exit non-zero with no output,
         // exactly as a missing file does.
+        if argv.first().is_some_and(|arg| arg == "ip") {
+            return Ok(self.answer_ip(argv));
+        }
         if argv.first().is_some_and(|arg| arg == "cat") {
             return Ok(match behavior.forwarded_port {
                 Some(port) => ExecOutput {
@@ -125,7 +211,14 @@ impl Engine for Fake {
                 stdout: behavior.country.unwrap_or_default().to_owned(),
             });
         }
-        match behavior.address {
+        // While the tunnel is down the client answers with whatever the test says
+        // still gets out — nothing at all, where the killswitch holds.
+        let address = if self.is_dropped() && behavior.service != "gluetun" {
+            self.link.and_then(|link| link.leaks_as)
+        } else {
+            behavior.address
+        };
+        match address {
             Some(address) => Ok(ExecOutput {
                 status: Some(0),
                 stdout: format!("{address}\n"),
@@ -221,6 +314,20 @@ fn pass_note(findings: &[Finding], check: &str) -> Option<String> {
     }
 }
 
+/// The finding for a check, where the run produced one at all.
+fn finding<'a>(findings: &'a [Finding], check: &str) -> Option<&'a Finding> {
+    findings.iter().find(|finding| finding.check == check)
+}
+
+/// The problem carried by a failing finding, cloned so a test can read it after
+/// the findings go out of scope.
+fn failure(findings: &[Finding], check: &str) -> Option<Problem> {
+    match verdict(findings, check) {
+        Some(Verdict::Fail(problem)) => Some(problem.clone()),
+        _ => None,
+    }
+}
+
 /// The reason carried by an unverified finding.
 fn unverified_reason(findings: &[Finding], check: &str) -> Option<String> {
     match verdict(findings, check) {
@@ -271,25 +378,201 @@ async fn a_matching_ipv6_address_is_also_verified() {
     ));
 }
 
-#[tokio::test]
-async fn opting_into_the_disruptive_check_says_it_is_not_yet_built() {
-    // The killswitch is unverified either way; with --disruptive it must not
-    // point back at the flag the operator already gave.
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![
-            Behavior::up("gluetun", Some("185.65.1.1")),
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ])),
+/// The check over an engine, with the killswitch scripted.
+fn checking(engine: Fake) -> VpnCheck {
+    VpnCheck::new(
+        Arc::new(engine),
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
         Some("https://ifconfig.me".to_owned()),
         PortForward::default(),
         true,
+    )
+}
+
+/// A tunnel and a client that both answer from the same address — the healthy
+/// pair every killswitch test starts from.
+fn contained() -> Vec<Behavior> {
+    vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ]
+}
+
+#[tokio::test]
+async fn a_killswitch_that_holds_is_proven_by_taking_the_tunnel_away() {
+    // The whole point: not inferred from a running container, but established by
+    // dropping the tunnel and watching the client's traffic stop with it.
+    let findings = checking(Fake::linked(contained(), Link::holding()))
+        .run()
+        .await;
+    assert!(
+        matches!(
+            verdict(&findings, "vpn.killswitch"),
+            Some(Verdict::Pass { .. })
+        ),
+        "{:?}",
+        verdict(&findings, "vpn.killswitch")
+    );
+    assert!(
+        finding(&findings, "vpn.tunnel-restored").is_none(),
+        "a tunnel that came back needs no second finding"
+    );
+}
+
+#[tokio::test]
+async fn traffic_that_survives_the_tunnel_is_the_leak_this_check_exists_for() {
+    // A stack whose killswitch is a comfortable assumption: the tunnel goes away
+    // and the torrents carry on, in the open, from the operator's own address.
+    let findings = checking(Fake::linked(
+        contained(),
+        Link {
+            leaks_as: Some("203.0.113.9"),
+            ..Link::holding()
+        },
+    ))
+    .run()
+    .await;
+    let problem = failure(&findings, "vpn.killswitch");
+    assert_eq!(problem.as_ref().map(|p| p.severity), Some(Severity::Error));
+    assert!(
+        problem
+            .and_then(|p| p.detail)
+            .is_some_and(|detail| detail.contains("203.0.113.9")),
+        "the address the world saw is named"
+    );
+}
+
+#[tokio::test]
+async fn a_tunnel_the_test_could_not_put_back_is_reported_twice_over() {
+    // This check breaks something on purpose. Failing to restore it is not a
+    // footnote on the killswitch verdict — it is its own emergency, and folding
+    // the two into one finding would report whichever was written last.
+    let findings = checking(Fake::linked(
+        contained(),
+        Link {
+            restores: false,
+            ..Link::holding()
+        },
+    ))
+    .run()
+    .await;
+    assert!(failure(&findings, "vpn.killswitch").is_some());
+    let restored = failure(&findings, "vpn.tunnel-restored");
+    assert!(
+        restored.is_some_and(|problem| problem.summary.contains("did not come back")),
+        "the operator is told their tunnel is gone"
+    );
+}
+
+#[tokio::test]
+async fn a_tunnel_that_cannot_be_dropped_disturbs_nothing_and_proves_nothing() {
+    // An image with no `ip`, a route with no device, a link that will not move:
+    // each leaves the stack exactly as it was, and none of them is a pass.
+    let unmovable = [
+        Link {
+            device: None,
+            ..Link::holding()
+        },
+        Link {
+            movable: false,
+            ..Link::holding()
+        },
+    ];
+    for link in unmovable {
+        let findings = checking(Fake::linked(contained(), link)).run().await;
+        assert!(
+            unverified_reason(&findings, "vpn.killswitch").is_some(),
+            "{link:?} should prove nothing"
+        );
+    }
+    // And no `ip` at all.
+    let findings = checking(Fake::new(contained())).run().await;
+    assert!(unverified_reason(&findings, "vpn.killswitch").is_some());
+}
+
+#[tokio::test]
+async fn a_pair_that_is_not_both_running_is_not_tested_against() {
+    // Nothing to drop, or nothing to ask afterwards. Either way the stack is left
+    // exactly as it was found.
+    let down_gateway = vec![
+        Behavior {
+            running: false,
+            ..Behavior::up("gluetun", Some("185.65.1.1"))
+        },
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ];
+    let findings = checking(Fake::linked(down_gateway, Link::holding()))
+        .run()
+        .await;
+    assert!(unverified_reason(&findings, "vpn.killswitch")
+        .is_some_and(|reason| reason.contains("tunnel container is not running")));
+
+    let down_client = vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
+        Behavior {
+            running: false,
+            ..Behavior::up("qbittorrent", Some("185.65.1.1"))
+        },
+    ];
+    let findings = checking(Fake::linked(down_client, Link::holding()))
+        .run()
+        .await;
+    assert!(unverified_reason(&findings, "vpn.killswitch")
+        .is_some_and(|reason| reason.contains("download client is not running")));
+}
+
+#[tokio::test]
+async fn a_tunnel_container_that_will_not_take_a_command_is_left_alone() {
+    // The route cannot even be read, so there is nothing to drop and nothing is.
+    let findings = checking(Fake::linked(
+        vec![
+            Behavior {
+                exec_fails: true,
+                ..Behavior::up("gluetun", Some("185.65.1.1"))
+            },
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ],
+        Link::holding(),
+    ))
+    .run()
+    .await;
+    assert!(unverified_reason(&findings, "vpn.killswitch")
+        .is_some_and(|reason| reason.contains("no default route")));
+}
+
+#[tokio::test]
+async fn a_client_already_off_the_internet_proves_nothing_about_the_killswitch() {
+    // It would answer "blocked" whatever the killswitch does, so reading that as
+    // a pass would be the comfortable falsehood again in a new place.
+    let findings = checking(Fake::linked(
+        vec![
+            Behavior::up("gluetun", Some("185.65.1.1")),
+            Behavior::up("qbittorrent", None),
+        ],
+        Link::holding(),
+    ))
+    .run()
+    .await;
+    assert!(unverified_reason(&findings, "vpn.killswitch")
+        .is_some_and(|reason| reason.contains("prove nothing")));
+}
+
+#[tokio::test]
+async fn without_the_flag_nothing_is_touched_and_the_operator_is_told_how_to_ask() {
+    let subject = VpnCheck::new(
+        Arc::new(Fake::linked(contained(), Link::holding())),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Protocols::both(),
+        Some("https://ifconfig.me".to_owned()),
+        PortForward::default(),
+        false,
     );
     let findings = subject.run().await;
     assert!(unverified_reason(&findings, "vpn.killswitch")
-        .is_some_and(|reason| reason.contains("not yet built")));
+        .is_some_and(|reason| reason.contains("interrupts transfers")));
 }
 
 #[tokio::test]
