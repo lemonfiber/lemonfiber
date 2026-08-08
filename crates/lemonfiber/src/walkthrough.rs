@@ -56,6 +56,7 @@ fn code(report: &WalkthroughReport) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::{code, walk};
+    use crate::exit::{shown, success};
     use crate::setup::tests::working_ctx;
     use lemonfiber_core::model::WalkthroughReport;
     use lemonfiber_core::walkthrough::{Shape, State};
@@ -77,23 +78,18 @@ mod tests {
         }
     }
 
-    /// What an exit code reads as, for comparison.
-    fn shown(code: std::process::ExitCode) -> String {
-        format!("{code:?}")
-    }
-
     #[tokio::test]
     async fn a_walk_run_from_the_command_line_reports_how_it_ended() {
         // This stack has no media server to prove anything against, so the walk stops and
         // the command exits non-zero — the whole path from request to exit code.
         let ended = walk(&working_ctx(), "", false).await;
-        assert_ne!(shown(ended), shown(std::process::ExitCode::SUCCESS));
+        assert_ne!(shown(ended), success());
     }
 
     #[tokio::test]
     async fn a_named_item_is_walked_rather_than_a_suggested_one() {
         let ended = walk(&working_ctx(), "Sintel", false).await;
-        assert_ne!(shown(ended), shown(std::process::ExitCode::SUCCESS));
+        assert_ne!(shown(ended), success());
     }
 
     #[tokio::test]
@@ -101,7 +97,7 @@ mod tests {
         // Prose interleaved into the stream would hand a consumer something that is not a
         // document at all.
         let ended = walk(&working_ctx(), "", true).await;
-        assert_ne!(shown(ended), shown(std::process::ExitCode::SUCCESS));
+        assert_ne!(shown(ended), success());
     }
 
     #[tokio::test]
@@ -109,19 +105,18 @@ mod tests {
         let mut ctx = working_ctx();
         ctx.stack = lemonfiber_core::stack::Source::External(std::path::Path::new("/not-a-stack"));
         let ended = walk(&ctx, "", false).await;
-        assert_ne!(shown(ended), shown(std::process::ExitCode::SUCCESS));
+        assert_ne!(shown(ended), success());
     }
 
     #[test]
     fn only_a_walk_that_stopped_is_a_failure() {
-        let success = format!("{:?}", std::process::ExitCode::SUCCESS);
-        assert_eq!(format!("{:?}", code(&ended(State::Complete))), success);
+        assert_eq!(shown(code(&ended(State::Complete))), success());
         assert_eq!(
-            format!("{:?}", code(&ended(State::Downloading))),
-            success,
+            shown(code(&ended(State::Downloading))),
+            success(),
             "still coming is not a failure — the operator was told so"
         );
-        assert_eq!(format!("{:?}", code(&ended(State::Skipped))), success);
-        assert_ne!(format!("{:?}", code(&ended(State::Failed))), success);
+        assert_eq!(shown(code(&ended(State::Skipped))), success());
+        assert_ne!(shown(code(&ended(State::Failed))), success());
     }
 }

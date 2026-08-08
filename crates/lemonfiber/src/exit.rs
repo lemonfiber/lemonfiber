@@ -202,6 +202,22 @@ pub(crate) fn no_config_home() -> ExitCode {
     ExitCode::FAILURE
 }
 
+/// An exit code as it reads, so two can be compared.
+///
+/// `ExitCode` implements neither `PartialEq` nor `Debug`-free comparison, so every test
+/// that checks one renders it first. Written once here — the module that owns exit codes —
+/// rather than re-spelled in each of the seven that check them.
+#[cfg(test)]
+pub(crate) fn shown(code: std::process::ExitCode) -> String {
+    format!("{code:?}")
+}
+
+/// A clean exit, as it reads.
+#[cfg(test)]
+pub(crate) fn success() -> String {
+    shown(std::process::ExitCode::SUCCESS)
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::app::Outcome;
@@ -216,16 +232,10 @@ mod tests {
         Assessment, Report as SeedReport, Severity as SeedSeverity, State as SeedState, Wiring,
     };
 
-    use std::process::ExitCode;
-
     use super::{
-        complain, exit_code, no_config_home, settled, FAILURE, NEVER_SETTLED, USAGE, VALIDATION,
+        complain, exit_code, no_config_home, settled, success, FAILURE, NEVER_SETTLED, USAGE,
+        VALIDATION,
     };
-
-    /// A clean exit, as it reads — `ExitCode` compares no other way.
-    fn success() -> String {
-        format!("{:?}", ExitCode::SUCCESS)
-    }
 
     /// A problem of the given severity and state.
     fn problem(severity: Severity, state: State) -> Problem {

@@ -79,17 +79,13 @@ fn yes(surface: &dyn Surface) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use crate::exit::shown;
     use std::process::ExitCode;
 
     use lemonfiber_core::docker::Condition;
 
     use super::{offer, yes};
     use crate::setup::tests::{working_ctx, Scripted};
-
-    /// What an exit code reads as, for comparison.
-    fn code(code: ExitCode) -> String {
-        format!("{code:?}")
-    }
 
     /// The code setup would have exited with, had there been no offer.
     fn already_settled() -> ExitCode {
@@ -108,7 +104,7 @@ mod tests {
                 already_settled(),
             )
             .await;
-            assert_eq!(code(ended), code(already_settled()), "{condition:?}");
+            assert_eq!(shown(ended), shown(already_settled()), "{condition:?}");
         }
     }
 
@@ -125,7 +121,7 @@ mod tests {
             already_settled(),
         )
         .await;
-        assert_eq!(code(ended), code(already_settled()));
+        assert_eq!(shown(ended), shown(already_settled()));
     }
 
     #[tokio::test]
@@ -138,7 +134,7 @@ mod tests {
             already_settled(),
         )
         .await;
-        assert_eq!(code(ended), code(already_settled()));
+        assert_eq!(shown(ended), shown(already_settled()));
     }
 
     #[tokio::test]
@@ -152,7 +148,7 @@ mod tests {
             already_settled(),
         )
         .await;
-        assert_eq!(code(ended), code(already_settled()));
+        assert_eq!(shown(ended), shown(already_settled()));
     }
 
     #[tokio::test]
@@ -166,7 +162,7 @@ mod tests {
             already_settled(),
         )
         .await;
-        assert_ne!(code(ended), code(already_settled()));
+        assert_ne!(shown(ended), shown(already_settled()));
     }
 
     #[tokio::test]
@@ -182,7 +178,7 @@ mod tests {
             already_settled(),
         )
         .await;
-        assert_eq!(code(ended), code(already_settled()));
+        assert_eq!(shown(ended), shown(already_settled()));
     }
 
     #[test]

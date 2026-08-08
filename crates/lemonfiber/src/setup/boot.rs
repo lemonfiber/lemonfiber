@@ -82,6 +82,7 @@ fn condition(outcome: &Outcome) -> Option<Condition> {
 #[cfg(test)]
 mod tests {
     use super::{condition, preflight, start};
+    use crate::exit::{shown, success};
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::config::Protocols;
     use lemonfiber_core::stack::Source;
@@ -113,10 +114,7 @@ mod tests {
     async fn a_pull_that_failed_stops_before_starting_against_images_that_never_came() {
         // Starting against images that never arrived is worse than not starting.
         let code = start(&ctx(), &Scripted::saying(false, &[])).await;
-        assert_ne!(
-            format!("{code:?}"),
-            format!("{:?}", std::process::ExitCode::SUCCESS)
-        );
+        assert_ne!(shown(code), success());
     }
 
     /// A stack with no services of its own — enough for a real `up` to run and
@@ -154,8 +152,8 @@ mod tests {
         let code = start(&ctx, &Scripted::saying(false, &[])).await;
 
         assert_eq!(
-            format!("{code:?}"),
-            format!("{:?}", std::process::ExitCode::SUCCESS),
+            shown(code),
+            success(),
             "a stack that came up is not reported as a failure"
         );
         let _ = std::fs::remove_dir_all(&stack_dir);

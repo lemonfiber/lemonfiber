@@ -130,6 +130,7 @@ pub(super) fn discard(paths: &Paths) {
 
 #[cfg(test)]
 mod tests {
+    use crate::exit::{shown, success};
     use lemonfiber_core::config::paths::Paths;
     use lemonfiber_core::config::Protocols;
     use lemonfiber_core::journal::{Change, Kind};
@@ -283,10 +284,7 @@ mod tests {
             progress_at(&paths),
         )
         .await;
-        assert_ne!(
-            format!("{code:?}"),
-            format!("{:?}", std::process::ExitCode::SUCCESS)
-        );
+        assert_ne!(shown(code), success());
         assert!(paths.setup_progress().exists(), "nothing was discarded");
     }
 
@@ -326,10 +324,7 @@ mod tests {
             progress_at(&paths),
         )
         .await;
-        assert_eq!(
-            format!("{code:?}"),
-            format!("{:?}", std::process::ExitCode::SUCCESS)
-        );
+        assert_eq!(shown(code), success());
         assert!(!paths.setup_progress().exists(), "nothing of it remains");
         assert!(!paths.journal().exists());
     }
@@ -351,10 +346,7 @@ mod tests {
             progress_at(&paths),
         )
         .await;
-        assert_ne!(
-            format!("{code:?}"),
-            format!("{:?}", std::process::ExitCode::SUCCESS)
-        );
+        assert_ne!(shown(code), success());
     }
 
     #[tokio::test]
@@ -388,11 +380,7 @@ mod tests {
                 progress_at(&paths),
             )
             .await;
-            assert_ne!(
-                format!("{code:?}"),
-                format!("{:?}", std::process::ExitCode::SUCCESS),
-                "answering {answer}"
-            );
+            assert_ne!(shown(code), success(), "answering {answer}");
         }
     }
 }
