@@ -28,12 +28,14 @@ jobs:
 
   # The zero-new-issues standard (Q-R63/R64) is enforced by the shared reusable in
   # spec, so all repos gate identically. It reads the scan's summary and fails on
-  # any new issue, posting a sticky verdict on the PR.
+  # any new issue, posting a sticky verdict on the PR. A required check: it blocks on
+  # a counted issue and on nothing else, so a summary that never arrived or one it
+  # cannot read warns rather than holding the pull request hostage.
   gate:
     needs: sonar
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@7a4638bfe6cedc0ce032577263ca17999c744c59 # main
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@355b391c5f4673f28dcbc2999d7a96c160786581 # main
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
