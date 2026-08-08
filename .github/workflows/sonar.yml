@@ -34,6 +34,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@5c231a6164cd7b6013e711bc7286d6731782a5eb # main
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@7a4638bfe6cedc0ce032577263ca17999c744c59 # main
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
