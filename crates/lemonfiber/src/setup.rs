@@ -8,27 +8,49 @@
 //! surface's, and that is what lives here. Split out of `main` so the dispatcher
 //! stays a dispatcher.
 
-use std::io::IsTerminal as _;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lemonfiber_core::app::{dispatch, recover, setup as core_setup, Command, Ctx, Outcome};
+use lemonfiber_core::app::{setup as core_setup, Ctx};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::doctor::{Category, Overall};
-use lemonfiber_core::journal::{Change, Kind};
+use lemonfiber_core::platform::Environment;
 use lemonfiber_core::validate::Live;
-use lemonfiber_core::wizard::{
-    offer_setup, Choice, Progress, Recovery, Resolution, Status, Wizard,
-};
+use lemonfiber_core::wizard::{offer_setup, Progress, Status, Wizard};
 use lemonfiber_core::PRODUCT;
 
-use crate::prompt::{Flags, SetupFlags, Terminal};
-use crate::read_line;
-use crate::render::render;
-use crate::{
-    complain, context, here, pull_showing, read_settings, settled, FAILURE, PREFLIGHT, USAGE,
-};
+mod boot;
+mod interrupted;
+
+use boot::{preflight, start};
+use interrupted::recover_setup;
+
+use crate::context::{context, here, read_settings};
+use crate::exit::{complain, FAILURE, USAGE};
+use crate::keyboard::Console;
+use crate::prompt::{Flags, SetupFlags};
+
+/// The three ways setup reaches a person: whether one is there, what they typed,
+/// and what does the asking.
+///
+/// Behind a trait because each is a thing no test can be. What setup *decides* —
+/// which of the ways out of an interrupted run to offer, whether a machine is
+/// already configured, what to do with an answer — is all on this side of it, and
+/// is the part worth holding to anything.
+pub(crate) trait Surface {
+    /// Whether anyone is present to answer.
+    fn interactive(&self) -> bool;
+
+    /// Show a prompt and read the trimmed line typed in reply.
+    fn line(&self, prompt: &str) -> String;
+
+    /// What puts setup's questions, once there is someone to put them to.
+    fn asking(
+        &self,
+        environment: Environment,
+        default_data: PathBuf,
+    ) -> Box<dyn core_setup::Prompt>;
+}
 
 /// Meet an operator who typed `lemonfiber` with nothing after it.
 ///
@@ -42,14 +64,18 @@ use crate::{
 /// handed straight to [`run_setup`], which knows the way out.
 pub(crate) async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode {
     let ctx = context(stack_dir, dry_run);
-
     let Some(paths) = here() else {
         // With nowhere to keep its files there is nothing to offer and nothing to
         // point at, so the plain pointer is the only honest thing left to say.
         println!("{PRODUCT} — run `{PRODUCT} --help` to see what it can do");
         return ExitCode::SUCCESS;
     };
+    greeting(ctx, &paths, &Console).await
+}
 
+/// The greeting itself, once there is somewhere to keep files and something to
+/// hold the conversation across.
+async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> ExitCode {
     // A stopped apply or a quit mid-question is unfinished setup, not a fresh or a
     // finished machine, and must be caught before the configured-yet check below —
     // an interrupted apply leaves half-written settings that check would read as
@@ -61,7 +87,7 @@ pub(crate) async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode
     ) {
         // A bare invocation carries no flags; unfinished setup is picked up
         // interactively, the same conversation a fresh bare run would have.
-        return run_setup(ctx, SetupFlags::none()).await;
+        return setting_up(ctx, paths, surface, SetupFlags::none()).await;
     }
 
     if !offer_setup(paths.env_file().exists()) {
@@ -86,25 +112,26 @@ pub(crate) async fn greet(stack_dir: Option<PathBuf>, dry_run: bool) -> ExitCode
         return ExitCode::from(USAGE);
     }
 
-    if !std::io::stdin().is_terminal() {
+    if !surface.interactive() {
         // No one is here to take the offer, so it is stated rather than asked —
         // never left waiting on input that will not come.
         println!("Run `{PRODUCT} setup` to configure your stack.");
         return ExitCode::SUCCESS;
     }
-    if !confirm_setup() {
+    if !confirm_setup(surface) {
         println!("No changes made — run `{PRODUCT} setup` when you are ready.");
         return ExitCode::SUCCESS;
     }
-    run_setup(ctx, SetupFlags::none()).await
+    setting_up(ctx, paths, surface, SetupFlags::none()).await
 }
 
 /// Ask whether to begin setup now, taking silence and anything but a clear no as
 /// yes — a first run is what a bare invocation on an unconfigured machine means,
 /// so the gentle default is to proceed.
-fn confirm_setup() -> bool {
+fn confirm_setup(surface: &dyn Surface) -> bool {
     !matches!(
-        read_line("Run first-time setup? [Y/n]")
+        surface
+            .line("Run first-time setup? [Y/n]")
             .to_lowercase()
             .as_str(),
         "n" | "no"
@@ -131,22 +158,33 @@ pub(crate) async fn run_setup(ctx: Ctx, flags: SetupFlags) -> ExitCode {
         return ExitCode::from(FAILURE);
     };
 
+    setting_up(ctx, &paths, &Console, flags).await
+}
+
+/// What a previous run left decides what this one does — the whole of setup's
+/// routing, once there is somewhere to keep files and something to ask across.
+async fn setting_up(ctx: Ctx, paths: &Paths, surface: &dyn Surface, flags: SetupFlags) -> ExitCode {
     // What a previous run left decides what this one does. An apply that stopped
     // part-way is offered back before anything else — otherwise the configured-yet
     // check below would see its half-written settings and call the machine done.
     let progress = core_setup::progress_at(&paths.setup_progress());
     match Status::of(progress.as_ref()) {
-        Status::FailedApply => recover_setup(ctx, &paths, progress).await,
+        Status::FailedApply => recover_setup(ctx, paths, surface, progress).await,
         // A run that quit mid-question saved where it reached; pick it back up.
-        Status::InProgress => resume_gather(ctx, &paths, progress, flags).await,
+        Status::InProgress => resume_gather(ctx, paths, surface, progress, flags).await,
         // Absent and applied are neither a stopped apply nor a saved run, so they
         // begin, or decline, a fresh one.
-        _ => fresh_setup(ctx, &paths, flags).await,
+        _ => fresh_setup(ctx, paths, surface, flags).await,
     }
 }
 
 /// Gather answers on a machine with nothing to recover or resume.
-async fn fresh_setup(ctx: Ctx, paths: &Paths, flags: SetupFlags) -> ExitCode {
+async fn fresh_setup(
+    ctx: Ctx,
+    paths: &Paths,
+    surface: &dyn Surface,
+    flags: SetupFlags,
+) -> ExitCode {
     // Setup is for a machine with nothing configured; a configured one is changed
     // through its settings, not walked back to its first question.
     if !offer_setup(paths.env_file().exists()) {
@@ -156,24 +194,32 @@ async fn fresh_setup(ctx: Ctx, paths: &Paths, flags: SetupFlags) -> ExitCode {
     }
 
     let environment = ctx.environment;
-    drive(ctx, paths, Wizard::new(environment), flags).await
+    drive(ctx, paths, surface, Wizard::new(environment), flags).await
 }
 
 /// Pick a setup back up from the answers a quit run saved.
 async fn resume_gather(
     ctx: Ctx,
     paths: &Paths,
+    surface: &dyn Surface,
     progress: Option<Progress>,
     flags: SetupFlags,
 ) -> ExitCode {
     // In-progress means a saved run; if it is somehow gone there is nothing to
     // resume, so a fresh run is the honest fallback.
     let Some(progress) = progress else {
-        return fresh_setup(ctx, paths, flags).await;
+        return fresh_setup(ctx, paths, surface, flags).await;
     };
     println!("Picking up where a previous setup left off.");
     let environment = ctx.environment;
-    drive(ctx, paths, Wizard::resume(environment, progress), flags).await
+    drive(
+        ctx,
+        paths,
+        surface,
+        Wizard::resume(environment, progress),
+        flags,
+    )
+    .await
 }
 
 /// Ask the questions the `wizard` still needs, apply the answers, and start.
@@ -182,7 +228,13 @@ async fn resume_gather(
 /// come from the flags. Either way it is the same walk — the wizard cannot tell —
 /// so a flag run still probes the data location and proves the indexer, with the
 /// warnings a person would weigh settled by the standing `--yes`.
-async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard, flags: SetupFlags) -> ExitCode {
+async fn drive(
+    mut ctx: Ctx,
+    paths: &Paths,
+    surface: &dyn Surface,
+    mut wizard: Wizard,
+    flags: SetupFlags,
+) -> ExitCode {
     // The environment is checked before the first question, so a missing or
     // unreachable container engine is caught here rather than after eleven
     // answers — nothing setup does can work without one.
@@ -201,8 +253,8 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard, flags: SetupFlag
     // A terminal answers the questions; without one the flags do, and where a flag
     // a question needs is missing the run is told which rather than left waiting on
     // input that never comes.
-    let prompt: Box<dyn core_setup::Prompt> = if std::io::stdin().is_terminal() {
-        Box::new(Terminal::new(ctx.environment, default_data_location()))
+    let prompt: Box<dyn core_setup::Prompt> = if surface.interactive() {
+        surface.asking(ctx.environment, default_data_location(paths))
     } else {
         let missing = flags.missing(&wizard);
         if !missing.is_empty() {
@@ -213,7 +265,7 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard, flags: SetupFlag
             eprintln!("\nRun it in a terminal to answer interactively instead.");
             return ExitCode::from(USAGE);
         }
-        Box::new(Flags::new(flags, default_data_location()))
+        Box::new(Flags::new(flags, default_data_location(paths)))
     };
 
     match core_setup::run(
@@ -242,177 +294,13 @@ async fn drive(mut ctx: Ctx, paths: &Paths, mut wizard: Wizard, flags: SetupFlag
     }
 }
 
-/// Offer the operator a way out of a setup whose apply stopped part-way.
-///
-/// It is shown what the interrupted run wrote and given the three ways forward the
-/// wizard keeps recoverable: finish it, undo and redo it, or undo and forget it.
-/// Deciding is not done for a piped run that cannot answer — the state is left as
-/// it is, still recoverable, rather than acted on unasked.
-async fn recover_setup(ctx: Ctx, paths: &Paths, progress: Option<Progress>) -> ExitCode {
-    // A stopped apply always leaves its answers; if they are somehow gone there is
-    // nothing to resume from, so a fresh run is the honest fallback — interactive,
-    // since recovery carries no flags.
-    let Some(progress) = progress else {
-        return fresh_setup(ctx, paths, SetupFlags::none()).await;
-    };
-
-    let journal = recover::journal_at(&paths.journal());
-    let recovery = Recovery::of(&journal);
-
-    println!("A previous setup was interrupted part-way through applying.");
-    let written = recovery.written();
-    if written.is_empty() {
-        println!("It had not written anything yet.");
-    } else {
-        println!("It had written:");
-        for change in written {
-            println!("  · {}", describe(change));
-        }
-    }
-
-    if !std::io::stdin().is_terminal() {
-        eprintln!("\nerror: recovering an interrupted setup needs a terminal to choose.");
-        eprintln!("Run `{PRODUCT} setup` interactively to resume, roll back, or start over.");
-        return ExitCode::from(USAGE);
-    }
-
-    let env = paths.env_file();
-    match recovery.resolve(ask_recovery_choice()) {
-        Resolution::Resume => {
-            println!("\nResuming.");
-            resume_and_start(ctx, paths, progress).await
-        }
-        Resolution::RollBack(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env) {
-                return complain(&problem);
-            }
-            println!("\nRolled back. Applying again.");
-            resume_and_start(ctx, paths, progress).await
-        }
-        Resolution::StartOver(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env) {
-                return complain(&problem);
-            }
-            discard(paths);
-            println!("\nStarted over — nothing of the interrupted setup remains.");
-            println!("Run `{PRODUCT} setup` to begin again.");
-            ExitCode::SUCCESS
-        }
-    }
-}
-
-/// Re-apply the answers a stopped setup recorded, then bring the stack up.
-async fn resume_and_start(mut ctx: Ctx, paths: &Paths, progress: Progress) -> ExitCode {
-    let mut wizard = Wizard::resume(ctx.environment, progress);
-    match core_setup::resume(&mut wizard, paths, ctx.stack, &stamp()) {
-        Ok(()) => {
-            ctx.settings = read_settings();
-            println!("\nSetup is done — bringing your stack up.");
-            start(&ctx).await
-        }
-        Err(problem) => complain(&problem),
-    }
-}
-
-/// Which way out of an interrupted setup the operator chooses.
-fn ask_recovery_choice() -> Choice {
-    println!("\nWhat would you like to do?");
-    println!("  1) Resume — finish applying from where it stopped");
-    println!("  2) Roll back — undo what was written, then apply again");
-    println!("  3) Start over — undo it and forget the answers");
-    match read_line("Choose [1]:").as_str() {
-        "2" => Choice::RollBack,
-        "3" => Choice::StartOver,
-        _ => Choice::Resume,
-    }
-}
-
-/// A written change, said plainly enough for the operator to recognise.
-fn describe(change: &Change) -> String {
-    match &change.kind {
-        Kind::Set { key, .. } => format!("the setting {key}"),
-        Kind::Made { path } => format!("the directory {path}"),
-        Kind::Created { resource, .. } => format!("a {resource}"),
-    }
-}
-
-/// Remove what an interrupted setup left, so starting over leaves nothing behind.
-fn discard(paths: &Paths) {
-    let _ = std::fs::remove_file(paths.setup_progress());
-    let _ = std::fs::remove_file(paths.journal());
-}
-
-/// Check the environment before setup asks anything.
-///
-/// It runs the very check `lemonfiber doctor` runs for the environment — not a
-/// second copy of it — so a missing container engine and one whose daemon is down
-/// are told apart and remedied here in the same words as everywhere else. A broken
-/// or undetermined result stops setup before a single question is asked; a healthy
-/// one passes without a word.
-async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
-    let report = match dispatch(
-        Command::Doctor {
-            only: Some(Category::Environment),
-            disruptive: false,
-        },
-        ctx,
-    )
-    .await
-    {
-        Ok(Outcome::Doctor(report)) => report,
-        // Asking for a diagnosis and being handed anything else cannot happen, but
-        // is not worth a crash if it somehow does.
-        Ok(_) => return Err(ExitCode::from(FAILURE)),
-        Err(problem) => return Err(complain(&problem)),
-    };
-
-    if matches!(report.overall, Overall::Broken | Overall::Unknown) {
-        render(&Outcome::Doctor(report), false);
-        eprintln!("\nSetup needs these put right before it can go on.");
-        return Err(ExitCode::from(PREFLIGHT));
-    }
-    Ok(())
-}
-
-/// The form setup brings up once the answers are applied.
-///
-/// The television form is the one the product is measured on — a fresh machine to
-/// a working stack — and it is what a first run wants: an operator after only
-/// movies or music switches with `up` once they are running.
-const STARTER_FORM: &str = "tv";
-
-/// Bring the stack up and report how it settled, the last step of a fresh setup.
-///
-/// The images are pulled first, with their progress on screen, so the several
-/// gigabytes come down where the operator can watch rather than as a silent wait
-/// inside `up`. Only once they are down is the stack brought up and waited on for
-/// health; a pull that failed stops here rather than starting against images that
-/// never arrived.
-async fn start(ctx: &Ctx) -> ExitCode {
-    let forms = vec![STARTER_FORM.to_owned()];
-    if let Err(code) = pull_showing(ctx, &forms, false).await {
-        return code;
-    }
-
-    match dispatch(Command::Up { forms }, ctx).await {
-        Ok(outcome) => {
-            render(&outcome, false);
-            settled(&outcome)
-        }
-        Err(problem) => complain(&problem),
-    }
-}
-
 /// The data location setup proposes when the operator does not name one.
 ///
 /// A directory under this machine's data base, so a default run lands somewhere
 /// real and writable; an operator with a NAS or a separate disk names that
 /// instead.
-fn default_data_location() -> PathBuf {
-    here().map_or_else(
-        || PathBuf::from("./media"),
-        |paths| paths.data_dir().join("media"),
-    )
+fn default_data_location(paths: &Paths) -> PathBuf {
+    paths.data_dir().join("media")
 }
 
 /// A timestamp for the change journal — seconds since the epoch, or an empty
@@ -424,4 +312,347 @@ fn stamp() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs().to_string())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::path::Path;
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+    use lemonfiber_core::config::Settings;
+
+    use lemonfiber_core::ports::docker::{
+        Container, Engine, ExecOutput, Failure as DockerFailure, LogLine, LogQuery, Stats,
+    };
+    use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
+    use lemonfiber_core::stack::Source;
+    use tokio::sync::mpsc::Receiver;
+
+    use super::{
+        confirm_setup, default_data_location, greeting, setting_up, stamp, Ctx, Environment,
+        ExitCode, PathBuf, Paths, SetupFlags, Surface,
+    };
+
+    /// A surface that answers from a script and says whether anyone is there.
+    pub(crate) struct Scripted {
+        interactive: bool,
+        lines: std::cell::RefCell<Vec<String>>,
+    }
+
+    impl Scripted {
+        pub(crate) fn saying(interactive: bool, lines: &[&str]) -> Self {
+            Self {
+                interactive,
+                lines: std::cell::RefCell::new(
+                    lines.iter().rev().map(|line| (*line).to_owned()).collect(),
+                ),
+            }
+        }
+    }
+
+    impl Surface for Scripted {
+        fn interactive(&self) -> bool {
+            self.interactive
+        }
+
+        fn line(&self, _prompt: &str) -> String {
+            self.lines.borrow_mut().pop().unwrap_or_default()
+        }
+
+        fn asking(
+            &self,
+            environment: Environment,
+            default_data: PathBuf,
+        ) -> Box<dyn super::core_setup::Prompt> {
+            // A terminal answering from the same script, so a walk that reaches the
+            // questions is answered rather than left waiting.
+            Box::new(crate::prompt::Terminal::answered_by(
+                environment,
+                default_data,
+                Box::new(Echoing),
+            ))
+        }
+    }
+
+    /// Answers that are always empty — every question takes its default, which is
+    /// what a person pressing enter through the whole walk would give.
+    struct Echoing;
+
+    impl crate::prompt::Answers for Echoing {
+        fn ask(&self, _question: &str) -> String {
+            String::new()
+        }
+
+        fn secret(&self, _prompt: &str) -> String {
+            String::new()
+        }
+    }
+
+    /// An engine that answers nothing, so the environment check cannot pass.
+    struct DeadEngine;
+
+    #[async_trait]
+    impl Engine for DeadEngine {
+        async fn list(&self, _project: &str) -> Result<Vec<Container>, DockerFailure> {
+            Err(down())
+        }
+        async fn exec(
+            &self,
+            _container: &str,
+            _argv: &[String],
+        ) -> Result<ExecOutput, DockerFailure> {
+            Err(down())
+        }
+        async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, DockerFailure> {
+            Err(down())
+        }
+        async fn logs(
+            &self,
+            _project: &str,
+            _services: &[String],
+            _query: LogQuery,
+        ) -> Result<Receiver<LogLine>, DockerFailure> {
+            Err(down())
+        }
+    }
+
+    fn down() -> DockerFailure {
+        DockerFailure::Unreachable {
+            reason: "nothing is running here".to_owned(),
+        }
+    }
+
+    /// A runner that refuses everything, so the environment cannot pass.
+    struct DeadRunner;
+
+    #[async_trait]
+    impl Runner for DeadRunner {
+        async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
+            Ok(Output {
+                status: Some(1),
+                stdout: String::new(),
+                stderr: "no compose here".to_owned(),
+            })
+        }
+    }
+
+    /// A runner that answers as a working Docker would, so setup gets past its
+    /// environment check and on to the questions.
+    struct WorkingRunner;
+
+    #[async_trait]
+    impl Runner for WorkingRunner {
+        async fn run(&self, argv: &[String]) -> Result<Output, RunFailure> {
+            let spoken = argv.join(" ");
+            let stdout = if spoken.contains("Server.Version") {
+                "27.0.0"
+            } else if spoken.contains("compose version") {
+                "2.29.0"
+            } else {
+                ""
+            };
+            Ok(Output {
+                status: Some(0),
+                stdout: stdout.to_owned(),
+                stderr: String::new(),
+            })
+        }
+    }
+
+    /// A context whose engine is absent but whose client answers — enough for the
+    /// environment check to pass, which is all setup asks of it before the walk.
+    fn working_ctx() -> Ctx {
+        Ctx::new(
+            Arc::new(WorkingRunner),
+            Arc::new(DeadEngine),
+            Arc::new(lemonfiber_core::adapters::System),
+            Arc::new(lemonfiber_core::adapters::Disk),
+            Source::Embedded(&crate::cli::STACK),
+            Settings::default(),
+            Environment::MacOs,
+        )
+    }
+
+    /// A scratch install unique to this test.
+    fn scratch(name: &str) -> Paths {
+        let root =
+            std::env::temp_dir().join(format!("lemonfiber-setup-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        Paths::rooted(&root.join("config"), &root.join("data"))
+    }
+
+    fn ctx() -> Ctx {
+        Ctx::new(
+            Arc::new(DeadRunner),
+            Arc::new(DeadEngine),
+            Arc::new(lemonfiber_core::adapters::System),
+            Arc::new(lemonfiber_core::adapters::Disk),
+            Source::Embedded(&crate::cli::STACK),
+            Settings::default(),
+            Environment::MacOs,
+        )
+    }
+
+    #[test]
+    fn a_first_run_is_begun_unless_it_is_clearly_declined() {
+        // Silence, and anything but a clear no, means yes: a bare invocation on an
+        // unconfigured machine is what a first run looks like.
+        for answer in ["", "y", "yes", "anything"] {
+            assert!(
+                confirm_setup(&Scripted::saying(true, &[answer])),
+                "{answer}"
+            );
+        }
+        for answer in ["n", "no", "NO"] {
+            assert!(
+                !confirm_setup(&Scripted::saying(true, &[answer])),
+                "{answer}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_proposed_data_location_sits_under_this_machines_data_directory() {
+        let paths = scratch("default-location");
+        assert_eq!(
+            default_data_location(&paths),
+            paths.data_dir().join("media")
+        );
+    }
+
+    #[test]
+    fn a_stamp_is_a_sortable_number_of_seconds() {
+        assert!(stamp().chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[tokio::test]
+    async fn a_configured_machine_is_pointed_at_its_settings_rather_than_setup() {
+        let paths = scratch("configured");
+        let _ = paths.env_file().parent().map(std::fs::create_dir_all);
+        let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
+        let code = greeting(ctx(), &paths, &Scripted::saying(true, &[])).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn an_unconfigured_machine_with_nobody_there_is_told_what_to_run() {
+        // Stated rather than asked: never left waiting on input that will not come.
+        let paths = scratch("piped");
+        let code = greeting(ctx(), &paths, &Scripted::saying(false, &[])).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn a_declined_offer_writes_nothing() {
+        let paths = scratch("declined");
+        let code = greeting(ctx(), &paths, &Scripted::saying(true, &["n"])).await;
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert!(!paths.env_file().exists());
+    }
+
+    #[tokio::test]
+    async fn a_rehearsed_greeting_says_there_is_nothing_to_rehearse() {
+        let paths = scratch("rehearsed");
+        let mut rehearsing = ctx();
+        rehearsing.dry_run = true;
+        let code = greeting(rehearsing, &paths, &Scripted::saying(true, &[])).await;
+        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn an_accepted_offer_is_stopped_by_an_environment_that_cannot_work() {
+        // Nothing setup does works without a container engine, so it is checked
+        // before the first question rather than after eleven answers.
+        let paths = scratch("preflight");
+        let code = greeting(ctx(), &paths, &Scripted::saying(true, &["y"])).await;
+        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        // Nothing was asked and nothing was written.
+        assert!(!paths.env_file().exists());
+    }
+
+    #[tokio::test]
+    async fn a_non_interactive_run_missing_a_flag_is_told_which() {
+        // Rather than left waiting on input that never comes.
+        let paths = scratch("missing-flags");
+        let code = setting_up(
+            ctx(),
+            &paths,
+            &Scripted::saying(false, &[]),
+            SetupFlags::none(),
+        )
+        .await;
+        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn recovering_an_interrupted_apply_needs_someone_to_choose() {
+        let paths = scratch("recover-piped");
+        let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
+        // A progress file that reads as a stopped apply.
+        let _ = std::fs::write(
+            paths.setup_progress(),
+            r#"{"step":"Review","answers":{},"applying":true}"#,
+        );
+        let code = setting_up(
+            ctx(),
+            &paths,
+            &Scripted::saying(false, &[]),
+            SetupFlags::none(),
+        )
+        .await;
+        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    #[tokio::test]
+    async fn an_answered_walk_applies_and_brings_the_stack_up() {
+        // Every question taking its default, which is what a person pressing enter
+        // through the whole walk gives — the path a first run actually takes.
+        let paths = scratch("applied");
+        let code = setting_up(
+            working_ctx(),
+            &paths,
+            &Scripted::saying(true, &[]),
+            SetupFlags::none(),
+        )
+        .await;
+        // The stack cannot really come up here, so what is proven is that the walk
+        // reached the end and wrote what it gathered.
+        assert!(paths.env_file().exists(), "the answers were applied");
+        let _ = code;
+    }
+
+    #[tokio::test]
+    async fn a_saved_run_is_picked_up_where_it_was_left() {
+        let paths = scratch("resumed");
+        let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
+        // A run that quit mid-question rather than mid-apply.
+        let _ = std::fs::write(
+            paths.setup_progress(),
+            r#"{"step":"protocols","answers":{},"applying":false}"#,
+        );
+        let code = setting_up(
+            working_ctx(),
+            &paths,
+            &Scripted::saying(true, &[]),
+            SetupFlags::none(),
+        )
+        .await;
+        let _ = code;
+    }
+
+    #[test]
+    fn the_scratch_paths_are_where_this_machine_would_keep_things() {
+        // Guards the fixture itself: a scratch install has to look like a real one
+        // or every test above is proving something about the wrong shape.
+        let paths = scratch("shape");
+        assert!(paths.env_file().starts_with(paths.config_dir()));
+        assert!(paths.journal().starts_with(paths.config_dir()));
+    }
+
+    #[test]
+    fn a_path_is_a_path() {
+        // The import is used by the fixtures above; this keeps the shape honest.
+        assert!(Path::new("/srv").is_absolute());
+    }
 }

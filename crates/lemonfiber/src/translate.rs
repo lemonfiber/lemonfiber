@@ -1,0 +1,194 @@
+//! Turning what the command line accepted into what the core understands.
+//!
+//! A subcommand is the surface's vocabulary and a [`Command`] is the core's, and
+//! this is the whole of the mapping between them. Kept apart from the dispatcher
+//! so that what a request *means* can be read, and proven, without going through
+//! everything that happens to it afterwards.
+
+use lemonfiber_core::app::{Command, QualityAction};
+use lemonfiber_core::audio::Format;
+use lemonfiber_core::quality::Preset;
+use lemonfiber_core::recyclarr::Kind;
+
+use crate::cli::{ConfigAction, QualityCommand};
+use crate::exit::USAGE;
+
+/// Which setting the operator is reading or changing.
+pub(crate) fn configuration(action: ConfigAction) -> Command {
+    match action {
+        ConfigAction::Get { key } => Command::ConfigGet { key },
+        ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
+        ConfigAction::Show => Command::ConfigShow,
+    }
+}
+
+pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
+    let action = match action {
+        QualityCommand::Show => QualityAction::Show,
+        QualityCommand::Set {
+            preset,
+            media_type,
+            confirm,
+        } => {
+            // Music has no resolution: `--for music` chooses an audio format instead of a
+            // resolution preset, and reaches the service rather than only recording, so it
+            // routes to its own command.
+            if media_type.as_deref() == Some("music") {
+                let Some(format) = Format::from_label(&preset) else {
+                    eprintln!(
+                        "error: no music format named `{preset}` \
+                         (try compact, lossless, or hi-res)"
+                    );
+                    return Err(USAGE);
+                };
+                return Ok(Command::QualityMusic { format });
+            }
+            let Some(preset) = Preset::from_label(&preset) else {
+                eprintln!(
+                    "error: no quality preset named `{preset}` \
+                     (try space-saving, balanced, high-quality, or maximum)"
+                );
+                return Err(USAGE);
+            };
+            if let Some(media_type) = &media_type {
+                if !Kind::ALL.iter().any(|kind| kind.media_type() == media_type) {
+                    eprintln!(
+                        "error: no media type named `{media_type}` (try tv, movies, or music)"
+                    );
+                    return Err(USAGE);
+                }
+            }
+            QualityAction::Set {
+                preset,
+                media_type,
+                confirm,
+            }
+        }
+        QualityCommand::Reapply => QualityAction::Reapply,
+        // Upgrade is its own command, not a quality action, since it reaches the
+        // services rather than only reading or writing the recorded choice.
+        QualityCommand::Upgrade { confirm } => return Ok(Command::QualityUpgrade { confirm }),
+    };
+    Ok(Command::Quality(action))
+}
+
+#[cfg(test)]
+mod tests {
+    use lemonfiber_core::app::{Command, QualityAction};
+    use lemonfiber_core::audio::Format;
+    use lemonfiber_core::quality::Preset;
+
+    use super::{configuration, quality};
+    use crate::cli::{ConfigAction, QualityCommand};
+    use crate::exit::USAGE;
+
+    #[test]
+    fn each_configuration_action_becomes_its_own_command() {
+        assert_eq!(
+            configuration(ConfigAction::Get {
+                key: "DATA_ROOT".to_owned()
+            }),
+            Command::ConfigGet {
+                key: "DATA_ROOT".to_owned()
+            }
+        );
+        assert_eq!(
+            configuration(ConfigAction::Set {
+                key: "DATA_ROOT".to_owned(),
+                value: "/srv".to_owned()
+            }),
+            Command::ConfigSet {
+                key: "DATA_ROOT".to_owned(),
+                value: "/srv".to_owned()
+            }
+        );
+        assert_eq!(configuration(ConfigAction::Show), Command::ConfigShow);
+    }
+
+    #[test]
+    fn showing_and_reapplying_the_quality_choice_need_no_argument() {
+        assert_eq!(
+            quality(QualityCommand::Show),
+            Ok(Command::Quality(QualityAction::Show))
+        );
+        assert_eq!(
+            quality(QualityCommand::Reapply),
+            Ok(Command::Quality(QualityAction::Reapply))
+        );
+    }
+
+    #[test]
+    fn a_preset_can_be_set_for_everything_or_for_one_media_type() {
+        let everything = quality(QualityCommand::Set {
+            preset: "balanced".to_owned(),
+            media_type: None,
+            confirm: false,
+        });
+        assert!(matches!(
+            everything,
+            Ok(Command::Quality(QualityAction::Set {
+                preset: Preset::Balanced,
+                media_type: None,
+                confirm: false
+            }))
+        ));
+        let television = quality(QualityCommand::Set {
+            preset: "maximum".to_owned(),
+            media_type: Some("tv".to_owned()),
+            confirm: true,
+        });
+        assert!(matches!(
+            television,
+            Ok(Command::Quality(QualityAction::Set {
+                preset: Preset::Maximum,
+                confirm: true,
+                ..
+            }))
+        ));
+    }
+
+    #[test]
+    fn a_music_format_is_its_own_command_rather_than_a_preset() {
+        // Music has no resolution, so it is set by format and reaches the service
+        // asynchronously — a different command, not a variant of the same one.
+        assert!(matches!(
+            quality(QualityCommand::Set {
+                preset: "lossless".to_owned(),
+                media_type: Some("music".to_owned()),
+                confirm: false,
+            }),
+            Ok(Command::QualityMusic {
+                format: Format::Lossless
+            })
+        ));
+    }
+
+    #[test]
+    fn upgrading_existing_content_is_its_own_command() {
+        // It reaches the services asynchronously rather than recording a choice, so
+        // it is not a quality action but a command of its own.
+        assert_eq!(
+            quality(QualityCommand::Upgrade { confirm: true }),
+            Ok(Command::QualityUpgrade { confirm: true })
+        );
+    }
+
+    #[test]
+    fn a_preset_or_media_type_this_build_does_not_know_is_a_usage_error() {
+        // Named rather than guessed at: the operator gets to see what was expected.
+        for (preset, media_type) in [
+            ("gorgeous", None),
+            ("balanced", Some("audiobooks".to_owned())),
+            ("mp3", Some("music".to_owned())),
+        ] {
+            assert_eq!(
+                quality(QualityCommand::Set {
+                    preset: preset.to_owned(),
+                    media_type,
+                    confirm: false,
+                }),
+                Err(USAGE)
+            );
+        }
+    }
+}

@@ -9,17 +9,19 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use lemonfiber_core::app::backup::{capture, Report as BackupReport};
-use lemonfiber_core::app::restore::{inspect, restore, Preview, Report as RestoreReport};
+use lemonfiber_core::app::backup::capture;
+use lemonfiber_core::app::restore::{inspect, restore};
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::backup::{Relocation, Retention, Scope, SCHEMA};
+use lemonfiber_core::backup::{Retention, Scope, SCHEMA};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::{self, store};
-use lemonfiber_core::error::Diagnose;
-use lemonfiber_core::ports::docker::{Container, Failure, Lifecycle};
+
+mod guard;
+mod report;
+
+use guard::{repoint_env, require_stopped, stamp};
+use report::{next_steps, render_backup, render_preview, render_restore};
 
 use crate::archive::Tar;
-use crate::render::Lines;
 
 /// What stands in for a report that could not be turned into JSON — a value rather
 /// than an unreachable branch, for the reason the renderer's own fallback is.
@@ -141,194 +143,6 @@ enum Stack {
     Unknown,
 }
 
-/// Ask the engine whether the stack is running.
-async fn stack_state(ctx: &Ctx) -> Stack {
-    stack_from(ctx.engine.list(&ctx.settings.project).await)
-}
-
-/// What a container listing means for whether anything may be writing to a database.
-fn stack_from(listed: Result<Vec<Container>, Failure>) -> Stack {
-    match listed {
-        Ok(containers) => {
-            if containers
-                .iter()
-                .any(|container| container.lifecycle == Lifecycle::Running)
-            {
-                Stack::Running
-            } else {
-                Stack::Stopped
-            }
-        }
-        Err(_) => Stack::Unknown,
-    }
-}
-
-/// Refuse an operation that touches service databases unless the stack is
-/// *confirmed* stopped, returning the exit code to end on where it is not.
-///
-/// The refusal fails closed: an engine that will not answer leaves it unable to
-/// prove nothing is writing, and capturing — or restoring over — a database a
-/// service is mid-write to is the corruption a backup exists to prevent, so an
-/// uncertain answer is refused as firmly as a running one rather than assumed safe.
-async fn require_stopped(ctx: &Ctx, operation: &str) -> Option<ExitCode> {
-    let refusal = refuse(&stack_state(ctx).await, operation)?;
-    refusal.eprint();
-    Some(ExitCode::FAILURE)
-}
-
-/// What to tell the operator about a state that will not permit the operation, or
-/// nothing at all where it may go ahead.
-fn refuse(stack: &Stack, operation: &str) -> Option<Lines> {
-    let mut lines = Lines::default();
-    match stack {
-        Stack::Stopped => return None,
-        Stack::Running => {
-            lines.put(format!(
-                "A {operation} touches the service databases, which must not happen while the \
-                 services are running and writing to them."
-            ));
-            lines.put("Stop the stack first:  lemonfiber down <form>");
-        }
-        Stack::Unknown => {
-            lines.put(format!(
-                "lemonfiber could not reach the container engine, so it cannot confirm the stack \
-                 is stopped — and will not risk a {operation} over a database a service may be \
-                 writing."
-            ));
-            lines.put("Make sure Docker is running and the stack is down, then try again.");
-        }
-    }
-    Some(lines)
-}
-
-/// Point the restored environment file at this machine's data root, or the code to
-/// end on where it will not take it.
-///
-/// The file that landed still names the root the backup was taken against, which is
-/// not on this machine; this is the adjustment the re-point offered, applied once
-/// the files are in place.
-fn repoint_env(paths: &Paths, relocation: &Relocation) -> Option<ExitCode> {
-    let failure = store::set(&paths.env_file(), config::DATA_ROOT_KEY, &relocation.now).err()?;
-    Some(crate::complain(&failure.problem()))
-}
-
-/// What a restore leaves the operator to do, once the files are back in place.
-fn next_steps() -> Lines {
-    let mut lines = Lines::default();
-    lines.put(
-        "Now bring the stack up and reconcile its wiring:  lemonfiber up <form> && lemonfiber seed",
-    );
-    lines.put(
-        "Then check the restored credentials still work:  lemonfiber doctor --only credentials",
-    );
-    lines
-}
-
-/// A timestamp for a backup — seconds since the epoch, filename-safe and sorting
-/// by age, or empty on a clock too absurd to read.
-fn stamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs().to_string())
-        .unwrap_or_default()
-}
-
-/// How a scope reads in a line of output.
-fn scope_name(scope: &Scope) -> String {
-    match scope {
-        Scope::WholeStack => "the whole stack".to_owned(),
-        Scope::Service { name } => format!("service {name}"),
-    }
-}
-
-fn render_backup(report: &BackupReport, json: bool) -> Lines {
-    let mut lines = Lines::default();
-    if json {
-        // Built eagerly, like the envelope's: a report of owned values cannot fail
-        // to serialise, so a lazy fallback would be a line no test could reach.
-        lines.put(serde_json::to_string(report).unwrap_or(UNSERIALISABLE.to_owned()));
-        return lines;
-    }
-    lines.put(format!(
-        "Backed up {} to {}",
-        scope_name(&report.scope),
-        report.path.display()
-    ));
-    if report.sensitive {
-        lines.put(
-            "This backup contains credentials — the VPN key, provider passwords and API keys. \
-             Keep it as private as the secrets inside it.",
-        );
-    }
-    if !report.pruned.is_empty() {
-        lines.put(format!("Pruned {} older backup(s).", report.pruned.len()));
-    }
-    lines
-}
-
-fn render_preview(preview: &Preview, json: bool) -> Lines {
-    let mut lines = Lines::default();
-    if json {
-        // The preview's own type is not yet serialised; report the essentials.
-        lines.put(format!(
-            r#"{{"kind":"restore-preview","version":{version:?},"scope":{scope:?},"downgrade":{downgrade}}}"#,
-            version = preview.manifest.product_version,
-            scope = scope_name(&preview.manifest.scope),
-            downgrade = preview.downgrade,
-        ));
-        return lines;
-    }
-    lines.put(format!(
-        "This backup holds {}, taken by lemonfiber {} on {}.",
-        scope_name(&preview.manifest.scope),
-        preview.manifest.product_version,
-        preview.manifest.created_at,
-    ));
-    for member in &preview.manifest.members {
-        lines.put(format!("  - {}", member.label));
-    }
-    if preview.downgrade {
-        lines.put(
-            "It is from an older major version; restoring it is allowed but may need a further \
-             reconcile.",
-        );
-    }
-    if let Some(relocation) = &preview.relocation {
-        lines.put(format!(
-            "It was taken against a different data root ({} → {}); re-run with --repoint to \
-             restore onto this machine's.",
-            relocation.was, relocation.now
-        ));
-    }
-    lines
-}
-
-fn render_restore(report: &RestoreReport, json: bool) -> Lines {
-    let mut lines = Lines::default();
-    if json {
-        lines.put(format!(
-            r#"{{"kind":"restore","from_version":{version:?},"scope":{scope:?}}}"#,
-            version = report.from_version,
-            scope = scope_name(&report.scope),
-        ));
-        return lines;
-    }
-    lines.put(format!(
-        "Restored {} from a backup taken by lemonfiber {}.",
-        scope_name(&report.scope),
-        report.from_version
-    ));
-    if let Some(relocation) = &report.relocated {
-        lines.put(format!(
-            "Re-pointed the data root from {} to {}.",
-            relocation.was, relocation.now
-        ));
-    }
-    lines
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -343,10 +157,11 @@ mod tests {
     use lemonfiber_core::stack::Source;
     use tokio::sync::mpsc::Receiver;
 
-    use super::{
-        next_steps, refuse, render_backup, render_preview, render_restore, scope_name, stack_from,
-        stamp, Ctx, ExitCode, Paths, Preview, Stack,
-    };
+    use super::guard::{refuse, stack_from, stamp};
+    use super::report::{next_steps, render_backup, render_preview, render_restore, scope_name};
+    use lemonfiber_core::app::restore::Preview;
+
+    use super::{Ctx, ExitCode, Paths, Stack};
 
     /// An engine that answers a listing however a test needs, and nothing else —
     /// the only capability a backup's refusal actually consults.
@@ -406,7 +221,7 @@ mod tests {
             Arc::new(engine),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
-            Source::Embedded(&crate::STACK),
+            Source::Embedded(&crate::cli::STACK),
             Settings::default(),
             Environment::MacOs,
         )

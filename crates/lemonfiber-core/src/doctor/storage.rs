@@ -30,23 +30,16 @@ use crate::platform::Environment;
 use crate::ports::filesystem::{FileSystem, Ownership, StorageFacts};
 use crate::storage::{self, Linked};
 
-/// Raised when the data root cannot hardlink, so imports must copy.
-pub const COPY_ONLY: Code = Code::new("STORAGE-1");
+mod findings;
+mod space;
 
-/// Raised when the data root exists but cannot be written to.
-pub const ROOT_UNWRITABLE: Code = Code::new("STORAGE-2");
+pub use findings::{COPY_ONLY, DEGRADED, ROOT_ABSENT, ROOT_UNWRITABLE, SERVICE_DENIED};
+pub use space::{LOW_SPACE_FLOOR, SPACE_LOW};
 
-/// Raised when the data root is not there to test.
-pub const ROOT_ABSENT: Code = Code::new("STORAGE-3");
-
-/// Raised when the volume holding the data root is nearly full.
-pub const SPACE_LOW: Code = Code::new("STORAGE-4");
-
-/// Raised when the data root used to hardlink and no longer does.
-pub const DEGRADED: Code = Code::new("STORAGE-5");
-
-/// Raised when the operator owns the data root but the services cannot write it.
-pub const SERVICE_DENIED: Code = Code::new("STORAGE-6");
+use findings::{
+    copying, linked, service_skipped, service_unverified, service_verdict, unconfirmed,
+};
+use space::space;
 
 /// The capability the storage check remembers between runs, so a later run can
 /// tell that a location which used to hardlink has stopped.
@@ -55,19 +48,6 @@ struct Recorded {
     /// Whether the data root could hardlink when it was last checked.
     hardlinks: bool,
 }
-
-/// The free space a volume must keep clear once the queue has landed.
-///
-/// The check projects exhaustion from committed downloads — the free space *minus*
-/// what the download clients still have to write — and warns when that projected
-/// figure falls under this floor. Where no download client is
-/// reachable there is nothing to subtract, so the same floor guards the raw free
-/// space instead. A single large import can be tens of gigabytes and unpacking
-/// needs room beside the file, so the floor sits well above one file.
-///
-/// Public so the quality-headroom check can defer to this one below it: a disk this
-/// low is a free-space problem this check already reports, not a quality-fit one.
-pub const LOW_SPACE_FLOOR: u64 = 10 * 1024 * 1024 * 1024;
 
 /// Whether the data root can hardlink, and what mode that puts the stack in.
 pub struct StorageCheck {
@@ -228,305 +208,6 @@ impl Check for StorageCheck {
     }
 }
 
-/// The findings when the link was made and confirmed: a pass naming how many
-/// names point at the one file, and the mode a working link puts the stack in.
-fn linked(facts: &StorageFacts, links: u64) -> Vec<Finding> {
-    let note = format!("{}, {links} names to one file", facts.kind.label());
-    pair(Verdict::Pass { note: Some(note) }, working_mode(facts))
-}
-
-/// The findings when the link was made but could not be confirmed to point at one
-/// file: the capability is not disproven, but it is not proven either, and an
-/// unproven guarantee is never reported as met.
-fn unconfirmed() -> Vec<Finding> {
-    pair(
-        Verdict::Unverified {
-            reason: "the link was made but could not be confirmed to point at the same file"
-                .to_owned(),
-            remedy: Remedy::new("Run the storage check again"),
-        },
-        Verdict::Skipped {
-            reason: "the link could not be confirmed, so no mode was derived".to_owned(),
-        },
-    )
-}
-
-/// The findings when the link could not be made.
-///
-/// A location that used to link and now cannot is a regression, not the same
-/// thing as one that never could: something changed under a running stack, and
-/// every import since has quietly been copying. It is reported as its own,
-/// louder finding, while a location that was never able to link stays the
-/// ordinary copy-mode warning.
-fn copying(facts: &StorageFacts, regressed: bool) -> Vec<Finding> {
-    if regressed {
-        return pair(Verdict::Fail(degraded()), degraded_mode());
-    }
-
-    let summary = match facts.kind.limitation() {
-        Some(cause) => format!("This location cannot hardlink — {cause}"),
-        None => "This location cannot hardlink".to_owned(),
-    };
-    let problem = Problem::new(
-        COPY_ONLY,
-        Severity::Warning,
-        summary,
-        storage::COPY_CONSEQUENCE,
-        Remedy::new("Choose a location that hardlinks, or continue in copy mode")
-            .with_detail("The services are configured to copy so imports still work"),
-    )
-    .in_state(State::Guided);
-
-    pair(Verdict::Warn(problem), copy_mode(facts))
-}
-
-/// The problem for a location whose hardlink capability was lost.
-fn degraded() -> Problem {
-    Problem::new(
-        DEGRADED,
-        Severity::Error,
-        "Hardlinks have stopped working here",
-        "This location used to hardlink and no longer does — usually a drive that came back \
-         mounted with different options. Every import since has been copying, using twice the \
-         disk and leaving nothing to seed from.",
-        Remedy::new("Check how the data location is mounted, and remount it as it was")
-            .with_detail("A network share remounted without the right options is the common cause"),
-    )
-    .in_state(State::Guided)
-}
-
-/// The mode a regressed location is now in: copying, where it used to link.
-fn degraded_mode() -> Verdict {
-    Verdict::Warn(
-        Problem::new(
-            DEGRADED,
-            Severity::Warning,
-            "degraded — was linking, now copying",
-            "The stack is running in copy mode it was not set up for, because the location \
-             changed under it.",
-            Remedy::new(
-                "Restore the location's hardlink support, then run the storage check again",
-            ),
-        )
-        .in_state(State::Guided),
-    )
-}
-
-/// The mode a working link puts the stack in: local, or external on removable
-/// media, both of which link.
-fn working_mode(facts: &StorageFacts) -> Verdict {
-    let note = if facts.removable {
-        "external — hardlinks on removable media"
-    } else {
-        "local — imports hardlink instantly"
-    };
-    Verdict::Pass {
-        note: Some(note.to_owned()),
-    }
-}
-
-/// The mode a failed link puts the stack in: copy, or a network share's copy.
-fn copy_mode(facts: &StorageFacts) -> Verdict {
-    let note = if facts.kind.is_network() {
-        "nas — imports copy across a network share"
-    } else {
-        "copy — imports copy; this location cannot hardlink"
-    };
-    Verdict::Pass {
-        note: Some(note.to_owned()),
-    }
-}
-
-/// Whether a user and group can write a path, by the ownership and mode of it.
-///
-/// The classes do not fall back on each other: a file owned by the user is
-/// judged on its owner bits alone, even where the group or other bits would be
-/// more permissive, because that is how the kernel decides it.
-fn writable(owner: Ownership, uid: u32, gid: u32) -> bool {
-    const OWNER_WRITE: u32 = 0o200;
-    const GROUP_WRITE: u32 = 0o020;
-    const OTHER_WRITE: u32 = 0o002;
-    // Root is bound by no permission bits, so a container running as it can
-    // write regardless of who owns the directory.
-    if uid == 0 {
-        return true;
-    }
-    if owner.uid == uid {
-        owner.mode & OWNER_WRITE != 0
-    } else if owner.gid == gid {
-        owner.mode & GROUP_WRITE != 0
-    } else {
-        owner.mode & OTHER_WRITE != 0
-    }
-}
-
-/// The service-facing permission finding, once ownership is known.
-fn service_verdict(owner: Ownership, uid: u32, gid: u32) -> Finding {
-    let verdict = if writable(owner, uid, gid) {
-        Verdict::Pass {
-            note: Some(format!("writable by the services ({uid}:{gid})")),
-        }
-    } else {
-        Verdict::Fail(
-            Problem::new(
-                SERVICE_DENIED,
-                Severity::Error,
-                "The services cannot write to the data location",
-                format!(
-                    "The containers run as {uid}:{gid}, but the data location is owned by {}:{} \
-                     with mode {:o} and is not writable by them. Imports fail inside the services, \
-                     far from where the cause is.",
-                    owner.uid, owner.gid, owner.mode
-                ),
-                Remedy::new(
-                    "Give the service user ownership of the data location, or write access",
-                )
-                .with_detail(format!("chown -R {uid}:{gid} the data location")),
-            )
-            .in_state(State::Guided),
-        )
-    };
-    finding("storage.permissions", "Service access", verdict)
-}
-
-/// The permission finding where it does not apply — off native Linux, or before
-/// the service user is known.
-fn service_skipped(reason: &str) -> Finding {
-    finding(
-        "storage.permissions",
-        "Service access",
-        Verdict::Skipped {
-            reason: reason.to_owned(),
-        },
-    )
-}
-
-/// The permission finding where ownership could not be read.
-fn service_unverified() -> Finding {
-    finding(
-        "storage.permissions",
-        "Service access",
-        Verdict::Unverified {
-            reason: "the data location's ownership could not be read".to_owned(),
-            remedy: Remedy::new(
-                "Confirm the data location exists, then run the storage check again",
-            ),
-        },
-    )
-}
-
-/// The free-space finding for the volume the data root sits on.
-///
-/// A volume that reports no size at all could not be measured rather than being
-/// empty, so it is unverified rather than reported as full. Otherwise the finding
-/// is a projection: the free space left once the download clients' committed
-/// content has landed, warned on when that projected figure falls under the floor
-/// rather than only when the volume is already nearly full. A committed figure of
-/// zero — the clients quiet or unreachable — and `None` — no projection supplied at
-/// all — both subtract nothing, so the same floor guards the raw free space, the
-/// behaviour before a client could be read.
-fn space(facts: &StorageFacts, committed: Option<u64>) -> Finding {
-    if facts.total == 0 {
-        return finding(
-            "storage.space",
-            "Free space",
-            Verdict::Unverified {
-                reason: "the volume's free space could not be read".to_owned(),
-                remedy: Remedy::new("Run the storage check again once the location is reachable"),
-            },
-        );
-    }
-
-    let underway = committed.unwrap_or(0);
-    let projected = facts.available.saturating_sub(underway);
-    let verdict = if projected >= LOW_SPACE_FLOOR {
-        Verdict::Pass {
-            note: Some(free_note(facts, underway)),
-        }
-    } else if underway > 0 {
-        // Room now, but the queue will consume it: exhaustion the operator is
-        // warned of before it happens rather than once the disk is already full.
-        Verdict::Warn(
-            Problem::new(
-                SPACE_LOW,
-                Severity::Warning,
-                format!(
-                    "Storage is projected to run out — {} of downloads still to land, {} free",
-                    humanize(underway),
-                    humanize(facts.available),
-                ),
-                "Downloads already queued will not fit alongside the room an import and its \
-                 unpacking need, so the disk fills partway through and leaves half a file behind.",
-                Remedy::new(
-                    "Free space on the data location, thin the download queue, or move it to a \
-                     larger volume",
-                ),
-            )
-            .in_state(State::Guided),
-        )
-    } else {
-        // No committed content to project from, but the volume is already low.
-        Verdict::Warn(
-            Problem::new(
-                SPACE_LOW,
-                Severity::Warning,
-                format!("Free space is low — {} left", humanize(facts.available)),
-                "A disk that fills partway through an import leaves half a file behind and \
-                 stalls the queue, so what is left has to cover what is still to come.",
-                Remedy::new("Free space on the data location, or move it to a larger volume"),
-            )
-            .in_state(State::Guided),
-        )
-    };
-    finding("storage.space", "Free space", verdict)
-}
-
-/// The passing note: what is free of the whole, and — where downloads are underway
-/// — what is still to land, so a pass that is comfortable only because the queue is
-/// small still says so.
-fn free_note(facts: &StorageFacts, underway: u64) -> String {
-    let free_of_total = format!(
-        "{} free of {}",
-        humanize(facts.available),
-        humanize(facts.total)
-    );
-    if underway > 0 {
-        format!("{free_of_total}, {} still to land", humanize(underway))
-    } else {
-        free_of_total
-    }
-}
-
-/// A byte count as a person reads it, to one decimal place.
-///
-/// Binary units, because that is what the tools an operator will cross-check
-/// against report, and one decimal because a library measured to the byte is
-/// noise around a figure whose point is "roughly how much room is left".
-fn humanize(bytes: u64) -> String {
-    const UNITS: [(&str, u64); 4] = [
-        ("TiB", 1 << 40),
-        ("GiB", 1 << 30),
-        ("MiB", 1 << 20),
-        ("KiB", 1 << 10),
-    ];
-    for (label, size) in UNITS {
-        if bytes >= size {
-            // Rounded to the nearest tenth rather than truncated, so 2.0 GiB does
-            // not read as 1.9. The remainder is well under a terabyte, so scaling
-            // it by ten cannot overflow; a remainder that rounds up to a whole
-            // unit carries into it.
-            let mut whole = bytes / size;
-            let mut tenths = ((bytes % size) * 10 + size / 2) / size;
-            if tenths == 10 {
-                whole += 1;
-                tenths = 0;
-            }
-            return format!("{whole}.{tenths} {label}");
-        }
-    }
-    format!("{bytes} B")
-}
-
 /// The findings when the data root could not be reached at all.
 fn absent(root: &Path, detail: &str) -> Vec<Finding> {
     let problem = Problem::new(
@@ -601,9 +282,11 @@ mod tests {
 
     use async_trait::async_trait;
 
+    use super::findings::writable;
+    use super::space::humanize;
     use super::{
-        humanize, writable, Check, Environment, Finding, StorageCheck, Verdict, COPY_ONLY,
-        DEGRADED, ROOT_ABSENT, ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
+        Check, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED, ROOT_ABSENT,
+        ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
     };
     use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
 

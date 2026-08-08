@@ -6,9 +6,14 @@
 //! ask and what an answer means is in [`crate::prompt`], where it can be proven
 //! against a script; what is here is the wire to the human, and nothing else.
 
-use std::io::Write as _;
+use std::io::{IsTerminal as _, Write as _};
+use std::path::PathBuf;
 
-use crate::prompt::Answers;
+use lemonfiber_core::app::setup::Prompt;
+use lemonfiber_core::platform::Environment;
+
+use crate::prompt::{Answers, Terminal};
+use crate::setup::Surface;
 
 /// Answers typed by whoever is running this.
 pub(crate) struct Keyboard;
@@ -33,5 +38,26 @@ impl Answers for Keyboard {
             .unwrap_or_default()
             .trim()
             .to_owned()
+    }
+}
+
+/// The terminal setup holds its conversation across.
+///
+/// Here for the same reason [`Keyboard`] is: whether someone is present, what they
+/// typed, and what does the asking are the three ways setup reaches a person, and
+/// each of them is a thing no test can be.
+pub(crate) struct Console;
+
+impl Surface for Console {
+    fn interactive(&self) -> bool {
+        std::io::stdin().is_terminal()
+    }
+
+    fn line(&self, prompt: &str) -> String {
+        Keyboard.ask(prompt)
+    }
+
+    fn asking(&self, environment: Environment, default_data: PathBuf) -> Box<dyn Prompt> {
+        Box::new(Terminal::new(environment, default_data))
     }
 }
