@@ -277,6 +277,7 @@ fn stamp() -> String {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use crate::exit::{shown, success};
     use std::path::Path;
     use std::sync::Arc;
 
@@ -292,7 +293,7 @@ pub(crate) mod tests {
 
     use super::{
         confirm_setup, default_data_location, greeting, setting_up, stamp, Ctx, Environment,
-        ExitCode, PathBuf, Paths, SetupFlags, Surface,
+        PathBuf, Paths, SetupFlags, Surface,
     };
 
     /// A surface that answers from a script and says whether anyone is there.
@@ -539,7 +540,7 @@ pub(crate) mod tests {
         let _ = paths.env_file().parent().map(std::fs::create_dir_all);
         let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
         let code = greeting(ctx(), &paths, &Scripted::saying(true, &[])).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_eq!(shown(code), success());
     }
 
     #[tokio::test]
@@ -547,14 +548,14 @@ pub(crate) mod tests {
         // Stated rather than asked: never left waiting on input that will not come.
         let paths = scratch("piped");
         let code = greeting(ctx(), &paths, &Scripted::saying(false, &[])).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_eq!(shown(code), success());
     }
 
     #[tokio::test]
     async fn a_declined_offer_writes_nothing() {
         let paths = scratch("declined");
         let code = greeting(ctx(), &paths, &Scripted::saying(true, &["n"])).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_eq!(shown(code), success());
         assert!(!paths.env_file().exists());
     }
 
@@ -564,7 +565,7 @@ pub(crate) mod tests {
         let mut rehearsing = ctx();
         rehearsing.dry_run = true;
         let code = greeting(rehearsing, &paths, &Scripted::saying(true, &[])).await;
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_ne!(shown(code), success());
     }
 
     #[tokio::test]
@@ -573,7 +574,7 @@ pub(crate) mod tests {
         // before the first question rather than after eleven answers.
         let paths = scratch("preflight");
         let code = greeting(ctx(), &paths, &Scripted::saying(true, &["y"])).await;
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_ne!(shown(code), success());
         // Nothing was asked and nothing was written.
         assert!(!paths.env_file().exists());
     }
@@ -589,7 +590,7 @@ pub(crate) mod tests {
             SetupFlags::none(),
         )
         .await;
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_ne!(shown(code), success());
     }
 
     #[tokio::test]
@@ -608,7 +609,7 @@ pub(crate) mod tests {
             SetupFlags::none(),
         )
         .await;
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_ne!(shown(code), success());
     }
 
     #[tokio::test]
@@ -624,11 +625,7 @@ pub(crate) mod tests {
             SetupFlags::none(),
         )
         .await;
-        assert_eq!(
-            format!("{code:?}"),
-            format!("{:?}", ExitCode::SUCCESS),
-            "walking away is not a failure"
-        );
+        assert_eq!(shown(code), success(), "walking away is not a failure");
         assert!(!paths.env_file().exists(), "nothing was written");
     }
 
@@ -713,7 +710,7 @@ pub(crate) mod tests {
             SetupFlags::none(),
         )
         .await;
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_ne!(shown(code), success());
     }
 
     #[tokio::test]
@@ -744,7 +741,7 @@ pub(crate) mod tests {
             SetupFlags::none(),
         )
         .await;
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_ne!(shown(code), success());
     }
 
     #[tokio::test]

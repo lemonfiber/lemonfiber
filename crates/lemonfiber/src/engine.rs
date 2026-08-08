@@ -167,6 +167,7 @@ pub(crate) async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
 
 #[cfg(test)]
 mod tests {
+    use crate::exit::{shown, success};
     use std::sync::Arc;
 
     use async_trait::async_trait;
@@ -178,7 +179,7 @@ mod tests {
     use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
     use lemonfiber_core::stack::Source;
 
-    use super::{emit_pull_line, guard, pull, pull_showing, stream, Ctx, ExitCode};
+    use super::{emit_pull_line, guard, pull, pull_showing, stream, Ctx};
 
     /// A runner that answers every command the same way.
     struct Answering {
@@ -291,9 +292,6 @@ mod tests {
     }
 
     /// A clean exit, as it reads.
-    fn success() -> String {
-        format!("{:?}", ExitCode::SUCCESS)
-    }
 
     #[tokio::test]
     async fn a_pull_that_the_engine_refuses_is_not_a_success() {
@@ -458,12 +456,12 @@ mod tests {
     #[tokio::test]
     async fn streaming_logs_from_a_stack_that_is_not_there_is_not_a_success() {
         let code = stream(&ctx(1, ""), &[], &[], false, 10, false).await;
-        assert_ne!(format!("{code:?}"), success());
+        assert_ne!(shown(code), success());
     }
 
     #[tokio::test]
     async fn guarding_a_location_that_cannot_be_watched_reports_rather_than_waits() {
         let code = guard(&ctx(1, ""), &["tv".to_owned()], false).await;
-        assert_ne!(format!("{code:?}"), success());
+        assert_ne!(shown(code), success());
     }
 }

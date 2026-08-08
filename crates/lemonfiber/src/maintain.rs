@@ -145,6 +145,7 @@ enum Stack {
 
 #[cfg(test)]
 mod tests {
+    use crate::exit::{shown, success};
     use std::sync::Arc;
 
     use async_trait::async_trait;
@@ -272,7 +273,7 @@ mod tests {
         let paths = install("round-trip");
         // Capture: the engine says nothing is running, so it goes ahead.
         let code = super::run_backup(stopped(), paths.clone(), None, false).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_eq!(shown(code), success());
 
         let written = std::fs::read_dir(paths.backups())
             .into_iter()
@@ -286,14 +287,14 @@ mod tests {
         // Restore it back over the same install: the preview is shown, then the
         // files are put back and the operator is told what follows.
         let restored = super::run_restore(stopped(), paths, archive, false, false).await;
-        assert_eq!(format!("{restored:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_eq!(shown(restored), success());
     }
 
     #[tokio::test]
     async fn a_backup_scoped_to_one_service_reports_as_json_when_asked() {
         let paths = install("one-service");
         let code = super::run_backup(stopped(), paths, Some("sonarr".to_owned()), true).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_eq!(shown(code), success());
     }
 
     #[tokio::test]
@@ -301,7 +302,7 @@ mod tests {
         let paths = install("running");
         let running = || ctx_with(FakeEngine(Some(Lifecycle::Running)));
         let backup = super::run_backup(running(), paths.clone(), None, false).await;
-        assert_eq!(format!("{backup:?}"), format!("{:?}", ExitCode::FAILURE));
+        assert_eq!(shown(backup), shown(ExitCode::FAILURE));
         // Nothing was written: the refusal comes before the capture.
         assert!(std::fs::read_dir(paths.backups()).is_err());
     }
@@ -311,7 +312,7 @@ mod tests {
         let paths = install("no-archive");
         let missing = paths.backups().join("nothing.tar.gz");
         let code = super::run_restore(stopped(), paths, missing, false, false).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+        assert_eq!(shown(code), shown(ExitCode::FAILURE));
     }
 
     #[tokio::test]
@@ -340,7 +341,7 @@ mod tests {
         let _ = paths.backups().parent().map(std::fs::create_dir_all);
         let _ = std::fs::write(paths.backups(), "not a directory");
         let code = super::run_backup(stopped(), paths, None, false).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+        assert_eq!(shown(code), shown(ExitCode::FAILURE));
     }
 
     #[tokio::test]
@@ -351,7 +352,7 @@ mod tests {
                 "{:?}",
                 super::run_backup(stopped(), paths.clone(), None, false).await
             ),
-            format!("{:?}", ExitCode::SUCCESS)
+            success()
         );
         let archive = one_backup(&paths);
 
@@ -359,7 +360,7 @@ mod tests {
         // is refused while something may be writing.
         let running = ctx_with(FakeEngine(Some(Lifecycle::Running)));
         let code = super::run_restore(running, paths, archive, false, false).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+        assert_eq!(shown(code), shown(ExitCode::FAILURE));
     }
 
     #[tokio::test]
@@ -370,7 +371,7 @@ mod tests {
                 "{:?}",
                 super::run_backup(stopped_at("/old/media"), paths.clone(), None, false).await
             ),
-            format!("{:?}", ExitCode::SUCCESS)
+            success()
         );
         let archive = one_backup(&paths);
 
@@ -385,7 +386,7 @@ mod tests {
             false,
         )
         .await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_eq!(shown(code), success());
         let env = std::fs::read_to_string(paths.env_file()).unwrap_or_default();
         assert!(
             env.contains("/new/media"),
@@ -414,7 +415,7 @@ mod tests {
         );
 
         let code = super::run_restore(stopped(), paths, archive, false, false).await;
-        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+        assert_eq!(shown(code), shown(ExitCode::FAILURE));
     }
 
     /// The single archive a capture left in the backups directory.
@@ -500,7 +501,7 @@ mod tests {
         let code = super::run_restore(stopped_at("/new/media"), paths, archive, true, false).await;
         // The code is whichever the problem's own severity earns; what matters is
         // that it is not a success.
-        assert_ne!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+        assert_ne!(shown(code), success());
     }
 
     #[test]

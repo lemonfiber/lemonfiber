@@ -97,6 +97,12 @@ pub fn decide(expected: Option<u32>, actual: Option<u32>, desired: u32) -> Decis
 /// would. The lines only in their file are marked `-`, the lines only in
 /// lemonfiber's `+`; the matching head and tail are left out, so what is shown is
 /// the change and not the whole file.
+///
+/// A line that carries a credential is shown by name with its value withheld — on
+/// **both** sides, so a drifted secret is reported without displaying either the
+/// operator's value or lemonfiber's. A diff is printed to a terminal, read into
+/// scrollback and pasted into bug reports, and a key that reaches any of those is a
+/// key that has to be rotated.
 #[must_use]
 pub fn diff(yours: &str, ours: &str) -> String {
     let yours: Vec<&str> = yours.lines().collect();
@@ -115,17 +121,44 @@ pub fn diff(yours: &str, ours: &str) -> String {
     let our_middle = ours.get(head..ours.len() - tail).unwrap_or_default();
     let mut out = String::new();
     for line in your_middle {
-        let _ = writeln!(out, "- {line}");
+        let _ = writeln!(out, "- {}", withheld(line));
     }
     for line in our_middle {
-        let _ = writeln!(out, "+ {line}");
+        let _ = writeln!(out, "+ {}", withheld(line));
     }
     out
+}
+
+/// One diff line as it is safe to show: a setting whose name reads as a credential keeps
+/// its name and loses its value.
+///
+/// The separator is whichever of `:` or `=` comes **first**, because either can appear
+/// inside the other's value — a password containing a colon, a key containing an equals —
+/// and splitting on the later one would leave part of the value in the name and print it.
+fn withheld(line: &str) -> String {
+    // The separator is taken with its position in one pass, so what follows it never has
+    // to be re-derived — and there is no "the character I just found is not there" arm to
+    // write, which is a branch nothing could ever take.
+    let Some((at, separator)) = line
+        .char_indices()
+        .find(|(_, character)| *character == ':' || *character == '=')
+    else {
+        return line.to_owned();
+    };
+    let (name, rest) = line.split_at(at);
+    let value = rest.get(separator.len_utf8()..).unwrap_or_default();
+    // A name with nothing after it is a YAML key opening a block, not a setting with a
+    // value — there is nothing to withhold and blanking it would corrupt the shape.
+    if value.trim().is_empty() || !crate::config::store::is_secret(name) {
+        return line.to_owned();
+    }
+    format!("{name}{separator} {}", crate::config::store::REDACTED)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{checksum, decide, diff, Decision, Materialised};
+    use crate::config::store::REDACTED;
 
     #[test]
     fn a_recorded_checksum_is_read_back_and_an_unrecorded_one_is_none() {
@@ -170,6 +203,68 @@ mod tests {
         let yours = "a\nMINE\nc\n";
         let ours = "a\nOURS\nc\n";
         assert_eq!(diff(yours, ours), "- MINE\n+ OURS\n");
+    }
+
+    #[test]
+    fn a_drifted_credential_is_named_and_neither_value_is_shown() {
+        // A diff reaches a terminal, its scrollback and any bug report pasted out of
+        // it, so a key that reaches a diff is a key that has to be rotated.
+        let yours = "services:\n  sonarr:\n    environment:\n      SONARR_API_KEY: theirs\n";
+        let ours = "services:\n  sonarr:\n    environment:\n      SONARR_API_KEY: ours\n";
+        let shown = diff(yours, ours);
+
+        assert!(
+            shown.contains("SONARR_API_KEY"),
+            "the operator learns which drifted"
+        );
+        assert!(
+            !shown.contains("theirs"),
+            "their value is not shown: {shown}"
+        );
+        assert!(
+            !shown.contains("ours"),
+            "and neither is lemonfiber's: {shown}"
+        );
+        assert_eq!(shown.matches(REDACTED).count(), 2, "both sides withheld");
+    }
+
+    #[test]
+    fn a_credential_is_withheld_however_it_is_written() {
+        // Both separators, and a value containing the other one — splitting on the later
+        // separator would leave half the value in the name and print it.
+        for line in [
+            "      SONARR_API_KEY: a:b",
+            "SONARR_API_KEY=a=b",
+            "  ADMIN_PASSWORD: p:ss=word",
+            "PROVIDER_CREDENTIAL=x",
+        ] {
+            let withheld = super::withheld(line);
+            assert!(withheld.ends_with(REDACTED), "{line} -> {withheld}");
+            assert!(!withheld.contains("word"), "{line} -> {withheld}");
+            assert!(!withheld.contains("a:b"), "{line} -> {withheld}");
+        }
+    }
+
+    #[test]
+    fn an_ordinary_line_is_shown_exactly_as_it_is() {
+        // Withholding is for credentials; a diff that redacted the ordinary lines would
+        // be a diff that says nothing.
+        for line in [
+            "    image: ghcr.io/example/sonarr:4.0",
+            "services:",
+            "      PUID: 1000",
+            "  # a comment",
+            "",
+        ] {
+            assert_eq!(super::withheld(line), line, "{line}");
+        }
+    }
+
+    #[test]
+    fn a_key_that_opens_a_block_keeps_its_shape() {
+        // `environment:` with nothing after it is a YAML key opening a block, not a
+        // setting with a value — blanking it would corrupt what the operator is reading.
+        assert_eq!(super::withheld("    AUTH_SETTINGS:"), "    AUTH_SETTINGS:");
     }
 
     #[test]
