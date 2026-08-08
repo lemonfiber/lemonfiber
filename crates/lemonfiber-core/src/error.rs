@@ -5,7 +5,7 @@
 //! wording lives here because all three surfaces must say the same thing;
 //! colour, wrapping and placement are the surface's business.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// A stable identifier for a kind of problem.
 ///
@@ -39,7 +39,7 @@ impl std::fmt::Display for Code {
 ///
 /// Four levels, deliberately. More would not be applied consistently, and
 /// inconsistent severity is worse than coarse severity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// Informational; nothing is required.
