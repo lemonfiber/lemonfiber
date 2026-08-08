@@ -175,4 +175,16 @@ pub trait Library: Send + Sync {
     /// Returns [`Failure`] when the media server is unreachable or refuses — which a
     /// trace reads as "cannot tell", never as "not there".
     async fn has_item(&self, kind: crate::recyclarr::Kind, term: &str) -> Result<bool, Failure>;
+
+    /// Tell the media server to look at what is on disk now.
+    ///
+    /// A library scans on its own schedule, so content that has just been imported is
+    /// genuinely there and genuinely invisible for as long as an hour. Left alone that is
+    /// the walkthrough's worst possible ending — everything worked and nothing is there —
+    /// so it is asked for rather than waited on.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the media server is unreachable or refuses.
+    async fn rescan(&self) -> Result<(), Failure>;
 }

@@ -37,6 +37,7 @@ pub mod setup;
 mod targets;
 mod trace;
 mod upgrade;
+mod walkthrough;
 pub mod watch;
 
 pub use ctx::Ctx;
@@ -44,6 +45,7 @@ pub use ctx::Ctx;
 // The log-following reads a surface streams from live outside dispatch, so they are the
 // engine module's functions re-exported for the binary and the log commands to reach.
 pub use engine::{diagnose, logs, pull_progress};
+pub use walkthrough::{walkthrough, worth_offering};
 
 // The data-location watch is a self-contained feature in its own module; these
 // are the names the rest of the crate and the binary reach it by.

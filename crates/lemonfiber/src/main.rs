@@ -22,6 +22,7 @@ mod prompt;
 mod render;
 mod setup;
 mod translate;
+mod walkthrough;
 
 use cli::{Cli, Request};
 use context::{context, here};
@@ -32,6 +33,7 @@ use prompt::SetupFlags;
 use render::render;
 use setup::{greeting, setting_up};
 use translate::{configuration, quality};
+use walkthrough::walk;
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -106,6 +108,11 @@ async fn main() -> ExitCode {
             term: term.join(" "),
             season,
         },
+        // A walkthrough narrates for minutes and produces one report at its end, not a
+        // value that arrives once, so like streaming and watching it runs its own way.
+        Request::Walkthrough { item } => {
+            return walk(&ctx, &item.join(" "), cli.json).await;
+        }
         Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,

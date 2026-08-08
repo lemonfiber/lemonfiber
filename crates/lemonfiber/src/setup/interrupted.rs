@@ -61,14 +61,14 @@ pub(super) async fn recover_setup(
     match recovery.resolve(ask_recovery_choice(surface)) {
         Resolution::Resume => {
             println!("\nResuming.");
-            resume_and_start(ctx, paths, progress).await
+            resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::RollBack(undos) => {
             if let Err(problem) = recover::undo(&undos, &env) {
                 return complain(&problem);
             }
             println!("\nRolled back. Applying again.");
-            resume_and_start(ctx, paths, progress).await
+            resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::StartOver(undos) => {
             if let Err(problem) = recover::undo(&undos, &env) {
@@ -83,13 +83,18 @@ pub(super) async fn recover_setup(
 }
 
 /// Re-apply the answers a stopped setup recorded, then bring the stack up.
-pub(super) async fn resume_and_start(mut ctx: Ctx, paths: &Paths, progress: Progress) -> ExitCode {
+pub(super) async fn resume_and_start(
+    mut ctx: Ctx,
+    paths: &Paths,
+    surface: &dyn Surface,
+    progress: Progress,
+) -> ExitCode {
     let mut wizard = Wizard::resume(ctx.environment, progress);
     match core_setup::resume(&mut wizard, paths, ctx.stack, &stamp()) {
         Ok(()) => {
             ctx.settings = read_settings();
             println!("\nSetup is done — bringing your stack up.");
-            start(&ctx).await
+            start(&ctx, surface).await
         }
         Err(problem) => complain(&problem),
     }

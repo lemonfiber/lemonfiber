@@ -19,6 +19,7 @@ mod quality;
 mod seed;
 mod stack;
 mod trace;
+pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::model::{ConfigReport, SupervisionReport, VersionReport};

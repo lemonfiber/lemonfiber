@@ -1,22 +1,24 @@
-//! Driving Jellyfin's first-run setup.
+//! Talking to Jellyfin — the media server, and the one service lemonfiber holds an
+//! account on rather than a key.
 //!
-//! Jellyfin is the one service lemonfiber sets an account on rather than reading
-//! a key from: it writes no key to disk and asks for its first account through a
-//! setup wizard whose endpoints answer only until setup completes. So this reads
-//! whether the wizard is done and, where it is not, creates the administrator
-//! with a password lemonfiber minted and finishes the wizard — after which those
-//! endpoints stop answering, which is what makes the whole thing safe to drive
-//! exactly once.
+//! Jellyfin writes no key to disk and asks for its first account through a setup wizard
+//! whose endpoints answer only until that wizard completes. So lemonfiber drives the
+//! wizard once, mints the administrator, and afterwards signs in as that administrator
+//! for everything else. This file is the client and the plumbing all of that shares; the
+//! two things done with it — driving the first run, and reading and rescanning the
+//! library — are a file each beside it.
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::{Failure, Library, MediaServer};
+use crate::ports::service::Failure;
 use crate::recyclarr::Kind;
+
+mod library;
+mod setup;
 
 /// The header Jellyfin identifies a client through on the sign-in that mints an access
 /// token — its own scheme, named as it parses it. The values only have to be present and
@@ -73,9 +75,24 @@ impl Jellyfin {
         self.endpoint.json_request(method, path, body)
     }
 
-    /// Sign in as the household admin and return the access token the library reads carry.
-    /// Jellyfin mints the token from a username and password rather than a stored key, so
-    /// a read is always this exchange first, then the read under the token it hands back.
+    /// A request signed in as the household admin, which every read and every rescan is.
+    ///
+    /// Jellyfin mints its token from a username and password rather than a stored key, so
+    /// each of these is the sign-in exchange first and then the request under the token it
+    /// hands back.
+    async fn as_admin(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<String>,
+    ) -> Result<Request, Failure> {
+        let token = self.sign_in().await?;
+        let mut request = self.request(method, path, body);
+        request.headers.push((TOKEN_HEADER.to_owned(), token));
+        Ok(request)
+    }
+
+    /// Sign in as the household admin and return the access token the reads carry.
     async fn sign_in(&self) -> Result<String, Failure> {
         let body =
             serde_json::json!({ "Username": self.username, "Pw": self.password }).to_string();
@@ -91,14 +108,6 @@ impl Jellyfin {
     }
 }
 
-/// The one field of the public system info lemonfiber reads: whether the setup
-/// wizard has already run. Named as Jellyfin sends it, in `PascalCase`.
-#[derive(Deserialize)]
-struct PublicInfo {
-    #[serde(rename = "StartupWizardCompleted", default)]
-    startup_wizard_completed: bool,
-}
-
 /// The one field of a sign-in lemonfiber reads: the access token every later read
 /// carries. Named as Jellyfin sends it, in `PascalCase`.
 #[derive(Deserialize)]
@@ -107,79 +116,11 @@ struct Session {
     access_token: String,
 }
 
-/// A page of library items, as Jellyfin returns them under `Items`.
-#[derive(Deserialize)]
-struct ItemPage {
-    #[serde(rename = "Items", default)]
-    items: Vec<LibraryItem>,
-}
-
-/// The one field of a library item a trace reads: its title, to match the term against.
-#[derive(Deserialize)]
-struct LibraryItem {
-    #[serde(rename = "Name", default)]
-    name: String,
-}
-
 /// Jellyfin's own name for the item type a [`Kind`] traces — a series for television, a
 /// movie for film — the value its `IncludeItemTypes` filter narrows the library by.
 const fn item_type(kind: Kind) -> &'static str {
     match kind {
         Kind::Sonarr => "Series",
         Kind::Radarr => "Movie",
-    }
-}
-
-#[async_trait]
-impl MediaServer for Jellyfin {
-    async fn startup_completed(&self) -> Result<bool, Failure> {
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, "/System/Info/Public", None))
-            .await?;
-        let info: PublicInfo = self
-            .endpoint
-            .decode(&response, "the public system info could not be read")?;
-        Ok(info.startup_wizard_completed)
-    }
-
-    async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure> {
-        let body = serde_json::json!({ "Name": name, "Password": password }).to_string();
-        let created = self
-            .endpoint
-            .send(&self.request(Method::Post, "/Startup/User", Some(body)))
-            .await?;
-        self.endpoint.expect_success(&created)?;
-
-        let completed = self
-            .endpoint
-            .send(&self.request(Method::Post, "/Startup/Complete", None))
-            .await?;
-        self.endpoint.expect_success(&completed)
-    }
-}
-
-#[async_trait]
-impl Library for Jellyfin {
-    async fn has_item(&self, kind: Kind, term: &str) -> Result<bool, Failure> {
-        let token = self.sign_in().await?;
-
-        // Narrow to the media type and recurse into every library folder, then match the
-        // term in the same case-insensitive, contains way the *arr found the item by — so
-        // the two ends of the trace agree on what "a title matches" means. The token, not
-        // a query string, carries the term, so nothing here has to be URL-encoded.
-        let path = format!("/Items?Recursive=true&IncludeItemTypes={}", item_type(kind));
-        let mut request = self.request(Method::Get, &path, None);
-        request.headers.push((TOKEN_HEADER.to_owned(), token));
-        let response = self.endpoint.send(&request).await?;
-        let page: ItemPage = self
-            .endpoint
-            .decode(&response, "the library could not be read")?;
-
-        let needle = term.to_lowercase();
-        Ok(page
-            .items
-            .iter()
-            .any(|item| item.name.to_lowercase().contains(&needle)))
     }
 }

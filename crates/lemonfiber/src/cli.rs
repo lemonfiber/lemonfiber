@@ -144,6 +144,18 @@ pub(crate) enum Request {
         #[arg(long)]
         member: Option<String>,
     },
+    /// Add one thing, end to end, and watch every step of it happen.
+    ///
+    /// The walk a first run is offered: search the indexers, grab a release, download
+    /// it, import it, and see it appear in the library — narrated as it goes, so that
+    /// afterwards you know what your stack does because you watched it do it. If any
+    /// link is broken this is where it shows, with the step named and a way out.
+    ///
+    /// Name something, or name nothing and be suggested something likely to work.
+    Walkthrough {
+        /// What to add, named as you would say it.
+        item: Vec<String>,
+    },
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,

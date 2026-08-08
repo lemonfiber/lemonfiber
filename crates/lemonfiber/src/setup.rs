@@ -20,6 +20,7 @@ use lemonfiber_core::wizard::{offer_setup, Progress, Status, Wizard};
 use lemonfiber_core::PRODUCT;
 
 mod boot;
+mod first_content;
 mod interrupted;
 
 use boot::{preflight, start};
@@ -244,7 +245,7 @@ async fn drive(
             // they are refreshed before the stack is brought up against them.
             ctx.settings = read_settings();
             println!("\nSetup is done — bringing your stack up.");
-            start(&ctx).await
+            start(&ctx, surface).await
         }
         Ok(core_setup::Outcome::Abandoned) => {
             println!("\nSetup was left here — nothing was written.");

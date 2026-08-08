@@ -12,12 +12,14 @@ use async_trait::async_trait;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 mod applications;
+mod catalogue;
 mod clients;
 mod failure;
 mod quality;
 mod trace;
 
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
+pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
     Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, QueueDepth, Queues,
     RegisteredClient, RegisteredFolder, RootFolder, Transfers,

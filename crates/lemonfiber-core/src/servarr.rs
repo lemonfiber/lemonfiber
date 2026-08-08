@@ -28,6 +28,7 @@ use crate::ports::service::{
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 
+mod catalogue;
 mod pipeline;
 mod quality;
 
