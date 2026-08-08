@@ -25,7 +25,8 @@ use crate::quality::{Preset, Selection};
 /// The two services whose quality an operator chooses by resolution, and so the
 /// two [`crate::quality`] speaks to. Music and books have a different axis and
 /// are not resolution presets, so they are not here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Kind {
     /// Sonarr — television.
     Sonarr,
@@ -125,6 +126,28 @@ impl Kind {
         match self {
             Self::Sonarr => Some("episode"),
             Self::Radarr => None,
+        }
+    }
+
+    /// The external catalogue this service files by — the identifier an add is made
+    /// with. The two services use different catalogues, and a field one does not know is
+    /// a field it refuses the whole request over.
+    #[must_use]
+    pub const fn reference_field(self) -> &'static str {
+        match self {
+            Self::Sonarr => "tvdbId",
+            Self::Radarr => "tmdbId",
+        }
+    }
+
+    /// The add option that tells the service to go and look for what it has just taken
+    /// on, rather than filing it and waiting for its next scheduled sweep — which is the
+    /// difference between a walkthrough and a bookmark.
+    #[must_use]
+    pub const fn search_option(self) -> &'static str {
+        match self {
+            Self::Sonarr => "searchForMissingEpisodes",
+            Self::Radarr => "searchForMovie",
         }
     }
 
@@ -428,6 +451,10 @@ mod tests {
         // Only television files its items in parts; a film is the whole item.
         assert_eq!(Kind::Sonarr.parts_endpoint(), Some("episode"));
         assert_eq!(Kind::Radarr.parts_endpoint(), None);
+        assert_eq!(Kind::Sonarr.reference_field(), "tvdbId");
+        assert_eq!(Kind::Radarr.reference_field(), "tmdbId");
+        assert_eq!(Kind::Sonarr.search_option(), "searchForMissingEpisodes");
+        assert_eq!(Kind::Radarr.search_option(), "searchForMovie");
         assert_eq!(Kind::Sonarr.parts_filter(), "seriesId");
         assert_eq!(Kind::Radarr.parts_filter(), "movieId");
         // The words a household uses, not the services' own.

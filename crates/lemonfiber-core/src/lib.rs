@@ -68,6 +68,7 @@ mod test_support;
 pub mod trace;
 pub mod transcoding;
 pub mod validate;
+pub mod walkthrough;
 pub mod wizard;
 
 /// The name of the product, as it appears to users.

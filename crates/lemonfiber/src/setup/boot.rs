@@ -7,11 +7,15 @@
 use std::process::ExitCode;
 
 use lemonfiber_core::app::{diagnose, dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::{Category, Overall};
 
 use crate::engine::pull_showing;
 use crate::exit::{complain, settled, PREFLIGHT};
 use crate::render::render;
+
+use super::first_content;
+use super::Surface;
 
 /// The form setup brings up once the answers are applied.
 ///
@@ -50,7 +54,7 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
 /// inside `up`. Only once they are down is the stack brought up and waited on for
 /// health; a pull that failed stops here rather than starting against images that
 /// never arrived.
-pub(super) async fn start(ctx: &Ctx) -> ExitCode {
+pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
     let forms = vec![STARTER_FORM.to_owned()];
     if let Err(code) = pull_showing(ctx, &forms, false).await {
         return code;
@@ -59,19 +63,30 @@ pub(super) async fn start(ctx: &Ctx) -> ExitCode {
     match dispatch(Command::Up { forms }, ctx).await {
         Ok(outcome) => {
             render(&outcome, false);
-            settled(&outcome)
+            // The offer is the last thing setup does, and it needs to know what the stack
+            // actually settled to — which is right here, and nowhere else afterwards.
+            first_content::offer(ctx, surface, condition(&outcome), settled(&outcome)).await
         }
         Err(problem) => complain(&problem),
     }
 }
 
+/// What the stack settled to, where the outcome is one a lifecycle produced.
+fn condition(outcome: &Outcome) -> Option<Condition> {
+    match outcome {
+        Outcome::Lifecycle(report) => report.condition,
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{preflight, start};
+    use super::{condition, preflight, start};
+    use lemonfiber_core::app::Outcome;
     use lemonfiber_core::config::Protocols;
     use lemonfiber_core::stack::Source;
 
-    use crate::setup::tests::{ctx, working_ctx, FakeEngine};
+    use crate::setup::tests::{ctx, working_ctx, FakeEngine, Scripted};
 
     #[tokio::test]
     async fn an_environment_that_cannot_work_stops_setup_before_a_question() {
@@ -97,7 +112,7 @@ mod tests {
     #[tokio::test]
     async fn a_pull_that_failed_stops_before_starting_against_images_that_never_came() {
         // Starting against images that never arrived is worse than not starting.
-        let code = start(&ctx()).await;
+        let code = start(&ctx(), &Scripted::saying(false, &[])).await;
         assert_ne!(
             format!("{code:?}"),
             format!("{:?}", std::process::ExitCode::SUCCESS)
@@ -108,6 +123,19 @@ mod tests {
     /// settle, without the fifteen containers the shipped one would wait on.
     static QUIET: include_dir::Dir<'_> =
         include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/quiet-stack");
+
+    #[test]
+    fn only_a_lifecycle_says_what_the_stack_settled_to() {
+        // Asked of whatever `up` handed back: anything that is not a lifecycle report has
+        // no condition to read, and offering a walk over one would be a guess.
+        let report = lemonfiber_core::model::VersionReport {
+            binary: "0".to_owned(),
+            supported_schema: Vec::new(),
+            stack: String::new(),
+            compose: None,
+        };
+        assert_eq!(condition(&Outcome::Version(report)), None);
+    }
 
     #[tokio::test]
     async fn a_stack_that_came_up_reports_how_it_settled() {
@@ -123,7 +151,7 @@ mod tests {
         ctx.settings.protocols = Protocols::both();
         ctx.settings.stack_dir = Some(stack_dir.clone());
 
-        let code = start(&ctx).await;
+        let code = start(&ctx, &Scripted::saying(false, &[])).await;
 
         assert_eq!(
             format!("{code:?}"),
