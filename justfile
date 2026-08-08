@@ -43,20 +43,22 @@ release-workflow:
     @grep -q 'allow-dirty = ' Cargo.toml || (echo "allow-dirty not restored" && exit 1)
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.
-# The binary crate is coming under the gate a file at a time; what is still
-# listed here has not been made testable yet, and the list only ever shrinks.
-# adapters/nntp.rs is the exception, and the path is by crate rather than by
-# file for it. It is thoroughly covered from both tests/nntp.rs and its own
-# module, which is what this crate's two compilations each require. What is
-# left is four map_err arms on operations that cannot fail: a TLS backend that
-# will not initialise, and a socket erroring mid-exchange. Neither can be
-# provoked from both compilations at once, since one drives it through the
-# public port and the other through private functions.
-# render.rs is already in, which is why it builds its lines and hands them back
-# rather than printing them. Per-item exclusion would need #[coverage(off)],
-# which is nightly-only, so applicable code is instead kept coverable — see
-# .docs/architecture/error-model.md on writing assertions that leave no branch
-# a test cannot reach.
+#
+# What is still listed here is the surface's outermost edge: the entry point, the
+# terminal, where this machine keeps its files, the reads that stream, and the
+# first-run walk. Each reaches the world at the point where a test cannot follow.
+# Everything they used to hold — the command line, the exit codes, the request
+# translation, every renderer — is out of them now and under the gate.
+#
+# adapters/nntp.rs is an exception of a different kind: it is thoroughly tested,
+# and what remains is four map_err arms on operations that cannot fail. Neither
+# can be provoked from both of this crate's compilations at once, since one drives
+# it through the public port and the other through private functions.
+#
+# Per-item exclusion would need #[coverage(off)], which is nightly-only, so
+# applicable code is instead kept coverable — see .docs/architecture/error-model.md
+# on writing assertions that leave no branch a test cannot reach.
+#
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|keyboard|setup)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|keyboard|context|engine|setup)\.rs|crates/lemonfiber/src/setup/.*\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info

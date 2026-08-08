@@ -225,3 +225,51 @@ fn no_feature_requirement_identifier_appears_in_a_comment() {
         }
     }
 }
+
+/// No file grows past what one sitting can hold.
+///
+/// A file that keeps accreting is how a codebase stops being navigable: the third
+/// concern arrives, nobody notices, and by the fifth there is nowhere obvious to
+/// put the sixth. The cap is deliberately mechanical — it makes no judgement about
+/// whether a file is *cohesive*, only that it is finite — and it is a floor under
+/// review rather than a substitute for it.
+///
+/// Counted before the test module, because tests legitimately double a file and
+/// there is no reason to ration them.
+///
+/// When this fails, the answer is a module: split the file into a directory of the
+/// same name, one concern per file, tests beside the code they exercise and shared
+/// fixtures in a `fixtures.rs` of their own. Raising the number is not the answer.
+#[test]
+fn no_source_file_outgrows_reading_in_one_sitting() {
+    /// Production lines a single file may hold.
+    const CAP: usize = 550;
+
+    let mut oversized: Vec<(PathBuf, usize)> = Vec::new();
+    for (path, text) in sources() {
+        if path.to_string_lossy().contains("tests") {
+            continue;
+        }
+        let production = text
+            .lines()
+            .position(|line| {
+                let trimmed = line.trim_start();
+                trimmed.starts_with("mod tests") || trimmed.starts_with("pub(crate) mod tests")
+            })
+            .map_or_else(|| text.lines().count(), |at| at.saturating_sub(1));
+        if production > CAP {
+            oversized.push((path, production));
+        }
+    }
+    oversized.sort_by_key(|(_, lines)| std::cmp::Reverse(*lines));
+
+    let named: Vec<String> = oversized
+        .iter()
+        .map(|(path, lines)| format!("{} ({lines})", path.display()))
+        .collect();
+    assert!(
+        oversized.is_empty(),
+        "past {CAP} production lines, split into a module rather than raising the cap: {}",
+        named.join(", ")
+    );
+}
