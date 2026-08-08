@@ -6,11 +6,11 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{diagnose, dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::doctor::{Category, Overall};
 
 use crate::engine::pull_showing;
-use crate::exit::{complain, settled, FAILURE, PREFLIGHT};
+use crate::exit::{complain, settled, PREFLIGHT};
 use crate::render::render;
 
 /// The form setup brings up once the answers are applied.
@@ -28,21 +28,12 @@ const STARTER_FORM: &str = "tv";
 /// or undetermined result stops setup before a single question is asked; a healthy
 /// one passes without a word.
 pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
-    let report = match dispatch(
-        Command::Doctor {
-            only: Some(Category::Environment),
-            disruptive: false,
-        },
-        ctx,
-    )
-    .await
-    {
-        Ok(Outcome::Doctor(report)) => report,
-        // Asking for a diagnosis and being handed anything else cannot happen, but
-        // is not worth a crash if it somehow does.
-        Ok(_) => return Err(ExitCode::from(FAILURE)),
-        Err(problem) => return Err(complain(&problem)),
-    };
+    // Asked for as a report rather than through the command enum: a dispatched
+    // diagnosis comes back as an outcome that has to be destructured, with an arm
+    // for every answer it could never be.
+    let report = diagnose(ctx, Some(Category::Environment), false)
+        .await
+        .map_err(|problem| complain(&problem))?;
 
     if matches!(report.overall, Overall::Broken | Overall::Unknown) {
         render(&Outcome::Doctor(report), false);
@@ -71,5 +62,74 @@ pub(super) async fn start(ctx: &Ctx) -> ExitCode {
             settled(&outcome)
         }
         Err(problem) => complain(&problem),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{preflight, start};
+    use lemonfiber_core::config::Protocols;
+    use lemonfiber_core::stack::Source;
+
+    use crate::setup::tests::{ctx, working_ctx, FakeEngine};
+
+    #[tokio::test]
+    async fn an_environment_that_cannot_work_stops_setup_before_a_question() {
+        // Nothing setup does works without a container engine, so it is checked
+        // before the first question rather than after eleven answers.
+        assert!(preflight(&ctx()).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_stops_setup_with_its_own_words() {
+        // The checks need the stack before any of them can run, so a stack that
+        // will not read is reported as itself rather than as a failed environment.
+        let mut ctx = working_ctx();
+        ctx.stack = Source::External(std::path::Path::new("/lemonfiber-not-a-real-stack"));
+        assert!(preflight(&ctx).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn an_environment_that_works_passes_without_a_word() {
+        assert!(preflight(&working_ctx()).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_pull_that_failed_stops_before_starting_against_images_that_never_came() {
+        // Starting against images that never arrived is worse than not starting.
+        let code = start(&ctx()).await;
+        assert_ne!(
+            format!("{code:?}"),
+            format!("{:?}", std::process::ExitCode::SUCCESS)
+        );
+    }
+
+    /// A stack with no services of its own — enough for a real `up` to run and
+    /// settle, without the fifteen containers the shipped one would wait on.
+    static QUIET: include_dir::Dir<'_> =
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/quiet-stack");
+
+    #[tokio::test]
+    async fn a_stack_that_came_up_reports_how_it_settled() {
+        // The far end of a first run: images down, stack up, and how it settled put
+        // on screen. It needs somewhere to write the stack Docker reads and an
+        // engine that answers, which is what an applied setup leaves behind.
+        let stack_dir =
+            std::env::temp_dir().join(format!("lemonfiber-boot-{}-started", std::process::id()));
+        let _ = std::fs::remove_dir_all(&stack_dir);
+        let mut ctx = working_ctx();
+        ctx.engine = std::sync::Arc::new(FakeEngine::quiet());
+        ctx.stack = Source::Embedded(&QUIET);
+        ctx.settings.protocols = Protocols::both();
+        ctx.settings.stack_dir = Some(stack_dir.clone());
+
+        let code = start(&ctx).await;
+
+        assert_eq!(
+            format!("{code:?}"),
+            format!("{:?}", std::process::ExitCode::SUCCESS),
+            "a stack that came up is not reported as a failure"
+        );
+        let _ = std::fs::remove_dir_all(&stack_dir);
     }
 }

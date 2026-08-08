@@ -263,7 +263,16 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
 /// needs a slice of it — the VPN check needs the engine, the resolved pair and
 /// the operator's echo choice — and building them at the point of use keeps the
 /// context a bag of capabilities rather than a registry of features.
-pub(super) async fn diagnose(
+///
+/// Public as well as dispatched, because a caller that wants a diagnosis wants a
+/// report: routing it through the command enum would hand back an outcome that
+/// has to be destructured, with an arm for every answer it cannot be.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the stack cannot be read, which is the one thing
+/// the checks need before any of them can run.
+pub async fn diagnose(
     ctx: &Ctx,
     only: Option<Category>,
     disruptive: bool,
