@@ -428,6 +428,18 @@ mod tests {
     }
 
     #[test]
+    fn a_host_and_a_container_disagreeing_about_the_time_cannot_render_a_countdown() {
+        // Durations come from one clock, and the arithmetic is saturating either
+        // way: a remaining count larger than the total, or a speed read after the
+        // figure it divides, must not produce a negative or a wrapped duration.
+        assert_eq!(eta(0, 1_000), Some(Duration::from_secs(0)), "already there");
+        assert_eq!(eta(u64::MAX, 1), Some(Duration::from_secs(u64::MAX)));
+        // A speed of zero is the disagreement made concrete: nothing is moving, so
+        // there is no arrival time rather than an infinite or negative one.
+        assert_eq!(eta(1_000, 0), None);
+    }
+
+    #[test]
     fn a_percentage_stays_between_zero_and_a_hundred() {
         assert_eq!(percent(0, 100), 0);
         assert_eq!(percent(50, 100), 50);

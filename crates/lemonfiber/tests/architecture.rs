@@ -273,3 +273,43 @@ fn no_source_file_outgrows_reading_in_one_sitting() {
         named.join(", ")
     );
 }
+
+/// A failure reaches the operator on stderr, so a script can read the answer on
+/// stdout and a person can read the problem beside it.
+///
+/// Guarded rather than merely true: `complain` is one function, and the day
+/// somebody adds a line to it the difference between `println!` and `eprintln!`
+/// is one character and no test. A machine-readable run that mixed its diagnosis
+/// into its output would be broken in a way nothing else here would catch.
+#[test]
+fn a_failure_is_reported_on_stderr_and_never_on_stdout() {
+    let exit = std::fs::read_to_string("src/exit.rs").unwrap_or_default();
+    let complain = exit
+        .split_once("pub(crate) fn complain")
+        .and_then(|(_, rest)| rest.split_once("\n}\n"))
+        .map(|(body, _)| body)
+        .unwrap_or_default();
+
+    assert!(!complain.is_empty(), "the reporter was found");
+    assert!(
+        complain.contains("eprintln!"),
+        "it reports something at all"
+    );
+    assert!(
+        !complain.contains("println!(") || !complain.contains(" println!"),
+        "a diagnosis on stdout would corrupt a machine-readable run"
+    );
+    for line in complain.lines() {
+        let statement = line.trim_start();
+        assert!(
+            !statement.starts_with("println!"),
+            "reports on stdout: {statement}"
+        );
+        // Nothing in a failure path may wait for a person: a non-interactive run
+        // has nobody to answer, and a prompt there hangs a script for ever.
+        assert!(
+            !statement.contains("read_line") && !statement.contains("stdin"),
+            "prompts while reporting: {statement}"
+        );
+    }
+}
