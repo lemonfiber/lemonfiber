@@ -1,0 +1,55 @@
+# Tell the spec a release was published, so it records what shipped.
+#
+# `release-finalize` in the spec repo has always been triggered by a
+# `release-published` dispatch and said in its own header that the binary repo
+# fires one on publish. Nothing did. Publishing 0.5.0 announced it to Discord and
+# otherwise did nothing at all, leaving the manifest at `releasable` — which by
+# OPS-R52 blocks the next version from being staged. So a release nobody
+# remembered to record by hand did not merely leave the record stale, it stopped
+# the train.
+#
+# Fires on publish rather than on the draft, because a draft is not a release: it
+# is a thing a person is still deciding about.
+name: release-record
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Mint a token that can reach the spec
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: spec
+
+      - name: Ask the spec to record it
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # The manifest is named by version, not by tag. Matched strictly rather
+          # than by a glob: the value only ever travels as a quoted argument, so
+          # nothing is evaluated, but a check worth writing is worth meaning.
+          version="${TAG#v}"
+          printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || {
+            echo "::error::${TAG} is not a version tag; nothing to record."
+            exit 1
+          }
+          gh api --method POST "repos/${OWNER}/spec/dispatches" \
+            -f event_type=release-published \
+            -F "client_payload[version]=${version}"
+          echo "asked the spec to record ${version}."
