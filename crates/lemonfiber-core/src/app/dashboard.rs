@@ -17,12 +17,12 @@ use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::dashboard::{
-    eta, Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing, Storage,
-    Transfer, Vpn,
+    eta, Hardlink, Panel, Protocol, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
 };
-use crate::docker::{condition, survey, Condition, Service};
+use crate::docker::{survey, Service};
 use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
+use crate::health::{observed, Egress, Reach, Summary};
 use crate::ports::service::Queues;
 use crate::storage::{test_link, Linked};
 
@@ -32,10 +32,16 @@ use super::targets::{
 
 /// Gather one snapshot of what the stack is doing right now.
 ///
-/// Reads the services through the engine and summarises their health; a stack that
-/// cannot be reached leaves both unavailable and the standing disconnected. The
-/// panels without a gatherer are marked pending — they do not drag the standing
-/// down, because a panel nobody has wired is not a source that failed.
+/// Reads the services through the engine; a stack that cannot be reached leaves
+/// their panel unavailable and the telemetry disconnected. The panels without a
+/// gatherer are marked pending — they do not drag the telemetry down, because a
+/// panel nobody has wired is not a source that failed.
+///
+/// The health summary is not read from the panels but computed from what they
+/// found, through the one shared computation every surface uses. So the tunnel is
+/// read before the summary rather than beside it: a stack whose containers are all
+/// healthy while its download client's traffic leaves outside the tunnel is the
+/// case this ordering exists for.
 pub async fn gather(ctx: &Ctx) -> Snapshot {
     let configured = ctx.settings.data_root.is_some();
     // The manifest every stack-derived panel reads from, resolved once — or the one
@@ -48,18 +54,25 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
         .map_err(|err| err.problem().summary);
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
 
-    let observed = observe(ctx, manifest.as_ref()).await;
-    let reach = reach(configured, observed.as_ref());
+    let seen = observe(ctx, manifest.as_ref()).await;
+    let reach = Reach::of(configured, seen.as_deref().ok());
+    let vpn = vpn(ctx, manifest.as_ref()).await;
 
-    let (services, health) = match observed {
-        Ok(services) => {
-            let health = Health::of(&services);
-            (Panel::Ready(services), Panel::Ready(health))
-        }
-        Err(reason) => (
-            Panel::unavailable(reason.clone()),
-            Panel::unavailable(reason),
-        ),
+    // A stack that could not be read has nothing to raise conditions about; the
+    // summary then rests on the reach alone and says `unknown` rather than healthy.
+    let health = Summary::of(
+        reach,
+        &observed(
+            seen.as_deref().unwrap_or_default(),
+            egress(vpn.as_ref()),
+            &ctx.stamp(),
+        )
+        .iter()
+        .collect::<Vec<_>>(),
+    );
+    let services = match seen {
+        Ok(services) => Panel::Ready(services),
+        Err(reason) => Panel::unavailable(reason),
     };
 
     // Storage's exhaustion projection needs the rate downloads are landing on the
@@ -70,13 +83,27 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
     Snapshot {
         // Only a source that genuinely failed marks the screen degraded; the
         // pending panels below are not-yet-built, not down, so they pass `false`.
-        standing: Standing::read(reach, false),
+        telemetry: Telemetry::read(reach, false),
         health,
-        vpn: vpn(ctx, manifest.as_ref()).await,
+        vpn,
         transfers,
         queue: queues(ctx, manifest.as_ref(), project.as_deref()).await,
         storage,
         services,
+    }
+}
+
+/// What the VPN panel proved about the download client's traffic.
+///
+/// A panel that could not be filled is unreadable rather than fine: the reason to
+/// run a torrent client behind a tunnel is unverified, and the summary is entitled
+/// to say so.
+fn egress(vpn: Option<&Panel<Vpn>>) -> Egress {
+    match vpn {
+        None => Egress::NotApplicable,
+        Some(Panel::Unavailable { .. }) => Egress::Unreadable,
+        Some(Panel::Ready(vpn)) if vpn.egress_matches => Egress::Behind,
+        Some(Panel::Ready(_)) => Egress::Leaking,
     }
 }
 
@@ -284,18 +311,6 @@ async fn observe(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Result<Vec<
     Ok(survey(manifest, &profiles, &containers))
 }
 
-/// How far the surface reached, from which the standing is read.
-fn reach(configured: bool, observed: Result<&Vec<Service>, &String>) -> Reach {
-    if !configured {
-        return Reach::Unconfigured;
-    }
-    match observed {
-        Err(_) => Reach::Disconnected,
-        Ok(services) if condition(services) == Condition::Inactive => Reach::Idle,
-        Ok(_) => Reach::Up,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -307,7 +322,8 @@ mod tests {
     use super::{gather, vpn};
     use crate::app::Ctx;
     use crate::config::{PortForward, Protocols, Settings};
-    use crate::dashboard::{Hardlink, Panel, Protocol, Reading, Standing, Transfer, Vpn};
+    use crate::dashboard::{Hardlink, Panel, Protocol, Reading, Telemetry, Transfer, Vpn};
+    use crate::health::Standing;
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
@@ -386,17 +402,22 @@ mod tests {
             matches!(snapshot.services, Panel::Ready(ref services) if !services.is_empty()),
             "the services panel is filled"
         );
-        // The health summary is the stack's condition, not the dashboard's: the
-        // services the engine reports are healthy, so nothing wants attention, even
-        // though the rest of the manifest's services are absent.
-        assert!(
-            matches!(&snapshot.health, Panel::Ready(health) if health.needing_attention == 0),
-            "nothing the engine reported wants attention"
-        );
-        // Standing is the telemetry state, not the stack's: every source that has a
-        // gatherer answered and the pending panels are not failures, so it reads
+        // The health summary is the stack's verdict, not the screen's: the services
+        // the engine reports are healthy, so nothing wants attention — except that
+        // this stack declares a torrent client whose egress cannot be read here, and
+        // an unverified tunnel is a finding rather than silence.
+        assert_eq!(snapshot.health.standing, Standing::Degraded);
+        let affected: Vec<&str> = snapshot
+            .health
+            .affected
+            .iter()
+            .map(|item| item.check.as_str())
+            .collect();
+        assert_eq!(affected, vec!["vpn.egress"]);
+        // Telemetry is how the screen is doing, not the stack: every source that has
+        // a gatherer answered and the pending panels are not failures, so it reads
         // live even though the stack is only partly up.
-        assert_eq!(snapshot.standing, Standing::Live);
+        assert_eq!(snapshot.telemetry, Telemetry::Live);
     }
 
     #[tokio::test]
@@ -417,7 +438,9 @@ mod tests {
         // Containers exist but none is running — configured, reachable, nothing up.
         let engine = Reporting::holding(&LIBRARY, Lifecycle::Exited, Health::None);
         let snapshot = gather(&ctx(engine)).await;
-        assert_eq!(snapshot.standing, Standing::NoStack);
+        assert_eq!(snapshot.telemetry, Telemetry::NoStack);
+        // An idle stack is stopped on purpose, not a failure.
+        assert_eq!(snapshot.health.standing, Standing::Stopped);
     }
 
     #[tokio::test]
@@ -444,7 +467,7 @@ mod tests {
             Environment::MacOs,
         );
         let snapshot = gather(&ctx).await;
-        assert_eq!(snapshot.standing, Standing::Disconnected);
+        assert_eq!(snapshot.telemetry, Telemetry::Disconnected);
         assert!(!snapshot.services.is_available());
         assert!(
             !snapshot.queue.is_available(),
@@ -516,11 +539,14 @@ mod tests {
     #[tokio::test]
     async fn an_unreachable_engine_leaves_services_unavailable_and_reads_disconnected() {
         let snapshot = gather(&ctx(Reporting::absent())).await;
-        assert_eq!(snapshot.standing, Standing::Disconnected);
+        assert_eq!(snapshot.telemetry, Telemetry::Disconnected);
         assert!(
-            !snapshot.services.is_available() && !snapshot.health.is_available(),
-            "a stack that cannot be read leaves its services and health unavailable, not empty"
+            !snapshot.services.is_available(),
+            "a stack that cannot be read leaves its services unavailable, not empty"
         );
+        // The summary is still there, and says it does not know — never healthy, and
+        // never absent, since a blank space is a reading an operator can misread.
+        assert_eq!(snapshot.health.standing, Standing::Unknown);
     }
 
     #[tokio::test]
@@ -544,7 +570,8 @@ mod tests {
             Environment::MacOs,
         );
         let snapshot = gather(&ctx).await;
-        assert_eq!(snapshot.standing, Standing::Unconfigured);
+        assert_eq!(snapshot.telemetry, Telemetry::Unconfigured);
+        assert_eq!(snapshot.health.standing, Standing::Unconfigured);
         assert!(
             !snapshot.storage.is_available(),
             "with no data location there is no volume to report free space on"
@@ -1092,5 +1119,66 @@ mod tests {
             super::storage(&ctx, 0).await,
             Panel::Ready(s) if s.exhaustion.is_none()
         ));
+    }
+
+    // ── What the tunnel panel means to the summary ────────────────
+
+    /// A filled VPN panel whose client egress does or does not match the tunnel's.
+    fn vpn_panel_with(egress_matches: bool) -> Panel<Vpn> {
+        Panel::Ready(Vpn {
+            exit_ip: "203.0.113.7".to_owned(),
+            country: "NL".to_owned(),
+            forwarded_port: None,
+            egress_matches,
+        })
+    }
+
+    #[test]
+    fn the_tunnel_panel_reads_across_to_the_summary_without_losing_the_middle_case() {
+        use crate::health::Egress;
+        // No panel is no VPN to be wrong about; a panel that could not be filled is
+        // unverified rather than fine — the distinction the summary rests on.
+        assert_eq!(super::egress(None), Egress::NotApplicable);
+        assert_eq!(
+            super::egress(Some(&Panel::unavailable("the gateway did not answer"))),
+            Egress::Unreadable
+        );
+        assert_eq!(super::egress(Some(&vpn_panel_with(true))), Egress::Behind);
+        assert_eq!(super::egress(Some(&vpn_panel_with(false))), Egress::Leaking);
+    }
+
+    #[tokio::test]
+    async fn a_healthy_stack_leaking_outside_the_tunnel_is_summarised_as_critical() {
+        // The case the summary exists for, end to end: every container the engine
+        // reports is healthy, and the download client's traffic is not behind the
+        // tunnel. A count of running containers would call this fine.
+        let tunnel = Tunnel {
+            client_ip: Some("198.51.100.9"),
+            ..healthy_tunnel()
+        };
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(tunnel)),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        let snapshot = gather(&ctx).await;
+        assert_eq!(snapshot.health.standing, Standing::Critical);
+        assert!(snapshot.health.standing.wants_attention());
+        // And the screen itself is fine, which is a separate matter entirely.
+        assert_eq!(snapshot.telemetry, Telemetry::Live);
+    }
+
+    #[tokio::test]
+    async fn a_stack_behind_its_tunnel_with_nothing_wrong_is_healthy() {
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(healthy_tunnel())),
+            Some("https://echo"),
+            forwarding(),
+            Protocols::both(),
+        );
+        let snapshot = gather(&ctx).await;
+        assert_eq!(snapshot.health.standing, Standing::Healthy);
+        assert_eq!(snapshot.health.said(), "healthy");
     }
 }

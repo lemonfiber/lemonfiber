@@ -45,6 +45,7 @@ pub mod docker;
 pub mod doctor;
 mod endpoint;
 pub mod error;
+pub mod health;
 pub mod household;
 pub mod jellyfin;
 pub mod journal;
