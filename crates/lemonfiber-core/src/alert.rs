@@ -16,9 +16,11 @@
 //! layer's; deciding what is worth saying is this one's.
 
 mod digest;
+mod kind;
 mod moment;
 mod outbox;
 
 pub use digest::{Digest, FLAPPING};
+pub use kind::is_ours;
 pub use moment::{Alert, Moment};
 pub use outbox::{Outbox, KEPT};

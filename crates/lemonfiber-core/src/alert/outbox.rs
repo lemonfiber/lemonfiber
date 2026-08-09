@@ -65,7 +65,14 @@ impl Outbox {
     /// it passed through while a channel was down.
     pub fn owe(&mut self, alerts: impl IntoIterator<Item = Alert>) {
         for alert in alerts {
-            self.owed.retain(|owed| owed.check != alert.check);
+            // Matched on everything the new alert speaks for, so a group replaces
+            // the individual alerts it now covers rather than sitting beside them.
+            self.owed.retain(|owed| {
+                !owed
+                    .affected
+                    .iter()
+                    .any(|check| alert.affected.contains(check))
+            });
             self.owed.push(alert);
         }
     }
@@ -89,8 +96,12 @@ impl Outbox {
     /// the alert carries the check and the condition carries the count.
     pub fn delivered(&mut self, recurrence: &dyn Fn(&str) -> u32) {
         for alert in std::mem::take(&mut self.owed) {
-            self.told
-                .insert(alert.check.clone(), recurrence(&alert.check));
+            // Every check the alert spoke for, not only the one it spoke in the
+            // words of: a grouped alert has told the operator about all of them,
+            // and leaving the rest unrecorded would report them again next run.
+            for check in &alert.affected {
+                self.told.insert(check.clone(), recurrence(check));
+            }
             self.said.push(alert);
         }
         // Oldest first out, so what remains is the most recent history.
@@ -108,7 +119,8 @@ impl Outbox {
     /// Forget a check entirely, for something that no longer exists to alert about.
     pub fn forget(&mut self, check: &str) {
         self.told.remove(check);
-        self.owed.retain(|alert| alert.check != check);
+        self.owed
+            .retain(|alert| !alert.affected.iter().any(|spoken| spoken == check));
     }
 }
 
@@ -122,9 +134,12 @@ mod tests {
     fn alert(check: &str, moment: Moment) -> Alert {
         Alert {
             check: check.to_owned(),
+            kind: "service.stopped".to_owned(),
             moment,
             severity: Severity::Warning,
             summary: "it broke".to_owned(),
+            remedies: vec!["start it again".to_owned()],
+            affected: vec![check.to_owned()],
         }
     }
 

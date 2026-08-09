@@ -33,8 +33,14 @@ use crate::error::Severity;
 /// drift apart into two names for one problem.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Condition {
-    /// The check this came from — `vpn.egress-match`, `queue.stalled`.
+    /// The check this came from — `vpn.egress`, `service.sonarr`. Names the
+    /// instance, which is what the store is keyed by.
     pub check: String,
+    /// What kind of thing it is — `service.stopped`, `vpn.egress.leaking`. Shared
+    /// by every instance of the same event, which is what lets four services
+    /// stopping be one alert rather than four.
+    #[serde(default)]
+    pub kind: String,
     /// How bad it is, in the same words every other severity uses.
     pub severity: Severity,
     /// What is wrong, in one line, as the finding said it.
@@ -70,6 +76,7 @@ impl Condition {
     pub fn raised(check: &str, fault: &Fault, now: &str) -> Self {
         Self {
             check: check.to_owned(),
+            kind: fault.kind.clone(),
             severity: fault.severity,
             summary: fault.summary.clone(),
             since: now.to_owned(),
@@ -100,6 +107,7 @@ impl Condition {
     /// fault, and what it turns out to be downstream of, can both change as the
     /// picture fills in, and the stale answer is the wrong one to keep.
     pub fn raise(&mut self, fault: &Fault, now: &str) {
+        self.kind.clone_from(&fault.kind);
         self.severity = fault.severity;
         self.summary.clone_from(&fault.summary);
         self.remedies.clone_from(&fault.remedies);
@@ -153,7 +161,12 @@ mod tests {
 
     /// What the stall check reports, with what to do about it.
     fn stalled(summary: &str) -> Fault {
-        Fault::new(Severity::Warning, summary, "check the indexer is answering")
+        Fault::new(
+            "queue.stalled",
+            Severity::Warning,
+            summary,
+            "check the indexer is answering",
+        )
     }
 
     /// A condition raised at a fixed moment — the stamps are seconds since the
@@ -190,7 +203,12 @@ mod tests {
         // It has not gone away, but it has got worse, and the operator is owed the
         // worse one rather than the words it was first raised with.
         let mut condition = raised();
-        let worse = Fault::new(Severity::Error, "the disk is full", "delete something");
+        let worse = Fault::new(
+            "storage.full",
+            Severity::Error,
+            "the disk is full",
+            "delete something",
+        );
         condition.raise(&worse, "2000");
         assert_eq!(condition.severity, Severity::Error);
         assert_eq!(condition.summary, "the disk is full");
@@ -257,7 +275,7 @@ mod tests {
 
         let advisory = Condition::raised(
             "x",
-            &Fault::new(Severity::Advisory, "a note", "read it"),
+            &Fault::new("note", Severity::Advisory, "a note", "read it"),
             "1000",
         );
         assert!(!advisory.is_worth_saying(None), "not worth an interruption");

@@ -62,6 +62,7 @@ mod tests {
         conditions.observe(
             "queue.stalled",
             Some(&Fault::new(
+                "queue.stalled",
                 Severity::Warning,
                 "two downloads have not moved",
                 "check the indexer is answering",

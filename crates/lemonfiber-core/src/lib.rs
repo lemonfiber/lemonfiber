@@ -53,6 +53,7 @@ pub mod lidarr;
 pub mod materialised;
 pub mod model;
 pub mod platform;
+pub mod plural;
 pub mod ports;
 pub mod prerequisites;
 pub mod prowlarr;

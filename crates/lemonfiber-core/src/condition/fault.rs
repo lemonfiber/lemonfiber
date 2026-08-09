@@ -17,6 +17,13 @@ use crate::error::Severity;
 /// Something a check found wrong.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fault {
+    /// What kind of thing this is — `service.stopped`, `vpn.egress.leaking`.
+    ///
+    /// Distinct from the check that raised it, which names the *instance*: four
+    /// services stopping raise four checks and one kind. That is what lets four
+    /// alerts be one, and what an operator turns off when they turn off an event
+    /// rather than a machine.
+    pub kind: String,
     /// How bad it is.
     pub severity: Severity,
     /// What is wrong, in one line.
@@ -33,8 +40,9 @@ pub struct Fault {
 impl Fault {
     /// A fault, with the one thing an operator should do about it.
     #[must_use]
-    pub fn new(severity: Severity, summary: &str, remedy: &str) -> Self {
+    pub fn new(kind: &str, severity: Severity, summary: &str, remedy: &str) -> Self {
         Self {
+            kind: kind.to_owned(),
             severity,
             summary: summary.to_owned(),
             remedies: vec![remedy.to_owned()],
@@ -66,16 +74,27 @@ mod tests {
     fn a_fault_cannot_be_built_without_something_to_do_about_it() {
         // Not enforced by a check at runtime but by the constructor: there is no way
         // to reach a fault with an empty remedy list.
-        let fault = Fault::new(Severity::Error, "the disk is full", "delete something");
+        let fault = Fault::new(
+            "storage.full",
+            Severity::Error,
+            "the disk is full",
+            "delete something",
+        );
         assert_eq!(fault.remedies, vec!["delete something".to_owned()]);
         assert_eq!(fault.caused_by, None);
+        assert_eq!(fault.kind, "storage.full");
     }
 
     #[test]
     fn further_remedies_keep_the_order_they_were_offered() {
         // Most likely first, as everywhere else remedies are listed.
-        let fault = Fault::new(Severity::Error, "the disk is full", "delete something")
-            .or_else("move the library to a larger volume");
+        let fault = Fault::new(
+            "storage.full",
+            Severity::Error,
+            "the disk is full",
+            "delete something",
+        )
+        .or_else("move the library to a larger volume");
         assert_eq!(
             fault.remedies,
             vec![
@@ -87,8 +106,13 @@ mod tests {
 
     #[test]
     fn a_fault_can_name_the_one_it_is_downstream_of() {
-        let fault = Fault::new(Severity::Error, "the import failed", "retry the import")
-            .caused_by("storage.space");
+        let fault = Fault::new(
+            "import.failed",
+            Severity::Error,
+            "the import failed",
+            "retry the import",
+        )
+        .caused_by("storage.space");
         assert_eq!(fault.caused_by.as_deref(), Some("storage.space"));
     }
 }

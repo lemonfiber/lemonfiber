@@ -113,7 +113,7 @@ mod tests {
 
     /// What a check reports, with something to do about it.
     fn wrong(severity: Severity, summary: &str) -> Fault {
-        Fault::new(severity, summary, "look at it")
+        Fault::new("queue.stalled", severity, summary, "look at it")
     }
 
     /// A store with one stalled queue raised at a fixed moment. Stamps are seconds
