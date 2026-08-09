@@ -13,7 +13,9 @@ jobs:
   rebuild:
     permissions:
       contents: read
-    uses: lemonfiber/spec/.github/workflows/rebuild-site.yml@dec2ccbb40ca857b40a226d75fddc429883ba09e # main
+    uses: lemonfiber/spec/.github/workflows/rebuild-site.yml@517d72192e422c226118f0ef64f8b3a3e60ecc89 # main
     with:
       because: "the tool changed"
-    secrets: inherit
+    secrets:
+      # Only what the dispatch needs: the App key it mints a website-scoped token with.
+      RELEASE_APP_KEY: ${{ secrets.RELEASE_APP_KEY }}
