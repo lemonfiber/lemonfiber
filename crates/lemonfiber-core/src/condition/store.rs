@@ -75,6 +75,15 @@ impl Conditions {
         raised
     }
 
+    /// Every condition the store knows, raised or cleared.
+    ///
+    /// Alerting needs both: a resolution is news about something that is no longer
+    /// raised, so a reader that saw only what is wrong now could never report one.
+    #[must_use]
+    pub fn all(&self) -> Vec<&Condition> {
+        self.by_check.values().collect()
+    }
+
     /// One condition, raised or cleared, where the store knows it.
     #[must_use]
     pub fn get(&self, check: &str) -> Option<&Condition> {
