@@ -17,6 +17,8 @@
 
 mod digest;
 mod moment;
+mod outbox;
 
 pub use digest::{Digest, FLAPPING};
 pub use moment::{Alert, Moment};
+pub use outbox::{Outbox, KEPT};
