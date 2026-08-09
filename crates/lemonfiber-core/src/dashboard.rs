@@ -22,7 +22,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::docker::{condition, Condition, Service};
+use crate::docker::Service;
+use crate::health::{Reach, Summary};
 
 /// A figure a source reports, kept apart from the two ways it can be missing.
 ///
@@ -91,37 +92,6 @@ impl<T> Panel<T> {
     #[must_use]
     pub const fn is_available(&self) -> bool {
         matches!(self, Self::Ready(_))
-    }
-}
-
-/// The one-line answer to "is everything fine?": the stack's condition and how
-/// many services are asking for attention.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct Health {
-    /// What the whole set of services amounts to.
-    pub condition: Condition,
-    /// How many services are in a state an operator needs to act on.
-    pub needing_attention: usize,
-}
-
-impl Health {
-    /// Summarise the health of a set of services.
-    #[must_use]
-    pub fn of(services: &[Service]) -> Self {
-        Self {
-            condition: condition(services),
-            needing_attention: services
-                .iter()
-                .filter(|service| service.state.wants_attention())
-                .count(),
-        }
-    }
-
-    /// Whether everything is fine — nothing is asking for attention and the stack
-    /// is fully up.
-    #[must_use]
-    pub fn is_well(&self) -> bool {
-        self.needing_attention == 0 && self.condition == Condition::Active
     }
 }
 
@@ -204,10 +174,16 @@ pub struct Vpn {
     pub egress_matches: bool,
 }
 
-/// Where the dashboard as a whole stands.
+/// How the screen itself is doing, which is a different question from how the
+/// stack is doing.
+///
+/// The stack's own verdict is [`crate::health::Standing`]; this is only whether the
+/// picture can be trusted to be current. Kept apart because they disagree in both
+/// directions: a healthy stack can be shown through half-failing telemetry, and a
+/// perfectly refreshing screen can be reporting a stack that is on fire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Standing {
+pub enum Telemetry {
     /// Telemetry is current and refreshing normally.
     Live,
     /// Some sources are unavailable; their panels are marked.
@@ -220,42 +196,28 @@ pub enum Standing {
     Unconfigured,
 }
 
-/// How far the surface got in reaching the stack — the ladder from which the
-/// dashboard's standing is read.
-///
-/// A ladder rather than a handful of booleans, so the states are exclusive by
-/// construction: a machine is at exactly one rung, and there is no way to describe
-/// one that is both unconfigured and running.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Reach {
-    /// Nothing is configured.
-    Unconfigured,
-    /// Configured, but the engine cannot be reached.
-    Disconnected,
-    /// The engine answers, but nothing is running.
-    Idle,
-    /// The engine answers and services are running.
-    Up,
-}
-
-impl Standing {
-    /// Read the dashboard's standing from how far the surface reached and whether
+impl Telemetry {
+    /// Read how the screen is doing from how far the surface reached and whether
     /// any panel's source was down.
     ///
     /// Ordered by how much is wrong: no configuration outranks everything, then an
     /// unreachable engine (telemetry is off but control may not be), then a stack
-    /// that is configured but idle, and only on a running stack does a down panel
+    /// that is configured but idle, and only on a reachable stack does a down panel
     /// mark the screen degraded rather than live. The order matters — a disconnected
     /// engine must not be hidden behind a "degraded" that suggests the screen is
     /// merely incomplete.
+    ///
+    /// A stack that is still coming up reads live: the screen is refreshing fine,
+    /// and what the operator should make of a half-started stack is the health
+    /// summary's job to say, not this one's.
     #[must_use]
     pub const fn read(reach: Reach, any_panel_down: bool) -> Self {
         match reach {
             Reach::Unconfigured => Self::Unconfigured,
-            Reach::Disconnected => Self::Disconnected,
-            Reach::Idle => Self::NoStack,
-            Reach::Up if any_panel_down => Self::Degraded,
-            Reach::Up => Self::Live,
+            Reach::Unreachable => Self::Disconnected,
+            Reach::Stopped => Self::NoStack,
+            Reach::Running | Reach::Starting if any_panel_down => Self::Degraded,
+            Reach::Running | Reach::Starting => Self::Live,
         }
     }
 }
@@ -268,12 +230,16 @@ impl Standing {
 /// disagree with the panels.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Snapshot {
-    /// Where the dashboard as a whole stands.
-    pub standing: Standing,
-    /// The one-line health summary, or unavailable where the services it is read
-    /// from could not be reached — so an unknown stack is not summarised as an idle
-    /// one, which is what an always-present `Health::of(&[])` would claim.
-    pub health: Panel<Health>,
+    /// Whether the screen itself can be trusted to be current.
+    pub telemetry: Telemetry,
+    /// The one-line health summary — the same computation every other surface
+    /// uses, so no two of them can grade the same stack differently.
+    ///
+    /// Always present, unlike the panels: a stack that could not be reached has a
+    /// summary, and it says `unknown`. An absent summary would leave the operator
+    /// to infer health from a blank space, which is the one reading this must never
+    /// be open to.
+    pub health: Summary,
     /// The VPN, or `None` where no VPN is configured and the panel is omitted
     /// rather than shown permanently red.
     pub vpn: Option<Panel<Vpn>>,
@@ -318,10 +284,11 @@ mod tests {
     use std::time::Duration;
 
     use super::{
-        eta, percent, Hardlink, Health, Panel, Protocol, Queue, Reach, Reading, Snapshot, Standing,
-        Storage, Transfer, Vpn,
+        eta, percent, Hardlink, Panel, Protocol, Queue, Reach, Reading, Snapshot, Storage,
+        Telemetry, Transfer, Vpn,
     };
-    use crate::docker::{Condition, Service, State};
+    use crate::docker::{Service, State};
+    use crate::health::Summary;
     use lemonfiber_manifest::Criticality;
 
     #[test]
@@ -364,48 +331,30 @@ mod tests {
     }
 
     #[test]
-    fn health_counts_what_wants_attention_and_reads_the_condition() {
-        let services = vec![
-            service("sonarr", State::Healthy),
-            service("radarr", State::Unhealthy),
-            service("qbittorrent", State::Failed),
-        ];
-        let health = Health::of(&services);
+    fn how_the_screen_is_doing_is_read_in_order_of_how_much_is_wrong() {
+        // Unconfigured outranks all, then a disconnected engine, then a stopped
+        // stack, then a degraded panel, then a fully live screen.
         assert_eq!(
-            health.needing_attention, 2,
-            "unhealthy and failed both want attention"
-        );
-        assert_eq!(health.condition, Condition::Degraded);
-        assert!(!health.is_well());
-    }
-
-    #[test]
-    fn health_is_well_only_when_all_is_up_and_quiet() {
-        let services = vec![service("sonarr", State::Healthy)];
-        let health = Health::of(&services);
-        assert!(
-            health.is_well(),
-            "everything up and nothing wanting attention is well"
-        );
-        assert_eq!(health.needing_attention, 0);
-    }
-
-    #[test]
-    fn the_standing_is_read_in_order_of_how_much_is_wrong() {
-        // Unconfigured outranks all, then a disconnected engine, then an idle stack,
-        // then a degraded panel, then a fully live screen.
-        assert_eq!(
-            Standing::read(Reach::Unconfigured, false),
-            Standing::Unconfigured
+            Telemetry::read(Reach::Unconfigured, false),
+            Telemetry::Unconfigured
         );
         assert_eq!(
-            Standing::read(Reach::Disconnected, true),
-            Standing::Disconnected,
+            Telemetry::read(Reach::Unreachable, true),
+            Telemetry::Disconnected,
             "a disconnected engine is not hidden behind degraded"
         );
-        assert_eq!(Standing::read(Reach::Idle, false), Standing::NoStack);
-        assert_eq!(Standing::read(Reach::Up, true), Standing::Degraded);
-        assert_eq!(Standing::read(Reach::Up, false), Standing::Live);
+        assert_eq!(Telemetry::read(Reach::Stopped, false), Telemetry::NoStack);
+        assert_eq!(Telemetry::read(Reach::Running, true), Telemetry::Degraded);
+        assert_eq!(Telemetry::read(Reach::Running, false), Telemetry::Live);
+    }
+
+    #[test]
+    fn a_stack_still_coming_up_leaves_the_screen_live() {
+        // How the screen is doing and how the stack is doing are different
+        // questions: telemetry refreshing normally over a half-started stack is a
+        // live screen, and what to make of the stack is the summary's job.
+        assert_eq!(Telemetry::read(Reach::Starting, false), Telemetry::Live);
+        assert_eq!(Telemetry::read(Reach::Starting, true), Telemetry::Degraded);
     }
 
     #[test]
@@ -455,8 +404,8 @@ mod tests {
         // One dead source (the queue) is marked unavailable while the rest are live,
         // and the whole thing round-trips to the machine-readable form.
         let snapshot = Snapshot {
-            standing: Standing::Degraded,
-            health: Panel::Ready(Health::of(&[service("sonarr", State::Healthy)])),
+            telemetry: Telemetry::Degraded,
+            health: Summary::of(Reach::Running, &[]),
             vpn: Some(Panel::Ready(Vpn {
                 exit_ip: "203.0.113.7".to_owned(),
                 country: "Netherlands".to_owned(),
