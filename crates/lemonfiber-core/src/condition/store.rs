@@ -15,8 +15,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::Condition;
-use crate::error::Severity;
+use super::{Condition, Fault};
 
 /// Every condition this machine has raised, by the check that raised it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,16 +38,12 @@ impl Conditions {
     ///
     /// A check that could not be run does not call this at all. Passing `None` for
     /// an unrunnable check would clear a fault nobody proved was gone.
-    pub fn observe(&mut self, check: &str, wrong: Option<(Severity, &str)>, now: &str) {
+    pub fn observe(&mut self, check: &str, wrong: Option<&Fault>, now: &str) {
         match (wrong, self.by_check.get_mut(check)) {
-            (Some((severity, summary)), Some(condition)) => {
-                condition.raise(severity, summary, now);
-            }
-            (Some((severity, summary)), None) => {
-                self.by_check.insert(
-                    check.to_owned(),
-                    Condition::raised(check, severity, summary, now),
-                );
+            (Some(fault), Some(condition)) => condition.raise(fault, now),
+            (Some(fault), None) => {
+                self.by_check
+                    .insert(check.to_owned(), Condition::raised(check, fault, now));
             }
             // Nothing wrong, and nothing was: there is no condition to write, and
             // inventing a cleared one would fill the store with things that never
@@ -113,16 +108,22 @@ impl Conditions {
 
 #[cfg(test)]
 mod tests {
-    use super::Conditions;
+    use super::{Conditions, Fault};
     use crate::error::Severity;
 
-    /// A store with one stalled queue raised at a fixed moment.
+    /// What a check reports, with something to do about it.
+    fn wrong(severity: Severity, summary: &str) -> Fault {
+        Fault::new(severity, summary, "look at it")
+    }
+
+    /// A store with one stalled queue raised at a fixed moment. Stamps are seconds
+    /// since the epoch, which is what the clock port hands out.
     fn stalled() -> Conditions {
         let mut conditions = Conditions::new();
         conditions.observe(
             "queue.stalled",
-            Some((Severity::Warning, "two downloads have not moved")),
-            "2026-08-08T09:00:00Z",
+            Some(&wrong(Severity::Warning, "two downloads have not moved")),
+            "1000",
         );
         conditions
     }
@@ -144,14 +145,14 @@ mod tests {
         let mut conditions = stalled();
         conditions.observe(
             "queue.stalled",
-            Some((Severity::Error, "and now the disk is full")),
-            "2026-08-08T17:00:00Z",
+            Some(&wrong(Severity::Error, "and now the disk is full")),
+            "2000",
         );
         assert_eq!(conditions.raised().len(), 1, "one problem, not two");
         let condition = conditions.get("queue.stalled");
         assert_eq!(
             condition.map(|c| (c.since.as_str(), c.severity, c.recurrences)),
-            Some(("2026-08-08T09:00:00Z", Severity::Error, 0)),
+            Some(("1000", Severity::Error, 0)),
             "since it broke, at the severity it has become"
         );
     }
@@ -161,12 +162,12 @@ mod tests {
         // The self-resolving stall: it went away on its own, and that is recorded
         // rather than silently forgotten.
         let mut conditions = stalled();
-        conditions.observe("queue.stalled", None, "2026-08-08T10:00:00Z");
+        conditions.observe("queue.stalled", None, "1500");
         assert!(conditions.raised().is_empty());
         let cleared = conditions
             .get("queue.stalled")
             .and_then(|condition| condition.cleared.clone());
-        assert_eq!(cleared.as_deref(), Some("2026-08-08T10:00:00Z"));
+        assert_eq!(cleared.as_deref(), Some("1500"));
     }
 
     #[test]
@@ -174,7 +175,7 @@ mod tests {
         // Inventing a cleared condition for every passing check would fill the
         // store with things that never happened.
         let mut conditions = Conditions::new();
-        conditions.observe("vpn.egress-match", None, "2026-08-08T09:00:00Z");
+        conditions.observe("vpn.egress-match", None, "1000");
         assert!(conditions.is_empty());
     }
 
@@ -187,7 +188,7 @@ mod tests {
             ("a.warn", Severity::Warning),
             ("c.error", Severity::Error),
         ] {
-            conditions.observe(check, Some((severity, "wrong")), "now");
+            conditions.observe(check, Some(&wrong(severity, "wrong")), "1000");
         }
         let order: Vec<&str> = conditions
             .raised()

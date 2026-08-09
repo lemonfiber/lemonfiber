@@ -23,6 +23,8 @@ use crate::docker::{survey, Service};
 use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
 use crate::health::{observed, Egress, Reach, Summary};
+
+use super::conditions;
 use crate::ports::service::Queues;
 use crate::storage::{test_link, Linked};
 
@@ -60,15 +62,11 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
 
     // A stack that could not be read has nothing to raise conditions about; the
     // summary then rests on the reach alone and says `unknown` rather than healthy.
-    let health = Summary::of(
+    let health = summarise(
+        ctx,
         reach,
-        &observed(
-            seen.as_deref().unwrap_or_default(),
-            egress(vpn.as_ref()),
-            &ctx.stamp(),
-        )
-        .iter()
-        .collect::<Vec<_>>(),
+        seen.as_deref().unwrap_or_default(),
+        egress(vpn.as_ref()),
     );
     let services = match seen {
         Ok(services) => Panel::Ready(services),
@@ -91,6 +89,27 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
         storage,
         services,
     }
+}
+
+/// Record what this refresh saw against the store the last one left, and
+/// summarise from it.
+///
+/// Through the store rather than straight from the observations, because how long
+/// a fault has lasted is the difference between a service that restarted once and
+/// one that has been down all morning — and the summary grades them differently.
+/// Read and written each refresh: the file is small, and a refresh that is not
+/// remembered is one the next one has to guess about.
+fn summarise(ctx: &Ctx, reach: Reach, services: &[Service], egress: Egress) -> Summary {
+    let now = ctx.stamp();
+    let mut conditions = conditions::load(ctx);
+    for (check, fault) in observed(services, egress) {
+        conditions.observe(&check, fault.as_ref(), &now);
+    }
+    // Everything the store knows, not only what is raised: a fault that has been
+    // flapping is not called fixed the moment it blinks off.
+    let summary = Summary::of(reach, &conditions.all(), &now);
+    conditions::save(ctx, &conditions);
+    summary
 }
 
 /// What the VPN panel proved about the download client's traffic.

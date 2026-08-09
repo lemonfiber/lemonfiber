@@ -50,6 +50,7 @@ pub(super) fn service(id: &str, state: State, exit: Option<i32>) -> Service {
         state,
         criticality: Criticality::Core,
         exit,
+        depends_on: Vec::new(),
     }
 }
 

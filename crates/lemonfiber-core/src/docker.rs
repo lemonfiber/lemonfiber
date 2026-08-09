@@ -87,6 +87,10 @@ pub struct Service {
     pub state: State,
     /// How much its absence costs, so a summary can weigh it.
     pub criticality: Criticality,
+    /// The services it needs before it can work, as the manifest declares them.
+    /// Carried so a failure can be attributed to the thing underneath it rather
+    /// than counted as one more independent thing wrong.
+    pub depends_on: Vec<String>,
     /// How it exited, where it has exited.
     pub exit: Option<i32>,
 }
@@ -168,6 +172,7 @@ pub fn survey(manifest: &Manifest, profiles: &[String], containers: &[Container]
                     .map_or(State::Absent, |c| read(c))
             },
             criticality: service.criticality,
+            depends_on: service.depends_on.clone(),
             exit: found.get(service.id.as_str()).and_then(|c| c.exit),
         })
         .collect();

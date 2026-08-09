@@ -17,7 +17,7 @@
 //! is either a loop or a lie.
 
 use crate::alert::{Digest, Outbox};
-use crate::condition::Conditions;
+use crate::condition::{Conditions, Fault};
 use crate::error::Severity;
 use crate::ports::notify::Channel;
 
@@ -72,7 +72,12 @@ pub async fn notify(
         match said {
             Ok(()) => conditions.observe(&check, None, &now),
             Err(problem) => {
-                conditions.observe(&check, Some((Severity::Warning, &problem.reason)), &now);
+                let fault = Fault::new(
+                    Severity::Warning,
+                    &problem.reason,
+                    "check the channel's configuration; the alert is kept in-app either way",
+                );
+                conditions.observe(&check, Some(&fault), &now);
                 refused.push(problem.channel);
             }
         }
@@ -98,7 +103,7 @@ mod tests {
 
     use super::{notify, Notified, CHANNEL_CHECK};
     use crate::alert::{Digest, Outbox};
-    use crate::condition::Conditions;
+    use crate::condition::{Conditions, Fault};
     use crate::config::Settings;
     use crate::error::Severity;
     use crate::platform::Environment;
@@ -171,8 +176,12 @@ mod tests {
         let mut conditions = Conditions::new();
         conditions.observe(
             "queue.stalled",
-            Some((Severity::Warning, "two downloads have not moved")),
-            "2026-08-09T09:00:00Z",
+            Some(&Fault::new(
+                Severity::Warning,
+                "two downloads have not moved",
+                "check the indexer is answering",
+            )),
+            "1000",
         );
         conditions
     }
@@ -248,8 +257,12 @@ mod tests {
         // Something new to say, and this time the channel takes it.
         conditions.observe(
             "disk.full",
-            Some((Severity::Error, "no room left")),
-            "2026-08-09T10:00:00Z",
+            Some(&Fault::new(
+                Severity::Error,
+                "no room left",
+                "delete something, or move the library",
+            )),
+            "2000",
         );
         notify(
             &ctx,
