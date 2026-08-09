@@ -33,6 +33,7 @@
 //! decisions behind it live in the specification.
 
 pub mod adapters;
+pub mod alert;
 pub mod app;
 pub mod audio;
 pub mod backup;
