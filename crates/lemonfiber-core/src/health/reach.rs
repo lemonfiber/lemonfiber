@@ -78,6 +78,7 @@ mod tests {
             state,
             criticality: Criticality::Core,
             exit: None,
+            depends_on: Vec::new(),
         }
     }
 

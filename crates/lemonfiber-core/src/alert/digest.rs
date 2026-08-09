@@ -114,15 +114,16 @@ fn alert_for(condition: &Condition, told: Option<u32>) -> Option<Alert> {
 #[cfg(test)]
 mod tests {
     use super::{Digest, FLAPPING};
-    use crate::condition::Condition;
+    use crate::condition::{Condition, Fault};
     use crate::error::Severity;
 
     /// A condition that has come back `times` times and is wrong now.
     fn flapped(check: &str, severity: Severity, times: u32) -> Condition {
-        let mut condition = Condition::raised(check, severity, "it broke", "t0");
+        let fault = Fault::new(severity, "it broke", "look at it");
+        let mut condition = Condition::raised(check, &fault, "1000");
         for n in 0..times {
-            condition.clear("t1");
-            condition.raise(severity, "it broke", &format!("t{}", n + 2));
+            condition.clear("1100");
+            condition.raise(&fault, &format!("{}", 1200 + n));
         }
         condition
     }

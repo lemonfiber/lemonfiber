@@ -86,16 +86,20 @@ impl Alert {
 #[cfg(test)]
 mod tests {
     use super::{Alert, Moment};
-    use crate::condition::Condition;
+    use crate::condition::{Condition, Fault};
     use crate::error::Severity;
+
+    /// What a check reports, with something to do about it.
+    fn wrong(severity: Severity, summary: &str) -> Fault {
+        Fault::new(severity, summary, "look at it")
+    }
 
     /// A condition raised at a fixed moment.
     fn raised() -> Condition {
         Condition::raised(
             "queue.stalled",
-            Severity::Warning,
-            "two downloads have not moved",
-            "2026-08-09T09:00:00Z",
+            &wrong(Severity::Warning, "two downloads have not moved"),
+            "1000",
         )
     }
 
@@ -121,7 +125,7 @@ mod tests {
         // Told a disk filled up and never told it was fixed, an operator goes on
         // believing it.
         let mut condition = raised();
-        condition.clear("2026-08-09T10:00:00Z");
+        condition.clear("1000");
         let alert = Alert::of(&condition, Some(0));
         assert_eq!(alert.as_ref().map(|a| a.moment), Some(Moment::Resolved));
         assert_eq!(
@@ -136,14 +140,15 @@ mod tests {
         // Something that broke and fixed itself between two runs never reached them,
         // and "it is better now" about a thing they never knew was worse is noise.
         let mut condition = raised();
-        condition.clear("2026-08-09T10:00:00Z");
+        condition.clear("1000");
         assert_eq!(Alert::of(&condition, None), None);
     }
 
     #[test]
     fn a_resolution_carries_the_weight_of_what_resolved() {
         // "The critical thing is over" deserves the attention the critical thing had.
-        let mut condition = Condition::raised("vpn.leak", Severity::Critical, "leaking", "now");
+        let mut condition =
+            Condition::raised("vpn.leak", &wrong(Severity::Critical, "leaking"), "1000");
         condition.clear("later");
         assert_eq!(
             Alert::of(&condition, Some(0)).map(|a| a.severity),
@@ -153,7 +158,7 @@ mod tests {
 
     #[test]
     fn only_a_critical_onset_interrupts_someone_who_asked_for_quiet() {
-        let critical = Condition::raised("vpn.leak", Severity::Critical, "leaking", "now");
+        let critical = Condition::raised("vpn.leak", &wrong(Severity::Critical, "leaking"), "1000");
         assert!(Alert::of(&critical, None).is_some_and(|a| a.overrides_quiet()));
 
         // Good news can wait for morning.

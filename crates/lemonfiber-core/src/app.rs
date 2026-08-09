@@ -22,6 +22,7 @@ use crate::stack::compose::Action;
 
 pub mod apply;
 pub mod backup;
+pub mod conditions;
 mod ctx;
 pub mod dashboard;
 mod engine;
