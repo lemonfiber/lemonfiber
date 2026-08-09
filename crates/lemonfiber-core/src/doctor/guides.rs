@@ -156,6 +156,7 @@ mod tests {
         let unverified = verdict(Err(Unreachable {
             url: "https://github.com/TRaSH-Guides/Guides".to_owned(),
             reason: "connection refused".to_owned(),
+            attempts: 1,
         }))
         .await;
         assert!(matches!(unverified, Some(Verdict::Unverified { .. })));

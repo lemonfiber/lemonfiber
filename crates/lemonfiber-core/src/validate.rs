@@ -194,7 +194,7 @@ impl Live {
             Ok(response) => response,
             Err(unreachable) => {
                 return Validation::Unreachable {
-                    detail: unreachable.reason,
+                    detail: persisting(&unreachable),
                 }
             }
         };
@@ -229,7 +229,7 @@ impl Live {
         match self.http.send(&request).await {
             Ok(response) => interpret_service(response.status, &response.body),
             Err(unreachable) => Validation::Unreachable {
-                detail: unreachable.reason,
+                detail: persisting(&unreachable),
             },
         }
     }
@@ -254,6 +254,20 @@ impl Validator for Live {
 
 /// Read a service's answer to an authenticated identity request into an outcome.
 ///
+/// What a transport failure amounts to, in the operator's terms.
+///
+/// The transport's own words lead, as they must — they are the only account of
+/// what actually happened. What lemonfiber adds is whether it kept happening: a
+/// service that did not answer once may have been busy, and one that did not
+/// answer every time it was asked is down, and those are different things to do
+/// about.
+fn persisting(unreachable: &crate::ports::http::Unreachable) -> String {
+    match crate::retry::said(unreachable.attempts) {
+        Some(persisted) => format!("{} — {persisted}", unreachable.reason),
+        None => unreachable.reason.clone(),
+    }
+}
+
 /// A refusing status is the key being wrong; a well-formed identity proves it and
 /// carries what the service said about itself as the observed capability; any
 /// other answer came from something that is not the service's API, which points
@@ -545,6 +559,23 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn a_service_that_kept_not_answering_is_told_apart_from_one_that_was_busy() {
+        // The transport's own words lead either way — they are the only account of
+        // what happened — and what lemonfiber adds is whether it kept happening.
+        let once = crate::ports::http::Unreachable::once("http://sonarr", "connection refused");
+        assert_eq!(super::persisting(&once), "connection refused");
+
+        let persisted = crate::ports::http::Unreachable {
+            attempts: crate::retry::ATTEMPTS,
+            ..once
+        };
+        assert_eq!(
+            super::persisting(&persisted),
+            "connection refused — still failing after 3 attempts"
+        );
+    }
+
     #[tokio::test]
     async fn an_error_without_a_description_still_refuses_rather_than_panics() {
         let body = "<error code=\"101\"/>";
@@ -594,6 +625,7 @@ mod tests {
         let outcome = Live::new(Arc::new(Canned(Err(Unreachable {
             url: "http://indexer.test/api".to_owned(),
             reason: "connection refused".to_owned(),
+            attempts: 1,
         }))))
         .validate(&indexer())
         .await;
@@ -863,6 +895,7 @@ mod tests {
         let outcome = Live::new(Arc::new(Canned(Err(Unreachable {
             url: "http://sonarr.test:8989".to_owned(),
             reason: "connection refused".to_owned(),
+            attempts: 1,
         }))))
         .validate(&service())
         .await;

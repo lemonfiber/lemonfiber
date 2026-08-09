@@ -868,6 +868,7 @@ mod tests {
                     None => Err(crate::ports::http::Unreachable {
                         url: request.url.clone(),
                         reason: "the list could not be read".to_owned(),
+                        attempts: 1,
                     }),
                 };
             }

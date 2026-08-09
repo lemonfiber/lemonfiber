@@ -64,8 +64,24 @@ impl Response {
 pub struct Unreachable {
     /// The URL that was tried.
     pub url: String,
-    /// The transport's own account of why.
+    /// The transport's own account of why. Theirs verbatim — what lemonfiber
+    /// makes of it belongs beside it, never rewritten over it.
     pub reason: String,
+    /// How many times it was tried before giving up, which is what separates a
+    /// service that was busy from one that is down. One where nothing retried it.
+    pub attempts: u32,
+}
+
+impl Unreachable {
+    /// A failure nothing retried — the shape a transport reports on its own.
+    #[must_use]
+    pub fn once(url: &str, reason: &str) -> Self {
+        Self {
+            url: url.to_owned(),
+            reason: reason.to_owned(),
+            attempts: 1,
+        }
+    }
 }
 
 /// Sends HTTP requests to services and returns what they answered.
@@ -110,6 +126,7 @@ mod tests {
         let failure = Unreachable {
             url: "http://sonarr:8989/api".to_owned(),
             reason: "connection refused".to_owned(),
+            attempts: 1,
         };
         let rendered = failure.to_string();
         assert!(rendered.contains("sonarr"));

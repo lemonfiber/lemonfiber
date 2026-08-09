@@ -75,7 +75,13 @@ impl Ctx {
             // The real transport is the only sensible default; the one code path
             // that needs to answer for a fake service overrides it with
             // `with_http`, so no test reaches the network to build a context.
-            http: Arc::new(crate::adapters::Web::new()),
+            //
+            // Wrapped so a service that is merely still starting is tried again
+            // rather than reported. Applied here rather than at each caller: a
+            // retry policy written into fifteen call sites is fifteen policies.
+            http: Arc::new(crate::adapters::Retrying::around(
+                crate::adapters::Web::new(),
+            )),
             random: Arc::new(crate::adapters::Os),
             patience: PATIENCE,
             stack,

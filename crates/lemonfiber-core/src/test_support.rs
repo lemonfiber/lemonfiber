@@ -253,6 +253,7 @@ impl crate::ports::http::Http for ScriptedHttp {
             None => Err(crate::ports::http::Unreachable {
                 url: request.url.clone(),
                 reason: "nothing scripted".to_owned(),
+                attempts: 1,
             }),
         }
     }

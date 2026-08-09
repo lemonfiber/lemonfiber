@@ -62,6 +62,7 @@ impl Http for FakeHttp {
             _ => Err(Unreachable {
                 url: request.url.clone(),
                 reason: "connection refused".to_owned(),
+                attempts: 1,
             }),
         }
     }
