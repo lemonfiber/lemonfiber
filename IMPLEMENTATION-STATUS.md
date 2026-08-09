@@ -7,8 +7,10 @@ so a new contributor (human or agent) does not have to.
 
 This tracks the `lemonfiber` binary's milestones, **M2–M10** (one per v1
 version). M0–M1 live in the `spec` and `media-stack` repos and are recorded here
-only for context. Milestones M5, M7, M8 and M9 are not started — their sections
-are stubs pointing at the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
+only for context. Milestones M5 and M8 are not started — their sections are stubs
+pointing at the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
+M7 and M9 have one deliverable each, landed ahead of the rest of their milestone
+because something already built needed it.
 
 - Update this file **in the same PR** as the work it describes. A tracker in a
   separate change drifts; one that moves with the code cannot.
@@ -176,12 +178,18 @@ and input stays responsive while images pull. The read-only model, its assembler
 and every panel's telemetry are in; the ratatui render loop and every interactive
 surface above are the remaining work — all of `0.6.0`.
 
-## M7 — Web surface & UX · ☐
+## M7 — Web surface & UX · ◐
 
 `0.7.0`. A third surface — a read-only web view over the same core — plus the
 cross-cutting UX (front door, health summary, error model, plain language,
-accessibility, privacy, web-security, support bundle). Not started. See the
+accessibility, privacy, web-security, support bundle). The web surface itself is
+not started; the health summary landed ahead of it, because the dashboard needed
+one and was computing its own. See the
 [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m7--web-surface--ux).
+
+| Deliverable | Spec | Status | Landing / notes |
+|-------------|------|--------|-----------------|
+| Health summary — one computation, from findings | `G7-R1..R14` | ✅ | [`health/`](crates/lemonfiber-core/src/health.rs) (#201, #202). Computed from the conditions the checks raised, **not** from a count of running containers — the two come apart exactly where it matters, and the dashboard's own `Health::of(services)` was on the wrong side of that: sixteen containers up and answering while torrent traffic leaves outside the tunnel graded as *healthy*. Now a critical finding outranks every reason to stay quiet (`G7-R4`), an unreachable stack reports `unknown` and never healthy (`G7-R5`), a deliberately stopped one reports `stopped` rather than a failure (`G7-R9`/`G7-R12`), and the worst is a `max` over the declaration order rather than an average (`G7-R3`). How much a failure matters comes from what the manifest says the service costs, so a failed subtitle fetcher is advisory and a failed download client is not (`G7-R10`). Every finding carries a remedy — `Fault` cannot be constructed without one — and the summary expands to the affected items and theirs (`G7-R7`). A finding downstream of another is folded into its root and counted once, so a filled disk and the nine imports it broke is one problem (`G7-R6`); never into a root less bad than itself, since letting the cascade rule bury the worst thing on the machine is the outcome the whole feature exists to prevent. Debounced on the *clearing* side rather than the appearing side (`G7-R11`): holding a new fault back would let an unverified tunnel read healthy for the first half-minute, so instead a fault that has come back before stays counted for a while after it clears. Landing it retired the dashboard's duplicate `Reach` ladder and renamed its `Standing` to `Telemetry` — whether the screen is current and how the stack is doing are different questions that disagree in both directions (`G7-R8`). Conditions now persist in `conditions.json`, without which none of the above has a memory older than one process. |
 
 ---
 
@@ -193,12 +201,16 @@ See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/
 
 ---
 
-## M9 — Lifecycle & maintenance · ☐
+## M9 — Lifecycle & maintenance · ◐
 
 `0.9.0`. Reconfiguration, migration, uninstall, notifications, remote control,
 autostart & boot persistence, stack and self updates, rollback, and the service
-catalogue. Not started. See the
+catalogue. Only notifications are in; the rest is not started. See the
 [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m9--lifecycle--maintenance).
+
+| Deliverable | Spec | Status | Landing / notes |
+|-------------|------|--------|-----------------|
+| Notifications & alerting | `B5-R1..R14` | ✅ | [`condition.rs`](crates/lemonfiber-core/src/condition.rs), [`alert/`](crates/lemonfiber-core/src/alert.rs), [`app/notify.rs`](crates/lemonfiber-core/src/app/notify.rs) (#194, #197–#199, #203, #204). Almost every rule here exists to *not* send something. A condition notifies once on onset and once on resolution, never per poll (`B5-R5`); a service flapping past three round trips is reported as flapping, which is a different fault with a different remedy, rather than as forty alternating states (`B5-R6`); everything at one moment is one digest rather than six interruptions (`B5-R7`). Four services failing the same way is **one** event naming all four (`B5-R14`) — grouped on the `kind` a condition carries beside its `check`, so the instance and the event stay distinct; the group is as loud as the worst thing in it, and the outbox marks every check it spoke for or the rest would be reported again next run. In-app delivery is the writing-down itself and so cannot fail (`B5-R4`), which is what lets a channel refuse without losing anything; a refusing channel raises a condition of its own and is deliberately never notified *through* channels — a notification about notifications failing, delivered by the thing that failed, is either a loop or a lie (`B5-R10`). A stack the operator stopped on purpose says nothing operational (`B5-R12`), but only while genuinely `Stopped`: an engine nobody could reach is not one somebody turned off. The request lifecycle is refused outright (`B5-R1`) — Seerr tells the requester itself, and a second message from here is what teaches an operator to mute the channel that also carries the leak. Setup asks appetite **once**, as three presets rather than a checklist of thirteen events (`B5-R2`), defaulting to the quiet one; every individual event stays switchable afterwards (`B5-R3`), kept in `notifications.json`. Alerts carry their remedies (`B5-R8`) and are redacted on the support bundle's own rules (`B5-R9`); a critical one carries a whole digest through a quiet period rather than being split from its context (`B5-R11`); and a fault that came and went unseen is still in the history (`B5-R13`). |
 
 ---
 

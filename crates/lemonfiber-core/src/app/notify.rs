@@ -67,7 +67,10 @@ pub async fn notify(
     channels: &[&dyn Channel],
 ) -> Notified {
     let now = ctx.stamp();
-    let digest = Digest::reached(reach, conditions.all(), &|check| outbox.told(check));
+    // What the operator asked to hear about, as answered at setup and changed
+    // since. Read here rather than passed in, so no caller can forget it.
+    let wants = super::appetite::recorded(ctx);
+    let digest = Digest::wanted(reach, &wants, conditions.all(), &|check| outbox.told(check));
     if digest.is_empty() {
         return Notified::default();
     }

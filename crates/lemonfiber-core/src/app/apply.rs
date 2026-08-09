@@ -21,6 +21,7 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::alert::{Appetite, Wants};
 use crate::config::paths::Paths;
 use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
@@ -162,6 +163,22 @@ fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Res
         store::set(&env_file, key, value).map_err(Fault::Store)?;
     }
 
+    // The notification appetite is its own file rather than an environment
+    // setting, because it grows: the preset chosen here is one answer, and the
+    // individual events switched on or off later live beside it. Written before
+    // the applied marker so a completed apply always has one.
+    let wants = Wants::preset(
+        wizard
+            .answers()
+            .notifications
+            .unwrap_or_else(Appetite::default_appetite),
+    );
+    store::write(
+        &paths.notifications(),
+        &serde_json::to_string(&wants).unwrap_or_default(),
+    )
+    .map_err(Fault::Store)?;
+
     // The applied marker lands only after every setting is on disk, so a stop
     // before it leaves `applying` over a complete file rather than `applied` over
     // an incomplete one — the next run treats that as a failed apply and offers to
@@ -247,6 +264,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::apply;
+    use crate::alert::{Appetite, Wants};
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::journal::{Change, Kind};
@@ -333,6 +351,9 @@ mod tests {
             .answer(Answer::Library(Library::JellyfinDocker))
             .unwrap_or(());
         wizard.answer(Answer::Household(true)).unwrap_or(());
+        wizard
+            .answer(Answer::Notifications(Appetite::default_appetite()))
+            .unwrap_or(());
         wizard.answer(Answer::Autostart(false)).unwrap_or(());
         assert!(wizard.transition(Phase::Reviewing), "answers are complete");
         wizard
@@ -583,5 +604,42 @@ mod tests {
             "no setting was written before the stop"
         );
         assert!(!root.exists(), "the directory was not made before the stop");
+    }
+
+    #[test]
+    fn the_notification_answer_is_written_where_a_later_run_reads_it() {
+        // Gathered at setup and then discarded would be worse than never asking:
+        // the operator would believe they had chosen something.
+        let dir = scratch("appetite");
+        let paths = layout(&dir);
+        let root = dir.join("data-root");
+        let mut wizard = reviewed(&root);
+        assert!(apply(&mut wizard, &paths, external(), "1000").is_ok());
+
+        let written = std::fs::read_to_string(paths.notifications()).unwrap_or_default();
+        assert_eq!(
+            serde_json::from_str::<Wants>(&written).ok(),
+            Some(Wants::preset(Appetite::default_appetite())),
+            "{written}"
+        );
+    }
+
+    #[test]
+    fn a_notification_answer_that_cannot_be_written_stops_the_apply() {
+        // It is the last thing written before the applied marker, so failing here
+        // must leave `applying` rather than a stack recorded as fully set up with
+        // an answer nobody kept.
+        let dir = scratch("no-appetite");
+        let paths = layout(&dir);
+        assert!(
+            std::fs::create_dir_all(paths.notifications()).is_ok(),
+            "a directory sits where the answer's file must go"
+        );
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        let stopped = apply(&mut wizard, &paths, external(), "t");
+
+        assert!(stopped.is_err());
+        assert_ne!(wizard.phase(), crate::wizard::Phase::Applied);
     }
 }

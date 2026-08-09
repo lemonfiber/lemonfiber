@@ -168,6 +168,9 @@ impl Wizard {
             }
             Answer::Library(library) => self.progress.answers.library = Some(library),
             Answer::Household(shared) => self.progress.answers.household = Some(shared),
+            Answer::Notifications(appetite) => {
+                self.progress.answers.notifications = Some(appetite);
+            }
             Answer::Autostart(boot) => self.progress.answers.autostart = Some(boot),
         }
         Ok(())
@@ -240,6 +243,7 @@ impl Wizard {
             Step::ServiceUser => answers.service_user.is_some(),
             Step::Library => answers.library.is_some(),
             Step::Household => answers.household.is_some(),
+            Step::Notifications => answers.notifications.is_some(),
             Step::Autostart => answers.autostart.is_some(),
             // Informing steps have no answer to hold.
             Step::Welcome | Step::Preflight | Step::Prerequisites | Step::Review => true,
@@ -339,6 +343,7 @@ impl Wizard {
 
 #[cfg(test)]
 mod tests {
+    use crate::alert::Appetite;
     use std::path::PathBuf;
 
     use super::{
@@ -391,6 +396,9 @@ mod tests {
             .answer(Answer::Library(Library::JellyfinDocker))
             .unwrap_or(());
         wizard.answer(Answer::Household(true)).unwrap_or(());
+        wizard
+            .answer(Answer::Notifications(Appetite::default_appetite()))
+            .unwrap_or(());
         wizard.answer(Answer::Autostart(false)).unwrap_or(());
     }
 
@@ -511,6 +519,9 @@ mod tests {
             .answer(Answer::Library(Library::JellyfinDocker))
             .unwrap_or(());
         wizard.answer(Answer::Household(true)).unwrap_or(());
+        wizard
+            .answer(Answer::Notifications(Appetite::default_appetite()))
+            .unwrap_or(());
         wizard.answer(Answer::Autostart(false)).unwrap_or(());
 
         let answers = wizard.answers();
@@ -563,6 +574,7 @@ mod tests {
                 Step::ServiceUser,
                 Step::Library,
                 Step::Household,
+                Step::Notifications,
                 Step::Autostart,
             ]
         );

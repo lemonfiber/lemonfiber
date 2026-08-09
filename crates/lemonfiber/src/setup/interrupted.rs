@@ -131,6 +131,7 @@ pub(super) fn discard(paths: &Paths) {
 #[cfg(test)]
 mod tests {
     use crate::exit::{shown, success};
+    use lemonfiber_core::alert::Appetite;
     use lemonfiber_core::config::paths::Paths;
     use lemonfiber_core::config::Protocols;
     use lemonfiber_core::journal::{Change, Kind};
@@ -263,6 +264,7 @@ mod tests {
             Answer::ServiceUser(Some((1000, 1000))),
             Answer::Library(Library::JellyfinDocker),
             Answer::Household(true),
+            Answer::Notifications(Appetite::default_appetite()),
             Answer::Autostart(false),
         ] {
             let _ = wizard.answer(answer);

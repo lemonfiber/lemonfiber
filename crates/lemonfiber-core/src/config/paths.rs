@@ -81,6 +81,15 @@ impl Paths {
         self.config.join("quality.json")
     }
 
+    /// The operator's notification choice: which appetite is in force, and the
+    /// individual events they set apart from it. Kept with configuration for the
+    /// same reasons the quality choice is — a backup carries it, and a later run
+    /// respects the answer rather than falling back to the quiet default.
+    #[must_use]
+    pub fn notifications(&self) -> PathBuf {
+        self.config.join("notifications.json")
+    }
+
     /// The materialised stack — compose files written where Compose can read
     /// them.
     #[must_use]
@@ -151,6 +160,7 @@ mod tests {
             paths.baseline(),
             paths.materialised(),
             paths.quality(),
+            paths.notifications(),
         ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),

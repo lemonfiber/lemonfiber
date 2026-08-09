@@ -18,12 +18,15 @@
 //! And a stack the operator deliberately stopped is not a stack that broke. Every
 //! service being down is what they asked for, and reporting it as a fault teaches
 //! them that stopping the stack means a page of alerts.
+//!
+//! On top of all of which sits what the operator actually asked to hear about,
+//! which is the one rule here they chose rather than inherited.
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::{is_ours, Alert, Moment};
+use super::{is_ours, Alert, Moment, Wants};
 use crate::condition::Condition;
 use crate::error::Severity;
 use crate::health::Reach;
@@ -55,21 +58,37 @@ impl Digest {
         Self::reached(Reach::Running, conditions, told)
     }
 
-    /// The digest, given how far the stack got.
-    ///
-    /// A stack the operator stopped on purpose says nothing operational: its
-    /// services being down is what was asked for. What is not about the running
-    /// stack — a channel that will not take deliveries — is still said, since that
-    /// is wrong whatever the stack is doing.
+    /// The digest for a stack that is up, for an operator with a default appetite.
     #[must_use]
     pub fn reached<'a>(
         reach: Reach,
         conditions: impl IntoIterator<Item = &'a Condition>,
         told: &dyn Fn(&str) -> Option<u32>,
     ) -> Self {
+        Self::wanted(reach, &Wants::default(), conditions, told)
+    }
+
+    /// The digest, given how far the stack got and what the operator asked to hear.
+    ///
+    /// A stack the operator stopped on purpose says nothing operational: its
+    /// services being down is what was asked for. What is not about the running
+    /// stack — a channel that will not take deliveries — is still said, since that
+    /// is wrong whatever the stack is doing.
+    ///
+    /// A resolution is delivered on the same terms as its onset, which is why the
+    /// appetite is read from the condition rather than from the alert: an operator
+    /// told a disk filled up and never told it was resolved goes on believing it.
+    #[must_use]
+    pub fn wanted<'a>(
+        reach: Reach,
+        wants: &Wants,
+        conditions: impl IntoIterator<Item = &'a Condition>,
+        told: &dyn Fn(&str) -> Option<u32>,
+    ) -> Self {
         let mut alerts: Vec<Alert> = conditions
             .into_iter()
             .filter(|condition| is_ours(&condition.kind))
+            .filter(|condition| wants.wants(&condition.kind, condition.severity))
             .filter(|condition| !is_expected_while_stopped(condition, reach))
             .filter_map(|condition| alert_for(condition, told(&condition.check)))
             .collect();
@@ -194,7 +213,8 @@ fn alert_for(condition: &Condition, told: Option<u32>) -> Option<Alert> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Digest, Moment, Reach, FLAPPING};
+    use super::{Digest, Moment, Reach, Wants, FLAPPING};
+    use crate::alert::Appetite;
     use crate::condition::{Condition, Fault};
     use crate::error::Severity;
 
@@ -459,5 +479,100 @@ mod tests {
             "1000",
         );
         assert!(!Digest::reached(Reach::Stopped, [&refusing], &untold).is_empty());
+    }
+
+    // ── Only what was asked for ───────────────────────────────────
+
+    /// A finished download, which is advisory and a completion.
+    fn finished() -> Condition {
+        Condition::raised(
+            "download.ubuntu-iso",
+            &Fault::new(
+                "download.completed",
+                Severity::Advisory,
+                "Ubuntu.iso finished",
+                "nothing to do",
+            ),
+            "1000",
+        )
+    }
+
+    #[test]
+    fn the_quiet_preset_hears_problems_and_nothing_else() {
+        let done = finished();
+        let broken = stopped("service.sonarr", Severity::Error);
+        let quiet = Wants::preset(Appetite::ProblemsOnly);
+        let kinds: Vec<String> = Digest::wanted(Reach::Running, &quiet, [&done, &broken], &untold)
+            .alerts
+            .iter()
+            .map(|alert| alert.kind.clone())
+            .collect();
+        assert_eq!(kinds, vec!["service.stopped".to_owned()]);
+    }
+
+    #[test]
+    fn asking_for_completions_hears_them_without_hearing_everything() {
+        let done = finished();
+        let notice = Condition::raised(
+            "update.stack",
+            &Fault::new(
+                "update.available",
+                Severity::Advisory,
+                "a newer stack is available",
+                "upgrade when convenient",
+            ),
+            "1000",
+        );
+        let wants = Wants::preset(Appetite::WithCompletions);
+        let kinds: Vec<String> = Digest::wanted(Reach::Running, &wants, [&done, &notice], &untold)
+            .alerts
+            .iter()
+            .map(|alert| alert.kind.clone())
+            .collect();
+        assert_eq!(kinds, vec!["download.completed".to_owned()]);
+    }
+
+    #[test]
+    fn one_event_switched_on_arrives_without_the_rest_of_its_class() {
+        // The preset is a starting point, not a ceiling.
+        let done = finished();
+        let mut wants = Wants::preset(Appetite::ProblemsOnly);
+        wants.set("download.completed", true);
+        assert!(!Digest::wanted(Reach::Running, &wants, [&done], &untold).is_empty());
+    }
+
+    #[test]
+    fn something_wrong_is_heard_however_quiet_the_operator_asked_to_be() {
+        // The floor under every preset: a leak is not something to be opted out of
+        // by choosing the quiet option at setup.
+        let leak = Condition::raised(
+            "vpn.egress",
+            &Fault::new(
+                "vpn.egress.leaking",
+                Severity::Critical,
+                "traffic is leaving the tunnel",
+                "stop the download client",
+            ),
+            "1000",
+        );
+        let quiet = Wants::preset(Appetite::ProblemsOnly);
+        assert!(!Digest::wanted(Reach::Running, &quiet, [&leak], &untold).is_empty());
+    }
+
+    #[test]
+    fn a_resolution_arrives_on_the_same_terms_as_the_onset_that_was_heard() {
+        // An operator told a disk filled up and never told it was resolved goes on
+        // believing it.
+        let mut done = finished();
+        done.clear("1100");
+        let mut wants = Wants::preset(Appetite::ProblemsOnly);
+        wants.set("download.completed", true);
+        let heard = |_: &str| Some(0);
+        let moments: Vec<Moment> = Digest::wanted(Reach::Running, &wants, [&done], &heard)
+            .alerts
+            .iter()
+            .map(|alert| alert.moment)
+            .collect();
+        assert_eq!(moments, vec![Moment::Resolved]);
     }
 }
