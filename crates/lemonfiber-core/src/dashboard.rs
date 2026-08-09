@@ -61,6 +61,26 @@ impl<T> Reading<T> {
     }
 }
 
+impl<T: Clone> Reading<T> {
+    /// This reading, or the last value a now-quiet source gave, marked stale.
+    ///
+    /// The middle state exists for exactly this: a source that answered a moment
+    /// ago and did not this time has told us something, and blanking its figure to
+    /// `unknown` throws that away — while presenting it as current would be a lie.
+    /// Carried forward until a fresh value arrives, since it remains the last thing
+    /// the source actually said.
+    #[must_use]
+    pub fn or_stale(self, previous: Option<&Self>) -> Self {
+        match self {
+            Self::Known(value) => Self::Known(value),
+            Self::Stale(_) | Self::Unknown => match previous.and_then(Self::value) {
+                Some(last) => Self::Stale(last.clone()),
+                None => Self::Unknown,
+            },
+        }
+    }
+}
+
 /// A panel's content, or the reason its source could not fill it.
 ///
 /// The difference between "this panel is up to date" and "this panel's source is
@@ -308,6 +328,44 @@ mod tests {
             "stale still carries its last value"
         );
         assert_eq!(unknown.value(), None, "unknown carries nothing");
+    }
+
+    #[test]
+    fn a_source_that_has_gone_quiet_keeps_its_last_value_rather_than_blanking() {
+        // The middle state exists for exactly this. Blanking throws away something
+        // the source told us; presenting it as current would be a lie.
+        let last = Reading::Known(4096_u64);
+        assert_eq!(
+            Reading::Unknown.or_stale(Some(&last)),
+            Reading::Stale(4096),
+            "the last thing it actually said, marked as such"
+        );
+    }
+
+    #[test]
+    fn a_fresh_value_replaces_a_stale_one_rather_than_being_shadowed_by_it() {
+        let last = Reading::Stale(4096_u64);
+        assert_eq!(Reading::Known(0).or_stale(Some(&last)), Reading::Known(0));
+    }
+
+    #[test]
+    fn a_source_that_has_never_answered_stays_unknown() {
+        // Nothing to carry forward, and inventing a figure would be worse than the
+        // blank this correctly reports.
+        assert_eq!(Reading::<u64>::Unknown.or_stale(None), Reading::Unknown);
+        let never: Reading<u64> = Reading::Unknown;
+        assert_eq!(
+            Reading::<u64>::Unknown.or_stale(Some(&never)),
+            Reading::Unknown
+        );
+    }
+
+    #[test]
+    fn a_value_stays_stale_across_refreshes_until_something_fresh_arrives() {
+        // It remains the last thing the source said, however long ago; a stale
+        // reading that decayed to unknown would lose that on the second refresh.
+        let once = Reading::Unknown.or_stale(Some(&Reading::Known(4096_u64)));
+        assert_eq!(Reading::Unknown.or_stale(Some(&once)), Reading::Stale(4096));
     }
 
     #[test]

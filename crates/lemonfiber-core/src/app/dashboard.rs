@@ -44,7 +44,13 @@ use super::targets::{
 /// read before the summary rather than beside it: a stack whose containers are all
 /// healthy while its download client's traffic leaves outside the tunnel is the
 /// case this ordering exists for.
-pub async fn gather(ctx: &Ctx) -> Snapshot {
+///
+/// `previous` is the snapshot this one replaces, where there is one. A figure a
+/// source gave a moment ago and did not give this time is carried forward marked
+/// stale rather than blanked: the source has told us something, and throwing it
+/// away is as dishonest as presenting it as current. A first refresh has nothing
+/// to carry, so it passes `None`.
+pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
     let configured = ctx.settings.data_root.is_some();
     // The manifest every stack-derived panel reads from, resolved once — or the one
     // reason each reports if it cannot be read. Read once rather than re-parsed and
@@ -75,8 +81,8 @@ pub async fn gather(ctx: &Ctx) -> Snapshot {
 
     // Storage's exhaustion projection needs the rate downloads are landing on the
     // disk at, so the transfers are gathered first and their speeds carried into it.
-    let transfers = transfers(ctx, manifest.as_ref(), project.as_deref()).await;
-    let storage = storage(ctx, download_rate(&transfers)).await;
+    let transfers = transfers(ctx, manifest.as_ref(), project.as_deref(), previous).await;
+    let storage = storage(ctx, download_rate(&transfers), previous).await;
 
     Snapshot {
         // Only a source that genuinely failed marks the screen degraded; the
@@ -110,6 +116,28 @@ fn summarise(ctx: &Ctx, reach: Reach, services: &[Service], egress: Egress) -> S
     let summary = Summary::of(reach, &conditions.all(), &now);
     conditions::save(ctx, &conditions);
     summary
+}
+
+/// What one download's speed was last time it was seen, where it was.
+///
+/// Matched by name, since that is what identifies the same download across
+/// refreshes; a download that has only just appeared has nothing to carry.
+fn last_speed<'a>(previous: Option<&'a Snapshot>, name: &str) -> Option<&'a Reading<u64>> {
+    match previous.map(|snapshot| &snapshot.transfers) {
+        Some(Panel::Ready(active)) => active
+            .iter()
+            .find(|transfer| transfer.name == name)
+            .map(|transfer| &transfer.speed),
+        _ => None,
+    }
+}
+
+/// What the volume's free space last read as, where it read at all.
+fn last_free(previous: Option<&Snapshot>) -> Option<&Reading<u64>> {
+    match previous.map(|snapshot| &snapshot.storage) {
+        Some(Panel::Ready(storage)) => Some(&storage.free),
+        _ => None,
+    }
 }
 
 /// What the VPN panel proved about the download client's traffic.
@@ -156,6 +184,7 @@ async fn transfers(
     ctx: &Ctx,
     manifest: Result<&Manifest, &String>,
     project: Option<&Path>,
+    previous: Option<&Snapshot>,
 ) -> Panel<Vec<Transfer>> {
     let manifest = match manifest {
         Ok(manifest) => manifest,
@@ -167,14 +196,21 @@ async fn transfers(
     for target in &targets {
         let downloads = read_transfers(ctx, target).await;
         let protocol = protocol_of(&target.kind);
-        active.extend(downloads.into_iter().map(|download| Transfer {
-            name: download.name,
-            protocol,
-            progress: download.progress,
-            // A speed the client reported this refresh is known even at zero (a
-            // stall); one it did not report is unknown, not a confident zero.
-            speed: download.speed.map_or(Reading::Unknown, Reading::Known),
-            eta: download.eta,
+        active.extend(downloads.into_iter().map(|download| {
+            Transfer {
+                name: download.name.clone(),
+                protocol,
+                progress: download.progress,
+                // A speed the client reported this refresh is known even at zero (a
+                // stall); one it did not report falls back to what the same download
+                // last reported, marked stale, and is unknown only where there is no
+                // such thing to fall back to.
+                speed: download
+                    .speed
+                    .map_or(Reading::Unknown, Reading::Known)
+                    .or_stale(last_speed(previous, &download.name)),
+                eta: download.eta,
+            }
         }));
     }
     Panel::Ready(active)
@@ -271,7 +307,7 @@ async fn queues(
 /// comes from the empirical probe, and the exhaustion from the free space against
 /// the rate downloads are landing at (`download_rate`), so a stalled queue
 /// projects no exhaustion rather than one that never arrives.
-async fn storage(ctx: &Ctx, download_rate: u64) -> Panel<Storage> {
+async fn storage(ctx: &Ctx, download_rate: u64, previous: Option<&Snapshot>) -> Panel<Storage> {
     let Some(root) = ctx.settings.data_root.as_deref() else {
         return Panel::unavailable("no data location is configured");
     };
@@ -280,7 +316,8 @@ async fn storage(ctx: &Ctx, download_rate: u64) -> Panel<Storage> {
         Reading::Unknown
     } else {
         Reading::Known(facts.available)
-    };
+    }
+    .or_stale(last_free(previous));
     // The hardlink test writes — it creates a file, links it, and inspects the two
     // names — unlike the cheap free-space read. Cheap once, but a per-refresh write;
     // the refresh loop will run it far less often, and until then it runs each time.
@@ -415,7 +452,7 @@ mod tests {
     #[tokio::test]
     async fn a_running_stack_fills_the_services_and_health_and_reads_as_up() {
         let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-        let snapshot = gather(&ctx(engine)).await;
+        let snapshot = gather(&ctx(engine), None).await;
 
         assert!(
             matches!(snapshot.services, Panel::Ready(ref services) if !services.is_empty()),
@@ -442,7 +479,7 @@ mod tests {
     #[tokio::test]
     async fn every_panel_now_has_a_gatherer_rather_than_reading_as_pending() {
         let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-        let snapshot = gather(&ctx(engine)).await;
+        let snapshot = gather(&ctx(engine), None).await;
         // The VPN panel is now gathered: this stack declares a torrent client, so it
         // applies (`Some`), and — with no IP-echo configured here — reports that its
         // egress cannot be read rather than being omitted.
@@ -456,7 +493,7 @@ mod tests {
     async fn an_idle_stack_reads_as_no_stack() {
         // Containers exist but none is running — configured, reachable, nothing up.
         let engine = Reporting::holding(&LIBRARY, Lifecycle::Exited, Health::None);
-        let snapshot = gather(&ctx(engine)).await;
+        let snapshot = gather(&ctx(engine), None).await;
         assert_eq!(snapshot.telemetry, Telemetry::NoStack);
         // An idle stack is stopped on purpose, not a failure.
         assert_eq!(snapshot.health.standing, Standing::Stopped);
@@ -485,7 +522,7 @@ mod tests {
             settings,
             Environment::MacOs,
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.telemetry, Telemetry::Disconnected);
         assert!(!snapshot.services.is_available());
         assert!(
@@ -516,7 +553,7 @@ mod tests {
             SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
             HttpReturning(QUEUE_JSON),
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(
             matches!(snapshot.queue, Panel::Ready(ref queues)
                 if !queues.is_empty() && queues.iter().all(|q| q.depth == 4 && q.stuck == 1)),
@@ -529,7 +566,7 @@ mod tests {
         // No config to read: the ordinary first-start case, skipped so the panel is
         // ready-but-empty rather than failed.
         let ctx = ctx_with(SeedFs::keyed(None, None), HttpReturning(QUEUE_JSON));
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
     }
 
@@ -539,7 +576,7 @@ mod tests {
             SeedFs::keyed(Some(CONFIG_NO_KEY), None),
             HttpReturning(QUEUE_JSON),
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
     }
 
@@ -551,13 +588,13 @@ mod tests {
             SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
             HttpReturning("not a queue"),
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
     }
 
     #[tokio::test]
     async fn an_unreachable_engine_leaves_services_unavailable_and_reads_disconnected() {
-        let snapshot = gather(&ctx(Reporting::absent())).await;
+        let snapshot = gather(&ctx(Reporting::absent()), None).await;
         assert_eq!(snapshot.telemetry, Telemetry::Disconnected);
         assert!(
             !snapshot.services.is_available(),
@@ -588,7 +625,7 @@ mod tests {
             settings,
             Environment::MacOs,
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.telemetry, Telemetry::Unconfigured);
         assert_eq!(snapshot.health.standing, Standing::Unconfigured);
         assert!(
@@ -603,7 +640,7 @@ mod tests {
         let ctx = ctx(engine).with_filesystem(Arc::new(
             SeedFs::keyed(None, None).with_facts(facts(42, 100)),
         ));
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(
             matches!(snapshot.storage, Panel::Ready(storage) if storage.free == Reading::Known(42)),
             "the volume's free space fills the panel"
@@ -617,7 +654,7 @@ mod tests {
         let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
         let ctx = ctx(engine)
             .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(0, 0))));
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(
             matches!(snapshot.storage, Panel::Ready(storage) if storage.free == Reading::Unknown),
             "a volume that could not be read reports unknown free space, not zero"
@@ -713,7 +750,7 @@ mod tests {
             http,
             Some(env_at("fills", &a_password())),
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
 
         // The torrent client's download: progress from its byte counts, a known
         // speed even at a value, and its ETA — tagged as a torrent by which client
@@ -748,7 +785,7 @@ mod tests {
         // ready-but-empty rather than failed.
         let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
         let ctx = ctx_downloads(SeedFs::keyed(None, None), http, None);
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
     }
 
@@ -758,7 +795,7 @@ mod tests {
         // password. Neither can be read, so neither appears.
         let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
         let ctx = ctx_downloads(SeedFs::keyed(None, Some(SAB_NO_KEY_INI)), http, None);
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
     }
 
@@ -772,7 +809,7 @@ mod tests {
             http,
             Some(env_at("silent", &a_password())),
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
     }
 
@@ -1122,7 +1159,7 @@ mod tests {
         ));
         // 3600 bytes free, draining at 60 B/s, is a minute until full.
         assert!(matches!(
-            super::storage(&ctx, 60).await,
+            super::storage(&ctx, 60, None).await,
             Panel::Ready(s) if s.exhaustion == Some(Duration::from_secs(60))
         ));
     }
@@ -1135,7 +1172,7 @@ mod tests {
         ));
         // A rate of zero divides to no estimate rather than an infinite one.
         assert!(matches!(
-            super::storage(&ctx, 0).await,
+            super::storage(&ctx, 0, None).await,
             Panel::Ready(s) if s.exhaustion.is_none()
         ));
     }
@@ -1181,7 +1218,7 @@ mod tests {
             forwarding(),
             Protocols::both(),
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.health.standing, Standing::Critical);
         assert!(snapshot.health.standing.wants_attention());
         // And the screen itself is fine, which is a separate matter entirely.
@@ -1196,8 +1233,61 @@ mod tests {
             forwarding(),
             Protocols::both(),
         );
-        let snapshot = gather(&ctx).await;
+        let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.health.standing, Standing::Healthy);
         assert_eq!(snapshot.health.said(), "healthy");
+    }
+
+    #[tokio::test]
+    async fn a_volume_that_read_last_refresh_and_not_this_one_reads_stale() {
+        // End to end, because the middle state was reachable in the type and not in
+        // the assembler: every `Reading` it built was known or unknown, so the
+        // distinction the whole model rests on had a state nothing ever entered.
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let reading = ctx(engine).with_filesystem(Arc::new(
+            SeedFs::keyed(None, None).with_facts(facts(42, 100)),
+        ));
+        let first = gather(&reading, None).await;
+        assert!(matches!(first.storage, Panel::Ready(ref s) if s.free == Reading::Known(42)));
+
+        // The same volume, now unreadable — a zero total is a mount it could not be
+        // attributed to, not a full disk.
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let quiet = ctx(engine)
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(0, 0))));
+        let second = gather(&quiet, Some(&first)).await;
+        assert!(
+            matches!(second.storage, Panel::Ready(ref s) if s.free == Reading::Stale(42)),
+            "the last figure it gave, marked stale rather than blanked"
+        );
+
+        // And with nothing to carry forward it is still unknown, never a zero that
+        // would read as a full disk.
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let cold = ctx(engine)
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(0, 0))));
+        let alone = gather(&cold, None).await;
+        assert!(matches!(alone.storage, Panel::Ready(ref s) if s.free == Reading::Unknown));
+    }
+
+    #[test]
+    fn a_download_carries_its_last_speed_across_a_refresh_that_did_not_report_one() {
+        // Matched by name, since that is what identifies the same download between
+        // refreshes; one that has only just appeared has nothing to carry.
+        let before = crate::dashboard::Snapshot {
+            telemetry: Telemetry::Live,
+            health: crate::health::Summary::of(crate::health::Reach::Running, &[], "1000"),
+            vpn: None,
+            transfers: Panel::Ready(vec![a_transfer(Reading::Known(4096))]),
+            queue: Panel::Ready(Vec::new()),
+            storage: Panel::unavailable("not read here"),
+            services: Panel::Ready(Vec::new()),
+        };
+        assert_eq!(
+            super::last_speed(Some(&before), "download"),
+            Some(&Reading::Known(4096))
+        );
+        assert_eq!(super::last_speed(Some(&before), "something else"), None);
+        assert_eq!(super::last_speed(None, "download"), None);
     }
 }
