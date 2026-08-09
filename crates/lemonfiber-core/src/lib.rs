@@ -60,6 +60,7 @@ pub mod prowlarr;
 pub mod qbittorrent;
 pub mod quality;
 pub mod recyclarr;
+pub mod retry;
 pub mod sabnzbd;
 pub mod secret;
 pub mod seed;

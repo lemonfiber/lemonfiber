@@ -57,6 +57,7 @@ impl Http for Fake {
             return Err(Unreachable {
                 url: request.url.clone(),
                 reason: "connection refused".to_owned(),
+                attempts: 1,
             });
         }
         match self
@@ -72,6 +73,7 @@ impl Http for Fake {
             None => Err(Unreachable {
                 url: request.url.clone(),
                 reason: "nothing scripted".to_owned(),
+                attempts: 1,
             }),
         }
     }

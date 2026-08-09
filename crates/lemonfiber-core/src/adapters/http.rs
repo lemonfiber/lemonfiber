@@ -90,6 +90,7 @@ impl Http for Web {
         let unreachable = |error: &reqwest::Error| Unreachable {
             url: mask(&request.url, &secrets),
             reason: mask(&error.to_string(), &secrets),
+            attempts: 1,
         };
 
         // The status is read before the body, because a body that fails to arrive

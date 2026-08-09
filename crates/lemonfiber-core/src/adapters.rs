@@ -17,6 +17,7 @@ pub mod http;
 pub mod nntp;
 pub mod process;
 pub mod random;
+pub mod retrying;
 pub mod time;
 
 pub use docker::Daemon;
@@ -25,4 +26,5 @@ pub use http::Web;
 pub use nntp::Dialer;
 pub use process::Local;
 pub use random::Os;
+pub use retrying::Retrying;
 pub use time::System;

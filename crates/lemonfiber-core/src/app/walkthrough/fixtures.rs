@@ -167,6 +167,7 @@ impl Http for Fake {
             return Err(Unreachable {
                 url: request.url.clone(),
                 reason: reason.to_owned(),
+                attempts: 1,
             });
         }
         Ok(Response {

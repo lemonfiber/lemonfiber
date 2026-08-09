@@ -59,6 +59,7 @@ impl Http for Fake {
             Answer::Silent => Err(Unreachable {
                 url: request.url.clone(),
                 reason: "connection refused".to_owned(),
+                attempts: 1,
             }),
         }
     }
