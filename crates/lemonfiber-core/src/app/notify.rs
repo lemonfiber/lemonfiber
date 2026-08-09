@@ -19,6 +19,7 @@
 use crate::alert::{Digest, Outbox};
 use crate::condition::{Conditions, Fault};
 use crate::error::Severity;
+use crate::health::Reach;
 use crate::ports::notify::Channel;
 
 use super::Ctx;
@@ -26,6 +27,10 @@ use super::Ctx;
 /// The prefix a channel's own condition is filed under, so the ones about
 /// delivery can be told from the ones about the stack.
 pub const CHANNEL_CHECK: &str = "notify.channel";
+
+/// The kind of event a refusing channel raises — one kind however many channels
+/// refuse, so twelve dead channels are one thing wrong and not twelve.
+pub const CHANNEL_REFUSED: &str = "notify.channel.refused";
 
 /// What one round of notifying did.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -46,17 +51,23 @@ impl Notified {
 
 /// Say whatever the conditions now warrant, through every channel given.
 ///
+/// `reach` is how far the stack got, because a stack the operator deliberately
+/// stopped is not a stack that broke: every service being down is what was asked
+/// for, and reporting it teaches them that stopping the stack means a page of
+/// alerts.
+///
 /// Returns what was said and which channels refused it. Both the outbox and the
 /// conditions are updated: the outbox because the operator has now been told, and
 /// the conditions because a channel refusing is itself something being wrong.
 pub async fn notify(
     ctx: &Ctx,
+    reach: Reach,
     conditions: &mut Conditions,
     outbox: &mut Outbox,
     channels: &[&dyn Channel],
 ) -> Notified {
     let now = ctx.stamp();
-    let digest = Digest::of(conditions.all(), &|check| outbox.told(check));
+    let digest = Digest::reached(reach, conditions.all(), &|check| outbox.told(check));
     if digest.is_empty() {
         return Notified::default();
     }
@@ -73,6 +84,7 @@ pub async fn notify(
             Ok(()) => conditions.observe(&check, None, &now),
             Err(problem) => {
                 let fault = Fault::new(
+                    CHANNEL_REFUSED,
                     Severity::Warning,
                     &problem.reason,
                     "check the channel's configuration; the alert is kept in-app either way",
@@ -106,6 +118,7 @@ mod tests {
     use crate::condition::{Conditions, Fault};
     use crate::config::Settings;
     use crate::error::Severity;
+    use crate::health::Reach;
     use crate::platform::Environment;
     use crate::ports::notify::{Channel, Undelivered};
     use crate::test_support::{spoke, stack, Reporting, Scripted as ScriptedRunner};
@@ -177,6 +190,7 @@ mod tests {
         conditions.observe(
             "queue.stalled",
             Some(&Fault::new(
+                "queue.stalled",
                 Severity::Warning,
                 "two downloads have not moved",
                 "check the indexer is answering",
@@ -192,7 +206,14 @@ mod tests {
         let (mut conditions, mut outbox) = (stalled(), Outbox::new());
         let channel = Scripted::taking("discord");
 
-        let said = notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
+        let said = notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
 
         assert!(!said.is_quiet());
         assert!(said.refused.is_empty());
@@ -206,8 +227,22 @@ mod tests {
         let (mut conditions, mut outbox) = (stalled(), Outbox::new());
         let channel = Scripted::taking("discord");
 
-        notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
-        let again = notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
+        notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
+        let again = notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
 
         assert!(again.is_quiet(), "nothing new to say");
         assert_eq!(channel.delivered(), 1, "and nothing sent");
@@ -221,7 +256,14 @@ mod tests {
         let (mut conditions, mut outbox) = (stalled(), Outbox::new());
         let channel = Scripted::refusing("discord");
 
-        let said = notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
+        let said = notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
 
         assert_eq!(said.refused, vec!["discord".to_owned()]);
         assert_eq!(outbox.history().len(), 1, "the operator can still find it");
@@ -235,7 +277,14 @@ mod tests {
         let (mut conditions, mut outbox) = (stalled(), Outbox::new());
         let channel = Scripted::refusing("discord");
 
-        notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
+        notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
 
         let raised = conditions.get(&format!("{CHANNEL_CHECK}.discord"));
         assert!(raised.is_some_and(crate::condition::Condition::is_raised));
@@ -248,6 +297,7 @@ mod tests {
         let (mut conditions, mut outbox) = (stalled(), Outbox::new());
         notify(
             &ctx,
+            Reach::Running,
             &mut conditions,
             &mut outbox,
             &[&Scripted::refusing("discord")],
@@ -258,6 +308,7 @@ mod tests {
         conditions.observe(
             "disk.full",
             Some(&Fault::new(
+                "storage.full",
                 Severity::Error,
                 "no room left",
                 "delete something, or move the library",
@@ -266,6 +317,7 @@ mod tests {
         );
         notify(
             &ctx,
+            Reach::Running,
             &mut conditions,
             &mut outbox,
             &[&Scripted::taking("discord")],
@@ -283,7 +335,14 @@ mod tests {
         let working = Scripted::taking("email");
         let broken = Scripted::refusing("discord");
 
-        let said = notify(&ctx, &mut conditions, &mut outbox, &[&broken, &working]).await;
+        let said = notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&broken, &working],
+        )
+        .await;
 
         assert_eq!(said.refused, vec!["discord".to_owned()]);
         assert_eq!(working.delivered(), 1);
@@ -295,7 +354,14 @@ mod tests {
         let (mut conditions, mut outbox) = (Conditions::new(), Outbox::new());
         let channel = Scripted::taking("discord");
 
-        let said = notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
+        let said = notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
 
         assert!(said.is_quiet());
         assert_eq!(said, Notified::default());
@@ -308,13 +374,49 @@ mod tests {
         let ctx = plain_ctx();
         let (mut conditions, mut outbox) = (stalled(), Outbox::new());
         let channel = Scripted::taking("discord");
-        notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
+        notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
 
         conditions.observe("queue.stalled", None, "2026-08-09T11:00:00Z");
-        let over = notify(&ctx, &mut conditions, &mut outbox, &[&channel]).await;
+        let over = notify(
+            &ctx,
+            Reach::Running,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
 
         assert!(!over.is_quiet(), "it resolving is news");
         assert_eq!(channel.delivered(), 2);
         assert_eq!(outbox.history().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_stack_the_operator_stopped_sends_nothing_and_owes_nothing() {
+        // Not merely unsent: nothing is written down as owed either, or the alerts
+        // would arrive in a rush the moment the stack came back up.
+        let ctx = plain_ctx();
+        let (mut conditions, mut outbox) = (stalled(), Outbox::new());
+        let channel = Scripted::taking("discord");
+
+        let said = notify(
+            &ctx,
+            Reach::Stopped,
+            &mut conditions,
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
+
+        assert!(said.is_quiet());
+        assert_eq!(channel.delivered(), 0);
+        assert!(!outbox.owes_anything());
     }
 }

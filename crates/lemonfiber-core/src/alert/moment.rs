@@ -10,7 +10,7 @@ use crate::error::Severity;
 /// Both directions are worth saying and neither is worth saying twice. An operator
 /// told a disk filled up and never told it was resolved goes on believing it — so
 /// resolution is an alert in its own right rather than the absence of one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Moment {
     /// It started.
@@ -34,7 +34,10 @@ impl Moment {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Alert {
     /// The check this came from, so an alert and its condition cannot drift apart.
+    /// Where several were grouped, the first of them.
     pub check: String,
+    /// What kind of event it is, shared by every instance of it.
+    pub kind: String,
     /// Which way it went.
     pub moment: Moment,
     /// How much it matters. A resolution takes the severity of what resolved,
@@ -43,6 +46,12 @@ pub struct Alert {
     pub severity: Severity,
     /// What happened, in the words the condition was raised with.
     pub summary: String,
+    /// What to do about it, most likely first. An alert that says what happened
+    /// and not what to do is a notification, which is a different and worse thing.
+    pub remedies: Vec<String>,
+    /// Every check this alert speaks for, the first being [`Self::check`]. More
+    /// than one where the same event was grouped across several services.
+    pub affected: Vec<String>,
 }
 
 impl Alert {
@@ -61,9 +70,12 @@ impl Alert {
         }?;
         Some(Self {
             check: condition.check.clone(),
+            kind: condition.kind.clone(),
             moment,
             severity: condition.severity,
             summary: condition.summary.clone(),
+            remedies: condition.remedies.clone(),
+            affected: vec![condition.check.clone()],
         })
     }
 
@@ -77,9 +89,21 @@ impl Alert {
     }
 
     /// The line an operator reads.
+    ///
+    /// Where the alert speaks for several services, it says so rather than naming
+    /// one and leaving the rest to be discovered separately.
     #[must_use]
     pub fn said(&self) -> String {
-        format!("{} — {}", self.summary, self.moment.said())
+        let others = self.affected.len().saturating_sub(1);
+        if others == 0 {
+            return format!("{} — {}", self.summary, self.moment.said());
+        }
+        format!(
+            "{} — {}, and {others} other service{}",
+            self.summary,
+            self.moment.said(),
+            crate::plural::s(others)
+        )
     }
 }
 
@@ -91,7 +115,7 @@ mod tests {
 
     /// What a check reports, with something to do about it.
     fn wrong(severity: Severity, summary: &str) -> Fault {
-        Fault::new(severity, summary, "look at it")
+        Fault::new("queue.stalled", severity, summary, "look at it")
     }
 
     /// A condition raised at a fixed moment.
@@ -147,8 +171,11 @@ mod tests {
     #[test]
     fn a_resolution_carries_the_weight_of_what_resolved() {
         // "The critical thing is over" deserves the attention the critical thing had.
-        let mut condition =
-            Condition::raised("vpn.leak", &wrong(Severity::Critical, "leaking"), "1000");
+        let mut condition = Condition::raised(
+            "vpn.leak",
+            &Fault::new("vpn.leak", Severity::Critical, "leaking", "look at it"),
+            "1000",
+        );
         condition.clear("later");
         assert_eq!(
             Alert::of(&condition, Some(0)).map(|a| a.severity),
@@ -158,7 +185,11 @@ mod tests {
 
     #[test]
     fn only_a_critical_onset_interrupts_someone_who_asked_for_quiet() {
-        let critical = Condition::raised("vpn.leak", &wrong(Severity::Critical, "leaking"), "1000");
+        let critical = Condition::raised(
+            "vpn.leak",
+            &Fault::new("vpn.leak", Severity::Critical, "leaking", "look at it"),
+            "1000",
+        );
         assert!(Alert::of(&critical, None).is_some_and(|a| a.overrides_quiet()));
 
         // Good news can wait for morning.

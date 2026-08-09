@@ -186,7 +186,7 @@ impl Summary {
         format!(
             "{} — {worst}, and {others} other{}",
             self.standing.word(),
-            if others == 1 { "" } else { "s" }
+            crate::plural::s(others)
         )
     }
 }
@@ -207,14 +207,18 @@ mod tests {
 
     /// One thing wrong, at a severity.
     fn wrong(check: &str, severity: Severity, summary: &str) -> Condition {
-        Condition::raised(check, &Fault::new(severity, summary, "look at it"), RAISED)
+        Condition::raised(
+            check,
+            &Fault::new(check, severity, summary, "look at it"),
+            RAISED,
+        )
     }
 
     /// One thing wrong, downstream of another.
     fn caused_by(check: &str, severity: Severity, summary: &str, cause: &str) -> Condition {
         Condition::raised(
             check,
-            &Fault::new(severity, summary, "look at it").caused_by(cause),
+            &Fault::new(check, severity, summary, "look at it").caused_by(cause),
             RAISED,
         )
     }
@@ -422,7 +426,12 @@ mod tests {
         let mut bouncing = wrong("service.sonarr", Severity::Error, "sonarr stopped");
         bouncing.clear("1100");
         bouncing.raise(
-            &Fault::new(Severity::Error, "sonarr stopped", "look at it"),
+            &Fault::new(
+                "service.stopped",
+                Severity::Error,
+                "sonarr stopped",
+                "look at it",
+            ),
             "1200",
         );
         bouncing.clear("1300");
@@ -458,7 +467,12 @@ mod tests {
         let mut resolved = wrong("service.sonarr", Severity::Error, "sonarr stopped");
         resolved.clear("1100");
         resolved.raise(
-            &Fault::new(Severity::Error, "sonarr stopped", "look at it"),
+            &Fault::new(
+                "service.stopped",
+                Severity::Error,
+                "sonarr stopped",
+                "look at it",
+            ),
             "1200",
         );
         resolved.cleared = Some("whenever".to_owned());

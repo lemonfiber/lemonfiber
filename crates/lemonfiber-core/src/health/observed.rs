@@ -24,6 +24,21 @@ use crate::error::Severity;
 /// The check the tunnel's egress is filed under.
 pub const EGRESS_CHECK: &str = "vpn.egress";
 
+// The kinds of event this module raises. Named here rather than spelled at each
+// site, since a kind is what an operator switches off and what groups four
+// services failing alike into one alert.
+
+/// The download client's traffic was proven to leave outside the tunnel.
+pub const LEAKING: &str = "vpn.egress.leaking";
+/// Whether it is behind the tunnel could not be established either way.
+pub const UNVERIFIED: &str = "vpn.egress.unverified";
+/// A service exited without being asked to.
+pub const STOPPED: &str = "service.stopped";
+/// A service is exiting and restarting repeatedly.
+pub const CRASH_LOOPING: &str = "service.crash-looping";
+/// A service is running and its own probe says it is not working.
+pub const UNHEALTHY: &str = "service.unhealthy";
+
 /// What the tunnel turned out to be doing, where a surface looked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Egress {
@@ -75,12 +90,14 @@ fn tunnel(egress: Egress, services: &[Service]) -> Option<Fault> {
     let fault = match egress {
         Egress::NotApplicable | Egress::Behind => return None,
         Egress::Leaking => Fault::new(
+            LEAKING,
             Severity::Critical,
             "the download client's traffic is not going through the tunnel",
             "stop the download client until the tunnel is proven to carry its traffic",
         )
         .or_else("check the gateway container is running and connected"),
         Egress::Unreadable => Fault::new(
+            UNVERIFIED,
             Severity::Warning,
             "whether the download client is behind the tunnel could not be established",
             "check the gateway container is running",
@@ -110,6 +127,7 @@ fn service_fault(service: &Service, services: &[Service]) -> Option<Fault> {
         return None;
     }
     let fault = Fault::new(
+        kind_of(service),
         severity_of(service.criticality),
         &summary_of(service),
         &remedy_of(service),
@@ -125,6 +143,16 @@ fn service_fault(service: &Service, services: &[Service]) -> Option<Fault> {
     }) {
         Some(needed) => Some(fault.caused_by(&format!("service.{needed}"))),
         None => Some(fault),
+    }
+}
+
+/// Which kind of failure this is — what four services failing the same way have
+/// in common, and what an operator switches off.
+const fn kind_of(service: &Service) -> &'static str {
+    match service.state {
+        State::CrashLooping => CRASH_LOOPING,
+        State::Unhealthy => UNHEALTHY,
+        _ => STOPPED,
     }
 }
 
