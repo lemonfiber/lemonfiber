@@ -36,6 +36,43 @@ pub fn is_secret(key: &str) -> bool {
     SECRET_MARKERS.iter().any(|marker| upper.contains(marker))
 }
 
+/// One line as it is safe to show: a setting whose name reads as a credential keeps
+/// its name and loses its value.
+///
+/// Wherever text that might carry a credential reaches a person — a diff of a file
+/// they edited, the technical detail under an error, a log line quoted back — it
+/// comes through here. A terminal, its scrollback and any bug report pasted out of
+/// it are all the same place as far as a key is concerned: somewhere it now has to
+/// be rotated from.
+///
+/// The separator is whichever of `:` or `=` comes **first**, because either can
+/// appear inside the other's value — a password containing a colon, a key containing
+/// an equals — and splitting on the later one would leave part of the value in the
+/// name and print it.
+#[must_use]
+pub fn withheld(line: &str) -> String {
+    let Some((at, separator)) = line
+        .char_indices()
+        .find(|(_, character)| *character == ':' || *character == '=')
+    else {
+        return line.to_owned();
+    };
+    let (name, rest) = line.split_at(at);
+    let value = rest.get(separator.len_utf8()..).unwrap_or_default();
+    // A name with nothing after it opens a block rather than setting a value: there
+    // is nothing to withhold, and blanking it would corrupt the shape.
+    if value.trim().is_empty() || !is_secret(name) {
+        return line.to_owned();
+    }
+    format!("{name}{separator} {REDACTED}")
+}
+
+/// Every line of `text`, each withheld where it carries a credential.
+#[must_use]
+pub fn withheld_text(text: &str) -> String {
+    text.lines().map(withheld).collect::<Vec<_>>().join("\n")
+}
+
 /// One setting, as it is safe to display.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shown {

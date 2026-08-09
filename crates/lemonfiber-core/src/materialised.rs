@@ -121,38 +121,12 @@ pub fn diff(yours: &str, ours: &str) -> String {
     let our_middle = ours.get(head..ours.len() - tail).unwrap_or_default();
     let mut out = String::new();
     for line in your_middle {
-        let _ = writeln!(out, "- {}", withheld(line));
+        let _ = writeln!(out, "- {}", crate::config::store::withheld(line));
     }
     for line in our_middle {
-        let _ = writeln!(out, "+ {}", withheld(line));
+        let _ = writeln!(out, "+ {}", crate::config::store::withheld(line));
     }
     out
-}
-
-/// One diff line as it is safe to show: a setting whose name reads as a credential keeps
-/// its name and loses its value.
-///
-/// The separator is whichever of `:` or `=` comes **first**, because either can appear
-/// inside the other's value — a password containing a colon, a key containing an equals —
-/// and splitting on the later one would leave part of the value in the name and print it.
-fn withheld(line: &str) -> String {
-    // The separator is taken with its position in one pass, so what follows it never has
-    // to be re-derived — and there is no "the character I just found is not there" arm to
-    // write, which is a branch nothing could ever take.
-    let Some((at, separator)) = line
-        .char_indices()
-        .find(|(_, character)| *character == ':' || *character == '=')
-    else {
-        return line.to_owned();
-    };
-    let (name, rest) = line.split_at(at);
-    let value = rest.get(separator.len_utf8()..).unwrap_or_default();
-    // A name with nothing after it is a YAML key opening a block, not a setting with a
-    // value — there is nothing to withhold and blanking it would corrupt the shape.
-    if value.trim().is_empty() || !crate::config::store::is_secret(name) {
-        return line.to_owned();
-    }
-    format!("{name}{separator} {}", crate::config::store::REDACTED)
 }
 
 #[cfg(test)]
@@ -238,7 +212,7 @@ mod tests {
             "  ADMIN_PASSWORD: p:ss=word",
             "PROVIDER_CREDENTIAL=x",
         ] {
-            let withheld = super::withheld(line);
+            let withheld = crate::config::store::withheld(line);
             assert!(withheld.ends_with(REDACTED), "{line} -> {withheld}");
             assert!(!withheld.contains("word"), "{line} -> {withheld}");
             assert!(!withheld.contains("a:b"), "{line} -> {withheld}");
@@ -256,7 +230,7 @@ mod tests {
             "  # a comment",
             "",
         ] {
-            assert_eq!(super::withheld(line), line, "{line}");
+            assert_eq!(crate::config::store::withheld(line), line, "{line}");
         }
     }
 
@@ -264,7 +238,10 @@ mod tests {
     fn a_key_that_opens_a_block_keeps_its_shape() {
         // `environment:` with nothing after it is a YAML key opening a block, not a
         // setting with a value — blanking it would corrupt what the operator is reading.
-        assert_eq!(super::withheld("    AUTH_SETTINGS:"), "    AUTH_SETTINGS:");
+        assert_eq!(
+            crate::config::store::withheld("    AUTH_SETTINGS:"),
+            "    AUTH_SETTINGS:"
+        );
     }
 
     #[test]

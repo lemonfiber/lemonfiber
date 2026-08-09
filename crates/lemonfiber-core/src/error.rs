@@ -89,8 +89,15 @@ impl Remedy {
 
     /// Point the remedy at a command, a path or a log.
     #[must_use]
+    /// Attach the underlying technical detail, with any credential in it withheld.
+    ///
+    /// Detail is where a service's own words are quoted verbatim, and a service that
+    /// echoes its configuration back in an error message is an ordinary thing rather
+    /// than an exotic one. So the withholding happens here rather than at each of the
+    /// dozens of call sites: a rule you have to remember at every one of them is a
+    /// rule that holds until somebody is in a hurry.
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
-        self.detail = Some(detail.into());
+        self.detail = Some(crate::config::store::withheld_text(&detail.into()));
         self
     }
 }
@@ -185,8 +192,15 @@ impl Problem {
 
     /// Attach the underlying technical detail, verbatim.
     #[must_use]
+    /// Attach the underlying technical detail, with any credential in it withheld.
+    ///
+    /// Detail is where a service's own words are quoted verbatim, and a service that
+    /// echoes its configuration back in an error message is an ordinary thing rather
+    /// than an exotic one. So the withholding happens here rather than at each of the
+    /// dozens of call sites: a rule you have to remember at every one of them is a
+    /// rule that holds until somebody is in a hurry.
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
-        self.detail = Some(detail.into());
+        self.detail = Some(crate::config::store::withheld_text(&detail.into()));
         self
     }
 
@@ -207,9 +221,66 @@ pub trait Diagnose {
     fn problem(&self) -> Problem;
 }
 
+/// The same problem, however many times it happened.
+///
+/// Twenty services failing to start for one reason is one thing wrong, and a screen
+/// listing it twenty times reads as twenty — which is both harder to act on and
+/// frightening in a way the situation does not warrant. So identical problems are
+/// folded, and the count is kept rather than discarded: "this happened twelve times"
+/// is information, and losing it would be the opposite mistake.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Repeated {
+    /// The problem itself, as it was first reported.
+    pub problem: Problem,
+    /// How many times it happened. Always at least one.
+    pub times: usize,
+}
+
+impl Repeated {
+    /// Whether this happened more than once.
+    #[must_use]
+    pub const fn is_repeated(&self) -> bool {
+        self.times > 1
+    }
+
+    /// How to say the count, or nothing where there is nothing to say — one
+    /// occurrence is just the problem, and "1 time" reads as a bug in the product.
+    #[must_use]
+    pub fn said(&self) -> Option<String> {
+        self.is_repeated()
+            .then(|| format!("this happened {} times", self.times))
+    }
+}
+
+/// Fold identical problems into one apiece, keeping the count and the order they
+/// were first seen.
+///
+/// Identity is the code and the summary together: the same code with a different
+/// summary is the same *kind* of problem about two different things — two root
+/// folders, two services — and folding those would report one and hide the other.
+#[must_use]
+pub fn folded(problems: Vec<Problem>) -> Vec<Repeated> {
+    let mut order: Vec<(Code, String)> = Vec::new();
+    let mut seen: std::collections::HashMap<(Code, String), Repeated> =
+        std::collections::HashMap::new();
+    for problem in problems {
+        let key = (problem.code, problem.summary.clone());
+        if let Some(already) = seen.get_mut(&key) {
+            already.times += 1;
+        } else {
+            order.push(key.clone());
+            seen.insert(key, Repeated { problem, times: 1 });
+        }
+    }
+    order
+        .into_iter()
+        .filter_map(|key| seen.remove(&key))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Code, Diagnose, Problem, Remedy, Severity, State};
+    use super::{folded, Code, Diagnose, Problem, Remedy, Repeated, Severity, State};
 
     const TEST: Code = Code::new("TEST-1");
 
@@ -297,5 +368,99 @@ mod tests {
             }
         }
         assert_eq!(Broken.problem().code, TEST);
+    }
+
+    /// The fixture problem, carrying whatever detail is given.
+    fn detailed(detail: &str) -> Problem {
+        a_problem().with_detail(detail)
+    }
+
+    /// The fixture problem, said differently.
+    fn about(summary: &str) -> Problem {
+        Problem::new(
+            TEST,
+            Severity::Error,
+            summary,
+            "The thing you asked for did not happen",
+            Remedy::new("Try it again"),
+        )
+    }
+
+    #[test]
+    fn a_credential_in_a_service_message_never_reaches_the_error() {
+        // Detail is where a service's own words are quoted verbatim, and a service
+        // echoing its configuration back in an error message is ordinary. A key that
+        // reaches a terminal is a key that has to be rotated.
+        let problem = detailed("could not apply:\n  SONARR_API_KEY: abc123\n  retries: 3");
+        let detail = problem.detail.unwrap_or_default();
+        assert!(!detail.contains("abc123"), "{detail}");
+        assert!(
+            detail.contains("SONARR_API_KEY"),
+            "the setting is still named"
+        );
+        assert!(
+            detail.contains("retries: 3"),
+            "and the rest survives: {detail}"
+        );
+    }
+
+    #[test]
+    fn detail_that_carries_no_credential_is_untouched() {
+        // Withholding is for credentials; detail that redacted everything would be
+        // detail that says nothing.
+        let said = "connection refused (os error 61)";
+        assert_eq!(detailed(said).detail.as_deref(), Some(said));
+    }
+
+    #[test]
+    fn one_problem_twenty_times_is_one_thing_wrong() {
+        // A screen listing it twenty times reads as twenty, which is harder to act on
+        // and frightening in a way the situation does not warrant.
+        let many = vec![a_problem(); 20];
+        let folded = folded(many);
+        assert_eq!(folded.len(), 1);
+        assert_eq!(folded.first().map(|r| r.times), Some(20));
+        assert_eq!(
+            folded.first().and_then(Repeated::said).as_deref(),
+            Some("this happened 20 times")
+        );
+    }
+
+    #[test]
+    fn one_occurrence_says_nothing_about_a_count() {
+        // "1 time" reads as a bug in the product.
+        let folded = folded(vec![a_problem()]);
+        let only = folded.first();
+        assert_eq!(only.map(|r| r.times), Some(1));
+        assert!(only.is_some_and(|r| !r.is_repeated()));
+        assert_eq!(only.and_then(Repeated::said), None);
+    }
+
+    #[test]
+    fn the_same_code_about_two_different_things_stays_two_things() {
+        // Two root folders failing for one reason are two problems, and folding them
+        // would report one and hide the other.
+        let folded = folded(vec![a_problem(), about("A different thing broke")]);
+        assert_eq!(folded.len(), 2);
+        assert!(folded.iter().all(|r| r.times == 1));
+    }
+
+    #[test]
+    fn folding_keeps_the_order_they_were_first_seen() {
+        // The first thing that went wrong is usually the one that caused the rest, so
+        // reordering by count would bury the cause under its symptoms.
+        let folded = folded(vec![a_problem(), about("Later"), about("Later")]);
+        assert_eq!(
+            folded
+                .iter()
+                .map(|r| (r.problem.summary.as_str(), r.times))
+                .collect::<Vec<_>>(),
+            vec![("Something broke", 1), ("Later", 2)]
+        );
+    }
+
+    #[test]
+    fn folding_nothing_is_nothing() {
+        assert!(folded(Vec::new()).is_empty());
     }
 }
