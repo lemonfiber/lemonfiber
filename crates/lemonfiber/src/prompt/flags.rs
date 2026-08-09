@@ -6,6 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
+use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
@@ -39,6 +40,21 @@ pub(super) fn parse_library(value: &str) -> Result<Library, String> {
         "none" => Ok(Library::None),
         other => Err(format!(
             "--library must be docker, native or none, not `{other}`"
+        )),
+    }
+}
+
+/// Read `--notifications` into an appetite, or name what was expected.
+///
+/// Takes the plain word rather than the stored label, since that is what an
+/// operator types: `problems`, not `problems only`.
+pub(super) fn parse_appetite(value: &str) -> Result<Appetite, String> {
+    match value.to_lowercase().as_str() {
+        "problems" => Ok(Appetite::ProblemsOnly),
+        "completions" => Ok(Appetite::WithCompletions),
+        "everything" => Ok(Appetite::Everything),
+        other => Err(format!(
+            "--notifications must be problems, completions or everything, not `{other}`"
         )),
     }
 }
@@ -104,6 +120,9 @@ pub struct RawSetup {
     /// Whether others in the home will use it.
     #[arg(long, value_name = "BOOL")]
     pub household: Option<bool>,
+    /// What to be told about: `problems`, `completions`, or `everything`.
+    #[arg(long, value_name = "APPETITE")]
+    pub notifications: Option<String>,
     /// Whether to start the stack when the machine boots.
     #[arg(long, value_name = "BOOL")]
     pub autostart: Option<bool>,
@@ -125,6 +144,7 @@ pub struct SetupFlags {
     service_user: Option<(u32, u32)>,
     library: Option<Library>,
     household: Option<bool>,
+    notifications: Option<Appetite>,
     autostart: Option<bool>,
 }
 
@@ -142,6 +162,7 @@ impl SetupFlags {
             service_user: None,
             library: None,
             household: None,
+            notifications: None,
             autostart: None,
         }
     }
@@ -193,6 +214,10 @@ impl SetupFlags {
                 .transpose()?,
             library: raw.library.map(|value| parse_library(&value)).transpose()?,
             household: raw.household,
+            notifications: raw
+                .notifications
+                .map(|value| parse_appetite(&value))
+                .transpose()?,
             autostart: raw.autostart,
         })
     }
@@ -212,8 +237,11 @@ impl SetupFlags {
     }
 
     /// The flag a step needs where one is required and absent — `None` where the
-    /// step's flag is present, or where the step has a supported empty answer
-    /// (an indexer left unset, a container user left to the image default).
+    /// step's flag is present, or where the step has a supported default answer
+    /// (an indexer left unset, a container user left to the image default, a
+    /// notification appetite left at the quiet preset). Requiring a flag for a
+    /// question that has a safe answer is friction an unattended install pays for
+    /// nothing.
     fn flag_for(&self, step: Step) -> Option<&'static str> {
         match step {
             Step::Protocols => self
@@ -302,6 +330,11 @@ impl Prompt for Flags {
     }
     fn household(&self) -> bool {
         self.flags.household.unwrap_or(false)
+    }
+    fn notifications(&self) -> Appetite {
+        self.flags
+            .notifications
+            .unwrap_or_else(Appetite::default_appetite)
     }
     fn autostart(&self) -> bool {
         self.flags.autostart.unwrap_or(false)
@@ -595,5 +628,39 @@ mod tests {
             entry,
             Some(ProviderEntry { host, port, tls, .. }) if host == "news.test" && port == 563 && tls
         ));
+    }
+
+    #[test]
+    fn each_notification_appetite_can_be_named_on_the_command_line() {
+        use lemonfiber_core::alert::Appetite;
+        for (given, expected) in [
+            ("problems", Appetite::ProblemsOnly),
+            ("completions", Appetite::WithCompletions),
+            ("EVERYTHING", Appetite::Everything),
+        ] {
+            // Through the parse an operator's command line actually takes, so the
+            // flag is proven wired and not merely parseable.
+            let raw = RawSetup {
+                notifications: Some(given.to_owned()),
+                ..raw()
+            };
+            let prompt = SetupFlags::parse(raw).map(|flags| Flags::new(flags, PathBuf::new()));
+            assert_eq!(
+                prompt.map(|prompt| prompt.notifications()),
+                Ok(expected),
+                "{given}"
+            );
+        }
+        // And a word that is none of them says which ones it expected, rather than
+        // quietly falling back to a preset the operator did not ask for.
+        let bad = RawSetup {
+            notifications: Some("loudly".to_owned()),
+            ..raw()
+        };
+        let refused = SetupFlags::parse(bad).err().unwrap_or_default();
+        assert!(
+            refused.contains("problems, completions or everything"),
+            "{refused}"
+        );
     }
 }

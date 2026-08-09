@@ -11,6 +11,7 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::alert::Appetite;
 use crate::app::apply;
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
@@ -73,6 +74,9 @@ pub trait Prompt {
     fn library(&self) -> Library;
     /// Whether others in the home will use it.
     fn household(&self) -> bool;
+    /// How much the operator wants to be told about — one question, three presets,
+    /// never a checklist of every event.
+    fn notifications(&self) -> Appetite;
     /// Whether the stack starts on boot.
     fn autostart(&self) -> bool;
     /// Whether the operator, shown the plan, confirms it.
@@ -247,7 +251,7 @@ async fn gather(
     // record, and save before moving on, so quitting mid-setup resumes at the
     // question reached rather than restarting. One loop keeps the recording a
     // single `?` rather than one tucked inside each conditional.
-    let questions: [(Step, How); 8] = [
+    let questions: [(Step, How); 9] = [
         (
             Step::Protocols,
             How::Sync(|prompt| Answer::Protocols(prompt.protocols())),
@@ -266,6 +270,10 @@ async fn gather(
         (
             Step::Household,
             How::Sync(|prompt| Answer::Household(prompt.household())),
+        ),
+        (
+            Step::Notifications,
+            How::Sync(|prompt| Answer::Notifications(prompt.notifications())),
         ),
         (
             Step::Autostart,
@@ -547,6 +555,7 @@ mod tests {
     use super::{
         progress_at, run, CredentialChoice, Outcome, Prompt, ProviderEntry, StorageWarning,
     };
+    use crate::alert::Appetite;
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::platform::Environment;
@@ -699,6 +708,7 @@ mod tests {
         service_user: Option<(u32, u32)>,
         library: Library,
         household: bool,
+        notifications: Appetite,
         autostart: bool,
         confirm: bool,
         /// The protocol choices each prerequisites checklist was derived from, in
@@ -737,6 +747,7 @@ mod tests {
                 service_user: Some((1000, 1000)),
                 library: Library::JellyfinDocker,
                 household: true,
+                notifications: Appetite::default_appetite(),
                 autostart: false,
                 confirm: true,
                 shown_prerequisites: std::cell::RefCell::new(Vec::new()),
@@ -793,6 +804,10 @@ mod tests {
         }
         fn household(&self) -> bool {
             self.household
+        }
+
+        fn notifications(&self) -> Appetite {
+            self.notifications
         }
         fn autostart(&self) -> bool {
             self.autostart
@@ -1019,6 +1034,7 @@ mod tests {
             Answer::ServiceUser(Some((1000, 1000))),
             Answer::Library(Library::JellyfinDocker),
             Answer::Household(true),
+            Answer::Notifications(Appetite::default_appetite()),
             Answer::Autostart(false),
         ] {
             wizard.answer(answer).unwrap_or(());
@@ -1049,6 +1065,7 @@ mod tests {
             Answer::ServiceUser(Some((1000, 1000))),
             Answer::Library(Library::JellyfinDocker),
             Answer::Household(true),
+            Answer::Notifications(Appetite::default_appetite()),
             Answer::Autostart(false),
         ] {
             wizard.answer(answer).unwrap_or(());

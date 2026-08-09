@@ -4,6 +4,7 @@
 //! not make sense cannot be represented rather than being caught later.
 
 use super::{PathBuf, Protocols};
+use crate::alert::Appetite;
 use serde::{Deserialize, Serialize};
 
 /// How the operator wants their existing and downloaded media served, where they
@@ -146,6 +147,11 @@ pub struct Answers {
     pub library: Option<Library>,
     /// Whether the household beyond the operator will use it.
     pub household: Option<bool>,
+    /// How much the operator wants to be told about. Absent from a progress file
+    /// written before the question existed, so defaulted rather than failing the
+    /// resume.
+    #[serde(default)]
+    pub notifications: Option<Appetite>,
     /// Whether the stack starts on boot.
     pub autostart: Option<bool>,
 }
@@ -167,6 +173,8 @@ pub enum Answer {
     ServiceUser(Option<(u32, u32)>),
     /// How the library is served.
     Library(Library),
+    /// How much the operator wants to be told about.
+    Notifications(Appetite),
     /// Whether the household uses it.
     Household(bool),
     /// Whether to start on boot.

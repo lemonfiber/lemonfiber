@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
@@ -259,6 +260,26 @@ impl Prompt for Terminal {
 
     fn household(&self) -> bool {
         self.yes_no("\nWill others in your home use it?", false)
+    }
+
+    fn notifications(&self) -> Appetite {
+        // Three presets rather than a checklist of thirteen events: an operator
+        // setting up a media stack has no basis for deciding whether they want to
+        // hear about a degraded hardlink, and every event stays switchable later.
+        println!("\nWhat should lemonfiber tell you about?");
+        for (index, preset) in Appetite::ALL.iter().enumerate() {
+            println!(
+                "  {}) {} — {}",
+                index + 1,
+                preset.label(),
+                preset.describe()
+            );
+        }
+        match self.answers.ask("Choose [1]:").as_str() {
+            "2" => Appetite::WithCompletions,
+            "3" => Appetite::Everything,
+            _ => Appetite::default_appetite(),
+        }
     }
 
     fn autostart(&self) -> bool {

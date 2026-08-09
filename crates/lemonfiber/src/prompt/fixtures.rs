@@ -70,6 +70,7 @@ pub(crate) fn raw() -> RawSetup {
         library: None,
         service_user: None,
         household: None,
+        notifications: None,
         autostart: None,
     }
 }

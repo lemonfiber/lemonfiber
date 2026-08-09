@@ -39,6 +39,8 @@ pub enum Step {
     Library,
     /// Whether others in the home will use it.
     Household,
+    /// How much the operator wants to be told about — one question, three presets.
+    Notifications,
     /// Whether to start on boot.
     Autostart,
     /// The complete summary, before anything is written. Informs.
@@ -47,7 +49,7 @@ pub enum Step {
 
 impl Step {
     /// The steps in presentation order.
-    pub(crate) const ORDER: [Self; 12] = [
+    pub(crate) const ORDER: [Self; 13] = [
         Self::Welcome,
         Self::Preflight,
         Self::Protocols,
@@ -58,6 +60,7 @@ impl Step {
         Self::ServiceUser,
         Self::Library,
         Self::Household,
+        Self::Notifications,
         Self::Autostart,
         Self::Review,
     ];
@@ -78,8 +81,9 @@ impl Step {
             Self::ServiceUser => 7,
             Self::Library => 8,
             Self::Household => 9,
-            Self::Autostart => 10,
-            Self::Review => 11,
+            Self::Notifications => 10,
+            Self::Autostart => 11,
+            Self::Review => 12,
         }
     }
 
@@ -98,6 +102,7 @@ impl Step {
                 | Self::ServiceUser
                 | Self::Library
                 | Self::Household
+                | Self::Notifications
                 | Self::Autostart
         )
     }

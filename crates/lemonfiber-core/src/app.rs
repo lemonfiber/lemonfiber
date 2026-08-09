@@ -20,6 +20,7 @@ use crate::model::{
 use crate::quality::Preset;
 use crate::stack::compose::Action;
 
+pub mod appetite;
 pub mod apply;
 pub mod backup;
 pub mod conditions;
