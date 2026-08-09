@@ -61,10 +61,52 @@ pub fn withheld(line: &str) -> String {
     let value = rest.get(separator.len_utf8()..).unwrap_or_default();
     // A name with nothing after it opens a block rather than setting a value: there
     // is nothing to withhold, and blanking it would corrupt the shape.
-    if value.trim().is_empty() || !is_secret(name) {
+    if value.trim().is_empty() {
         return line.to_owned();
     }
+    if !is_secret(name) {
+        // Not a setting line, but prose can still carry one: a service that fails
+        // while authenticating says so with the credential in hand, and that
+        // sentence becomes an error detail, a condition, and a push notification.
+        return withheld_within(line);
+    }
     format!("{name}{separator} {REDACTED}")
+}
+
+/// A line of prose, with any credential embedded in it withheld.
+///
+/// Scans for the two shapes a credential takes when a service quotes one back —
+/// `api_key=abc123` and `api_key: abc123` — rather than treating the whole line as
+/// one setting. Over-redacting a word that merely reads like a key costs a reader
+/// one lookup; under-redacting costs a rotation.
+fn withheld_within(line: &str) -> String {
+    let mut safe: Vec<String> = Vec::new();
+    let mut redact_next = false;
+    for token in line.split_whitespace() {
+        if redact_next {
+            redact_next = false;
+            safe.push(REDACTED.to_owned());
+            continue;
+        }
+        match token.split_once('=') {
+            Some((name, value)) if is_secret(name) && !value.is_empty() => {
+                safe.push(format!("{name}={REDACTED}"));
+                continue;
+            }
+            _ => {}
+        }
+        // `api_key: abc123` — the value is the next token along.
+        redact_next = token.strip_suffix(':').is_some_and(is_secret);
+        safe.push(token.to_owned());
+    }
+    // Rebuilt from tokens, so the original spacing is not preserved; a line that
+    // needed nothing withheld is returned untouched rather than reflowed.
+    let rebuilt = safe.join(" ");
+    if rebuilt.contains(REDACTED) {
+        rebuilt
+    } else {
+        line.to_owned()
+    }
 }
 
 /// Every line of `text`, each withheld where it carries a credential.

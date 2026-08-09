@@ -9,10 +9,23 @@
 //! "I'll add the remedy later" is how a model like this erodes one message at a
 //! time. Everything that raises a condition therefore has to have thought about
 //! what the operator should do, at the point of raising it.
+//!
+//! Every word of one is redacted on the way in, on the support bundle's own
+//! rules. A fault's summary is frequently a service's own message repeated back,
+//! and a service that fails while authenticating will say so with the credential
+//! in hand. Redacting here rather than at each surface is the point: a condition
+//! is written to disk, read back next run, folded into a digest and pushed to a
+//! phone, and a rule applied at only some of those places is a rule that holds
+//! until somebody adds the next surface.
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::Severity;
+
+/// One line of a fault, as it is safe to keep and to send.
+fn withheld(text: &str) -> String {
+    crate::config::store::withheld_text(text)
+}
 
 /// Something a check found wrong.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,8 +57,8 @@ impl Fault {
         Self {
             kind: kind.to_owned(),
             severity,
-            summary: summary.to_owned(),
-            remedies: vec![remedy.to_owned()],
+            summary: withheld(summary),
+            remedies: vec![withheld(remedy)],
             caused_by: None,
         }
     }
@@ -53,7 +66,7 @@ impl Fault {
     /// A further thing to try, after the ones already offered.
     #[must_use]
     pub fn or_else(mut self, remedy: &str) -> Self {
-        self.remedies.push(remedy.to_owned());
+        self.remedies.push(withheld(remedy));
         self
     }
 
@@ -114,5 +127,62 @@ mod tests {
         )
         .caused_by("storage.space");
         assert_eq!(fault.caused_by.as_deref(), Some("storage.space"));
+    }
+
+    #[test]
+    fn a_credential_a_service_repeated_back_never_reaches_a_fault() {
+        // A service that fails while authenticating says so with the credential in
+        // hand, and that message becomes a summary, a stored condition, a digest,
+        // and a push to somebody's phone.
+        let leaked = format!("sonarr refused: {}=abcdef123456", "api_key");
+        let fault = Fault::new("service.refused", Severity::Error, &leaked, "check the key");
+        assert!(!fault.summary.contains("abcdef123456"), "{}", fault.summary);
+        assert!(
+            fault.summary.contains("sonarr refused"),
+            "{}",
+            fault.summary
+        );
+    }
+
+    #[test]
+    fn a_remedy_is_redacted_on_the_same_rules_as_the_summary() {
+        // A remedy that quotes the offending line is the obvious way for one to get
+        // out, and the least obvious place to look for it.
+        let quoted = format!("set {}=hunter2 in the environment file", "PASSWORD");
+        let fault = Fault::new("config.wrong", Severity::Error, "the login failed", &quoted)
+            .or_else(&quoted);
+        assert!(
+            fault
+                .remedies
+                .iter()
+                .all(|remedy| !remedy.contains("hunter2")),
+            "{:?}",
+            fault.remedies
+        );
+    }
+
+    #[test]
+    fn a_credential_written_after_a_colon_is_withheld_too() {
+        // The other shape a service quotes one back in. Both are ordinary; catching
+        // only the one with an equals sign would be a rule that holds until the
+        // next service words its error differently.
+        let leaked = format!("sonarr refused: {}: abcdef123456", "api_key");
+        let fault = Fault::new("service.refused", Severity::Error, &leaked, "check the key");
+        assert!(!fault.summary.contains("abcdef123456"), "{}", fault.summary);
+        assert!(fault.summary.contains("api_key"), "{}", fault.summary);
+    }
+
+    #[test]
+    fn wording_that_carries_no_credential_is_left_exactly_as_written() {
+        // Redaction that mangled ordinary sentences would be its own problem.
+        let plain = "sonarr keeps restarting";
+        let fault = Fault::new(
+            "service.crash-looping",
+            Severity::Error,
+            plain,
+            "read its logs",
+        );
+        assert_eq!(fault.summary, plain);
+        assert_eq!(fault.remedies, vec!["read its logs".to_owned()]);
     }
 }
