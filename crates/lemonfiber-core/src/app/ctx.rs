@@ -127,6 +127,19 @@ impl Ctx {
     /// falls back to the epoch: refusing to do anything because the machine's
     /// clock is absurd would be a worse answer than checking dates against a
     /// date that is merely wrong.
+    /// The moment now, as the opaque stamp durable records carry.
+    ///
+    /// Seconds since the epoch, read through the clock port rather than from the
+    /// system directly, so a test can say what time it is and a record written on
+    /// one run can be compared with one written on another.
+    pub(super) fn stamp(&self) -> String {
+        self.clock
+            .now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_secs().to_string())
+            .unwrap_or_default()
+    }
+
     pub(super) fn today(&self) -> lemonfiber_manifest::Date {
         let seconds = self
             .clock
