@@ -1,0 +1,19 @@
+# The website mirrors this repository — its implementation status, its releases —
+# so it is told when they change rather than waiting for its daily schedule.
+name: site
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    permissions:
+      contents: read
+    uses: lemonfiber/spec/.github/workflows/rebuild-site.yml@dec2ccbb40ca857b40a226d75fddc429883ba09e # main
+    with:
+      because: "the tool changed"
+    secrets: inherit
