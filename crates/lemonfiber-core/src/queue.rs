@@ -29,7 +29,7 @@ mod item;
 mod stall;
 mod threshold;
 
-pub use assess::{assess, Stuck, LOOPING, REPEATED};
+pub use assess::{assess, category, Stuck, LOOPING, REPEATED};
 pub use item::{Fetching, Importing, Item};
 pub use stall::Stall;
 pub use threshold::Thresholds;

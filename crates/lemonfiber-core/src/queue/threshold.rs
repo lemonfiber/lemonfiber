@@ -13,6 +13,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use super::Stall;
+
 /// How long each kind of stillness has to last before it is worth saying.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Thresholds {
@@ -53,6 +55,22 @@ impl Thresholds {
     #[must_use]
     pub fn within(self, kind: Duration, held: Duration) -> bool {
         held < kind
+    }
+
+    /// How long this kind of stall has to last before it is worth saying.
+    ///
+    /// A loop and a repeated import failure are structural — they will not resolve
+    /// themselves, and waiting only spends more of the allowance — so they are
+    /// said as soon as they are seen. Everything else waits.
+    #[must_use]
+    pub const fn for_stall(self, stall: Stall) -> Duration {
+        match stall {
+            Stall::RedownloadLoop | Stall::RepeatedImportFailure => Duration::ZERO,
+            Stall::CompletedNotImported | Stall::Orphaned => self.not_imported,
+            Stall::StalledDownload => self.stalled,
+            Stall::WaitingIndefinitely => self.waiting,
+            Stall::Slow => self.slow,
+        }
     }
 }
 

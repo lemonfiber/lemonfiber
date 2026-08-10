@@ -77,7 +77,9 @@ pub fn assess(items: &[Item], thresholds: Thresholds) -> Vec<Stuck> {
         .iter()
         .filter(|item| !item.unmanaged)
         .filter_map(|item| {
-            stall_of(item, thresholds).map(|stall| Stuck {
+            let stall = category(item)?;
+            // Long enough to be worth saying, by whatever age the caller knows.
+            (!thresholds.within(thresholds.for_stall(stall), item.held_for)).then(|| Stuck {
                 name: item.name.clone(),
                 stall,
                 held_for: item.held_for.as_secs(),
@@ -95,11 +97,22 @@ pub fn assess(items: &[Item], thresholds: Thresholds) -> Vec<Stuck> {
     stuck
 }
 
-/// What is wrong with one item, or nothing where it is simply working.
+/// Which category an item falls in, before any question of how long.
+///
+/// Separated from the threshold because the two have different sources. What kind
+/// of stall this is can be read from the services right now; *how long it has been
+/// that way* cannot — neither side reports it, and time since the item was added
+/// is a different measurement that would call a download added three days ago and
+/// stalled ten minutes ago "stalled for three days".
+///
+/// So a caller with a memory — the condition store, which stamps when a fault was
+/// first seen — applies [`Thresholds::for_stall`] to the age it knows. A caller
+/// without one passes the age it has and uses [`assess`].
 ///
 /// Checked worst-first because an item can be several of these at once, and the
 /// one that sends the operator to the right place is the worst true one.
-fn stall_of(item: &Item, thresholds: Thresholds) -> Option<Stall> {
+#[must_use]
+pub fn category(item: &Item) -> Option<Stall> {
     // Being fetched over and over outranks everything: whatever else is true of
     // this item right now, the loop is what is spending the allowance.
     if item.grabs >= LOOPING {
@@ -112,14 +125,14 @@ fn stall_of(item: &Item, thresholds: Thresholds) -> Option<Stall> {
         return Some(Stall::RepeatedImportFailure);
     }
     if item.is_completed_not_imported() {
-        return past(thresholds.not_imported, item).then_some(if item.is_orphaned() {
+        return Some(if item.is_orphaned() {
             Stall::Orphaned
         } else {
             Stall::CompletedNotImported
         });
     }
     if item.is_waiting() {
-        return past(thresholds.waiting, item).then_some(Stall::WaitingIndefinitely);
+        return Some(Stall::WaitingIndefinitely);
     }
     // A finished download is not a stalled one. Past this point the transfer is
     // still running, so a complete one has already been accounted for above —
@@ -130,15 +143,11 @@ fn stall_of(item: &Item, thresholds: Thresholds) -> Option<Stall> {
     }
     // Still fetching. Not moving at all is a stall; moving slowly is a note.
     let moving = item.fetching.is_some_and(|fetching| fetching.moving);
-    if !moving && past(thresholds.stalled, item) {
-        return Some(Stall::StalledDownload);
-    }
-    (moving && past(thresholds.slow, item)).then_some(Stall::Slow)
-}
-
-/// Whether an item has been in its state longer than a threshold allows.
-fn past(threshold: std::time::Duration, item: &Item) -> bool {
-    !Thresholds::conservative().within(threshold, item.held_for)
+    Some(if moving {
+        Stall::Slow
+    } else {
+        Stall::StalledDownload
+    })
 }
 
 #[cfg(test)]
@@ -350,5 +359,55 @@ mod tests {
         assert_eq!(spoken(47 * 60 * 60), "47 hours");
         assert_eq!(spoken(48 * 60 * 60), "2 days");
         assert_eq!(spoken(8 * 24 * 60 * 60), "8 days");
+    }
+
+    #[test]
+    fn what_kind_of_stall_it_is_can_be_read_without_knowing_how_long() {
+        // The two have different sources: the category is readable from the
+        // services right now, the age is not — neither side reports it.
+        assert_eq!(
+            super::category(&downloading("Some.Release", 42, false)),
+            Some(Stall::StalledDownload)
+        );
+        let fresh = Item {
+            held_for: Duration::ZERO,
+            ..downloading("Some.Release", 42, false)
+        };
+        assert_eq!(
+            super::category(&fresh),
+            Some(Stall::StalledDownload),
+            "the same category however new it is"
+        );
+    }
+
+    #[test]
+    fn something_structural_is_said_as_soon_as_it_is_seen() {
+        // A loop and a repeated import failure will not resolve themselves, and
+        // waiting only spends more of the allowance.
+        let thresholds = Thresholds::conservative();
+        assert_eq!(thresholds.for_stall(Stall::RedownloadLoop), Duration::ZERO);
+        assert_eq!(
+            thresholds.for_stall(Stall::RepeatedImportFailure),
+            Duration::ZERO
+        );
+        let looping = Item {
+            grabs: LOOPING,
+            held_for: Duration::ZERO,
+            ..downloading("Some.Release", 42, false)
+        };
+        assert_eq!(verdict(looping), Some(Stall::RedownloadLoop));
+    }
+
+    #[test]
+    fn every_category_has_a_threshold_and_only_the_structural_ones_are_immediate() {
+        let thresholds = Thresholds::conservative();
+        let immediate: Vec<Stall> = Stall::ALL
+            .into_iter()
+            .filter(|stall| thresholds.for_stall(*stall).is_zero())
+            .collect();
+        assert_eq!(
+            immediate,
+            vec![Stall::RedownloadLoop, Stall::RepeatedImportFailure]
+        );
     }
 }

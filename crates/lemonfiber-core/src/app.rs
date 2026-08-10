@@ -32,6 +32,7 @@ mod materialise;
 mod music;
 mod notify;
 mod quality;
+pub mod queue;
 pub mod recover;
 mod reset;
 pub mod restore;

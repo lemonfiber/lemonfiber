@@ -89,9 +89,14 @@ impl Stall {
         }
     }
 
-    /// What to do about it, most likely first. Never empty.
+    /// What to do about it, most likely first.
+    ///
+    /// Two of them, as a type rather than a promise: a caller cannot reach a
+    /// category with nothing to suggest, so it needs no fallback for a case that
+    /// cannot arise — and a fallback for one that cannot arise is a branch nothing
+    /// can test.
     #[must_use]
-    pub fn remedies(self) -> Vec<String> {
+    pub fn remedies(self) -> [String; 2] {
         let each = match self {
             Self::RedownloadLoop => [
                 "stop the item before it spends more of the allowance, then fix the import",
@@ -122,7 +127,14 @@ impl Stall {
                 "check whether something else is using the connection",
             ],
         };
-        each.iter().map(|remedy| (*remedy).to_owned()).collect()
+        each.map(str::to_owned)
+    }
+
+    /// The first thing to try — the most likely of the two.
+    #[must_use]
+    pub fn first_remedy(self) -> String {
+        let [first, _] = self.remedies();
+        first
     }
 
     /// Whether this is worth interrupting the operator about, as opposed to worth
@@ -158,7 +170,7 @@ mod tests {
         // decorative.
         let mut first: Vec<String> = Stall::ALL
             .iter()
-            .filter_map(|stall| stall.remedies().first().cloned())
+            .map(|stall| stall.first_remedy())
             .collect();
         let count = first.len();
         first.sort_unstable();
