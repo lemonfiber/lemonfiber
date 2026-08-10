@@ -25,7 +25,7 @@ use crate::error::Diagnose;
 use crate::health::{observed, Egress, Reach, Summary};
 
 use super::conditions;
-use crate::ports::service::Queues;
+use crate::ports::service::{QueueDepth, Queues};
 use crate::storage::{test_link, Linked};
 
 use super::targets::{
@@ -287,7 +287,8 @@ async fn queues(
         let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
             continue;
         };
-        if let Ok(depth) = service.queue().await {
+        if let Ok(read) = service.queue().await {
+            let depth = QueueDepth::of(&read);
             depths.push(Queue {
                 service: target.name.clone(),
                 depth: depth.total,

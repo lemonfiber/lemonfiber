@@ -21,8 +21,8 @@ mod trace;
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
-    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, QueueDepth, Queues,
-    RegisteredClient, RegisteredFolder, RootFolder, Transfers,
+    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, Queue, QueueDepth,
+    Queued, Queues, RegisteredClient, RegisteredFolder, RootFolder, Transfers,
 };
 pub use failure::{
     Failure, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE, SERVICE_UNSUPPORTED,

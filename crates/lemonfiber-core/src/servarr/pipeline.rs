@@ -80,7 +80,7 @@ impl Pipeline for Servarr {
                 // way, whatever it calls the step.
                 stage: Stage::of_queue_state(&record.tracked_download_state)
                     .unwrap_or(Stage::Downloading),
-                stuck: super::is_stuck(&record.tracked_download_status),
+                stuck: is_stuck(&record.tracked_download_status),
             })
             .collect())
     }
@@ -128,7 +128,7 @@ impl Pipeline for Servarr {
         let mut seen = std::collections::BTreeSet::new();
         Ok(records
             .iter()
-            .filter(|record| super::is_stuck(&record.tracked_download_status))
+            .filter(|record| is_stuck(&record.tracked_download_status))
             .filter_map(|record| record.item_title(kind).map(|title| (title, record)))
             .filter(|(title, _)| seen.insert(title.clone()))
             .map(|(title, record)| StuckItem {
@@ -219,4 +219,10 @@ struct HistoryRecord {
     /// The episode it happened to, where the service files its history per episode.
     #[serde(default)]
     episode_id: Option<i64>,
+}
+
+/// Whether a queue item's tracked status is one that has stopped progressing —
+/// the service's own words for a download that needs attention.
+fn is_stuck(status: &str) -> bool {
+    status.eq_ignore_ascii_case("warning") || status.eq_ignore_ascii_case("error")
 }

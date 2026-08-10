@@ -171,13 +171,71 @@ pub trait Transfers: Send + Sync {
 /// being wired need not answer for a question they are never asked.
 #[async_trait]
 pub trait Queues: Send + Sync {
-    /// How deep the service's queue is, and how much of it is stuck — the numbers
-    /// the dashboard shows without opening the service's own web UI.
+    /// The service's queue: how deep it is, and the items on the page read.
+    ///
+    /// Both, because they answer different questions and neither substitutes for
+    /// the other. The depth is the service's own count and is authoritative — a
+    /// queue deeper than one page would otherwise be under-reported by however
+    /// much did not fit. The items are what a stall is categorised from, since a
+    /// number cannot say which ones or why.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
-    async fn queue(&self) -> Result<QueueDepth, Failure>;
+    async fn queue(&self) -> Result<Queue, Failure>;
+}
+
+/// A service's queue as one read of it found it.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Queue {
+    /// How many items the service says it has, whatever fitted on the page.
+    pub total: usize,
+    /// The items on the page that was read.
+    pub items: Vec<Queued>,
+}
+
+impl Queue {
+    /// Whether the service answered with nothing at all.
+    ///
+    /// Distinct from a queue that could not be read, which is a `Failure` and
+    /// never reaches here: an empty queue is a working stack with nothing to do,
+    /// and rendering the two alike is how an operator comes to believe a service
+    /// is idle when it is unreachable.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.total == 0 && self.items.is_empty()
+    }
+}
+
+/// One thing in a service's queue, in the service's own terms.
+///
+/// Deliberately close to what the API returns: interpreting it is
+/// [`crate::queue`]'s, and a port that decided what counted as stuck would put
+/// the judgement in the one place a test cannot reach it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Queued {
+    /// What the service calls it — the name the download client also knows it by,
+    /// which is what correlates the two sides.
+    pub title: String,
+    /// The service's own word for how it is tracking: `ok`, `warning`, `error`.
+    pub status: String,
+    /// The service's own word for what stage it is at, such as `importPending`.
+    pub state: String,
+    /// What the service said went wrong, where it said anything. The blocking
+    /// cause, in the words of the thing that refused — a permission denial in an
+    /// import log is worth more than any interpretation of it.
+    pub message: Option<String>,
+    /// The download client's own identifier for it, where the service knows one.
+    /// A surer correlation than the title, which either side may have rewritten.
+    pub download_id: Option<String>,
+}
+
+impl Queued {
+    /// Whether the service considers this one to have stopped progressing.
+    #[must_use]
+    pub fn is_stuck(&self) -> bool {
+        self.status.eq_ignore_ascii_case("warning") || self.status.eq_ignore_ascii_case("error")
+    }
 }
 
 /// How deep a service's queue is, and how much of it is stuck.
@@ -187,4 +245,80 @@ pub struct QueueDepth {
     pub total: usize,
     /// How many of them are stuck — warning or error — rather than progressing.
     pub stuck: usize,
+}
+
+impl QueueDepth {
+    /// The depth a read of the queue amounts to.
+    ///
+    /// The total is the service's own; the stuck count is read from the items that
+    /// came back, so a queue deeper than one page reports its true depth with a
+    /// stuck count from the page — an under-count of what is wrong rather than an
+    /// invented one.
+    #[must_use]
+    pub fn of(queue: &Queue) -> Self {
+        Self {
+            total: queue.total,
+            stuck: queue.items.iter().filter(|item| item.is_stuck()).count(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Queue, QueueDepth, Queued};
+
+    /// One queue item at a tracked status.
+    fn item(title: &str, status: &str) -> Queued {
+        Queued {
+            title: title.to_owned(),
+            status: status.to_owned(),
+            state: "downloading".to_owned(),
+            message: None,
+            download_id: None,
+        }
+    }
+
+    #[test]
+    fn a_queue_deeper_than_one_page_reports_its_true_depth() {
+        // Counting the depth from the page would silently report 200 for a queue
+        // of 500. The service's own total is authoritative; only the stuck count
+        // comes from what came back, which under-counts rather than invents.
+        let read = Queue {
+            total: 500,
+            items: vec![item("a", "ok"), item("b", "warning")],
+        };
+        assert_eq!(
+            QueueDepth::of(&read),
+            QueueDepth {
+                total: 500,
+                stuck: 1
+            }
+        );
+    }
+
+    #[test]
+    fn the_services_own_words_decide_what_is_stuck_however_they_are_cased() {
+        assert!(item("a", "warning").is_stuck());
+        assert!(item("a", "Error").is_stuck());
+        assert!(!item("a", "ok").is_stuck());
+        assert!(!item("a", String::new().as_str()).is_stuck());
+    }
+
+    #[test]
+    fn an_empty_queue_is_a_working_stack_with_nothing_to_do() {
+        // Distinct from one that could not be read, which never reaches here — it
+        // is a `Failure`. Rendering the two alike is how an operator comes to
+        // believe a service is idle when it is unreachable.
+        assert!(Queue::default().is_empty());
+        assert!(!Queue {
+            total: 1,
+            items: Vec::new()
+        }
+        .is_empty());
+        assert!(!Queue {
+            total: 0,
+            items: vec![item("a", "ok")]
+        }
+        .is_empty());
+    }
 }
