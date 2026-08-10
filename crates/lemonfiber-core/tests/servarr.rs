@@ -14,7 +14,8 @@ use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Http, Method, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
     Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, MusicQuality,
-    Pipeline, QueueDepth, QueueItem, Queues, RegisteredClient, RegisteredFolder, RootFolder,
+    Pipeline, QueueDepth, QueueItem, Queued, Queues, RegisteredClient, RegisteredFolder,
+    RootFolder,
 };
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::{api_key, Servarr};
@@ -677,15 +678,60 @@ async fn a_get_carries_no_content_type() {
 }
 
 #[tokio::test]
+async fn a_queue_item_carries_what_the_service_said_went_wrong() {
+    // The blocking cause in the words of the thing that refused. A permission
+    // denial from an import log is worth more than any interpretation of it, and
+    // it is the difference between "stuck" and something an operator can fix.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"{"totalRecords":1,"records":[{"title":"Some.Release","trackedDownloadStatus":"warning",
+           "trackedDownloadState":"importPending","downloadId":"ABC123",
+           "statusMessages":[{"messages":["Permission denied writing to /data/media"]}]}]}"#,
+    ));
+    let read = sonarr(&fake).queue().await.ok().unwrap_or_default();
+    let first = read.items.first().cloned().unwrap_or_else(|| Queued {
+        title: String::new(),
+        status: String::new(),
+        state: String::new(),
+        message: None,
+        download_id: None,
+    });
+    assert_eq!(first.title, "Some.Release");
+    assert_eq!(first.state, "importPending");
+    assert_eq!(
+        first.message.as_deref(),
+        Some("Permission denied writing to /data/media")
+    );
+    assert_eq!(first.download_id.as_deref(), Some("ABC123"));
+}
+
+#[tokio::test]
+async fn a_service_that_offers_only_blank_detail_carries_none_rather_than_empty() {
+    // An empty string is not a cause. Carrying one would put a blank line where an
+    // explanation belongs, which reads as though the service explained itself.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"{"totalRecords":1,"records":[{"title":"Some.Release","trackedDownloadStatus":"warning",
+           "errorMessage":"   ","downloadId":""}]}"#,
+    ));
+    let read = sonarr(&fake).queue().await.ok().unwrap_or_default();
+    let carried: Vec<(Option<String>, Option<String>)> = read
+        .items
+        .iter()
+        .map(|item| (item.message.clone(), item.download_id.clone()))
+        .collect();
+    assert_eq!(carried, vec![(None, None)]);
+}
+
+#[tokio::test]
 async fn the_queue_depth_and_the_stuck_count_are_read() {
-    // The total is the service's own; the stuck count is read from the records,
-    // counting warning and error as stuck and leaving ok alone.
     let fake = Fake::new(Answer::Reply(
         200,
         r#"{"totalRecords":5,"records":[{"trackedDownloadStatus":"ok"},{"trackedDownloadStatus":"warning"},{"trackedDownloadStatus":"Error"}]}"#,
     ));
     let queue = sonarr(&fake).queue().await;
-    assert_eq!(queue.ok(), Some(QueueDepth { total: 5, stuck: 2 }));
+    let depth = queue.as_ref().map(QueueDepth::of);
+    assert_eq!(depth.ok(), Some(QueueDepth { total: 5, stuck: 2 }));
 
     // It asked the queue route, and for a generous page so the count is whole.
     assert!(fake

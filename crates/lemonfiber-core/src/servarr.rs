@@ -24,7 +24,7 @@ use serde::Deserialize;
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
-    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity, QueueDepth,
+    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity, Queue, Queued,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 
@@ -238,7 +238,7 @@ impl crate::ports::service::Maintenance for Servarr {
 
 #[async_trait]
 impl crate::ports::service::Queues for Servarr {
-    async fn queue(&self) -> Result<QueueDepth, Failure> {
+    async fn queue(&self) -> Result<Queue, Failure> {
         // A generous page is asked for so the stuck count is read from the whole
         // queue rather than the default first page; the total is the service's own
         // count, independent of the page.
@@ -248,23 +248,42 @@ impl crate::ports::service::Queues for Servarr {
         let queue: QueueResource = self
             .endpoint
             .decode(&response, "the queue could not be read")?;
-        let stuck = queue
-            .records
-            .iter()
-            .filter(|record| is_stuck(&record.tracked_download_status))
-            .count();
-        Ok(QueueDepth {
+        Ok(Queue {
             total: queue.total_records,
-            stuck,
+            items: queue.records.into_iter().map(queued).collect(),
         })
     }
 }
 
-/// Whether a queue item's tracked status is one that has stopped progressing —
-/// the service's own words for a download that needs attention. Shared by the
-/// dashboard's queue depth and a per-item trace.
-fn is_stuck(status: &str) -> bool {
-    status.eq_ignore_ascii_case("warning") || status.eq_ignore_ascii_case("error")
+/// One queue record as the port reports it.
+///
+/// The service's own words are carried through rather than interpreted here: what
+/// counts as stuck, and which category a stall belongs to, is a judgement, and a
+/// judgement made in an adapter is one no test can reach without a network.
+fn queued(record: QueueRecord) -> Queued {
+    Queued {
+        title: record.title.unwrap_or_default(),
+        status: record.tracked_download_status,
+        state: record.tracked_download_state,
+        // The service reports a single message and a list of them; the list is
+        // where an import failure explains itself, so it leads.
+        message: record
+            .status_messages
+            .into_iter()
+            .flat_map(|message| message.messages)
+            .next()
+            .or(record.error_message)
+            .filter(|message| !message.trim().is_empty()),
+        download_id: record.download_id.filter(|id| !id.is_empty()),
+    }
+}
+
+/// One group of complaints about a queue item.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StatusMessage {
+    #[serde(default)]
+    messages: Vec<String>,
 }
 
 /// A page of the queue as the service reports it: its own total, and the records
@@ -285,6 +304,20 @@ struct QueueResource {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueueRecord {
+    /// What the service calls it — the name the download client knows it by too.
+    #[serde(default)]
+    title: Option<String>,
+    /// What the service said went wrong, where it reported a single message.
+    #[serde(default)]
+    error_message: Option<String>,
+    /// Where an import failure explains itself: the service groups its complaints
+    /// under a title each, and the messages beneath are the operator-facing words.
+    #[serde(default)]
+    status_messages: Vec<StatusMessage>,
+    /// The download client's own identifier, which correlates the two sides more
+    /// surely than a title either may have rewritten.
+    #[serde(default)]
+    download_id: Option<String>,
     #[serde(default)]
     tracked_download_status: String,
     #[serde(default)]
