@@ -67,6 +67,26 @@ pub(super) fn skipped(reason: String) -> Finding {
     finding("vpn", "VPN verification", Verdict::Skipped { reason })
 }
 
+/// The finding for address services that contradict each other.
+///
+/// Unverified rather than a failure: nothing here says traffic is leaking. It
+/// says the one number every other verdict is compared against cannot be
+/// established, which is a different and more honest claim — and one the operator
+/// can act on, since the fix is to their sources rather than to their tunnel.
+pub(super) fn disagreeing(reason: String) -> Finding {
+    finding(
+        "vpn.egress-sources",
+        "Address services agree",
+        Verdict::Unverified {
+            reason,
+            remedy: Remedy::new(
+                "Check the address services are reachable and not behind a caching proxy",
+            )
+            .with_detail("LEMONFIBER_IP_ECHO accepts several, comma-separated"),
+        },
+    )
+}
+
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.
 pub(super) fn unreachable_engine(

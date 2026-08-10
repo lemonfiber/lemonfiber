@@ -72,6 +72,9 @@ pub(crate) struct Tunnel {
     pub(crate) client_ip: Option<&'static str>,
     pub(crate) country: Option<&'static str>,
     pub(crate) port: Option<&'static str>,
+    /// What a second address service says the gateway's egress is, where a test
+    /// is about the sources contradicting each other. Absent means both agree.
+    pub(crate) second_opinion: Option<&'static str>,
 }
 
 impl Reporting {
@@ -177,8 +180,15 @@ impl Engine for Reporting {
                 stdout: tunnel.country.unwrap_or_default().to_owned(),
             });
         }
+        let asked_second = argv
+            .last()
+            .is_some_and(|arg| arg.contains("second.example"));
         let ip = if container.contains(tunnel.gateway) {
-            tunnel.gateway_ip
+            if asked_second {
+                tunnel.second_opinion.or(tunnel.gateway_ip)
+            } else {
+                tunnel.gateway_ip
+            }
         } else {
             tunnel.client_ip
         };
