@@ -305,7 +305,7 @@ pub(super) fn ctx_through_a_tunnel(fake: Fake) -> Ctx {
     let mut ctx = ctx_with_torrents(fake);
     // What the check needs before it can say anything: somewhere to ask what address the
     // world sees, and a forwarding choice to judge.
-    ctx.settings.ip_echo = Some("https://echo.example".to_owned());
+    ctx.settings.ip_echo = vec!["https://echo.example".to_owned()];
     ctx.settings.port_forward = crate::config::PortForward {
         enabled: true,
         provider: Some("proton".to_owned()),
@@ -322,6 +322,7 @@ pub(super) fn ctx_through_a_tunnel(fake: Fake) -> Ctx {
             client_ip: Some("203.0.113.7"),
             country: Some("nl"),
             port: Some("51413"),
+            second_opinion: None,
         }),
     );
     ctx

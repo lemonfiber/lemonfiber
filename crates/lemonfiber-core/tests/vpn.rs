@@ -33,6 +33,9 @@ struct Behavior {
     country: Option<&'static str>,
     /// What the container's forwarded-port status file reads, where it has one.
     forwarded_port: Option<&'static str>,
+    /// A different answer for a second address service, where the test is about
+    /// the sources contradicting each other.
+    second_opinion: Option<&'static str>,
     exec_fails: bool,
 }
 
@@ -44,6 +47,7 @@ impl Behavior {
             address,
             country: None,
             forwarded_port: None,
+            second_opinion: None,
             exec_fails: false,
         }
     }
@@ -211,10 +215,17 @@ impl Engine for Fake {
                 stdout: behavior.country.unwrap_or_default().to_owned(),
             });
         }
+        // A second address service, where the test gave one a different answer —
+        // which is what a cached or misconfigured echo looks like from here.
+        let asked_second = argv
+            .last()
+            .is_some_and(|arg| arg.contains("second.example"));
         // While the tunnel is down the client answers with whatever the test says
         // still gets out — nothing at all, where the killswitch holds.
         let address = if self.is_dropped() && behavior.service != "gluetun" {
             self.link.and_then(|link| link.leaks_as)
+        } else if asked_second {
+            behavior.second_opinion.or(behavior.address)
         } else {
             behavior.address
         };
@@ -277,7 +288,7 @@ fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnCheck {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         port_forward,
         false,
     )
@@ -385,7 +396,7 @@ fn checking(engine: Fake) -> VpnCheck {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         PortForward::default(),
         true,
     )
@@ -566,7 +577,7 @@ async fn without_the_flag_nothing_is_touched_and_the_operator_is_told_how_to_ask
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         PortForward::default(),
         false,
     );
@@ -751,7 +762,7 @@ async fn an_unreachable_engine_leaves_the_checks_unverified() {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         PortForward::default(),
         false,
     );
@@ -782,7 +793,7 @@ async fn no_torrents_configured_does_not_apply() {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::none(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         PortForward::default(),
         false,
     );
@@ -805,7 +816,7 @@ async fn leak_detection_switched_off_does_not_apply() {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        None,
+        Vec::new(),
         PortForward::default(),
         false,
     );
@@ -826,7 +837,7 @@ async fn leak_detection_off_holds_even_when_the_engine_is_down() {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        None,
+        Vec::new(),
         PortForward::default(),
         false,
     );
@@ -849,7 +860,7 @@ async fn a_stack_with_no_gateway_does_not_apply() {
         "lemonfiber".to_owned(),
         &empty(),
         Protocols::both(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         PortForward::default(),
         false,
     );
@@ -1070,7 +1081,7 @@ async fn port_forwarding_is_checked_even_with_leak_detection_off() {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        None,
+        Vec::new(),
         forwarding("protonvpn"),
         false,
     );
@@ -1090,7 +1101,7 @@ async fn an_unreachable_engine_leaves_an_enabled_forward_unverified() {
         "lemonfiber".to_owned(),
         &stack(),
         Protocols::both(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         forwarding("protonvpn"),
         false,
     );
@@ -1117,7 +1128,7 @@ async fn a_gateway_with_no_client_does_not_apply() {
         "lemonfiber".to_owned(),
         &lone_gateway,
         Protocols::both(),
-        Some("https://ifconfig.me".to_owned()),
+        vec!["https://ifconfig.me".to_owned()],
         PortForward::default(),
         false,
     );
@@ -1125,4 +1136,54 @@ async fn a_gateway_with_no_client_does_not_apply() {
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })
     ));
+}
+
+/// A pair whose two address services disagree about the gateway's egress.
+fn contradicted() -> Fake {
+    Fake::new(vec![
+        Behavior {
+            second_opinion: Some("198.51.100.9"),
+            ..Behavior::up("gluetun", Some("185.65.1.1"))
+        },
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ])
+}
+
+#[tokio::test]
+async fn address_services_that_contradict_each_other_are_reported_rather_than_resolved() {
+    // The whole leak verdict is a comparison against one number. A source that is
+    // cached, misconfigured or simply wrong returns a plausible address, and a
+    // check that picked a winner would say `pass` while traffic left in the clear.
+    let subject = VpnCheck::new(
+        Arc::new(contradicted()),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Protocols::both(),
+        vec![
+            "https://first.example".to_owned(),
+            "https://second.example".to_owned(),
+        ],
+        PortForward::default(),
+        false,
+    );
+    let findings = subject.run().await;
+
+    let disagreement = findings
+        .iter()
+        .find(|finding| finding.check == "vpn.egress-sources");
+    let reason = disagreement.and_then(|finding| match &finding.verdict {
+        Verdict::Unverified { reason, .. } => Some(reason.clone()),
+        _ => None,
+    });
+    let reason = reason.unwrap_or_default();
+    assert!(reason.contains("185.65.1.1"), "{reason}");
+    assert!(reason.contains("198.51.100.9"), "{reason}");
+
+    // And nothing anywhere claims the tunnel was proven, because it was not.
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| matches!(finding.verdict, Verdict::Pass { .. })),
+        "nothing passes on an address nobody agreed"
+    );
 }

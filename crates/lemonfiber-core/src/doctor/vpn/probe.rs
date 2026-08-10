@@ -6,6 +6,7 @@
 //! gathered here — the commands, the containers they run in, and how a silence
 //! is read.
 
+use super::echo::Seen;
 use super::leak::{is_country_code, looks_like_ip, Reach};
 use super::port_forward::{parse_grant, Grant};
 use super::FORWARDED_PORT_FILE;
@@ -40,6 +41,45 @@ pub(super) fn running(container: Option<&Container>) -> Option<&Container> {
 /// share, so both ask the same way. A container that is absent or not running is
 /// `Down`; an engine that will not answer is `Unknown`; anything that is not an
 /// address is `Blocked`.
+/// The public address as every configured source sees it.
+///
+/// Asked of each in turn from inside the container, because the whole leak check
+/// rests on this one number and asking a single stranger makes the guarantee
+/// exactly as good as that stranger. A source that will not answer contributes
+/// nothing rather than a contradiction.
+///
+/// The container's reachability is read from the first source that had anything
+/// to say about it: down is down whoever was asked, and a container that could
+/// not be exec'd into does not become reachable by asking again.
+pub(super) async fn addresses(
+    engine: &dyn Engine,
+    container: Option<&Container>,
+    echoes: &[String],
+) -> (Reach, Seen) {
+    let mut heard: Vec<Option<String>> = Vec::new();
+    let mut reach = Reach::Unknown;
+    for echo in echoes {
+        let answer = public_address(engine, container, echo).await;
+        heard.push(match &answer {
+            Reach::Address(address) => Some(address.clone()),
+            Reach::Blocked | Reach::Down | Reach::Unknown => None,
+        });
+        // The first definite answer about the container itself stands: a later
+        // source failing says something about that source, not about the container.
+        if matches!(reach, Reach::Unknown) || matches!(answer, Reach::Address(_)) {
+            reach = answer;
+        }
+    }
+    let seen = Seen::of(&heard);
+    // Sources that contradict each other leave no address anybody can rely on, so
+    // the reachability is downgraded to match rather than carrying one of them.
+    let reach = match (&seen, reach) {
+        (Seen::Disagreed(_), _) => Reach::Blocked,
+        (_, reach) => reach,
+    };
+    (reach, seen)
+}
+
 pub(super) async fn public_address(
     engine: &dyn Engine,
     container: Option<&Container>,

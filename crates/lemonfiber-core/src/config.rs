@@ -51,6 +51,15 @@ pub const TORRENT_KEY: &str = "LEMONFIBER_TORRENT";
 /// lemonfiber reaching the network on their behalf.
 pub const DEFAULT_IP_ECHO: &str = "https://ifconfig.me";
 
+/// A second, independent source asked alongside the first.
+///
+/// Two rather than one because the entire leak verdict is a comparison against
+/// what these report: a single source that is misconfigured, cached behind a
+/// proxy, or simply wrong returns a plausible address, and the check says `pass`
+/// while traffic leaves in the clear. Two that disagree cannot both be trusted,
+/// and saying so is the only honest answer available.
+pub const SECOND_IP_ECHO: &str = "https://icanhazip.com";
+
 /// The setting naming the IP-echo service, or switching leak detection off.
 pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 
@@ -185,12 +194,21 @@ pub fn reads_as_off(value: &str) -> bool {
 /// default with the operator's own endpoint — so the one third-party dependency
 /// the check has is replaceable as well as disableable.
 #[must_use]
-pub fn ip_echo_from_env(file: &env::EnvFile) -> Option<String> {
+pub fn ip_echo_from_env(file: &env::EnvFile) -> Vec<String> {
+    let defaults = || vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()];
     match file.get(IP_ECHO_KEY) {
-        None => Some(DEFAULT_IP_ECHO.to_owned()),
-        Some(value) if reads_as_on(value) => Some(DEFAULT_IP_ECHO.to_owned()),
-        Some(value) if reads_as_off(value) => None,
-        Some(value) => Some(unquoted(value)),
+        None => defaults(),
+        Some(value) if reads_as_on(value) => defaults(),
+        Some(value) if reads_as_off(value) => Vec::new(),
+        // Several, comma-separated, so an operator who wants their own sources can
+        // still have more than one — the point of asking two is lost if naming one
+        // silently drops back to trusting a single stranger.
+        Some(value) => unquoted(value)
+            .split(',')
+            .map(str::trim)
+            .filter(|source| !source.is_empty())
+            .map(str::to_owned)
+            .collect(),
     }
 }
 
@@ -341,7 +359,7 @@ pub struct Settings {
     ///
     /// On by default, because the failure it catches is the one whose
     /// consequences reach outside the machine.
-    pub ip_echo: Option<String>,
+    pub ip_echo: Vec<String>,
     /// Where downloads and the library are kept, once setup has chosen it.
     ///
     /// Absent until then, which is why the storage checks tell an operator to
@@ -386,7 +404,7 @@ impl Default for Settings {
             overlays: Vec::new(),
             stack_dir: None,
             protocols: Protocols::none(),
-            ip_echo: Some(DEFAULT_IP_ECHO.to_owned()),
+            ip_echo: vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()],
             data_root: None,
             storage_state: None,
             service_user: None,
@@ -400,7 +418,7 @@ impl Default for Settings {
 mod tests {
     use super::{
         env, indexer_from_env, ip_echo_from_env, Indexer, Protocol, Protocols, Settings,
-        DEFAULT_IP_ECHO,
+        DEFAULT_IP_ECHO, SECOND_IP_ECHO,
     };
 
     #[test]
@@ -511,13 +529,16 @@ mod tests {
     fn leak_detection_is_on_by_default() {
         // The failure it catches reaches outside the machine, so a fresh install
         // is protected without the operator having to ask.
+        // Two sources, not one: the whole verdict is a comparison against what
+        // they report, and a single stranger who is wrong makes the check say
+        // `pass` while traffic leaves in the clear.
         assert_eq!(
-            ip_echo_from_env(&env::EnvFile::parse("")).as_deref(),
-            Some(DEFAULT_IP_ECHO)
+            ip_echo_from_env(&env::EnvFile::parse("")),
+            vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()]
         );
         assert_eq!(
-            Settings::default().ip_echo.as_deref(),
-            Some(DEFAULT_IP_ECHO)
+            Settings::default().ip_echo,
+            vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()]
         );
     }
 
@@ -525,7 +546,10 @@ mod tests {
     fn an_operator_can_switch_leak_detection_off() {
         for off in ["off", "OFF", "no", "false", "0", ""] {
             let file = env::EnvFile::parse(&format!("LEMONFIBER_IP_ECHO={off}\n"));
-            assert_eq!(ip_echo_from_env(&file), None, "{off:?} should disable it");
+            assert!(
+                ip_echo_from_env(&file).is_empty(),
+                "{off:?} should disable it"
+            );
         }
     }
 
@@ -534,8 +558,8 @@ mod tests {
         for on in ["on", "yes", "true", "1"] {
             let file = env::EnvFile::parse(&format!("LEMONFIBER_IP_ECHO={on}\n"));
             assert_eq!(
-                ip_echo_from_env(&file).as_deref(),
-                Some(DEFAULT_IP_ECHO),
+                ip_echo_from_env(&file),
+                vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()],
                 "{on:?}"
             );
         }
@@ -545,8 +569,23 @@ mod tests {
     fn any_other_value_replaces_the_default_endpoint() {
         let file = env::EnvFile::parse("LEMONFIBER_IP_ECHO=https://ip.example\n");
         assert_eq!(
-            ip_echo_from_env(&file).as_deref(),
-            Some("https://ip.example")
+            ip_echo_from_env(&file),
+            vec!["https://ip.example".to_owned()]
+        );
+    }
+
+    #[test]
+    fn an_operator_can_name_several_sources_of_their_own() {
+        // Naming one must not silently drop back to trusting a single stranger,
+        // which is the arrangement asking two exists to avoid.
+        let file =
+            env::EnvFile::parse("LEMONFIBER_IP_ECHO=https://ip.example, https://other.example\n");
+        assert_eq!(
+            ip_echo_from_env(&file),
+            vec![
+                "https://ip.example".to_owned(),
+                "https://other.example".to_owned()
+            ]
         );
     }
 
@@ -557,8 +596,8 @@ mod tests {
         // case-sensitive so the value is not folded like the on/off switch is.
         let file = env::EnvFile::parse("LEMONFIBER_IP_ECHO=\"https://IP.Example/Path\"\n");
         assert_eq!(
-            ip_echo_from_env(&file).as_deref(),
-            Some("https://IP.Example/Path")
+            ip_echo_from_env(&file),
+            vec!["https://IP.Example/Path".to_owned()]
         );
     }
 

@@ -13,6 +13,7 @@
 //!
 //! See `.docs/architecture/module-layout.md`.
 
+mod echo;
 mod findings;
 mod killswitch;
 mod leak;
@@ -29,11 +30,12 @@ use crate::config::{PortForward, Protocols};
 use crate::error::Remedy;
 use crate::ports::docker::{Container, Engine};
 
-use findings::{assemble, finding, killswitch_findings, skipped, unreachable_engine};
+pub use echo::Seen;
+use findings::{assemble, disagreeing, finding, killswitch_findings, skipped, unreachable_engine};
 use killswitch::{not_attempted, Held};
 use leak::{labelled, Reach};
 use port_forward::{no_port, port_forward_offline, Grant};
-use probe::{exit_country, find, public_address, read_grant, running};
+use probe::{addresses, exit_country, find, public_address, read_grant, running};
 
 pub use killswitch::{KILLSWITCH_LEAKS, TUNNEL_NOT_RESTORED};
 pub use leak::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
@@ -101,7 +103,7 @@ pub(crate) fn resolve_pair(manifest: &Manifest) -> Option<Pair> {
 pub struct VpnCheck {
     engine: Arc<dyn Engine>,
     project: String,
-    echo: Option<String>,
+    echo: Vec<String>,
     target: Target,
     port_forward: PortForward,
     disruptive: bool,
@@ -132,7 +134,7 @@ impl VpnCheck {
         project: String,
         manifest: &Manifest,
         protocols: Protocols,
-        echo: Option<String>,
+        echo: Vec<String>,
         port_forward: PortForward,
         disruptive: bool,
     ) -> Self {
@@ -325,7 +327,7 @@ pub(crate) async fn read_vpn(
     project: &str,
     manifest: &Manifest,
     protocols: Protocols,
-    echo: Option<&str>,
+    echoes: Vec<String>,
     port_forward_enabled: bool,
 ) -> VpnReading {
     if !protocols.torrent {
@@ -353,13 +355,19 @@ pub(crate) async fn read_vpn(
         None
     };
 
-    let Some(echo) = echo else {
+    if echoes.is_empty() {
         return VpnReading::Unavailable(
             "leak detection is switched off, so the tunnel's egress cannot be read".to_owned(),
         );
-    };
-
-    let gateway = public_address(engine, gateway_container, echo).await;
+    }
+    // The panel compares the same way the check does, so it reads the same number
+    // — a panel and a diagnostic disagreeing about the tunnel is the one thing
+    // sharing these probes exists to prevent.
+    let (gateway, gateway_seen) = addresses(engine, gateway_container, &echoes).await;
+    if let Some(disagreement) = gateway_seen.said() {
+        return VpnReading::Unavailable(disagreement);
+    }
+    let echo = echoes.first().map_or("", String::as_str);
     // The country is the gateway's, asked only where the gateway both answered and
     // is a container we can ask — the same case that yields an address. The
     // catch-all absorbs every other combination (including the address-without-a-
@@ -371,7 +379,7 @@ pub(crate) async fn read_vpn(
     };
     match gateway {
         Reach::Address(exit_ip) => {
-            let client = public_address(engine, find(&containers, &pair.client), echo).await;
+            let (client, _) = addresses(engine, find(&containers, &pair.client), &echoes).await;
             let egress_matches = matches!(&client, Reach::Address(ip) if *ip == exit_ip);
             VpnReading::Ready {
                 exit_ip,
@@ -410,12 +418,13 @@ impl Check for VpnCheck {
         // about egress, so it stays skipped rather than becoming an unverified
         // engine finding — while port forwarding, which they did ask for, reports.
         let Ok(containers) = self.engine.list(&self.project).await else {
-            return match self.echo {
-                Some(_) => unreachable_engine(pair, &self.port_forward, self.disruptive),
-                None => vec![
+            return if self.echo.is_empty() {
+                vec![
                     skipped("leak detection is switched off".to_owned()),
                     port_forward_offline(&self.port_forward),
-                ],
+                ]
+            } else {
+                unreachable_engine(pair, &self.port_forward, self.disruptive)
             };
         };
         // Nothing is running, so the whole VPN check collapses to one line rather
@@ -433,17 +442,25 @@ impl Check for VpnCheck {
         // has switched leak detection off.
         let port_forward = self.port_forward_finding(gateway_container).await;
 
-        let Some(echo) = self.echo.as_deref() else {
+        if self.echo.is_empty() {
             return vec![
                 skipped("leak detection is switched off".to_owned()),
                 port_forward,
             ];
-        };
+        }
+        // The first source is what the single-answer reads still use — the country
+        // and the killswitch probe, neither of which is a comparison and so neither
+        // of which gains anything from a second opinion.
+        let echo = self.echo.first().map_or("", String::as_str);
 
         let client_container = find(&containers, &pair.client);
 
-        let gateway = self.reach(gateway_container, echo).await;
-        let client = self.reach(client_container, echo).await;
+        // Every configured source is asked, so a single one that is wrong cannot
+        // make the check say `pass` while traffic leaves in the clear.
+        let (gateway, gateway_seen) =
+            addresses(self.engine.as_ref(), gateway_container, &self.echo).await;
+        let (client, client_seen) =
+            addresses(self.engine.as_ref(), client_container, &self.echo).await;
 
         // The exit country only means anything where the tunnel answered, and is
         // one extra request, so it is asked for only then. Awaited into a plain
@@ -462,6 +479,15 @@ impl Check for VpnCheck {
             .killswitch_held(gateway_container, client_container, echo, &client)
             .await;
         let mut findings = assemble(pair, &gateway, &client, note, killswitch_findings(&held));
+        // A disagreement is reported rather than resolved: there is no basis to
+        // prefer one stranger's account over another's, and a check that quietly
+        // chose would be least trustworthy exactly when it mattered most.
+        findings.extend(
+            [&gateway_seen, &client_seen]
+                .into_iter()
+                .filter_map(Seen::said)
+                .map(disagreeing),
+        );
         findings.push(port_forward);
         findings
     }

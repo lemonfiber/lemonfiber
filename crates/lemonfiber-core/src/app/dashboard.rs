@@ -242,7 +242,7 @@ async fn vpn(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Option<Panel<Vp
         &ctx.settings.project,
         manifest,
         ctx.settings.protocols,
-        ctx.settings.ip_echo.as_deref(),
+        ctx.settings.ip_echo.clone(),
         ctx.settings.port_forward.enabled,
     )
     .await;
@@ -824,6 +824,7 @@ mod tests {
             client_ip: Some("203.0.113.7"),
             country: Some("nl"),
             port: Some("51413"),
+            second_opinion: None,
         }
     }
 
@@ -857,14 +858,14 @@ mod tests {
     /// (the IP-echo) and port forwarding as configured.
     fn vpn_ctx(
         engine: Reporting,
-        ip_echo: Option<&str>,
+        ip_echo: Vec<String>,
         port_forward: PortForward,
         protocols: Protocols,
     ) -> Ctx {
         let settings = Settings {
             protocols,
             data_root: Some(PathBuf::from("/srv/media")),
-            ip_echo: ip_echo.map(str::to_owned),
+            ip_echo,
             port_forward,
             ..Settings::default()
         };
@@ -894,7 +895,7 @@ mod tests {
     async fn the_vpn_panel_shows_the_tunnel_when_it_answers() {
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(healthy_tunnel())),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -909,6 +910,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_panel_whose_address_services_contradict_each_other_says_so() {
+        // The panel compares the same number the check does, so it has to refuse
+        // the same way: an address chosen from among contradictory ones would show
+        // an exit IP the operator could not rely on, beside a tick.
+        let tunnel = Tunnel {
+            second_opinion: Some("198.51.100.9"),
+            ..healthy_tunnel()
+        };
+        let ctx = vpn_ctx(
+            tunnel_engine(true, Some(tunnel)),
+            vec![
+                "https://first.example".to_owned(),
+                "https://second.example".to_owned(),
+            ],
+            forwarding(),
+            Protocols::both(),
+        );
+        assert!(
+            matches!(vpn_panel(&ctx).await, Some(Panel::Unavailable { reason })
+                if reason.contains("disagree")),
+            "the panel states it rather than picking one"
+        );
+    }
+
+    #[tokio::test]
     async fn a_client_whose_egress_differs_from_the_tunnel_is_flagged() {
         let tunnel = Tunnel {
             client_ip: Some("198.51.100.9"),
@@ -916,7 +942,7 @@ mod tests {
         };
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(tunnel)),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -927,7 +953,7 @@ mod tests {
     async fn a_tunnel_that_is_not_running_leaves_the_panel_unavailable() {
         let ctx = vpn_ctx(
             tunnel_engine(false, Some(healthy_tunnel())),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -945,7 +971,7 @@ mod tests {
         };
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(tunnel)),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -960,7 +986,7 @@ mod tests {
         // The gateway is up but the engine has nothing scripted, so the exec fails.
         let ctx = vpn_ctx(
             tunnel_engine(true, None),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -974,7 +1000,7 @@ mod tests {
     async fn an_unreachable_engine_leaves_the_vpn_panel_unavailable() {
         let ctx = vpn_ctx(
             Reporting::absent(),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -988,7 +1014,7 @@ mod tests {
     async fn leak_detection_switched_off_leaves_the_egress_unreadable() {
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(healthy_tunnel())),
-            None,
+            Vec::new(),
             forwarding(),
             Protocols::both(),
         );
@@ -1002,7 +1028,7 @@ mod tests {
     async fn a_stack_without_a_torrent_client_has_no_vpn_panel() {
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(healthy_tunnel())),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols {
                 torrent: false,
@@ -1016,7 +1042,7 @@ mod tests {
     async fn port_forwarding_off_reads_no_forwarded_port() {
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(healthy_tunnel())),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             PortForward::default(),
             Protocols::both(),
         );
@@ -1033,7 +1059,7 @@ mod tests {
         };
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(tunnel)),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -1050,7 +1076,7 @@ mod tests {
         };
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(tunnel)),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -1064,7 +1090,7 @@ mod tests {
         let settings = Settings {
             protocols: Protocols::both(),
             data_root: Some(PathBuf::from("/srv/media")),
-            ip_echo: Some("https://echo".to_owned()),
+            ip_echo: vec!["https://echo".to_owned()],
             port_forward: forwarding(),
             ..Settings::default()
         };
@@ -1099,7 +1125,7 @@ mod tests {
             "lemonfiber",
             &manifest,
             Protocols::both(),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             true,
         )
         .await;
@@ -1214,7 +1240,7 @@ mod tests {
         };
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(tunnel)),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
@@ -1229,7 +1255,7 @@ mod tests {
     async fn a_stack_behind_its_tunnel_with_nothing_wrong_is_healthy() {
         let ctx = vpn_ctx(
             tunnel_engine(true, Some(healthy_tunnel())),
-            Some("https://echo"),
+            vec!["https://echo".to_owned()],
             forwarding(),
             Protocols::both(),
         );
