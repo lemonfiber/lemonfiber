@@ -29,6 +29,7 @@ use crate::ports::service::{
 };
 
 mod catalogue;
+mod importing;
 mod pipeline;
 mod quality;
 
