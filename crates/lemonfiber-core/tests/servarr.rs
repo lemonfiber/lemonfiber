@@ -13,9 +13,9 @@ use async_trait::async_trait;
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Http, Method, Request, Response, Unreachable};
 use lemonfiber_core::ports::service::{
-    Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, MusicQuality,
-    Pipeline, QueueDepth, QueueItem, Queued, Queues, RegisteredClient, RegisteredFolder,
-    RootFolder,
+    Category, Client, ClientKind, Credential, DownloadClient, Failure, Importing, Maintenance,
+    MusicQuality, Pipeline, QueueDepth, QueueItem, Queued, Queues, RegisteredClient,
+    RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::{api_key, Servarr};
@@ -1359,4 +1359,40 @@ async fn an_unreadable_queue_is_a_failure() {
         .item_queue(Kind::Sonarr, 1)
         .await
         .is_err());
+}
+
+#[tokio::test]
+async fn whether_the_service_hardlinks_is_read_from_its_own_settings() {
+    let fake = Fake::new(Answer::Reply(200, r#"{"id":1,"copyUsingHardlinks":true}"#));
+    assert_eq!(sonarr(&fake).hardlinks().await.ok(), Some(true));
+}
+
+#[tokio::test]
+async fn telling_it_to_copy_keeps_every_other_setting_it_had() {
+    // The service replaces the whole document on a write, so sending only the one
+    // field would silently reset settings the operator chose themselves.
+    let fake = Fake::new(Answer::Reply(
+        200,
+        r#"{"id":3,"copyUsingHardlinks":true,"importExtraFiles":true,"recycleBin":"/data/bin"}"#,
+    ));
+    assert!(sonarr(&fake).set_hardlinks(false).await.is_ok());
+
+    let sent = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    assert!(sent.contains(r#""copyUsingHardlinks":false"#), "{sent}");
+    assert!(sent.contains(r#""importExtraFiles":true"#), "kept: {sent}");
+    assert!(sent.contains(r#""recycleBin":"/data/bin""#), "kept: {sent}");
+    assert!(
+        fake.request()
+            .is_some_and(|request| request.url.ends_with("/config/mediamanagement/3")),
+        "written back to its own id"
+    );
+}
+
+#[tokio::test]
+async fn settings_that_are_not_an_object_are_refused_rather_than_guessed() {
+    let fake = Fake::new(Answer::Reply(200, "[]"));
+    assert!(sonarr(&fake).set_hardlinks(false).await.is_err());
 }

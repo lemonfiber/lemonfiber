@@ -241,6 +241,30 @@ pub trait Maintenance: Send + Sync {
     async fn run_command(&self, name: &str) -> Result<(), Failure>;
 }
 
+/// Telling a service how to move files from the download directory into the
+/// library.
+///
+/// Its own port because it is neither provisioning nor a read: it is a correction
+/// made once the filesystem has been observed, and only where the observation says
+/// it is needed.
+#[async_trait]
+pub trait Importing: Send + Sync {
+    /// Whether the service is currently set to hardlink rather than copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or answers unusably.
+    async fn hardlinks(&self) -> Result<bool, Failure>;
+
+    /// Set whether it should hardlink. `false` makes every import a copy, which
+    /// is correct — and the only thing that works — where the volume cannot link.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn set_hardlinks(&self, hardlink: bool) -> Result<(), Failure>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
