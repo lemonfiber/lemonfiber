@@ -32,10 +32,13 @@ use crate::error::Remedy;
 use crate::ports::docker::{Container, Engine};
 
 pub use echo::Seen;
-use findings::{assemble, disagreeing, finding, killswitch_findings, skipped, unreachable_engine};
+use findings::{
+    assemble, disagreeing, finding, killswitch_findings, port_mismatch, skipped, unreachable_engine,
+};
 pub use forwarding::{Answer, Forwarding};
 use killswitch::{not_attempted, Held};
 use leak::{labelled, Reach};
+pub use port_forward::granted_port;
 use port_forward::{no_port, port_forward_offline, Grant};
 use probe::{addresses, exit_country, find, public_address, read_grant, running};
 
@@ -106,9 +109,30 @@ pub struct VpnCheck {
     engine: Arc<dyn Engine>,
     project: String,
     echo: Vec<String>,
+    /// What the download client says it is listening on, where it could be asked.
+    /// Read by the caller: this check speaks to containers, not to services.
+    listening: Option<u16>,
     target: Target,
     port_forward: PortForward,
     disruptive: bool,
+}
+
+/// What the operator asked for, and what was read on their behalf, gathered so
+/// the check takes one value rather than a row of loose arguments whose order is
+/// the only thing keeping them apart.
+pub struct Asked {
+    /// Which download protocols are configured.
+    pub protocols: Protocols,
+    /// The address services to compare egress against; empty switches leak
+    /// detection off.
+    pub echo: Vec<String>,
+    /// What the download client says it is listening on, where it could be asked.
+    /// Read by the caller: this check speaks to containers, not to services.
+    pub listening: Option<u16>,
+    /// What was asked for around port forwarding.
+    pub port_forward: PortForward,
+    /// Whether the killswitch may be proven by breaking the tunnel.
+    pub disruptive: bool,
 }
 
 /// Whether the check applies, and against what.
@@ -135,11 +159,15 @@ impl VpnCheck {
         engine: Arc<dyn Engine>,
         project: String,
         manifest: &Manifest,
-        protocols: Protocols,
-        echo: Vec<String>,
-        port_forward: PortForward,
-        disruptive: bool,
+        asked: Asked,
     ) -> Self {
+        let Asked {
+            protocols,
+            echo,
+            listening,
+            port_forward,
+            disruptive,
+        } = asked;
         let target = if protocols.torrent {
             resolve_pair(manifest).map_or_else(
                 || Target::Skip("this stack declares no VPN-contained torrent client".to_owned()),
@@ -152,6 +180,7 @@ impl VpnCheck {
             engine,
             project,
             echo,
+            listening,
             target,
             port_forward,
             disruptive,
@@ -443,6 +472,18 @@ impl Check for VpnCheck {
         // from the IP-echo comparison, so it is established even where the operator
         // has switched leak detection off.
         let port_forward = self.port_forward_finding(gateway_container).await;
+        // A client on the wrong port is a separate fact from a port having been
+        // granted, and fails separately — so it is its own finding rather than a
+        // clause inside that one.
+        let mismatch = match (
+            read_grant(self.engine.as_ref(), gateway_container).await,
+            self.listening,
+        ) {
+            (Grant::Port(granted), Some(listening)) if granted != listening => {
+                Some(port_mismatch(granted, listening))
+            }
+            _ => None,
+        };
 
         if self.echo.is_empty() {
             return vec![
@@ -491,6 +532,7 @@ impl Check for VpnCheck {
                 .map(disagreeing),
         );
         findings.push(port_forward);
+        findings.extend(mismatch);
         findings
     }
 }

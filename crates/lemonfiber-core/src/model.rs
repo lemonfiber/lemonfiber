@@ -416,6 +416,12 @@ pub struct LifecycleReport {
     /// overwritten with lemonfiber's own. Empty in the ordinary case; a named entry
     /// warns that an upgrade would change a file they changed, and shows the diff.
     pub stack_edits: Vec<StackEdit>,
+    /// What starting the stack did about the VPN's forwarded port, where it did
+    /// anything. Absent in the ordinary case — the client was already on it, or
+    /// there is no tunnel to forward through — and a sentence where the client was
+    /// moved, or could not be.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forwarding: Option<String>,
 }
 
 /// A stack file the operator edited, preserved rather than overwritten, with the

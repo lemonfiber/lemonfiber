@@ -2,10 +2,14 @@
 //! what a missing port can honestly be called.
 
 use super::findings::finding;
+use super::probe::{find, read_grant};
+use super::resolve_pair;
 use super::NOT_ENABLED;
 use crate::config::PortForward;
 use crate::doctor::{Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::ports::docker::Engine;
+use lemonfiber_manifest::Manifest;
 
 /// Raised when port forwarding was asked for but the provider granted no port.
 pub const NO_FORWARDED_PORT: Code = Code::new("VPN-4");
@@ -147,6 +151,28 @@ pub(super) fn port_forward_offline(port_forward: &PortForward) -> Finding {
         }
     };
     finding("vpn.port-forward", "forwarded port", verdict)
+}
+
+/// The port the VPN provider granted, where one was granted and forwarding was
+/// asked for.
+///
+/// Read from the gateway's own status file, the same way the check and the panel
+/// read it, so nothing has a second opinion about what was granted.
+pub async fn granted_port(
+    engine: &dyn Engine,
+    project: &str,
+    manifest: &Manifest,
+    enabled: bool,
+) -> Option<u16> {
+    if !enabled {
+        return None;
+    }
+    let pair = resolve_pair(manifest)?;
+    let containers = engine.list(project).await.ok()?;
+    match read_grant(engine, find(&containers, &pair.gateway)).await {
+        Grant::Port(port) => Some(port),
+        Grant::Absent | Grant::Unreadable => None,
+    }
 }
 
 #[cfg(test)]

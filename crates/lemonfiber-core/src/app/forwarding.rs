@@ -134,6 +134,37 @@ pub async fn reconcile(ctx: &Ctx, granted: Option<u16>, project: Option<&Path>) 
     .await
 }
 
+/// What the torrent client says it is listening on, where there is one and it can
+/// be authenticated to.
+pub async fn listening_port(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    project: Option<&std::path::Path>,
+) -> Option<u16> {
+    let targets = download_targets(&manifest.services, project);
+    torrent_client(ctx, &targets)?.listen_port().await.ok()
+}
+
+/// What starting the stack does about the forwarded port.
+///
+/// The tunnel has just come up, which is exactly when the provider grants a port
+/// — commonly a different one from last time. Applied here rather than offered
+/// because the operator has already asked for an action, and a client left on
+/// yesterday's port looks entirely healthy from inside while nobody outside can
+/// reach it. A diagnosis, which is only looking, offers the same fix instead of
+/// making it.
+pub async fn after_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Option<String> {
+    let granted = crate::doctor::vpn::granted_port(
+        ctx.engine.as_ref(),
+        &ctx.settings.project,
+        manifest,
+        ctx.settings.port_forward.enabled,
+    )
+    .await;
+    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    reconcile(ctx, granted, project.as_deref()).await.said()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{push, Pushed, SETTING};
@@ -376,5 +407,70 @@ mod tests {
                 to: 51999
             }
         );
+    }
+
+    #[tokio::test]
+    async fn starting_a_stack_with_no_forwarding_asked_for_changes_nothing() {
+        // Nothing was requested, so nothing was granted, and a client on its own
+        // default port is where the operator left it.
+        // Collected rather than matched: the stack this repo embeds always parses,
+        // so a fallback would be a branch no passing test can reach.
+        let ctx = ctx();
+        let manifests: Vec<_> = ctx
+            .stack
+            .checked_manifest(ctx.today())
+            .into_iter()
+            .collect();
+        for manifest in &manifests {
+            assert_eq!(super::after_start(&ctx, manifest).await, None);
+        }
+        assert_eq!(manifests.len(), 1, "the embedded stack parses");
+    }
+
+    #[tokio::test]
+    async fn a_client_that_refuses_the_write_says_so_in_its_own_words() {
+        // Login, the read, login, then a refusal — reported rather than recorded
+        // as done.
+        let ctx = ctx_with_client(
+            "refusing",
+            vec![
+                (200, "Ok."),
+                (200, r#"{"listen_port":51413}"#),
+                (200, "Ok."),
+                (403, "Forbidden"),
+            ],
+        );
+        // Compared through what it would say, rather than asserted with a message
+        // argument: an argument only evaluates when the assertion fails, so it is a
+        // line no passing test can cover.
+        let pushed = super::reconcile(&ctx, Some(51999), None).await;
+        let said = pushed.said().unwrap_or_default();
+        assert!(
+            said.starts_with("the forwarded port could not be pushed"),
+            "{said}"
+        );
+        assert_eq!(pushed.change("1000"), None, "nothing happened to record");
+    }
+
+    #[tokio::test]
+    async fn the_clients_own_port_is_read_for_the_diagnosis() {
+        // Asked by the caller because the VPN check speaks to containers, and this
+        // is a service's own API.
+        let ctx = ctx_with_client(
+            "reading",
+            vec![(200, "Ok."), (200, r#"{"listen_port":51413}"#)],
+        );
+        let manifests: Vec<_> = ctx
+            .stack
+            .checked_manifest(ctx.today())
+            .into_iter()
+            .collect();
+        for manifest in &manifests {
+            assert_eq!(
+                super::listening_port(&ctx, manifest, None).await,
+                Some(51413)
+            );
+        }
+        assert_eq!(manifests.len(), 1, "the embedded stack parses");
     }
 }

@@ -303,10 +303,15 @@ pub async fn diagnose(
         ctx.engine.clone(),
         ctx.settings.project.clone(),
         &manifest,
-        ctx.settings.protocols,
-        ctx.settings.ip_echo.clone(),
-        ctx.settings.port_forward.clone(),
-        disruptive,
+        crate::doctor::vpn::Asked {
+            protocols: ctx.settings.protocols,
+            echo: ctx.settings.ip_echo.clone(),
+            // Asked here rather than inside the check: that one speaks to
+            // containers, and this is a service's own API.
+            listening: super::forwarding::listening_port(ctx, &manifest, project.as_deref()).await,
+            port_forward: ctx.settings.port_forward.clone(),
+            disruptive,
+        },
     );
     let credentials = CredentialsCheck::new(
         ctx.http.clone(),
@@ -468,6 +473,7 @@ pub(super) async fn lifecycle(
         services: Vec::new(),
         condition: None,
         stack_edits,
+        forwarding: None,
     };
 
     // A rehearsal stops here deliberately: it has already done everything except
@@ -491,6 +497,7 @@ pub(super) async fn lifecycle(
         let settled = settle(ctx, &manifest, &report.profiles).await?;
         report.condition = Some(condition(&settled));
         report.services = settled;
+        report.forwarding = super::forwarding::after_start(ctx, &manifest).await;
     }
 
     Ok(Outcome::Lifecycle(report))

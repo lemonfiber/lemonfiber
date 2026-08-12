@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_core::config::{PortForward, Protocols};
+use lemonfiber_core::doctor::vpn::Asked;
 use lemonfiber_core::doctor::vpn::{
     VpnCheck, CLIENT_ISOLATED, LEAKING, NO_FORWARDED_PORT, VPN_CONTAINER_DOWN,
 };
@@ -287,10 +288,13 @@ fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnCheck {
         Arc::new(Fake::new(behaviors)),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        vec!["https://ifconfig.me".to_owned()],
-        port_forward,
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward,
+            disruptive: false,
+        },
     )
 }
 
@@ -395,10 +399,13 @@ fn checking(engine: Fake) -> VpnCheck {
         Arc::new(engine),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        vec!["https://ifconfig.me".to_owned()],
-        PortForward::default(),
-        true,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: true,
+        },
     )
 }
 
@@ -576,10 +583,13 @@ async fn without_the_flag_nothing_is_touched_and_the_operator_is_told_how_to_ask
         Arc::new(Fake::linked(contained(), Link::holding())),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        vec!["https://ifconfig.me".to_owned()],
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     let findings = subject.run().await;
     assert!(unverified_reason(&findings, "vpn.killswitch")
@@ -761,10 +771,13 @@ async fn an_unreachable_engine_leaves_the_checks_unverified() {
         Arc::new(engine),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        vec!["https://ifconfig.me".to_owned()],
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     let findings = subject.run().await;
     assert!(matches!(
@@ -792,10 +805,13 @@ async fn no_torrents_configured_does_not_apply() {
         Arc::new(Fake::new(vec![])),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::none(),
-        vec!["https://ifconfig.me".to_owned()],
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::none(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
@@ -815,10 +831,13 @@ async fn leak_detection_switched_off_does_not_apply() {
         ])),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        Vec::new(),
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: Vec::new(),
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
@@ -836,10 +855,13 @@ async fn leak_detection_off_holds_even_when_the_engine_is_down() {
         Arc::new(engine),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        Vec::new(),
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: Vec::new(),
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     let findings = subject.run().await;
     // The egress group is skipped, not reported unverified against a down engine.
@@ -859,10 +881,13 @@ async fn a_stack_with_no_gateway_does_not_apply() {
         Arc::new(Fake::new(vec![])),
         "lemonfiber".to_owned(),
         &empty(),
-        Protocols::both(),
-        vec!["https://ifconfig.me".to_owned()],
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
@@ -1080,10 +1105,13 @@ async fn port_forwarding_is_checked_even_with_leak_detection_off() {
         Arc::new(Fake::new(vec![gateway_with_port("51413")])),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        Vec::new(),
-        forwarding("protonvpn"),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: Vec::new(),
+            listening: None,
+            port_forward: forwarding("protonvpn"),
+            disruptive: false,
+        },
     );
     let findings = subject.run().await;
     assert!(
@@ -1100,10 +1128,13 @@ async fn an_unreachable_engine_leaves_an_enabled_forward_unverified() {
         Arc::new(engine),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        vec!["https://ifconfig.me".to_owned()],
-        forwarding("protonvpn"),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: forwarding("protonvpn"),
+            disruptive: false,
+        },
     );
     let findings = subject.run().await;
     assert!(matches!(
@@ -1127,10 +1158,13 @@ async fn a_gateway_with_no_client_does_not_apply() {
         Arc::new(Fake::new(vec![])),
         "lemonfiber".to_owned(),
         &lone_gateway,
-        Protocols::both(),
-        vec!["https://ifconfig.me".to_owned()],
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
@@ -1158,13 +1192,16 @@ async fn address_services_that_contradict_each_other_are_reported_rather_than_re
         Arc::new(contradicted()),
         "lemonfiber".to_owned(),
         &stack(),
-        Protocols::both(),
-        vec![
-            "https://first.example".to_owned(),
-            "https://second.example".to_owned(),
-        ],
-        PortForward::default(),
-        false,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec![
+                "https://first.example".to_owned(),
+                "https://second.example".to_owned(),
+            ],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
     );
     let findings = subject.run().await;
 
@@ -1185,5 +1222,104 @@ async fn address_services_that_contradict_each_other_are_reported_rather_than_re
             .iter()
             .any(|finding| matches!(finding.verdict, Verdict::Pass { .. })),
         "nothing passes on an address nobody agreed"
+    );
+}
+
+#[tokio::test]
+async fn a_client_listening_off_the_forwarded_port_is_reported_rather_than_corrected() {
+    // A diagnosis is only looking: the operator asked what is wrong, not for
+    // anything to be changed. Starting the stack applies the same fix, because by
+    // then they have asked for an action.
+    let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
+    gateway.forwarded_port = Some("51999");
+    let subject = VpnCheck::new(
+        Arc::new(Fake::new(vec![
+            gateway,
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ])),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: Some(51413),
+            port_forward: forwarding("proton"),
+            disruptive: false,
+        },
+    );
+    let findings = subject.run().await;
+    let mismatch = findings
+        .iter()
+        .find(|finding| finding.check == "vpn.port-forward-client");
+    let summary = mismatch.and_then(|finding| match &finding.verdict {
+        Verdict::Warn(problem) => Some(problem.summary.clone()),
+        _ => None,
+    });
+    let summary = summary.unwrap_or_default();
+    assert!(summary.contains("51999"), "{summary}");
+    assert!(summary.contains("51413"), "{summary}");
+}
+
+#[tokio::test]
+async fn a_client_already_on_the_forwarded_port_is_not_reported() {
+    let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
+    gateway.forwarded_port = Some("51413");
+    let subject = VpnCheck::new(
+        Arc::new(Fake::new(vec![
+            gateway,
+            Behavior::up("qbittorrent", Some("185.65.1.1")),
+        ])),
+        "lemonfiber".to_owned(),
+        &stack(),
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: Some(51413),
+            port_forward: forwarding("proton"),
+            disruptive: false,
+        },
+    );
+    assert!(subject
+        .run()
+        .await
+        .iter()
+        .all(|finding| finding.check != "vpn.port-forward-client"));
+}
+
+#[tokio::test]
+async fn the_granted_port_is_read_from_the_gateways_own_status_file() {
+    // The same file the check and the panel read, so nothing has a second opinion
+    // about what the provider granted.
+    let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
+    gateway.forwarded_port = Some("51413");
+    let engine = Fake::new(vec![
+        gateway,
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ]);
+    assert_eq!(
+        lemonfiber_core::doctor::vpn::granted_port(&engine, "lemonfiber", &stack(), true).await,
+        Some(51413)
+    );
+}
+
+#[tokio::test]
+async fn no_port_is_read_where_forwarding_was_never_asked_for() {
+    // Nothing is granted because nothing was requested; reading the file anyway
+    // would report a stale port from a previous configuration.
+    let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
+    gateway.forwarded_port = Some("51413");
+    let engine = Fake::new(vec![gateway]);
+    assert_eq!(
+        lemonfiber_core::doctor::vpn::granted_port(&engine, "lemonfiber", &stack(), false).await,
+        None
+    );
+}
+
+#[tokio::test]
+async fn a_gateway_with_no_granted_port_reads_as_none_rather_than_a_failure() {
+    let engine = Fake::new(vec![Behavior::up("gluetun", Some("185.65.1.1"))]);
+    assert_eq!(
+        lemonfiber_core::doctor::vpn::granted_port(&engine, "lemonfiber", &stack(), true).await,
+        None
     );
 }
