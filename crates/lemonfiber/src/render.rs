@@ -301,6 +301,7 @@ mod tests {
                 services: Vec::new(),
                 condition: None,
                 stack_edits: Vec::new(),
+                forwarding: None,
             }),
             Outcome::Status(StatusReport {
                 forms: Vec::new(),

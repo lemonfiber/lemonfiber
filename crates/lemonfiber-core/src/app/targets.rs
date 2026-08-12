@@ -333,6 +333,23 @@ pub(super) fn service_addr(
 /// Shared by the dashboard's transfers panel (which keeps each client's protocol)
 /// and the free-space projection (which only sums what is still to land), so the
 /// two never read a client two different ways.
+/// The torrent client's listening port, and a way to change it.
+///
+/// `None` where this stack has no torrent client, or where lemonfiber has no
+/// recorded password for it — a client it cannot authenticate to is one it cannot
+/// read or correct, and guessing either way would be worse than saying nothing.
+pub(super) fn torrent_client(ctx: &Ctx, targets: &[DownloadTarget]) -> Option<Qbittorrent> {
+    let target = targets
+        .iter()
+        .find(|target| matches!(target.kind, DownloadKind::Qbittorrent))?;
+    let password = recorded_qbittorrent_password(ctx)?;
+    Some(Qbittorrent::authenticated(
+        ctx.http.clone(),
+        &target.base,
+        password,
+    ))
+}
+
 pub(super) async fn read_transfers(ctx: &Ctx, target: &DownloadTarget) -> Vec<Download> {
     match &target.kind {
         DownloadKind::Qbittorrent => {

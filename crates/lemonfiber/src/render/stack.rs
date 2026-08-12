@@ -196,6 +196,7 @@ mod tests {
                 path: "compose.yml".to_owned(),
                 diff: "-a\n+b\n".to_owned(),
             }],
+            forwarding: None,
         };
         let text = lifecycle(&report).text();
         assert!(text.contains("would run:"));
@@ -220,6 +221,7 @@ mod tests {
             services: Vec::new(),
             condition: None,
             stack_edits: Vec::new(),
+            forwarding: None,
         };
         let text = lifecycle(&report).text();
         assert_eq!(text, "down: media");

@@ -11,7 +11,7 @@ use super::port_forward::port_forward_offline;
 use super::Pair;
 use super::{Category, Finding, Verdict};
 use crate::config::PortForward;
-use crate::error::Remedy;
+use crate::error::{Code, Problem, Remedy, Severity};
 
 pub(super) fn assemble(
     pair: &Pair,
@@ -86,6 +86,43 @@ pub(super) fn disagreeing(reason: String) -> Finding {
         },
     )
 }
+
+/// The finding for a download client listening somewhere other than the port the
+/// provider granted.
+///
+/// Offered rather than applied, because a diagnosis is only looking: an operator
+/// asking what is wrong has not asked for anything to be changed. Starting the
+/// stack applies the same fix, since by then they have asked for an action.
+///
+/// A warning rather than a failure — nothing is leaking and downloads still
+/// arrive. What stops is peers reaching the client, so seeding stops, which is
+/// the part noticed last and the reason this is worth saying at all.
+pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
+    finding(
+        "vpn.port-forward-client",
+        "The download client listens on the forwarded port",
+        Verdict::Warn(
+            Problem::new(
+                PORT_MISMATCH,
+                Severity::Warning,
+                format!(
+                    "The provider forwards port {granted} and the download client is listening \
+                     on {listening}"
+                ),
+                "Downloads still arrive, so nothing looks wrong from here — but no peer can \
+                 reach the client, so it cannot seed and connects to fewer sources.",
+                Remedy::new("Start the stack to move the client onto the forwarded port")
+                    .with_detail("lemonfiber up"),
+            )
+            .or_try(Remedy::new(format!(
+                "Or set the client's listening port to {granted} yourself"
+            ))),
+        ),
+    )
+}
+
+/// Raised when the client is listening somewhere other than the forwarded port.
+pub const PORT_MISMATCH: Code = Code::new("VPN-5");
 
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.

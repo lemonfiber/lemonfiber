@@ -134,6 +134,75 @@ impl Qbittorrent {
 
         self.login(new).await
     }
+
+    /// Which port the client is listening on for incoming peers.
+    ///
+    /// The number that has to match what the VPN granted: peers reach a client on
+    /// the port the provider forwards, and a client listening elsewhere is
+    /// connectable by nobody while looking entirely healthy from inside.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where qBittorrent cannot be reached, rejects the
+    /// password, or answers with something unreadable.
+    pub async fn listen_port(&self) -> Result<u16, Failure> {
+        let password = self
+            .password
+            .as_deref()
+            .ok_or_else(|| self.endpoint.unauthorised())?;
+        self.login(password).await?;
+
+        let request = Request {
+            method: Method::Get,
+            url: self.endpoint.url("/api/v2/app/preferences"),
+            headers: Vec::new(),
+            body: None,
+        };
+        let response = self.endpoint.send(&request).await?;
+        let preferences: Preferences = self
+            .endpoint
+            .decode(&response, "the preferences could not be read")?;
+        Ok(preferences.listen_port)
+    }
+
+    /// Listen on `port` instead, and confirm the client took it.
+    ///
+    /// Read back rather than trusted, for the reason the password change is: a
+    /// client that accepted the write and did not apply it would otherwise be
+    /// recorded as configured while remaining unreachable — which is the failure
+    /// this whole path exists to notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where qBittorrent cannot be reached, rejects the
+    /// password, refuses the change, or reports a different port afterwards.
+    pub async fn set_listen_port(&self, port: u16) -> Result<(), Failure> {
+        let password = self
+            .password
+            .as_deref()
+            .ok_or_else(|| self.endpoint.unauthorised())?;
+        self.login(password).await?;
+
+        let preferences = serde_json::json!({ "listen_port": port }).to_string();
+        let request = self.post("/app/setPreferences", &[("json", &preferences)]);
+        let response = self.endpoint.send(&request).await?;
+        self.endpoint.expect_success(&response)?;
+
+        match self.listen_port().await? {
+            listening if listening == port => Ok(()),
+            listening => Err(self.endpoint.refused(&format!(
+                "the port was set to {port} and the client is listening on {listening}"
+            ))),
+        }
+    }
+}
+
+/// The preferences fields the forwarded port is read from. The many others
+/// qBittorrent sends are ignored.
+#[derive(Deserialize)]
+struct Preferences {
+    #[serde(default)]
+    listen_port: u16,
 }
 
 /// qBittorrent's sentinel `eta` for "no estimate to give" — 100 days, in seconds.
@@ -292,5 +361,68 @@ mod transfers_tests {
             qbit.transfers().await,
             Err(Failure::Refused { .. })
         ));
+    }
+
+    /// A successful login, as every call begins with.
+    const LOGGED_IN: (u16, &str) = (200, "Ok.");
+
+    #[tokio::test]
+    async fn the_listening_port_is_read_from_the_preferences() {
+        // The number that has to match what the VPN granted: peers reach a client
+        // on the port the provider forwards.
+        let client = client(vec![LOGGED_IN, (200, r#"{"listen_port":51413}"#)]);
+        assert_eq!(client.listen_port().await.ok(), Some(51413));
+    }
+
+    #[tokio::test]
+    async fn preferences_that_will_not_parse_are_refused_rather_than_guessed() {
+        let client = client(vec![LOGGED_IN, (200, "not json")]);
+        assert!(client.listen_port().await.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_client_holding_no_password_cannot_read_or_set_the_port() {
+        let anonymous = Qbittorrent::new(
+            Arc::new(ScriptedHttp::new(Vec::new())),
+            "http://127.0.0.1:8080",
+        );
+        assert!(anonymous.listen_port().await.is_err());
+        assert!(anonymous.set_listen_port(51413).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn setting_the_port_is_confirmed_by_reading_it_back() {
+        // Read back rather than trusted: a client that accepted the write and did
+        // not apply it would otherwise be recorded as configured while remaining
+        // unreachable, which is the failure this whole path exists to notice.
+        let client = client(vec![
+            LOGGED_IN,
+            (200, ""),
+            LOGGED_IN,
+            (200, r#"{"listen_port":51413}"#),
+        ]);
+        assert!(client.set_listen_port(51413).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_client_that_took_the_write_and_kept_its_old_port_is_a_failure() {
+        // Accepted and not applied — the case the read-back exists for.
+        let client = client(vec![
+            LOGGED_IN,
+            (200, ""),
+            LOGGED_IN,
+            (200, r#"{"listen_port":6881}"#),
+        ]);
+        let refused = client.set_listen_port(51413).await;
+        assert!(
+            refused.is_err(),
+            "the client is not on the port it was set to"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refused_write_is_reported_rather_than_read_back() {
+        let client = client(vec![LOGGED_IN, (403, "Forbidden")]);
+        assert!(client.set_listen_port(51413).await.is_err());
     }
 }
