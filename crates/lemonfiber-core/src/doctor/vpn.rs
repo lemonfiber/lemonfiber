@@ -15,6 +15,7 @@
 
 mod echo;
 mod findings;
+mod forwarding;
 mod killswitch;
 mod leak;
 mod port_forward;
@@ -32,6 +33,7 @@ use crate::ports::docker::{Container, Engine};
 
 pub use echo::Seen;
 use findings::{assemble, disagreeing, finding, killswitch_findings, skipped, unreachable_engine};
+pub use forwarding::{Answer, Forwarding};
 use killswitch::{not_attempted, Held};
 use leak::{labelled, Reach};
 use port_forward::{no_port, port_forward_offline, Grant};
