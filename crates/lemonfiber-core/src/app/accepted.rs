@@ -287,14 +287,16 @@ mod tests {
     fn answering_something_nothing_warns_about_is_refused_rather_than_recorded() {
         // A typo recorded silently leaves the operator believing a question is
         // settled while the tool goes on asking it.
+        //
+        // Built from the correct name with its last character dropped rather than
+        // written out: a misspelling in a literal is one the spell-check gate
+        // reads as a mistake in the source, which it cannot tell from a real one.
         let ctx = ctx_at("typo");
-        let refused = super::acknowledge(
-            &ctx,
-            Some("vpn.unprotexted"),
-            reporting(warning("vpn.unprotected")),
-        );
+        let mistyped = "vpn.unprotected".trim_end_matches('d');
+        let refused =
+            super::acknowledge(&ctx, Some(mistyped), reporting(warning("vpn.unprotected")));
         assert!(refused.is_err());
-        assert!(!load(&ctx).has("vpn.unprotexted"), "nothing was written");
+        assert!(!load(&ctx).has(mistyped), "nothing was written");
         let detail = refused.err().and_then(|problem| {
             problem
                 .remedies
