@@ -26,6 +26,7 @@ pub mod backup;
 pub mod conditions;
 mod ctx;
 pub mod dashboard;
+pub mod egress;
 mod engine;
 pub mod forwarding;
 mod household;
