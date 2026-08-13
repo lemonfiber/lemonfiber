@@ -20,10 +20,12 @@ use crate::model::{
 use crate::quality::Preset;
 use crate::stack::compose::Action;
 
+pub mod accepted;
 pub mod appetite;
 pub mod apply;
 pub mod backup;
 pub mod conditions;
+mod configuring;
 mod ctx;
 pub mod dashboard;
 pub mod egress;
@@ -39,6 +41,7 @@ pub mod recover;
 mod reset;
 pub mod restore;
 mod seed;
+pub mod seeding;
 pub mod setup;
 mod targets;
 mod trace;
@@ -114,6 +117,9 @@ pub enum Command {
         only: Option<Category>,
         /// Whether the operator opted into the checks that disturb the system.
         disruptive: bool,
+        /// A check whose warning the operator is answering: they have weighed the
+        /// cost and chosen it, so it stops leading from now on.
+        accept: Option<String>,
     },
     /// Show or change the quality preset — how good media should look, and how
     /// much disk it should cost — in plain language.
@@ -279,11 +285,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             engine::lifecycle(ctx, &forms, &Action::Restart(services)).await
         }
         Command::Pull { forms } => engine::lifecycle(ctx, &forms, &Action::Pull).await,
-        Command::ConfigGet { key } => engine::configuration(ctx, Some(&key), None).map_err(|p| *p),
-        Command::ConfigSet { key, value } => {
-            engine::configuration(ctx, Some(&key), Some(&value)).map_err(|p| *p)
+        Command::ConfigGet { key } => {
+            configuring::configuration(ctx, Some(&key), None).map_err(|p| *p)
         }
-        Command::ConfigShow => engine::configuration(ctx, None, None).map_err(|p| *p),
+        Command::ConfigSet { key, value } => {
+            configuring::configuration(ctx, Some(&key), Some(&value)).map_err(|p| *p)
+        }
+        Command::ConfigShow => configuring::configuration(ctx, None, None).map_err(|p| *p),
         Command::Quality(action) => quality::quality(ctx, action)
             .map(Outcome::Quality)
             .map_err(|problem| *problem),
@@ -308,9 +316,16 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             .map(Outcome::Upgrade)
             .map_err(|problem| *problem),
         Command::Ps { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
-        Command::Doctor { only, disruptive } => engine::diagnose(ctx, only, disruptive)
-            .await
-            .map(Outcome::Doctor),
+        Command::Doctor {
+            only,
+            disruptive,
+            accept,
+        } => {
+            let report = engine::diagnose(ctx, only, disruptive).await?;
+            accepted::acknowledge(ctx, accept.as_deref(), report)
+                .map(Outcome::Doctor)
+                .map_err(|problem| *problem)
+        }
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Reset { confirm } => reset::reset(ctx, confirm)
@@ -668,6 +683,7 @@ mod tests {
         let command = Command::Doctor {
             only: Some(Category::Vpn),
             disruptive: false,
+            accept: None,
         };
         let outcome = dispatch(command, &ctx).await;
 
@@ -704,6 +720,7 @@ mod tests {
             Command::Doctor {
                 only: None,
                 disruptive: false,
+                accept: None,
             },
             &ctx,
         )
@@ -740,6 +757,7 @@ mod tests {
             Command::Doctor {
                 only: None,
                 disruptive: false,
+                accept: None,
             },
             &ctx,
         )

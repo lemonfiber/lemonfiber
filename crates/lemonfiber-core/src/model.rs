@@ -85,6 +85,12 @@ pub struct ConfigReport {
     /// Whether this was a rehearsal, so a change that `changed` reports was one
     /// that *would* be made rather than one that was.
     pub rehearsed: bool,
+    /// What this change costs, where making it decided something with a
+    /// consequence — turning port forwarding off, or moving to a provider while it
+    /// is off. Absent for every other change, and for a rehearsal, which decided
+    /// nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consequence: Option<String>,
 }
 
 /// What a quality command did to the stored choice.

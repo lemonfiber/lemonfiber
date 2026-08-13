@@ -1323,3 +1323,40 @@ async fn a_gateway_with_no_granted_port_reads_as_none_rather_than_a_failure() {
         None
     );
 }
+
+#[tokio::test]
+async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
+    // The arrangement this whole category exists to catch, and the one it used to
+    // pass over: with no gateway the pair does not resolve, and reporting that as
+    // "does not apply" reads as though the check looked and found nothing to look
+    // at — while what it found is torrent traffic leaving under the operator's own
+    // address.
+    let mut uncontained = stack();
+    uncontained
+        .services
+        .retain(|service| service.id != "gluetun");
+    let subject = VpnCheck::new(
+        Arc::new(Fake::new(vec![])),
+        "lemonfiber".to_owned(),
+        &uncontained,
+        Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+        },
+    );
+    let findings = subject.run().await;
+    assert!(
+        matches!(
+            verdict(&findings, "vpn.unprotected"),
+            Some(Verdict::Warn(_))
+        ),
+        "a choice with a cost, never a failure and never a skip"
+    );
+    assert!(
+        verdict(&findings, "vpn").is_none(),
+        "and not also reported as not applying"
+    );
+}

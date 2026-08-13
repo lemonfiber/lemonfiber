@@ -160,6 +160,12 @@ fn settings(report: &ConfigReport) -> Lines {
             "saved"
         });
     }
+    // Said at the moment the choice was made, and only then — the checks
+    // deliberately do not raise it again on every run afterwards.
+    if let Some(consequence) = &report.consequence {
+        lines.put(String::new());
+        lines.put(consequence.clone());
+    }
     lines
 }
 
@@ -225,6 +231,25 @@ mod tests {
     }
 
     #[test]
+    fn a_change_that_costs_something_says_so_where_it_was_made() {
+        // The only moment it is worth saying: the checks deliberately go quiet
+        // about it afterwards, so if it is not here the operator never hears it.
+        let report = ConfigReport {
+            settings: vec![SettingReport {
+                key: "VPN_PORT_FORWARDING".to_owned(),
+                value: "off".to_owned(),
+                secret: false,
+            }],
+            changed: true,
+            rehearsed: false,
+            consequence: Some("seeding will be slower".to_owned()),
+        };
+        let text = settings(&report).text();
+        assert!(text.contains("saved"));
+        assert!(text.contains("seeding will be slower"), "{text}");
+    }
+
+    #[test]
     fn settings_are_listed_and_a_change_says_whether_it_saved() {
         let report = ConfigReport {
             settings: vec![SettingReport {
@@ -233,6 +258,7 @@ mod tests {
                 secret: false,
             }],
             changed: true,
+            consequence: None,
             rehearsed: false,
         };
         assert!(settings(&report).text().contains("DATA_ROOT=/data"));
@@ -265,6 +291,7 @@ mod tests {
                 }],
                 changed: false,
                 rehearsed: false,
+                consequence: None,
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],
