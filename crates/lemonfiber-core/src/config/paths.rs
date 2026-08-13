@@ -90,6 +90,15 @@ impl Paths {
         self.config.join("notifications.json")
     }
 
+    /// The choices the operator answered whose cost was stated to them once —
+    /// running with no VPN, or with a provider that forwards no port. Kept with
+    /// configuration because it records a decision, and a backup that restored the
+    /// stack without it would put every settled question again.
+    #[must_use]
+    pub fn accepted(&self) -> PathBuf {
+        self.config.join("accepted.json")
+    }
+
     /// The materialised stack — compose files written where Compose can read
     /// them.
     #[must_use]
@@ -161,6 +170,7 @@ mod tests {
             paths.materialised(),
             paths.quality(),
             paths.notifications(),
+            paths.accepted(),
         ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),
@@ -212,6 +222,19 @@ mod tests {
         assert_eq!(
             paths.env_file().with_file_name("materialised.json"),
             paths.materialised()
+        );
+    }
+
+    #[test]
+    fn the_answered_choices_sit_beside_the_env_file() {
+        // The doctor derives where it keeps them from the environment file it is
+        // handed — `env_file.with_file_name("accepted.json")` — while a backup
+        // captures the configuration directory whole. The two derivations must land
+        // on the same file, or a restore would put every settled question again.
+        let paths = paths();
+        assert_eq!(
+            paths.env_file().with_file_name("accepted.json"),
+            paths.accepted()
         );
     }
 

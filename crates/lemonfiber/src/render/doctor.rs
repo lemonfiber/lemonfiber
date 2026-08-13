@@ -4,7 +4,7 @@
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
 use lemonfiber_core::doctor::{Overall, Verdict};
-use lemonfiber_core::error::Problem;
+use lemonfiber_core::error::{Problem, State};
 use lemonfiber_core::model::DoctorReport;
 
 use super::Lines;
@@ -23,6 +23,12 @@ pub(super) fn diagnosis(report: &DoctorReport) -> Lines {
                 Some(note) => lines.put(format!("  ✓ {title}   {note}")),
                 None => lines.put(format!("  ✓ {title}")),
             },
+            // An answered choice keeps its line and loses its lead: still there,
+            // still saying what it costs, no longer repeating the remedy for
+            // something the operator has already decided against doing.
+            Verdict::Warn(problem) if problem.state == State::Suppressed => {
+                lines.put(format!("  · {title}   {} (answered)", problem.summary));
+            }
             Verdict::Warn(problem) => {
                 lines.put(format!("  ! {title}   {}", problem.summary));
                 lines.extend(remedies(problem));
@@ -183,5 +189,24 @@ mod tests {
         ] {
             assert!(overall(verdict).contains('—'));
         }
+    }
+
+    #[test]
+    fn an_answered_choice_stops_leading_without_disappearing() {
+        // The whole point of suppressing rather than removing: it is still on
+        // screen, still saying what it costs, and no longer putting a remedy for
+        // something the operator has already decided against.
+        let report = DoctorReport {
+            overall: Overall::Degraded,
+            findings: vec![Finding {
+                check: "vpn.unprotected".to_owned(),
+                category: Category::Vpn,
+                title: "Torrent traffic is contained".to_owned(),
+                verdict: Verdict::Warn(a_problem().in_state(State::Suppressed)),
+            }],
+        };
+        let text = diagnosis(&report).text();
+        assert!(text.contains("· Torrent traffic is contained   it broke (answered)"));
+        assert!(!text.contains("→ "), "the remedy is not put again: {text}");
     }
 }

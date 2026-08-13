@@ -88,7 +88,11 @@ async fn main() -> ExitCode {
             Ok(command) => command,
             Err(code) => return ExitCode::from(code),
         },
-        Request::Doctor { only, disruptive } => {
+        Request::Doctor {
+            only,
+            disruptive,
+            accept,
+        } => {
             let only = match only.as_deref().map(Category::parse) {
                 // A named category that lemonfiber does not know is a mistake to
                 // name, not a request to run everything.
@@ -100,7 +104,11 @@ async fn main() -> ExitCode {
                 Some(Some(category)) => Some(category),
                 None => None,
             };
-            Command::Doctor { only, disruptive }
+            Command::Doctor {
+                only,
+                disruptive,
+                accept,
+            }
         }
         // The term is taken as words so it can be typed unquoted; joined back into the
         // title as said.

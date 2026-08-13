@@ -9,7 +9,6 @@ use tokio::sync::mpsc::Receiver;
 
 use super::targets::{committed_bytes, project_directory, servarr_targets};
 use super::{Ctx, Outcome};
-use crate::config::store;
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
@@ -21,10 +20,7 @@ use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Diagnose, Problem, Remedy, Severity, State};
-use crate::model::{
-    ConfigReport, DoctorReport, LifecycleReport, SettingReport, StackEdit, StatusReport,
-    VersionReport,
-};
+use crate::model::{DoctorReport, LifecycleReport, StackEdit, StatusReport, VersionReport};
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
 use crate::stack::closure::{resolve, Plan};
@@ -360,7 +356,14 @@ pub async fn diagnose(
         Box::new(releases),
     ];
 
-    Ok(examine(&checks, only).await)
+    // A choice the operator has already answered is marked as answered rather than
+    // repeated. Applied over the whole set here, so the rule is in one place and a
+    // check cannot forget it — least of all the one about running with no tunnel,
+    // which is the choice most likely to be deliberate and most tiresome repeated.
+    let mut report = examine(&checks, only).await;
+    report.findings =
+        crate::doctor::acknowledged::suppressing(report.findings, &super::accepted::load(ctx));
+    Ok(report)
 }
 
 /// What every service in the named forms is doing.
@@ -400,55 +403,6 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         condition: condition(&services),
         services,
     })
-}
-
-/// Read or change settings.
-///
-/// A rehearsal reads and reports what it would have written without writing it,
-/// so `--dry-run` means the same thing here as everywhere else.
-///
-/// The failure is boxed. This is the only fallible path here that is not async,
-/// so it is the only one where a large error variant sits in the returned value
-/// rather than inside a future — and a problem is a rare, cold thing that is
-/// cheaper to move behind a pointer.
-pub(super) fn configuration(
-    ctx: &Ctx,
-    key: Option<&str>,
-    value: Option<&str>,
-) -> Result<Outcome, Box<Problem>> {
-    let Some(path) = ctx.settings.env_file.as_deref() else {
-        return Err(Box::new(store::Failure::Nowhere.problem()));
-    };
-
-    let changed = match (key, value) {
-        (Some(key), Some(value)) if !ctx.dry_run => {
-            if let Err(err) = store::set(path, key, value) {
-                return Err(Box::new(err.problem()));
-            }
-            true
-        }
-        (_, value) => value.is_some(),
-    };
-
-    let file = match store::read(path) {
-        Ok(file) => file,
-        Err(err) => return Err(Box::new(err.problem())),
-    };
-    let settings = store::shown(&file)
-        .into_iter()
-        .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
-        .map(|setting| SettingReport {
-            key: setting.key,
-            value: setting.value,
-            secret: setting.secret,
-        })
-        .collect();
-
-    Ok(Outcome::Config(ConfigReport {
-        settings,
-        changed,
-        rehearsed: ctx.dry_run,
-    }))
 }
 
 /// Resolve forms, build the command, and run it unless this is a rehearsal.

@@ -18,13 +18,14 @@ mod findings;
 mod forwarding;
 mod killswitch;
 mod leak;
+mod pair;
 mod port_forward;
 mod probe;
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_manifest::{Manifest, Protocol};
+use lemonfiber_manifest::Manifest;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::config::{PortForward, Protocols};
@@ -33,11 +34,14 @@ use crate::ports::docker::{Container, Engine};
 
 pub use echo::Seen;
 use findings::{
-    assemble, disagreeing, finding, killswitch_findings, port_mismatch, skipped, unreachable_engine,
+    assemble, disagreeing, finding, killswitch_findings, port_mismatch, skipped, unprotected,
+    unreachable_engine,
 };
 pub use forwarding::{Answer, Forwarding};
 use killswitch::{not_attempted, Held};
 use leak::{labelled, Reach};
+use pair::torrent_client;
+pub(crate) use pair::{resolve_pair, Pair};
 pub use port_forward::granted_port;
 use port_forward::{no_port, port_forward_offline, Grant};
 use probe::{addresses, exit_country, find, public_address, read_grant, running};
@@ -55,54 +59,6 @@ const FORWARDED_PORT_FILE: &str = "/tmp/gluetun/forwarded_port";
 /// Why the port-forward check does not apply when the switch is off — shared so
 /// the running and offline paths word it identically.
 const NOT_ENABLED: &str = "port forwarding is not enabled, so there is no forwarded port to verify";
-
-/// The capability a VPN gateway needs to route the traffic of the containers
-/// sharing its network, and so the mark by which one is recognised — the unit is
-/// capability, not the container's name.
-const GATEWAY_CAPABILITY: &str = "NET_ADMIN";
-
-/// The two containers the check compares: the tunnel and the client contained
-/// by it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Pair {
-    /// The service that provides the tunnel.
-    pub gateway: String,
-    /// The download client whose traffic must traverse it.
-    pub client: String,
-}
-
-/// The tunnel gateway and the download client contained by it, recognised by
-/// capability rather than name so support is not tied to one provider or one
-/// image.
-///
-/// The gateway is the torrent-profile service holding the routing capability;
-/// the client is the torrent-profile service that depends on it.
-pub(crate) fn resolve_pair(manifest: &Manifest) -> Option<Pair> {
-    let torrent: Vec<&str> = manifest
-        .profiles
-        .iter()
-        .filter(|profile| profile.protocol == Some(Protocol::Torrent))
-        .map(|profile| profile.id.as_str())
-        .collect();
-
-    let gateway = manifest.services.iter().find(|service| {
-        torrent.contains(&service.profile.as_str())
-            && service
-                .capabilities
-                .iter()
-                .any(|capability| capability == GATEWAY_CAPABILITY)
-    })?;
-
-    let client = manifest.services.iter().find(|service| {
-        torrent.contains(&service.profile.as_str())
-            && service.depends_on.iter().any(|on| on == &gateway.id)
-    })?;
-
-    Some(Pair {
-        gateway: gateway.id.clone(),
-        client: client.id.clone(),
-    })
-}
 
 /// The VPN leak check: compare the client's egress against the tunnel's.
 pub struct VpnCheck {
@@ -139,6 +95,8 @@ pub struct Asked {
 enum Target {
     /// The pair to compare.
     Pair(Pair),
+    /// Torrents are configured and nothing contains them.
+    Unprotected,
     /// The check does not apply, and why.
     Skip(String),
 }
@@ -169,8 +127,21 @@ impl VpnCheck {
             disruptive,
         } = asked;
         let target = if protocols.torrent {
+            // A pair that will not resolve is two different situations, and only
+            // one of them is a skip. A stack with a torrent client and nothing
+            // containing it is the arrangement this whole category exists to
+            // catch — reported as "does not apply" it reads as though the check
+            // found nothing to look at, while what it found is traffic leaving
+            // under the operator's own address. A stack with no torrent client at
+            // all has nothing to protect, whatever the setting says.
             resolve_pair(manifest).map_or_else(
-                || Target::Skip("this stack declares no VPN-contained torrent client".to_owned()),
+                || {
+                    if torrent_client(manifest) {
+                        Target::Unprotected
+                    } else {
+                        Target::Skip("this stack declares no torrent client to contain".to_owned())
+                    }
+                },
                 Target::Pair,
             )
         } else {
@@ -440,6 +411,7 @@ impl Check for VpnCheck {
     async fn run(&self) -> Vec<Finding> {
         let pair = match &self.target {
             Target::Skip(reason) => return vec![skipped(reason.clone())],
+            Target::Unprotected => return vec![unprotected()],
             Target::Pair(pair) => pair,
         };
 

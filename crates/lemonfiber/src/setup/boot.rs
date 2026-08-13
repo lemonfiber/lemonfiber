@@ -6,7 +6,7 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{diagnose, dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{diagnose, dispatch, seeding, Command, Ctx, Outcome};
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::{Category, Overall};
 
@@ -63,6 +63,15 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
     match dispatch(Command::Up { forms }, ctx).await {
         Ok(outcome) => {
             render(&outcome, false);
+            // Said here and nowhere else: setup is the moment this stack was
+            // decided, and a stack that forwards no port is not broken — nothing
+            // would come of repeating it on every run except an operator who
+            // skims.
+            if let Some(cost) =
+                seeding::at_setup(ctx.settings.protocols, &ctx.settings.port_forward)
+            {
+                println!("\n{cost}");
+            }
             // The offer is the last thing setup does, and it needs to know what the stack
             // actually settled to — which is right here, and nowhere else afterwards.
             first_content::offer(ctx, surface, condition(&outcome), settled(&outcome)).await

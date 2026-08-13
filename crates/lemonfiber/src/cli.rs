@@ -115,6 +115,10 @@ pub(crate) enum Request {
         /// Include the checks that disturb the running system.
         #[arg(long)]
         disruptive: bool,
+        /// Answer a warning about a choice — `vpn.unprotected`, say — so it stops
+        /// leading. Only something this run warns about can be answered.
+        #[arg(long, value_name = "CHECK")]
+        accept: Option<String>,
     },
     /// Guard the data location while forms run, stopping them if it disappears.
     Watch {
