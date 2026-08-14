@@ -24,7 +24,7 @@ use serde::Deserialize;
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
-    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity, Queue, Queued,
+    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 
@@ -32,6 +32,7 @@ mod catalogue;
 mod importing;
 mod pipeline;
 mod quality;
+mod queue;
 
 /// A client for one Servarr-shape service.
 ///
@@ -237,48 +238,6 @@ impl crate::ports::service::Maintenance for Servarr {
     }
 }
 
-#[async_trait]
-impl crate::ports::service::Queues for Servarr {
-    async fn queue(&self) -> Result<Queue, Failure> {
-        // A generous page is asked for so the stuck count is read from the whole
-        // queue rather than the default first page; the total is the service's own
-        // count, independent of the page.
-        let response = self
-            .probe(&self.request(Method::Get, "/queue?pageSize=200", None))
-            .await?;
-        let queue: QueueResource = self
-            .endpoint
-            .decode(&response, "the queue could not be read")?;
-        Ok(Queue {
-            total: queue.total_records,
-            items: queue.records.into_iter().map(queued).collect(),
-        })
-    }
-}
-
-/// One queue record as the port reports it.
-///
-/// The service's own words are carried through rather than interpreted here: what
-/// counts as stuck, and which category a stall belongs to, is a judgement, and a
-/// judgement made in an adapter is one no test can reach without a network.
-fn queued(record: QueueRecord) -> Queued {
-    Queued {
-        title: record.title.unwrap_or_default(),
-        status: record.tracked_download_status,
-        state: record.tracked_download_state,
-        // The service reports a single message and a list of them; the list is
-        // where an import failure explains itself, so it leads.
-        message: record
-            .status_messages
-            .into_iter()
-            .flat_map(|message| message.messages)
-            .next()
-            .or(record.error_message)
-            .filter(|message| !message.trim().is_empty()),
-        download_id: record.download_id.filter(|id| !id.is_empty()),
-    }
-}
-
 /// One group of complaints about a queue item.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -291,7 +250,7 @@ struct StatusMessage {
 /// on this page whose statuses the stuck count is read from.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct QueueResource {
+pub(super) struct QueueResource {
     #[serde(default)]
     total_records: usize,
     #[serde(default)]
@@ -304,7 +263,7 @@ struct QueueResource {
 /// title, so a stuck item names the show a trace would search by.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct QueueRecord {
+pub(super) struct QueueRecord {
     /// What the service calls it — the name the download client knows it by too.
     #[serde(default)]
     title: Option<String>,
@@ -347,6 +306,17 @@ struct TitledResource {
 }
 
 impl QueueRecord {
+    /// The item this record is for, whichever kind of service filed it — the
+    /// episode where the queue is filed per episode, the film otherwise. What a
+    /// re-grab is counted against, since a loop commonly changes release while
+    /// staying the same item.
+    pub(super) const fn item(&self) -> Option<i64> {
+        match self.episode_id {
+            Some(episode) => Some(episode),
+            None => self.movie_id,
+        }
+    }
+
     /// Whether this record is for the given item — matched on the id field the item's
     /// kind files under.
     fn is_for(&self, kind: crate::recyclarr::Kind, id: i64) -> bool {

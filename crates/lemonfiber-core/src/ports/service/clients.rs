@@ -228,6 +228,15 @@ pub struct Queued {
     /// The download client's own identifier for it, where the service knows one.
     /// A surer correlation than the title, which either side may have rewritten.
     pub download_id: Option<String>,
+    /// How many times the service has grabbed this item since it last imported
+    /// it — at least the one that put it here.
+    ///
+    /// Counted per item rather than per release, because a loop commonly grabs a
+    /// different release each time for the same episode, and counted only since
+    /// the last import, which is what separates a loop from an upgrade. A history
+    /// nobody could read leaves it at one: a count that could not be taken is not
+    /// a loop.
+    pub grabs: u32,
 }
 
 impl Queued {
@@ -275,6 +284,7 @@ mod tests {
             state: "downloading".to_owned(),
             message: None,
             download_id: None,
+            grabs: 1,
         }
     }
 

@@ -29,23 +29,37 @@ enum Answer {
     Silent,
 }
 
-/// A transport that answers every request the same way, keeping the last one.
+/// A transport that answers every request the same way, keeping what it was
+/// asked. Every request rather than the last, because a read that makes two — the
+/// queue and the history behind it — would otherwise leave a test asserting about
+/// whichever happened to come second.
 struct Fake {
     answer: Answer,
-    seen: Mutex<Option<Request>>,
+    seen: Mutex<Vec<Request>>,
 }
 
 impl Fake {
     fn new(answer: Answer) -> Arc<Self> {
         Arc::new(Self {
             answer,
-            seen: Mutex::new(None),
+            seen: Mutex::new(Vec::new()),
         })
     }
 
     /// The request the client sent.
+    /// The last request it was sent.
     fn request(&self) -> Option<Request> {
-        self.seen.lock().ok().and_then(|guard| guard.clone())
+        self.seen
+            .lock()
+            .ok()
+            .and_then(|guard| guard.last().cloned())
+    }
+
+    /// Whether it was ever asked for something naming this fragment.
+    fn asked_for(&self, fragment: &str) -> bool {
+        self.seen
+            .lock()
+            .is_ok_and(|guard| guard.iter().any(|request| request.url.contains(fragment)))
     }
 }
 
@@ -53,7 +67,7 @@ impl Fake {
 impl Http for Fake {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
         if let Ok(mut guard) = self.seen.lock() {
-            *guard = Some(request.clone());
+            guard.push(request.clone());
         }
         match self.answer {
             Answer::Reply(status, body) => Ok(Response {
@@ -695,6 +709,7 @@ async fn a_queue_item_carries_what_the_service_said_went_wrong() {
         state: String::new(),
         message: None,
         download_id: None,
+        grabs: 1,
     });
     assert_eq!(first.title, "Some.Release");
     assert_eq!(first.state, "importPending");
@@ -734,9 +749,7 @@ async fn the_queue_depth_and_the_stuck_count_are_read() {
     assert_eq!(depth.ok(), Some(QueueDepth { total: 5, stuck: 2 }));
 
     // It asked the queue route, and for a generous page so the count is whole.
-    assert!(fake
-        .request()
-        .is_some_and(|request| request.url.contains("/api/v3/queue?pageSize=")));
+    assert!(fake.asked_for("/api/v3/queue?pageSize="));
 }
 
 #[tokio::test]
@@ -1395,4 +1408,117 @@ async fn telling_it_to_copy_keeps_every_other_setting_it_had() {
 async fn settings_that_are_not_an_object_are_refused_rather_than_guessed() {
     let fake = Fake::new(Answer::Reply(200, "[]"));
     assert!(sonarr(&fake).set_hardlinks(false).await.is_err());
+}
+
+#[tokio::test]
+async fn an_item_fetched_over_and_over_carries_the_count_the_history_shows() {
+    // The queue alone says one record, downloading, nothing wrong. What makes it a
+    // loop is in the history — and counted per item, because the third fetch is a
+    // different release from the first.
+    let router = Router::new(vec![
+        (
+            Method::Get,
+            "/queue",
+            200,
+            r#"{"totalRecords":1,"records":[{"title":"Some.Release.v3","episodeId":7,
+               "trackedDownloadStatus":"ok","trackedDownloadState":"downloading"}]}"#
+                .to_owned(),
+        ),
+        (
+            Method::Get,
+            "/history",
+            200,
+            r#"{"records":[{"eventType":"grabbed","episodeId":7},
+               {"eventType":"downloadFailed","episodeId":7},
+               {"eventType":"grabbed","episodeId":7},
+               {"eventType":"downloadFailed","episodeId":7},
+               {"eventType":"grabbed","episodeId":7}]}"#
+                .to_owned(),
+        ),
+    ]);
+    let read = sonarr_routed(&router)
+        .queue()
+        .await
+        .ok()
+        .unwrap_or_default();
+    assert_eq!(read.items.first().map(|item| item.grabs), Some(3));
+}
+
+#[tokio::test]
+async fn an_item_grabbed_again_after_it_imported_is_not_counted_as_a_loop() {
+    // An upgrade: a better copy replacing one that arrived. Counting the grabs
+    // before the import would flag every upgraded episode on the machine.
+    let router = Router::new(vec![
+        (
+            Method::Get,
+            "/queue",
+            200,
+            r#"{"totalRecords":1,"records":[{"title":"Some.Release.2160p","episodeId":7,
+               "trackedDownloadStatus":"ok","trackedDownloadState":"downloading"}]}"#
+                .to_owned(),
+        ),
+        (
+            Method::Get,
+            "/history",
+            200,
+            r#"{"records":[{"eventType":"grabbed","episodeId":7},
+               {"eventType":"downloadFolderImported","episodeId":7},
+               {"eventType":"grabbed","episodeId":7},
+               {"eventType":"grabbed","episodeId":7}]}"#
+                .to_owned(),
+        ),
+    ]);
+    let read = sonarr_routed(&router)
+        .queue()
+        .await
+        .ok()
+        .unwrap_or_default();
+    assert_eq!(read.items.first().map(|item| item.grabs), Some(1));
+}
+
+#[tokio::test]
+async fn a_history_that_cannot_be_read_still_answers_with_the_queue() {
+    // Losing the queue because a second read failed would turn a missing count
+    // into a missing queue — and a count nobody could take is not a loop.
+    let router = Router::new(vec![
+        (
+            Method::Get,
+            "/queue",
+            200,
+            r#"{"totalRecords":1,"records":[{"title":"Some.Release","episodeId":7,
+               "trackedDownloadStatus":"ok","trackedDownloadState":"downloading"}]}"#
+                .to_owned(),
+        ),
+        (Method::Get, "/history", 200, "not json at all".to_owned()),
+    ]);
+    let read = sonarr_routed(&router)
+        .queue()
+        .await
+        .ok()
+        .unwrap_or_default();
+    assert_eq!(read.items.first().map(|item| item.grabs), Some(1));
+    assert_eq!(read.total, 1, "the queue itself still came back");
+}
+
+#[tokio::test]
+async fn a_history_the_service_refuses_still_answers_with_the_queue() {
+    // The other way the second read fails: the service answers, and refuses.
+    let router = Router::new(vec![
+        (
+            Method::Get,
+            "/queue",
+            200,
+            r#"{"totalRecords":1,"records":[{"title":"Some.Release","episodeId":7,
+               "trackedDownloadStatus":"ok","trackedDownloadState":"downloading"}]}"#
+                .to_owned(),
+        ),
+        (Method::Get, "/history", 500, "nope".to_owned()),
+    ]);
+    let read = sonarr_routed(&router)
+        .queue()
+        .await
+        .ok()
+        .unwrap_or_default();
+    assert_eq!(read.items.first().map(|item| item.grabs), Some(1));
+    assert_eq!(read.total, 1, "the queue itself still came back");
 }
