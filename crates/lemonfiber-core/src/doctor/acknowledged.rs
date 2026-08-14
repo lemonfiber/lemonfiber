@@ -59,7 +59,7 @@ impl Accepted {
 /// Applied to a whole set rather than per finding, so the rule is in one place
 /// and a surface cannot forget it for the one check where it matters most.
 #[must_use]
-pub fn suppressing(findings: Vec<Finding>, accepted: &Accepted) -> Vec<Finding> {
+pub(crate) fn suppressing(findings: Vec<Finding>, accepted: &Accepted) -> Vec<Finding> {
     findings
         .into_iter()
         .map(|finding| {

@@ -48,7 +48,7 @@ pub const fn at_setup(protocols: Protocols, port_forward: &PortForward) -> Optio
 /// the runtime check's business, and it says so itself rather than being guessed
 /// at from a provider's name.
 #[must_use]
-pub fn on_change(before: &PortForward, after: &PortForward) -> Option<&'static str> {
+pub(crate) fn on_change(before: &PortForward, after: &PortForward) -> Option<&'static str> {
     if after.enabled {
         return None;
     }

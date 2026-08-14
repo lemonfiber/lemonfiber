@@ -23,10 +23,7 @@ use super::Ctx;
 /// said and where the answer cannot be read.
 #[must_use]
 pub fn recorded(ctx: &Ctx) -> Wants {
-    path(ctx)
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+    super::record::kept(path(ctx).as_deref())
 }
 
 /// Record the answer where the next run — and a backup — will find it.

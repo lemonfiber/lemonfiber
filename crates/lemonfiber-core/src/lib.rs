@@ -71,6 +71,7 @@ pub mod stack;
 pub mod storage;
 #[cfg(test)]
 mod test_support;
+pub mod text;
 pub mod trace;
 pub mod transcoding;
 pub mod validate;

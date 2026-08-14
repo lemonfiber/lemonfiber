@@ -43,21 +43,31 @@ pub(crate) struct Lines(Vec<String>);
 
 impl Lines {
     /// One line.
+    ///
+    /// Made plain on the way in, because most of what is shown here came from
+    /// somewhere else — a release name from an indexer, a failure message from a
+    /// \*arr — and a terminal reads a control character in the middle of one as an
+    /// instruction. One place rather than at each caller: a line that skipped it
+    /// would be the one carrying the name somebody chose.
     pub(crate) fn put(&mut self, line: impl Into<String>) {
-        self.0.push(line.into());
+        self.0.push(lemonfiber_core::text::plain(&line.into()));
     }
 
     /// A blank line, then the given one — the separated closing remark most answers end
     /// on, kept as one call so the spacing is uniform rather than re-decided each time.
     pub(crate) fn spaced(&mut self, line: impl Into<String>) {
         self.0.push(String::new());
-        self.0.push(line.into());
+        self.put(line);
     }
 
     /// Text that already carries its own line breaks — a diff — split into the lines it
     /// is made of, so a block and a built line are the same kind of thing from here on.
     pub(crate) fn block(&mut self, text: &str) {
-        self.0.extend(text.lines().map(str::to_owned));
+        // Its own line breaks are what makes it a block, so those are kept and the
+        // lines they separate are made plain the same way any other line is.
+        for line in text.lines() {
+            self.put(line);
+        }
     }
 
     /// Everything another renderer built, appended.
@@ -363,5 +373,18 @@ mod tests {
             .text()
             .contains(r#""kind":"version""#));
         assert!(!super::UNRENDERABLE.is_empty());
+    }
+
+    #[test]
+    fn a_name_from_somewhere_else_cannot_take_over_the_terminal() {
+        // Most of what is shown here came from an indexer or a service, and a
+        // terminal reads a control character in the middle of one as an
+        // instruction. Caught at the one place every line goes through, so a
+        // renderer added later cannot forget it.
+        let mut lines = Lines::default();
+        lines.put("Some\u{1b}[2JRelease");
+        lines.spaced("and\rthis");
+        lines.block("a\u{7f}b");
+        assert_eq!(lines.text(), "Some[2JRelease\n\nandthis\nab");
     }
 }
