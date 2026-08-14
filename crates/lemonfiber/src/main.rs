@@ -14,6 +14,7 @@ use lemonfiber_core::doctor::Category;
 mod archive;
 mod cli;
 mod context;
+mod dashboard;
 mod engine;
 mod exit;
 mod keyboard;
@@ -21,6 +22,7 @@ mod maintain;
 mod prompt;
 mod render;
 mod setup;
+mod terminal;
 mod translate;
 mod walkthrough;
 

@@ -61,4 +61,4 @@ release-workflow:
 #
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info

@@ -44,6 +44,7 @@ sysinfo = { workspace = true }
 # Reading and writing the manifest that rides inside the archive. The type and its
 # derives live in the core; this only turns it to and from the bytes tar stores.
 serde_json = "1"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 
 [lints]
 workspace = true
