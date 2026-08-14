@@ -27,6 +27,12 @@ form_urlencoded = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true }
 serde_json = "1"
+# Compose files are YAML, and the single-mount rule can only be read from them —
+# it is invisible to every probe, since from the host the data root is one
+# filesystem and hardlinks work perfectly. A parser rather than line-matching,
+# because anchors, merge keys and both volume syntaxes all have to read the way
+# Compose reads them. Confined to `stack/mounts.rs`.
+serde_yaml_ng = "0.10"
 sysinfo = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

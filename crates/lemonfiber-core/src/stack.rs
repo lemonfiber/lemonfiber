@@ -23,6 +23,7 @@
 
 pub mod closure;
 pub mod compose;
+pub mod mounts;
 
 use std::path::{Path, PathBuf};
 
@@ -89,13 +90,42 @@ impl Source {
     /// [`Failure::Invalid`] when it parses and breaks the contract.
     pub fn checked_manifest(self, today: Date) -> Result<Manifest, Failure> {
         let manifest = self.manifest()?;
-        let violations = validate(&manifest, today);
+        let mut violations: Vec<String> = validate(&manifest, today)
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        // The compose files as well as the manifest, because the rule that
+        // decides whether an import costs nothing or costs a second copy of every
+        // file is written in the volumes rather than in `stack.toml` — and it is
+        // invisible to every probe, since from the host the data root is one
+        // filesystem and links work perfectly.
+        violations.extend(
+            mounts::crowded(&self.compose_files())
+                .iter()
+                .map(ToString::to_string),
+        );
         if violations.is_empty() {
             return Ok(manifest);
         }
-        Err(Failure::Invalid {
-            violations: violations.iter().map(ToString::to_string).collect(),
-        })
+        Err(Failure::Invalid { violations })
+    }
+
+    /// Every compose file in this stack, with its text.
+    ///
+    /// Read for both kinds of stack: an operator running their own fork is
+    /// exactly who this protects, since the shipped one is held to the rule by
+    /// its own tests.
+    #[must_use]
+    fn compose_files(self) -> Vec<(PathBuf, String)> {
+        match self {
+            Self::Embedded(_) => self
+                .files()
+                .into_iter()
+                .filter(|(path, _)| is_compose(path))
+                .map(|(path, text)| (path, String::from_utf8_lossy(text).into_owned()))
+                .collect(),
+            Self::External(directory) => on_disk(directory),
+        }
     }
 
     /// Write the stack somewhere Compose can read it, and say where that is.
@@ -156,6 +186,41 @@ impl Source {
             reason: err.to_string(),
         })
     }
+}
+
+/// Whether a path is a file Compose would read.
+fn is_compose(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
+        })
+}
+
+/// Every compose file under a stack directory, with its text.
+///
+/// A file that cannot be read contributes nothing rather than stopping the read:
+/// the manifest is what says whether this is a stack at all, and it has already
+/// been read by the time this runs.
+fn on_disk(directory: &Path) -> Vec<(PathBuf, String)> {
+    let mut files = Vec::new();
+    let mut pending = vec![directory.to_path_buf()];
+    while let Some(here) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&here) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if is_compose(&path) {
+                if let Ok(text) = std::fs::read_to_string(&path) {
+                    files.push((path, text));
+                }
+            }
+        }
+    }
+    files
 }
 
 /// Gather every file in an embedded directory — its path within the stack and its
@@ -516,5 +581,81 @@ mod tests {
             assert!(!failure.to_string().is_empty());
             assert!(!failure.problem().remedies.is_empty());
         }
+    }
+
+    /// Today, for the checks that take a date. Far enough forward that nothing in
+    /// the shipped stack has aged out of its own freshness rule.
+    const fn today() -> lemonfiber_manifest::Date {
+        lemonfiber_manifest::Date {
+            year: 2026,
+            month: 8,
+            day: 14,
+        }
+    }
+
+    /// What checking a stack complained about, in the words the operator is
+    /// shown — empty where it complained about nothing.
+    fn refusal(source: Source) -> String {
+        source
+            .checked_manifest(today())
+            .err()
+            .map(|failure| failure.problem())
+            .and_then(|problem| problem.detail)
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn the_stack_we_ship_obeys_its_own_single_mount_rule() {
+        // The rule is invisible to every probe — from the host the data root is
+        // one filesystem and links work perfectly — so the only thing that can
+        // hold the shipped stack to it is this.
+        assert_eq!(refusal(Source::Embedded(&EMBEDDED)), "");
+    }
+
+    #[test]
+    fn a_stack_that_splits_the_data_root_is_refused() {
+        // The failure this exists for: two mounts beneath the data root put the
+        // download and the library on opposite sides of a filesystem boundary
+        // inside the container, and every import silently becomes a copy.
+        let dir = std::env::temp_dir().join(format!("lemonfiber-split-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        assert!(std::fs::copy(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../assets/media-stack/stack.toml"
+            ),
+            dir.join("stack.toml")
+        )
+        .is_ok());
+        // A raw literal on its own lines: a continued string here is reflowed by
+        // the formatter into one indented line, which YAML then reads as a
+        // continuation of the previous entry rather than a second mount — a
+        // fixture that quietly stops describing the thing it is testing.
+        let split = r"services:
+  sonarr:
+    volumes:
+      - ${DATA_ROOT}/downloads:/downloads
+      - ${DATA_ROOT}/media:/media
+";
+        assert!(std::fs::write(dir.join("split.yml"), split).is_ok());
+
+        // Leaked deliberately: `Source::External` holds a `&'static Path`, and a
+        // stack directory outliving one test is a few kilobytes in a scratch dir.
+        let path: &'static Path = Box::leak(dir.clone().into_boxed_path());
+        // Asserted on what the operator is actually shown, rather than on the
+        // shape of the error behind it.
+        let said = refusal(Source::External(path));
+        assert!(said.contains("sonarr"), "{said}");
+        assert!(said.contains("copied rather than hardlinked"), "{said}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_directory_that_cannot_be_read_contributes_nothing_rather_than_stopping() {
+        // Whether this is a stack at all is the manifest's business, and it has
+        // already been read by the time this runs. A path that is not a directory
+        // to walk simply has no compose files in it.
+        assert!(super::on_disk(Path::new("/lemonfiber-no-such-directory")).is_empty());
     }
 }
