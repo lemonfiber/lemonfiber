@@ -93,7 +93,7 @@ fn the_core_has_no_user_interface_dependency() {
 /// to the network fails the build.
 #[test]
 fn talking_to_the_outside_world_only_happens_in_adapters() {
-    let confined: [(&str, &[&str]); 7] = [
+    let confined: [(&str, &[&str]); 8] = [
         ("tokio::process", &["adapters/process.rs"]),
         ("std::process::Command", &["adapters/process.rs"]),
         (
@@ -106,6 +106,10 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         // reason a static Linux build carries no system TLS. Both are its homes.
         ("rustls", &["adapters/nntp.rs", "adapters/http.rs"]),
         ("webpki_roots", &["adapters/nntp.rs"]),
+        // Not an adapter — YAML is a format, and reading one is pure. Confined
+        // for the same reason the rest are: the day something else wants to read
+        // a compose file, it asks the module that already knows how.
+        ("serde_yaml_ng", &["stack/mounts.rs"]),
     ];
 
     for (crate_name, permitted) in confined {
