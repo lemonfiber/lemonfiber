@@ -80,34 +80,54 @@ pub fn watch(
         .collect();
 
     let items = assemble(answers, fetching, conditions);
+    let sayable: Vec<(&crate::queue::Item, Stall)> = items
+        .iter()
+        .filter_map(|item| sayable(item).map(|stall| (item, stall)))
+        .collect();
+    // What more than one item is blocked by. A full disk stops every download on
+    // the machine, and twenty conditions about it are twenty alerts for one thing
+    // to fix — which is how an operator learns to mute the queue check.
+    let mut sharing: BTreeMap<&str, usize> = BTreeMap::new();
+    for (item, _) in &sayable {
+        if let Some(cause) = item.cause.as_deref() {
+            *sharing.entry(cause).or_default() += 1;
+        }
+    }
+
     let mut stuck = Vec::new();
     let mut seen: Vec<String> = Vec::new();
-    for item in &items {
-        let Some(stall) = sayable(item) else {
-            // Nothing to say about it. Whatever was recorded is left unseen, and
-            // the sweep below clears it — including a verdict that resolved by the
-            // item finishing, which would otherwise stand for ever.
-            continue;
-        };
-        // Keyed by the item *and* what is wrong with it, because the age is per
-        // fault rather than per item: a download that stalled for a day and then
-        // began crawling has been slow for a moment, not for a day, and one
-        // condition for the item would have handed the new fault the old one's
-        // stamp.
-        let check = format!("{CHECK}.{}.{}", kind_of(stall), item.name);
-        seen.push(check.clone());
-        conditions.observe(&check, Some(&fault_for(item, stall)), now);
+    for (item, stall) in &sayable {
+        let shared = item
+            .cause
+            .as_deref()
+            .filter(|cause| sharing.get(cause).copied().unwrap_or(0) > 1);
+        // Keyed by the cause where several share one, and otherwise by the item
+        // *and* what is wrong with it — the age is per fault rather than per item,
+        // since a download that stalled for a day and then began crawling has been
+        // slow for a moment, not for a day.
+        let check = shared.map_or_else(
+            || format!("{CHECK}.{}.{}", kind_of(*stall), item.name),
+            |cause| format!("{CHECK}.blocked.{cause}"),
+        );
+        let first = !seen.contains(&check);
+        if first {
+            seen.push(check.clone());
+        }
+        let group = shared.map(|cause| (cause, sharing.get(cause).copied().unwrap_or(1)));
+        conditions.observe(&check, Some(&fault_for(item, *stall, group)), now);
         // The age is the store's: when this fault was first seen, not when the
         // item was added.
         let held = conditions
             .get(&check)
             .map(|condition| age(condition.since.as_str(), now))
             .unwrap_or_default();
-        if !thresholds.within(thresholds.for_stall(stall), held) {
+        if first && !thresholds.within(thresholds.for_stall(*stall), held) {
             stuck.push(Stuck {
-                name: item.name.clone(),
-                stall,
+                name: shared.map_or_else(|| item.name.clone(), str::to_owned),
+                stall: *stall,
                 held_for: held.as_secs(),
+                blocking: item.cause.clone(),
+                items: shared.map_or(1, |cause| sharing.get(cause).copied().unwrap_or(1)),
             });
         }
     }
@@ -206,26 +226,44 @@ fn assemble(
                 .map(|condition| condition.recurrences)
                 .max()
                 .unwrap_or(0);
+            // Verbatim, and never interpreted here: what the service said is worth
+            // more than any reading of it, and it is what tells one item's problem
+            // from a condition stopping everything.
+            held.cause.clone_from(&item.message);
             held.importing = Some(Importing {
                 failures: if item.is_stuck() { returned } else { 0 },
                 imported: false,
             });
+            // The service's own count of how often it has fetched this since it
+            // last imported it. The highest wins where two services claim the same
+            // title, since one of them looping is a loop whatever the other says.
+            held.grabs = held.grabs.max(item.grabs);
         }
     }
     by_name.into_values().collect()
 }
 
 /// The fault a stuck item raises, in the category's own words.
-fn fault_for(item: &Item, stall: Stall) -> Fault {
+fn fault_for(item: &Item, stall: Stall, shared: Option<(&str, usize)>) -> Fault {
     let severity = if stall.wants_attention() {
         Severity::Warning
     } else {
         Severity::Advisory
     };
+    // Where several items report one cause, the cause is what is wrong and the
+    // items are how it showed. Naming an item there would send the operator to a
+    // download to fix something that is not about that download.
+    let summary = shared.map_or_else(
+        || match item.cause.as_deref() {
+            Some(cause) => format!("{} — {}: {cause}", item.name, stall.word()),
+            None => format!("{} — {}", item.name, stall.word()),
+        },
+        |(cause, items)| format!("{items} downloads are blocked: {cause}"),
+    );
     let mut fault = Fault::new(
         &format!("{CHECK}.{}", kind_of(stall)),
         severity,
-        &format!("{} — {}", item.name, stall.word()),
+        &summary,
         &stall.first_remedy(),
     );
     for remedy in stall.remedies().into_iter().skip(1) {
@@ -252,16 +290,22 @@ mod tests {
     use super::{watch, Answered, Watched};
     use crate::condition::Conditions;
     use crate::ports::service::Queued;
-    use crate::queue::{Stall, Thresholds};
+    use crate::queue::{Stall, Stuck, Thresholds};
 
-    /// One thing an \*arr is waiting for.
+    /// One thing an \*arr is waiting for, fetched once.
     fn queued(title: &str, status: &str, message: Option<&str>) -> Queued {
+        grabbed(title, status, message, 1)
+    }
+
+    /// The same, fetched however many times since it last imported.
+    fn grabbed(title: &str, status: &str, message: Option<&str>, grabs: u32) -> Queued {
         Queued {
             title: title.to_owned(),
             status: status.to_owned(),
             state: "downloading".to_owned(),
             message: message.map(str::to_owned),
             download_id: None,
+            grabs,
         }
     }
 
@@ -492,5 +536,118 @@ mod tests {
         kinds.dedup();
         assert_eq!(kinds.len(), count, "two categories share a kind");
         assert!(kinds.iter().all(|kind| !kind.is_empty()));
+    }
+
+    #[test]
+    fn one_cause_stopping_several_downloads_is_reported_once() {
+        // A full disk stops everything on the machine. Twenty conditions about it
+        // are twenty alerts for one thing to fix, which is how an operator learns
+        // to mute the check that would have told them.
+        let full = Some("No space left on device");
+        let answers = sonarr(vec![
+            queued("First.Release", "warning", full),
+            queued("Second.Release", "warning", full),
+            queued("Third.Release", "warning", full),
+        ]);
+        // Each is downloading and stopped, which is what a full disk does to a
+        // download: the client still holds it and nothing is moving.
+        let stopped = [
+            ("First.Release".to_owned(), 40u8, false),
+            ("Second.Release".to_owned(), 40u8, false),
+            ("Third.Release".to_owned(), 40u8, false),
+        ];
+        let mut conditions = Conditions::new();
+        watched(&answers, &stopped, &mut conditions, "1000");
+        let reported = watched(&answers, &stopped, &mut conditions, "100000");
+
+        let said: Vec<String> = reported.stuck.iter().map(Stuck::said).collect();
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(
+            said.first().is_some_and(
+                |line| line.contains("3 items") && line.contains("No space left on device")
+            ),
+            "{said:?}"
+        );
+        let raised: Vec<String> = conditions
+            .raised()
+            .iter()
+            .map(|condition| condition.check.clone())
+            .collect();
+        assert_eq!(raised, vec!["queue.blocked.No space left on device"]);
+    }
+
+    #[test]
+    fn one_item_blocked_by_something_is_still_named_by_its_own_name() {
+        // A single item blocked by something is that item's problem, and naming the
+        // cause instead would lose which download to look at.
+        let answers = sonarr(vec![queued(
+            "Only.Release",
+            "warning",
+            Some("Permission denied"),
+        )]);
+        let stopped = [("Only.Release".to_owned(), 40u8, false)];
+        let mut conditions = Conditions::new();
+        watched(&answers, &stopped, &mut conditions, "1000");
+        let reported = watched(&answers, &stopped, &mut conditions, "100000");
+        let said: Vec<String> = reported.stuck.iter().map(Stuck::said).collect();
+        assert!(
+            said.first()
+                .is_some_and(|line| line.starts_with("Only.Release")
+                    && line.ends_with(": Permission denied")),
+            "{said:?}"
+        );
+    }
+
+    #[test]
+    fn two_items_stopped_by_different_things_stay_two() {
+        // Grouping is about one cause, not about tidiness: two different faults are
+        // two things to fix, and folding them together would hide one of them.
+        let answers = sonarr(vec![
+            queued("First.Release", "warning", Some("No space left on device")),
+            queued("Second.Release", "warning", Some("Permission denied")),
+        ]);
+        let stopped = [
+            ("First.Release".to_owned(), 40u8, false),
+            ("Second.Release".to_owned(), 40u8, false),
+        ];
+        let mut conditions = Conditions::new();
+        watched(&answers, &stopped, &mut conditions, "1000");
+        let reported = watched(&answers, &stopped, &mut conditions, "100000");
+        assert_eq!(reported.stuck.len(), 2);
+    }
+
+    #[test]
+    fn an_item_fetched_over_and_over_is_reported_as_the_loop_it_is() {
+        // The category the model has always carried and nothing could reach: the
+        // count comes from the service's own history, and without it a loop reads
+        // as an ordinary download.
+        let answers = sonarr(vec![grabbed("Some.Release", "ok", None, 3)]);
+        let moving = [("Some.Release".to_owned(), 40u8, true)];
+        let mut conditions = Conditions::new();
+        watched(&answers, &moving, &mut conditions, "1000");
+        let reported = watched(&answers, &moving, &mut conditions, "100000");
+        assert_eq!(
+            reported
+                .stuck
+                .iter()
+                .map(|stuck| stuck.stall)
+                .collect::<Vec<_>>(),
+            vec![Stall::RedownloadLoop]
+        );
+    }
+
+    #[test]
+    fn an_item_fetched_once_is_not_a_loop() {
+        // Twice is a retry, which is a system working. The count has to come from
+        // somewhere real, or every download reads as a loop.
+        let answers = sonarr(vec![grabbed("Some.Release", "ok", None, 1)]);
+        let moving = [("Some.Release".to_owned(), 40u8, true)];
+        let mut conditions = Conditions::new();
+        watched(&answers, &moving, &mut conditions, "1000");
+        let reported = watched(&answers, &moving, &mut conditions, "100000");
+        assert!(reported
+            .stuck
+            .iter()
+            .all(|stuck| stuck.stall != Stall::RedownloadLoop));
     }
 }

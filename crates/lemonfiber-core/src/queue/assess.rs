@@ -10,6 +10,8 @@
 //! to the torrent when the problem is an import failing silently underneath.
 //! So the worst true thing wins, and the categories are checked in that order.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use serde::{Deserialize, Serialize};
 
 use super::{Item, Stall, Thresholds};
@@ -27,25 +29,45 @@ pub const REPEATED: u32 = 2;
 /// One thing that is wrong, and why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stuck {
-    /// Which item.
+    /// Which item — or, where several share one cause, that cause.
     pub name: String,
     /// What is wrong with it.
     pub stall: Stall,
     /// How long it has been that way, in seconds — what turns "stuck" into a
     /// sentence an operator can weigh.
     pub held_for: u64,
+    /// What the service said was blocking it, in its own words, where it said
+    /// anything. A permission denial from an import log is worth more than any
+    /// interpretation of it, and it is the difference between "stuck" and
+    /// something an operator can fix.
+    pub blocking: Option<String>,
+    /// How many items this stands for. One in the ordinary case; more where they
+    /// share a cause and the cause is what is wrong — twenty downloads stopped by
+    /// a full disk are one thing to fix, and twenty alerts about it are how an
+    /// operator learns to mute the queue check.
+    pub items: usize,
 }
 
 impl Stuck {
     /// The line an operator reads.
     #[must_use]
     pub fn said(&self) -> String {
-        format!(
-            "{} — {} for {}",
-            self.name,
-            self.stall.word(),
-            spoken(self.held_for)
-        )
+        let held = spoken(self.held_for);
+        let cause = self
+            .blocking
+            .as_deref()
+            .map(|cause| format!(": {cause}"))
+            .unwrap_or_default();
+        if self.items > 1 {
+            // The cause leads, because it is the thing to fix. Naming twenty items
+            // would bury the one sentence that matters.
+            return format!(
+                "{} items — {} for {held}{cause}",
+                self.items,
+                self.stall.word()
+            );
+        }
+        format!("{} — {} for {held}{cause}", self.name, self.stall.word())
     }
 }
 
@@ -83,6 +105,8 @@ pub fn assess(items: &[Item], thresholds: Thresholds) -> Vec<Stuck> {
                 name: item.name.clone(),
                 stall,
                 held_for: item.held_for.as_secs(),
+                blocking: item.cause.clone(),
+                items: 1,
             })
         })
         .collect();
@@ -94,7 +118,50 @@ pub fn assess(items: &[Item], thresholds: Thresholds) -> Vec<Stuck> {
             .then_with(|| right.held_for.cmp(&left.held_for))
             .then_with(|| left.name.cmp(&right.name))
     });
-    stuck
+    attributed(stuck)
+}
+
+/// Collapse the items sharing one blocking cause into that cause.
+///
+/// A full disk stops every download on the machine. Reporting it twenty times —
+/// once per item, each with the same sentence — buries the one thing to fix and
+/// teaches an operator to mute the check that would have told them. The cause is
+/// what is wrong; the items are how it showed.
+///
+/// Only where more than one item reports it. A single item blocked by something is
+/// that item's problem, and naming the cause instead of the item would lose which
+/// download to look at.
+#[must_use]
+pub fn attributed(stuck: Vec<Stuck>) -> Vec<Stuck> {
+    let mut sharing: BTreeMap<String, usize> = BTreeMap::new();
+    for entry in &stuck {
+        if let Some(cause) = entry.blocking.clone() {
+            *sharing.entry(cause).or_default() += 1;
+        }
+    }
+    let mut attributed: Vec<Stuck> = Vec::new();
+    let mut spoken_for: BTreeSet<String> = BTreeSet::new();
+    for entry in stuck {
+        let shared = entry
+            .blocking
+            .as_deref()
+            .filter(|cause| sharing.get(*cause).copied().unwrap_or(0) > 1)
+            .map(str::to_owned);
+        let Some(cause) = shared else {
+            attributed.push(entry);
+            continue;
+        };
+        // The first one carries the group: the list is already worst-first and
+        // longest-first, so the entry that leads is the worst and oldest of them.
+        if spoken_for.insert(cause.clone()) {
+            attributed.push(Stuck {
+                name: cause.clone(),
+                items: sharing.get(cause.as_str()).copied().unwrap_or(1),
+                ..entry
+            });
+        }
+    }
+    attributed
 }
 
 /// Which category an item falls in, before any question of how long.
@@ -343,8 +410,45 @@ mod tests {
             name: "Some.Release".to_owned(),
             stall: Stall::StalledDownload,
             held_for: 7 * 60 * 60,
+            blocking: None,
+            items: 1,
         };
         assert_eq!(stuck.said(), "Some.Release — not moving for 7 hours");
+    }
+
+    #[test]
+    fn an_item_whose_cause_the_service_named_says_it() {
+        // The difference between "stuck" and something an operator can fix, in the
+        // words of the thing that refused.
+        let stuck = Stuck {
+            name: "Some.Release".to_owned(),
+            stall: Stall::StalledDownload,
+            held_for: 7 * 60 * 60,
+            blocking: Some("No space left on device".to_owned()),
+            items: 1,
+        };
+        assert_eq!(
+            stuck.said(),
+            "Some.Release — not moving for 7 hours: No space left on device"
+        );
+    }
+
+    #[test]
+    fn a_cause_stopping_several_leads_with_the_cause_rather_than_an_item() {
+        // Twenty downloads stopped by a full disk are one thing to fix. Naming the
+        // items would bury the sentence that matters, and naming one of them would
+        // send the operator to a download to fix something that is not about it.
+        let stuck = Stuck {
+            name: "No space left on device".to_owned(),
+            stall: Stall::StalledDownload,
+            held_for: 7 * 60 * 60,
+            blocking: Some("No space left on device".to_owned()),
+            items: 20,
+        };
+        assert_eq!(
+            stuck.said(),
+            "20 items — not moving for 7 hours: No space left on device"
+        );
     }
 
     #[test]
@@ -408,6 +512,40 @@ mod tests {
         assert_eq!(
             immediate,
             vec![Stall::RedownloadLoop, Stall::RepeatedImportFailure]
+        );
+    }
+
+    #[test]
+    fn items_stopped_by_one_cause_are_assessed_as_that_cause() {
+        // The pure path, without a store: a full disk stops every download on the
+        // machine, and reporting it once per item buries the one thing to fix.
+        let blocked = |name: &str| Item {
+            cause: Some("No space left on device".to_owned()),
+            ..downloading(name, 40, false)
+        };
+        let assessed = assess(
+            &[blocked("First"), blocked("Second"), blocked("Third")],
+            Thresholds::conservative(),
+        );
+        assert_eq!(assessed.len(), 1, "{assessed:?}");
+        assert_eq!(
+            assessed
+                .first()
+                .map(|stuck| (stuck.name.clone(), stuck.items)),
+            Some(("No space left on device".to_owned(), 3))
+        );
+    }
+
+    #[test]
+    fn one_item_with_a_cause_keeps_its_own_name() {
+        let alone = Item {
+            cause: Some("Permission denied".to_owned()),
+            ..downloading("Only.Release", 40, false)
+        };
+        let assessed = assess(&[alone], Thresholds::conservative());
+        assert_eq!(
+            assessed.first().map(|stuck| stuck.name.clone()),
+            Some("Only.Release".to_owned())
         );
     }
 }

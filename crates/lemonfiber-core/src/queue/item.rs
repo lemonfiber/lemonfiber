@@ -54,6 +54,11 @@ pub struct Item {
     /// How many times this same item has been fetched. More than once is the
     /// signal that something is retrying an import that keeps failing.
     pub grabs: u32,
+    /// What the service said was blocking it, in its own words, where it said
+    /// anything. Carried verbatim: a permission denial from an import log is worth
+    /// more than any interpretation of it, and where several items report the same
+    /// one it is the cause rather than the items that is wrong.
+    pub cause: Option<String>,
     /// The operator said to leave this one alone. Nothing is reported about it,
     /// whatever it is doing — a queue check that keeps flagging something already
     /// judged is a check that gets muted.
@@ -70,6 +75,7 @@ impl Item {
             importing: None,
             held_for: Duration::ZERO,
             grabs: 1,
+            cause: None,
             unmanaged: false,
         }
     }
