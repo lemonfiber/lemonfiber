@@ -264,10 +264,7 @@ fn shipped_recyclarr(source: Source) -> Option<&'static [u8]> {
 /// differs is preserved rather than overwritten — the safe direction when what was
 /// written cannot be recalled.
 fn load(record_path: Option<&Path>) -> Materialised {
-    record_path
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+    super::record::kept(record_path)
 }
 
 /// Write the record where the next run will read it. Best-effort, like the stack it

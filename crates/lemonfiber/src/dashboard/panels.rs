@@ -21,6 +21,7 @@ use lemonfiber_core::dashboard::{
 };
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;
+use lemonfiber_core::text::plain;
 use lemonfiber_core::walkthrough::{size, spell_out};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -80,9 +81,9 @@ pub(super) fn vpn(panel: Option<&Panel<Vpn>>) -> Vec<Line<'static>> {
     );
     vec![
         Line::from(vec![
-            Span::raw(vpn.exit_ip.clone()),
+            Span::raw(plain(&vpn.exit_ip)),
             Span::raw("  "),
-            Span::raw(vpn.country.clone()),
+            Span::raw(plain(&vpn.country)),
         ]),
         Line::from(vec![
             // The one line that matters: a tunnel being up says nothing about
@@ -120,7 +121,9 @@ pub(super) fn transfers(panel: &Panel<Vec<Transfer>>) -> Vec<Line<'static>> {
                     |left| Span::raw(format!("~{}", spell_out(left))),
                 ),
                 Span::raw("  "),
-                Span::raw(transfer.name.clone()),
+                // From an indexer by way of a download client: a terminal reads a
+                // control character in the middle of it as an instruction.
+                Span::raw(plain(&transfer.name)),
             ])
         })
         .collect();
@@ -166,7 +169,7 @@ pub(super) fn queues(panel: &Panel<Vec<Queue>>) -> Vec<Line<'static>> {
                 Span::raw(format!("{} stuck", queue.stuck))
             };
             Line::from(vec![
-                Span::raw(format!("{:<12}", queue.service)),
+                Span::raw(format!("{:<12}", plain(&queue.service))),
                 Span::raw(format!("{:>4} queued  ", queue.depth)),
                 stuck,
             ])
@@ -219,7 +222,7 @@ pub(super) fn services(panel: &Panel<Vec<Service>>) -> Vec<Line<'static>> {
         .take(SHOWN)
         .map(|service| {
             Line::from(vec![
-                Span::raw(format!("{:<14}", service.id)),
+                Span::raw(format!("{:<14}", plain(&service.id))),
                 Span::raw(format!("{:?}", service.state).to_lowercase()),
             ])
         })
@@ -252,7 +255,12 @@ fn rest(total: usize, noun: &str) -> Option<Line<'static>> {
 /// One panel, one source. A panel that could not be filled marks itself and
 /// leaves the rest of the screen live.
 fn unavailable(reason: &str) -> Vec<Line<'static>> {
-    vec![Line::styled(format!("unavailable — {reason}"), quiet())]
+    // The reason commonly quotes what a service said, which is text from
+    // somewhere else on its way to a terminal.
+    vec![Line::styled(
+        format!("unavailable — {}", plain(reason)),
+        quiet(),
+    )]
 }
 
 /// Whether any panel in this snapshot could not be filled.
@@ -587,5 +595,24 @@ mod tests {
         assert!(lines
             .first()
             .is_some_and(|line| line.contains("sonarr") && line.contains("running")));
+    }
+
+    #[test]
+    fn a_release_name_from_an_indexer_cannot_take_over_the_screen() {
+        // Every name on this screen came from somewhere else. A terminal reads a
+        // control character in the middle of one as an instruction, and the result
+        // is a screen that no longer says what this product said.
+        let named = transfer("Some\u{1b}[2JRelease", Reading::Known(1_000_000));
+        let lines = said(&transfers(&Panel::Ready(vec![named])));
+        assert!(
+            lines.first().is_some_and(|line| !line.contains('\u{1b}')),
+            "{lines:?}"
+        );
+        assert!(
+            lines
+                .first()
+                .is_some_and(|line| line.contains("Some[2JRelease")),
+            "and the name it leaves is still the name: {lines:?}"
+        );
     }
 }

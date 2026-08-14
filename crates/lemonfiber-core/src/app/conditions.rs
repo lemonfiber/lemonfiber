@@ -16,7 +16,6 @@
 //! command over.
 
 use crate::condition::Conditions;
-use crate::config::store;
 
 use super::Ctx;
 
@@ -28,20 +27,15 @@ use super::Ctx;
 /// faults read as new, which the next run corrects on its own.
 #[must_use]
 pub fn load(ctx: &Ctx) -> Conditions {
-    path(ctx)
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+    super::record::kept(path(ctx).as_deref())
 }
 
 /// Write the store where the next run will read it.
 pub fn save(ctx: &Ctx, conditions: &Conditions) {
-    if let Some(path) = path(ctx) {
-        let _ = store::write(
-            &path,
-            &serde_json::to_string(conditions).unwrap_or_default(),
-        );
-    }
+    // Best effort on the way out, unlike the records an operator decided: a
+    // refresh that could not write its history is one the next refresh starts
+    // afresh from, which is a worse picture rather than a wrong claim.
+    let _ = super::record::keep(path(ctx).as_deref(), conditions);
 }
 
 /// Where the store is kept: beside the environment file, or nowhere on a machine

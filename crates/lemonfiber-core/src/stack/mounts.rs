@@ -29,7 +29,7 @@ const DATA_ROOT: &str = "DATA_ROOT";
 
 /// One service that would see more than one mount beneath the data root.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Crowded {
+pub(crate) struct Crowded {
     /// The service as the compose file names it.
     pub service: String,
     /// The mounts it would get, in the order they were declared.
@@ -56,7 +56,7 @@ impl std::fmt::Display for Crowded {
 /// Given every compose file at once: a service's mounts are what it declares plus
 /// whatever it extends, and the two are commonly in different files.
 #[must_use]
-pub fn crowded(files: &[(PathBuf, String)]) -> Vec<Crowded> {
+pub(crate) fn crowded(files: &[(PathBuf, String)]) -> Vec<Crowded> {
     let declared = declarations(files);
     let mut crowded: Vec<Crowded> = Vec::new();
     for key in declared.keys() {

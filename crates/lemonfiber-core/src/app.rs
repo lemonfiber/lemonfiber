@@ -37,6 +37,7 @@ mod music;
 mod notify;
 mod quality;
 pub mod queue;
+mod record;
 pub mod recover;
 mod reset;
 pub mod restore;

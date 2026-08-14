@@ -21,10 +21,9 @@
 
 use std::path::PathBuf;
 
-use crate::config::store;
 use crate::doctor::acknowledged::{suppressing, Accepted};
 use crate::doctor::Verdict;
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Code, Problem, Remedy, Severity};
 use crate::model::DoctorReport;
 
 use super::Ctx;
@@ -34,11 +33,8 @@ const NOT_WARNED: Code = Code::new("ACK-1");
 
 /// What the operator has answered, or nothing where they have answered nothing.
 #[must_use]
-pub fn load(ctx: &Ctx) -> Accepted {
-    path(ctx)
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+pub(crate) fn load(ctx: &Ctx) -> Accepted {
+    super::record::kept(path(ctx).as_deref())
 }
 
 /// Record it where the next run will find it.
@@ -46,10 +42,8 @@ pub fn load(ctx: &Ctx) -> Accepted {
 /// # Errors
 ///
 /// Where there is nowhere configured to keep it, or the file cannot be written.
-pub fn save(ctx: &Ctx, accepted: &Accepted) -> Result<(), Box<Problem>> {
-    let path = path(ctx).ok_or_else(|| Box::new(store::Failure::Nowhere.problem()))?;
-    store::write(&path, &serde_json::to_string(accepted).unwrap_or_default())
-        .map_err(|failure| Box::new(failure.problem()))
+pub(crate) fn save(ctx: &Ctx, accepted: &Accepted) -> Result<(), Box<Problem>> {
+    super::record::keep(path(ctx).as_deref(), accepted)
 }
 
 /// Where the record is kept: beside the environment file, or nowhere on a machine
@@ -71,7 +65,7 @@ fn path(ctx: &Ctx) -> Option<PathBuf> {
 ///
 /// Where the named check is not warning in this report, or the answer cannot be
 /// written down.
-pub fn acknowledge(
+pub(crate) fn acknowledge(
     ctx: &Ctx,
     accept: Option<&str>,
     report: DoctorReport,
