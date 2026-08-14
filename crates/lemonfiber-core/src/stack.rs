@@ -211,9 +211,16 @@ fn on_disk(directory: &Path) -> Vec<(PathBuf, String)> {
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() {
+            // The entry's own type, which does not follow a link. A stack
+            // directory holding a link back to an ancestor would otherwise be
+            // walked for ever — and this runs on every command, so it would hang
+            // the whole tool over one symlink an operator is entitled to make.
+            // A compose file reachable only through a link is not read, which is
+            // the safe direction: this under-reports rather than never returning.
+            let kind = entry.file_type();
+            if kind.as_ref().is_ok_and(std::fs::FileType::is_dir) {
                 pending.push(path);
-            } else if is_compose(&path) {
+            } else if kind.is_ok_and(|kind| kind.is_file()) && is_compose(&path) {
                 if let Ok(text) = std::fs::read_to_string(&path) {
                     files.push((path, text));
                 }
@@ -648,6 +655,26 @@ mod tests {
         let said = refusal(Source::External(path));
         assert!(said.contains("sonarr"), "{said}");
         assert!(said.contains("copied rather than hardlinked"), "{said}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_link_back_to_an_ancestor_is_not_walked_into() {
+        // A stack directory is the operator's own, and a link inside it is theirs
+        // to make. Following one back to an ancestor would walk for ever, on every
+        // command — so the entry's own type decides, and a link is not a directory.
+        let dir = std::env::temp_dir().join(format!("lemonfiber-loop-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let inner = dir.join("compose");
+        assert!(std::fs::create_dir_all(&inner).is_ok());
+        assert!(std::fs::write(inner.join("tv.yml"), "services: {}\n").is_ok());
+        // Where the platform makes one cheaply. Its absence changes no branch: the
+        // walk reads the entry's type either way.
+        #[cfg(unix)]
+        let _ = std::os::unix::fs::symlink(&dir, inner.join("back"));
+
+        let read = super::on_disk(&dir);
+        assert_eq!(read.len(), 1, "the real file, once: {read:?}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
