@@ -52,6 +52,43 @@ pub(crate) trait Surface {
     ) -> Box<dyn core_setup::Prompt>;
 }
 
+/// Where to send an operator whose machine is already set up, for a run nobody is
+/// watching.
+///
+/// The words rather than the printing, so what a bare run says is proven here and
+/// only the act of saying it happens at the edge.
+pub(crate) fn already_set_up() -> Vec<String> {
+    vec![
+        format!("{PRODUCT} is already set up on this machine."),
+        format!("  · change a setting with `{PRODUCT} config set <key> <value>`"),
+        format!("  · start the stack with `{PRODUCT} up`"),
+        format!("  · see everything with `{PRODUCT} --help`"),
+    ]
+}
+
+/// What a bare run on a machine that is already set up does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Bare {
+    /// Open the dashboard — what a bare invocation means when somebody is watching.
+    Dashboard,
+    /// Say where to go next, for a run nobody is watching.
+    Guidance,
+}
+
+/// Which of the two a bare run on a configured machine is.
+///
+/// The dashboard holds the terminal until somebody leaves it, which is right in
+/// front of a person and wrong in a pipe, a cron line or a CI step — there it
+/// would draw to nothing and never return. So the one case that cannot be tested
+/// (a real terminal) is reached through a decision that can be.
+pub(crate) const fn bare_run(interactive: bool) -> Bare {
+    if interactive {
+        Bare::Dashboard
+    } else {
+        Bare::Guidance
+    }
+}
+
 /// The greeting itself, once there is somewhere to keep files and something to
 /// hold the conversation across.
 pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> ExitCode {
@@ -71,13 +108,8 @@ pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> 
 
     if !offer_setup(paths.env_file().exists()) {
         // Already set up: setup would walk a done machine back to its first
-        // question. Reconfiguration and starting are what a bare run wants instead —
-        // and this is guidance, not a misuse, so it leaves with success.
-        println!("{PRODUCT} is already set up on this machine.");
-        println!("  · change a setting with `{PRODUCT} config set <key> <value>`");
-        println!("  · start the stack with `{PRODUCT} up`");
-        println!("  · see everything with `{PRODUCT} --help`");
-        return ExitCode::SUCCESS;
+        // question, so a bare run does the other thing it could mean.
+        return crate::terminal::configured(ctx, bare_run(surface.interactive())).await;
     }
 
     println!("No configuration found.");
@@ -292,8 +324,8 @@ pub(crate) mod tests {
     use tokio::sync::mpsc::Receiver;
 
     use super::{
-        confirm_setup, default_data_location, greeting, setting_up, stamp, Ctx, Environment,
-        PathBuf, Paths, SetupFlags, Surface,
+        already_set_up, bare_run, confirm_setup, default_data_location, greeting, setting_up,
+        stamp, Bare, Ctx, Environment, PathBuf, Paths, SetupFlags, Surface,
     };
 
     /// A surface that answers from a script and says whether anyone is there.
@@ -535,12 +567,35 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn a_configured_machine_is_pointed_at_its_settings_rather_than_setup() {
+    async fn a_configured_machine_nobody_is_watching_is_pointed_at_its_settings() {
+        // A pipe, a cron line or a CI step: the dashboard would draw to nothing and
+        // never return, so what a bare run can still usefully do is say where to go.
         let paths = scratch("configured");
         let _ = paths.env_file().parent().map(std::fs::create_dir_all);
         let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
-        let code = greeting(ctx(), &paths, &Scripted::saying(true, &[])).await;
+        let code = greeting(ctx(), &paths, &Scripted::saying(false, &[])).await;
         assert_eq!(shown(code), success());
+    }
+
+    #[test]
+    fn a_run_nobody_is_watching_is_told_where_to_go_next() {
+        // Three ways on rather than a refusal: this is guidance, not a misuse.
+        let said = already_set_up();
+        assert!(said
+            .first()
+            .is_some_and(|line| line.contains("already set up")));
+        assert!(said.iter().any(|line| line.contains("config set")));
+        assert!(said.iter().any(|line| line.contains(" up`")));
+        assert!(said.iter().any(|line| line.contains("--help")));
+    }
+
+    #[test]
+    fn a_bare_run_in_front_of_a_person_opens_the_dashboard() {
+        // What a bare invocation *is* on a machine that is already set up. The
+        // terminal it then takes is the one thing no test can stand in for, which
+        // is why the decision to take it is its own.
+        assert_eq!(bare_run(true), Bare::Dashboard);
+        assert_eq!(bare_run(false), Bare::Guidance);
     }
 
     #[tokio::test]
