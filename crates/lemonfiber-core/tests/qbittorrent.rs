@@ -6,71 +6,16 @@
 //! another, so it is exercised from here rather than from a `#[cfg(test)]` module,
 //! where async-trait code is compiled twice and its coverage counted wrong.
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+mod common;
 
-use async_trait::async_trait;
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use common::{Answer, Fake};
+use std::sync::Arc;
+
+use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::Failure;
 use lemonfiber_core::qbittorrent::{temporary_password, Qbittorrent};
 use lemonfiber_core::seed::{wire_qbittorrent_password, State};
-
-/// One scripted answer from the fake transport.
-enum Answer {
-    /// A response with this status and body.
-    Reply(u16, &'static str),
-    /// Nothing answered.
-    Silent,
-}
-
-/// A transport that answers from a queue, one reply per call, keeping every
-/// request it was sent.
-struct Fake {
-    replies: Mutex<VecDeque<Answer>>,
-    seen: Mutex<Vec<Request>>,
-}
-
-impl Fake {
-    fn new(replies: Vec<Answer>) -> Arc<Self> {
-        Arc::new(Self {
-            replies: Mutex::new(replies.into()),
-            seen: Mutex::new(Vec::new()),
-        })
-    }
-
-    fn requests(&self) -> Vec<Request> {
-        self.seen
-            .lock()
-            .map(|seen| seen.clone())
-            .unwrap_or_default()
-    }
-}
-
-#[async_trait]
-impl Http for Fake {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.push(request.clone());
-        }
-        let answer = self
-            .replies
-            .lock()
-            .ok()
-            .and_then(|mut replies| replies.pop_front());
-        match answer {
-            Some(Answer::Reply(status, body)) => Ok(Response {
-                status,
-                body: body.to_owned(),
-            }),
-            _ => Err(Unreachable {
-                url: request.url.clone(),
-                reason: "connection refused".to_owned(),
-                attempts: 1,
-            }),
-        }
-    }
-}
 
 fn qbittorrent(fake: &Arc<Fake>) -> Qbittorrent {
     let http: Arc<dyn Http> = fake.clone();
@@ -78,7 +23,10 @@ fn qbittorrent(fake: &Arc<Fake>) -> Qbittorrent {
 }
 
 /// The login answer qBittorrent gives when the password was right.
-const OK: Answer = Answer::Reply(200, "Ok.");
+/// What qBittorrent answers a write it accepted.
+fn ok() -> Answer {
+    Answer::reply(200, "Ok.")
+}
 
 #[test]
 fn the_temporary_password_is_read_from_the_log() {
@@ -122,7 +70,7 @@ fn a_log_without_the_announcement_has_no_password() {
 
 #[tokio::test]
 async fn replacing_the_password_authenticates_sets_and_confirms() {
-    let fake = Fake::new(vec![OK, Answer::Reply(200, ""), OK]);
+    let fake = Fake::in_turn(vec![ok(), Answer::reply(200, ""), ok()]);
     let outcome = qbittorrent(&fake)
         .replace_password("tempword", "freshword")
         .await;
@@ -162,7 +110,7 @@ async fn replacing_the_password_authenticates_sets_and_confirms() {
 
 #[tokio::test]
 async fn a_wrong_current_password_is_unauthorised() {
-    let fake = Fake::new(vec![Answer::Reply(200, "Fails.")]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, "Fails.")]);
     assert!(matches!(
         qbittorrent(&fake)
             .replace_password("wrongword", "freshword")
@@ -173,7 +121,7 @@ async fn a_wrong_current_password_is_unauthorised() {
 
 #[tokio::test]
 async fn a_login_ban_is_unauthorised() {
-    let fake = Fake::new(vec![Answer::Reply(403, "")]);
+    let fake = Fake::in_turn(vec![Answer::reply(403, "")]);
     assert!(matches!(
         qbittorrent(&fake)
             .replace_password("tempword", "freshword")
@@ -186,7 +134,7 @@ async fn a_login_ban_is_unauthorised() {
 async fn a_login_that_answers_unexpectedly_is_refused() {
     // Not a wrong password and not a ban — an answer lemonfiber does not
     // recognise, carried through with its status rather than guessed at.
-    let fake = Fake::new(vec![Answer::Reply(500, "")]);
+    let fake = Fake::in_turn(vec![Answer::reply(500, "")]);
     let detail = match qbittorrent(&fake)
         .replace_password("tempword", "freshword")
         .await
@@ -201,7 +149,7 @@ async fn a_login_that_answers_unexpectedly_is_refused() {
 async fn a_change_refused_as_unauthorised_is_unauthorised() {
     // The set itself can be refused for want of authorisation — a 403 there is a
     // rejected credential, not an unrecognised answer.
-    let fake = Fake::new(vec![OK, Answer::Reply(403, "")]);
+    let fake = Fake::in_turn(vec![ok(), Answer::reply(403, "")]);
     assert!(matches!(
         qbittorrent(&fake)
             .replace_password("tempword", "freshword")
@@ -212,7 +160,7 @@ async fn a_change_refused_as_unauthorised_is_unauthorised() {
 
 #[tokio::test]
 async fn a_refused_change_carries_the_services_own_words() {
-    let fake = Fake::new(vec![OK, Answer::Reply(500, "internal error")]);
+    let fake = Fake::in_turn(vec![ok(), Answer::reply(500, "internal error")]);
     let detail = match qbittorrent(&fake)
         .replace_password("tempword", "freshword")
         .await
@@ -230,10 +178,10 @@ async fn a_refused_change_carries_the_services_own_words() {
 async fn a_change_that_does_not_take_is_caught_by_the_confirming_login() {
     // The set was accepted but the new password does not authenticate, so it did
     // not land — caught by the confirming login rather than called done.
-    let fake = Fake::new(vec![
-        OK,
-        Answer::Reply(200, ""),
-        Answer::Reply(200, "Fails."),
+    let fake = Fake::in_turn(vec![
+        ok(),
+        Answer::reply(200, ""),
+        Answer::reply(200, "Fails."),
     ]);
     assert!(matches!(
         qbittorrent(&fake)
@@ -245,7 +193,7 @@ async fn a_change_that_does_not_take_is_caught_by_the_confirming_login() {
 
 #[tokio::test]
 async fn a_qbittorrent_that_is_not_answering_is_unavailable() {
-    let fake = Fake::new(vec![Answer::Silent]);
+    let fake = Fake::in_turn(vec![Answer::Silent]);
     assert!(matches!(
         qbittorrent(&fake)
             .replace_password("tempword", "freshword")
@@ -268,7 +216,7 @@ impl Random for FixedRandom {
 #[tokio::test]
 async fn a_generated_password_is_set_confirmed_and_handed_back() {
     // Login, set, and the confirming login all succeed.
-    let fake = Fake::new(vec![OK, Answer::Reply(200, ""), OK]);
+    let fake = Fake::in_turn(vec![ok(), Answer::reply(200, ""), ok()]);
     let random = FixedRandom(Some(vec![0x11; 24]));
 
     let (wiring, recorded) =
@@ -295,7 +243,7 @@ async fn a_generated_password_is_set_confirmed_and_handed_back() {
 async fn without_randomness_the_password_is_not_set() {
     // Nothing to set, so the client is never even called — and nothing is handed
     // back to record.
-    let fake = Fake::new(Vec::new());
+    let fake = Fake::in_turn(Vec::new());
     let random = FixedRandom(None);
 
     let (wiring, recorded) =
@@ -311,7 +259,7 @@ async fn without_randomness_the_password_is_not_set() {
 
 #[tokio::test]
 async fn a_rejected_current_password_fails_and_records_nothing() {
-    let fake = Fake::new(vec![Answer::Reply(200, "Fails.")]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, "Fails.")]);
     let random = FixedRandom(Some(vec![0x11; 24]));
 
     let (wiring, recorded) =

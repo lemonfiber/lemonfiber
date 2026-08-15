@@ -8,65 +8,19 @@
 //! `#[cfg(test)]` module, where async-trait code is compiled twice and its
 //! coverage counted from the wrong copy.
 
+mod common;
+
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use common::{Answer, Fake};
 use lemonfiber_core::doctor::credentials::{CredentialsCheck, Target, CREDENTIAL_REJECTED};
 use lemonfiber_core::doctor::{Category, Check, Verdict};
 use lemonfiber_core::error::Severity;
 use lemonfiber_core::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
 };
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
-
-/// How the fake transport answers a request whose URL carries a given marker.
-enum Answer {
-    /// A response with this status and body.
-    Reply(u16, &'static str),
-    /// Nothing answered.
-    Silent,
-}
-
-/// A transport routed by a substring of the request URL, so two services can be
-/// made to answer differently in the same run.
-struct FakeHttp {
-    routes: Vec<(&'static str, Answer)>,
-    seen: Mutex<Vec<Request>>,
-}
-
-impl FakeHttp {
-    fn new(routes: Vec<(&'static str, Answer)>) -> Arc<Self> {
-        Arc::new(Self {
-            routes,
-            seen: Mutex::new(Vec::new()),
-        })
-    }
-}
-
-#[async_trait]
-impl Http for FakeHttp {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Ok(mut guard) = self.seen.lock() {
-            guard.push(request.clone());
-        }
-        let answer = self
-            .routes
-            .iter()
-            .find(|(marker, _)| request.url.contains(marker));
-        match answer {
-            Some((_, Answer::Reply(status, body))) => Ok(Response {
-                status: *status,
-                body: (*body).to_owned(),
-            }),
-            _ => Err(Unreachable {
-                url: request.url.clone(),
-                reason: "connection refused".to_owned(),
-                attempts: 1,
-            }),
-        }
-    }
-}
 
 /// A filesystem that hands back the config text a test placed at a path, and
 /// nothing for any other. Only `read` is meaningful; the rest are unused here.
@@ -135,7 +89,7 @@ fn sonarr(config: &Path) -> Target {
 }
 
 /// Run the check over one target with the given filesystem and transport.
-async fn only(target: Target, fs: Arc<FakeFs>, http: Arc<FakeHttp>) -> Verdict {
+async fn only(target: Target, fs: Arc<FakeFs>, http: Arc<Fake>) -> Verdict {
     let check = CredentialsCheck::new(http, fs, vec![target]);
     let mut findings = check.run().await;
     findings.pop().map_or(
@@ -150,7 +104,7 @@ async fn only(target: Target, fs: Arc<FakeFs>, http: Arc<FakeHttp>) -> Verdict {
 async fn a_proven_credential_names_the_service_and_its_version() {
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = FakeHttp::new(vec![("8989", Answer::Reply(200, SONARR_STATUS))]);
+    let http = Fake::by_path(vec![("8989", Answer::reply(200, SONARR_STATUS))]);
 
     let verdict = only(sonarr(&config), fs, http).await;
     assert_eq!(
@@ -166,7 +120,7 @@ async fn a_proven_credential_names_the_service_and_its_version() {
 async fn a_service_that_refuses_its_own_key_is_a_failure() {
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = FakeHttp::new(vec![("8989", Answer::Reply(401, ""))]);
+    let http = Fake::by_path(vec![("8989", Answer::reply(401, ""))]);
 
     let problem = match only(sonarr(&config), fs, http).await {
         Verdict::Fail(problem) => Some(problem),
@@ -186,7 +140,7 @@ async fn a_service_that_does_not_answer_is_unverified_rather_than_failed() {
     // fault either: the honest verdict is that it could not be established.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = FakeHttp::new(vec![("8989", Answer::Silent)]);
+    let http = Fake::by_path(vec![("8989", Answer::Silent)]);
 
     assert!(matches!(
         only(sonarr(&config), fs, http).await,
@@ -198,7 +152,7 @@ async fn a_service_that_does_not_answer_is_unverified_rather_than_failed() {
 async fn a_service_answering_unusably_carries_its_own_words() {
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = FakeHttp::new(vec![("8989", Answer::Reply(500, "database is locked"))]);
+    let http = Fake::by_path(vec![("8989", Answer::reply(500, "database is locked"))]);
 
     let reason = match only(sonarr(&config), fs, http).await {
         Verdict::Unverified { reason, .. } => Some(reason),
@@ -217,7 +171,7 @@ async fn a_service_on_an_unsupported_api_version_is_unverified_with_that_reason(
     // be proven through it — unverified, pointed at aligning the versions.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = FakeHttp::new(vec![("8989", Answer::Reply(404, ""))]);
+    let http = Fake::by_path(vec![("8989", Answer::reply(404, ""))]);
 
     let reason = match only(sonarr(&config), fs, http).await {
         Verdict::Unverified { reason, .. } => Some(reason),
@@ -234,7 +188,7 @@ async fn a_service_with_no_config_file_yet_is_skipped() {
     // The file is not there because the service has not finished first start.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     let fs = FakeFs::with(Vec::new());
-    let http = FakeHttp::new(vec![("8989", Answer::Reply(200, SONARR_STATUS))]);
+    let http = Fake::by_path(vec![("8989", Answer::reply(200, SONARR_STATUS))]);
 
     assert!(matches!(
         only(sonarr(&config), fs, http).await,
@@ -247,7 +201,7 @@ async fn a_service_whose_key_is_not_generated_yet_is_skipped() {
     // The config exists but the key element is still empty mid-first-start.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     let fs = FakeFs::with(vec![(config.clone(), "<Config><ApiKey></ApiKey></Config>")]);
-    let http = FakeHttp::new(vec![("8989", Answer::Reply(200, SONARR_STATUS))]);
+    let http = Fake::by_path(vec![("8989", Answer::reply(200, SONARR_STATUS))]);
 
     assert!(matches!(
         only(sonarr(&config), fs, http).await,
@@ -265,8 +219,8 @@ async fn each_service_is_reported_independently() {
         (sonarr_config.clone(), CONFIG_WITH_KEY),
         (radarr_config.clone(), CONFIG_WITH_KEY),
     ]);
-    let http = FakeHttp::new(vec![
-        ("8989", Answer::Reply(200, SONARR_STATUS)),
+    let http = Fake::by_path(vec![
+        ("8989", Answer::reply(200, SONARR_STATUS)),
         ("7878", Answer::Silent),
     ]);
     let radarr = Target {
@@ -300,7 +254,7 @@ async fn each_service_is_reported_independently() {
 #[tokio::test]
 async fn nothing_to_prove_produces_no_findings() {
     let fs = FakeFs::with(Vec::new());
-    let http = FakeHttp::new(Vec::new());
+    let http = Fake::by_path(Vec::new());
     let check = CredentialsCheck::new(http, fs, Vec::new());
     assert!(check.run().await.is_empty());
 }
@@ -308,7 +262,7 @@ async fn nothing_to_prove_produces_no_findings() {
 #[tokio::test]
 async fn the_check_belongs_to_the_credentials_category() {
     let fs = FakeFs::with(Vec::new());
-    let http = FakeHttp::new(Vec::new());
+    let http = Fake::by_path(Vec::new());
     let check = CredentialsCheck::new(http, fs, Vec::new());
     assert_eq!(check.category(), Category::Credentials);
 }
@@ -319,13 +273,13 @@ async fn the_credential_never_appears_in_a_finding() {
     // authenticated the request must not be anywhere in what is shown.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
     for answer in [
-        Answer::Reply(200, SONARR_STATUS),
-        Answer::Reply(401, ""),
-        Answer::Reply(500, "database is locked"),
+        Answer::reply(200, SONARR_STATUS),
+        Answer::reply(401, ""),
+        Answer::reply(500, "database is locked"),
         Answer::Silent,
     ] {
         let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
-        let http = FakeHttp::new(vec![("8989", answer)]);
+        let http = Fake::by_path(vec![("8989", answer)]);
         let check = CredentialsCheck::new(http, fs, vec![sonarr(&config)]);
         let rendered = serde_json::to_string(&check.run().await).unwrap_or_default();
         assert!(

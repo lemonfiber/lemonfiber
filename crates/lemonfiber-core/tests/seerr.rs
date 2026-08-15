@@ -7,77 +7,14 @@
 //! The client speaks an async trait built on another, so it is driven from here
 //! rather than in-crate.
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+mod common;
 
-use async_trait::async_trait;
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use common::{Answer, Fake};
+use std::sync::Arc;
+
+use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::service::{Failure, Requests};
 use lemonfiber_core::seerr::Seerr;
-
-/// A transport that answers from a queue and remembers every request.
-struct Fake {
-    replies: Mutex<VecDeque<(u16, &'static str)>>,
-    seen: Mutex<Vec<Request>>,
-    silent: bool,
-}
-
-impl Fake {
-    fn replying(replies: Vec<(u16, &'static str)>) -> Arc<Self> {
-        Arc::new(Self {
-            replies: Mutex::new(replies.into()),
-            seen: Mutex::new(Vec::new()),
-            silent: false,
-        })
-    }
-
-    fn silent() -> Arc<Self> {
-        Arc::new(Self {
-            replies: Mutex::new(VecDeque::new()),
-            seen: Mutex::new(Vec::new()),
-            silent: true,
-        })
-    }
-
-    fn requests(&self) -> Vec<Request> {
-        self.seen
-            .lock()
-            .map(|seen| seen.clone())
-            .unwrap_or_default()
-    }
-}
-
-#[async_trait]
-impl Http for Fake {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.push(request.clone());
-        }
-        if self.silent {
-            return Err(Unreachable {
-                url: request.url.clone(),
-                reason: "connection refused".to_owned(),
-                attempts: 1,
-            });
-        }
-        match self
-            .replies
-            .lock()
-            .ok()
-            .and_then(|mut replies| replies.pop_front())
-        {
-            Some((status, body)) => Ok(Response {
-                status,
-                body: body.to_owned(),
-            }),
-            None => Err(Unreachable {
-                url: request.url.clone(),
-                reason: "nothing scripted".to_owned(),
-                attempts: 1,
-            }),
-        }
-    }
-}
 
 fn seerr(fake: &Arc<Fake>) -> Seerr {
     let http: Arc<dyn Http> = fake.clone();
@@ -93,7 +30,7 @@ async fn configure(fake: &Arc<Fake>) -> Result<(), Failure> {
 
 #[tokio::test]
 async fn an_initialised_seerr_is_reported() {
-    let fake = Fake::replying(vec![(200, r#"{"initialized":true}"#)]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"initialized":true}"#)]);
     assert_eq!(seerr(&fake).initialized().await.ok(), Some(true));
     assert!(fake
         .requests()
@@ -103,16 +40,16 @@ async fn an_initialised_seerr_is_reported() {
 
 #[tokio::test]
 async fn an_uninitialised_or_unstated_seerr_reads_as_not_done() {
-    let fake = Fake::replying(vec![(200, r#"{"initialized":false}"#)]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"initialized":false}"#)]);
     assert_eq!(seerr(&fake).initialized().await.ok(), Some(false));
     // A response that omits the field is a Seerr too fresh to have set it.
-    let bare = Fake::replying(vec![(200, "{}")]);
+    let bare = Fake::in_turn(vec![Answer::reply(200, "{}")]);
     assert_eq!(seerr(&bare).initialized().await.ok(), Some(false));
 }
 
 #[tokio::test]
 async fn an_unreadable_public_settings_is_refused() {
-    let fake = Fake::replying(vec![(200, "not json")]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, "not json")]);
     assert!(matches!(
         seerr(&fake).initialized().await,
         Err(Failure::Refused { .. })
@@ -130,7 +67,7 @@ async fn an_unreachable_seerr_is_unavailable_on_the_read() {
 
 #[tokio::test]
 async fn configuring_identity_signs_in_through_jellyfin_then_finishes_setup() {
-    let fake = Fake::replying(vec![(200, ""), (204, "")]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
     assert!(configure(&fake).await.is_ok());
 
     let requests = fake.requests();
@@ -164,7 +101,7 @@ async fn configuring_identity_signs_in_through_jellyfin_then_finishes_setup() {
 
 #[tokio::test]
 async fn a_rejected_sign_in_is_refused_and_setup_is_not_finished() {
-    let fake = Fake::replying(vec![(500, "credentials rejected")]);
+    let fake = Fake::in_turn(vec![Answer::reply(500, "credentials rejected")]);
     assert!(matches!(
         configure(&fake).await,
         Err(Failure::Refused { .. })
@@ -175,7 +112,7 @@ async fn a_rejected_sign_in_is_refused_and_setup_is_not_finished() {
 
 #[tokio::test]
 async fn a_rejected_finish_is_refused() {
-    let fake = Fake::replying(vec![(200, ""), (500, "boom")]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(500, "boom")]);
     assert!(matches!(
         configure(&fake).await,
         Err(Failure::Refused { .. })
@@ -195,7 +132,7 @@ async fn an_unreachable_seerr_is_unavailable_on_the_sign_in() {
 async fn signing_in_opens_a_session_without_finishing_setup() {
     // The read path signs in only: finishing setup is somebody else's business, and a
     // read must never complete a household's configuration as a side effect.
-    let fake = Fake::replying(vec![(200, "")]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
     assert!(seerr(&fake)
         .sign_in("admin", "secret", "http://jellyfin:8096")
         .await
@@ -220,7 +157,7 @@ async fn the_households_requests_are_read_with_who_asked_and_what_became_of_each
              "requestedBy":{"displayName":"Alex"}}
         ]
     }"#;
-    let fake = Fake::replying(vec![(200, page)]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, page)]);
     let requests = seerr(&fake).requests().await.unwrap_or_default();
     let read: Vec<(&str, bool, Option<i64>, u8, u8)> = requests
         .iter()
@@ -257,7 +194,7 @@ async fn a_media_type_this_build_does_not_know_names_no_service() {
     let page = r#"{"pageInfo":{"results":1},"results":[
         {"status":2,"type":"music","media":{"status":3},"requestedBy":{"displayName":"Sam"}}
     ]}"#;
-    let fake = Fake::replying(vec![(200, page)]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, page)]);
     let requests = seerr(&fake).requests().await.unwrap_or_default();
     // Reported as a request whose kind is unknown rather than guessed into one of the
     // two this build files.
@@ -279,7 +216,10 @@ async fn the_requests_walk_past_the_first_page() {
     let page_two = r#"{"pageInfo":{"results":101},"results":[
         {"status":2,"type":"tv","media":{"status":5},"requestedBy":{"displayName":"Sam"}}
     ]}"#;
-    let fake = Fake::replying(vec![(200, page_one), (200, page_two)]);
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, page_one),
+        Answer::reply(200, page_two),
+    ]);
     let requests = seerr(&fake).requests().await.unwrap_or_default();
     assert_eq!(requests.len(), 101);
     assert!(fake
@@ -290,6 +230,6 @@ async fn the_requests_walk_past_the_first_page() {
 
 #[tokio::test]
 async fn an_unreadable_request_record_is_a_failure() {
-    let fake = Fake::replying(vec![(200, "not json")]);
+    let fake = Fake::in_turn(vec![Answer::reply(200, "not json")]);
     assert!(seerr(&fake).requests().await.is_err());
 }
