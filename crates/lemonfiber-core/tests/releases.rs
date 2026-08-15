@@ -8,56 +8,19 @@
 //! exercised from here rather than a `#[cfg(test)]` module, where async-trait code is
 //! compiled twice and its coverage counted from the wrong copy.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use common::{Answer, Fake};
 use lemonfiber_core::doctor::credentials::Target;
 use lemonfiber_core::doctor::releases::{ReleasesCheck, NONE_AVAILABLE, PRESET_UNMET};
 use lemonfiber_core::doctor::{Category, Check, Verdict};
 use lemonfiber_core::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
 };
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
-
-/// How the fake transport answers a request whose URL carries a given marker; a request
-/// matching no route goes unanswered, standing in for an unreachable service.
-enum Answer {
-    Reply(u16, &'static str),
-}
-
-/// A transport routed by a substring of the request URL, so the wanted list and the
-/// release search answer differently in one run.
-struct FakeHttp {
-    routes: Vec<(&'static str, Answer)>,
-}
-
-impl FakeHttp {
-    fn new(routes: Vec<(&'static str, Answer)>) -> Arc<Self> {
-        Arc::new(Self { routes })
-    }
-}
-
-#[async_trait]
-impl Http for FakeHttp {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        match self
-            .routes
-            .iter()
-            .find(|(marker, _)| request.url.contains(marker))
-        {
-            Some((_, Answer::Reply(status, body))) => Ok(Response {
-                status: *status,
-                body: (*body).to_owned(),
-            }),
-            None => Err(Unreachable {
-                url: request.url.clone(),
-                reason: "connection refused".to_owned(),
-                attempts: 1,
-            }),
-        }
-    }
-}
 
 /// A filesystem that hands back the config text placed at a path; only `read` matters.
 struct FakeFs {
@@ -129,7 +92,7 @@ fn opening_fs() -> Arc<FakeFs> {
 }
 
 /// Run a disruptive check over one Sonarr target and return its single verdict.
-async fn sonarr_verdict(fs: Arc<FakeFs>, http: Arc<FakeHttp>) -> Verdict {
+async fn sonarr_verdict(fs: Arc<FakeFs>, http: Arc<Fake>) -> Verdict {
     let check = ReleasesCheck::new(http, fs, vec![sonarr()], true);
     let mut findings = check.run().await;
     findings.pop().map_or(
@@ -155,9 +118,9 @@ fn warned(verdict: &Verdict) -> Option<lemonfiber_core::error::Code> {
 #[tokio::test]
 async fn releases_meeting_the_preset_pass() {
     // Wanted content is found, and the profile would grab it — the preset is met.
-    let http = FakeHttp::new(vec![
-        ("wanted/missing", Answer::Reply(200, ONE_WANTED)),
-        ("release", Answer::Reply(200, r#"[{"rejections":[]}]"#)),
+    let http = Fake::by_path(vec![
+        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
+        ("release", Answer::reply(200, r#"[{"rejections":[]}]"#)),
     ]);
     assert!(matches!(
         sonarr_verdict(opening_fs(), http).await,
@@ -169,11 +132,11 @@ async fn releases_meeting_the_preset_pass() {
 async fn releases_the_preset_rejects_warn_that_the_preset_is_unmet() {
     // Releases exist, but the profile wants none of them — the preset conflicts with
     // what is available, distinct from an indexer failure.
-    let http = FakeHttp::new(vec![
-        ("wanted/missing", Answer::Reply(200, ONE_WANTED)),
+    let http = Fake::by_path(vec![
+        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
         (
             "release",
-            Answer::Reply(
+            Answer::reply(
                 200,
                 r#"[{"rejections":["Quality Bluray-2160p is not wanted in profile"]}]"#,
             ),
@@ -185,9 +148,9 @@ async fn releases_the_preset_rejects_warn_that_the_preset_is_unmet() {
 
 #[tokio::test]
 async fn a_clean_search_that_finds_nothing_warns_that_none_are_available() {
-    let http = FakeHttp::new(vec![
-        ("wanted/missing", Answer::Reply(200, ONE_WANTED)),
-        ("release", Answer::Reply(200, "[]")),
+    let http = Fake::by_path(vec![
+        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
+        ("release", Answer::reply(200, "[]")),
     ]);
     let verdict = sonarr_verdict(opening_fs(), http).await;
     assert_eq!(warned(&verdict), Some(NONE_AVAILABLE));
@@ -197,7 +160,7 @@ async fn a_clean_search_that_finds_nothing_warns_that_none_are_available() {
 async fn a_search_that_cannot_run_is_unverified_not_a_verdict_on_the_preset() {
     // The wanted list answered, but the search itself did not — the indexer-failure
     // case: nothing was learned about releases, so it is unverified, never a warning.
-    let http = FakeHttp::new(vec![("wanted/missing", Answer::Reply(200, ONE_WANTED))]);
+    let http = Fake::by_path(vec![("wanted/missing", Answer::reply(200, ONE_WANTED))]);
     assert!(matches!(
         sonarr_verdict(opening_fs(), http).await,
         Verdict::Unverified { .. }
@@ -206,9 +169,9 @@ async fn a_search_that_cannot_run_is_unverified_not_a_verdict_on_the_preset() {
 
 #[tokio::test]
 async fn nothing_wanted_is_skipped_rather_than_searched() {
-    let http = FakeHttp::new(vec![(
+    let http = Fake::by_path(vec![(
         "wanted/missing",
-        Answer::Reply(200, r#"{"records":[]}"#),
+        Answer::reply(200, r#"{"records":[]}"#),
     )]);
     assert!(matches!(
         sonarr_verdict(opening_fs(), http).await,
@@ -219,7 +182,7 @@ async fn nothing_wanted_is_skipped_rather_than_searched() {
 #[tokio::test]
 async fn a_service_that_has_not_started_is_skipped() {
     // No config on disk, so the target does not open and there is nothing to search.
-    let http = FakeHttp::new(vec![("wanted/missing", Answer::Reply(200, ONE_WANTED))]);
+    let http = Fake::by_path(vec![("wanted/missing", Answer::reply(200, ONE_WANTED))]);
     let fs = FakeFs::with(Vec::new());
     assert!(matches!(
         sonarr_verdict(fs, http).await,
@@ -230,7 +193,7 @@ async fn a_service_that_has_not_started_is_skipped() {
 #[tokio::test]
 async fn no_resolution_service_is_skipped() {
     // A stack with no television or film service has no releases to check.
-    let http = FakeHttp::new(Vec::new());
+    let http = Fake::by_path(Vec::new());
     let check = ReleasesCheck::new(http, opening_fs(), Vec::new(), true);
     let verdict = check.run().await.pop().map(|found| found.verdict);
     assert!(matches!(verdict, Some(Verdict::Skipped { .. })));
@@ -239,7 +202,7 @@ async fn no_resolution_service_is_skipped() {
 #[tokio::test]
 async fn an_ordinary_run_skips_the_live_search() {
     // Not disruptive: the check reports skipped rather than querying the indexer.
-    let http = FakeHttp::new(Vec::new());
+    let http = Fake::by_path(Vec::new());
     let check = ReleasesCheck::new(http, opening_fs(), vec![sonarr()], false);
     let findings = check.run().await;
     assert_eq!(findings.len(), 1);
@@ -253,9 +216,9 @@ async fn an_ordinary_run_skips_the_live_search() {
 async fn a_film_service_is_searched_by_its_own_id() {
     // Radarr searches by movieId rather than episodeId — the same probe, the other
     // resolution service, so both media types' search parameters are exercised.
-    let http = FakeHttp::new(vec![
-        ("wanted/missing", Answer::Reply(200, ONE_WANTED)),
-        ("release", Answer::Reply(200, r#"[{"rejections":[]}]"#)),
+    let http = Fake::by_path(vec![
+        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
+        ("release", Answer::reply(200, r#"[{"rejections":[]}]"#)),
     ]);
     let radarr = Target {
         id: "radarr".to_owned(),
@@ -278,6 +241,6 @@ async fn a_film_service_is_searched_by_its_own_id() {
 
 #[tokio::test]
 async fn the_check_is_a_services_check() {
-    let check = ReleasesCheck::new(FakeHttp::new(Vec::new()), opening_fs(), Vec::new(), true);
+    let check = ReleasesCheck::new(Fake::by_path(Vec::new()), opening_fs(), Vec::new(), true);
     assert_eq!(check.category(), Category::Services);
 }

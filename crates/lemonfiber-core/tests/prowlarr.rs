@@ -8,62 +8,16 @@
 //! another, so it is driven from here rather than from an in-crate test, where it
 //! would be compiled twice and its coverage counted from the wrong copy.
 
-use std::sync::{Arc, Mutex};
+mod common;
 
-use async_trait::async_trait;
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use std::sync::Arc;
+
+use common::{Answer, Fake};
+use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::service::{
     AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
 };
 use lemonfiber_core::prowlarr::Prowlarr;
-
-/// What the fake transport answers with.
-enum Answer {
-    /// A response with this status and body.
-    Reply(u16, &'static str),
-    /// Nothing answered.
-    Silent,
-}
-
-/// A transport that answers every request the same way, keeping the last one.
-struct Fake {
-    answer: Answer,
-    seen: Mutex<Option<Request>>,
-}
-
-impl Fake {
-    fn new(answer: Answer) -> Arc<Self> {
-        Arc::new(Self {
-            answer,
-            seen: Mutex::new(None),
-        })
-    }
-
-    /// The request the client sent.
-    fn request(&self) -> Option<Request> {
-        self.seen.lock().ok().and_then(|guard| guard.clone())
-    }
-}
-
-#[async_trait]
-impl Http for Fake {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Ok(mut guard) = self.seen.lock() {
-            *guard = Some(request.clone());
-        }
-        match self.answer {
-            Answer::Reply(status, body) => Ok(Response {
-                status,
-                body: body.to_owned(),
-            }),
-            Answer::Silent => Err(Unreachable {
-                url: request.url.clone(),
-                reason: "connection refused".to_owned(),
-                attempts: 1,
-            }),
-        }
-    }
-}
 
 /// A Prowlarr client over the given fake.
 fn prowlarr(fake: &Arc<Fake>) -> Prowlarr {
@@ -84,7 +38,7 @@ fn application(name: &str, kind: ApplicationKind, base_url: &str) -> Application
 
 #[tokio::test]
 async fn an_application_is_posted_to_its_v1_endpoint_with_the_key() {
-    let fake = Fake::new(Answer::Reply(201, ""));
+    let fake = Fake::always(Answer::reply(201, ""));
     let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
     assert!(prowlarr(&fake).register_application(&sonarr).await.is_ok());
 
@@ -107,7 +61,7 @@ async fn an_application_is_posted_to_its_v1_endpoint_with_the_key() {
 
 #[tokio::test]
 async fn a_sonarr_application_carries_its_schema_and_television_categories() {
-    let fake = Fake::new(Answer::Reply(201, ""));
+    let fake = Fake::always(Answer::reply(201, ""));
     let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
     assert!(prowlarr(&fake).register_application(&sonarr).await.is_ok());
 
@@ -142,7 +96,7 @@ async fn a_sonarr_application_carries_its_schema_and_television_categories() {
 
 #[tokio::test]
 async fn a_radarr_application_carries_its_schema_and_movie_categories() {
-    let fake = Fake::new(Answer::Reply(201, ""));
+    let fake = Fake::always(Answer::reply(201, ""));
     let radarr = application("Radarr", ApplicationKind::Radarr, "http://radarr:7878");
     assert!(prowlarr(&fake).register_application(&radarr).await.is_ok());
 
@@ -164,7 +118,7 @@ async fn a_radarr_application_carries_its_schema_and_movie_categories() {
 
 #[tokio::test]
 async fn a_lidarr_application_carries_its_schema_and_music_categories() {
-    let fake = Fake::new(Answer::Reply(201, ""));
+    let fake = Fake::always(Answer::reply(201, ""));
     let lidarr = application("Lidarr", ApplicationKind::Lidarr, "http://lidarr:8686");
     assert!(prowlarr(&fake).register_application(&lidarr).await.is_ok());
 
@@ -186,7 +140,7 @@ async fn a_lidarr_application_carries_its_schema_and_music_categories() {
 
 #[tokio::test]
 async fn a_rejected_application_registration_is_refused() {
-    let fake = Fake::new(Answer::Reply(400, "unknown implementation"));
+    let fake = Fake::always(Answer::reply(400, "unknown implementation"));
     let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
     assert!(matches!(
         prowlarr(&fake).register_application(&sonarr).await,
@@ -196,7 +150,7 @@ async fn a_rejected_application_registration_is_refused() {
 
 #[tokio::test]
 async fn a_registration_with_no_answer_is_unavailable() {
-    let fake = Fake::new(Answer::Silent);
+    let fake = Fake::always(Answer::Silent);
     let sonarr = application("Sonarr", ApplicationKind::Sonarr, "http://sonarr:8989");
     assert!(matches!(
         prowlarr(&fake).register_application(&sonarr).await,
@@ -208,7 +162,7 @@ async fn a_registration_with_no_answer_is_unavailable() {
 async fn the_applications_are_read_back_by_their_base_url() {
     // Prowlarr carries the connection settings as named entries in a `fields`
     // array, not top-level keys; the address is decoded from there.
-    let fake = Fake::new(Answer::Reply(
+    let fake = Fake::always(Answer::reply(
         200,
         r#"[{"id":3,"name":"Sonarr","fields":[{"name":"baseUrl","value":"http://sonarr:8989"},{"name":"apiKey","value":"x"}]}]"#,
     ));
@@ -229,7 +183,7 @@ async fn the_applications_are_read_back_by_their_base_url() {
 async fn an_application_that_names_no_base_url_is_left_out_rather_than_guessed() {
     // A resource without a baseUrl cannot be matched by connection, so it is left
     // out rather than returned as an unusable half-entry.
-    let fake = Fake::new(Answer::Reply(
+    let fake = Fake::always(Answer::reply(
         200,
         r#"[{"id":3,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]},{"id":4,"fields":[{"name":"apiKey","value":"x"}]}]"#,
     ));
@@ -250,7 +204,7 @@ async fn an_application_that_names_no_base_url_is_left_out_rather_than_guessed()
 
 #[tokio::test]
 async fn an_unreadable_application_list_is_refused() {
-    let fake = Fake::new(Answer::Reply(200, "not an array"));
+    let fake = Fake::always(Answer::reply(200, "not an array"));
     assert!(matches!(
         prowlarr(&fake).applications().await,
         Err(Failure::Refused { .. })
@@ -259,7 +213,7 @@ async fn an_unreadable_application_list_is_refused() {
 
 #[tokio::test]
 async fn an_application_listing_that_is_refused_is_unauthorised() {
-    let fake = Fake::new(Answer::Reply(401, ""));
+    let fake = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
         prowlarr(&fake).applications().await,
         Err(Failure::Unauthorised { .. })
@@ -268,7 +222,7 @@ async fn an_application_listing_that_is_refused_is_unauthorised() {
 
 #[tokio::test]
 async fn an_application_listing_with_no_answer_is_unavailable() {
-    let fake = Fake::new(Answer::Silent);
+    let fake = Fake::always(Answer::Silent);
     assert!(matches!(
         prowlarr(&fake).applications().await,
         Err(Failure::Unavailable { .. })

@@ -168,6 +168,82 @@ fn no_lint_is_suppressed_in_source() {
     }
 }
 
+/// A test file covers one seam, and stays small enough to read.
+///
+/// The production cap does not apply here: a test file legitimately carries
+/// fixtures, fakes and every case of one thing, and holding it to 550 would push
+/// the shared scaffolding into ever more modules rather than making anything
+/// clearer.
+///
+/// What does apply is the reason behind that cap. One file, one seam. Past this
+/// length a file has stopped being the tests for one thing and become the tests
+/// for a subsystem — which is how `seed.rs` reached two and a half thousand lines
+/// covering five different drivers, each with a fake nobody else could see.
+///
+/// The number is a ratchet, not a target: it should come down as files are split,
+/// never up to admit one that grew.
+#[test]
+fn no_test_file_covers_more_than_one_seam() {
+    /// Lines a single test file may hold.
+    const CAP: usize = 1_200;
+
+    let oversized: Vec<(PathBuf, usize)> = sources()
+        .into_iter()
+        .filter(|(path, _)| path.to_string_lossy().contains("tests"))
+        .map(|(path, text)| (path, text.lines().count()))
+        .filter(|(_, lines)| *lines > CAP)
+        .collect();
+    assert!(
+        oversized.is_empty(),
+        "past {CAP} lines a test file covers more than one seam — split it: {oversized:?}"
+    );
+}
+
+/// No two problems answer to the same code.
+///
+/// The error model deliberately declares each code as a `const` beside the error
+/// that raises it rather than in one shared enum, so that adding an error is not
+/// editing a list everyone edits. What that decision costs is the one property a
+/// central list would have given for free: nothing stops two errors picking the
+/// same string.
+///
+/// It costs something real. An operator who searches for a code should find the
+/// same answer a year later, and for four releases `VPN-5` was both a port
+/// mismatch and a killswitch leak — so whoever looked one up found the other.
+#[test]
+fn no_two_problems_answer_to_the_same_code() {
+    let mut seen: BTreeMap<String, PathBuf> = BTreeMap::new();
+    let mut collisions: Vec<String> = Vec::new();
+    for (path, text) in sources() {
+        // Tests reuse real codes as fixtures, which is not a second declaration
+        // of one — the production half of each file is what declares.
+        let production = text.split("#[cfg(test)]").next().unwrap_or_default();
+        for code in declared(production) {
+            if let Some(first) = seen.insert(code.clone(), path.clone()) {
+                collisions.push(format!(
+                    "{code} in {} and {}",
+                    first.display(),
+                    path.display()
+                ));
+            }
+        }
+    }
+    assert!(collisions.is_empty(), "{collisions:?}");
+}
+
+/// Every code declared in a piece of source.
+fn declared(text: &str) -> Vec<String> {
+    text.match_indices("Code::new(\"")
+        .filter_map(|(at, opening)| {
+            let from = at + opening.len();
+            let rest = text.get(from..)?;
+            rest.find('"')
+                .and_then(|end| rest.get(..end))
+                .map(str::to_owned)
+        })
+        .collect()
+}
+
 /// Requirement identifiers do not belong in code.
 ///
 /// Provenance in a comment is worthless to the next reader and rots the moment
