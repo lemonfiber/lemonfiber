@@ -38,13 +38,12 @@ use findings::{
     unreachable_engine,
 };
 pub use forwarding::{Answer, Forwarding};
-use killswitch::{not_attempted, Held};
 use leak::{labelled, Reach};
 use pair::torrent_client;
 pub(crate) use pair::{resolve_pair, Pair};
 pub use port_forward::granted_port;
 use port_forward::{no_port, port_forward_offline, Grant};
-use probe::{addresses, exit_country, find, public_address, read_grant, running};
+use probe::{addresses, exit_country, find, public_address, read_grant};
 
 pub use killswitch::{KILLSWITCH_LEAKS, TUNNEL_NOT_RESTORED};
 pub use leak::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
@@ -196,92 +195,6 @@ impl VpnCheck {
             }
         };
         finding("vpn.port-forward", "forwarded port", verdict)
-    }
-
-    /// Prove the killswitch: take the tunnel away, ask the client whether it can
-    /// still reach the internet, and put the tunnel back.
-    ///
-    /// Only where the operator asked for the disruptive checks, and only where
-    /// there is something to prove — a client that is not reaching the internet
-    /// right now would answer "blocked" whatever the killswitch does, and calling
-    /// that a pass would be the comfortable falsehood again in a new place.
-    ///
-    /// Whatever the probe finds, the tunnel goes back up. That restoration is
-    /// attempted unconditionally and then confirmed; a tunnel this check took away
-    /// and could not return is reported as the fault it is rather than left for
-    /// the operator to discover.
-    async fn killswitch_held(
-        &self,
-        gateway: Option<&Container>,
-        client: Option<&Container>,
-        echo: &str,
-        client_now: &Reach,
-    ) -> Held {
-        if !self.disruptive {
-            return Held::NotAttempted {
-                reason: killswitch::NOT_ASKED_FOR.to_owned(),
-            };
-        }
-        let Some(gateway) = running(gateway) else {
-            return not_attempted(true, "the tunnel container is not running");
-        };
-        let Some(client) = running(client) else {
-            return not_attempted(true, "the download client is not running");
-        };
-        // Nothing to prove against: a client already unable to reach the internet
-        // answers "blocked" whether or not the killswitch had anything to do with
-        // it, and reading that as a pass would prove nothing at all.
-        if !matches!(client_now, Reach::Address(_)) {
-            return not_attempted(
-                true,
-                "the download client is not reaching the internet right now, so stopping it \
-                 would prove nothing",
-            );
-        }
-        let Some(device) = self.tunnel_device(gateway).await else {
-            return not_attempted(
-                true,
-                "the tunnel container carries no default route to drop",
-            );
-        };
-        if !self.set_link(gateway, &device, false).await {
-            return not_attempted(true, "the tunnel device could not be taken down");
-        }
-
-        // From here the stack is disturbed, so every path restores before it
-        // returns — the probe's own answer is held until that has happened.
-        //
-        // The CLIENT is asked, not the gateway. The gateway's own traffic is not
-        // the question; whether the container behind it still reaches the world
-        // with the tunnel gone is the entire test.
-        let held = killswitch::held_from(&self.reach(Some(client), echo).await);
-        let restored = self.set_link(gateway, &device, true).await
-            && self.tunnel_device(gateway).await.is_some();
-        if restored {
-            held
-        } else {
-            Held::NotRestored
-        }
-    }
-
-    /// Which device carries the gateway's default route — the tunnel, whatever it
-    /// is called.
-    async fn tunnel_device(&self, gateway: &Container) -> Option<String> {
-        let output = self
-            .engine
-            .exec(&gateway.id, &killswitch::read_route())
-            .await
-            .ok()?;
-        killswitch::tunnel_device(&output.stdout)
-    }
-
-    /// Take the gateway's tunnel device down, or put it back. Whether the engine
-    /// carried the command out at all.
-    async fn set_link(&self, gateway: &Container, device: &str, up: bool) -> bool {
-        self.engine
-            .exec(&gateway.id, &killswitch::set_link(device, up))
-            .await
-            .is_ok_and(|output| output.status == Some(0))
     }
 
     /// Read the granted port from the gateway's own status file.
