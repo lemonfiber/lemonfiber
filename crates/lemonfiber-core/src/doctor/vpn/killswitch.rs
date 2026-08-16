@@ -20,7 +20,9 @@
 use crate::error::{Code, Remedy};
 
 use super::leak::Reach;
+use super::probe::running;
 use super::Verdict;
+use crate::ports::docker::Container;
 
 /// The code a stack whose traffic survives its tunnel earns.
 pub const KILLSWITCH_LEAKS: Code = Code::new("VPN-5");
@@ -170,6 +172,97 @@ pub(super) fn verdict(held: &Held) -> Verdict {
 pub(super) const NOT_ASKED_FOR: &str =
     "the killswitch has not been tested; proving it works means dropping the tunnel and \
      confirming traffic stops, which interrupts transfers";
+
+/// Driving the test: taking the tunnel away and putting it back.
+///
+/// The verdicts above say what the result *means*; this is the doing of it, and
+/// it is the only thing in the VPN check that changes the running system. Kept
+/// with the verdicts rather than with the read-only observation for that reason —
+/// what disturbs a stack and what merely looks at one are different kinds of
+/// code, and one of them needs reading twice.
+impl super::VpnCheck {
+    /// Prove the killswitch: take the tunnel away, ask the client whether it can
+    /// still reach the internet, and put the tunnel back.
+    ///
+    /// Only where the operator asked for the disruptive checks, and only where
+    /// there is something to prove — a client that is not reaching the internet
+    /// right now would answer "blocked" whatever the killswitch does, and calling
+    /// that a pass would be the comfortable falsehood again in a new place.
+    ///
+    /// Whatever the probe finds, the tunnel goes back up. That restoration is
+    /// attempted unconditionally and then confirmed; a tunnel this check took away
+    /// and could not return is reported as the fault it is rather than left for
+    /// the operator to discover.
+    pub(super) async fn killswitch_held(
+        &self,
+        gateway: Option<&Container>,
+        client: Option<&Container>,
+        echo: &str,
+        client_now: &Reach,
+    ) -> Held {
+        if !self.disruptive {
+            return Held::NotAttempted {
+                reason: NOT_ASKED_FOR.to_owned(),
+            };
+        }
+        let Some(gateway) = running(gateway) else {
+            return not_attempted(true, "the tunnel container is not running");
+        };
+        let Some(client) = running(client) else {
+            return not_attempted(true, "the download client is not running");
+        };
+        // Nothing to prove against: a client already unable to reach the internet
+        // answers "blocked" whether or not the killswitch had anything to do with
+        // it, and reading that as a pass would prove nothing at all.
+        if !matches!(client_now, Reach::Address(_)) {
+            return not_attempted(
+                true,
+                "the download client is not reaching the internet right now, so stopping it \
+                 would prove nothing",
+            );
+        }
+        let Some(device) = self.tunnel_device(gateway).await else {
+            return not_attempted(
+                true,
+                "the tunnel container carries no default route to drop",
+            );
+        };
+        if !self.set_link(gateway, &device, false).await {
+            return not_attempted(true, "the tunnel device could not be taken down");
+        }
+
+        // From here the stack is disturbed, so every path restores before it
+        // returns — the probe's own answer is held until that has happened.
+        //
+        // The CLIENT is asked, not the gateway. The gateway's own traffic is not
+        // the question; whether the container behind it still reaches the world
+        // with the tunnel gone is the entire test.
+        let held = held_from(&self.reach(Some(client), echo).await);
+        let restored = self.set_link(gateway, &device, true).await
+            && self.tunnel_device(gateway).await.is_some();
+        if restored {
+            held
+        } else {
+            Held::NotRestored
+        }
+    }
+
+    /// Which device carries the gateway's default route — the tunnel, whatever it
+    /// is called.
+    async fn tunnel_device(&self, gateway: &Container) -> Option<String> {
+        let output = self.engine.exec(&gateway.id, &read_route()).await.ok()?;
+        tunnel_device(&output.stdout)
+    }
+
+    /// Take the gateway's tunnel device down, or put it back. Whether the engine
+    /// carried the command out at all.
+    async fn set_link(&self, gateway: &Container, device: &str, up: bool) -> bool {
+        self.engine
+            .exec(&gateway.id, &set_link(device, up))
+            .await
+            .is_ok_and(|output| output.status == Some(0))
+    }
+}
 
 #[cfg(test)]
 mod tests {
