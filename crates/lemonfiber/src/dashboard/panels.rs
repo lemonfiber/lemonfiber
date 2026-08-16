@@ -16,11 +16,13 @@
 //!   tells more than a blank, as long as nobody reads it as current.
 //! * An **absent** panel says why. An empty region reads as "nothing wrong".
 
+use lemonfiber_core::alert::Alert;
 use lemonfiber_core::dashboard::{
     Hardlink, Panel, Protocol, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
 };
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;
+use lemonfiber_core::queue::Stuck;
 use lemonfiber_core::text::plain;
 use lemonfiber_core::walkthrough::{size, spell_out};
 use ratatui::style::{Modifier, Style};
@@ -150,6 +152,46 @@ const fn protocol(protocol: Protocol) -> &'static str {
     }
 }
 
+/// The alerts panel: what the operator has been told, newest first.
+///
+/// The screen is a channel — the one that needs no configuring and cannot be down
+/// — so an alert reaches here whether or not anything else was set up. What is
+/// owed and what has been said read alike, because to somebody looking at the
+/// screen there is no difference: both are things that happened.
+pub(super) fn alerts(alerts: &[Alert]) -> Vec<Line<'static>> {
+    if alerts.is_empty() {
+        return vec![Line::styled("nothing has needed saying", quiet())];
+    }
+    alerts
+        .iter()
+        .map(|alert| {
+            Line::from(vec![
+                Span::raw(format!("{:<9}", alert.moment.said())),
+                Span::raw(plain(&alert.summary)),
+            ])
+        })
+        .collect()
+}
+
+/// The stuck panel: what in the pipeline has stopped, and for how long.
+///
+/// Read across the download clients and the \*arrs together, because the failure
+/// that matters most is invisible inside either: an item that downloaded and was
+/// never imported is a finished download to the client and nothing at all to the
+/// \*arr.
+pub(super) fn stuck(stuck: &[Stuck]) -> Vec<Line<'static>> {
+    if stuck.is_empty() {
+        return vec![Line::styled("nothing is stuck", quiet())];
+    }
+    let mut lines: Vec<Line<'static>> = stuck
+        .iter()
+        .take(SHOWN)
+        .map(|stuck| Line::from(vec![Span::raw(plain(&stuck.said()))]))
+        .collect();
+    lines.extend(rest(stuck.len(), "item"));
+    lines
+}
+
 /// The queue panel: how deep each service's queue is, and how much of it is stuck.
 pub(super) fn queues(panel: &Panel<Vec<Queue>>) -> Vec<Line<'static>> {
     let queues = match panel {
@@ -277,11 +319,15 @@ pub(super) fn any_panel_down(snapshot: &Snapshot) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{any_panel_down, header, queues, services, storage, transfers, vpn, SHOWN};
+    use super::{
+        alerts, any_panel_down, header, queues, services, storage, stuck, transfers, vpn, SHOWN,
+    };
+    use lemonfiber_core::alert::Alert;
     use lemonfiber_core::dashboard::{
         Hardlink, Panel, Protocol, Queue, Reading, Storage, Telemetry, Transfer, Vpn,
     };
     use lemonfiber_core::health::{Reach, Summary};
+    use lemonfiber_core::queue::Stuck;
 
     /// The words of a panel, one string per line.
     fn said(lines: &[ratatui::text::Line<'static>]) -> Vec<String> {
@@ -614,5 +660,79 @@ mod tests {
                 .is_some_and(|line| line.contains("Some[2JRelease")),
             "and the name it leaves is still the name: {lines:?}"
         );
+    }
+
+    /// One alert about something that happened.
+    fn an_alert(summary: &str, moment: lemonfiber_core::alert::Moment) -> Alert {
+        Alert {
+            check: "service.sonarr".to_owned(),
+            kind: "service.down".to_owned(),
+            moment,
+            severity: lemonfiber_core::error::Severity::Warning,
+            summary: summary.to_owned(),
+            remedies: vec!["start it".to_owned()],
+            affected: vec!["service.sonarr".to_owned()],
+        }
+    }
+
+    #[test]
+    fn an_alert_says_which_way_it_went_as_well_as_what_happened() {
+        // "Sonarr is down" and "Sonarr came back" are opposite news, and a list
+        // that renders them alike is one an operator has to read twice.
+        let lines = said(&alerts(&[
+            an_alert(
+                "Sonarr is not running",
+                lemonfiber_core::alert::Moment::Onset,
+            ),
+            an_alert(
+                "Sonarr is running again",
+                lemonfiber_core::alert::Moment::Resolved,
+            ),
+        ]));
+        assert!(lines
+            .first()
+            .is_some_and(|line| line.starts_with("started")));
+        assert!(lines
+            .get(1)
+            .is_some_and(|line| line.starts_with("resolved")));
+    }
+
+    #[test]
+    fn a_quiet_stack_says_nothing_has_needed_saying() {
+        // Not a blank region: an empty alerts panel is good news, and it should
+        // read as good news rather than as a panel that failed to fill.
+        assert_eq!(
+            said(&alerts(&[])),
+            vec!["nothing has needed saying".to_owned()]
+        );
+    }
+
+    #[test]
+    fn an_alert_from_a_service_cannot_take_over_the_screen() {
+        // The summary quotes what a service said, which came from somewhere else.
+        let evil = an_alert("gone\u{1b}[2Jaway", lemonfiber_core::alert::Moment::Onset);
+        assert!(said(&alerts(&[evil]))
+            .first()
+            .is_some_and(|line| !line.contains('\u{1b}')));
+    }
+
+    #[test]
+    fn a_stuck_item_says_what_is_wrong_and_for_how_long() {
+        let held = Stuck {
+            name: "Some.Release".to_owned(),
+            stall: lemonfiber_core::queue::Stall::StalledDownload,
+            held_for: 7 * 60 * 60,
+            blocking: None,
+            items: 1,
+        };
+        let lines = said(&stuck(std::slice::from_ref(&held)));
+        assert!(lines
+            .first()
+            .is_some_and(|line| line.contains("Some.Release") && line.contains("7 hours")));
+    }
+
+    #[test]
+    fn a_pipeline_with_nothing_stuck_says_so() {
+        assert_eq!(said(&stuck(&[])), vec!["nothing is stuck".to_owned()]);
     }
 }

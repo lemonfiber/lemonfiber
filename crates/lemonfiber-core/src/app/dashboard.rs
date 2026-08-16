@@ -24,8 +24,12 @@ use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
 use crate::health::{observed, Egress, Reach, Summary};
 
-use super::conditions;
+use super::queue::Answered;
+use super::screen::Screen;
+use super::{conditions, notify, outbox};
+use crate::condition::Conditions;
 use crate::ports::service::{QueueDepth, Queues};
+use crate::queue::Thresholds;
 use crate::storage::{test_link, Linked};
 
 use super::targets::{
@@ -62,6 +66,10 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
         .map_err(|err| err.problem().summary);
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
 
+    // One store for the whole refresh: the health summary, the queue check and the
+    // notifier all read and write the same history, and three loads would be three
+    // pictures of it — the last one written winning.
+    let mut conditions = conditions::load(ctx);
     let seen = observe(ctx, manifest.as_ref()).await;
     let reach = Reach::of(configured, seen.as_deref().ok());
     let vpn = vpn(ctx, manifest.as_ref()).await;
@@ -73,6 +81,7 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
         reach,
         seen.as_deref().unwrap_or_default(),
         egress(vpn.as_ref()),
+        &mut conditions,
     );
     let services = match seen {
         Ok(services) => Panel::Ready(services),
@@ -84,6 +93,34 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
     let transfers = transfers(ctx, manifest.as_ref(), project.as_deref(), previous).await;
     let storage = storage(ctx, download_rate(&transfers), previous).await;
 
+    let (queue, answers) = queues(ctx, manifest.as_ref(), project.as_deref()).await;
+
+    // What the pipeline is doing, assessed across the services together. Recorded
+    // against the same store, so a stall that has held for a day is known to have
+    // held for a day rather than looking new on every refresh.
+    let watched = crate::app::queue::watch(
+        &answers,
+        &downloading(&transfers),
+        &mut conditions,
+        Thresholds::conservative(),
+        &ctx.stamp(),
+    );
+
+    // And then the operator is told. Last, because everything above is what there
+    // is to tell them about — and through the screen, which is the one channel
+    // that needs no configuring and cannot be down.
+    let mut outbox = outbox::load(ctx);
+    notify::notify(ctx, reach, &mut conditions, &mut outbox, &[&Screen]).await;
+    let alerts = outbox
+        .owing()
+        .iter()
+        .chain(outbox.history())
+        .take(SHOWN_ALERTS)
+        .cloned()
+        .collect();
+    conditions::save(ctx, &conditions);
+    outbox::save(ctx, &outbox);
+
     Snapshot {
         // Only a source that genuinely failed marks the screen degraded; the
         // pending panels below are not-yet-built, not down, so they pass `false`.
@@ -91,9 +128,34 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
         health,
         vpn,
         transfers,
-        queue: queues(ctx, manifest.as_ref(), project.as_deref()).await,
+        queue,
+        stuck: watched.stuck,
+        alerts,
         storage,
         services,
+    }
+}
+
+/// How many alerts the screen carries. Enough to see what happened, few enough
+/// that the newest is not buried under a week of history.
+const SHOWN_ALERTS: usize = 8;
+
+/// What the download clients are moving, in the shape the queue check reads:
+/// what it is called, how far along, and whether it is going anywhere.
+///
+/// A speed nobody could read counts as moving: not knowing is not evidence of a
+/// stall, and calling it one would raise a fault about a reading rather than
+/// about a download.
+fn downloading(transfers: &Panel<Vec<Transfer>>) -> Vec<(String, u8, bool)> {
+    match transfers {
+        Panel::Ready(transfers) => transfers
+            .iter()
+            .map(|transfer| {
+                let moving = transfer.speed.value().is_none_or(|speed| *speed > 0);
+                (transfer.name.clone(), transfer.progress, moving)
+            })
+            .collect(),
+        Panel::Unavailable { .. } => Vec::new(),
     }
 }
 
@@ -105,17 +167,20 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
 /// one that has been down all morning — and the summary grades them differently.
 /// Read and written each refresh: the file is small, and a refresh that is not
 /// remembered is one the next one has to guess about.
-fn summarise(ctx: &Ctx, reach: Reach, services: &[Service], egress: Egress) -> Summary {
+fn summarise(
+    ctx: &Ctx,
+    reach: Reach,
+    services: &[Service],
+    egress: Egress,
+    conditions: &mut Conditions,
+) -> Summary {
     let now = ctx.stamp();
-    let mut conditions = conditions::load(ctx);
     for (check, fault) in observed(services, egress) {
         conditions.observe(&check, fault.as_ref(), &now);
     }
     // Everything the store knows, not only what is raised: a fault that has been
     // flapping is not called fixed the moment it blinks off.
-    let summary = Summary::of(reach, &conditions.all(), &now);
-    conditions::save(ctx, &conditions);
-    summary
+    Summary::of(reach, &conditions.all(), &now)
 }
 
 /// What one download's speed was last time it was seen, where it was.
@@ -275,28 +340,39 @@ async fn queues(
     ctx: &Ctx,
     manifest: Result<&Manifest, &String>,
     project: Option<&Path>,
-) -> Panel<Vec<Queue>> {
+) -> (Panel<Vec<Queue>>, Vec<(String, Answered)>) {
     let manifest = match manifest {
         Ok(manifest) => manifest,
-        Err(reason) => return Panel::unavailable(reason.clone()),
+        Err(reason) => return (Panel::unavailable(reason.clone()), Vec::new()),
     };
     let targets = servarr_targets(&manifest.services, project);
 
     let mut depths = Vec::new();
+    // The items as well as the depths. A number says how much is queued and
+    // cannot say which of it is stuck or why, which is what the queue check is
+    // for — and asking each service twice for the same page would be a second
+    // round of requests for an answer already in hand.
+    let mut answers = Vec::new();
     for target in &targets {
         let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
             continue;
         };
-        if let Ok(read) = service.queue().await {
-            let depth = QueueDepth::of(&read);
-            depths.push(Queue {
-                service: target.name.clone(),
-                depth: depth.total,
-                stuck: depth.stuck,
-            });
+        match service.queue().await {
+            Ok(read) => {
+                let depth = QueueDepth::of(&read);
+                depths.push(Queue {
+                    service: target.name.clone(),
+                    depth: depth.total,
+                    stuck: depth.stuck,
+                });
+                answers.push((target.name.clone(), Answered::Queue(read.items)));
+            }
+            // Silence is not an empty queue, and the check is told so rather than
+            // left to infer health from an absence.
+            Err(_) => answers.push((target.name.clone(), Answered::Unreachable)),
         }
     }
-    Panel::Ready(depths)
+    (Panel::Ready(depths), answers)
 }
 
 /// The storage picture: how much is free, whether imports link, and when it fills.
@@ -1307,6 +1383,8 @@ mod tests {
             vpn: None,
             transfers: Panel::Ready(vec![a_transfer(Reading::Known(4096))]),
             queue: Panel::Ready(Vec::new()),
+            stuck: Vec::new(),
+            alerts: Vec::new(),
             storage: Panel::unavailable("not read here"),
             services: Panel::Ready(Vec::new()),
         };
@@ -1316,5 +1394,66 @@ mod tests {
         );
         assert_eq!(super::last_speed(Some(&before), "something else"), None);
         assert_eq!(super::last_speed(None, "download"), None);
+    }
+
+    /// A context whose records land in an emptied scratch directory, so a refresh
+    /// can be run twice and the second one read what the first left.
+    fn ctx_remembering(name: &str, engine: Reporting) -> Ctx {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-refresh-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let settings = Settings {
+            protocols: Protocols::both(),
+            data_root: Some(std::path::PathBuf::from("/srv/media")),
+            env_file: Some(dir.join(".env")),
+            ..Settings::default()
+        };
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(engine),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            settings,
+            Environment::MacOs,
+        )
+        .waiting(Duration::ZERO)
+    }
+
+    #[tokio::test]
+    async fn a_refresh_tells_the_operator_what_it_found() {
+        // The whole point of the driver: the health check, the queue check and the
+        // notifier all ran because a refresh ran, without anybody asking for them.
+        // Before this they were reachable only from their own tests.
+        let ctx = ctx_remembering("tells", Reporting::absent());
+        let snapshot = gather(&ctx, None).await;
+
+        // Nothing is running, so there is something to say about it — and the
+        // screen is the channel that carries it, needing no configuration.
+        assert!(!snapshot.alerts.is_empty(), "{:?}", snapshot.alerts);
+    }
+
+    #[tokio::test]
+    async fn what_was_said_once_is_not_said_again_on_the_next_refresh() {
+        // A screen refreshing once a second must not re-announce a standing fault
+        // every second. The outbox is what stops it, and it only stops it because
+        // it now survives the refresh that wrote it.
+        let ctx = ctx_remembering("once", Reporting::absent());
+        let first = gather(&ctx, None).await;
+        let again = gather(&ctx, Some(&first)).await;
+
+        assert!(
+            !first.alerts.is_empty(),
+            "something was said the first time"
+        );
+        let repeated: Vec<&crate::alert::Alert> = again
+            .alerts
+            .iter()
+            .filter(|alert| !first.alerts.contains(alert))
+            .collect();
+        assert!(
+            repeated.is_empty(),
+            "nothing new was invented: {repeated:?}"
+        );
     }
 }

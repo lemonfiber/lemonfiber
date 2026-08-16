@@ -72,6 +72,8 @@ fn sections(snapshot: &Snapshot) -> Vec<(&'static str, Vec<Line<'static>>)> {
         ("Queues", panels::queues(&snapshot.queue)),
         ("Storage", panels::storage(&snapshot.storage)),
         ("Services", panels::services(&snapshot.services)),
+        ("Stuck", panels::stuck(&snapshot.stuck)),
+        ("Alerts", panels::alerts(&snapshot.alerts)),
     ]
 }
 
@@ -83,18 +85,18 @@ fn sections(snapshot: &Snapshot) -> Vec<(&'static str, Vec<Line<'static>>)> {
 fn places(body: Rect) -> Vec<Rect> {
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Ratio(1, 3); 3])
+        .constraints([Constraint::Ratio(1, 4); 4])
         .split(body);
     if body.width < TWO_COLUMNS {
-        // One column: the same five panels, stacked, each narrower and taller.
+        // One column: the same seven panels, stacked, each narrower and taller.
         return Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Ratio(1, 5); 5])
+            .constraints([Constraint::Ratio(1, 7); 7])
             .split(body)
             .to_vec();
     }
     let mut places = Vec::new();
-    for (row, count) in rows.iter().zip([2usize, 2, 1]) {
+    for (row, count) in rows.iter().zip([2usize, 2, 2, 1]) {
         places.extend(
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -111,7 +113,7 @@ fn places(body: Rect) -> Vec<Rect> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{draw, places, TWO_COLUMNS};
+    use super::{draw, places, sections, TWO_COLUMNS};
     use lemonfiber_core::dashboard::{
         Hardlink, Panel, Protocol, Reading, Snapshot, Storage, Telemetry, Transfer,
     };
@@ -134,6 +136,8 @@ pub(crate) mod tests {
                 eta: Some(std::time::Duration::from_secs(600)),
             }]),
             queue: Panel::Ready(Vec::new()),
+            stuck: Vec::new(),
+            alerts: Vec::new(),
             storage: Panel::Ready(Storage {
                 free: Reading::Known(500_000_000_000),
                 exhaustion: None,
@@ -167,7 +171,7 @@ pub(crate) mod tests {
     #[test]
     fn the_screen_carries_every_panel_and_the_state_of_the_screen_itself() {
         let text = drawn(&a_snapshot(), 120, 40);
-        for panel in ["VPN", "Transfers", "Queues", "Storage", "Services"] {
+        for (panel, _) in sections(&a_snapshot()) {
             assert!(text.contains(panel), "{panel} is missing:\n{text}");
         }
         assert!(text.contains("lemonfiber"), "{text}");
@@ -178,8 +182,8 @@ pub(crate) mod tests {
     fn a_narrow_terminal_carries_the_same_panels_in_one_column() {
         // Degrading by carrying less at a time, never by overlapping: a corrupted
         // screen is worse than a tall one.
-        let text = drawn(&a_snapshot(), 60, 60);
-        for panel in ["VPN", "Transfers", "Queues", "Storage", "Services"] {
+        let text = drawn(&a_snapshot(), 60, 90);
+        for (panel, _) in sections(&a_snapshot()) {
             assert!(text.contains(panel), "{panel} is missing:\n{text}");
         }
     }
@@ -196,10 +200,13 @@ pub(crate) mod tests {
 
     #[test]
     fn every_panel_has_somewhere_to_go_at_either_width() {
-        // Five panels, five places. One left without a place would leave an
-        // operator looking for something that is simply not on the screen.
-        assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS, 40)).len(), 5);
-        assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS - 1, 40)).len(), 5);
+        // A place for each panel there is, at either width. One left without a
+        // place would leave an operator looking for something that is simply not
+        // on the screen — so this counts against the sections themselves rather
+        // than a number written twice.
+        let wanted = sections(&a_snapshot()).len();
+        assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS, 40)).len(), wanted);
+        assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS - 1, 40)).len(), wanted);
     }
 
     #[test]
