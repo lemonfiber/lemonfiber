@@ -199,6 +199,66 @@ fn no_test_file_covers_more_than_one_seam() {
     );
 }
 
+/// Each requirement is claimed by exactly one row of the status file.
+///
+/// The release gate reads done-ness from that file: a requirement named in a ✅
+/// row is finished, and one named in a ☐ row is not. A requirement named in both
+/// is a question the gate answers by whichever row it reads first — and it has
+/// been wrong three times, once for four releases.
+///
+/// Only the identifier column counts. The prose beside it cites requirements
+/// freely, which is how a row explains itself, and citing one is not claiming it.
+#[test]
+fn each_requirement_is_claimed_by_one_row() {
+    let file = fs::read_to_string("../../IMPLEMENTATION-STATUS.md").unwrap_or_default();
+    let mut claimed: BTreeMap<String, usize> = BTreeMap::new();
+    for row in file.lines().filter(|line| line.starts_with('|')) {
+        for id in requirements(column(row, 1)) {
+            *claimed.entry(id).or_default() += 1;
+        }
+    }
+    let twice: Vec<&String> = claimed
+        .iter()
+        .filter(|(_, rows)| **rows > 1)
+        .map(|(id, _)| id)
+        .collect();
+    assert!(
+        twice.is_empty(),
+        "claimed by more than one row, so the gate reads whichever it finds first: {twice:?}"
+    );
+}
+
+/// One cell of a table row, or nothing where the row is too short.
+fn column(row: &str, at: usize) -> &str {
+    row.split('|').nth(at + 1).unwrap_or_default()
+}
+
+/// Every requirement a cell claims, with `X-R1..R4` counted as the four it means.
+///
+/// Anything that is not a requirement identifier — a command name, a feature with
+/// no requirement number, an error code — is passed over rather than guessed at.
+fn requirements(cell: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for token in cell.split('`').skip(1).step_by(2) {
+        let Some((feature, numbers)) = token.split_once("-R") else {
+            continue;
+        };
+        if !feature
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        {
+            continue;
+        }
+        let (first, last) = numbers.split_once("..").unwrap_or((numbers, numbers));
+        let last = last.trim_start_matches('R');
+        let (Ok(first), Ok(last)) = (first.parse::<u32>(), last.parse::<u32>()) else {
+            continue;
+        };
+        found.extend((first..=last).map(|number| format!("{feature}-R{number}")));
+    }
+    found
+}
+
 /// No two problems answer to the same code.
 ///
 /// The error model deliberately declares each code as a `const` beside the error
