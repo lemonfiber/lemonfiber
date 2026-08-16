@@ -267,6 +267,13 @@ pub struct Snapshot {
     pub transfers: Panel<Vec<Transfer>>,
     /// The per-service queues.
     pub queue: Panel<Vec<Queue>>,
+    /// What in the pipeline has stopped, worst first — assessed across the
+    /// download clients and the \*arrs together, because the failure that matters
+    /// most is invisible inside either.
+    pub stuck: Vec<crate::queue::Stuck>,
+    /// What the operator has been told, newest first: what is owed them where a
+    /// channel is refusing, then what has already been said.
+    pub alerts: Vec<crate::alert::Alert>,
     /// The storage picture.
     pub storage: Panel<Storage>,
     /// Every service and what it is doing.
@@ -491,6 +498,8 @@ mod tests {
                 eta: eta(5_000_000, 1_048_576),
             }]),
             queue: Panel::unavailable("sonarr did not answer"),
+            stuck: Vec::new(),
+            alerts: Vec::new(),
             storage: Panel::Ready(Storage {
                 free: Reading::Known(42_000_000_000),
                 exhaustion: None,
