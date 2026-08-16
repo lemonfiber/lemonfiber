@@ -3,6 +3,8 @@
 //! A byte count means nothing to the person reading it; the floor and the phrasing that
 //! turns one into the other belong together.
 
+use crate::bytes::humanize;
+
 use super::{finding, Code, Finding, Problem, Remedy, Severity, State, StorageFacts, Verdict};
 
 /// The free-space finding for the volume the data root sits on.
@@ -85,36 +87,6 @@ pub(super) fn free_note(facts: &StorageFacts, underway: u64) -> String {
     } else {
         free_of_total
     }
-}
-
-/// A byte count as a person reads it, to one decimal place.
-///
-/// Binary units, because that is what the tools an operator will cross-check
-/// against report, and one decimal because a library measured to the byte is
-/// noise around a figure whose point is "roughly how much room is left".
-pub(super) fn humanize(bytes: u64) -> String {
-    const UNITS: [(&str, u64); 4] = [
-        ("TiB", 1 << 40),
-        ("GiB", 1 << 30),
-        ("MiB", 1 << 20),
-        ("KiB", 1 << 10),
-    ];
-    for (label, size) in UNITS {
-        if bytes >= size {
-            // Rounded to the nearest tenth rather than truncated, so 2.0 GiB does
-            // not read as 1.9. The remainder is well under a terabyte, so scaling
-            // it by ten cannot overflow; a remainder that rounds up to a whole
-            // unit carries into it.
-            let mut whole = bytes / size;
-            let mut tenths = ((bytes % size) * 10 + size / 2) / size;
-            if tenths == 10 {
-                whole += 1;
-                tenths = 0;
-            }
-            return format!("{whole}.{tenths} {label}");
-        }
-    }
-    format!("{bytes} B")
 }
 
 /// Raised when the volume holding the data root is nearly full.

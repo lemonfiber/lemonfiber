@@ -151,13 +151,26 @@ restores full functionality in under 2 minutes, idempotently.
 
 ---
 
-## M5 — Trust checks · ☐
+## M5 — Trust checks · ◐
 
-`0.5.0`. The P3 trust pillar made continuous: VPN egress proof beyond setup,
-ongoing storage/hardlink verification, queue and provider health, and safe
-auto-remediation. The setup-time checks (M3) and the dashboard's read-only
-telemetry (M6) exist; the continuous trust lifecycle over them does not. See the
-[spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m5--trust-checks).
+The P3 trust pillar made continuous. Its first half shipped as `0.6.0` — VPN
+egress and killswitch proof, storage and hardlink verification, and queue health
+with its stuck-item categories. Those are recorded in the M3 table above, beside
+the setup-time checks they grew out of, rather than repeated here: a requirement
+named in two rows is one the release gate can read either way.
+
+What remains is the second half — the accounts underneath the stack, the bundle
+that makes a problem shareable, and the remediation that acts on what the checks
+find. See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m5--trust-checks).
+
+| Deliverable | Spec | Status | Landing / notes |
+|-------------|------|--------|-----------------|
+| Provider health — what the accounts have left | `C8-R1`, `C8-R3`, `C8-R4`, `C8-R6`, `C8-R7`, `C8-R10`, `C8-R11`, `C8-R13`, `C8-R14` | ✅ | [`doctor/providers`](crates/lemonfiber-core/src/doctor/providers.rs), over a pure [`provider`](crates/lemonfiber-core/src/provider.rs) model. Capacity is tracked beside validity, because a working login on an empty account authenticates perfectly and downloads nothing (`C8-R1`). A Usenet block is read from the download client that has been pulling through it — the only place the allowance and the bytes spent both exist — and depletion is warned about *before* it bites (`C8-R3`), projected from what the client actually measured day by day (`C8-R4`). The projection deliberately does not use the client's own week or month totals: those reset on the calendar, so read on a Monday morning they would promise an account years it does not have. Where no allowance is recorded, what it has pulled is still reported and nothing is concluded from it — an inferred figure presented as fact is worse than an honest gap (`C8-R6`). None of it spends any of what it measures: both the client and the aggregator keep their own records, so the check costs the providers nothing (`C8-R7`). Each indexer is reported on its own (`C8-R10`), except when every one of them is failing at once, which is escalated as the local network problem it almost certainly is rather than as eight lapsed subscriptions (`C8-R11`). A subscription's recorded end date is warned about before it passes (`C8-R13`), and a provider removed from the client stops being reported the moment it is gone, because every finding is derived from what the services hold now (`C8-R14`). |
+| Provider health — asking the provider itself | `C8-R2`, `C8-R9`, `C8-R12` | ☐ | The three that need lemonfiber to speak to the provider rather than read a client's records. The pure model already keeps `exhausted`, `invalid` and `unreachable` apart and maps a validation outcome onto them in one place, so a timeout can never be read as a refused credential — what is missing is the live probe that produces one, which needs an NNTP seam on the context. The connection-limit mismatch (`C8-R12`) has its source identified: the download client records the provider's own words when it refuses, and classifies them the way the client itself does. |
+| Indexer caps and when they reset | `C8-R5` | ☐ | Calls and grabs are counted per indexer today; the cap they are counted against is not, because almost no indexer publishes one. The limits in a Newznab capabilities document are results per query, not calls per day — reading them as a daily cap would report a quota that does not exist. Needs the spec's own answer on what "the reset time" can mean where the provider states none. |
+| Provider health in the no-downloads diagnosis | `C8-R8` | ☐ | Provider health is checked, but nothing yet reaches for it when the question is "why is nothing downloading". |
+| Support bundle | `C4-R1..R14` | ☐ | One command, one local archive, allow-list redaction with stable placeholders, and a fail-closed scan before anything is written. |
+| Auto-remediation | `C3-R1..R14` | ☐ | Offer, confirm, apply, re-run the originating check — and refuse anything that would overwrite an operator's own change. |
 
 ---
 

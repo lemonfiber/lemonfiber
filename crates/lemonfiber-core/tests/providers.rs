@@ -1,0 +1,260 @@
+//! The provider check, driven end to end through the diagnosis it is part of.
+//!
+//! From here rather than from a `#[cfg(test)]` module for the reason the
+//! credentials check is: the whole path is `#[async_trait]` clients built on
+//! another, which is compiled twice and whose coverage is counted from the wrong
+//! copy when it is exercised in-crate. Driving it from outside also proves the
+//! part an in-crate test cannot — that a real stack's services resolve to the two
+//! clients this reads, at the addresses and config paths the manifest declares.
+//!
+//! The stack is the real one, read from the repository's own embedded copy. The
+//! services under it are fakes: a filesystem holding the two configuration files
+//! the clients write their keys to, and a transport answering as the download
+//! client and the aggregator would.
+
+mod common;
+
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::SystemTime;
+
+use async_trait::async_trait;
+use common::{Answer, Fake};
+use lemonfiber_core::app::{diagnose, Ctx};
+use lemonfiber_core::config::Settings;
+use lemonfiber_core::doctor::{Category, Verdict};
+use lemonfiber_core::platform::Environment;
+use lemonfiber_core::ports::docker::{
+    Container, Engine, ExecOutput, Failure as EngineFailure, LogLine, LogQuery, Stats,
+};
+use lemonfiber_core::ports::filesystem::{
+    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
+};
+use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
+use lemonfiber_core::ports::time::Clock;
+use lemonfiber_core::stack::Source;
+use tokio::sync::mpsc::Receiver;
+
+/// The repository's own copy of the stack, so the services resolve to the ids,
+/// ports and config paths a real installation has rather than to invented ones.
+fn project() -> &'static Path {
+    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    PROJECT
+        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
+}
+
+/// `SABnzbd`'s configuration, carrying the key it generated for itself.
+const SAB_INI: &str = "[misc]\napi_key = sabkey123\n";
+
+/// The aggregator's configuration, carrying the key it generated for itself.
+const PROWLARR_XML: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
+
+/// One Usenet account with a block recorded against it, and one day of history.
+const SERVERS: &str = r#"{"config":{"servers":[
+    {"name":"news.example.com","displayname":"Block 500","enable":1,"quota":"500 G",
+     "usage_at_start":0,"expire_date":""}
+]}}"#;
+
+/// What that account has pulled, as the client has measured it.
+const STATS: &str = r#"{"servers":{"news.example.com":{"total":10737418240,"daily":{}}}}"#;
+
+/// One indexer the aggregator is querying, with today's counts.
+const INDEXERS: &str = r#"[{"id":1,"name":"Fast Indexer","enable":true,"status":null}]"#;
+const STANDINGS: &str = "[]";
+const COUNTS: &str = r#"{"indexers":[{"indexerId":1,"numberOfQueries":12,"numberOfGrabs":2,
+    "numberOfFailedQueries":0,"numberOfFailedGrabs":0}]}"#;
+
+/// A filesystem holding the two configuration files the clients write, and
+/// nothing else — every other capability is one this path never reaches for.
+struct Files;
+
+#[async_trait]
+impl FileSystem for Files {
+    async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
+        Ok(path.to_path_buf())
+    }
+    async fn touch(&self, _path: &Path) -> Result<(), Fault> {
+        Err(Fault::new("unused"))
+    }
+    async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
+        Err(Fault::new("unused"))
+    }
+    async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
+        Err(Fault::new("unused"))
+    }
+    async fn remove(&self, _path: &Path) {}
+    async fn read(&self, path: &Path) -> Option<String> {
+        let path = path.to_string_lossy().replace('\\', "/");
+        if path.ends_with("config/sabnzbd/sabnzbd.ini") {
+            return Some(SAB_INI.to_owned());
+        }
+        path.ends_with("config/prowlarr/config.xml")
+            .then(|| PROWLARR_XML.to_owned())
+    }
+    async fn write(&self, _path: &Path, _contents: &str) {}
+    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
+        None
+    }
+    async fn describe(&self, _path: &Path) -> StorageFacts {
+        StorageFacts {
+            kind: FsKind::Linking("test".to_owned()),
+            removable: false,
+            available: 0,
+            total: 0,
+        }
+    }
+}
+
+/// An engine with nothing running: the checks that ask it are not this one, and a
+/// stack that is down still has accounts worth reading.
+struct Stopped;
+
+#[async_trait]
+impl Engine for Stopped {
+    async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
+        Ok(Vec::new())
+    }
+    async fn logs(
+        &self,
+        _project: &str,
+        _services: &[String],
+        _query: LogQuery,
+    ) -> Result<Receiver<LogLine>, EngineFailure> {
+        Err(EngineFailure::Unreachable {
+            reason: "unused".to_owned(),
+        })
+    }
+    async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
+        Err(EngineFailure::Unreachable {
+            reason: "unused".to_owned(),
+        })
+    }
+    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
+        Err(EngineFailure::Unreachable {
+            reason: "unused".to_owned(),
+        })
+    }
+}
+
+/// A runner that spawns nothing, for the checks this one does not run.
+struct Idle;
+
+#[async_trait]
+impl Runner for Idle {
+    async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
+        Err(RunFailure::NotFound {
+            program: "unused".to_owned(),
+        })
+    }
+}
+
+/// A clock stopped at a fixed moment, so a projection is the same run to run.
+struct StoppedClock;
+
+#[async_trait]
+impl Clock for StoppedClock {
+    fn now(&self) -> SystemTime {
+        SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_786_000_000)
+    }
+}
+
+#[tokio::test]
+async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_them() {
+    let http = Fake::by_path(vec![
+        ("mode=get_config", Answer::reply(200, SERVERS)),
+        ("mode=server_stats", Answer::reply(200, STATS)),
+        ("/api/v1/indexerstatus", Answer::reply(200, STANDINGS)),
+        ("/api/v1/indexerstats", Answer::reply(200, COUNTS)),
+        ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
+    ]);
+    let ctx = Ctx::new(
+        Arc::new(Idle),
+        Arc::new(Stopped),
+        Arc::new(StoppedClock),
+        Arc::new(Files),
+        Source::External(project()),
+        Settings::default(),
+        Environment::MacOs,
+    )
+    .with_http(http);
+
+    let report = diagnose(&ctx, Some(Category::Providers), false).await;
+    let findings = report.map(|report| report.findings).unwrap_or_default();
+
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.title == "Block 500"
+                && matches!(&finding.verdict, Verdict::Pass { note }
+                    if note.as_deref().is_some_and(|note| note.contains("490.0 GiB left of 500.0 GiB")))),
+        "the Usenet account reports what its client measured: {findings:?}"
+    );
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.title == "Fast Indexer"
+                && matches!(&finding.verdict, Verdict::Pass { note }
+                    if note.as_deref().is_some_and(|note| note.contains("12 searches today, 2 grabs")))),
+        "the indexer reports what the aggregator counted: {findings:?}"
+    );
+}
+
+/// A stack whose services have not written their keys yet has nothing to read —
+/// which is a later run's business, not a fault.
+#[tokio::test]
+async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
+    struct Empty;
+
+    #[async_trait]
+    impl FileSystem for Empty {
+        async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
+            Ok(path.to_path_buf())
+        }
+        async fn touch(&self, _path: &Path) -> Result<(), Fault> {
+            Err(Fault::new("unused"))
+        }
+        async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
+            Err(Fault::new("unused"))
+        }
+        async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
+            Err(Fault::new("unused"))
+        }
+        async fn remove(&self, _path: &Path) {}
+        async fn read(&self, _path: &Path) -> Option<String> {
+            None
+        }
+        async fn write(&self, _path: &Path, _contents: &str) {}
+        async fn ownership(&self, _path: &Path) -> Option<Ownership> {
+            None
+        }
+        async fn describe(&self, _path: &Path) -> StorageFacts {
+            StorageFacts {
+                kind: FsKind::Linking("test".to_owned()),
+                removable: false,
+                available: 0,
+                total: 0,
+            }
+        }
+    }
+
+    let ctx = Ctx::new(
+        Arc::new(Idle),
+        Arc::new(Stopped),
+        Arc::new(StoppedClock),
+        Arc::new(Empty),
+        Source::External(project()),
+        Settings::default(),
+        Environment::MacOs,
+    )
+    .with_http(Fake::silent());
+
+    let report = diagnose(&ctx, Some(Category::Providers), false).await;
+    let findings = report.map(|report| report.findings).unwrap_or_default();
+
+    assert!(
+        findings
+            .iter()
+            .all(|finding| matches!(finding.verdict, Verdict::Skipped { .. })),
+        "nothing to read is skipped, not failed: {findings:?}"
+    );
+}
