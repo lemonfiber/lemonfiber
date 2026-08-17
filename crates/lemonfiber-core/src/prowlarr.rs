@@ -12,10 +12,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+use lemonfiber_manifest::Date;
+
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
-    AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
+    AppSync, Application, ApplicationKind, Failure, IndexerUse, Indexers, RegisteredApplication,
 };
 
 /// A client for one Prowlarr, speaking its application-sync API.
@@ -47,6 +49,19 @@ impl Prowlarr {
         self.endpoint
             .keyed_request(method, &format!("/api/v1{path}"), &self.key, body)
     }
+
+    /// One read under `/api/v1`, decoded — the shape every listing here shares.
+    async fn read<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        whenever: &str,
+    ) -> Result<T, Failure> {
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, path, None))
+            .await?;
+        self.endpoint.decode(&response, whenever)
+    }
 }
 
 #[async_trait]
@@ -64,17 +79,120 @@ impl AppSync for Prowlarr {
     }
 
     async fn applications(&self) -> Result<Vec<RegisteredApplication>, Failure> {
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, "/applications", None))
-            .await?;
         let applications: Vec<ApplicationResource> = self
-            .endpoint
-            .decode(&response, "the application list could not be read")?;
+            .read("/applications", "the application list could not be read")
+            .await?;
         Ok(applications
             .into_iter()
             .filter_map(ApplicationResource::registered)
             .collect())
+    }
+}
+
+/// An indexer as Prowlarr lists it.
+///
+/// The resource declares a `status` too, and Prowlarr never fills it in — the mapper
+/// that builds this answer leaves it null, and the standing of an indexer lives at its
+/// own endpoint. Reading it here would report every indexer as having never failed.
+#[derive(Deserialize)]
+struct IndexerResource {
+    id: i64,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    enable: bool,
+}
+
+/// One indexer's standing, from the endpoint that does fill it in.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IndexerStatusResource {
+    indexer_id: i64,
+    #[serde(default)]
+    disabled_till: Option<String>,
+}
+
+/// The counts Prowlarr keeps for each indexer over a window.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IndexerStatsResource {
+    #[serde(default)]
+    indexers: Vec<IndexerCounts>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IndexerCounts {
+    indexer_id: i64,
+    #[serde(default)]
+    number_of_queries: i64,
+    #[serde(default)]
+    number_of_grabs: i64,
+    #[serde(default)]
+    number_of_failed_queries: i64,
+    #[serde(default)]
+    number_of_failed_grabs: i64,
+}
+
+#[async_trait]
+impl Indexers for Prowlarr {
+    async fn indexers(&self, since: Date) -> Result<Vec<IndexerUse>, Failure> {
+        let listed: Vec<IndexerResource> = self
+            .read("/indexer", "the indexers could not be read")
+            .await?;
+        let standing: Vec<IndexerStatusResource> = self
+            .read("/indexerstatus", "the indexer standings could not be read")
+            .await?;
+        // The day starts where the aggregator is, which is where its own counters
+        // roll over; an hour of drift at the boundary moves a query between two days
+        // rather than losing it.
+        let counted: IndexerStatsResource = self
+            .read(
+                &format!(
+                    "/indexerstats?startDate={:04}-{:02}-{:02}T00:00:00",
+                    since.year, since.month, since.day
+                ),
+                "the indexer counts could not be read",
+            )
+            .await?;
+        Ok(listed
+            .into_iter()
+            .map(|indexer| {
+                let counts = counted
+                    .indexers
+                    .iter()
+                    .find(|counts| counts.indexer_id == indexer.id);
+                let rested = standing
+                    .iter()
+                    .find(|status| status.indexer_id == indexer.id)
+                    .and_then(|status| status.disabled_till.clone());
+                indexer_use(indexer, counts, rested)
+            })
+            .collect())
+    }
+}
+
+/// One listed indexer joined to its counts and its standing.
+///
+/// An indexer the counts do not mention has not been asked for anything in the
+/// window, which is a zero rather than a gap — and a zero is worth reporting: an
+/// indexer nobody is querying is a different thing from one that is failing.
+fn indexer_use(
+    indexer: IndexerResource,
+    counts: Option<&IndexerCounts>,
+    rested_until: Option<String>,
+) -> IndexerUse {
+    let count = |taken: fn(&IndexerCounts) -> i64| {
+        counts.map_or(0, |counts| u64::try_from(taken(counts)).unwrap_or(0))
+    };
+    IndexerUse {
+        name: indexer.name,
+        enabled: indexer.enable,
+        queries: count(|counts| counts.number_of_queries),
+        failed_queries: count(|counts| counts.number_of_failed_queries),
+        grabs: count(|counts| counts.number_of_grabs),
+        failed_grabs: count(|counts| counts.number_of_failed_grabs),
+        rested_until,
     }
 }
 

@@ -10,6 +10,7 @@ use crate::config::store;
 use crate::doctor::credentials::Target;
 use crate::jellyfin::Jellyfin;
 use crate::ports::service::{Download, Transfers};
+use crate::prowlarr::Prowlarr;
 use crate::qbittorrent::Qbittorrent;
 use crate::recyclarr::Kind;
 use crate::sabnzbd::Sabnzbd;
@@ -327,6 +328,70 @@ pub(super) fn service_addr(
     })
 }
 
+/// The stack's Usenet download client, as a reader of the accounts behind it.
+///
+/// Nothing where the stack has no Usenet client, or where the client has not written
+/// its key yet — a service still starting holds nothing to report, the same skip every
+/// read here makes.
+pub(super) async fn usenet_client(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Option<Sabnzbd> {
+    let (base, config) = download_targets(services, project)
+        .into_iter()
+        .find_map(|target| match target.kind {
+            DownloadKind::Sabnzbd { config } => Some((target.base, config)),
+            DownloadKind::Qbittorrent => None,
+        })?;
+    let text = ctx.filesystem.read(&config).await?;
+    let key = crate::sabnzbd::api_key(&text)?;
+    Some(Sabnzbd::new(ctx.http.clone(), base, key))
+}
+
+/// The Servarr-shape service that files no media of its own — the indexer aggregator,
+/// which is what makes it the one that knows how the indexers have been behaving.
+///
+/// Identified by what it does rather than by name, like every other service here, so a
+/// fork that ships a different aggregator under the same shape resolves the same way.
+pub(super) fn aggregator_target(
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Option<Target> {
+    let project = project?;
+    // A plain walk rather than a closure: this resolves from two callers in two
+    // crates, and a closure instantiated in both is one the coverage gate counts
+    // twice and sees run once.
+    for service in services {
+        if !service.media_types.is_empty() {
+            continue;
+        }
+        if let Some(target) = target_for(service, project) {
+            return Some(target);
+        }
+    }
+    None
+}
+
+/// The indexer aggregator, ready to be asked how its indexers have been behaving.
+///
+/// Its API is a major behind the media \*arrs', which is why it is its own client
+/// rather than the shared Servarr one — but it writes its key exactly the way they do.
+pub(super) async fn indexer_aggregator(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Option<Prowlarr> {
+    let target = aggregator_target(services, project)?;
+    let key = target.key(ctx.filesystem.as_ref()).await?;
+    Some(Prowlarr::new(
+        ctx.http.clone(),
+        &target.base,
+        key,
+        &target.id,
+    ))
+}
+
 /// One client's active downloads, read on its own shape — nothing where it is not
 /// yet seeded or will not answer, so it is left out rather than failing the read.
 ///
@@ -410,8 +475,54 @@ fn committed_of(downloads: &[Download]) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::committed_of;
+    use std::sync::Arc;
+
+    use super::{aggregator_target, committed_of, project_directory, Ctx};
+    use crate::config::Settings;
+    use crate::platform::Environment;
     use crate::ports::service::Download;
+    use crate::test_support::{spoke, stack, Reporting, Scripted};
+
+    /// A context over the real stack, for the resolution that reads only the manifest.
+    fn ctx() -> Ctx {
+        Ctx::new(
+            Arc::new(Scripted(Ok(spoke("")))),
+            Arc::new(Reporting::absent()),
+            Arc::new(crate::adapters::System),
+            Arc::new(crate::adapters::Disk),
+            stack(),
+            Settings::default(),
+            Environment::MacOs,
+        )
+    }
+
+    /// Every service the embedded stack declares, with the project it is read from.
+    fn resolving() -> (
+        Vec<lemonfiber_manifest::Service>,
+        Option<std::path::PathBuf>,
+    ) {
+        let context = ctx();
+        let services = context
+            .stack
+            .checked_manifest(context.today())
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
+        let project = project_directory(&context.stack, context.settings.stack_dir.as_deref());
+        (services, project)
+    }
+
+    /// The walk carries on past a service that files no media and is no target of its
+    /// own — the proxy solver in the middle of the list is exactly that, and stopping
+    /// at it would leave the aggregator unresolved on a stack that has one.
+    #[test]
+    fn a_service_that_files_no_media_and_is_no_target_does_not_end_the_walk() {
+        let (services, project) = resolving();
+        let without_the_aggregator: Vec<lemonfiber_manifest::Service> = services
+            .into_iter()
+            .filter(|service| service.id != "prowlarr")
+            .collect();
+        assert!(aggregator_target(&without_the_aggregator, project.as_deref()).is_none());
+    }
 
     /// A download with only its bytes-still-to-write set — the one field the
     /// committed sum reads.

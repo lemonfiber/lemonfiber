@@ -90,6 +90,29 @@ impl Date {
             day: u8::try_from(day).ok()?,
         })
     }
+
+    /// How many days from this date to `other` — negative where `other` is earlier.
+    ///
+    /// Counting days between calendar dates is the one operation subtraction of the
+    /// fields cannot do: months are different lengths and Februaries are two lengths,
+    /// so both dates are converted to a day count first and the difference taken there.
+    #[must_use]
+    pub fn days_until(self, other: Self) -> i64 {
+        other.epoch_day() - self.epoch_day()
+    }
+
+    /// The date as days since the Unix epoch — the inverse of the conversion above,
+    /// and Hinnant's `days_from_civil` for the same reason: shifting the year to start
+    /// in March puts the leap day at the end of it, where it needs no special case.
+    fn epoch_day(self) -> i64 {
+        let year = i64::from(self.year) - i64::from(self.month <= 2);
+        let era = year.div_euclid(400);
+        let year_of_era = year - era * 400;
+        let shifted_month = i64::from(self.month) + if self.month > 2 { -3 } else { 9 };
+        let day_of_year = (153 * shifted_month + 2) / 5 + i64::from(self.day) - 1;
+        let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+        era * 146_097 + day_of_era - 719_468
+    }
 }
 
 #[cfg(test)]
@@ -166,5 +189,46 @@ mod tests {
         assert!(Date::parse("2025-12-31") < Date::parse("2026-01-01"));
         assert!(Date::parse("2026-01-01") < Date::parse("2026-01-02"));
         assert!(Date::parse("2026-01-01") < Date::parse("2026-02-01"));
+    }
+
+    /// The cases field subtraction gets wrong: month ends, year ends, and the two
+    /// lengths of February — including the century rule that makes 1900 an ordinary
+    /// year and 2000 a leap one.
+    #[test]
+    fn days_between_dates_count_the_calendar_rather_than_the_fields() {
+        for (from, to, days) in [
+            (day(2026, 6, 26), day(2026, 6, 26), 0_i64),
+            (day(2026, 6, 26), day(2026, 6, 27), 1),
+            (day(2026, 1, 31), day(2026, 2, 1), 1),
+            (day(2025, 12, 31), day(2026, 1, 1), 1),
+            (day(2024, 2, 28), day(2024, 3, 1), 2),
+            (day(2023, 2, 28), day(2023, 3, 1), 1),
+            (day(1900, 2, 28), day(1900, 3, 1), 1),
+            (day(2000, 2, 28), day(2000, 3, 1), 2),
+            (day(2026, 1, 1), day(2027, 1, 1), 365),
+            (day(2024, 1, 1), day(2025, 1, 1), 366),
+        ] {
+            assert_eq!(from.days_until(to), days, "{from:?} to {to:?}");
+            assert_eq!(to.days_until(from), -days, "{to:?} back to {from:?}");
+        }
+    }
+
+    /// The two conversions are inverses, so a date read from a moment counts the same
+    /// days back to the epoch that the moment did.
+    #[test]
+    fn the_day_count_agrees_with_the_moment_it_came_from() {
+        for seconds in [0_i64, 86_400, 951_782_400, 1_774_396_800, -86_400] {
+            assert_eq!(
+                Date::from_unix_seconds(seconds).map(|date| day(1970, 1, 1).days_until(date)),
+                Some(seconds.div_euclid(86_400)),
+                "{seconds} seconds"
+            );
+        }
+    }
+
+    /// Built rather than parsed, because the parse is what the tests above are for
+    /// and a test helper that can fail is a second thing to reason about.
+    const fn day(year: u16, month: u8, day: u8) -> Date {
+        Date { year, month, day }
     }
 }

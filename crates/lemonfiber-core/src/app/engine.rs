@@ -15,6 +15,7 @@ use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
+use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
@@ -23,6 +24,7 @@ use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{DoctorReport, LifecycleReport, StackEdit, StatusReport, VersionReport};
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
+use crate::ports::service::{Indexers, UsenetAccounts};
 use crate::stack::closure::{resolve, Plan};
 use crate::stack::compose::{build, Action};
 
@@ -345,12 +347,27 @@ pub async fn diagnose(
         servarr_targets(&manifest.services, project.as_deref()),
         disruptive,
     );
+    // What the accounts underneath the stack have left, read from the services that
+    // use them — the download client that pulls through the Usenet accounts and the
+    // aggregator that queries the indexers, both of which keep their own records. So
+    // this costs the providers nothing: a check that spent the quota it measures would
+    // help cause the outage it is there to warn about.
+    let providers = ProvidersCheck::new(
+        super::targets::usenet_client(ctx, &manifest.services, project.as_deref())
+            .await
+            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
+        super::targets::indexer_aggregator(ctx, &manifest.services, project.as_deref())
+            .await
+            .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
+        ctx.today(),
+    );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(storage),
         Box::new(vpn),
         Box::new(credentials),
         Box::new(indexer),
+        Box::new(providers),
         Box::new(guides),
         Box::new(headroom),
         Box::new(releases),

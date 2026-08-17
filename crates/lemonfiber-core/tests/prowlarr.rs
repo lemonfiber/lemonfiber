@@ -15,9 +15,18 @@ use std::sync::Arc;
 use common::{Answer, Fake};
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::service::{
-    AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
+    AppSync, Application, ApplicationKind, Failure, IndexerUse, Indexers, RegisteredApplication,
 };
 use lemonfiber_core::prowlarr::Prowlarr;
+use lemonfiber_manifest::Date;
+
+/// The day the indexer counts are asked for, built rather than parsed: parsing has
+/// its own tests, and a fixture that can fail is a second thing to reason about.
+const TODAY: Date = Date {
+    year: 2026,
+    month: 8,
+    day: 16,
+};
 
 /// A Prowlarr client over the given fake.
 fn prowlarr(fake: &Arc<Fake>) -> Prowlarr {
@@ -227,4 +236,81 @@ async fn an_application_listing_with_no_answer_is_unavailable() {
         prowlarr(&fake).applications().await,
         Err(Failure::Unavailable { .. })
     ));
+}
+
+/// Two indexers as Prowlarr lists them, one of them switched off. The `status`
+/// field is present and null, which is all Prowlarr ever puts there.
+const INDEXERS: &str = r#"[
+    {"id":1,"name":"Fast Indexer","enable":true,"status":null},
+    {"id":2,"name":"Old Indexer","enable":false,"status":null}
+]"#;
+
+/// The standings, from the endpoint that does fill them in.
+const STANDINGS: &str = r#"[{"indexerId":2,"disabledTill":"2026-08-16T20:00:00Z"}]"#;
+
+/// The counts for the window asked for. The second indexer is not mentioned,
+/// because nothing has been asked of it.
+const COUNTS: &str = r#"{"indexers":[
+    {"indexerId":1,"numberOfQueries":142,"numberOfGrabs":7,
+     "numberOfFailedQueries":3,"numberOfFailedGrabs":1}
+]}"#;
+
+/// Reading how much of an allowance has gone must not spend any of it, so every
+/// figure comes from Prowlarr's own records rather than from asking the indexers.
+#[tokio::test]
+async fn indexer_use_is_read_from_the_aggregator_rather_than_from_the_indexers() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, INDEXERS),
+        Answer::reply(200, STANDINGS),
+        Answer::reply(200, COUNTS),
+    ]);
+    let indexers = prowlarr(&fake).indexers(TODAY).await.unwrap_or_default();
+
+    assert_eq!(
+        indexers,
+        vec![
+            IndexerUse {
+                name: "Fast Indexer".to_owned(),
+                enabled: true,
+                queries: 142,
+                failed_queries: 3,
+                grabs: 7,
+                failed_grabs: 1,
+                rested_until: None,
+            },
+            // Nothing has been asked of the second one, which is a zero rather than a
+            // gap — and its standing comes from the endpoint that fills one in.
+            IndexerUse {
+                name: "Old Indexer".to_owned(),
+                enabled: false,
+                queries: 0,
+                failed_queries: 0,
+                grabs: 0,
+                failed_grabs: 0,
+                rested_until: Some("2026-08-16T20:00:00Z".to_owned()),
+            },
+        ]
+    );
+
+    assert!(fake.asked_for("/api/v1/indexerstatus"));
+    assert!(fake.asked_for("/api/v1/indexerstats?startDate=2026-08-16T00:00:00"));
+}
+
+#[tokio::test]
+async fn indexers_that_cannot_be_read_are_a_failure_rather_than_an_empty_list() {
+    for answers in [
+        vec![Answer::reply(200, "not an array")],
+        vec![Answer::reply(200, INDEXERS), Answer::reply(200, "{}")],
+        vec![
+            Answer::reply(200, INDEXERS),
+            Answer::reply(200, STANDINGS),
+            Answer::reply(200, "not an object"),
+        ],
+    ] {
+        let fake = Fake::in_turn(answers);
+        assert!(matches!(
+            prowlarr(&fake).indexers(TODAY).await,
+            Err(Failure::Refused { .. })
+        ));
+    }
 }

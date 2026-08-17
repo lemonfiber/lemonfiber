@@ -93,20 +93,17 @@ pub(super) fn prowlarr_source(
     services: &[lemonfiber_manifest::Service],
     project: Option<&Path>,
 ) -> Option<AppSyncSource> {
-    let project = project?;
-    services.iter().find_map(|service| {
-        if !service.media_types.is_empty() {
-            return None;
-        }
-        // The target's api version is required for it to resolve, but Prowlarr's
-        // own client fixes v1, so it is the config path here that is load-bearing,
-        // not the version the target carries.
-        let target = target_for(service, project)?;
-        let port = service.port?;
-        Some(AppSyncSource {
-            target,
-            network_url: format!("http://{}:{port}", service.id),
-        })
+    // The target's api version is required for it to resolve, but Prowlarr's own
+    // client fixes v1, so it is the config path here that is load-bearing, not the
+    // version the target carries.
+    let target = super::super::targets::aggregator_target(services, project)?;
+    let port = services
+        .iter()
+        .find(|service| service.id == target.id)
+        .and_then(|service| service.port)?;
+    Some(AppSyncSource {
+        network_url: format!("http://{}:{port}", target.id),
+        target,
     })
 }
 

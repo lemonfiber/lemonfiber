@@ -1,4 +1,4 @@
-//! Reading `SABnzbd` — its configuration, and its queue for the dashboard.
+//! Reading `SABnzbd` — its configuration, its queue, and the accounts behind it.
 //!
 //! `SABnzbd` is a download client the Servarr apps are told about, not a service
 //! lemonfiber sends wiring commands to, so unlike the Servarr shape seed sends it
@@ -6,6 +6,12 @@
 //! generates for itself on first start. The dashboard does ask it one thing,
 //! though — what it is downloading right now — so a small read-only client lives
 //! here too, alongside the key reader.
+//!
+//! It is also the only place the Usenet accounts are legible at all: a provider
+//! publishes no quota, so the block that was bought is recorded in the client and the
+//! bytes pulled are measured there. Reading those is the third thing this asks for,
+//! and the client's own dialect — sizes stepped by 1024, booleans written as 0 and 1,
+//! counters that reset on the calendar — is translated here rather than leaking out.
 //!
 //! The key lives in `sabnzbd.ini`, a plain INI file, under a single `api_key`
 //! entry. It is read as text rather than through an INI dependency: one known key
@@ -21,9 +27,13 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+use lemonfiber_manifest::Date;
+
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::{Download, Failure, Transfers};
+use crate::ports::service::{
+    Download, Failure, Recorded, Transfers, UsenetAccount, UsenetAccounts,
+};
 
 /// The service name a failure is reported against.
 const SERVICE: &str = "sabnzbd";
@@ -98,21 +108,30 @@ struct Slot {
     mbleft: String,
 }
 
-#[async_trait]
-impl Transfers for Sabnzbd {
-    async fn transfers(&self) -> Result<Vec<Download>, Failure> {
+impl Sabnzbd {
+    /// One `mode=` call, decoded — the shape every read here shares.
+    async fn read<T: serde::de::DeserializeOwned>(
+        &self,
+        mode: &str,
+        whenever: &str,
+    ) -> Result<T, Failure> {
         let request = Request {
             method: Method::Get,
             url: self
                 .endpoint
-                .url(&format!("/api?mode=queue&output=json&apikey={}", self.key)),
+                .url(&format!("/api?mode={mode}&output=json&apikey={}", self.key)),
             headers: Vec::new(),
             body: None,
         };
         let response = self.endpoint.send(&request).await?;
-        let body: QueueResponse = self
-            .endpoint
-            .decode(&response, "the queue could not be read")?;
+        self.endpoint.decode(&response, whenever)
+    }
+}
+
+#[async_trait]
+impl Transfers for Sabnzbd {
+    async fn transfers(&self) -> Result<Vec<Download>, Failure> {
+        let body: QueueResponse = self.read("queue", "the queue could not be read").await?;
         let active_speed = bytes_per_second(&body.queue.kbpersec);
         Ok(body
             .queue
@@ -141,6 +160,170 @@ fn download_of(slot: Slot, active_speed: Option<u64>) -> Download {
             .map(Duration::from_secs),
         remaining: bytes_left(&slot.mbleft),
     }
+}
+
+/// `SABnzbd`'s `mode=get_config&section=servers` answer: the accounts as configured.
+#[derive(Deserialize)]
+struct ConfigResponse {
+    config: Servers,
+}
+
+#[derive(Deserialize)]
+struct Servers {
+    #[serde(default)]
+    servers: Vec<ServerConfig>,
+}
+
+/// One configured account. The username and the starred-out password come back in
+/// this answer too and are deliberately not read: nothing here needs them, and a
+/// field that is never taken cannot be logged, reported, or put in a bundle.
+#[derive(Deserialize)]
+struct ServerConfig {
+    /// The account's own key, which is also how the statistics are keyed.
+    name: String,
+    /// What the operator named it, where they named it anything.
+    #[serde(default)]
+    displayname: String,
+    /// `SABnzbd` writes its booleans as 0 or 1. A missing flag reads as in use:
+    /// over-reporting an account is a smaller error than silently dropping one.
+    #[serde(default = "in_use")]
+    enable: i64,
+    /// The allowance, in the client's own size notation.
+    #[serde(default)]
+    quota: String,
+    /// What had been pulled when that allowance was recorded.
+    #[serde(default)]
+    usage_at_start: i64,
+    /// The subscription's last day, as an ISO date.
+    #[serde(default)]
+    expire_date: String,
+}
+
+/// The default for a missing enabled flag — see [`ServerConfig::enable`].
+const fn in_use() -> i64 {
+    1
+}
+
+/// `SABnzbd`'s `mode=server_stats` answer: what each account has pulled, keyed by
+/// the same name the configuration uses.
+#[derive(Deserialize)]
+struct StatsResponse {
+    #[serde(default)]
+    servers: std::collections::BTreeMap<String, ServerStats>,
+}
+
+#[derive(Deserialize)]
+struct ServerStats {
+    /// Everything ever pulled from the account.
+    #[serde(default)]
+    total: u64,
+    /// Bytes per day, keyed by `YYYY-MM-DD`. The client's own week and month totals
+    /// are deliberately ignored: they reset on the calendar rather than rolling, so a
+    /// rate taken from them depends on what day it happens to be.
+    #[serde(default)]
+    daily: std::collections::BTreeMap<String, u64>,
+}
+
+#[async_trait]
+impl UsenetAccounts for Sabnzbd {
+    async fn accounts(&self) -> Result<Vec<UsenetAccount>, Failure> {
+        let configured: ConfigResponse = self
+            .read(
+                "get_config&section=servers",
+                "the Usenet accounts could not be read",
+            )
+            .await?;
+        let measured: StatsResponse = self
+            .read("server_stats", "the account statistics could not be read")
+            .await?;
+        Ok(configured
+            .config
+            .servers
+            .into_iter()
+            .map(|server| {
+                let stats = measured.servers.get(&server.name);
+                account_of(server, stats)
+            })
+            .collect())
+    }
+}
+
+/// One configured account joined to what it has pulled.
+///
+/// An account the statistics have never mentioned has downloaded nothing yet, which
+/// is a zero rather than a gap: the client would not measure an account it has not
+/// used, and reporting that as unreadable would raise a fault about an idle provider.
+fn account_of(server: ServerConfig, stats: Option<&ServerStats>) -> UsenetAccount {
+    let downloaded = stats.map_or(0, |stats| stats.total);
+    let name = if server.displayname.trim().is_empty() {
+        server.name
+    } else {
+        server.displayname
+    };
+    UsenetAccount {
+        name,
+        enabled: server.enable != 0,
+        quota: recorded_quota(&server.quota, server.usage_at_start),
+        downloaded,
+        daily: stats.map(daily_totals).unwrap_or_default(),
+        expires_on: Date::parse(server.expire_date.trim()),
+    }
+}
+
+/// The allowance recorded against an account, where one is recorded at all.
+///
+/// An unset, unreadable or unlimited quota is `None` — nothing to judge capacity
+/// against, which the report says plainly rather than filling in.
+fn recorded_quota(quota: &str, usage_at_start: i64) -> Option<Recorded> {
+    let cap = size_of(quota).filter(|cap| *cap > 0)?;
+    Some(Recorded {
+        cap,
+        from: u64::try_from(usage_at_start).unwrap_or(0),
+    })
+}
+
+/// `SABnzbd`'s size notation — a number with an optional `K`/`M`/`G`/`T`/`P` — as
+/// bytes.
+///
+/// Each step is 1024, not 1000, which is what the client itself does: reading `100G`
+/// as a hundred billion bytes would put every figure lemonfiber reports seven percent
+/// away from the one the operator sees in their own client, and a figure that
+/// disagrees with the client is worse than no figure. The fraction is folded in by
+/// integer arithmetic rather than a float, so a size the client accepts is not
+/// rounded on the way through.
+fn size_of(text: &str) -> Option<u64> {
+    let text = text.trim();
+    let split = text
+        .find(|character: char| character.is_ascii_alphabetic())
+        .unwrap_or(text.len());
+    let (number, unit) = text.split_at(split);
+    let scale: u64 = match unit.trim().to_ascii_uppercase().as_str() {
+        "" => 1,
+        "K" => 1 << 10,
+        "M" => 1 << 20,
+        "G" => 1 << 30,
+        "T" => 1 << 40,
+        "P" => 1 << 50,
+        _ => return None,
+    };
+    let (whole, fraction) = number.trim().split_once('.').unwrap_or((number.trim(), ""));
+    let bytes = whole.trim().parse::<u64>().ok()?.checked_mul(scale)?;
+    if fraction.is_empty() {
+        return Some(bytes);
+    }
+    let places = u32::try_from(fraction.len()).ok()?;
+    let scaled = fraction.parse::<u64>().ok()?.checked_mul(scale)?;
+    bytes.checked_add(scaled / 10_u64.checked_pow(places)?)
+}
+
+/// The per-day figures, as dates. A key that is not a date is dropped rather than
+/// guessed at: a day nobody can place cannot be part of a window.
+fn daily_totals(stats: &ServerStats) -> Vec<(Date, u64)> {
+    stats
+        .daily
+        .iter()
+        .filter_map(|(day, bytes)| Date::parse(day).map(|day| (day, *bytes)))
+        .collect()
 }
 
 /// `SABnzbd`'s `mbleft` — a decimal string of megabytes still to fetch — as bytes,
@@ -248,14 +431,16 @@ nzb_key = ffffffffffff
 }
 
 #[cfg(test)]
-mod transfers_tests {
+mod client_tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use crate::ports::service::{Failure, Transfers};
+    use lemonfiber_manifest::Date;
+
+    use crate::ports::service::{Failure, Recorded, Transfers, UsenetAccount, UsenetAccounts};
     use crate::test_support::ScriptedHttp;
 
-    use super::Sabnzbd;
+    use super::{recorded_quota, size_of, Sabnzbd};
 
     /// A client whose transport answers the queue call from `replies`.
     fn client(replies: Vec<(u16, &'static str)>) -> Sabnzbd {
@@ -340,5 +525,144 @@ mod transfers_tests {
             sab.transfers().await,
             Err(Failure::Refused { .. })
         ));
+    }
+
+    /// Two accounts as the client holds them: a block with an allowance, an expiry
+    /// and a history, and an unlimited one the operator disabled and named nothing.
+    const SERVERS: &str = r#"{"config":{"servers":[
+        {"name":"news.example.com","displayname":"Block 500","enable":1,"quota":"500 G",
+         "usage_at_start":100,"expire_date":"2026-09-01","username":"someone","password":"****"},
+        {"name":"backup.example.com","displayname":"","enable":0,"quota":"","usage_at_start":0,
+         "expire_date":""}
+    ]}}"#;
+
+    /// The matching statistics, keyed by the account's own name. One day's key is not
+    /// a date, and the disabled account has never been used at all.
+    const STATS: &str = r#"{"total":9,"servers":{"news.example.com":{
+        "total":2048,"month":10,"week":5,
+        "daily":{"2026-08-14":600,"2026-08-15":400,"not-a-day":999}}}}"#;
+
+    /// The whole shape at once: what was recorded, what was measured, and the join
+    /// between them — including the account the statistics have never mentioned.
+    #[tokio::test]
+    async fn each_account_carries_what_was_recorded_and_what_was_measured() {
+        let sab = client(vec![(200, SERVERS), (200, STATS)]);
+        assert_eq!(
+            sab.accounts().await.unwrap_or_default(),
+            vec![
+                UsenetAccount {
+                    name: "Block 500".to_owned(),
+                    enabled: true,
+                    quota: Some(Recorded {
+                        cap: 500 * (1 << 30),
+                        from: 100,
+                    }),
+                    downloaded: 2048,
+                    // A day nobody can place is dropped rather than guessed at.
+                    daily: vec![
+                        (
+                            Date {
+                                year: 2026,
+                                month: 8,
+                                day: 14
+                            },
+                            600
+                        ),
+                        (
+                            Date {
+                                year: 2026,
+                                month: 8,
+                                day: 15
+                            },
+                            400
+                        ),
+                    ],
+                    expires_on: Some(Date {
+                        year: 2026,
+                        month: 9,
+                        day: 1
+                    }),
+                },
+                UsenetAccount {
+                    name: "backup.example.com".to_owned(),
+                    enabled: false,
+                    quota: None,
+                    downloaded: 0,
+                    daily: Vec::new(),
+                    expires_on: None,
+                },
+            ]
+        );
+    }
+
+    /// A client that writes no enabled flag at all leaves the account in use: dropping
+    /// a provider silently is the worse of the two errors.
+    #[tokio::test]
+    async fn an_account_with_no_enabled_flag_is_read_as_one_in_use() {
+        let sparse = r#"{"config":{"servers":[{"name":"news.example.com"}]}}"#;
+        let sab = client(vec![(200, sparse), (200, r#"{"servers":{}}"#)]);
+        assert_eq!(
+            sab.accounts().await.unwrap_or_default(),
+            vec![UsenetAccount {
+                name: "news.example.com".to_owned(),
+                enabled: true,
+                quota: None,
+                downloaded: 0,
+                daily: Vec::new(),
+                expires_on: None,
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn accounts_that_cannot_be_read_are_a_failure_rather_than_an_empty_list() {
+        let unreadable = client(vec![(200, "not json")]);
+        assert!(matches!(
+            unreadable.accounts().await,
+            Err(Failure::Refused { .. })
+        ));
+
+        let no_statistics = client(vec![(200, SERVERS)]);
+        assert!(matches!(
+            no_statistics.accounts().await,
+            Err(Failure::Unavailable { .. })
+        ));
+    }
+
+    /// The client steps its sizes by 1024 whatever the letter suggests, so a figure
+    /// read here has to match the one the operator sees in their own client.
+    #[test]
+    fn a_recorded_size_reads_the_way_the_client_wrote_it() {
+        for (written, bytes) in [
+            ("1024", Some(1024_u64)),
+            ("1K", Some(1 << 10)),
+            ("10 M", Some(10 * (1 << 20))),
+            ("100G", Some(100 * (1 << 30))),
+            ("1.5G", Some(1024 * 1024 * 1024 + 512 * 1024 * 1024)),
+            ("2T", Some(2 * (1 << 40))),
+            ("1P", Some(1 << 50)),
+            ("", None),
+            ("-1", None),
+            ("unlimited", None),
+            ("100Z", None),
+            ("999999999999P", None),
+        ] {
+            assert_eq!(size_of(written), bytes, "{written:?}");
+        }
+    }
+
+    /// An allowance of nothing is no allowance: it would otherwise read as an account
+    /// that is permanently, provably empty.
+    #[test]
+    fn an_allowance_of_zero_is_not_an_allowance() {
+        assert_eq!(recorded_quota("0", 0), None);
+        assert_eq!(
+            recorded_quota("1G", -5),
+            Some(Recorded {
+                cap: 1 << 30,
+                from: 0,
+            }),
+            "a baseline no client would write reads as none rather than wrapping"
+        );
     }
 }

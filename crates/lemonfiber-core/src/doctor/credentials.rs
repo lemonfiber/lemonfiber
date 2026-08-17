@@ -61,8 +61,7 @@ impl Target {
     /// Servarr-shape service — the credentials check, the dashboard's queues, and
     /// seeding — cannot drift on how they do it.
     pub(crate) async fn open(&self, http: &Arc<dyn Http>, fs: &dyn FileSystem) -> Option<Servarr> {
-        let config = fs.read(&self.config).await?;
-        let key = api_key(&config)?;
+        let key = self.key(fs).await?;
         Some(Servarr::new(
             http.clone(),
             &self.base,
@@ -70,6 +69,16 @@ impl Target {
             &self.id,
             self.version,
         ))
+    }
+
+    /// The key this service generated for itself, read from the file it wrote it to.
+    ///
+    /// Apart from [`Self::open`] because the aggregator speaks a shape of its own: it
+    /// writes its key exactly the way the others do, and only what is built from it
+    /// differs.
+    pub(crate) async fn key(&self, fs: &dyn FileSystem) -> Option<String> {
+        let config = fs.read(&self.config).await?;
+        api_key(&config)
     }
 }
 

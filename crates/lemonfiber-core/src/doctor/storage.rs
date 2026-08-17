@@ -283,7 +283,6 @@ mod tests {
     use async_trait::async_trait;
 
     use super::findings::writable;
-    use super::space::humanize;
     use super::{
         Check, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED, ROOT_ABSENT,
         ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
@@ -660,23 +659,6 @@ mod tests {
             verdict(&findings, "storage.space"),
             Some(Verdict::Unverified { .. })
         ));
-    }
-
-    #[test]
-    fn a_byte_count_reads_in_the_unit_a_person_would_use() {
-        assert_eq!(humanize(0), "0 B");
-        assert_eq!(humanize(512), "512 B");
-        assert_eq!(humanize(1536), "1.5 KiB");
-        assert_eq!(humanize(3 * 1024 * 1024), "3.0 MiB");
-        assert_eq!(
-            humanize(10 * 1024 * 1024 * 1024 + 512 * 1024 * 1024),
-            "10.5 GiB"
-        );
-        assert_eq!(humanize(1024_u64.pow(4) * 2), "2.0 TiB");
-        // Rounded, not truncated: a hair under two gigabytes reads as 2.0, and
-        // the tenth that rounds up carries into the whole rather than showing 1.10.
-        assert_eq!(humanize(2 * 1024 * 1024 * 1024 - 1), "2.0 GiB");
-        assert_eq!(humanize(1024 * 1024 * 1024 + 550 * 1024 * 1024), "1.5 GiB");
     }
 
     #[tokio::test]
