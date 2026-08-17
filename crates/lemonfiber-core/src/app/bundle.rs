@@ -33,12 +33,11 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str) -> Option<Contents> {
     let mut missing = Vec::new();
     // The first thing read and the first thing that can be missing: a machine whose stack
     // will not read is exactly the machine somebody needs a bundle from.
-    let stack = match ctx.stack.checked_manifest(ctx.today()) {
-        Ok(manifest) => manifest.stack_version,
-        Err(_) => {
-            missing.push("the stack description could not be read".to_owned());
-            UNKNOWN.to_owned()
-        }
+    let stack = if let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) {
+        manifest.stack_version
+    } else {
+        missing.push("the stack description could not be read".to_owned());
+        UNKNOWN.to_owned()
     };
 
     match super::engine::diagnose(ctx, None, false).await {
