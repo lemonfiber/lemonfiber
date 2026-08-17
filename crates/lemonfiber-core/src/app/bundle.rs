@@ -270,7 +270,7 @@ fn unwritten(dest: &Path, fault: &Fault) -> Problem {
         Remedy::new("Check the path is writable, then ask for the bundle again"),
     )
     .in_state(State::Guided)
-    .with_detail(format!("{}: {fault}", dest.display()))
+    .with_detail(format!("{}: {}", dest.display(), fault.message))
 }
 
 #[cfg(test)]
