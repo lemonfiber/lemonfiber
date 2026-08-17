@@ -58,6 +58,20 @@ const SERVERS: &str = r#"{"config":{"servers":[
 /// What that account has pulled, as the client has measured it.
 const STATS: &str = r#"{"servers":{"news.example.com":{"total":10737418240,"daily":{}}}}"#;
 
+/// How the client is finding that account right now: in rotation, half its connections
+/// up, and nothing recorded against it.
+const STATUS: &str = r#"{"status":{"servers":[
+    {"servername":"Block 500","serveractive":true,"serveractiveconn":4,"servertotalconn":8,
+     "servererror":""}
+]}}"#;
+
+/// The same account, refusing the credentials the client offers it — the provider's own
+/// words, as the client wrote them down.
+const REFUSING: &str = r#"{"status":{"servers":[
+    {"servername":"Block 500","serveractive":false,"serveractiveconn":0,"servertotalconn":8,
+     "servererror":"Failed login for server news.example.com [481 Authentication rejected]"}
+]}}"#;
+
 /// One indexer the aggregator is querying, with today's counts.
 const INDEXERS: &str = r#"[{"id":1,"name":"Fast Indexer","enable":true,"status":null}]"#;
 const STANDINGS: &str = "[]";
@@ -163,6 +177,7 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
     let http = Fake::by_path(vec![
         ("mode=get_config", Answer::reply(200, SERVERS)),
         ("mode=server_stats", Answer::reply(200, STATS)),
+        ("mode=fullstatus", Answer::reply(200, STATUS)),
         ("/api/v1/indexerstatus", Answer::reply(200, STANDINGS)),
         ("/api/v1/indexerstats", Answer::reply(200, COUNTS)),
         ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
@@ -196,6 +211,41 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
                 && matches!(&finding.verdict, Verdict::Pass { note }
                     if note.as_deref().is_some_and(|note| note.contains("12 searches today, 2 grabs")))),
         "the indexer reports what the aggregator counted: {findings:?}"
+    );
+}
+
+/// The state the whole live view exists to name. Every service is up, the stack is
+/// perfect, and the account the downloads run through is turning the client away — which
+/// from the outside is indistinguishable from software that has stopped working.
+#[tokio::test]
+async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
+    let http = Fake::by_path(vec![
+        ("mode=get_config", Answer::reply(200, SERVERS)),
+        ("mode=server_stats", Answer::reply(200, STATS)),
+        ("mode=fullstatus", Answer::reply(200, REFUSING)),
+        ("/api/v1/indexerstatus", Answer::reply(200, STANDINGS)),
+        ("/api/v1/indexerstats", Answer::reply(200, COUNTS)),
+        ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
+    ]);
+    let ctx = Ctx::new(
+        Arc::new(Idle),
+        Arc::new(Stopped),
+        Arc::new(StoppedClock),
+        Arc::new(Files),
+        Source::External(project()),
+        Settings::default(),
+        Environment::MacOs,
+    )
+    .with_http(http);
+
+    let report = diagnose(&ctx, Some(Category::Providers), false).await;
+    let findings = report.map(|report| report.findings).unwrap_or_default();
+
+    assert!(
+        findings.iter().any(|finding| finding.title == "Block 500"
+            && matches!(&finding.verdict, Verdict::Fail(problem)
+                if problem.detail.as_deref().is_some_and(|detail| detail.contains("481")))),
+        "a rejected login is reported as one, in the provider's own words: {findings:?}"
     );
 }
 

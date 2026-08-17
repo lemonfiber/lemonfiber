@@ -32,7 +32,12 @@ pub(super) fn findings(indexers: &[IndexerUse]) -> Vec<Finding> {
         .iter()
         .filter(|indexer| is_failing(indexer))
         .count();
-    if failing == querying.len() {
+    // The escalation rests on a coincidence too large to believe — several indexers, run by
+    // unrelated people, all stopping within the same hour. With one indexer there is no
+    // coincidence to disbelieve: "all of them" is that one, and the likeliest cause is the
+    // ordinary one, which is the indexer itself. Sending its operator to check their DNS
+    // instead of their subscription would be the wrong half of the answer.
+    if failing == querying.len() && querying.len() > 1 {
         return vec![all_failing(&querying)];
     }
     querying.iter().map(|indexer| finding(indexer)).collect()
@@ -188,6 +193,23 @@ mod tests {
             Some(Verdict::Fail(problem))
                 if problem.code == INDEXERS_ALL_FAILING
                     && problem.detail.as_deref() == Some("2 indexers affected: Fast, Slow")
+        ));
+    }
+
+    /// The escalation is an argument from coincidence, and one indexer is no coincidence:
+    /// a household running a single indexer whose subscription lapsed would be sent to
+    /// check its network, which is the one place the problem is not.
+    #[test]
+    fn a_household_with_one_indexer_is_told_about_the_indexer() {
+        let found = findings(&[rested("Only")]);
+        assert_eq!(found.len(), 1);
+        assert_eq!(
+            found.first().map(|finding| finding.check.as_str()),
+            Some("providers.indexer.Only")
+        );
+        assert!(matches!(
+            found.first().map(|finding| &finding.verdict),
+            Some(Verdict::Warn(problem)) if problem.code == INDEXER_RESTED
         ));
     }
 

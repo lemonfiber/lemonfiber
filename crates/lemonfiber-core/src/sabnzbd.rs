@@ -32,7 +32,7 @@ use lemonfiber_manifest::Date;
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
-    Download, Failure, Recorded, Transfers, UsenetAccount, UsenetAccounts,
+    Download, Failure, Recorded, Standing, Transfers, UsenetAccount, UsenetAccounts,
 };
 
 /// The service name a failure is reported against.
@@ -224,6 +224,52 @@ struct ServerStats {
     daily: std::collections::BTreeMap<String, u64>,
 }
 
+/// `SABnzbd`'s `mode=fullstatus` answer: how each account is doing at this moment,
+/// rather than what it has pulled over its life.
+///
+/// The dashboard half of that answer is skipped. It resolves the machine's public
+/// address and probes DNS on the client's behalf — work nothing here asks about, and
+/// which would make a read of an account's standing reach the network to answer.
+#[derive(Deserialize)]
+struct StatusResponse {
+    status: Statuses,
+}
+
+#[derive(Deserialize)]
+struct Statuses {
+    #[serde(default)]
+    servers: Vec<ServerStatus>,
+}
+
+/// One account as the client is finding it right now.
+#[derive(Deserialize)]
+struct ServerStatus {
+    /// The name the client shows for it, which is the display name it was configured
+    /// with — the client fills that in from the account's own key where the operator
+    /// left it blank, so it is the name the configuration answer carries too.
+    #[serde(default)]
+    servername: String,
+    /// Whether the client still has it in rotation. A missing flag reads as in use, for
+    /// the same reason a missing enabled flag does: inventing a dropped account is a
+    /// worse error than missing one, and this one reports a provider as not answering.
+    #[serde(default = "in_rotation")]
+    serveractive: bool,
+    /// Connections it currently holds ready to it.
+    #[serde(default)]
+    serveractiveconn: i64,
+    /// Connections it is configured to open to it.
+    #[serde(default)]
+    servertotalconn: i64,
+    /// The last trouble it recorded against the account, in the words it recorded.
+    #[serde(default)]
+    servererror: String,
+}
+
+/// The default for a missing rotation flag — see [`ServerStatus::serveractive`].
+const fn in_rotation() -> bool {
+    true
+}
+
 #[async_trait]
 impl UsenetAccounts for Sabnzbd {
     async fn accounts(&self) -> Result<Vec<UsenetAccount>, Failure> {
@@ -236,30 +282,48 @@ impl UsenetAccounts for Sabnzbd {
         let measured: StatsResponse = self
             .read("server_stats", "the account statistics could not be read")
             .await?;
+        let live: StatusResponse = self
+            .read(
+                "fullstatus&skip_dashboard=1",
+                "how the accounts are being served could not be read",
+            )
+            .await?;
         Ok(configured
             .config
             .servers
             .into_iter()
             .map(|server| {
                 let stats = measured.servers.get(&server.name);
-                account_of(server, stats)
+                account_of(server, stats, &live.status.servers)
             })
             .collect())
     }
 }
 
-/// One configured account joined to what it has pulled.
+/// One configured account joined to what it has pulled and how it is being served.
 ///
 /// An account the statistics have never mentioned has downloaded nothing yet, which
 /// is a zero rather than a gap: the client would not measure an account it has not
 /// used, and reporting that as unreadable would raise a fault about an idle provider.
-fn account_of(server: ServerConfig, stats: Option<&ServerStats>) -> UsenetAccount {
+///
+/// One the live view does not mention has no standing at all, which is its own answer:
+/// the client only builds a connection to an account it is set to use, so an account
+/// missing from it is one nothing has been asked of.
+fn account_of(
+    server: ServerConfig,
+    stats: Option<&ServerStats>,
+    live: &[ServerStatus],
+) -> UsenetAccount {
     let downloaded = stats.map_or(0, |stats| stats.total);
     let name = if server.displayname.trim().is_empty() {
         server.name
     } else {
         server.displayname
     };
+    let standing = live
+        .iter()
+        .find(|status| status.servername == name)
+        .map(standing_of);
     UsenetAccount {
         name,
         enabled: server.enable != 0,
@@ -267,6 +331,22 @@ fn account_of(server: ServerConfig, stats: Option<&ServerStats>) -> UsenetAccoun
         downloaded,
         daily: stats.map(daily_totals).unwrap_or_default(),
         expires_on: Date::parse(server.expire_date.trim()),
+        standing,
+    }
+}
+
+/// How an account is being served, as the client has it this moment.
+///
+/// Counts that will not fit are read as none held rather than as an error: a negative
+/// connection count is not a fault of the account, and the figures are evidence of it
+/// working rather than of it failing, so the cautious reading is the smaller one.
+fn standing_of(status: &ServerStatus) -> Standing {
+    let words = status.servererror.trim();
+    Standing {
+        ready: u64::try_from(status.serveractiveconn).unwrap_or(0),
+        configured: u64::try_from(status.servertotalconn).unwrap_or(0),
+        serving: status.serveractive,
+        trouble: (!words.is_empty()).then(|| words.to_owned()),
     }
 }
 
@@ -437,7 +517,9 @@ mod client_tests {
 
     use lemonfiber_manifest::Date;
 
-    use crate::ports::service::{Failure, Recorded, Transfers, UsenetAccount, UsenetAccounts};
+    use crate::ports::service::{
+        Failure, Recorded, Standing, Transfers, UsenetAccount, UsenetAccounts,
+    };
     use crate::test_support::ScriptedHttp;
 
     use super::{recorded_quota, size_of, Sabnzbd};
@@ -542,11 +624,20 @@ mod client_tests {
         "total":2048,"month":10,"week":5,
         "daily":{"2026-08-14":600,"2026-08-15":400,"not-a-day":999}}}}"#;
 
-    /// The whole shape at once: what was recorded, what was measured, and the join
-    /// between them — including the account the statistics have never mentioned.
+    /// The client's live view of the same two accounts: it is holding two connections
+    /// to the block of the eight it is set to open, and the provider has refused the
+    /// rest. The disabled one it has not built a connection to at all.
+    const STATUS: &str = r#"{"status":{"servers":[
+        {"servername":"Block 500","serveractive":true,"serveractiveconn":2,"servertotalconn":8,
+         "servererror":"Too many connections to server news.example.com [502 Too many connections]"}
+    ]}}"#;
+
+    /// The whole shape at once: what was recorded, what was measured, how it is being
+    /// served, and the join between them — including the account the statistics have
+    /// never mentioned and the one the live view does not hold.
     #[tokio::test]
     async fn each_account_carries_what_was_recorded_and_what_was_measured() {
-        let sab = client(vec![(200, SERVERS), (200, STATS)]);
+        let sab = client(vec![(200, SERVERS), (200, STATS), (200, STATUS)]);
         assert_eq!(
             sab.accounts().await.unwrap_or_default(),
             vec![
@@ -582,6 +673,15 @@ mod client_tests {
                         month: 9,
                         day: 1
                     }),
+                    standing: Some(Standing {
+                        ready: 2,
+                        configured: 8,
+                        serving: true,
+                        trouble: Some(
+                            "Too many connections to server news.example.com [502 Too many connections]"
+                                .to_owned()
+                        ),
+                    }),
                 },
                 UsenetAccount {
                     name: "backup.example.com".to_owned(),
@@ -590,8 +690,67 @@ mod client_tests {
                     downloaded: 0,
                     daily: Vec::new(),
                     expires_on: None,
+                    standing: None,
                 },
             ]
+        );
+    }
+
+    /// A live view that says only which account it is leaves the account in rotation
+    /// with nothing recorded against it: the reading that follows from a missing flag
+    /// must be the one that invents no fault.
+    #[tokio::test]
+    async fn a_live_view_with_nothing_filled_in_reads_as_an_account_in_rotation() {
+        let bare = r#"{"status":{"servers":[{"servername":"news.example.com"}]}}"#;
+        let sab = client(vec![
+            (
+                200,
+                r#"{"config":{"servers":[{"name":"news.example.com"}]}}"#,
+            ),
+            (200, r#"{"servers":{}}"#),
+            (200, bare),
+        ]);
+        assert_eq!(
+            sab.accounts()
+                .await
+                .unwrap_or_default()
+                .first()
+                .and_then(|account| account.standing.clone()),
+            Some(Standing {
+                ready: 0,
+                configured: 0,
+                serving: true,
+                trouble: None,
+            })
+        );
+    }
+
+    /// Counts that cannot be what they claim to be are read as none held: the figures
+    /// are evidence of an account working, so the cautious reading is the smaller one.
+    #[tokio::test]
+    async fn connection_counts_that_make_no_sense_are_read_as_none_held() {
+        let impossible = r#"{"status":{"servers":[{"servername":"news.example.com",
+            "serveractiveconn":-4,"servertotalconn":-8,"servererror":"   "}]}}"#;
+        let sab = client(vec![
+            (
+                200,
+                r#"{"config":{"servers":[{"name":"news.example.com"}]}}"#,
+            ),
+            (200, r#"{"servers":{}}"#),
+            (200, impossible),
+        ]);
+        assert_eq!(
+            sab.accounts()
+                .await
+                .unwrap_or_default()
+                .first()
+                .and_then(|account| account.standing.clone()),
+            Some(Standing {
+                ready: 0,
+                configured: 0,
+                serving: true,
+                trouble: None,
+            })
         );
     }
 
@@ -600,7 +759,11 @@ mod client_tests {
     #[tokio::test]
     async fn an_account_with_no_enabled_flag_is_read_as_one_in_use() {
         let sparse = r#"{"config":{"servers":[{"name":"news.example.com"}]}}"#;
-        let sab = client(vec![(200, sparse), (200, r#"{"servers":{}}"#)]);
+        let sab = client(vec![
+            (200, sparse),
+            (200, r#"{"servers":{}}"#),
+            (200, r#"{"status":{}}"#),
+        ]);
         assert_eq!(
             sab.accounts().await.unwrap_or_default(),
             vec![UsenetAccount {
@@ -610,6 +773,7 @@ mod client_tests {
                 downloaded: 0,
                 daily: Vec::new(),
                 expires_on: None,
+                standing: None,
             }]
         );
     }
@@ -625,6 +789,15 @@ mod client_tests {
         let no_statistics = client(vec![(200, SERVERS)]);
         assert!(matches!(
             no_statistics.accounts().await,
+            Err(Failure::Unavailable { .. })
+        ));
+
+        // A client that will not say how the accounts are being served is a client
+        // half-read, and half a picture reported as a whole one is the failure this
+        // check exists to prevent.
+        let no_live_view = client(vec![(200, SERVERS), (200, STATS)]);
+        assert!(matches!(
+            no_live_view.accounts().await,
             Err(Failure::Unavailable { .. })
         ));
     }
