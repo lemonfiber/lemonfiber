@@ -28,7 +28,7 @@ pub use clients::{
 pub use failure::{
     Failure, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE, SERVICE_UNSUPPORTED,
 };
-pub use providers::{IndexerUse, Indexers, Recorded, UsenetAccount, UsenetAccounts};
+pub use providers::{IndexerUse, Indexers, Recorded, Standing, UsenetAccount, UsenetAccounts};
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 

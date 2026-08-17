@@ -30,6 +30,36 @@ pub struct Recorded {
     pub from: u64,
 }
 
+/// What the client's last exchange with an account showed.
+///
+/// Its records say what an account has pulled; this says what happened when the client
+/// last actually spoke to it, which no total can show — a hundred gigabytes pulled last
+/// week is no evidence the account answers this morning. So the two are kept apart, and
+/// only this half is a reply from the provider.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Standing {
+    /// Connections the client has open and ready to it.
+    ///
+    /// The one proof of a working account there is: a connection is ready only once the
+    /// provider has taken the credential on it, which no record of past bytes can show.
+    pub ready: u64,
+    /// How many connections the client is set to open to it.
+    pub configured: u64,
+    /// Whether the client still has it in rotation.
+    ///
+    /// The difference between an account nobody is downloading through and one that has
+    /// stopped answering, which no other figure here can tell apart: an idle client holds
+    /// no connections to a perfectly good account. A client drops an account it cannot
+    /// use and picks it up again itself once it works, so being out of rotation is the
+    /// client's own current verdict rather than a memory of an old failure.
+    pub serving: bool,
+    /// The last trouble the client recorded against it, in the words it recorded.
+    ///
+    /// Kept verbatim, the provider's own message and all: what those words amount to is
+    /// a judgment, and a mapping is not where judgments belong.
+    pub trouble: Option<String>,
+}
+
 /// One Usenet account as its download client holds it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UsenetAccount {
@@ -50,6 +80,9 @@ pub struct UsenetAccount {
     pub daily: Vec<(Date, u64)>,
     /// The day the subscription behind it ends, where the operator recorded one.
     pub expires_on: Option<Date>,
+    /// What the client's last exchange with it showed, where it has one to report. An
+    /// account the client is not set to use has none: nothing has been asked of it.
+    pub standing: Option<Standing>,
 }
 
 /// The Usenet accounts a download client is configured with.

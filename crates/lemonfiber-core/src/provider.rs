@@ -18,6 +18,8 @@
 //! worse than an honest gap: it is the same false confidence, dressed as a
 //! measurement. Nothing here reaches a provider; reading them is a separate concern.
 
+pub mod trouble;
+
 use serde::{Deserialize, Serialize};
 
 use crate::validate::Validation;
@@ -59,6 +61,8 @@ pub enum Answer {
     Answered,
     /// It authenticated and said it will not serve right now.
     Limited,
+    /// It answered and said the account has nothing left to serve.
+    Depleted,
     /// It answered and refused the credential.
     Refused,
     /// Nothing usable came back, so nothing is established either way.
@@ -279,15 +283,28 @@ impl Reading {
     /// which is a client configured above the plan rather than an empty block, and is
     /// reported as the configuration mismatch it is. So its word is taken where it is
     /// unambiguous, and its figures are read where it is not.
+    ///
+    /// A provider that says the account has nothing left is believed over any figures
+    /// held about it, because the figures are only ever a client's own record: a block
+    /// nobody wrote down, or one topped up somewhere the client never heard about, both
+    /// read as capacity that is fine. The account itself is the authority on being empty.
+    ///
+    /// Silence is the one answer an allowance can outrank. It is a fact about the
+    /// connection rather than about the account, and an account whose allowance is
+    /// provably gone stops serving whatever the connection does — so where both are
+    /// true, the operator is told the one with the remedy that brings downloads back
+    /// rather than sent to check a network that was never the problem.
     #[must_use]
     pub fn health(&self) -> Health {
+        let empty = self.allowance.is_some_and(|allowance| allowance.spent());
         match self.answer {
-            Answer::Silent => return Health::Unreachable,
+            Answer::Silent if !empty => return Health::Unreachable,
             Answer::Refused => return Health::Invalid,
+            Answer::Depleted => return self.renewal.when_empty(),
             Answer::Limited if self.renewal == Renewal::Refills => return Health::Capped,
-            Answer::Limited | Answer::Answered | Answer::Unasked => {}
+            Answer::Silent | Answer::Limited | Answer::Answered | Answer::Unasked => {}
         }
-        if self.allowance.is_some_and(|allowance| allowance.spent()) {
+        if empty {
             return self.renewal.when_empty();
         }
         self.running_out().unwrap_or(Health::Unknown)
@@ -447,6 +464,18 @@ mod tests {
             ..answered(Some(block(Some(100 * GIB), 0, 0)))
         };
         assert_eq!(silent.health(), Health::Unreachable);
+    }
+
+    /// Both are true at once often enough to matter, and only one of them has a remedy
+    /// that brings downloads back: an account with nothing left stops serving whatever
+    /// the connection to it is doing.
+    #[test]
+    fn an_allowance_provably_gone_outranks_a_provider_that_says_nothing() {
+        let silent_and_empty = Reading {
+            answer: Answer::Silent,
+            ..answered(Some(block(Some(100 * GIB), 100 * GIB, 0)))
+        };
+        assert_eq!(silent_and_empty.health(), Health::Exhausted);
     }
 
     #[test]

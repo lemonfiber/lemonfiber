@@ -32,6 +32,15 @@ pub const PROVIDER_LOW: Code = Code::new("PROVIDER-2");
 /// Raised when the subscription behind an account ends soon.
 pub const PROVIDER_ENDING: Code = Code::new("PROVIDER-3");
 
+/// Raised when an account refuses the credential the client offers it.
+pub const PROVIDER_REFUSED: Code = Code::new("PROVIDER-6");
+
+/// Raised when an account has stopped answering the client entirely.
+pub const PROVIDER_SILENT: Code = Code::new("PROVIDER-7");
+
+/// Raised when the client is set to open more connections than an account allows.
+pub const PROVIDER_CROWDED: Code = Code::new("PROVIDER-8");
+
 /// Raised when an indexer has been failing and its aggregator has rested it.
 pub const INDEXER_RESTED: Code = Code::new("PROVIDER-4");
 
@@ -76,7 +85,7 @@ impl ProvidersCheck {
             Ok(accounts) => accounts
                 .iter()
                 .filter(|account| account.enabled)
-                .map(|account| usenet::finding(account, self.today))
+                .flat_map(|account| usenet::findings(account, self.today))
                 .collect(),
         }
     }
@@ -189,6 +198,7 @@ mod tests {
             downloaded: 0,
             daily: Vec::new(),
             expires_on: None,
+            standing: None,
         }
     }
 
