@@ -95,6 +95,46 @@ impl Archive for Tar {
         fs::rename(&staging, dest).map_err(fault)
     }
 
+    async fn write_files(&self, dest: &Path, files: &[(String, String)]) -> Result<(), Fault> {
+        if dest.exists() {
+            return Err(Fault::new(format!(
+                "a bundle already exists at {}",
+                dest.display()
+            )));
+        }
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(fault)?;
+        }
+
+        // Staged and renamed over the target, as a capture is: a bundle half-written is a
+        // bundle somebody sends.
+        let staging = write_staging(dest);
+        let _ = fs::remove_file(&staging);
+
+        let result = (|| {
+            let file = File::create(&staging)?;
+            let encoder = GzEncoder::new(file, Compression::default());
+            let mut builder = tar::Builder::new(encoder);
+            for (name, body) in files {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(body.len() as u64);
+                // Readable by the operator who asked for it and nobody else: a bundle
+                // holds their configuration, redacted but still theirs.
+                header.set_mode(0o600);
+                header.set_cksum();
+                builder.append_data(&mut header, name, body.as_bytes())?;
+            }
+            builder.into_inner()?.finish()?;
+            Ok::<(), std::io::Error>(())
+        })();
+
+        if let Err(error) = result {
+            let _ = fs::remove_file(&staging);
+            return Err(fault(error));
+        }
+        fs::rename(&staging, dest).map_err(fault)
+    }
+
     async fn existing(&self, dir: &Path) -> Result<Vec<Existing>, Fault> {
         let entries = match fs::read_dir(dir) {
             Ok(entries) => entries,

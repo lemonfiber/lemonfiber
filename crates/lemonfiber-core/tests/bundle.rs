@@ -14,16 +14,18 @@
 mod common;
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use common::Fake;
-use lemonfiber_core::app::bundle::collect;
+use lemonfiber_core::app::bundle::{collect, write, BUNDLE_LEAK, BUNDLE_NO_ROOM, BUNDLE_UNWRITTEN};
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::bundle::MANIFEST;
+use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
+use lemonfiber_core::bundle::{Contents, Piece, Taken, MANIFEST};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
+use lemonfiber_core::ports::archive::{Archive, Fault as ArchiveFault, Space};
 use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
     Stats,
@@ -282,4 +284,157 @@ async fn no_randomness_means_no_bundle_at_all() {
 
     let context = ctx(Source::External(project()), true, None).with_random(Arc::new(Nothing));
     assert!(collect(&context, LEMONFIBER).await.is_none());
+}
+
+/// An archive that records what it was asked to write, and can be told to have no room or
+/// to fail outright.
+struct Recorder {
+    available: u64,
+    fails: bool,
+    written: Mutex<Vec<(PathBuf, Vec<(String, String)>)>>,
+}
+
+impl Recorder {
+    fn new(available: u64, fails: bool) -> Self {
+        Self {
+            available,
+            fails,
+            written: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn wrote(&self) -> usize {
+        self.written
+            .lock()
+            .map(|written| written.len())
+            .unwrap_or(0)
+    }
+}
+
+#[async_trait]
+impl Archive for Recorder {
+    async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, ArchiveFault> {
+        Ok(Space {
+            needed: 0,
+            available: self.available,
+        })
+    }
+    async fn write(
+        &self,
+        _dest: &Path,
+        _manifest: &BackupManifest,
+        _items: &[Item],
+    ) -> Result<(), ArchiveFault> {
+        Err(ArchiveFault::new("unused"))
+    }
+    async fn write_files(
+        &self,
+        dest: &Path,
+        files: &[(String, String)],
+    ) -> Result<(), ArchiveFault> {
+        if self.fails {
+            return Err(ArchiveFault::new("the disk said no"));
+        }
+        if let Ok(mut written) = self.written.lock() {
+            written.push((dest.to_path_buf(), files.to_vec()));
+        }
+        Ok(())
+    }
+    async fn existing(&self, _dir: &Path) -> Result<Vec<Existing>, ArchiveFault> {
+        Ok(Vec::new())
+    }
+    async fn remove(&self, _dir: &Path, _name: &str) -> Result<(), ArchiveFault> {
+        Ok(())
+    }
+}
+
+/// A value shaped the way a generated key is, built rather than written.
+fn key_shaped() -> String {
+    ('a'..='j').chain('0'..='9').cycle().take(32).collect()
+}
+
+/// Contents holding exactly what they are given.
+fn holding(name: &str, body: String) -> Contents {
+    Contents {
+        pieces: vec![Piece {
+            name: name.to_owned(),
+            body,
+        }],
+        missing: Vec::new(),
+        taken: Taken {
+            lemonfiber: LEMONFIBER.to_owned(),
+            stack: "1.0.0".to_owned(),
+            at: "2026-08-17T12:00:00".to_owned(),
+        },
+    }
+}
+
+/// Somewhere to write that nothing will actually be written to — the archive is a fake,
+/// and what is being proved is what it was asked for.
+fn dest() -> PathBuf {
+    PathBuf::from("/tmp/lemonfiber-bundle-test/support.tar.gz")
+}
+
+/// A bundle that holds nothing alarming is written, and what comes back is what the
+/// operator needs before they attach it to anything: where it is, how big, and what is in
+/// it — in that order, because the last is the one they should read first.
+#[tokio::test]
+async fn a_clean_bundle_is_written_and_says_what_it_holds() {
+    let archive = Recorder::new(u64::MAX / 2, false);
+    let contents = holding("configuration.env", "PUID=1000".to_owned());
+    let written = write(&archive, &contents, &dest()).await;
+
+    assert!(written.is_ok());
+    assert_eq!(archive.wrote(), 1);
+    let holds = written.map(|written| written.holds).unwrap_or_default();
+    assert_eq!(holds.first().map(String::as_str), Some(MANIFEST));
+    assert!(holds.iter().any(|name| name == "configuration.env"));
+}
+
+/// The one failure this whole feature exists to prevent. Nothing is written, and the file
+/// that produced it is named, because an operator cannot fix what nobody points at.
+#[tokio::test]
+async fn a_bundle_that_would_leak_is_not_written_at_all() {
+    let archive = Recorder::new(u64::MAX / 2, false);
+    let contents = holding(
+        "sonarr/config.xml",
+        format!("<ApiKey>{}</ApiKey>", key_shaped()),
+    );
+    let refused = write(&archive, &contents, &dest()).await;
+
+    assert_eq!(archive.wrote(), 0, "nothing may be written after a hit");
+    assert!(refused.is_err_and(|problem| problem.code == BUNDLE_LEAK
+        && problem
+            .detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("sonarr/config.xml"))));
+}
+
+/// A machine an operator is already asking for help about is not helped by having its disk
+/// filled, so the room is read before anything is written rather than partway through.
+#[tokio::test]
+async fn a_bundle_with_nowhere_to_fit_is_refused_before_it_is_written() {
+    let archive = Recorder::new(1024, false);
+    let contents = holding("configuration.env", "PUID=1000".to_owned());
+    let refused = write(&archive, &contents, &dest()).await;
+
+    assert_eq!(archive.wrote(), 0);
+    assert!(refused.is_err_and(|problem| problem.code == BUNDLE_NO_ROOM));
+}
+
+/// A bundle is written whole or not at all, so a write that fails leaves nothing to
+/// mistake for one — and says where it was trying to write.
+#[tokio::test]
+async fn a_bundle_that_cannot_be_written_says_so_and_says_where() {
+    let archive = Recorder::new(u64::MAX / 2, true);
+    let contents = holding("configuration.env", "PUID=1000".to_owned());
+    let refused = write(&archive, &contents, &dest()).await;
+
+    assert!(
+        refused.is_err_and(|problem| problem.code == BUNDLE_UNWRITTEN
+            && problem
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("support.tar.gz")))
+    );
 }

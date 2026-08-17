@@ -268,6 +268,12 @@ mod tests {
             }
             self.write.clone()
         }
+        async fn write_files(&self, dest: &Path, _files: &[(String, String)]) -> Result<(), Fault> {
+            if let Ok(mut written) = self.written.lock() {
+                written.push(dest.to_path_buf());
+            }
+            self.write.clone()
+        }
         async fn existing(&self, _dir: &Path) -> Result<Vec<Existing>, Fault> {
             self.existing.clone()
         }

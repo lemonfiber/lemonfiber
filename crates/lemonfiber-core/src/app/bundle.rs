@@ -10,9 +10,14 @@
 //! all. The scan that reads it all back is the second line rather than the first, because
 //! a check that is the only line is a check that has to be perfect.
 
-use crate::bundle::{self, Contents, Marks, Piece, Taken};
+use std::path::{Path, PathBuf};
+
+use crate::bundle::{self, Contents, Marks, Piece, Residual, Taken};
+use crate::bytes::humanize;
 use crate::doctor::Verdict;
+use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::instant;
+use crate::ports::archive::{Archive, Fault, Space};
 
 use super::Ctx;
 
@@ -136,6 +141,136 @@ fn platform(ctx: &Ctx, lemonfiber: &str) -> String {
 async fn configuration(ctx: &Ctx) -> Option<String> {
     let path = ctx.settings.env_file.as_deref()?;
     ctx.filesystem.read(path).await
+}
+
+/// Bytes kept free beyond the bundle itself, so writing one never spends the last of the
+/// disk the operator is already asking for help about.
+const HEADROOM: u64 = 64 * 1024 * 1024;
+
+/// Raised when a bundle would still hold something that reads as a credential.
+pub const BUNDLE_LEAK: Code = Code::new("BUNDLE-1");
+
+/// Raised when there is not enough room to write a bundle.
+pub const BUNDLE_NO_ROOM: Code = Code::new("BUNDLE-2");
+
+/// Raised when the archive could not be written.
+pub const BUNDLE_UNWRITTEN: Code = Code::new("BUNDLE-3");
+
+/// What was written, and what a reader will find in it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Written {
+    /// Where it is. It is only ever here: nothing sends it anywhere.
+    pub path: PathBuf,
+    /// How large it is, so the operator knows what they are about to attach.
+    pub bytes: u64,
+    /// What it holds, in order, so they can read it before anyone else does.
+    pub holds: Vec<String>,
+}
+
+/// Write `contents` as one archive at `dest`, or refuse and say why.
+///
+/// Read back before written, always. The allow-list decides what may be shared and this
+/// asks a different question of the result — does anything in here still read as a
+/// credential — because two checks that fail the same way are one check. A hit is not a
+/// warning: nothing is written, and the file that produced it is named, since the operator
+/// cannot fix what nobody points at.
+///
+/// Then room, before rather than after: an operator asking for help about a machine is not
+/// helped by filling its disk, and a bundle that failed halfway leaves them with a file
+/// that looks like a bundle and is not.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the assembled bundle still holds something that reads as a
+/// credential, where there is not enough room to write it, or where the archive itself
+/// could not be written. Nothing is left behind in any of the three.
+pub async fn write(
+    archive: &dyn Archive,
+    contents: &Contents,
+    dest: &Path,
+) -> Result<Written, Problem> {
+    let files = contents.files();
+    if let Some(residual) = bundle::residual(&files) {
+        return Err(leaking(&residual));
+    }
+
+    let bytes = files
+        .iter()
+        .map(|(name, body)| (name.len() + body.len()) as u64)
+        .sum();
+    let dir = dest.parent().unwrap_or(dest);
+    if let Ok(space) = archive.space(dir, &[]).await {
+        let room = Space {
+            needed: bytes,
+            available: space.available,
+        };
+        if !room.fits(HEADROOM) {
+            return Err(no_room(&room));
+        }
+    }
+
+    archive
+        .write_files(dest, &files)
+        .await
+        .map_err(|fault| unwritten(dest, &fault))?;
+
+    Ok(Written {
+        path: dest.to_path_buf(),
+        bytes,
+        holds: files.into_iter().map(|(name, _)| name).collect(),
+    })
+}
+
+/// A bundle that would have carried a credential out. Refused rather than written, and the
+/// source named — the one failure this whole feature exists to prevent is a bundle that
+/// looked fine and was not.
+fn leaking(residual: &Residual) -> Problem {
+    Problem::new(
+        BUNDLE_LEAK,
+        Severity::Critical,
+        "The bundle still held something that reads as a credential",
+        "Nothing has been written. A bundle is a thing people post in public, so anything in one that still reads like a key is treated as one — even where it turns out not to be.",
+        Remedy::new(
+            "Report which file this names, so the value it holds can be added to what a bundle knows how to replace",
+        ),
+    )
+    .in_state(State::Guided)
+    .with_detail(format!(
+        "{} line {} — nothing was written",
+        residual.source, residual.line
+    ))
+}
+
+/// Not enough room. Reported before collecting anything rather than partway through
+/// writing it, because a machine an operator is already asking about is not helped by
+/// having its disk filled.
+fn no_room(space: &Space) -> Problem {
+    Problem::new(
+        BUNDLE_NO_ROOM,
+        Severity::Error,
+        "There is not enough room to write the bundle",
+        "The bundle would not fit where it was to be written, with room left over for the machine to keep working in.",
+        Remedy::new("Free some space, or write the bundle somewhere with more room"),
+    )
+    .in_state(State::Guided)
+    .with_detail(format!(
+        "{} needed, {} free",
+        humanize(space.needed),
+        humanize(space.available)
+    ))
+}
+
+/// The archive itself would not be written.
+fn unwritten(dest: &Path, fault: &Fault) -> Problem {
+    Problem::new(
+        BUNDLE_UNWRITTEN,
+        Severity::Error,
+        "The bundle could not be written",
+        "Nothing was left behind: a bundle is written whole or not at all, so there is no half-file to mistake for one.",
+        Remedy::new("Check the path is writable, then ask for the bundle again"),
+    )
+    .in_state(State::Guided)
+    .with_detail(format!("{}: {fault}", dest.display()))
 }
 
 #[cfg(test)]
