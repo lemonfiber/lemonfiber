@@ -16,6 +16,10 @@ use crate::instant;
 
 use super::Ctx;
 
+/// What a bundle says for a version it could not read, rather than leaving a blank a
+/// reader would take for a version of nothing.
+const UNKNOWN: &str = "unknown";
+
 /// Everything a bundle would hold, gathered and redacted, with whatever could not be read
 /// named rather than passed over — or nothing at all where the machine could not provide
 /// the randomness the stand-ins are derived from.
@@ -27,12 +31,15 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str) -> Option<Contents> {
     let marks = &Marks::new(ctx.random.as_ref())?;
     let mut pieces = Vec::new();
     let mut missing = Vec::new();
-    let mut stack = String::from("unknown");
-
-    match ctx.stack.checked_manifest(ctx.today()) {
-        Err(_) => missing.push("the stack description could not be read".to_owned()),
-        Ok(manifest) => stack = manifest.stack_version.clone(),
-    }
+    // The first thing read and the first thing that can be missing: a machine whose stack
+    // will not read is exactly the machine somebody needs a bundle from.
+    let stack = match ctx.stack.checked_manifest(ctx.today()) {
+        Ok(manifest) => manifest.stack_version,
+        Err(_) => {
+            missing.push("the stack description could not be read".to_owned());
+            UNKNOWN.to_owned()
+        }
+    };
 
     match super::engine::diagnose(ctx, None, false).await {
         Err(problem) => missing.push(format!("the diagnosis could not run — {}", problem.summary)),
