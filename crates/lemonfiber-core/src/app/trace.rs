@@ -531,6 +531,9 @@ mod tests {
     /// A Servarr config that opens a target, carrying a readable key.
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
+    /// A download client configuration carrying the key it generated for itself.
+    const SAB_INI: &str = "[misc]\napi_key = sabkey123\n";
+
     /// An empty queue, as the shape a service returns with nothing downloading.
     const EMPTY_QUEUE: &str = r#"{"records":[]}"#;
 
@@ -667,6 +670,12 @@ mod tests {
     /// so the library stage is simply left unanswered, as on the \*arr-only slices.
     fn ctx(library: &'static str, history: &'static str, queue: &'static str) -> Ctx {
         ctx_with(Fake::arr(library, history, queue))
+    }
+
+    /// A context whose download client's key is readable as well as the \*arrs', so a
+    /// trace that asks the accounts resolves both readers rather than only one.
+    fn ctx_with_accounts(fake: Fake) -> Ctx {
+        ctx_with(fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_INI))))
     }
 
     /// A context that can reach its Jellyfin: the admin password is recorded under the
@@ -1356,6 +1365,24 @@ mod tests {
             Environment::MacOs,
         );
         assert!(super::stuck(&bad).await.is_err());
+    }
+
+    /// A stall the accounts could explain, on a stack whose accounts will not answer: the
+    /// reason stands exactly as it did. A service that could not be read says nothing about
+    /// the accounts behind it, and a trace that added an empty aside would be claiming it
+    /// had asked and heard something.
+    #[tokio::test]
+    async fn a_stall_reads_unchanged_where_the_accounts_cannot_be_read() {
+        let context = ctx_with_accounts(Fake::arr(
+            r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
+            r#"{"records":[]}"#,
+            EMPTY_QUEUE,
+        ));
+        let report = trace(&context, "expanse", None).await.unwrap_or_default();
+        assert_eq!(report.furthest, Stage::Monitored);
+        assert!(report.stall.as_deref().is_some_and(|reason| reason
+            .contains("indexers returned nothing")
+            && !reason.contains('(')));
     }
 
     /// The two stages an account can explain, and the ones it cannot. A preset that finds
