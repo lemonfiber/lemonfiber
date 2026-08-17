@@ -291,8 +291,11 @@ async fn no_randomness_means_no_bundle_at_all() {
 struct Recorder {
     available: u64,
     fails: bool,
-    written: Mutex<Vec<(PathBuf, Vec<(String, String)>)>>,
+    written: Mutex<Vec<Wrote>>,
 }
+
+/// One call to the writer, kept so a test can say what was asked for.
+type Wrote = (PathBuf, Vec<(String, String)>);
 
 impl Recorder {
     fn new(available: u64, fails: bool) -> Self {
@@ -304,10 +307,7 @@ impl Recorder {
     }
 
     fn wrote(&self) -> usize {
-        self.written
-            .lock()
-            .map(|written| written.len())
-            .unwrap_or(0)
+        self.written.lock().map_or(0, |written| written.len())
     }
 }
 
