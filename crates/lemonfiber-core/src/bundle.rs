@@ -196,6 +196,10 @@ pub struct Contents {
     pub taken: Taken,
 }
 
+/// What every bundle says about its own redaction, so a reader knows what the marks in it
+/// mean without having to be told separately.
+const NOTE: &str = "Every value not named safe has been replaced. A replacement reads the same wherever the same value appeared in this bundle, and means nothing in any other.";
+
 /// The name the bundle's own first page carries.
 pub const MANIFEST: &str = "README.txt";
 
@@ -205,24 +209,35 @@ impl Contents {
     /// it is usually not the person who made it.
     #[must_use]
     pub fn manifest(&self) -> String {
-        let mut page = format!(
-            "lemonfiber support bundle\n\nlemonfiber {}\nstack {}\ntaken {}\n\nHolds:\n",
-            self.taken.lemonfiber, self.taken.stack, self.taken.at
-        );
-        for piece in &self.pieces {
-            page.push_str(&format!("  {}\n", piece.name));
+        let holds: String = self
+            .pieces
+            .iter()
+            .map(|piece| format!("  {}\n", piece.name))
+            .collect();
+        let gaps = self.gaps();
+        let Taken {
+            lemonfiber,
+            stack,
+            at,
+        } = &self.taken;
+        format!(
+            "lemonfiber support bundle\n\nlemonfiber {lemonfiber}\nstack {stack}\ntaken {at}\n\nHolds:\n{holds}{gaps}\n{NOTE}\n"
+        )
+    }
+
+    /// What could not be read, where anything could not — and nothing at all where
+    /// everything answered, so a complete bundle does not carry an empty heading that
+    /// reads as a list somebody forgot to fill in.
+    fn gaps(&self) -> String {
+        if self.missing.is_empty() {
+            return String::new();
         }
-        if !self.missing.is_empty() {
-            page.push_str("\nCould not be read:\n");
-            for gap in &self.missing {
-                page.push_str(&format!("  {gap}\n"));
-            }
-        }
-        page.push_str(
-            "\nEvery value not named safe has been replaced. A replacement reads the same \
-             wherever the same value appeared in this bundle, and means nothing in any other.\n",
-        );
-        page
+        let listed: String = self
+            .missing
+            .iter()
+            .map(|gap| format!("  {gap}\n"))
+            .collect();
+        format!("\nCould not be read:\n{listed}")
     }
 
     /// Every file the bundle would hold, its own first page included — which is what the
