@@ -25,7 +25,8 @@ use lemonfiber_core::bundle::MANIFEST;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{
-    Container, Engine, ExecOutput, Failure as EngineFailure, LogLine, LogQuery, Stats,
+    Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
+    Stats,
 };
 use lemonfiber_core::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
@@ -91,7 +92,14 @@ struct Engine1(bool);
 impl Engine for Engine1 {
     async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
         if self.0 {
-            return Ok(Vec::new());
+            return Ok(vec![Container {
+                id: "abc".to_owned(),
+                project: "media-stack".to_owned(),
+                service: "sonarr".to_owned(),
+                lifecycle: Lifecycle::Running,
+                health: Health::Healthy,
+                exit: None,
+            }]);
         }
         Err(EngineFailure::Unreachable {
             reason: "no engine here".to_owned(),
@@ -168,6 +176,7 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
         stack,
         Settings {
             env_file: Some(PathBuf::from("/tmp/lemonfiber-bundle-test/.env")),
+            stack_dir: Some(PathBuf::from("/tmp/lemonfiber-bundle-test")),
             ..Settings::default()
         },
         Environment::MacOs,
@@ -197,6 +206,11 @@ async fn a_bundle_holds_what_could_be_read_and_says_where_it_came_from() {
     assert!(names.contains(&"services.txt"));
     assert!(names.contains(&"platform.txt"));
     assert!(names.contains(&"configuration.env"));
+    // What the engine is running is read too, not merely asked for.
+    assert!(contents
+        .pieces
+        .iter()
+        .any(|piece| piece.name == "services.txt" && piece.body.contains("sonarr")));
 
     // Provenance, so a bundle read next week is not mistaken for this week's.
     assert_eq!(contents.taken.lemonfiber, LEMONFIBER);

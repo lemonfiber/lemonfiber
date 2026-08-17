@@ -137,3 +137,51 @@ async fn configuration(ctx: &Ctx) -> Option<String> {
     let path = ctx.settings.env_file.as_deref()?;
     ctx.filesystem.read(path).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::reading;
+    use crate::doctor::Verdict;
+    use crate::error::{Code, Problem, Remedy, Severity};
+
+    /// A problem as a check reports one.
+    fn problem() -> Problem {
+        Problem::new(
+            Code::new("BUNDLE-0"),
+            Severity::Warning,
+            "something is wrong",
+            "why it matters",
+            Remedy::new("do something"),
+        )
+    }
+
+    /// Every verdict a check can reach, in the words the check chose. A bundle that
+    /// paraphrased any of them would leave the operator and the person helping comparing
+    /// two accounts of one finding.
+    #[test]
+    fn a_verdict_reads_in_the_words_the_check_used() {
+        assert_eq!(
+            reading(&Verdict::Pass {
+                note: Some("340 GiB left".to_owned())
+            }),
+            "340 GiB left"
+        );
+        // A pass with nothing to add says nothing rather than inventing a reassurance.
+        assert_eq!(reading(&Verdict::Pass { note: None }), "");
+        assert_eq!(reading(&Verdict::Warn(problem())), "something is wrong");
+        assert_eq!(reading(&Verdict::Fail(problem())), "something is wrong");
+        assert_eq!(
+            reading(&Verdict::Unverified {
+                reason: "nothing answered".to_owned(),
+                remedy: Remedy::new("try again"),
+            }),
+            "nothing answered"
+        );
+        assert_eq!(
+            reading(&Verdict::Skipped {
+                reason: "nothing to read".to_owned()
+            }),
+            "nothing to read"
+        );
+    }
+}
