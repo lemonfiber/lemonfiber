@@ -11,22 +11,21 @@
 mod common;
 
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use common::{Answer, Fake};
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::service::{
-    AppSync, Application, ApplicationKind, Failure, IndexerUse, Indexers, RegisteredApplication,
+    AppSync, Application, ApplicationKind, Failure, IndexerUse, Indexers, Limits,
+    RegisteredApplication,
 };
 use lemonfiber_core::prowlarr::Prowlarr;
-use lemonfiber_manifest::Date;
 
-/// The day the indexer counts are asked for, built rather than parsed: parsing has
-/// its own tests, and a fixture that can fail is a second thing to reason about.
-const TODAY: Date = Date {
-    year: 2026,
-    month: 8,
-    day: 16,
-};
+/// The moment the indexer counts are asked at — noon on a fixed day, so a window taken
+/// back from it lands inside the same day and reads plainly in an assertion.
+fn now() -> SystemTime {
+    SystemTime::UNIX_EPOCH + Duration::from_secs(1_786_968_000)
+}
 
 /// A Prowlarr client over the given fake.
 fn prowlarr(fake: &Arc<Fake>) -> Prowlarr {
@@ -264,7 +263,7 @@ async fn indexer_use_is_read_from_the_aggregator_rather_than_from_the_indexers()
         Answer::reply(200, STANDINGS),
         Answer::reply(200, COUNTS),
     ]);
-    let indexers = prowlarr(&fake).indexers(TODAY).await.unwrap_or_default();
+    let indexers = prowlarr(&fake).indexers(now()).await.unwrap_or_default();
 
     assert_eq!(
         indexers,
@@ -277,6 +276,9 @@ async fn indexer_use_is_read_from_the_aggregator_rather_than_from_the_indexers()
                 grabs: 7,
                 failed_grabs: 1,
                 rested_until: None,
+                limits: None,
+                searched_from: None,
+                grabbed_from: None,
             },
             // Nothing has been asked of the second one, which is a zero rather than a
             // gap — and its standing comes from the endpoint that fills one in.
@@ -288,12 +290,80 @@ async fn indexer_use_is_read_from_the_aggregator_rather_than_from_the_indexers()
                 grabs: 0,
                 failed_grabs: 0,
                 rested_until: Some("2026-08-16T20:00:00Z".to_owned()),
+                limits: None,
+                searched_from: None,
+                grabbed_from: None,
             },
         ]
     );
 
     assert!(fake.asked_for("/api/v1/indexerstatus"));
-    assert!(fake.asked_for("/api/v1/indexerstats?startDate=2026-08-16T00:00:00"));
+    assert!(fake.asked_for("/api/v1/indexerstats?startDate=2026-08-16T12:00:00"));
+    // With no allowance recorded anywhere, the aggregator's own log is not read at all:
+    // it is only ever wanted to date a reset, and there is nothing here to reset.
+    assert!(!fake.asked_for("/api/v1/history/since"));
+}
+
+/// One indexer with the caps its operator recorded, counted by the hour rather than by
+/// the day. The settings arrive flattened, under the names their nesting gives them, and
+/// a cap nobody filled in comes back named with nothing in it.
+const CAPPED: &str = r#"[{"id":1,"name":"Fast Indexer","enable":true,"fields":[
+    {"name":"baseSettings.queryLimit","value":100},
+    {"name":"baseSettings.grabLimit","value":null},
+    {"name":"baseSettings.limitsUnit","value":1}
+]}]"#;
+
+/// What that indexer has been asked for in the hour, and when.
+const HOURLY_COUNTS: &str = r#"{"indexers":[{"indexerId":1,"numberOfQueries":40,
+    "numberOfRssQueries":60,"numberOfGrabs":2}]}"#;
+
+/// The aggregator's own log of the calls inside that window. The first search in it is
+/// what dates the reset, and the entries are the aggregator's own — a search a person
+/// asked for, a search a feed poll made, and a grab.
+const HISTORY: &str = r#"[
+    {"indexerId":1,"date":"2026-08-17T11:20:00Z","eventType":"indexerQuery"},
+    {"indexerId":1,"date":"2026-08-17T11:05:30Z","eventType":"indexerRss"},
+    {"indexerId":1,"date":"2026-08-17T11:40:00Z","eventType":"releaseGrabbed"},
+    {"indexerId":1,"date":"not a moment","eventType":"indexerQuery"},
+    {"indexerId":1,"date":"2026-08-17T11:55:00Z"}
+]"#;
+
+/// The counts a cap is judged against have to be counted the way the aggregator counts
+/// them: over its own rolling window, and with the feed polls in, which are most of the
+/// traffic and live in a column of their own.
+#[tokio::test]
+async fn a_recorded_cap_is_read_with_the_window_and_the_calls_it_is_counted_over() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, CAPPED),
+        Answer::reply(200, "[]"),
+        Answer::reply(200, HOURLY_COUNTS),
+        Answer::reply(200, HISTORY),
+    ]);
+    let indexers = prowlarr(&fake).indexers(now()).await.unwrap_or_default();
+
+    assert_eq!(
+        indexers.first().map(|indexer| indexer.limits),
+        Some(Some(Limits {
+            queries: Some(100),
+            grabs: None,
+            window: Duration::from_secs(3600),
+        }))
+    );
+    // The searches a person asked for and the ones a feed poll made are one allowance.
+    assert_eq!(indexers.first().map(|indexer| indexer.queries), Some(100));
+    // The window is taken back from now, not from midnight.
+    assert!(fake.asked_for("/api/v1/indexerstats?startDate=2026-08-17T11:00:00"));
+    assert!(fake.asked_for("/api/v1/history/since?date=2026-08-17T11:00:00"));
+    // The oldest call of each kind, with the entry nothing can place left out rather
+    // than guessed at.
+    assert_eq!(
+        indexers.first().and_then(|indexer| indexer.searched_from),
+        Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_786_964_730))
+    );
+    assert_eq!(
+        indexers.first().and_then(|indexer| indexer.grabbed_from),
+        Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_786_966_800))
+    );
 }
 
 #[tokio::test]
@@ -309,7 +379,7 @@ async fn indexers_that_cannot_be_read_are_a_failure_rather_than_an_empty_list() 
     ] {
         let fake = Fake::in_turn(answers);
         assert!(matches!(
-            prowlarr(&fake).indexers(TODAY).await,
+            prowlarr(&fake).indexers(now()).await,
             Err(Failure::Refused { .. })
         ));
     }

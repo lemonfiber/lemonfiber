@@ -15,6 +15,7 @@ mod indexers;
 mod usenet;
 
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use async_trait::async_trait;
 use lemonfiber_manifest::Date;
@@ -47,28 +48,38 @@ pub const INDEXER_RESTED: Code = Code::new("PROVIDER-4");
 /// Raised when every indexer is failing at once.
 pub const INDEXERS_ALL_FAILING: Code = Code::new("PROVIDER-5");
 
+/// Raised when an indexer has spent the allowance recorded against it.
+pub const INDEXER_CAPPED: Code = Code::new("PROVIDER-9");
+
 /// Reports on the accounts behind the stack: what they have left, and whether they
 /// are still serving it.
 pub struct ProvidersCheck {
     accounts: Option<Arc<dyn UsenetAccounts>>,
     indexers: Option<Arc<dyn Indexers>>,
     today: Date,
+    now: SystemTime,
 }
 
 impl ProvidersCheck {
     /// A check over whichever of the two the stack has — a torrent-only stack has no
     /// Usenet accounts to read, and a stack whose aggregator is not up yet has no
     /// indexers, and neither is a fault.
+    ///
+    /// The day and the moment are both taken because the two sides measure in different
+    /// units and neither can be had from the other here: a download client keeps its
+    /// figures per calendar day, and an aggregator counts against a window that rolls.
     #[must_use]
     pub fn new(
         accounts: Option<Arc<dyn UsenetAccounts>>,
         indexers: Option<Arc<dyn Indexers>>,
         today: Date,
+        now: SystemTime,
     ) -> Self {
         Self {
             accounts,
             indexers,
             today,
+            now,
         }
     }
 
@@ -95,7 +106,7 @@ impl ProvidersCheck {
         let Some(aggregator) = &self.indexers else {
             return Vec::new();
         };
-        match aggregator.indexers(self.today).await {
+        match aggregator.indexers(self.now).await {
             Err(failure) => vec![unread("indexers", "Indexers", &failure)],
             Ok(listed) => indexers::findings(&listed),
         }
@@ -146,7 +157,7 @@ fn unread(slug: &str, title: &str, failure: &Failure) -> Finding {
 mod tests {
     use lemonfiber_manifest::Date;
 
-    use super::{Arc, Check, Indexers, ProvidersCheck, UsenetAccounts, Verdict};
+    use super::{Arc, Check, Indexers, ProvidersCheck, SystemTime, UsenetAccounts, Verdict};
     use crate::ports::service::{Failure, IndexerUse, Recorded, UsenetAccount};
 
     /// A client that answers with what it was given.
@@ -169,7 +180,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Indexers for Aggregator {
-        async fn indexers(&self, _since: Date) -> Result<Vec<IndexerUse>, Failure> {
+        async fn indexers(&self, _now: SystemTime) -> Result<Vec<IndexerUse>, Failure> {
             match &self.0 {
                 Ok(indexers) => Ok(indexers.clone()),
                 Err(_) => Err(Failure::Unavailable {
@@ -211,6 +222,9 @@ mod tests {
             grabs: 1,
             failed_grabs: 0,
             rested_until: None,
+            limits: None,
+            searched_from: None,
+            grabbed_from: None,
         }
     }
 
@@ -222,6 +236,7 @@ mod tests {
             accounts.map(|answer| Arc::new(Client(answer)) as Arc<dyn UsenetAccounts>),
             indexers.map(|answer| Arc::new(Aggregator(answer)) as Arc<dyn Indexers>),
             today(),
+            SystemTime::UNIX_EPOCH,
         )
     }
 
