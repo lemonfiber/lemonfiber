@@ -7,14 +7,27 @@
 //!
 //! What the \*arr cannot see alone — whether an indexer found releases, whether the
 //! download client took it, whether the media server can play it — is left to the
-//! services that can, in a later slice; this never over-claims the reason for a stall it
-//! cannot prove.
+//! services that can; this never over-claims the reason for a stall it cannot prove.
+//!
+//! Two of those stalls are absences, and an absence has a cause no \*arr can see: nothing
+//! found, and nothing taken. Both are what a lapsed account looks like from here — an
+//! indexer with its allowance spent answers every search with an empty list, and an
+//! account that is refusing or empty takes nothing it is handed. So where the trace stops
+//! at one of those two, it asks the accounts, and what they say travels beside the stall
+//! rather than replacing it: how far the item got is still the answer to the question
+//! that was asked.
+
+use std::sync::Arc;
 
 use super::targets::{jellyfin_reader, open_servarrs};
 use super::Ctx;
+use crate::doctor::providers::ProvidersCheck;
+use crate::doctor::{Check, Finding, Verdict};
 use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceMoment, TraceReport, TraceStage};
-use crate::ports::service::{ItemPart, Library, Pipeline, QueueItem, TraceEvent};
+use crate::ports::service::{
+    Indexers, ItemPart, Library, Pipeline, QueueItem, TraceEvent, UsenetAccounts,
+};
 use crate::recyclarr::Kind;
 use crate::trace::{Confidence, Coverage, Outcome, Part, Presence, Stage};
 
@@ -68,7 +81,7 @@ pub(super) async fn trace(
             parts: parts_read,
         };
         let library = library_presence(jellyfin.as_ref(), kind, &item.title).await;
-        return Ok(assemble(
+        let mut report = assemble(
             &arr.name,
             &item.title,
             item.monitored,
@@ -79,10 +92,82 @@ pub(super) async fn trace(
                 library,
                 reads,
             },
-        ));
+        );
+        if let Some(reason) = account_explainable(&report) {
+            let said = troubles(providers(ctx, &manifest.services).await);
+            report.stall = Some(beside(reason, &said));
+        }
+        return Ok(report);
     }
 
     Ok(not_matched(term))
+}
+
+/// The stall an account underneath the stack could explain, where this trace has one.
+///
+/// Only two stages it could: nothing found, and nothing taken. An indexer with its
+/// allowance spent answers every search with an empty list, and an account that is
+/// refusing or empty takes nothing it is handed — and both leave a \*arr holding an
+/// absence it cannot explain, which is exactly what those two stalls are.
+///
+/// Deliberately not the stage where releases were found and none was good enough: that is
+/// a preset asking for what the indexers do not carry, and sending its operator to look at
+/// their subscriptions would be the wrong half of the answer.
+fn account_explainable(report: &TraceReport) -> Option<String> {
+    matches!(report.furthest, Stage::Monitored | Stage::Grabbed)
+        .then(|| report.stall.clone())
+        .flatten()
+}
+
+/// What the accounts underneath the stack amount to right now.
+///
+/// The provider check answers, rather than a second reading of the same services: it is
+/// already the judgment, and two paths to one verdict is one way for them to disagree.
+/// Reading it costs the providers nothing — every figure in it comes from the services
+/// that have been using the accounts.
+async fn providers(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Vec<Finding> {
+    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    ProvidersCheck::new(
+        super::targets::usenet_client(ctx, services, project.as_deref())
+            .await
+            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
+        super::targets::indexer_aggregator(ctx, services, project.as_deref())
+            .await
+            .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
+        ctx.today(),
+        ctx.clock.now(),
+    )
+    .run()
+    .await
+}
+
+/// The findings an operator would have to act on, in the check's own words.
+///
+/// Only those: an account that is fine, or one nothing could be read from, explains
+/// nothing about why an item stopped, and saying so beside a stall would bury the reason
+/// it is there to sharpen.
+fn troubles(findings: Vec<Finding>) -> Vec<String> {
+    findings
+        .into_iter()
+        .filter_map(|finding| match finding.verdict {
+            Verdict::Fail(problem) | Verdict::Warn(problem) => {
+                Some(format!("{} — {}", finding.title, problem.summary))
+            }
+            Verdict::Pass { .. } | Verdict::Skipped { .. } | Verdict::Unverified { .. } => None,
+        })
+        .collect()
+}
+
+/// The stall with what the accounts said beside it, where they said anything.
+///
+/// Beside rather than instead: how far the item got is still the answer to the question
+/// that was asked, and the account is why it got no further. Where the accounts are all
+/// well, or could not be read, the reason reads exactly as it did before.
+fn beside(reason: String, said: &[String]) -> String {
+    if said.is_empty() {
+        return reason;
+    }
+    format!("{reason} ({})", said.join("; "))
 }
 
 /// The items whose downloads are stuck, across the \*arrs — the landing point queue
@@ -427,8 +512,13 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{assemble, library_presence, trace, Ctx, Fragments, Reads};
+    use super::{
+        account_explainable, assemble, beside, library_presence, trace, troubles, Ctx, Finding,
+        Fragments, Reads, TraceReport, Verdict,
+    };
     use crate::config::Settings;
+    use crate::doctor::Category;
+    use crate::error::{Code, Problem, Remedy, Severity};
     use crate::jellyfin::Jellyfin;
     use crate::platform::Environment;
     use crate::ports::http::{Http, Request, Response, Unreachable};
@@ -1266,5 +1356,98 @@ mod tests {
             Environment::MacOs,
         );
         assert!(super::stuck(&bad).await.is_err());
+    }
+
+    /// The two stages an account can explain, and the ones it cannot. A preset that finds
+    /// nothing good enough is not an account problem, and sending its operator to look at
+    /// their subscriptions would be the wrong half of the answer.
+    #[test]
+    fn only_the_stalls_an_account_could_explain_ask_the_accounts() {
+        let stalled = |furthest: Stage| TraceReport {
+            furthest,
+            stall: Some("stopped".to_owned()),
+            ..TraceReport::default()
+        };
+        assert_eq!(
+            account_explainable(&stalled(Stage::Monitored)).as_deref(),
+            Some("stopped")
+        );
+        assert_eq!(
+            account_explainable(&stalled(Stage::Grabbed)).as_deref(),
+            Some("stopped")
+        );
+        assert_eq!(account_explainable(&stalled(Stage::Found)), None);
+        assert_eq!(account_explainable(&stalled(Stage::Imported)), None);
+        // Progressing rather than stopped: there is nothing to explain.
+        assert_eq!(
+            account_explainable(&TraceReport {
+                furthest: Stage::Monitored,
+                stall: None,
+                ..TraceReport::default()
+            }),
+            None
+        );
+    }
+
+    /// An account that is fine, or one nothing could be read from, explains nothing about
+    /// why an item stopped — and saying so beside a stall would bury the reason.
+    #[test]
+    fn only_the_findings_that_want_acting_on_are_carried() {
+        let said = troubles(vec![
+            finding(
+                "Fast Indexer",
+                Verdict::Warn(problem("An indexer has used everything it allows for now")),
+            ),
+            finding(
+                "Block 500",
+                Verdict::Fail(problem("A Usenet account is refusing the login")),
+            ),
+            finding("Quiet", Verdict::Pass { note: None }),
+            finding(
+                "Unread",
+                Verdict::Unverified {
+                    reason: "nothing answered".to_owned(),
+                    remedy: Remedy::new("try again"),
+                },
+            ),
+        ]);
+        assert_eq!(
+            said,
+            vec![
+                "Fast Indexer — An indexer has used everything it allows for now".to_owned(),
+                "Block 500 — A Usenet account is refusing the login".to_owned(),
+            ]
+        );
+    }
+
+    /// Beside rather than instead: how far the item got is still the answer to the
+    /// question that was asked.
+    #[test]
+    fn what_the_accounts_say_travels_beside_the_stall() {
+        let reason = "monitored, but no search has found it yet".to_owned();
+        assert_eq!(beside(reason.clone(), &[]), reason);
+        assert_eq!(
+            beside(
+                reason,
+                &["Fast — capped".to_owned(), "Slow — refused".to_owned()]
+            ),
+            "monitored, but no search has found it yet (Fast — capped; Slow — refused)"
+        );
+    }
+
+    /// A finding as the provider check reports one.
+    fn finding(title: &str, verdict: Verdict) -> Finding {
+        Finding::in_category(Category::Providers, "providers.test", title, verdict)
+    }
+
+    /// A problem whose summary is what a stall would quote.
+    fn problem(summary: &str) -> Problem {
+        Problem::new(
+            Code::new("PROVIDER-1"),
+            Severity::Warning,
+            summary,
+            "why it matters",
+            Remedy::new("do something"),
+        )
     }
 }
