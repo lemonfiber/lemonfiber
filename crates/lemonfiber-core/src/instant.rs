@@ -34,11 +34,15 @@ const EPOCH: Date = Date {
     day: 1,
 };
 
-/// `at` as a service writes an instant, or nothing where it is before the epoch.
+/// `at` as a service writes an instant, or nothing where no calendar holds it.
+///
+/// A count of seconds too large for the calendar to place is passed on as the largest one
+/// there is, so it fails at the one place that can say so rather than at two — a moment
+/// out past the end of time is refused either way, and one refusal is enough.
 #[must_use]
 pub fn written(at: SystemTime) -> Option<String> {
     let seconds = at.duration_since(UNIX_EPOCH).ok()?.as_secs();
-    let date = Date::from_unix_seconds(i64::try_from(seconds).ok()?)?;
+    let date = Date::from_unix_seconds(i64::try_from(seconds).unwrap_or(i64::MAX))?;
     let clock = seconds % DAY;
     Some(format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
@@ -136,9 +140,11 @@ mod tests {
     }
 
     /// Nothing in the stack records anything before the epoch, and an instant that
-    /// claims to is not one this can write.
+    /// claims to is not one this can write — or read back, since the count of seconds
+    /// every service keeps its history in starts there.
     #[test]
-    fn an_instant_before_the_epoch_is_not_written() {
+    fn an_instant_before_the_epoch_is_neither_written_nor_read() {
         assert_eq!(written(UNIX_EPOCH - Duration::from_secs(1)), None);
+        assert_eq!(read("1969-12-31T23:59:59"), None);
     }
 }

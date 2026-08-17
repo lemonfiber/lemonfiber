@@ -320,11 +320,20 @@ const HOURLY_COUNTS: &str = r#"{"indexers":[{"indexerId":1,"numberOfQueries":40,
 /// The aggregator's own log of the calls inside that window. The first search in it is
 /// what dates the reset, and the entries are the aggregator's own — a search a person
 /// asked for, a search a feed poll made, and a grab.
+///
+/// Written both ways on purpose: some versions name their event types and some number
+/// them, and an entry nothing places — a login, or a line with no type at all — counts
+/// against neither allowance.
 const HISTORY: &str = r#"[
     {"indexerId":1,"date":"2026-08-17T11:20:00Z","eventType":"indexerQuery"},
     {"indexerId":1,"date":"2026-08-17T11:05:30Z","eventType":"indexerRss"},
     {"indexerId":1,"date":"2026-08-17T11:40:00Z","eventType":"releaseGrabbed"},
     {"indexerId":1,"date":"not a moment","eventType":"indexerQuery"},
+    {"indexerId":1,"date":"2026-08-17T11:45:00Z","eventType":2},
+    {"indexerId":1,"date":"2026-08-17T11:46:00Z","eventType":3},
+    {"indexerId":1,"date":"2026-08-17T11:50:00Z","eventType":1},
+    {"indexerId":1,"date":"2026-08-17T11:47:00Z","eventType":4},
+    {"indexerId":1,"date":"2026-08-17T11:48:00Z","eventType":"indexerAuth"},
     {"indexerId":1,"date":"2026-08-17T11:55:00Z"}
 ]"#;
 
