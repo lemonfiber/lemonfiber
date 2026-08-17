@@ -428,6 +428,33 @@ mod tests {
         assert_eq!(read.ok(), Some(files));
     }
 
+    /// A bundle that cannot be created leaves nothing behind, not even the staging file
+    /// it was being built in — there is no half-file for a later listing, or a worried
+    /// operator, to mistake for a bundle.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_bundle_that_cannot_be_created_leaves_nothing_behind() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = scratch("bundle-unwritable");
+        let _ = fs::create_dir_all(&root);
+        let _ = fs::set_permissions(&root, fs::Permissions::from_mode(0o500));
+        let dest = root.join("support.tar.gz");
+
+        let tar = Tar;
+        let refused = tar
+            .write_files(&dest, &[("README.txt".to_owned(), "held".to_owned())])
+            .await;
+
+        // Restored first, so the scratch directory can be cleaned up whatever happened.
+        let _ = fs::set_permissions(&root, fs::Permissions::from_mode(0o755));
+        assert!(refused.is_err());
+        assert!(
+            !dest.exists(),
+            "nothing is left where a bundle would have been"
+        );
+    }
+
     /// A bundle is written whole or not at all, and never over one already there — the
     /// same rule a capture keeps, for the same reason.
     #[tokio::test]
