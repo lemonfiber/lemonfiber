@@ -24,6 +24,7 @@
 //! and nothing to stand up. The collecting and the writing live above it.
 
 use std::collections::hash_map::DefaultHasher;
+use std::fmt::Write as _;
 use std::hash::{Hash, Hasher};
 
 use crate::ports::random::Random;
@@ -209,11 +210,10 @@ impl Contents {
     /// it is usually not the person who made it.
     #[must_use]
     pub fn manifest(&self) -> String {
-        let holds: String = self
-            .pieces
-            .iter()
-            .map(|piece| format!("  {}\n", piece.name))
-            .collect();
+        let holds = self.pieces.iter().fold(String::new(), |mut page, piece| {
+            let _ = writeln!(page, "  {}", piece.name);
+            page
+        });
         let gaps = self.gaps();
         let Taken {
             lemonfiber,
@@ -232,11 +232,10 @@ impl Contents {
         if self.missing.is_empty() {
             return String::new();
         }
-        let listed: String = self
-            .missing
-            .iter()
-            .map(|gap| format!("  {gap}\n"))
-            .collect();
+        let listed = self.missing.iter().fold(String::new(), |mut page, gap| {
+            let _ = writeln!(page, "  {gap}");
+            page
+        });
         format!("\nCould not be read:\n{listed}")
     }
 
