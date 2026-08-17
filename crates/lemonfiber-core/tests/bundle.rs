@@ -291,6 +291,9 @@ async fn no_randomness_means_no_bundle_at_all() {
 struct Recorder {
     available: u64,
     fails: bool,
+    /// Whether the room can be read at all. A machine that will not say how much is free
+    /// is not a machine to refuse a bundle over — the bundle is the thing that explains it.
+    measurable: bool,
     written: Mutex<Vec<Wrote>>,
 }
 
@@ -302,7 +305,16 @@ impl Recorder {
         Self {
             available,
             fails,
+            measurable: true,
             written: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// A recorder that cannot say how much room there is.
+    fn unmeasurable() -> Self {
+        Self {
+            measurable: false,
+            ..Self::new(0, false)
         }
     }
 
@@ -314,10 +326,13 @@ impl Recorder {
 #[async_trait]
 impl Archive for Recorder {
     async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, ArchiveFault> {
-        Ok(Space {
-            needed: 0,
-            available: self.available,
-        })
+        if self.measurable {
+            return Ok(Space {
+                needed: 0,
+                available: self.available,
+            });
+        }
+        Err(ArchiveFault::new("the volume would not say"))
     }
     async fn write(
         &self,
@@ -437,4 +452,15 @@ async fn a_bundle_that_cannot_be_written_says_so_and_says_where() {
                 .as_deref()
                 .is_some_and(|detail| detail.contains("support.tar.gz")))
     );
+}
+
+/// A machine that will not say how much room it has is not one to refuse a bundle over.
+/// The bundle is the thing that would explain why it will not say.
+#[tokio::test]
+async fn a_bundle_is_still_written_where_the_room_cannot_be_read() {
+    let archive = Recorder::unmeasurable();
+    let contents = holding("configuration.env", "PUID=1000".to_owned());
+
+    assert!(write(&archive, &contents, &dest()).await.is_ok());
+    assert_eq!(archive.wrote(), 1);
 }

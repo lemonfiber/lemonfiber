@@ -395,6 +395,52 @@ mod tests {
         }
     }
 
+    /// A bundle's files are generated rather than copied, so they arrive in hand and go
+    /// straight into the archive — and come back out reading exactly as they went in.
+    #[tokio::test]
+    async fn a_bundle_of_files_in_hand_is_written_and_reads_back() {
+        let root = scratch("bundle");
+        let dest = root.join("support.tar.gz");
+        let files = vec![
+            ("README.txt".to_owned(), "what this holds".to_owned()),
+            (
+                "configuration.env".to_owned(),
+                "PUID=1000\nINDEXER_APIKEY=<redacted:a3f1>".to_owned(),
+            ),
+        ];
+
+        let tar = Tar;
+        assert!(tar.write_files(&dest, &files).await.is_ok());
+        assert!(dest.exists(), "the archive is where it was asked for");
+
+        let read = std::fs::File::open(&dest).and_then(|file| {
+            let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
+            let mut held = Vec::new();
+            for entry in archive.entries()? {
+                let mut entry = entry?;
+                let name = entry.path()?.to_string_lossy().into_owned();
+                let mut body = String::new();
+                std::io::Read::read_to_string(&mut entry, &mut body)?;
+                held.push((name, body));
+            }
+            Ok(held)
+        });
+        assert_eq!(read.ok(), Some(files));
+    }
+
+    /// A bundle is written whole or not at all, and never over one already there — the
+    /// same rule a capture keeps, for the same reason.
+    #[tokio::test]
+    async fn a_bundle_is_not_written_over_one_already_there() {
+        let root = scratch("bundle-no-overwrite");
+        let dest = root.join("support.tar.gz");
+        let files = vec![("README.txt".to_owned(), "what this holds".to_owned())];
+
+        let tar = Tar;
+        assert!(tar.write_files(&dest, &files).await.is_ok());
+        assert!(tar.write_files(&dest, &files).await.is_err());
+    }
+
     #[tokio::test]
     async fn a_backup_is_not_written_over_one_already_there() {
         let root = scratch("no-overwrite");
