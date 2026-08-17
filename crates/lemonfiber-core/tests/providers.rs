@@ -209,7 +209,7 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
             .iter()
             .any(|finding| finding.title == "Fast Indexer"
                 && matches!(&finding.verdict, Verdict::Pass { note }
-                    if note.as_deref().is_some_and(|note| note.contains("12 searches today, 2 grabs")))),
+                    if note.as_deref().is_some_and(|note| note.contains("12 searches, 2 grabs")))),
         "the indexer reports what the aggregator counted: {findings:?}"
     );
 }

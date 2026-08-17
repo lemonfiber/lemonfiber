@@ -11,12 +11,22 @@
 //! reporting the same symptom eight times and leaving the operator to notice the
 //! pattern.
 
+use std::time::{Duration, SystemTime};
+
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Problem, Remedy, Severity, State};
+use crate::instant;
 use crate::plural;
 use crate::ports::service::IndexerUse;
+use crate::provider::Allowance;
 
-use super::{INDEXERS_ALL_FAILING, INDEXER_RESTED};
+use super::{INDEXERS_ALL_FAILING, INDEXER_CAPPED, INDEXER_RESTED};
+
+/// Seconds in an hour, for reading a window back as a sentence names it.
+const SECONDS_AN_HOUR: u64 = 3_600;
+
+/// Hours in a day, which is the window nearly every subscription is sold in.
+const HOURS_A_DAY: u64 = 24;
 
 /// What the aggregator's indexers amount to.
 ///
@@ -57,9 +67,15 @@ fn is_failing(indexer: &IndexerUse) -> bool {
 
 /// One indexer's finding — passing ones carry their counts too, so an operator can see
 /// which of their indexers is actually carrying the searches.
+///
+/// Failing is decided before spent, because the two say different things about the same
+/// indexer and only one of them is a fault: an indexer that has answered every search
+/// until it ran out of its allowance is working exactly as bought.
 fn finding(indexer: &IndexerUse) -> Finding {
     let verdict = if is_failing(indexer) {
         Verdict::Warn(rested(indexer))
+    } else if let Some(spent) = spent(indexer) {
+        Verdict::Warn(capped(&spent))
     } else {
         Verdict::Pass {
             note: Some(use_of(indexer)),
@@ -73,23 +89,151 @@ fn finding(indexer: &IndexerUse) -> Finding {
     )
 }
 
-/// What an indexer has been asked for today, as the aggregator counted it.
+/// An allowance that has run out, and what is known about when it comes back.
+struct Spent {
+    /// What it counts, as a sentence names it.
+    counts: &'static str,
+    /// How much of it has gone, and of how much.
+    allowance: Allowance,
+    /// When the oldest call still counted against it was made, where the aggregator's
+    /// own records place one.
+    from: Option<SystemTime>,
+    /// How long the window it is counted over is.
+    window: Duration,
+}
+
+/// Which of an indexer's two allowances has run out, where either has.
+///
+/// Searches first: an indexer that cannot be searched finds nothing to grab, so its grab
+/// allowance is beside the point until searching works again.
+fn spent(indexer: &IndexerUse) -> Option<Spent> {
+    let limits = indexer.limits?;
+    let searches = allowance(indexer.queries, limits.queries).map(|allowance| Spent {
+        counts: "searches",
+        allowance,
+        from: indexer.searched_from,
+        window: limits.window,
+    });
+    let grabs = allowance(indexer.grabs, limits.grabs).map(|allowance| Spent {
+        counts: "grabs",
+        allowance,
+        from: indexer.grabbed_from,
+        window: limits.window,
+    });
+    [searches, grabs]
+        .into_iter()
+        .flatten()
+        .find(|spent| spent.allowance.spent())
+}
+
+/// One allowance, where a cap is recorded for it.
+///
+/// No rate is taken: an allowance that refills on a clock runs out from the calls made
+/// inside its window, and projecting a date onto something that resets tonight would
+/// answer a question nobody asked.
+fn allowance(used: u64, cap: Option<u64>) -> Option<Allowance> {
+    Some(Allowance {
+        used,
+        cap: Some(cap?),
+        burn: None,
+    })
+}
+
+/// What an indexer has been asked for in the window its allowance is counted over, as
+/// the aggregator counted it — and, where a cap is recorded, what that is against.
 fn use_of(indexer: &IndexerUse) -> String {
     let searches = format!(
-        "{} search{} today",
+        "{}{} search{}",
         indexer.queries,
+        against(indexer.limits.and_then(|limits| limits.queries)),
         if indexer.queries == 1 { "" } else { "es" }
     );
     let grabs = format!(
-        "{} grab{}",
+        "{}{} grab{}",
         indexer.grabs,
+        against(indexer.limits.and_then(|limits| limits.grabs)),
         plural::s(usize::try_from(indexer.grabs).unwrap_or(2))
     );
+    let over = over(indexer);
     let failed = indexer.failed_queries.saturating_add(indexer.failed_grabs);
     if failed == 0 {
-        return format!("{searches}, {grabs}");
+        return format!("{searches}, {grabs}{over}");
     }
-    format!("{searches}, {grabs} — {failed} of those failed")
+    format!("{searches}, {grabs}{over} — {failed} of those failed")
+}
+
+/// The cap a count is measured against, where one is recorded.
+fn against(cap: Option<u64>) -> String {
+    cap.map_or_else(String::new, |cap| format!(" of {cap}"))
+}
+
+/// The window the counts cover, named only where the counts are measured against
+/// something: a figure with no cap beside it is a count of what happened, and saying
+/// what window it happened in adds nothing an operator asked for.
+fn over(indexer: &IndexerUse) -> String {
+    match indexer.limits {
+        None => String::new(),
+        Some(limits) => format!(" in the last {}", window_reading(limits.window)),
+    }
+}
+
+/// A window as a sentence names it.
+fn window_reading(window: Duration) -> String {
+    let hours = window.as_secs() / SECONDS_AN_HOUR;
+    if hours == HOURS_A_DAY {
+        return "day".to_owned();
+    }
+    format!(
+        "{hours} hour{}",
+        plural::s(usize::try_from(hours).unwrap_or(2))
+    )
+}
+
+/// An indexer that has spent what it is allowed for now.
+///
+/// The sneakiest of the provider failures, and the one nothing else in the stack will
+/// say: at the limit the aggregator simply returns no results, without an error, a
+/// failure recorded against the indexer, or a word anywhere in its API. Searches come
+/// back empty all afternoon and every service stays green, which reads as a stack that
+/// has quietly stopped working rather than as an allowance that ran out at lunchtime.
+///
+/// A warning rather than an error, and it comes back on its own — which is why the
+/// moment it comes back is the whole of the useful answer.
+fn capped(spent: &Spent) -> Problem {
+    Problem::new(
+        INDEXER_CAPPED,
+        Severity::Warning,
+        "An indexer has used everything it allows for now",
+        "Searches through this indexer will come back empty until its allowance resets, and neither it nor the aggregator says so anywhere — the searches simply find nothing. Nothing is broken and nothing needs fixing; what it needs is either waiting out or a larger allowance.",
+        Remedy::new(
+            "Wait for the allowance to reset, or raise the limit recorded for this indexer in the aggregator if the subscription allows more",
+        ),
+    )
+    .in_state(State::Guided)
+    .with_detail(format!(
+        "{} of {} {} in the last {}{}",
+        spent.allowance.used,
+        spent.allowance.cap.unwrap_or(spent.allowance.used),
+        spent.counts,
+        window_reading(spent.window),
+        frees_up(spent)
+    ))
+}
+
+/// When the allowance frees up, where the aggregator's records date it.
+///
+/// A rolling window frees up as its oldest call ages out of it, so that call's time is
+/// the answer — and where nothing dates it, the reading says so rather than naming a
+/// time nothing establishes.
+fn frees_up(spent: &Spent) -> String {
+    let at = spent
+        .from
+        .and_then(|from| from.checked_add(spent.window))
+        .and_then(instant::written);
+    match at {
+        Some(at) => format!("; the first of them ages out at {at}"),
+        None => "; when it frees up depends on when those calls were made, which the aggregator does not record".to_owned(),
+    }
 }
 
 /// One indexer that is failing. A warning rather than an error: the others are still
@@ -100,7 +244,10 @@ fn rested(indexer: &IndexerUse) -> Problem {
         Some(until) => {
             format!("its aggregator has stopped querying it until {until} after repeated failures")
         }
-        None => format!("every one of its {} searches today failed", indexer.queries),
+        None => format!(
+            "every one of its {} searches in the window failed",
+            indexer.queries
+        ),
     };
     Problem::new(
         INDEXER_RESTED,
@@ -145,7 +292,14 @@ fn all_failing(querying: &[&IndexerUse]) -> Finding {
 
 #[cfg(test)]
 mod tests {
-    use super::{findings, IndexerUse, Verdict, INDEXERS_ALL_FAILING, INDEXER_RESTED};
+    use std::time::UNIX_EPOCH;
+
+    use crate::ports::service::Limits;
+
+    use super::{
+        findings, Duration, IndexerUse, Verdict, INDEXERS_ALL_FAILING, INDEXER_CAPPED,
+        INDEXER_RESTED,
+    };
 
     /// An indexer answering normally.
     fn answering(name: &str) -> IndexerUse {
@@ -157,6 +311,24 @@ mod tests {
             grabs: 3,
             failed_grabs: 0,
             rested_until: None,
+            limits: None,
+            searched_from: None,
+            grabbed_from: None,
+        }
+    }
+
+    /// An indexer whose operator recorded what their subscription allows, with the
+    /// window's first search dated so a reset has something to be taken from.
+    fn allowed(name: &str, queries: Option<u64>, grabs: Option<u64>) -> IndexerUse {
+        IndexerUse {
+            limits: Some(Limits {
+                queries,
+                grabs,
+                window: Duration::from_secs(24 * 60 * 60),
+            }),
+            searched_from: Some(UNIX_EPOCH + Duration::from_secs(1_786_900_000)),
+            grabbed_from: Some(UNIX_EPOCH + Duration::from_secs(1_786_910_000)),
+            ..answering(name)
         }
     }
 
@@ -173,7 +345,7 @@ mod tests {
         assert_eq!(found.len(), 3);
         assert!(found.iter().any(|finding| finding.title == "Fast"
             && matches!(&finding.verdict, Verdict::Pass { note }
-                if note.as_deref().is_some_and(|note| note.contains("40 searches today, 3 grabs")))));
+                if note.as_deref().is_some_and(|note| note.contains("40 searches, 3 grabs")))));
         assert!(found.iter().any(|finding| finding.title == "Slow"
             && matches!(&finding.verdict, Verdict::Warn(problem) if problem.code == INDEXER_RESTED)));
     }
@@ -226,7 +398,7 @@ mod tests {
         assert!(
             found.iter().any(|finding| finding.title == "Silent"
                 && matches!(&finding.verdict, Verdict::Warn(problem)
-                if problem.detail.as_deref() == Some("every one of its 12 searches today failed")))
+                if problem.detail.as_deref() == Some("every one of its 12 searches in the window failed")))
         );
     }
 
@@ -248,6 +420,119 @@ mod tests {
         ));
     }
 
+    /// The failure nothing else in the stack reports: at its limit the aggregator returns
+    /// no results without recording a failure anywhere, so searches come back empty all
+    /// afternoon with every service green.
+    #[test]
+    fn an_indexer_that_has_spent_its_allowance_says_so_and_says_when_it_comes_back() {
+        let spent = IndexerUse {
+            queries: 100,
+            ..allowed("Fast", Some(100), Some(10))
+        };
+        let found = findings(&[spent]);
+        assert!(
+            matches!(found.first().map(|finding| &finding.verdict), Some(Verdict::Warn(problem))
+            if problem.code == INDEXER_CAPPED
+                && problem.detail.as_deref().is_some_and(|detail| {
+                    detail.contains("100 of 100 searches in the last day")
+                        && detail.contains("ages out at 2026-08-17T17:06:40")
+                }))
+        );
+    }
+
+    /// An allowance sold by the hour is counted by the hour, and says so: an operator
+    /// told to wait wants to know whether that is minutes or most of a day.
+    #[test]
+    fn an_allowance_counted_by_the_hour_is_named_by_the_hour() {
+        let hourly = IndexerUse {
+            queries: 60,
+            limits: Some(Limits {
+                queries: Some(60),
+                grabs: None,
+                window: Duration::from_secs(60 * 60),
+            }),
+            ..allowed("Fast", Some(60), None)
+        };
+        let found = findings(&[hourly]);
+        assert!(
+            matches!(found.first().map(|finding| &finding.verdict), Some(Verdict::Warn(problem))
+            if problem.detail.as_deref().is_some_and(|detail| detail.contains("in the last 1 hour")))
+        );
+    }
+
+    /// Where the aggregator's log places no call inside the window, there is nothing to
+    /// date the reset from — and a time nothing establishes is worse than no time.
+    #[test]
+    fn a_cap_nothing_can_date_is_reported_without_a_time() {
+        let undated = IndexerUse {
+            queries: 100,
+            searched_from: None,
+            ..allowed("Fast", Some(100), None)
+        };
+        let found = findings(&[undated]);
+        assert!(
+            matches!(found.first().map(|finding| &finding.verdict), Some(Verdict::Warn(problem))
+            if problem.detail.as_deref().is_some_and(|detail| {
+                detail.contains("when it frees up depends on") && !detail.contains("ages out")
+            }))
+        );
+    }
+
+    /// Grabs run out on their own schedule, and an indexer that can still search but not
+    /// take anything is a different sentence with the same remedy.
+    #[test]
+    fn a_spent_grab_allowance_is_reported_on_its_own() {
+        let spent = IndexerUse {
+            grabs: 10,
+            ..allowed("Fast", Some(100), Some(10))
+        };
+        let found = findings(&[spent]);
+        assert!(
+            matches!(found.first().map(|finding| &finding.verdict), Some(Verdict::Warn(problem))
+            if problem.code == INDEXER_CAPPED
+                && problem.detail.as_deref().is_some_and(|detail| detail.contains("10 of 10 grabs")))
+        );
+    }
+
+    /// An allowance nobody recorded is not an allowance nobody reached: the counts are
+    /// still reported, and nothing is concluded from them.
+    #[test]
+    fn an_indexer_with_no_allowance_recorded_reports_its_counts_and_concludes_nothing() {
+        let found = findings(&[answering("Fast")]);
+        assert!(
+            matches!(found.first().map(|finding| &finding.verdict), Some(Verdict::Pass { note })
+            if note.as_deref() == Some("40 searches, 3 grabs"))
+        );
+    }
+
+    /// With a cap recorded, the passing note says what the counts are measured against
+    /// and over what — the two things that turn a number into a judgement an operator
+    /// can make for themselves.
+    #[test]
+    fn a_passing_indexer_with_a_cap_says_what_it_is_measured_against() {
+        let found = findings(&[allowed("Fast", Some(100), Some(10))]);
+        assert!(
+            matches!(found.first().map(|finding| &finding.verdict), Some(Verdict::Pass { note })
+            if note.as_deref() == Some("40 of 100 searches, 3 of 10 grabs in the last day"))
+        );
+    }
+
+    /// An indexer failing outright is failing whatever its allowance says, and the
+    /// remedy for that is not to wait for a reset.
+    #[test]
+    fn a_failing_indexer_is_reported_as_failing_rather_than_as_capped() {
+        let both = IndexerUse {
+            queries: 100,
+            rested_until: Some("2026-08-16T20:00:00Z".to_owned()),
+            ..allowed("Fast", Some(100), None)
+        };
+        let found = findings(&[both, answering("Other")]);
+        assert!(matches!(
+            found.first().map(|finding| &finding.verdict),
+            Some(Verdict::Warn(problem)) if problem.code == INDEXER_RESTED
+        ));
+    }
+
     #[test]
     fn an_indexer_nobody_is_querying_is_a_choice_rather_than_a_fault() {
         let switched_off = IndexerUse {
@@ -266,7 +551,7 @@ mod tests {
         };
         assert!(matches!(
             findings(&[once]).first().map(|finding| &finding.verdict),
-            Some(Verdict::Pass { note }) if note.as_deref() == Some("1 search today, 1 grab")
+            Some(Verdict::Pass { note }) if note.as_deref() == Some("1 search, 1 grab")
         ));
     }
 }

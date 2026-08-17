@@ -360,6 +360,7 @@ pub async fn diagnose(
             .await
             .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
         ctx.today(),
+        ctx.clock.now(),
     );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),

@@ -12,6 +12,8 @@
 //! "how much is left" belongs above this seam, where it can be read and tested on its
 //! own rather than hidden in a mapping.
 
+use std::time::{Duration, SystemTime};
+
 use async_trait::async_trait;
 use lemonfiber_manifest::Date;
 
@@ -96,13 +98,35 @@ pub trait UsenetAccounts: Send + Sync {
     async fn accounts(&self) -> Result<Vec<UsenetAccount>, Failure>;
 }
 
+/// What an indexer allows, as the aggregator was told it.
+///
+/// An indexer publishes its allowance almost nowhere — the caps in its capabilities
+/// document are results per query, not calls per day — so the figure that exists is the
+/// one the operator typed into the aggregator after reading their own subscription. That
+/// makes it exactly the shape a Usenet block takes: the allowance is recorded in the
+/// client, the use is measured by the client, and asking either costs the provider
+/// nothing.
+///
+/// The window travels with the caps because a cap means nothing without one, and because
+/// the aggregator counts against a *rolling* window: a count taken from midnight would
+/// report headroom that is not there every morning, which is the same calendar trap the
+/// download client's weekly totals set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// Searches allowed in the window, where the operator recorded a cap.
+    pub queries: Option<u64>,
+    /// Grabs allowed in the window, where the operator recorded a cap.
+    pub grabs: Option<u64>,
+    /// How far back the window reaches from now.
+    pub window: Duration,
+}
+
 /// One indexer as the aggregator that queries it has it.
 ///
-/// Counts rather than a limit, because an indexer states what it allows almost
-/// nowhere: the caps in its capabilities document are results per query, not calls
-/// per day. What the aggregator does know is how many times it asked, how many of
-/// those failed, and whether it has since given up on it — which is the honest half
-/// of the picture, and the half a cap would be judged against if one were published.
+/// Counts and, where the operator recorded them, the caps those counts are judged
+/// against. What the aggregator always knows is how many times it asked, how many of
+/// those failed, and whether it has since given up on the indexer; what it knows only
+/// sometimes is what the subscription behind it allows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexerUse {
     /// What the operator calls it.
@@ -120,12 +144,29 @@ pub struct IndexerUse {
     /// When the aggregator will try it again, in its own words, where it has taken it
     /// out of rotation after repeated failures.
     pub rested_until: Option<String>,
+    /// What it allows and over how long, where the operator recorded either.
+    pub limits: Option<Limits>,
+    /// When the oldest search still inside the window was made.
+    ///
+    /// A reset falls out of this and nothing else: a rolling window frees up the moment
+    /// its oldest call ages out of it. A total has no times in it, so a count alone can
+    /// say an allowance is spent and never say when it comes back.
+    pub searched_from: Option<SystemTime>,
+    /// When the oldest grab still inside the window was made — the same, for the other
+    /// allowance, which runs out on its own schedule.
+    pub grabbed_from: Option<SystemTime>,
 }
 
 /// The indexers an aggregator queries, and how they have been behaving.
 #[async_trait]
 pub trait Indexers: Send + Sync {
-    /// Every indexer the aggregator holds, with its use since the start of `since`.
+    /// Every indexer the aggregator holds, with its use over the window its own caps are
+    /// counted in, taken back from `now`.
+    ///
+    /// A moment rather than a day, because the caps are counted over a window that rolls:
+    /// one that began at midnight would report an allowance as barely touched every
+    /// morning, however much of it went overnight. An indexer capped by the hour cannot
+    /// be counted over a date at all.
     ///
     /// Reading this costs the indexers nothing: the aggregator keeps its own counts,
     /// so asking it how much of an allowance has gone does not spend any of it.
@@ -133,5 +174,5 @@ pub trait Indexers: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] where the aggregator could not be read.
-    async fn indexers(&self, since: Date) -> Result<Vec<IndexerUse>, Failure>;
+    async fn indexers(&self, now: SystemTime) -> Result<Vec<IndexerUse>, Failure>;
 }

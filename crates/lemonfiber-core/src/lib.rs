@@ -48,6 +48,7 @@ mod endpoint;
 pub mod error;
 pub mod health;
 pub mod household;
+mod instant;
 pub mod jellyfin;
 pub mod journal;
 pub mod lidarr;
