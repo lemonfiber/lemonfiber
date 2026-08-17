@@ -323,7 +323,10 @@ const HOURLY_COUNTS: &str = r#"{"indexers":[{"indexerId":1,"numberOfQueries":40,
 ///
 /// Written both ways on purpose: some versions name their event types and some number
 /// them, and an entry nothing places — a login, or a line with no type at all — counts
-/// against neither allowance.
+/// against neither allowance. The last two are there to be left out: one call older than
+/// this indexer's own window, which the aggregator's log reaches past because another
+/// indexer counts by the day, and one belonging to an indexer with no allowance recorded
+/// at all.
 const HISTORY: &str = r#"[
     {"indexerId":1,"date":"2026-08-17T11:20:00Z","eventType":"indexerQuery"},
     {"indexerId":1,"date":"2026-08-17T11:05:30Z","eventType":"indexerRss"},
@@ -334,7 +337,9 @@ const HISTORY: &str = r#"[
     {"indexerId":1,"date":"2026-08-17T11:50:00Z","eventType":1},
     {"indexerId":1,"date":"2026-08-17T11:47:00Z","eventType":4},
     {"indexerId":1,"date":"2026-08-17T11:48:00Z","eventType":"indexerAuth"},
-    {"indexerId":1,"date":"2026-08-17T11:55:00Z"}
+    {"indexerId":1,"date":"2026-08-17T11:55:00Z"},
+    {"indexerId":1,"date":"2026-08-17T10:30:00Z","eventType":"indexerQuery"},
+    {"indexerId":9,"date":"2026-08-17T11:10:00Z","eventType":"indexerQuery"}
 ]"#;
 
 /// The counts a cap is judged against have to be counted the way the aggregator counts
