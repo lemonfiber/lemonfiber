@@ -24,6 +24,7 @@ pub mod accepted;
 pub mod appetite;
 pub mod apply;
 pub mod backup;
+pub mod bundle;
 pub mod conditions;
 mod configuring;
 mod ctx;

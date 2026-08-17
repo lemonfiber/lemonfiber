@@ -24,6 +24,7 @@
 //! and nothing to stand up. The collecting and the writing live above it.
 
 use std::collections::hash_map::DefaultHasher;
+use std::fmt::Write as _;
 use std::hash::{Hash, Hasher};
 
 use crate::ports::random::Random;
@@ -150,6 +151,105 @@ fn url(value: &str, marks: &Marks) -> String {
     match value.split_once('?') {
         None => value.to_owned(),
         Some((address, query)) => format!("{address}?{}", marks.of(query)),
+    }
+}
+
+/// One file inside a bundle: the name it will carry, and what it holds.
+///
+/// Held in memory rather than written as it is gathered, because everything is read back
+/// before anything is written. A bundle that had already put one file on disk when it
+/// found a credential in the next would have to be unwritten, and unwriting is the kind of
+/// thing that half-works.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Piece {
+    /// What it is called inside the bundle.
+    pub name: String,
+    /// What it holds, already redacted.
+    pub body: String,
+}
+
+/// What a reader needs to know before reading a word of the bundle.
+///
+/// An operator pasting last week's bundle into this week's thread is the commonest way one
+/// of those threads goes wrong, and nothing in the contents tells either of them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Taken {
+    /// The lemonfiber that wrote it.
+    pub lemonfiber: String,
+    /// The stack it was written from.
+    pub stack: String,
+    /// When, as a service writes a moment.
+    pub at: String,
+}
+
+/// Everything gathered for a bundle, and everything that could not be.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Contents {
+    /// The files, in the order a reader would want them.
+    pub pieces: Vec<Piece>,
+    /// What could not be collected, named.
+    ///
+    /// Named rather than passed over: a bundle from a machine whose diagnostics will not
+    /// run is exactly the bundle worth having, and a gap nobody mentions reads as an
+    /// absence of trouble rather than as an absence of information.
+    pub missing: Vec<String>,
+    /// Where and when it came from.
+    pub taken: Taken,
+}
+
+/// What every bundle says about its own redaction, so a reader knows what the marks in it
+/// mean without having to be told separately.
+const NOTE: &str = "Every value not named safe has been replaced. A replacement reads the same wherever the same value appeared in this bundle, and means nothing in any other.";
+
+/// The name the bundle's own first page carries.
+pub const MANIFEST: &str = "README.txt";
+
+impl Contents {
+    /// The bundle's first page: what it is, where it came from, what is in it, and what is
+    /// not. Written into the bundle rather than printed once, because the person who reads
+    /// it is usually not the person who made it.
+    #[must_use]
+    pub fn manifest(&self) -> String {
+        let holds = self.pieces.iter().fold(String::new(), |mut page, piece| {
+            let _ = writeln!(page, "  {}", piece.name);
+            page
+        });
+        let gaps = self.gaps();
+        let Taken {
+            lemonfiber,
+            stack,
+            at,
+        } = &self.taken;
+        format!(
+            "lemonfiber support bundle\n\nlemonfiber {lemonfiber}\nstack {stack}\ntaken {at}\n\nHolds:\n{holds}{gaps}\n{NOTE}\n"
+        )
+    }
+
+    /// What could not be read, where anything could not — and nothing at all where
+    /// everything answered, so a complete bundle does not carry an empty heading that
+    /// reads as a list somebody forgot to fill in.
+    fn gaps(&self) -> String {
+        if self.missing.is_empty() {
+            return String::new();
+        }
+        let listed = self.missing.iter().fold(String::new(), |mut page, gap| {
+            let _ = writeln!(page, "  {gap}");
+            page
+        });
+        format!("\nCould not be read:\n{listed}")
+    }
+
+    /// Every file the bundle would hold, its own first page included — which is what the
+    /// scan reads, because the first page is written from the same values as the rest.
+    #[must_use]
+    pub fn files(&self) -> Vec<(String, String)> {
+        let mut files = vec![(MANIFEST.to_owned(), self.manifest())];
+        files.extend(
+            self.pieces
+                .iter()
+                .map(|piece| (piece.name.clone(), piece.body.clone())),
+        );
+        files
     }
 }
 
