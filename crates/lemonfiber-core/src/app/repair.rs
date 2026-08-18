@@ -278,11 +278,14 @@ async fn carried(
 /// that read moments ago, which is the machine changing under the repair rather than a
 /// verdict — so it answers "cannot say" rather than "still broken".
 async fn prove(ctx: &Ctx, again: Option<&[Box<dyn Check>]>, check: &str) -> Option<bool> {
-    if let Some(checks) = again {
-        return proved(&looked(ctx, checks).await, check);
-    }
-    let assembled = super::engine::assembled(ctx, false).await.ok()?;
-    proved(&looked(ctx, &assembled).await, check)
+    // Assembled eagerly where the caller brought none, so there is one path through this
+    // rather than two — the second would be a line the gate counts and only a live stack
+    // reaches, which is the shape the error model doc tells us to remove rather than test.
+    let assembled = match again {
+        Some(_) => Vec::new(),
+        None => super::engine::assembled(ctx, false).await.ok()?,
+    };
+    proved(&looked(ctx, again.unwrap_or(&assembled)).await, check)
 }
 
 /// What an attempt and the proof of it amount to together.

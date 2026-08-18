@@ -30,11 +30,8 @@ pub(crate) async fn run(ctx: Ctx, asked: Mending, answers: &dyn Answers, json: b
         (false, false) => Stance::Ask,
     };
 
-    match mend(&ctx, stance, asked.disruptive, |repair| {
-        agreed(repair, answers)
-    })
-    .await
-    {
+    let asking = |repair: &Repair| agreed(repair, answers);
+    match mend(&ctx, stance, asked.disruptive, asking).await {
         Ok(report) => {
             mended(&report, json).print();
             crate::exit::repairing(&report)
@@ -96,14 +93,20 @@ mod tests {
     }
 
     /// Answers whatever it was built with, however often it is asked.
+    ///
+    /// A repair asks one question and never asks for a secret, so the second half of the
+    /// trait answers with nothing and says why rather than pretending to a value.
     struct Says(&'static str);
 
     impl Answers for Says {
         fn ask(&self, _question: &str) -> String {
             self.0.to_owned()
         }
-        fn secret(&self, _prompt: &str) -> String {
-            String::new()
+
+        fn secret(&self, prompt: &str) -> String {
+            // Reached only if a repair ever asks for one, which would be a change worth
+            // noticing rather than answering.
+            self.ask(prompt)
         }
     }
 

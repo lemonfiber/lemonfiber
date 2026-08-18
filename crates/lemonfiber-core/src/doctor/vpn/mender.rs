@@ -50,15 +50,6 @@ impl PortMender {
             client,
         }
     }
-
-    /// What the provider is granting now.
-    ///
-    /// Read again rather than taken from the finding that prompted the repair: a grant can
-    /// move between looking and acting, and pushing a port the provider has since taken
-    /// back is worse than pushing none at all.
-    async fn granted(&self) -> Option<u16> {
-        grant_at(self.engine.as_ref(), &self.project, &self.gateway).await
-    }
 }
 
 #[async_trait]
@@ -97,7 +88,7 @@ impl Mend for PortMender {
         // between looking and acting, and pushing a port the provider has since taken back
         // is worse than pushing none at all. The client is asked afresh for the same reason.
         let forwarding = Forwarding {
-            granted: self.granted().await,
+            granted: grant_at(self.engine.as_ref(), &self.project, &self.gateway).await,
             listening: client.listen_port().await.ok(),
         };
         let Some(granted) = forwarding.to_push() else {
