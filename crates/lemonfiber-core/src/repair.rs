@@ -78,6 +78,28 @@ pub struct Repair {
     pub reversible: bool,
 }
 
+/// What carrying out a repair did, as the mender that carried it out saw it.
+///
+/// Deliberately not [`Outcome`]. A mender can say what it did; it cannot say whether it
+/// worked, because that takes asking the check again. Keeping the two apart in the type
+/// system means no mender can report a fault gone on the strength of its own command
+/// having succeeded — which is the failure this whole feature exists to avoid.
+///
+/// There is no refusal here either. Whether a repair would write over something the
+/// operator changed by hand is settled before a mender is asked, so that the rule holds
+/// for every repair rather than for each one that remembered it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "attempt")]
+pub enum Attempt {
+    /// It ran, and did what it said it would.
+    Carried,
+    /// It stopped partway, leaving this.
+    Stopped {
+        /// What the machine is now in, said plainly.
+        leaving: String,
+    },
+}
+
 /// How a repair turned out, once the check that raised the finding has been asked again.
 ///
 /// Deliberately not a boolean. "It ran" and "it worked" are different claims, and a model
@@ -105,6 +127,21 @@ pub enum Outcome {
 }
 
 impl Outcome {
+    /// What an attempt amounts to, once the check has been asked again.
+    ///
+    /// The only place `Fixed` can be constructed from a repair having run, and it takes
+    /// `settled` — the check's own answer afterwards — to get there. A repair that
+    /// stopped partway is neither fixed nor merely failed however the check now reads:
+    /// what matters to the operator is the state it was left in.
+    #[must_use]
+    pub fn of(attempt: Attempt, settled: bool) -> Self {
+        match attempt {
+            Attempt::Stopped { leaving } => Self::Stopped { leaving },
+            Attempt::Carried if settled => Self::Fixed,
+            Attempt::Carried => Self::FixFailed,
+        }
+    }
+
     /// Whether the fault this answered is gone.
     ///
     /// The one question the report turns on, and the only [`Outcome`] that answers yes is

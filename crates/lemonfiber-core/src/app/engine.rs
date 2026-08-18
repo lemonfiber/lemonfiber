@@ -277,6 +277,32 @@ pub async fn diagnose(
     only: Option<Category>,
     disruptive: bool,
 ) -> Result<DoctorReport, Problem> {
+    let checks = assembled(ctx, disruptive).await?;
+
+    // A choice the operator has already answered is marked as answered rather than
+    // repeated. Applied over the whole set here, so the rule is in one place and a
+    // check cannot forget it — least of all the one about running with no tunnel,
+    // which is the choice most likely to be deliberate and most tiresome repeated.
+    let mut report = examine(&checks, only).await;
+    report.findings =
+        crate::doctor::acknowledged::suppressing(report.findings, &super::accepted::load(ctx));
+    Ok(report)
+}
+
+/// The checks this stack is examined by, built and ready to run.
+///
+/// Assembled apart from the running of them because a repair has to ask the very same
+/// checks again to prove it worked, and two lists would be one list plus whichever check
+/// somebody forgot to add to the other.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the stack cannot be read, which is the one thing every
+/// check needs before any of them can run.
+pub(super) async fn assembled(
+    ctx: &Ctx,
+    disruptive: bool,
+) -> Result<Vec<Box<dyn Check>>, Problem> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -311,6 +337,13 @@ pub async fn diagnose(
             listening: super::forwarding::listening_port(ctx, &manifest, project.as_deref()).await,
             port_forward: ctx.settings.port_forward.clone(),
             disruptive,
+            // Built here because a client's credentials are a service's own business,
+            // and the check speaks to containers. Absent where it could not be
+            // authenticated to, which is a client to leave alone.
+            client: super::targets::torrent_client(
+                ctx,
+                &super::targets::download_targets(&manifest.services, project.as_deref()),
+            ),
         },
     );
     let credentials = CredentialsCheck::new(
@@ -364,7 +397,7 @@ pub async fn diagnose(
         ctx.today(),
         ctx.clock.now(),
     );
-    let checks: Vec<Box<dyn Check>> = vec![
+    Ok(vec![
         Box::new(environment),
         Box::new(storage),
         Box::new(vpn),
@@ -374,16 +407,7 @@ pub async fn diagnose(
         Box::new(guides),
         Box::new(headroom),
         Box::new(releases),
-    ];
-
-    // A choice the operator has already answered is marked as answered rather than
-    // repeated. Applied over the whole set here, so the rule is in one place and a
-    // check cannot forget it — least of all the one about running with no tunnel,
-    // which is the choice most likely to be deliberate and most tiresome repeated.
-    let mut report = examine(&checks, only).await;
-    report.findings =
-        crate::doctor::acknowledged::suppressing(report.findings, &super::accepted::load(ctx));
-    Ok(report)
+    ])
 }
 
 /// What every service in the named forms is doing.
