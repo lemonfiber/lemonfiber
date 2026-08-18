@@ -47,6 +47,7 @@ fn path(ctx: &Ctx) -> Option<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::{load, save};
+    use crate::app::fixtures::{ctx_at, scratch};
     use crate::condition::{Conditions, Fault};
     use crate::error::Severity;
 
@@ -64,36 +65,6 @@ mod tests {
             "1000",
         );
         conditions
-    }
-
-    /// Where a test's scratch store lives. Naming it does not touch it, so a test
-    /// can reach the file the module wrote rather than deleting it and proving
-    /// something else.
-    fn scratch(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("lemonfiber-cond-{}-{name}", std::process::id()))
-    }
-
-    /// A context whose environment file is in a scratch directory unique to the
-    /// test, emptied first, so the store lands beside it and concurrent tests do
-    /// not share one.
-    fn ctx_at(name: &str) -> crate::app::Ctx {
-        let dir = scratch(name);
-        let _ = std::fs::remove_dir_all(&dir);
-        let settings = crate::config::Settings {
-            env_file: Some(dir.join(".env")),
-            ..crate::config::Settings::default()
-        };
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
-                crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            settings,
-            crate::platform::Environment::MacOs,
-        )
     }
 
     #[test]

@@ -11,7 +11,7 @@ use super::port_forward::port_forward_offline;
 use super::Pair;
 use super::{Category, Finding, Verdict};
 use crate::config::PortForward;
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Code, Problem, Remedy, Severity, State};
 
 pub(super) fn assemble(
     pair: &Pair,
@@ -132,7 +132,7 @@ pub(super) fn disagreeing(reason: String) -> Finding {
 /// the part noticed last and the reason this is worth saying at all.
 pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
     finding(
-        "vpn.port-forward-client",
+        PORT_MISMATCH_CHECK,
         "The download client listens on the forwarded port",
         Verdict::Warn(
             Problem::new(
@@ -149,10 +149,17 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
             )
             .or_try(Remedy::new(format!(
                 "Or set the client's listening port to {granted} yourself"
-            ))),
+            )))
+            // The one finding in the tree lemonfiber can put right itself, and saying so is
+            // what makes the classification worth showing at all.
+            .in_state(State::Remediable),
         ),
     )
 }
+
+/// What this finding is called, named once so the repair that answers it and the check that
+/// raises it cannot drift apart on a rename.
+pub(super) const PORT_MISMATCH_CHECK: &str = "vpn.port-forward-client";
 
 /// Raised when the client is listening somewhere other than the forwarded port.
 pub const PORT_MISMATCH: Code = Code::new("VPN-7");

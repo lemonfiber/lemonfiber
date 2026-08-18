@@ -71,6 +71,7 @@ fn checking(engine: Fake) -> VpnCheck {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: true,
+            client: None,
         },
     )
 }
@@ -255,6 +256,7 @@ async fn without_the_flag_nothing_is_touched_and_the_operator_is_told_how_to_ask
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -443,6 +445,7 @@ async fn an_unreachable_engine_leaves_the_checks_unverified() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -477,6 +480,7 @@ async fn no_torrents_configured_does_not_apply() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     assert!(matches!(
@@ -503,6 +507,7 @@ async fn leak_detection_switched_off_does_not_apply() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     assert!(matches!(
@@ -527,6 +532,7 @@ async fn leak_detection_off_holds_even_when_the_engine_is_down() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -553,6 +559,7 @@ async fn a_stack_with_no_gateway_does_not_apply() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     assert!(matches!(

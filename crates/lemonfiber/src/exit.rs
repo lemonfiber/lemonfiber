@@ -7,6 +7,7 @@
 
 use std::process::ExitCode;
 
+use lemonfiber_core::app::repair::Report as RepairReport;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::Problem;
@@ -104,6 +105,18 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Stuck(_)
         | Outcome::Status(_) => ExitCode::SUCCESS,
     }
+}
+
+/// The exit code a repairing run earns.
+///
+/// Anything left unmended is a non-zero result: an operator who asked for things to be put
+/// right and had one fail needs their script to know, and a run that offered nothing had
+/// nothing wrong it could mend.
+pub(crate) fn repairing(report: &RepairReport) -> ExitCode {
+    if report.mended.iter().all(|mended| mended.outcome.settled()) {
+        return ExitCode::SUCCESS;
+    }
+    ExitCode::FAILURE
 }
 
 /// The exit code a seed earns. Seeding is run to make the wiring true, so leaving any

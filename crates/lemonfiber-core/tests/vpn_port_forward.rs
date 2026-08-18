@@ -13,6 +13,7 @@ use lemonfiber_core::config::{PortForward, Protocols};
 use lemonfiber_core::doctor::vpn::{Asked, VpnCheck, NO_FORWARDED_PORT};
 use lemonfiber_core::doctor::{Check, Verdict};
 use lemonfiber_core::error::Severity;
+use lemonfiber_core::repair::{Attempt, Repair};
 
 #[tokio::test]
 async fn a_granted_port_is_a_verified_forward() {
@@ -223,6 +224,7 @@ async fn port_forwarding_is_checked_even_with_leak_detection_off() {
             listening: None,
             port_forward: forwarding("protonvpn"),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -246,6 +248,7 @@ async fn an_unreachable_engine_leaves_an_enabled_forward_unverified() {
             listening: None,
             port_forward: forwarding("protonvpn"),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -276,6 +279,7 @@ async fn a_gateway_with_no_client_does_not_apply() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     assert!(matches!(
@@ -313,6 +317,7 @@ async fn address_services_that_contradict_each_other_are_reported_rather_than_re
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -357,6 +362,7 @@ async fn a_client_listening_off_the_forwarded_port_is_reported_rather_than_corre
             listening: Some(51413),
             port_forward: forwarding("proton"),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -389,6 +395,7 @@ async fn a_client_already_on_the_forwarded_port_is_not_reported() {
             listening: Some(51413),
             port_forward: forwarding("proton"),
             disruptive: false,
+            client: None,
         },
     );
     assert!(subject
@@ -457,6 +464,7 @@ async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -471,4 +479,80 @@ async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
         verdict(&findings, "vpn").is_none(),
         "and not also reported as not applying"
     );
+}
+
+/// The one fault in this category lemonfiber can put right itself: the provider forwards a
+/// port and the client is listening on another. What is offered says what it would do and
+/// what else changes, and admits it cannot be undone.
+#[tokio::test]
+async fn the_check_offers_a_repair_for_the_client_on_the_wrong_port() {
+    let subject = listening_on(
+        vec![gateway_with_port("51413")],
+        forwarding("protonvpn"),
+        Some(6881),
+    );
+    let found = subject.run().await;
+
+    let offered = subject
+        .mender()
+        .map(|mender| mender.repairs(&found))
+        .unwrap_or_default();
+
+    assert_eq!(
+        offered.first().map(|repair| repair.check.as_str()),
+        Some("vpn.port-forward-client")
+    );
+    assert!(offered
+        .first()
+        .is_some_and(|repair| !repair.effects.is_empty() && !repair.reversible));
+}
+
+/// And nothing where nothing is wrong: a client sitting on the granted port needs no
+/// moving, so a run has nothing to offer rather than a repair that would change nothing.
+#[tokio::test]
+async fn a_client_already_on_the_forwarded_port_is_offered_nothing() {
+    let subject = listening_on(
+        vec![gateway_with_port("51413")],
+        forwarding("protonvpn"),
+        Some(51413),
+    );
+    let found = subject.run().await;
+
+    assert!(subject
+        .mender()
+        .map(|mender| mender.repairs(&found))
+        .unwrap_or_default()
+        .is_empty());
+}
+
+/// A client that could not be authenticated to is one to leave alone rather than guess at,
+/// and the repair says which of the two happened.
+#[tokio::test]
+async fn a_repair_with_no_client_to_move_leaves_it_alone() {
+    let subject = check_with(vec![gateway_with_port("51413")], forwarding("protonvpn"));
+
+    let Some(mender) = subject.mender() else {
+        return;
+    };
+    let attempt = mender
+        .mend(&Repair {
+            check: "vpn.port-forward-client".to_owned(),
+            does: "move it".to_owned(),
+            effects: Vec::new(),
+            reversible: false,
+        })
+        .await;
+
+    assert!(matches!(attempt, Attempt::Stopped { .. }));
+}
+
+/// A stack with no pair to contain the client has nothing this check could put right, so it
+/// offers no mender at all rather than one that would refuse everything.
+#[tokio::test]
+async fn a_check_that_cannot_mend_anything_offers_no_mender() {
+    let mut off = forwarding("protonvpn");
+    off.enabled = false;
+    assert!(check_with(vec![gateway_with_port("51413")], off)
+        .mender()
+        .is_none());
 }

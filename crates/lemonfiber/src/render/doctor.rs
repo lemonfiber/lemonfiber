@@ -6,6 +6,7 @@
 use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::{Problem, State};
 use lemonfiber_core::model::DoctorReport;
+use lemonfiber_core::repair::{mendable, ASK_FOR_REPAIRS};
 
 use super::Lines;
 
@@ -59,11 +60,15 @@ pub(super) fn diagnosis(report: &DoctorReport) -> Lines {
 pub(super) fn remedies(problem: &Problem) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!("      {}", problem.meaning));
+    // Which of the three kinds this is, said where it changes what the operator can do.
+    // The other two already say so in their own remedies — one names where to go and the
+    // other offers the bundle — and only this one has an answer they would not guess at.
+    if mendable(problem.state) {
+        lines.put("      lemonfiber can put this one right for you".to_owned());
+        lines.put(format!("        {ASK_FOR_REPAIRS}"));
+    }
     for remedy in &problem.remedies {
-        lines.put(format!("      → {}", remedy.action));
-        if let Some(detail) = &remedy.detail {
-            lines.put(format!("        {detail}"));
-        }
+        lines.remedy(remedy, "      ");
     }
     lines
 }
@@ -84,6 +89,24 @@ mod tests {
     use crate::render::fixtures::*;
     use lemonfiber_core::doctor::{Category, Finding, Overall, Verdict};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+
+    /// The classification an operator can act on. A finding lemonfiber can put right
+    /// itself says so and names the command; the ones only they can act on already say
+    /// where to go in their own remedies, so a label there would be noise.
+    #[test]
+    fn a_finding_lemonfiber_can_mend_says_so_and_names_the_command() {
+        use lemonfiber_core::error::State;
+
+        let mendable = remedies(&a_problem().in_state(State::Remediable)).text();
+        assert!(
+            mendable.contains("can put this one right for you"),
+            "{mendable}"
+        );
+        assert!(mendable.contains("lemonfiber doctor --fix"), "{mendable}");
+
+        let theirs = remedies(&a_problem()).text();
+        assert!(!theirs.contains("can put this one right"), "{theirs}");
+    }
 
     #[test]
     fn every_verdict_reads_with_its_own_mark() {

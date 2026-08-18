@@ -32,6 +32,7 @@ use serde::Serialize;
 
 use crate::error::{Problem, Remedy};
 use crate::model::DoctorReport;
+use crate::repair::{Attempt, Repair};
 
 /// The family a check belongs to, so a run can be narrowed to one of them.
 ///
@@ -202,6 +203,42 @@ pub trait Check: Send + Sync {
 
     /// Establish the findings empirically.
     async fn run(&self) -> Vec<Finding>;
+
+    /// What this check can put right about what it found, where it can put anything
+    /// right at all.
+    ///
+    /// Nothing, for most of them — a check that can only observe says so by saying
+    /// nothing here. A check that can mend returns itself, which is the point of asking
+    /// the check rather than a table somewhere else: it already holds the ports it would
+    /// need, and the knowledge of how to fix a thing cannot drift away from the code that
+    /// detects it if the two are the same object.
+    fn mender(&self) -> Option<&dyn Mend> {
+        None
+    }
+}
+
+/// Putting right what a check found.
+///
+/// Separate from [`Check`] rather than folded into it, because the two are asked at
+/// different moments and by different callers: everything runs `run`, and only a run the
+/// operator has told to act asks anything here.
+///
+/// Neither half decides whether to go ahead. What may be offered is
+/// [`crate::repair`]'s, purely, and whether this run may act at all is the operator's —
+/// a mender that consulted either would be a second place for the answer to be wrong.
+#[async_trait]
+pub trait Mend: Send + Sync {
+    /// What this check could put right, given what it just found.
+    ///
+    /// Built from the findings rather than from nothing, because a repair states what it
+    /// would do and that sentence depends on what is actually wrong.
+    fn repairs(&self, found: &[Finding]) -> Vec<Repair>;
+
+    /// Carry one out.
+    ///
+    /// Reports what happened and no more. Whether the fault is *gone* is not this
+    /// method's to say — that takes asking the check again, which the caller does.
+    async fn mend(&self, repair: &Repair) -> Attempt;
 }
 
 /// Run the checks that match, bound each by its own budget, and sum the result.
