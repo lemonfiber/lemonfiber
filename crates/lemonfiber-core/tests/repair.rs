@@ -197,6 +197,48 @@ async fn a_repair_that_stopped_says_what_it_left() {
     );
 }
 
+/// A repair that ran and left the fault standing spends one of the few attempts it is
+/// given; after enough of them it stops being offered, and the run hands over the support
+/// bundle rather than going quiet about a fault it cannot mend.
+#[tokio::test]
+async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() {
+    let context = ctx("exhausted");
+
+    // Each run mends and the check keeps failing, so each spends one attempt.
+    for _ in 0..3 {
+        let report = mending(
+            &context,
+            &checks(Attempt::Carried),
+            Stance::Unattended,
+            |_| true,
+        )
+        .await;
+        assert_eq!(
+            report.mended.first().map(|mended| &mended.outcome),
+            Some(&Outcome::FixFailed),
+            "the check this test drives is never actually put right"
+        );
+    }
+
+    let past = mending(
+        &context,
+        &checks(Attempt::Carried),
+        Stance::Unattended,
+        |_| true,
+    )
+    .await;
+    assert!(past.offered.is_empty(), "it has had its chances");
+    assert_eq!(
+        past.beyond.first().map(|beyond| beyond.check.as_str()),
+        Some(CHECK)
+    );
+    assert!(past
+        .beyond
+        .first()
+        .and_then(|beyond| beyond.remedy.detail.as_deref())
+        .is_some_and(|detail| detail.contains("lemonfiber support")));
+}
+
 /// The whole errand over the real checks: nothing here can be mended, so nothing is
 /// offered — and the run says so rather than failing.
 #[tokio::test]

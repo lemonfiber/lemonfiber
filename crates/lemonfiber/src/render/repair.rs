@@ -65,7 +65,8 @@ fn said(outcome: &Outcome) -> String {
 
 #[cfg(test)]
 mod tests {
-    use lemonfiber_core::app::repair::{Mended, Report};
+    use lemonfiber_core::app::repair::{Beyond, Mended, Report};
+    use lemonfiber_core::error::Remedy;
     use lemonfiber_core::repair::{Outcome, Repair};
 
     use super::mended;
@@ -76,6 +77,15 @@ mod tests {
             does: "Move the download client onto the forwarded port".to_owned(),
             effects: Vec::new(),
             reversible: true,
+        }
+    }
+
+    /// A fault that has outlasted every repair for it, and where to go instead.
+    fn beyond() -> Beyond {
+        Beyond {
+            check: "vpn.port-forward-client".to_owned(),
+            remedy: Remedy::new("Ask for help with a support bundle")
+                .with_detail("lemonfiber support --logs 500"),
         }
     }
 
@@ -143,6 +153,30 @@ mod tests {
         // useful sentence in a failure, and flattening it loses what to do next.
         assert!(
             text.contains("stopped partway — the client on its old port"),
+            "{text}"
+        );
+    }
+
+    /// The thing an operator has to act on themselves, said first and never left implicit:
+    /// a repair that quietly stopped being offered leaves them watching a fault nobody
+    /// mentions any more, which is worse than being told it is past what lemonfiber knows.
+    #[test]
+    fn a_fault_past_repairing_is_named_with_somewhere_to_go() {
+        let past = Report {
+            offered: Vec::new(),
+            mended: Vec::new(),
+            beyond: vec![beyond()],
+            acted: false,
+        };
+        let text = mended(&past, false).text();
+
+        assert!(text.contains("has outlasted every repair"), "{text}");
+        assert!(text.contains("support bundle"), "{text}");
+        assert!(text.contains("lemonfiber support --logs 500"), "{text}");
+        // Nothing was offerable, but something was said — so the "nothing to put right"
+        // line would be untrue here and is not printed.
+        assert!(
+            !text.contains("nothing here lemonfiber can put right"),
             "{text}"
         );
     }
