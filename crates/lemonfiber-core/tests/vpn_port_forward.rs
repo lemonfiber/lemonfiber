@@ -481,23 +481,48 @@ async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
     );
 }
 
-/// The check that can put a fault right says so, and what it offers answers the finding it
-/// raised — driven through the seam a repair reaches it by, rather than through its type.
+/// The one fault in this category lemonfiber can put right itself: the provider forwards a
+/// port and the client is listening on another. What is offered says what it would do and
+/// what else changes, and admits it cannot be undone.
 #[tokio::test]
 async fn the_check_offers_a_repair_for_the_client_on_the_wrong_port() {
-    let subject = check_with(vec![gateway_with_port("51413")], forwarding("protonvpn"));
+    let subject = listening_on(
+        vec![gateway_with_port("51413")],
+        forwarding("protonvpn"),
+        Some(6881),
+    );
     let found = subject.run().await;
 
-    let Some(mender) = subject.mender() else {
-        // A stack with a resolved pair and forwarding asked for always has one, and the
-        // assertions below are what would fail if that ever stopped being true.
-        return;
-    };
-    let offered = mender.repairs(&found);
+    let offered = subject
+        .mender()
+        .map(|mender| mender.repairs(&found))
+        .unwrap_or_default();
 
-    // Nothing is wrong here — the client was not asked about, so no mismatch was raised —
-    // and a mender offers nothing for a finding that is not there.
-    assert!(offered.is_empty(), "nothing to put right");
+    assert_eq!(
+        offered.first().map(|repair| repair.check.as_str()),
+        Some("vpn.port-forward-client")
+    );
+    assert!(offered
+        .first()
+        .is_some_and(|repair| !repair.effects.is_empty() && !repair.reversible));
+}
+
+/// And nothing where nothing is wrong: a client sitting on the granted port needs no
+/// moving, so a run has nothing to offer rather than a repair that would change nothing.
+#[tokio::test]
+async fn a_client_already_on_the_forwarded_port_is_offered_nothing() {
+    let subject = listening_on(
+        vec![gateway_with_port("51413")],
+        forwarding("protonvpn"),
+        Some(51413),
+    );
+    let found = subject.run().await;
+
+    assert!(subject
+        .mender()
+        .map(|mender| mender.repairs(&found))
+        .unwrap_or_default()
+        .is_empty());
 }
 
 /// A client that could not be authenticated to is one to leave alone rather than guess at,

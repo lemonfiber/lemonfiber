@@ -238,12 +238,14 @@ async fn carried(ctx: &Ctx, mender: &dyn Mend, repair: &Repair) -> Outcome {
         // in is what the operator needs, and asking the checks again would only rename it.
         return Outcome::of(attempt, false);
     }
-    let Ok(checks) = super::engine::assembled(ctx, false).await else {
-        return Outcome::Stopped {
-            leaving: "the repair ran, and the stack could not be read again to prove it".to_owned(),
-        };
+    // Assembled afresh for the proof, and a stack that will not read now is one that read
+    // moments ago — so this is the machine changing under the repair rather than a fault in
+    // it, and the operator hears that rather than a verdict nobody could reach.
+    let proof = match super::engine::assembled(ctx, false).await {
+        Ok(checks) => proved(&looked(ctx, &checks).await, &repair.check),
+        Err(_) => None,
     };
-    judged(attempt, proved(&looked(ctx, &checks).await, &repair.check))
+    judged(attempt, proof)
 }
 
 /// What an attempt and the proof of it amount to together.

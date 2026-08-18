@@ -90,6 +90,24 @@ mod tests {
     use lemonfiber_core::doctor::{Category, Finding, Overall, Verdict};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 
+    /// The classification an operator can act on. A finding lemonfiber can put right
+    /// itself says so and names the command; the ones only they can act on already say
+    /// where to go in their own remedies, so a label there would be noise.
+    #[test]
+    fn a_finding_lemonfiber_can_mend_says_so_and_names_the_command() {
+        use lemonfiber_core::error::State;
+
+        let mendable = remedies(&a_problem().in_state(State::Remediable)).text();
+        assert!(
+            mendable.contains("can put this one right for you"),
+            "{mendable}"
+        );
+        assert!(mendable.contains("lemonfiber doctor --fix"), "{mendable}");
+
+        let theirs = remedies(&a_problem()).text();
+        assert!(!theirs.contains("can put this one right"), "{theirs}");
+    }
+
     #[test]
     fn every_verdict_reads_with_its_own_mark() {
         let findings = vec![

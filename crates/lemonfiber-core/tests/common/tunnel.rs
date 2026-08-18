@@ -282,6 +282,18 @@ pub fn check(behaviors: Vec<Behavior>) -> VpnCheck {
 /// A check as above, but with a chosen port-forward configuration, for the cases
 /// that exercise the forwarded-port finding.
 pub fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnCheck {
+    listening_on(behaviors, port_forward, None)
+}
+
+/// The same, for a client the caller says is listening somewhere.
+///
+/// Where that somewhere is not the granted port, this is the one fault in the category
+/// lemonfiber can put right itself — so it is what a repair has to be driven against.
+pub fn listening_on(
+    behaviors: Vec<Behavior>,
+    port_forward: PortForward,
+    listening: Option<u16>,
+) -> VpnCheck {
     VpnCheck::new(
         Arc::new(Fake::new(behaviors)),
         "lemonfiber".to_owned(),
@@ -289,7 +301,7 @@ pub fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnChe
         Asked {
             protocols: Protocols::both(),
             echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
+            listening,
             port_forward,
             disruptive: false,
             client: None,
