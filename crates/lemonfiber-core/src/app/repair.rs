@@ -336,11 +336,11 @@ mod tests {
         assert!(conditions
             .get("vpn.port-forward-client")
             .is_some_and(crate::condition::Condition::is_raised));
-        // A pass is remembered as cleared rather than not at all: how long something has
-        // been right is as much a history as how long it has been wrong.
-        assert!(conditions
-            .get("vpn.egress")
-            .is_some_and(|condition| !condition.is_raised()));
+        // A check that has never been wrong gets no entry at all. The store remembers
+        // faults, and inventing a cleared condition for something that never failed would
+        // fill it with things that never happened — which is also why a repair asks it
+        // about the checks that did fail and no others.
+        assert!(conditions.get("vpn.egress").is_none());
 
         // And it survives to the next run, which is the whole point of a store.
         assert!(super::super::conditions::load(&ctx)
