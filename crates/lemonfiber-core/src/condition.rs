@@ -59,6 +59,16 @@ pub struct Condition {
     /// clears, so a fix is offered again if the problem genuinely comes back —
     /// and not before, which is the difference between offering and nagging.
     pub declined: bool,
+    /// How many repairs have been carried out for it and left it standing.
+    ///
+    /// Counted separately from [`Self::recurrences`], which says how often the
+    /// problem came back on its own. This says how often lemonfiber tried and was
+    /// wrong about the cause, and a repair that has been wrong enough times stops
+    /// being offered — an operator watching the same fix fail a fourth time is
+    /// being wasted, not helped. Cleared with the rest when the condition clears,
+    /// because a problem that genuinely returns deserves the attempt afresh.
+    #[serde(default)]
+    pub attempts: u32,
     /// What to do about it, most likely first. Never empty, since the fault it was
     /// raised from could not have been built without one.
     #[serde(default)]
@@ -83,6 +93,7 @@ impl Condition {
             cleared: None,
             recurrences: 0,
             declined: false,
+            attempts: 0,
             remedies: fault.remedies.clone(),
             caused_by: fault.caused_by.clone(),
         }
@@ -119,6 +130,7 @@ impl Condition {
         now.clone_into(&mut self.since);
         self.recurrences = self.recurrences.saturating_add(1);
         self.declined = false;
+        self.attempts = 0;
     }
 
     /// Clear it, `now`. Clearing what is already clear changes nothing, so a run
@@ -326,8 +338,8 @@ mod tests {
             "since":"1000","cleared":null,"recurrences":0,"declined":false}"#;
         let parsed = serde_json::from_str::<Condition>(older).ok();
         assert_eq!(
-            parsed.map(|condition| (condition.remedies, condition.caused_by)),
-            Some((Vec::new(), None))
+            parsed.map(|condition| (condition.remedies, condition.caused_by, condition.attempts)),
+            Some((Vec::new(), None, 0))
         );
     }
 
