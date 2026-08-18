@@ -69,12 +69,7 @@ impl Archive for FakeArchive {
     async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, Fault> {
         self.space.clone()
     }
-    async fn write(
-        &self,
-        dest: &Path,
-        _manifest: &Manifest,
-        _items: &[Item],
-    ) -> Result<(), Fault> {
+    async fn write(&self, dest: &Path, _manifest: &Manifest, _items: &[Item]) -> Result<(), Fault> {
         self.record(dest)
     }
     async fn write_files(&self, dest: &Path, _files: &[(String, String)]) -> Result<(), Fault> {
