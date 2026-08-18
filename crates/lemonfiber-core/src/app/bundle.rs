@@ -12,18 +12,64 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::bundle::{self, Contents, Marks, Piece, Residual, Taken};
+use crate::bundle::{self, Contents, Filenames, Marks, Piece, Residual, Taken, Terms};
 use crate::bytes::humanize;
 use crate::doctor::Verdict;
 use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::instant;
 use crate::ports::archive::{Archive, Fault, Space};
+use crate::ports::docker::LogQuery;
 
 use super::Ctx;
 
 /// What a bundle says for a version it could not read, rather than leaving a blank a
 /// reader would take for a version of nothing.
 const UNKNOWN: &str = "unknown";
+
+/// How many log lines each service contributes when nothing else is asked for.
+///
+/// A window rather than everything: a bundle is a thing somebody attaches to a forum post,
+/// and a stack's whole log is gigabytes nobody will read. Two hundred lines a service is
+/// about what a fault that is still happening looks like.
+pub const LINES: u32 = 200;
+
+/// What the operator asked for, before it becomes what the bundle says was done.
+///
+/// The command carries choices and the bundle carries their consequences. Keeping the two
+/// apart means the stated window is worked out in one place, rather than once by whoever
+/// collects and again by whoever prints.
+#[derive(Debug, Clone)]
+pub struct Wanted {
+    /// How many log lines to take from each service.
+    pub lines: u32,
+    /// Whether media filenames are shown.
+    pub filenames: Filenames,
+    /// The settings to show as they are, named as the bundle names them.
+    pub reveal: Vec<String>,
+}
+
+impl Default for Wanted {
+    /// What somebody who asked for nothing in particular gets: the whole window, filenames
+    /// replaced, nothing revealed. Every default here is the careful one.
+    fn default() -> Self {
+        Self {
+            lines: LINES,
+            filenames: Filenames::Replaced,
+            reveal: Vec::new(),
+        }
+    }
+}
+
+impl Wanted {
+    /// The terms a bundle made this way carries.
+    fn terms(&self) -> Terms {
+        Terms {
+            window: format!("the last {} lines of each service", self.lines),
+            filenames: self.filenames,
+            revealed: self.reveal.clone(),
+        }
+    }
+}
 
 /// Everything a bundle would hold, gathered and redacted, with whatever could not be read
 /// named rather than passed over — or nothing at all where the machine could not provide
@@ -32,8 +78,9 @@ const UNKNOWN: &str = "unknown";
 /// Nothing at all, rather than a bundle with a predictable salt: a stand-in anyone can
 /// reproduce is a way back to the value it stands for, and a bundle is a thing people
 /// post in public.
-pub async fn collect(ctx: &Ctx, lemonfiber: &str) -> Option<Contents> {
+pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Contents> {
     let marks = &Marks::new(ctx.random.as_ref())?;
+    let terms = wanted.terms();
     let mut pieces = Vec::new();
     let mut missing = Vec::new();
     // The first thing read and the first thing that can be missing: a machine whose stack
@@ -47,9 +94,13 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str) -> Option<Contents> {
 
     match super::engine::diagnose(ctx, None, false).await {
         Err(problem) => missing.push(format!("the diagnosis could not run — {}", problem.summary)),
+        // A finding is a sentence, not a setting: the provider checks quote a download
+        // client's own words back, and those arrive with the provider's hostname in them
+        // and could arrive with a key. The settings rule leaves a line with no `=` in it
+        // exactly as it found it, so free text goes through the free-text rule.
         Ok(report) => pieces.push(Piece {
             name: "diagnosis.txt".to_owned(),
-            body: bundle::settings(&findings(&report), marks),
+            body: bundle::prose(&findings(&report), marks, &terms),
         }),
     }
 
@@ -57,32 +108,64 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str) -> Option<Contents> {
         Err(_) => missing.push("the container engine could not be reached".to_owned()),
         Ok(containers) => pieces.push(Piece {
             name: "services.txt".to_owned(),
-            body: services(&containers),
+            body: bundle::prose(&services(&containers), marks, &terms),
         }),
     }
 
     pieces.push(Piece {
         name: "platform.txt".to_owned(),
-        body: platform(ctx, lemonfiber),
+        body: bundle::prose(&platform(ctx, lemonfiber), marks, &terms),
     });
 
     match configuration(ctx).await {
         None => missing.push("no configuration has been written yet".to_owned()),
         Some(body) => pieces.push(Piece {
             name: "configuration.env".to_owned(),
-            body: bundle::settings(&body, marks),
+            body: bundle::settings(&body, marks, &terms),
+        }),
+    }
+
+    match logs(ctx, wanted.lines).await {
+        Err(problem) => missing.push(format!("the logs could not be read — {}", problem.summary)),
+        Ok(body) => pieces.push(Piece {
+            name: "logs.txt".to_owned(),
+            body: bundle::prose(&body, marks, &terms),
         }),
     }
 
     Some(Contents {
         pieces,
-        missing,
+        // The gaps carry other people's words too — each is built from the summary of
+        // whatever refused to answer, and a service that fails while authenticating says
+        // so with the credential in hand. A line on the bundle's first page is as public
+        // as any other line in it.
+        missing: missing
+            .iter()
+            .map(|gap| bundle::prose(gap, marks, &terms))
+            .collect(),
         taken: Taken {
             lemonfiber: lemonfiber.to_owned(),
             stack,
             at: instant::written(ctx.clock.now()).unwrap_or_default(),
         },
+        terms,
     })
+}
+
+/// The logs, bounded and stated.
+///
+/// Bounded because a bundle is something somebody attaches to a post, and stated because
+/// an extract that does not say what it is an extract of reads as the whole story. Allowed
+/// to fail like every other source: a machine whose engine will not answer still has a
+/// diagnosis and a configuration worth reading, and it is the engine not answering that
+/// the bundle is most likely being asked for.
+async fn logs(ctx: &Ctx, lines: u32) -> Result<String, Problem> {
+    let mut arriving = super::engine::logs(ctx, &[], &[], LogQuery::recent(lines)).await?;
+    let mut held = Vec::new();
+    while let Some(line) = arriving.recv().await {
+        held.push(format!("{} | {}", line.service, line.line));
+    }
+    Ok(held.join("\n"))
 }
 
 /// The Compose project the containers belong to, as every other read of them names it.
@@ -156,8 +239,49 @@ pub const BUNDLE_NO_ROOM: Code = Code::new("BUNDLE-2");
 /// Raised when the archive could not be written.
 pub const BUNDLE_UNWRITTEN: Code = Code::new("BUNDLE-3");
 
+/// Raised when a setting was asked to be shown as it is without that being confirmed.
+pub const BUNDLE_UNCONFIRMED: Code = Code::new("BUNDLE-4");
+
+/// Raised when the machine can offer no randomness to derive stand-ins from.
+pub const BUNDLE_NO_MARKS: Code = Code::new("BUNDLE-5");
+
+/// Refuse to show a setting nobody confirmed showing.
+///
+/// Naming a field and agreeing to publish it are two acts, deliberately. A flag that puts
+/// a credential in a file people post is not one to honour because it turned up on a
+/// command line somebody copied out of a thread — and the refusal names the settings, so
+/// what gets confirmed is those rather than a policy.
+#[must_use]
+pub fn unconfirmed(fields: &[String]) -> Problem {
+    Problem::new(
+        BUNDLE_UNCONFIRMED,
+        Severity::Error,
+        "Showing a setting as it is has to be confirmed",
+        "A bundle is a thing people post in public. Showing one of its settings as it is puts that value in the file, so it takes saying twice.",
+        Remedy::new("Run it again with --confirm if you meant it"),
+    )
+    .in_state(State::Guided)
+    .with_detail(format!("would have shown: {}", fields.join(", ")))
+}
+
+/// Refuse a bundle on a machine that will not provide randomness.
+///
+/// Not something to paper over with a fixed salt: every replaced value carries a stand-in
+/// derived from it, and one anybody can reproduce is a way back to the value it stands for.
+#[must_use]
+pub fn without_marks() -> Problem {
+    Problem::new(
+        BUNDLE_NO_MARKS,
+        Severity::Error,
+        "A bundle could not be made on this machine",
+        "Every replaced value carries a stand-in derived with randomness this machine would not provide, and a stand-in anyone can reproduce is a way back to the value it stands for. Nothing has been written.",
+        Remedy::new("Report this: a machine that cannot produce random bytes is a fault in its own right"),
+    )
+    .in_state(State::Guided)
+}
+
 /// What was written, and what a reader will find in it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Written {
     /// Where it is. It is only ever here: nothing sends it anywhere.
     pub path: PathBuf,
@@ -165,6 +289,30 @@ pub struct Written {
     pub bytes: u64,
     /// What it holds, in order, so they can read it before anyone else does.
     pub holds: Vec<String>,
+}
+
+/// How large a bundle would be, having read it back and found nothing left in it that
+/// reads as a credential.
+///
+/// The question a preview asks, and the first thing writing one asks — the same question,
+/// asked the same way, because a preview that scanned differently from the write would be
+/// a preview of something else. An operator is told the size while there is still nothing
+/// to attach, which is the only point at which the answer can change what they do.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the assembled bundle still holds something that reads as a
+/// credential, naming the file it came from. Boxed as a capture's refusals are, because a
+/// refusal carries a good deal more than the number it refuses to give.
+pub fn measure(contents: &Contents) -> Result<u64, Box<Problem>> {
+    let files = contents.files();
+    if let Some(residual) = bundle::residual(&files, &contents.terms) {
+        return Err(Box::new(leaking(&residual)));
+    }
+    Ok(files
+        .iter()
+        .map(|(name, body)| (name.len() + body.len()) as u64)
+        .sum())
 }
 
 /// Write `contents` as one archive at `dest`, or refuse and say why.
@@ -189,15 +337,8 @@ pub async fn write(
     contents: &Contents,
     dest: &Path,
 ) -> Result<Written, Problem> {
+    let bytes = measure(contents).map_err(|problem| *problem)?;
     let files = contents.files();
-    if let Some(residual) = bundle::residual(&files) {
-        return Err(leaking(&residual));
-    }
-
-    let bytes = files
-        .iter()
-        .map(|(name, body)| (name.len() + body.len()) as u64)
-        .sum();
     let dir = dest.parent().unwrap_or(dest);
     if let Ok(space) = archive.space(dir, &[]).await {
         let room = Space {
@@ -279,9 +420,31 @@ mod tests {
 
     use super::{reading, write};
     use crate::app::fixtures::FakeArchive;
-    use crate::bundle::{Contents, Piece, Taken, MANIFEST};
+    use crate::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
     use crate::doctor::Verdict;
     use crate::error::{Code, Problem, Remedy, Severity};
+
+    /// Naming a field and agreeing to publish it are two acts. The refusal names what
+    /// would have been shown, so what gets confirmed is those settings rather than a
+    /// policy somebody agrees to once and forgets.
+    #[test]
+    fn showing_a_setting_as_it_is_has_to_be_said_twice() {
+        let refused = super::unconfirmed(&["SONARR_API_KEY".to_owned(), "X".to_owned()]);
+        assert_eq!(refused.code, super::BUNDLE_UNCONFIRMED);
+        assert_eq!(
+            refused.detail.as_deref(),
+            Some("would have shown: SONARR_API_KEY, X")
+        );
+    }
+
+    /// A machine that will not produce random bytes gets no bundle rather than one whose
+    /// stand-ins anybody can reproduce — and is told which of those two it is.
+    #[test]
+    fn a_machine_that_offers_no_randomness_is_told_why_it_gets_no_bundle() {
+        let refused = super::without_marks();
+        assert_eq!(refused.code, super::BUNDLE_NO_MARKS);
+        assert!(refused.summary.contains("could not be made"));
+    }
 
     /// A problem as a check reports one.
     fn problem() -> Problem {
@@ -343,6 +506,7 @@ mod tests {
                 stack: "1.2.0".to_owned(),
                 at: "2026-08-18T00:00:00Z".to_owned(),
             },
+            terms: Terms::default(),
         };
         let archive = FakeArchive::roomy();
         let dest = Path::new("/tmp/support.tar.gz");

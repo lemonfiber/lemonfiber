@@ -39,7 +39,7 @@ pub mod audio;
 pub mod backup;
 pub mod baseline;
 pub mod bundle;
-mod bytes;
+pub mod bytes;
 pub mod condition;
 pub mod config;
 pub mod dashboard;

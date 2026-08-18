@@ -18,6 +18,7 @@ mod doctor;
 mod quality;
 mod seed;
 mod stack;
+pub(crate) mod support;
 mod trace;
 pub(crate) mod walkthrough;
 

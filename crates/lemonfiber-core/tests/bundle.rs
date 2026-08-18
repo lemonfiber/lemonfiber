@@ -19,16 +19,18 @@ use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use common::Fake;
-use lemonfiber_core::app::bundle::{collect, write, BUNDLE_LEAK, BUNDLE_NO_ROOM, BUNDLE_UNWRITTEN};
+use lemonfiber_core::app::bundle::{
+    collect, write, Wanted, BUNDLE_LEAK, BUNDLE_NO_ROOM, BUNDLE_UNWRITTEN,
+};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
-use lemonfiber_core::bundle::{Contents, Piece, Taken, MANIFEST};
+use lemonfiber_core::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::archive::{Archive, Fault as ArchiveFault, Space};
 use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
-    Stats,
+    Stats, Stream,
 };
 use lemonfiber_core::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
@@ -113,9 +115,26 @@ impl Engine for Engine1 {
         _services: &[String],
         _query: LogQuery,
     ) -> Result<Receiver<LogLine>, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
+        if !self.0 {
+            return Err(EngineFailure::Unreachable {
+                reason: "no engine here".to_owned(),
+            });
+        }
+        let (sending, receiving) = tokio::sync::mpsc::channel(4);
+        // A line with a key riding in a query string, which is the shape the whole
+        // free-text rule exists for and the one nobody spots by eye.
+        let _ = sending
+            .send(LogLine {
+                service: "prowlarr".to_owned(),
+                stream: Stream::Stdout,
+                at: None,
+                line: format!(
+                    "GET https://indexer.example.com/api?apikey={}&t=search",
+                    key_shaped()
+                ),
+            })
+            .await;
+        Ok(receiving)
     }
     async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
         Err(EngineFailure::Unreachable {
@@ -197,7 +216,9 @@ async fn a_bundle_holds_what_could_be_read_and_says_where_it_came_from() {
         true,
         Some("PUID=1000\nINDEXER_APIKEY=something-nobody-should-see"),
     );
-    let contents = collect(&context, LEMONFIBER).await.unwrap_or_default();
+    let contents = collect(&context, LEMONFIBER, &Wanted::default())
+        .await
+        .unwrap_or_default();
 
     let names: Vec<&str> = contents
         .pieces
@@ -237,13 +258,56 @@ async fn a_bundle_holds_what_could_be_read_and_says_where_it_came_from() {
         .is_some_and(|(_, body)| body.contains("configuration.env") && body.contains(LEMONFIBER)));
 }
 
+/// The logs go in bounded and stated, and a key riding in one of them does not.
+///
+/// A log line is where the credential nobody spotted actually lives — inside a query
+/// string, in text with no field name in front of it for an allow-list to recognise — so
+/// this is the piece the free-text rule exists for.
+#[tokio::test]
+async fn a_bundle_holds_the_recent_logs_with_the_keys_in_them_replaced() {
+    let context = ctx(Source::External(project()), true, None);
+    let wanted = Wanted {
+        lines: 5,
+        ..Wanted::default()
+    };
+    let contents = collect(&context, LEMONFIBER, &wanted)
+        .await
+        .unwrap_or_default();
+
+    let logs = contents
+        .pieces
+        .iter()
+        .find(|piece| piece.name == "logs.txt")
+        .map(|piece| piece.body.clone())
+        .unwrap_or_default();
+    assert!(logs.contains("https://indexer.example.com/api?"), "{logs}");
+    assert!(
+        !logs.contains(&key_shaped()),
+        "the key does not ride out: {logs}"
+    );
+
+    // Stated, because an extract that does not say what it is an extract of reads as the
+    // whole story — and the window is the operator's, not a fixed one.
+    assert!(contents
+        .manifest()
+        .contains("the last 5 lines of each service"));
+}
+
+/// A value shaped the way a generated key is, built from character ranges rather than
+/// written for the reason every credential-shaped fixture here is built.
+fn key_shaped() -> String {
+    ('a'..='j').chain('0'..='9').cycle().take(32).collect()
+}
+
 /// The case a bundle exists for: a machine where nothing answers. What can be read is
 /// collected, and what cannot is named — because a gap nobody mentions reads as an
 /// absence of trouble.
 #[tokio::test]
 async fn a_bundle_from_a_broken_machine_names_what_it_could_not_read() {
     let context = ctx(Source::External(Path::new("/no/such/stack")), false, None);
-    let contents = collect(&context, LEMONFIBER).await.unwrap_or_default();
+    let contents = collect(&context, LEMONFIBER, &Wanted::default())
+        .await
+        .unwrap_or_default();
 
     assert!(contents
         .missing
@@ -283,7 +347,9 @@ async fn no_randomness_means_no_bundle_at_all() {
     }
 
     let context = ctx(Source::External(project()), true, None).with_random(Arc::new(Nothing));
-    assert!(collect(&context, LEMONFIBER).await.is_none());
+    assert!(collect(&context, LEMONFIBER, &Wanted::default())
+        .await
+        .is_none());
 }
 
 /// An archive that records what it was asked to write, and can be told to have no room or
@@ -363,11 +429,6 @@ impl Archive for Recorder {
     }
 }
 
-/// A value shaped the way a generated key is, built rather than written.
-fn key_shaped() -> String {
-    ('a'..='j').chain('0'..='9').cycle().take(32).collect()
-}
-
 /// Contents holding exactly what they are given.
 fn holding(name: &str, body: String) -> Contents {
     Contents {
@@ -381,6 +442,7 @@ fn holding(name: &str, body: String) -> Contents {
             stack: "1.0.0".to_owned(),
             at: "2026-08-17T12:00:00".to_owned(),
         },
+        terms: Terms::default(),
     }
 }
 
