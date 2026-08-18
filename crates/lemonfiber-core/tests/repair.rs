@@ -146,10 +146,12 @@ impl Mend for Sticky {
 /// One set for both halves, deliberately: what says whether a repair settled the fault is
 /// the check's own state after being mended, so proving against a second, freshly built
 /// set would be asking a check nobody had repaired.
-async fn drive<D>(ctx: &Ctx, checks: &[Box<dyn Check>], stance: Stance, confirm: D) -> Report
-where
-    D: Fn(&Repair) -> bool,
-{
+async fn drive(
+    ctx: &Ctx,
+    checks: &[Box<dyn Check>],
+    stance: Stance,
+    confirm: &dyn Fn(&Repair) -> bool,
+) -> Report {
     mending(ctx, checks, checks, stance, confirm).await
 }
 
@@ -184,7 +186,7 @@ async fn a_run_that_may_not_act_offers_and_changes_nothing() {
 /// its answer earns `Fixed`.
 #[tokio::test]
 async fn a_repair_that_worked_is_reported_as_fixed() {
-    let report = drive(&ctx("fixed"), &settling(), Stance::Unattended, |_| true).await;
+    let report = drive(&ctx("fixed"), &settling(), Stance::Unattended, &|_| true).await;
 
     assert_eq!(
         report.mended.first().map(|mended| &mended.outcome),
@@ -197,7 +199,7 @@ async fn a_repair_that_worked_is_reported_as_fixed() {
 #[tokio::test]
 async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     let context = ctx("declined");
-    let first = drive(&context, &checks(Attempt::Carried), Stance::Ask, |_| false).await;
+    let first = drive(&context, &checks(Attempt::Carried), Stance::Ask, &|_| false).await;
 
     assert_eq!(
         first.mended.first().map(|mended| &mended.outcome),
@@ -205,7 +207,7 @@ async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     );
 
     // The next run does not ask again, because nothing has changed since they said no.
-    let again = drive(&context, &checks(Attempt::Carried), Stance::Ask, |_| true).await;
+    let again = drive(&context, &checks(Attempt::Carried), Stance::Ask, &|_| true).await;
     assert!(again.offered.is_empty(), "it was already declined");
 }
 
@@ -281,10 +283,10 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
 #[tokio::test]
 async fn a_stack_with_nothing_mendable_offers_nothing() {
     let context = ctx("real");
-    let report = mend(&context, Stance::ReportOnly, false, |_| true).await;
+    let report = mend(&context, Stance::ReportOnly, false, &|_| true).await;
     assert!(report.is_ok_and(|report| report.offered.is_empty()));
 
     // Asked to act rather than only look, and still with nothing to act on.
-    let acting = mend(&context, Stance::Unattended, false, |_| true).await;
+    let acting = mend(&context, Stance::Unattended, false, &|_| true).await;
     assert!(acting.is_ok_and(|report| report.mended.is_empty() && report.acted));
 }

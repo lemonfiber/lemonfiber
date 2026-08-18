@@ -31,7 +31,7 @@ pub(crate) async fn run(ctx: Ctx, asked: Mending, answers: &dyn Answers, json: b
     };
 
     let asking = |repair: &Repair| agreed(repair, answers);
-    match mend(&ctx, stance, asked.disruptive, asking).await {
+    match mend(&ctx, stance, asked.disruptive, &asking).await {
         Ok(report) => {
             mended(&report, json).print();
             crate::exit::repairing(&report)

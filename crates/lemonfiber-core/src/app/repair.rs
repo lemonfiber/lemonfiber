@@ -60,19 +60,20 @@ pub struct Report {
 /// surface is running this, and the sequence belongs here. Synchronous, because deciding
 /// is: a surface that must wait on something to answer can wait before calling this.
 ///
+/// Taken as a trait object rather than by type, so there is one of this function however
+/// many surfaces call it — a generic would be copied per call site, and the copy nothing
+/// drives is a copy the coverage gate counts and no test can reach.
+///
 /// # Errors
 ///
 /// Returns a [`Problem`] where the stack cannot be read, which is the one thing every
 /// check needs before any of this can begin.
-pub async fn mend<D>(
+pub async fn mend(
     ctx: &Ctx,
     stance: Stance,
     disruptive: bool,
-    confirm: D,
-) -> Result<Report, Box<Problem>>
-where
-    D: Fn(&Repair) -> bool,
-{
+    confirm: &dyn Fn(&Repair) -> bool,
+) -> Result<Report, Box<Problem>> {
     let checks = super::engine::assembled(ctx, disruptive)
         .await
         .map_err(Box::new)?;
@@ -95,16 +96,13 @@ where
 /// `again` is what proves the work, and is a second set rather than the same one: a check
 /// holds what it read when it was built, so asking the very instances that found the fault
 /// would compare a repair with the reading it was meant to change.
-pub async fn mending<D>(
+pub async fn mending(
     ctx: &Ctx,
     checks: &[Box<dyn Check>],
     again: &[Box<dyn Check>],
     stance: Stance,
-    confirm: D,
-) -> Report
-where
-    D: Fn(&Repair) -> bool,
-{
+    confirm: &dyn Fn(&Repair) -> bool,
+) -> Report {
     let found = looked(ctx, checks).await;
 
     // Remembered before anything is offered. Whether a fix was declined, and how often one
