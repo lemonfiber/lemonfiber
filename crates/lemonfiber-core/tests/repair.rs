@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::repair::{mend, mending};
+use lemonfiber_core::app::repair::{mend, mending, Report};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Check, Finding, Mend, Verdict};
@@ -141,6 +141,18 @@ impl Mend for Sticky {
     }
 }
 
+/// Run and prove over the same checks.
+///
+/// One set for both halves, deliberately: what says whether a repair settled the fault is
+/// the check's own state after being mended, so proving against a second, freshly built
+/// set would be asking a check nobody had repaired.
+async fn drive<D>(ctx: &Ctx, checks: &[Box<dyn Check>], stance: Stance, confirm: D) -> Report
+where
+    D: Fn(&Repair) -> bool,
+{
+    mending(ctx, checks, checks, stance, confirm).await
+}
+
 /// Checks whose repair leaves the fault standing however often it runs.
 fn checks(attempt: Attempt) -> Vec<Box<dyn Check>> {
     vec![Box::new(Sticky::new(attempt))]
@@ -155,7 +167,7 @@ fn settling() -> Vec<Box<dyn Check>> {
 /// That is the default, and the default is what most runs are.
 #[tokio::test]
 async fn a_run_that_may_not_act_offers_and_changes_nothing() {
-    let report = mending(
+    let report = drive(
         &ctx("report-only"),
         &checks(Attempt::Carried),
         Stance::ReportOnly,
@@ -172,7 +184,7 @@ async fn a_run_that_may_not_act_offers_and_changes_nothing() {
 /// its answer earns `Fixed`.
 #[tokio::test]
 async fn a_repair_that_worked_is_reported_as_fixed() {
-    let report = mending(&ctx("fixed"), &settling(), Stance::Unattended, |_| true).await;
+    let report = drive(&ctx("fixed"), &settling(), Stance::Unattended, |_| true).await;
 
     assert_eq!(
         report.mended.first().map(|mended| &mended.outcome),
@@ -185,7 +197,7 @@ async fn a_repair_that_worked_is_reported_as_fixed() {
 #[tokio::test]
 async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     let context = ctx("declined");
-    let first = mending(&context, &checks(Attempt::Carried), Stance::Ask, |_| false).await;
+    let first = drive(&context, &checks(Attempt::Carried), Stance::Ask, |_| false).await;
 
     assert_eq!(
         first.mended.first().map(|mended| &mended.outcome),
@@ -193,7 +205,7 @@ async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     );
 
     // The next run does not ask again, because nothing has changed since they said no.
-    let again = mending(&context, &checks(Attempt::Carried), Stance::Ask, |_| true).await;
+    let again = drive(&context, &checks(Attempt::Carried), Stance::Ask, |_| true).await;
     assert!(again.offered.is_empty(), "it was already declined");
 }
 
@@ -201,7 +213,7 @@ async fn a_declined_repair_is_left_alone_and_not_offered_again() {
 /// check again — what the operator needs is the state it was left in.
 #[tokio::test]
 async fn a_repair_that_stopped_says_what_it_left() {
-    let report = mending(
+    let report = drive(
         &ctx("stopped"),
         &checks(Attempt::Stopped {
             leaving: "half of it".to_owned(),
@@ -228,7 +240,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
 
     // Each run mends and the check keeps failing, so each spends one attempt.
     for _ in 0..3 {
-        let report = mending(
+        let report = drive(
             &context,
             &checks(Attempt::Carried),
             Stance::Unattended,
@@ -242,7 +254,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
         );
     }
 
-    let past = mending(
+    let past = drive(
         &context,
         &checks(Attempt::Carried),
         Stance::Unattended,

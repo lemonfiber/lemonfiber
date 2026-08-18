@@ -82,34 +82,20 @@ where
     let again = super::engine::assembled(ctx, false)
         .await
         .map_err(Box::new)?;
-    Ok(proving(ctx, &checks, &again, stance, confirm).await)
+    Ok(mending(ctx, &checks, &again, stance, confirm).await)
 }
 
 /// The same errand, over checks somebody else assembled.
 ///
-/// Apart from [`mend`] so that what a repair *does* can be driven against checks somebody
-/// assembled — a runner reachable only through nine real checks and a live stack is one
-/// nobody writes a test for, which is how two defects got into this module's first draft.
+/// Apart from [`mend`] so that what a repair *does* can be driven against checks written
+/// for the purpose — a runner reachable only through nine real checks and a live stack is
+/// one nobody writes a test for, which is how two defects got into this module's first
+/// draft.
 ///
-/// Public for that reason rather than for a caller: the sequence is the part worth proving,
-/// and proving it from outside the crate is what keeps its coverage counted from the copy
-/// that actually runs.
-pub async fn mending<D>(ctx: &Ctx, checks: &[Box<dyn Check>], stance: Stance, confirm: D) -> Report
-where
-    D: Fn(&Repair) -> bool,
-{
-    // Proved against the caller's own checks. A runner driven over a check written for a
-    // test has to be provable by asking that same check again — assembling the real nine
-    // would ask about a finding none of them raises, and a finding nobody raises reads as a
-    // fault that has gone.
-    proving(ctx, checks, checks, stance, confirm).await
-}
-
-/// The same errand, saying which checks prove the work.
-///
-/// One place decides what a repair did and whether it held, whichever checks are used for
-/// either half.
-async fn proving<D>(
+/// `again` is what proves the work, and is a second set rather than the same one: a check
+/// holds what it read when it was built, so asking the very instances that found the fault
+/// would compare a repair with the reading it was meant to change.
+pub async fn mending<D>(
     ctx: &Ctx,
     checks: &[Box<dyn Check>],
     again: &[Box<dyn Check>],
