@@ -10,7 +10,7 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::repair::mend;
+use lemonfiber_core::app::repair::{mend, Confirm};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::repair::{Repair, Stance};
 
@@ -30,8 +30,7 @@ pub(crate) async fn run(ctx: Ctx, asked: Mending, answers: &dyn Answers, json: b
         (false, false) => Stance::Ask,
     };
 
-    let asking = |repair: &Repair| agreed(repair, answers);
-    match mend(&ctx, stance, asked.disruptive, &asking).await {
+    match mend(&ctx, stance, asked.disruptive, &Asking(answers)).await {
         Ok(report) => {
             mended(&report, json).print();
             crate::exit::repairing(&report)
@@ -40,13 +39,18 @@ pub(crate) async fn run(ctx: Ctx, asked: Mending, answers: &dyn Answers, json: b
     }
 }
 
-/// Ask about one repair, having said what it would do and what else changes.
-///
-/// Stated before the question rather than after it, because an effect somebody learns about
-/// afterwards is not something they agreed to.
-fn agreed(repair: &Repair, answers: &dyn Answers) -> bool {
-    stated(repair).print();
-    yes_no(answers, &format!("{}?", repair.does), false)
+/// Asking whoever is at the terminal.
+struct Asking<'a>(&'a dyn Answers);
+
+impl Confirm for Asking<'_> {
+    /// Ask about one repair, having said what it would do and what else changes.
+    ///
+    /// Stated before the question rather than after it, because an effect somebody learns
+    /// about afterwards is not something they agreed to.
+    fn agreed(&self, repair: &Repair) -> bool {
+        stated(repair).print();
+        yes_no(self.0, &format!("{}?", repair.does), false)
+    }
 }
 
 /// What is about to be agreed to, built as lines like every other answer this binary
@@ -76,7 +80,7 @@ mod tests {
     use crate::exit::{repairing, shown, success};
     use crate::prompt::Answers;
 
-    use super::{agreed, run, Ctx, Mending};
+    use super::{run, Asking, Confirm as _, Ctx, Mending};
 
     /// A context over the stack this binary ships, with nothing configured — so nothing is
     /// wrong that lemonfiber could put right, which is the state a healthy machine is in.
@@ -141,13 +145,13 @@ mod tests {
     /// would answer it the same way rather than hiding it.
     #[test]
     fn nothing_but_yes_agrees_to_a_repair() {
-        assert!(agreed(&repair(true), &Says("y")));
-        assert!(agreed(&repair(true), &Says("YES")));
-        assert!(!agreed(&repair(true), &Says("n")));
-        assert!(!agreed(&repair(true), &Says("")));
+        assert!(Asking(&Says("y")).agreed(&repair(true)));
+        assert!(Asking(&Says("YES")).agreed(&repair(true)));
+        assert!(!Asking(&Says("n")).agreed(&repair(true)));
+        assert!(!Asking(&Says("")).agreed(&repair(true)));
         // One that cannot be undone says so before the question, and is still only
         // carried out on a yes.
-        assert!(agreed(&repair(false), &Says("y")));
+        assert!(Asking(&Says("y")).agreed(&repair(false)));
         assert_eq!(Says("y").secret("anything"), "y");
     }
 

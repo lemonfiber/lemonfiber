@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::repair::{mend, mending, Report};
+use lemonfiber_core::app::repair::{mend, mending, Confirm, Report};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Check, Finding, Mend, Verdict};
@@ -150,9 +150,18 @@ async fn drive(
     ctx: &Ctx,
     checks: &[Box<dyn Check>],
     stance: Stance,
-    confirm: &dyn Fn(&Repair) -> bool,
+    confirm: &dyn Confirm,
 ) -> Report {
     mending(ctx, checks, checks, stance, confirm).await
+}
+
+/// Answers every question the same way.
+struct Always(bool);
+
+impl Confirm for Always {
+    fn agreed(&self, _repair: &Repair) -> bool {
+        self.0
+    }
 }
 
 /// Checks whose repair leaves the fault standing however often it runs.
@@ -173,7 +182,7 @@ async fn a_run_that_may_not_act_offers_and_changes_nothing() {
         &ctx("report-only"),
         &checks(Attempt::Carried),
         Stance::ReportOnly,
-        &|_| true,
+        &Always(true),
     )
     .await;
 
@@ -186,7 +195,13 @@ async fn a_run_that_may_not_act_offers_and_changes_nothing() {
 /// its answer earns `Fixed`.
 #[tokio::test]
 async fn a_repair_that_worked_is_reported_as_fixed() {
-    let report = drive(&ctx("fixed"), &settling(), Stance::Unattended, &|_| true).await;
+    let report = drive(
+        &ctx("fixed"),
+        &settling(),
+        Stance::Unattended,
+        &Always(true),
+    )
+    .await;
 
     assert_eq!(
         report.mended.first().map(|mended| &mended.outcome),
@@ -199,7 +214,13 @@ async fn a_repair_that_worked_is_reported_as_fixed() {
 #[tokio::test]
 async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     let context = ctx("declined");
-    let first = drive(&context, &checks(Attempt::Carried), Stance::Ask, &|_| false).await;
+    let first = drive(
+        &context,
+        &checks(Attempt::Carried),
+        Stance::Ask,
+        &Always(false),
+    )
+    .await;
 
     assert_eq!(
         first.mended.first().map(|mended| &mended.outcome),
@@ -207,7 +228,13 @@ async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     );
 
     // The next run does not ask again, because nothing has changed since they said no.
-    let again = drive(&context, &checks(Attempt::Carried), Stance::Ask, &|_| true).await;
+    let again = drive(
+        &context,
+        &checks(Attempt::Carried),
+        Stance::Ask,
+        &Always(true),
+    )
+    .await;
     assert!(again.offered.is_empty(), "it was already declined");
 }
 
@@ -221,7 +248,7 @@ async fn a_repair_that_stopped_says_what_it_left() {
             leaving: "half of it".to_owned(),
         }),
         Stance::Unattended,
-        &|_| true,
+        &Always(true),
     )
     .await;
 
@@ -246,7 +273,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
             &context,
             &checks(Attempt::Carried),
             Stance::Unattended,
-            &|_| true,
+            &Always(true),
         )
         .await;
         assert_eq!(
@@ -260,7 +287,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
         &context,
         &checks(Attempt::Carried),
         Stance::Unattended,
-        &|_| true,
+        &Always(true),
     )
     .await;
     assert!(past.offered.is_empty(), "it has had its chances");
@@ -283,10 +310,10 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
 #[tokio::test]
 async fn a_stack_with_nothing_mendable_offers_nothing() {
     let context = ctx("real");
-    let report = mend(&context, Stance::ReportOnly, false, &|_| true).await;
+    let report = mend(&context, Stance::ReportOnly, false, &Always(true)).await;
     assert!(report.is_ok_and(|report| report.offered.is_empty()));
 
     // Asked to act rather than only look, and still with nothing to act on.
-    let acting = mend(&context, Stance::Unattended, false, &|_| true).await;
+    let acting = mend(&context, Stance::Unattended, false, &Always(true)).await;
     assert!(acting.is_ok_and(|report| report.mended.is_empty() && report.acted));
 }

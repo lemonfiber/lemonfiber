@@ -17,6 +17,16 @@ use crate::repair::{self, Attempt, Outcome, Repair, Stance};
 use super::repairs::Entry;
 use super::Ctx;
 
+/// Whoever decides, for this run, whether a repair goes ahead.
+///
+/// A trait rather than a closure: a surface that builds one to capture what it asks with
+/// builds a function of its own, and the sequence here would be copied around it. What
+/// asks is the surface's business either way — this only needs the answer.
+pub trait Confirm {
+    /// Whether this repair may be carried out.
+    fn agreed(&self, repair: &Repair) -> bool;
+}
+
 /// One repair, and what became of it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Mended {
@@ -72,7 +82,7 @@ pub async fn mend(
     ctx: &Ctx,
     stance: Stance,
     disruptive: bool,
-    confirm: &dyn Fn(&Repair) -> bool,
+    confirm: &dyn Confirm,
 ) -> Result<Report, Box<Problem>> {
     let checks = super::engine::assembled(ctx, disruptive)
         .await
@@ -101,7 +111,7 @@ pub async fn mending(
     checks: &[Box<dyn Check>],
     again: &[Box<dyn Check>],
     stance: Stance,
-    confirm: &dyn Fn(&Repair) -> bool,
+    confirm: &dyn Confirm,
 ) -> Report {
     let found = looked(ctx, checks).await;
 
@@ -132,7 +142,7 @@ pub async fn mending(
         .filter(|(_, proposal)| offered.iter().any(|kept| kept.check == proposal.check))
         .filter_map(|(at, proposal)| checks.get(at)?.mender().map(|found| (found, proposal)))
     {
-        if stance.asks() && !confirm(&repair) {
+        if stance.asks() && !confirm.agreed(&repair) {
             declined(ctx, &repair);
             report.mended.push(Mended {
                 repair,
