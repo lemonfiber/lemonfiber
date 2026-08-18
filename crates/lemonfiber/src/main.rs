@@ -22,6 +22,7 @@ mod maintain;
 mod prompt;
 mod render;
 mod setup;
+mod support;
 mod terminal;
 mod translate;
 mod walkthrough;
@@ -136,6 +137,30 @@ async fn main() -> ExitCode {
                 return no_config_home();
             };
             return maintain::run_backup(ctx, paths, service, cli.json).await;
+        }
+        // A bundle drives its own executor over the same tar adapter, and renders both
+        // of the answers it can give — what one would hold, and where one went.
+        Request::Support {
+            write,
+            out,
+            logs,
+            filenames,
+            reveal,
+            confirm,
+        } => {
+            return support::run(
+                ctx,
+                support::Asked {
+                    write,
+                    out,
+                    logs,
+                    filenames,
+                    reveal,
+                    confirm,
+                },
+                cli.json,
+            )
+            .await;
         }
         Request::Restore { archive, repoint } => {
             let Some(paths) = here() else {

@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use include_dir::{include_dir, Dir};
+use lemonfiber_core::app::bundle::LINES;
 
 use crate::prompt::RawSetup;
 
@@ -187,6 +188,40 @@ pub(crate) enum Request {
         /// Back up one service's configuration instead of the whole stack.
         #[arg(long, value_name = "SERVICE")]
         service: Option<String>,
+    },
+    /// Gather everything a person helping you would ask for, with every value not
+    /// named safe replaced by a stand-in.
+    ///
+    /// A bare run writes nothing. It collects, redacts, and reads the result back
+    /// looking for anything that still resembles a credential, then says what the
+    /// bundle would hold and how large it is — so the decision to make a file worth
+    /// attaching to a public thread is taken after seeing what goes in it. Run it
+    /// again with `--write` to produce it.
+    ///
+    /// Nothing is ever sent anywhere. The bundle is written here and stays here.
+    Support {
+        /// Produce the bundle, having seen what it would hold.
+        #[arg(long)]
+        write: bool,
+        /// Where to write it, instead of into this directory.
+        #[arg(long, value_name = "PATH")]
+        out: Option<PathBuf>,
+        /// How many log lines to take from each service.
+        #[arg(long, value_name = "LINES", default_value_t = LINES)]
+        logs: u32,
+        /// Include media filenames, which are replaced by default.
+        #[arg(long)]
+        filenames: bool,
+        /// Show one setting as it is, named exactly as the bundle names it.
+        ///
+        /// Repeatable, and refused without `--confirm` on the same run: a flag that
+        /// publishes a credential is not one to honour because it turned up on a
+        /// command line somebody copied.
+        #[arg(long, value_name = "SETTING")]
+        reveal: Vec<String>,
+        /// Confirm showing the settings named by `--reveal`.
+        #[arg(long)]
+        confirm: bool,
     },
     /// Restore your configuration from a backup archive.
     ///

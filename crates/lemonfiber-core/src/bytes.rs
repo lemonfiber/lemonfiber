@@ -9,7 +9,8 @@
 /// Binary units, because that is what the tools an operator will cross-check
 /// against report, and one decimal because a library measured to the byte is
 /// noise around a figure whose point is "roughly how much room is left".
-pub(crate) fn humanize(bytes: u64) -> String {
+#[must_use]
+pub fn humanize(bytes: u64) -> String {
     const UNITS: [(&str, u64); 4] = [
         ("TiB", 1 << 40),
         ("GiB", 1 << 30),
