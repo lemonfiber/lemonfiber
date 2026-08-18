@@ -10,6 +10,12 @@
 //! have to be filtered before an undo could read it, and an audit that only recorded the
 //! successful changes would be missing precisely the entries somebody is looking for.
 //!
+//! Written and not yet read by anything in the tree. That is deliberate rather than
+//! forgotten: what the requirement asks for is that every remediation be recorded with its
+//! finding, its action, the time and how it turned out, and this is where a person looks
+//! when the same repair keeps failing to hold a fault down. An accessor invented before
+//! anything needed one would be a method no test could justify.
+//!
 //! Best-effort, both ways, for the reason the conditions are: a lost history is a worse
 //! picture for the next run and never a reason to refuse this one.
 
@@ -52,19 +58,6 @@ impl Repairs {
             self.entries.drain(..self.entries.len() - KEPT);
         }
     }
-
-    /// How many attempts against one check are on record.
-    ///
-    /// A count rather than the entries themselves: what a reader wants from a history of
-    /// failures is how many there have been, and handing back the whole list would invite a
-    /// second caller to re-derive that from it.
-    #[must_use]
-    pub(super) fn tried(&self, check: &str) -> usize {
-        self.entries
-            .iter()
-            .filter(|entry| entry.check == check)
-            .count()
-    }
 }
 
 /// The name this record is kept under, beside the environment file.
@@ -98,14 +91,17 @@ mod tests {
     /// The attempts that changed nothing are the ones worth reading when a fault keeps
     /// coming back, so they are kept beside the ones that worked.
     #[test]
-    fn what_was_tried_against_a_check_is_kept_whether_or_not_it_worked() {
+    fn what_was_tried_is_kept_whether_or_not_it_worked() {
         let mut repairs = Repairs::default();
         repairs.record(entry("vpn.port-forward-client", Outcome::FixFailed));
         repairs.record(entry("vpn.port-forward-client", Outcome::Fixed));
         repairs.record(entry("something.else", Outcome::Fixed));
 
-        assert_eq!(repairs.tried("vpn.port-forward-client"), 2);
-        assert_eq!(repairs.tried("nothing.here"), 0);
+        assert_eq!(repairs.entries.len(), 3);
+        assert!(repairs
+            .entries
+            .iter()
+            .any(|entry| entry.outcome == Outcome::FixFailed));
     }
 
     /// Bounded, because a record nobody prunes is a file somebody finds the hard way —
