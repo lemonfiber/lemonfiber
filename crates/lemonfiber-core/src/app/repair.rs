@@ -76,7 +76,13 @@ where
     let checks = super::engine::assembled(ctx, disruptive)
         .await
         .map_err(Box::new)?;
-    Ok(proving(ctx, &checks, None, stance, confirm).await)
+    // A second set, assembled without the disruptive ones, for proving the work. Built
+    // here rather than per repair: nine checks constructed once are nine constructed once,
+    // however many faults this run puts right.
+    let again = super::engine::assembled(ctx, false)
+        .await
+        .map_err(Box::new)?;
+    Ok(proving(ctx, &checks, &again, stance, confirm).await)
 }
 
 /// The same errand, over checks somebody else assembled.
@@ -96,7 +102,7 @@ where
     // test has to be provable by asking that same check again — assembling the real nine
     // would ask about a finding none of them raises, and a finding nobody raises reads as a
     // fault that has gone.
-    proving(ctx, checks, Some(checks), stance, confirm).await
+    proving(ctx, checks, checks, stance, confirm).await
 }
 
 /// The same errand, saying which checks prove the work.
@@ -106,7 +112,7 @@ where
 async fn proving<D>(
     ctx: &Ctx,
     checks: &[Box<dyn Check>],
-    again: Option<&[Box<dyn Check>]>,
+    again: &[Box<dyn Check>],
     stance: Stance,
     confirm: D,
 ) -> Report
@@ -255,7 +261,7 @@ async fn looked(ctx: &Ctx, checks: &[Box<dyn Check>]) -> Vec<Finding> {
 async fn carried(
     ctx: &Ctx,
     mender: &dyn Mend,
-    again: Option<&[Box<dyn Check>]>,
+    again: &[Box<dyn Check>],
     repair: &Repair,
 ) -> Outcome {
     let attempt = mender.mend(repair).await;
@@ -269,23 +275,12 @@ async fn carried(
 
 /// Ask again whether the fault is gone.
 ///
-/// The checks are assembled afresh unless the caller has some of its own — a check holds
-/// what it read when it was built, so proving a repair against the very instances that
-/// found the fault would compare its work with the reading it was meant to change.
-///
-/// Afresh means without the disruptive ones, too: proving a repair worked is no reason to
-/// drop the default route again, once per repair. A stack that will not read now is one
-/// that read moments ago, which is the machine changing under the repair rather than a
-/// verdict — so it answers "cannot say" rather than "still broken".
-async fn prove(ctx: &Ctx, again: Option<&[Box<dyn Check>]>, check: &str) -> Option<bool> {
-    // Assembled eagerly where the caller brought none, so there is one path through this
-    // rather than two — the second would be a line the gate counts and only a live stack
-    // reaches, which is the shape the error model doc tells us to remove rather than test.
-    let assembled = match again {
-        Some(_) => Vec::new(),
-        None => super::engine::assembled(ctx, false).await.ok()?,
-    };
-    proved(&looked(ctx, again.unwrap_or(&assembled)).await, check)
+/// Over checks assembled for the purpose rather than the ones that found it: a check holds
+/// what it read when it was built, so proving a repair against those very instances would
+/// compare its work with the reading it was meant to change — and report every success as
+/// a failure.
+async fn prove(ctx: &Ctx, again: &[Box<dyn Check>], check: &str) -> Option<bool> {
+    proved(&looked(ctx, again).await, check)
 }
 
 /// What an attempt and the proof of it amount to together.
