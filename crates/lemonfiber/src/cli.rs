@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::app::bundle::LINES;
 
@@ -199,30 +199,7 @@ pub(crate) enum Request {
     /// again with `--write` to produce it.
     ///
     /// Nothing is ever sent anywhere. The bundle is written here and stays here.
-    Support {
-        /// Produce the bundle, having seen what it would hold.
-        #[arg(long)]
-        write: bool,
-        /// Where to write it, instead of into this directory.
-        #[arg(long, value_name = "PATH")]
-        out: Option<PathBuf>,
-        /// How many log lines to take from each service.
-        #[arg(long, value_name = "LINES", default_value_t = LINES)]
-        logs: u32,
-        /// Include media filenames, which are replaced by default.
-        #[arg(long)]
-        filenames: bool,
-        /// Show one setting as it is, named exactly as the bundle names it.
-        ///
-        /// Repeatable, and refused without `--confirm` on the same run: a flag that
-        /// publishes a credential is not one to honour because it turned up on a
-        /// command line somebody copied.
-        #[arg(long, value_name = "SETTING")]
-        reveal: Vec<String>,
-        /// Confirm showing the settings named by `--reveal`.
-        #[arg(long)]
-        confirm: bool,
-    },
+    Support(Asked),
     /// Restore your configuration from a backup archive.
     ///
     /// Verifies the archive and lists what it holds before anything is
@@ -235,6 +212,37 @@ pub(crate) enum Request {
         #[arg(long)]
         repoint: bool,
     },
+}
+
+/// What a support bundle was asked for.
+///
+/// Declared as one thing rather than as six loose values on a variant, because the same
+/// six would otherwise be written out again by whoever passes them on — and a flag added
+/// to one list and not the other is a flag that silently does nothing.
+#[derive(Debug, Args)]
+pub(crate) struct Asked {
+    /// Produce the bundle, having seen what it would hold.
+    #[arg(long)]
+    pub(crate) write: bool,
+    /// Where to write it, instead of into this directory.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) out: Option<PathBuf>,
+    /// How many log lines to take from each service.
+    #[arg(long, value_name = "LINES", default_value_t = LINES)]
+    pub(crate) logs: u32,
+    /// Include media filenames, which are replaced by default.
+    #[arg(long)]
+    pub(crate) filenames: bool,
+    /// Show one setting as it is, named exactly as the bundle names it.
+    ///
+    /// Repeatable, and refused without `--confirm` on the same run: a flag that
+    /// publishes a credential is not one to honour because it turned up on a
+    /// command line somebody copied.
+    #[arg(long, value_name = "SETTING")]
+    pub(crate) reveal: Vec<String>,
+    /// Confirm showing the settings named by `--reveal`.
+    #[arg(long)]
+    pub(crate) confirm: bool,
 }
 
 /// What to do with settings.

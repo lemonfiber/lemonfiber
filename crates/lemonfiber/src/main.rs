@@ -140,28 +140,7 @@ async fn main() -> ExitCode {
         }
         // A bundle drives its own executor over the same tar adapter, and renders both
         // of the answers it can give — what one would hold, and where one went.
-        Request::Support {
-            write,
-            out,
-            logs,
-            filenames,
-            reveal,
-            confirm,
-        } => {
-            return support::run(
-                ctx,
-                support::Asked {
-                    write,
-                    out,
-                    logs,
-                    filenames,
-                    reveal,
-                    confirm,
-                },
-                cli.json,
-            )
-            .await;
-        }
+        Request::Support(asked) => return support::run(ctx, asked, cli.json).await,
         Request::Restore { archive, repoint } => {
             let Some(paths) = here() else {
                 return no_config_home();

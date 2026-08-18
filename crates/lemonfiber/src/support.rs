@@ -17,24 +17,9 @@ use lemonfiber_core::app::Ctx;
 use lemonfiber_core::bundle::{Contents, Filenames};
 use lemonfiber_core::error::Problem;
 
+use crate::cli::Asked;
 use crate::render::support::{render_preview, render_written};
 use crate::render::Lines;
-
-/// What the command line asked for, as this surface received it.
-pub(crate) struct Asked {
-    /// Whether to produce the file rather than describe it.
-    pub(crate) write: bool,
-    /// Where to write it, where somewhere was named.
-    pub(crate) out: Option<PathBuf>,
-    /// How many log lines to take from each service.
-    pub(crate) logs: u32,
-    /// Whether media filenames are shown.
-    pub(crate) filenames: bool,
-    /// The settings to show as they are.
-    pub(crate) reveal: Vec<String>,
-    /// Whether showing them was confirmed.
-    pub(crate) confirm: bool,
-}
 
 /// Describe a bundle, or produce one.
 pub(crate) async fn run(ctx: Ctx, asked: Asked, json: bool) -> ExitCode {
