@@ -220,14 +220,14 @@ fn setting(line: &str, marks: &Marks, terms: &Terms) -> String {
 /// The allow-list cannot help here, so this is the narrower rule the same reasoning gives.
 /// A query string goes wholesale — that is where the key nobody spotted actually lives,
 /// riding inside something that looks like an address. Then any run long and dense enough
-/// to read as a key is replaced whatever it sits next to, using the very tokenizer the
+/// to read as a key is replaced whatever it sits next to, using the very tokeniser the
 /// scan uses, so that what this writes is what the scan will accept.
 ///
 /// Not the same rule as [`crate::config::store::withheld_text`], which faults already pass
 /// through on their way to being remembered: that one reads names and withholds what
 /// follows them, and this one reads values and knows no names at all. Two rules, two jobs.
 /// What both leave is a key broken up by characters no key alphabet uses — several short
-/// runs to the tokenizer, and to the scan as well.
+/// runs to the tokeniser, and to the scan as well.
 #[must_use]
 pub fn prose(text: &str, marks: &Marks, terms: &Terms) -> String {
     text.lines()
@@ -637,7 +637,7 @@ mod tests {
     }
 
     /// The invariant the two halves are built on: the redactor and the scan share a
-    /// tokenizer, so whatever one writes the other accepts. Without this they are free to
+    /// tokeniser, so whatever one writes the other accepts. Without this they are free to
     /// drift, and a bundle would start refusing itself over text it had just redacted.
     #[test]
     fn whatever_the_free_text_rule_writes_the_scan_accepts() {

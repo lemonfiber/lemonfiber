@@ -350,8 +350,8 @@ mod tests {
         let shown = render_preview(&contents(), 41_000, false).text();
         assert!(shown.contains("README.txt"), "{shown}");
         assert!(shown.contains("platform.txt"), "{shown}");
-        assert!(shown.contains("40.0 KiB"), "{shown}");
-        assert!(shown.contains("could not be read"), "{shown}");
+        assert!(shown.contains("40.0 KiB in all."), "{shown}");
+        assert!(shown.contains("Could not be read:"), "{shown}");
         assert!(shown.contains("Nothing has been written"), "{shown}");
         assert!(!shown.contains("because you asked"), "nothing was revealed");
 

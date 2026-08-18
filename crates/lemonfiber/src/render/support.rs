@@ -24,9 +24,15 @@ pub(crate) fn render_preview(contents: &Contents, bytes: u64, json: bool) -> Lin
     for (name, _) in contents.files() {
         lines.put(format!("  {name}"));
     }
-    lines.put(format!("  {} in all", humanize(bytes)));
-    for gap in &contents.missing {
-        lines.put(format!("  could not be read: {gap}"));
+    lines.spaced(format!("{} in all.", humanize(bytes)));
+    // Named rather than passed over, and set apart rather than mixed into the listing: a
+    // gap nobody mentions reads as an absence of trouble instead of an absence of
+    // information, and one buried among the filenames reads as neither.
+    if !contents.missing.is_empty() {
+        lines.spaced("Could not be read:");
+        for gap in &contents.missing {
+            lines.put(format!("  {gap}"));
+        }
     }
     if !contents.terms.revealed.is_empty() {
         let (subject, verb) = if contents.terms.revealed.len() == 1 {
