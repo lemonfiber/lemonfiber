@@ -21,7 +21,9 @@ use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Diagnose, Problem, Remedy, Severity, State};
-use crate::model::{DoctorReport, LifecycleReport, StackEdit, StatusReport, VersionReport};
+use crate::model::{
+    DoctorReport, FormReport, FormsReport, LifecycleReport, StackEdit, StatusReport, VersionReport,
+};
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
 use crate::ports::service::{Indexers, UsenetAccounts};
@@ -480,6 +482,38 @@ pub(super) async fn lifecycle(
 /// An unreachable engine is reported as absent rather than as a failure: asking
 /// what versions are in play is exactly what an operator does when something is
 /// wrong, so it must still answer when the engine is down.
+/// Every form the stack declares, in its own words.
+///
+/// A read of the manifest and nothing else: forms come from the stack rather than from
+/// lemonfiber, so this reports what is declared rather than what lemonfiber expects to
+/// find. An unreadable stack is the one thing that can genuinely be wrong here, and it is
+/// the operator's own `--stack-dir` when it is.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be read. Boxed
+/// as a capture's refusals are: a refusal carries a good deal more than the listing it is
+/// refusing to give.
+pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+
+    Ok(FormsReport {
+        forms: manifest
+            .forms
+            .iter()
+            .map(|form| FormReport {
+                id: form.id.clone(),
+                name: form.name.clone(),
+                description: form.description.clone(),
+                composable: form.composable,
+            })
+            .collect(),
+    })
+}
+
 pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Problem> {
     let argv = ["docker", "compose", "version", "--short"].map(str::to_owned);
     let compose = match ctx.runner.run(&argv).await {

@@ -6,7 +6,8 @@
 use lemonfiber_core::docker::{Criticality, Service, State};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::model::{
-    MusicChoice, PresetChoice, SupervisionReport, TraceReport, VersionReport,
+    FormReport, FormsReport, MusicChoice, PresetChoice, SupervisionReport, TraceReport,
+    VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
@@ -104,5 +105,26 @@ pub(super) fn a_watch() -> SupervisionReport {
         forms: vec!["media".to_owned()],
         reason: "the data location went away".to_owned(),
         stopped: true,
+    }
+}
+
+/// Two forms: one that combines and one that does not, which is the whole of what a
+/// listing has to tell apart.
+pub(super) fn some_forms() -> FormsReport {
+    FormsReport {
+        forms: vec![
+            FormReport {
+                id: "search".to_owned(),
+                name: "Search".to_owned(),
+                description: "Find things. Nothing else runs.".to_owned(),
+                composable: true,
+            },
+            FormReport {
+                id: "everything".to_owned(),
+                name: "Everything".to_owned(),
+                description: "The whole stack.".to_owned(),
+                composable: false,
+            },
+        ],
     }
 }

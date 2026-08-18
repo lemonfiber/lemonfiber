@@ -354,7 +354,7 @@ impl Diagnose for Failure {
                 Severity::Error,
                 "lemonfiber has not been set up on this machine yet",
                 "There is nowhere to keep settings until setup has chosen a location for them.",
-                Remedy::new("Run setup").with_detail("lemonfiber init"),
+                Remedy::new("Run setup").with_detail("lemonfiber setup"),
             )
             .in_state(State::Guided),
         }

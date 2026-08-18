@@ -340,7 +340,7 @@ impl Diagnose for Failure {
                 Severity::Error,
                 "lemonfiber has not been set up on this machine yet",
                 "The stack ships inside lemonfiber and has to be written somewhere before Docker can read it, and no location has been chosen.",
-                Remedy::new("Run setup").with_detail("lemonfiber init"),
+                Remedy::new("Run setup").with_detail("lemonfiber setup"),
             )
             .or_try(Remedy::new("Or operate a stack directory of your own")
                 .with_detail("lemonfiber --stack-dir <path>"))
