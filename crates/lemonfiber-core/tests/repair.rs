@@ -263,9 +263,16 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
 
 /// The whole errand over the real checks: nothing here can be mended, so nothing is
 /// offered — and the run says so rather than failing.
+///
+/// Also the only path that assembles its own checks to prove with, since a real run has no
+/// caller to hand it any.
 #[tokio::test]
 async fn a_stack_with_nothing_mendable_offers_nothing() {
-    let report = mend(&ctx("real"), Stance::ReportOnly, false, |_| true).await;
-
+    let context = ctx("real");
+    let report = mend(&context, Stance::ReportOnly, false, |_| true).await;
     assert!(report.is_ok_and(|report| report.offered.is_empty()));
+
+    // Asked to act rather than only look, and still with nothing to act on.
+    let acting = mend(&context, Stance::Unattended, false, |_| true).await;
+    assert!(acting.is_ok_and(|report| report.mended.is_empty() && report.acted));
 }

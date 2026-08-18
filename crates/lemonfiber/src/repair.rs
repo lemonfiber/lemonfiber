@@ -70,10 +70,30 @@ mod tests {
     use lemonfiber_core::app::repair::{Mended, Report};
     use lemonfiber_core::repair::{Outcome, Repair};
 
+    use std::sync::Arc;
+
+    use lemonfiber_core::config::Settings;
+    use lemonfiber_core::platform::Environment;
+    use lemonfiber_core::stack::Source;
+
     use crate::exit::{repairing, shown, success};
     use crate::prompt::Answers;
 
-    use super::agreed;
+    use super::{agreed, run, Ctx, Mending};
+
+    /// A context over the stack this binary ships, with nothing configured — so nothing is
+    /// wrong that lemonfiber could put right, which is the state a healthy machine is in.
+    fn ctx() -> Ctx {
+        Ctx::new(
+            Arc::new(lemonfiber_core::adapters::Local),
+            Arc::new(lemonfiber_core::adapters::Daemon::local()),
+            Arc::new(lemonfiber_core::adapters::System),
+            Arc::new(lemonfiber_core::adapters::Disk),
+            Source::Embedded(&crate::cli::STACK),
+            Settings::default(),
+            Environment::MacOs,
+        )
+    }
 
     /// Answers whatever it was built with, however often it is asked.
     struct Says(&'static str);
@@ -122,6 +142,35 @@ mod tests {
         // One that cannot be undone says so before the question, and is still only
         // carried out on a yes.
         assert!(agreed(&repair(false), &Says("y")));
+    }
+
+    /// The command end to end, over a stack with nothing wrong that lemonfiber can mend.
+    ///
+    /// Every stance reaches the same answer here — there is nothing to offer, so there is
+    /// nothing to ask about and nothing to carry out — which is what a run on a healthy
+    /// machine should say however it was asked.
+    #[tokio::test]
+    async fn a_run_with_nothing_to_mend_succeeds_however_it_was_asked() {
+        let asking = |fix: bool, yes: bool, json: bool| async move {
+            shown(
+                run(
+                    ctx(),
+                    Mending {
+                        fix,
+                        yes,
+                        disruptive: false,
+                    },
+                    &Says("n"),
+                    json,
+                )
+                .await,
+            )
+        };
+
+        // Asked about each, told to go ahead, and read by a script: all three.
+        assert_eq!(asking(true, false, false).await, success());
+        assert_eq!(asking(true, true, false).await, success());
+        assert_eq!(asking(true, false, true).await, success());
     }
 
     /// An operator who asked for things to be put right and had one fail needs their
