@@ -94,8 +94,9 @@ mod tests {
 
     /// Answers whatever it was built with, however often it is asked.
     ///
-    /// A repair asks one question and never asks for a secret, so the second half of the
-    /// trait answers with nothing and says why rather than pretending to a value.
+    /// A repair asks one kind of question and only ever that kind, so both halves of the
+    /// trait answer the same way — there is no secret to give and nothing that would ask
+    /// for one.
     struct Says(&'static str);
 
     impl Answers for Says {
@@ -103,10 +104,8 @@ mod tests {
             self.0.to_owned()
         }
 
-        fn secret(&self, prompt: &str) -> String {
-            // Reached only if a repair ever asks for one, which would be a change worth
-            // noticing rather than answering.
-            self.ask(prompt)
+        fn secret(&self, question: &str) -> String {
+            self.ask(question)
         }
     }
 
@@ -136,6 +135,10 @@ mod tests {
 
     /// Only yes means yes. Anything else — including the empty answer of somebody
     /// pressing return to make the question go away — leaves the machine alone.
+    ///
+    /// Asked through both halves of the answering trait, because a surface that reached
+    /// for a secret would be doing something a repair has no business doing, and the fake
+    /// would answer it the same way rather than hiding it.
     #[test]
     fn nothing_but_yes_agrees_to_a_repair() {
         assert!(agreed(&repair(true), &Says("y")));
@@ -145,6 +148,37 @@ mod tests {
         // One that cannot be undone says so before the question, and is still only
         // carried out on a yes.
         assert!(agreed(&repair(false), &Says("y")));
+        assert_eq!(Says("y").secret("anything"), "y");
+    }
+
+    /// A stack that will not read is the one thing every check needs before any of them
+    /// can run, so the operator hears about it rather than being told there is nothing to
+    /// put right — which would be true of a machine lemonfiber cannot see at all.
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_is_refused_rather_than_called_healthy() {
+        let nowhere = Ctx::new(
+            Arc::new(lemonfiber_core::adapters::Local),
+            Arc::new(lemonfiber_core::adapters::Daemon::local()),
+            Arc::new(lemonfiber_core::adapters::System),
+            Arc::new(lemonfiber_core::adapters::Disk),
+            Source::External(std::path::Path::new("/no/such/stack")),
+            Settings::default(),
+            Environment::MacOs,
+        );
+
+        let code = run(
+            nowhere,
+            Mending {
+                fix: true,
+                yes: true,
+                disruptive: false,
+            },
+            &Says("n"),
+            false,
+        )
+        .await;
+
+        assert_ne!(shown(code), success());
     }
 
     /// The command end to end, over a stack with nothing wrong that lemonfiber can mend.
