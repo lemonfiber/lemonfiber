@@ -200,7 +200,7 @@ mod tests {
     /// A named function rather than a closure: a closure is a function of its own as far
     /// as coverage is concerned, and one inside a test is one the gate counts and no other
     /// test enters.
-    async fn asked_for(yes: bool, json: bool) -> u8 {
+    async fn asked_for(yes: bool, json: bool) -> String {
         shown(
             run(
                 ctx(),
