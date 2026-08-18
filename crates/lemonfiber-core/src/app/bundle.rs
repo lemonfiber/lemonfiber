@@ -275,7 +275,11 @@ fn unwritten(dest: &Path, fault: &Fault) -> Problem {
 
 #[cfg(test)]
 mod tests {
-    use super::reading;
+    use std::path::Path;
+
+    use super::{reading, write};
+    use crate::app::fixtures::FakeArchive;
+    use crate::bundle::{Contents, Piece, Taken, MANIFEST};
     use crate::doctor::Verdict;
     use crate::error::{Code, Problem, Remedy, Severity};
 
@@ -318,5 +322,40 @@ mod tests {
             }),
             "nothing to read"
         );
+    }
+
+    /// The archive is handed the whole bundle at once, at the path it was asked for, and
+    /// what comes back names every file in it — the bundle's own first page included.
+    ///
+    /// The operator is told what they are about to attach before anybody else reads it,
+    /// so what `write` reports has to be what the archive was actually given rather than
+    /// what the collector meant to give it.
+    #[tokio::test]
+    async fn a_bundle_is_handed_to_the_archive_whole() {
+        let contents = Contents {
+            pieces: vec![Piece {
+                name: "platform.txt".to_owned(),
+                body: "lemonfiber 0.7.0".to_owned(),
+            }],
+            missing: Vec::new(),
+            taken: Taken {
+                lemonfiber: "0.7.0".to_owned(),
+                stack: "1.2.0".to_owned(),
+                at: "2026-08-18T00:00:00Z".to_owned(),
+            },
+        };
+        let archive = FakeArchive::roomy();
+        let dest = Path::new("/tmp/support.tar.gz");
+
+        let written = write(&archive, &contents, dest).await;
+
+        assert_eq!(
+            written.map(|written| (written.path, written.holds)),
+            Ok((
+                dest.to_path_buf(),
+                vec![MANIFEST.to_owned(), "platform.txt".to_owned()]
+            ))
+        );
+        assert_eq!(archive.writes(), vec![dest.to_path_buf()]);
     }
 }
