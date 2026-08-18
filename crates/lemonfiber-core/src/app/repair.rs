@@ -76,7 +76,7 @@ where
     let checks = super::engine::assembled(ctx, disruptive)
         .await
         .map_err(Box::new)?;
-    Ok(mending(ctx, &checks, stance, confirm).await)
+    Ok(proving(ctx, &checks, None, stance, confirm).await)
 }
 
 /// The same errand, over checks somebody else assembled.
@@ -89,6 +89,27 @@ where
 /// and proving it from outside the crate is what keeps its coverage counted from the copy
 /// that actually runs.
 pub async fn mending<D>(ctx: &Ctx, checks: &[Box<dyn Check>], stance: Stance, confirm: D) -> Report
+where
+    D: Fn(&Repair) -> bool,
+{
+    // Proved against the caller's own checks. A runner driven over a check written for a
+    // test has to be provable by asking that same check again — assembling the real nine
+    // would ask about a finding none of them raises, and a finding nobody raises reads as a
+    // fault that has gone.
+    proving(ctx, checks, Some(checks), stance, confirm).await
+}
+
+/// The same errand, saying which checks prove the work.
+///
+/// One place decides what a repair did and whether it held, whichever checks are used for
+/// either half.
+async fn proving<D>(
+    ctx: &Ctx,
+    checks: &[Box<dyn Check>],
+    again: Option<&[Box<dyn Check>]>,
+    stance: Stance,
+    confirm: D,
+) -> Report
 where
     D: Fn(&Repair) -> bool,
 {
@@ -129,7 +150,7 @@ where
             });
             continue;
         }
-        let outcome = carried(ctx, mender, &repair).await;
+        let outcome = carried(ctx, mender, again, &repair).await;
         recorded(ctx, &repair, &outcome);
         report.mended.push(Mended { repair, outcome });
     }
@@ -231,21 +252,37 @@ async fn looked(ctx: &Ctx, checks: &[Box<dyn Check>]) -> Vec<Finding> {
 ///
 /// Assembled without the disruptive ones, too. Proving a repair worked is no reason to drop
 /// the default route or run a live indexer search again, once per repair.
-async fn carried(ctx: &Ctx, mender: &dyn Mend, repair: &Repair) -> Outcome {
+async fn carried(
+    ctx: &Ctx,
+    mender: &dyn Mend,
+    again: Option<&[Box<dyn Check>]>,
+    repair: &Repair,
+) -> Outcome {
     let attempt = mender.mend(repair).await;
     if matches!(attempt, Attempt::Stopped { .. }) {
         // Nothing changed, or something changed half way. Either way the state it was left
         // in is what the operator needs, and asking the checks again would only rename it.
         return Outcome::of(attempt, false);
     }
-    // Assembled afresh for the proof, and a stack that will not read now is one that read
-    // moments ago — so this is the machine changing under the repair rather than a fault in
-    // it, and the operator hears that rather than a verdict nobody could reach.
-    let proof = match super::engine::assembled(ctx, false).await {
-        Ok(checks) => proved(&looked(ctx, &checks).await, &repair.check),
-        Err(_) => None,
-    };
-    judged(attempt, proof)
+    judged(attempt, prove(ctx, again, &repair.check).await)
+}
+
+/// Ask again whether the fault is gone.
+///
+/// The checks are assembled afresh unless the caller has some of its own — a check holds
+/// what it read when it was built, so proving a repair against the very instances that
+/// found the fault would compare its work with the reading it was meant to change.
+///
+/// Afresh means without the disruptive ones, too: proving a repair worked is no reason to
+/// drop the default route again, once per repair. A stack that will not read now is one
+/// that read moments ago, which is the machine changing under the repair rather than a
+/// verdict — so it answers "cannot say" rather than "still broken".
+async fn prove(ctx: &Ctx, again: Option<&[Box<dyn Check>]>, check: &str) -> Option<bool> {
+    if let Some(checks) = again {
+        return proved(&looked(ctx, checks).await, check);
+    }
+    let assembled = super::engine::assembled(ctx, false).await.ok()?;
+    proved(&looked(ctx, &assembled).await, check)
 }
 
 /// What an attempt and the proof of it amount to together.

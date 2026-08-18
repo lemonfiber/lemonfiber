@@ -57,13 +57,27 @@ fn ctx(name: &str) -> Ctx {
 /// reaching for anything real.
 struct Sticky {
     attempt: Attempt,
+    /// Whether putting it right actually settles it, which is what the second look asks.
+    settles: bool,
     mended: AtomicUsize,
 }
 
 impl Sticky {
+    /// One whose repair works: after it has been mended, it finds nothing wrong.
+    fn settling(attempt: Attempt) -> Self {
+        Self {
+            attempt,
+            settles: true,
+            mended: AtomicUsize::new(0),
+        }
+    }
+
+    /// One whose repair does not: it keeps finding the same thing wrong however often it
+    /// is mended, which is the fault lemonfiber eventually has to admit it cannot fix.
     fn new(attempt: Attempt) -> Self {
         Self {
             attempt,
+            settles: false,
             mended: AtomicUsize::new(0),
         }
     }
@@ -79,6 +93,14 @@ impl Check for Sticky {
     }
 
     async fn run(&self) -> Vec<Finding> {
+        if self.settles && self.mended.load(Ordering::Relaxed) > 0 {
+            return vec![Finding::in_category(
+                Category::Vpn,
+                CHECK,
+                "something this test can mend",
+                Verdict::Pass { note: None },
+            )];
+        }
         vec![Finding::in_category(
             Category::Vpn,
             CHECK,
@@ -119,8 +141,14 @@ impl Mend for Sticky {
     }
 }
 
+/// Checks whose repair leaves the fault standing however often it runs.
 fn checks(attempt: Attempt) -> Vec<Box<dyn Check>> {
     vec![Box::new(Sticky::new(attempt))]
+}
+
+/// Checks whose repair actually works.
+fn settling() -> Vec<Box<dyn Check>> {
+    vec![Box::new(Sticky::settling(Attempt::Carried))]
 }
 
 /// A run that was not told to act says what could be put right and puts none of it right.
@@ -144,13 +172,7 @@ async fn a_run_that_may_not_act_offers_and_changes_nothing() {
 /// its answer earns `Fixed`.
 #[tokio::test]
 async fn a_repair_that_worked_is_reported_as_fixed() {
-    let report = mending(
-        &ctx("fixed"),
-        &checks(Attempt::Carried),
-        Stance::Unattended,
-        |_| true,
-    )
-    .await;
+    let report = mending(&ctx("fixed"), &settling(), Stance::Unattended, |_| true).await;
 
     assert_eq!(
         report.mended.first().map(|mended| &mended.outcome),
