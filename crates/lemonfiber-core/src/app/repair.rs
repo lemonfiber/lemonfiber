@@ -76,14 +76,32 @@ where
     let checks = super::engine::assembled(ctx, disruptive)
         .await
         .map_err(Box::new)?;
-    let found = looked(ctx, &checks).await;
+    Ok(mending(ctx, &checks, stance, confirm).await)
+}
+
+/// The same errand, over checks somebody else assembled.
+///
+/// Apart from [`mend`] so that what a repair *does* can be driven against a check written
+/// for the purpose. A runner that could only be exercised through nine real checks and a
+/// live stack would be one nobody could write a test for — which is how the two defects
+/// this module was rewritten to fix got in.
+pub(crate) async fn mending<D>(
+    ctx: &Ctx,
+    checks: &[Box<dyn Check>],
+    stance: Stance,
+    confirm: D,
+) -> Report
+where
+    D: Fn(&Repair) -> bool,
+{
+    let found = looked(ctx, checks).await;
 
     // Remembered before anything is offered. Whether a fix was declined, and how often one
     // has been tried and left the fault standing, are questions about a check across runs —
     // and the store is where lemonfiber keeps that. A run that consulted it without first
     // telling it what this run found would be asking about faults it had never mentioned.
     let conditions = remembered(ctx, &found);
-    let proposals = proposed(&checks, &found);
+    let proposals = proposed(checks, &found);
     let all: Vec<Repair> = proposals.iter().map(|(_, repair)| repair.clone()).collect();
     let offered = repair::offered(&all, &conditions.all());
 
@@ -94,7 +112,7 @@ where
         acted: stance.may_act(),
     };
     if !stance.may_act() {
-        return Ok(report);
+        return report;
     }
 
     // Each survivor keeps the mender that offered it. Looking one up again by check name
@@ -117,7 +135,7 @@ where
         recorded(ctx, &repair, &outcome);
         report.mended.push(Mended { repair, outcome });
     }
-    Ok(report)
+    report
 }
 
 /// Fold what this run found into the store, and answer with it.
