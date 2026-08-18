@@ -37,6 +37,68 @@ use unpack::{fault, free_bytes, remove_any, stage, staging_for, tree_size, write
 /// A backup archive on the local filesystem, as a gzip-compressed tar.
 pub struct Tar;
 
+/// Build an archive at `dest` and swap it into place, or leave nothing behind.
+///
+/// The part a capture and a support bundle keep identically, and so neither should own:
+/// refuse one already there, write to a temporary name beside the target, and rename over
+/// it only once it is whole. A stop part-way leaves the partial file under its staging
+/// suffix rather than a truncated archive a later listing — or a worried operator — would
+/// take for a good one.
+///
+/// What differs between the two is only what goes inside, which is `pack`'s to say. The
+/// `kind` is what the archive is called when one is already there, because "a backup
+/// already exists" and "a bundle already exists" send an operator to different places.
+fn atomically(
+    dest: &Path,
+    kind: &str,
+    pack: impl FnOnce(&mut tar::Builder<GzEncoder<File>>) -> std::io::Result<()>,
+) -> Result<(), Fault> {
+    if dest.exists() {
+        return Err(Fault::new(format!(
+            "a {kind} already exists at {}",
+            dest.display()
+        )));
+    }
+    // No branch on whether there is a parent: `parent()` is empty for a bare filename and
+    // absent only for a root path, and `create_dir_all` treats both as nothing to do. The
+    // wrapper this replaces left its own closing brace as a line no test could reach.
+    fs::create_dir_all(dest.parent().unwrap_or(dest)).map_err(fault)?;
+
+    let staging = write_staging(dest);
+    let _ = fs::remove_file(&staging);
+
+    let result = (|| {
+        let file = File::create(&staging)?;
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        pack(&mut builder)?;
+        builder.into_inner()?.finish()?;
+        Ok::<(), std::io::Error>(())
+    })();
+
+    if let Err(error) = result {
+        let _ = fs::remove_file(&staging);
+        return Err(fault(error));
+    }
+    fs::rename(&staging, dest).map_err(fault)
+}
+
+/// One entry whose bytes are in hand, held at a mode nobody else can read.
+///
+/// Both archives carry the operator's own configuration — one of them redacted, both of
+/// them theirs — and a mode nobody sets is a mode the umask chose.
+fn held(
+    builder: &mut tar::Builder<GzEncoder<File>>,
+    name: &str,
+    body: &[u8],
+) -> std::io::Result<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_size(body.len() as u64);
+    header.set_mode(0o600);
+    header.set_cksum();
+    builder.append_data(&mut header, name, body)
+}
+
 #[async_trait]
 impl Archive for Tar {
     async fn space(&self, dir: &Path, items: &[Item]) -> Result<Space, Fault> {
@@ -48,33 +110,9 @@ impl Archive for Tar {
     }
 
     async fn write(&self, dest: &Path, manifest: &Manifest, items: &[Item]) -> Result<(), Fault> {
-        if dest.exists() {
-            return Err(Fault::new(format!(
-                "a backup already exists at {}",
-                dest.display()
-            )));
-        }
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).map_err(fault)?;
-        }
-
-        // Written to a temporary name and renamed over the target, so a stop
-        // part-way leaves the partial file under `.restoring` rather than a
-        // truncated archive a later listing would take for a good backup.
-        let staging = write_staging(dest);
-        let _ = fs::remove_file(&staging);
-
-        let result = (|| {
-            let file = File::create(&staging)?;
-            let encoder = GzEncoder::new(file, Compression::default());
-            let mut builder = tar::Builder::new(encoder);
-
+        atomically(dest, "backup", |builder| {
             let json = serde_json::to_vec(manifest).map_err(std::io::Error::other)?;
-            let mut header = tar::Header::new_gnu();
-            header.set_size(json.len() as u64);
-            header.set_mode(0o600);
-            header.set_cksum();
-            builder.append_data(&mut header, MANIFEST, json.as_slice())?;
+            held(builder, MANIFEST, json.as_slice())?;
 
             // A missing source is left out rather than failing the capture: a stack
             // an operator runs from their own directory, or a service that has not
@@ -84,15 +122,17 @@ impl Archive for Tar {
                     builder.append_dir_all(&item.archive_path, &item.source)?;
                 }
             }
-            builder.into_inner()?.finish()?;
-            Ok::<(), std::io::Error>(())
-        })();
+            Ok(())
+        })
+    }
 
-        if let Err(error) = result {
-            let _ = fs::remove_file(&staging);
-            return Err(fault(error));
-        }
-        fs::rename(&staging, dest).map_err(fault)
+    async fn write_files(&self, dest: &Path, files: &[(String, String)]) -> Result<(), Fault> {
+        atomically(dest, "bundle", |builder| {
+            for (name, body) in files {
+                held(builder, name, body.as_bytes())?;
+            }
+            Ok(())
+        })
     }
 
     async fn existing(&self, dir: &Path) -> Result<Vec<Existing>, Fault> {
@@ -353,6 +393,79 @@ mod tests {
                 "a restored file carries no group or other permission bits"
             );
         }
+    }
+
+    /// A bundle's files are generated rather than copied, so they arrive in hand and go
+    /// straight into the archive — and come back out reading exactly as they went in.
+    #[tokio::test]
+    async fn a_bundle_of_files_in_hand_is_written_and_reads_back() {
+        let root = scratch("bundle");
+        let dest = root.join("support.tar.gz");
+        let files = vec![
+            ("README.txt".to_owned(), "what this holds".to_owned()),
+            (
+                "configuration.env".to_owned(),
+                "PUID=1000\nINDEXER_APIKEY=<redacted:a3f1>".to_owned(),
+            ),
+        ];
+
+        let tar = Tar;
+        assert!(tar.write_files(&dest, &files).await.is_ok());
+        assert!(dest.exists(), "the archive is where it was asked for");
+
+        let read = std::fs::File::open(&dest).and_then(|file| {
+            let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
+            let mut held = Vec::new();
+            for entry in archive.entries()? {
+                let mut entry = entry?;
+                let name = entry.path()?.to_string_lossy().into_owned();
+                let mut body = String::new();
+                std::io::Read::read_to_string(&mut entry, &mut body)?;
+                held.push((name, body));
+            }
+            Ok(held)
+        });
+        assert_eq!(read.ok(), Some(files));
+    }
+
+    /// A bundle that cannot be created leaves nothing behind, not even the staging file
+    /// it was being built in — there is no half-file for a later listing, or a worried
+    /// operator, to mistake for a bundle.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_bundle_that_cannot_be_created_leaves_nothing_behind() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = scratch("bundle-unwritable");
+        let _ = fs::create_dir_all(&root);
+        let _ = fs::set_permissions(&root, fs::Permissions::from_mode(0o500));
+        let dest = root.join("support.tar.gz");
+
+        let tar = Tar;
+        let refused = tar
+            .write_files(&dest, &[("README.txt".to_owned(), "held".to_owned())])
+            .await;
+
+        // Restored first, so the scratch directory can be cleaned up whatever happened.
+        let _ = fs::set_permissions(&root, fs::Permissions::from_mode(0o755));
+        assert!(refused.is_err());
+        assert!(
+            !dest.exists(),
+            "nothing is left where a bundle would have been"
+        );
+    }
+
+    /// A bundle is written whole or not at all, and never over one already there — the
+    /// same rule a capture keeps, for the same reason.
+    #[tokio::test]
+    async fn a_bundle_is_not_written_over_one_already_there() {
+        let root = scratch("bundle-no-overwrite");
+        let dest = root.join("support.tar.gz");
+        let files = vec![("README.txt".to_owned(), "what this holds".to_owned())];
+
+        let tar = Tar;
+        assert!(tar.write_files(&dest, &files).await.is_ok());
+        assert!(tar.write_files(&dest, &files).await.is_err());
     }
 
     #[tokio::test]

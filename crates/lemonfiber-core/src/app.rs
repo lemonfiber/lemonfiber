@@ -31,6 +31,8 @@ mod ctx;
 pub mod dashboard;
 pub mod egress;
 mod engine;
+#[cfg(test)]
+mod fixtures;
 pub mod forwarding;
 mod household;
 mod materialise;

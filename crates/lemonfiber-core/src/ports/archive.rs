@@ -94,6 +94,23 @@ pub trait Archive: Send + Sync {
     /// where one already exists at `dest`.
     async fn write(&self, dest: &Path, manifest: &Manifest, items: &[Item]) -> Result<(), Fault>;
 
+    /// Write an archive at `dest` holding these named files, whose contents are in hand
+    /// rather than on disk.
+    ///
+    /// A support bundle is generated, not copied: its files are a diagnosis rendered, a
+    /// configuration redacted, a page describing the rest. None of them exist anywhere to
+    /// be pointed at, and staging them on disk to be picked up again would put the
+    /// redacted contents somewhere they would have to be cleaned up from afterwards.
+    ///
+    /// Atomic against failure and refusing an existing `dest`, exactly as a capture is,
+    /// and for the same reason: a bundle half-written is a bundle somebody sends.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where the archive could not be created or written, or where
+    /// one already exists at `dest`.
+    async fn write_files(&self, dest: &Path, files: &[(String, String)]) -> Result<(), Fault>;
+
     /// The backups already present in `dir`, for retention to prune from.
     ///
     /// Includes an archive written moments earlier, and gives each a `created_at`

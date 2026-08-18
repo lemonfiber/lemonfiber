@@ -206,78 +206,12 @@ fn not_measured(fault: &Fault) -> Problem {
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
-    use std::sync::Mutex;
 
-    use async_trait::async_trait;
-
-    use super::{capture, Report, HEADROOM, NOT_MEASURED, NOT_WRITTEN, NO_ROOM};
-    use crate::backup::{Existing, Item, Manifest, Retention, Scope};
+    use super::{capture, Report, NOT_MEASURED, NOT_WRITTEN, NO_ROOM};
+    use crate::app::fixtures::FakeArchive;
+    use crate::backup::{Existing, Retention, Scope};
     use crate::config::paths::Paths;
-    use crate::ports::archive::{Archive, Fault, Space};
-
-    /// An archive that answers each operation from what the test scripted, and
-    /// records what it was asked to write and remove.
-    struct FakeArchive {
-        space: Result<Space, Fault>,
-        write: Result<(), Fault>,
-        existing: Result<Vec<Existing>, Fault>,
-        remove: Result<(), Fault>,
-        written: Mutex<Vec<PathBuf>>,
-        removed: Mutex<Vec<String>>,
-    }
-
-    impl FakeArchive {
-        /// An archive with ample room where every operation succeeds and no older
-        /// backups exist to prune.
-        fn roomy() -> Self {
-            Self {
-                space: Ok(Space {
-                    needed: 10,
-                    available: HEADROOM + 1_000,
-                }),
-                write: Ok(()),
-                existing: Ok(Vec::new()),
-                remove: Ok(()),
-                written: Mutex::new(Vec::new()),
-                removed: Mutex::new(Vec::new()),
-            }
-        }
-
-        fn writes(&self) -> Vec<PathBuf> {
-            self.written.lock().map(|w| w.clone()).unwrap_or_default()
-        }
-
-        fn removes(&self) -> Vec<String> {
-            self.removed.lock().map(|r| r.clone()).unwrap_or_default()
-        }
-    }
-
-    #[async_trait]
-    impl Archive for FakeArchive {
-        async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, Fault> {
-            self.space.clone()
-        }
-        async fn write(
-            &self,
-            dest: &Path,
-            _manifest: &Manifest,
-            _items: &[Item],
-        ) -> Result<(), Fault> {
-            if let Ok(mut written) = self.written.lock() {
-                written.push(dest.to_path_buf());
-            }
-            self.write.clone()
-        }
-        async fn existing(&self, _dir: &Path) -> Result<Vec<Existing>, Fault> {
-            self.existing.clone()
-        }
-        async fn remove(&self, _dir: &Path, name: &str) -> Result<(), Fault> {
-            if let Ok(mut removed) = self.removed.lock() {
-                removed.push(name.to_owned());
-            }
-            self.remove.clone()
-        }
-    }
+    use crate::ports::archive::{Fault, Space};
 
     fn paths() -> Paths {
         Paths::rooted(Path::new("/cfg"), Path::new("/data"))

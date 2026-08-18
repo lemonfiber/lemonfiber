@@ -60,5 +60,12 @@ release-workflow:
 # on writing assertions that leave no branch a test cannot reach.
 #
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
+skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)'
+
+# A failing gate says which lines it failed on, from the profile already gathered —
+# `report` re-reads it rather than building and running anything a second time. Without
+# this the gate says only that a number is below a number, and finding out which line it
+# meant costs a full run somebody has to think to make.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+    cargo llvm-cov --workspace --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
+        || { cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --show-missing-lines; exit 1; }
