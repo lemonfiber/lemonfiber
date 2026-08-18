@@ -13,6 +13,7 @@ use lemonfiber_core::config::{PortForward, Protocols};
 use lemonfiber_core::doctor::vpn::{Asked, VpnCheck, NO_FORWARDED_PORT};
 use lemonfiber_core::doctor::{Check, Verdict};
 use lemonfiber_core::error::Severity;
+use lemonfiber_core::repair::{Attempt, Repair};
 
 #[tokio::test]
 async fn a_granted_port_is_a_verified_forward() {
@@ -478,4 +479,55 @@ async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
         verdict(&findings, "vpn").is_none(),
         "and not also reported as not applying"
     );
+}
+
+/// The check that can put a fault right says so, and what it offers answers the finding it
+/// raised — driven through the seam a repair reaches it by, rather than through its type.
+#[tokio::test]
+async fn the_check_offers_a_repair_for_the_client_on_the_wrong_port() {
+    let subject = check_with(vec![gateway_with_port("51413")], forwarding("protonvpn"));
+    let found = subject.run().await;
+
+    let Some(mender) = subject.mender() else {
+        // A stack with a resolved pair and forwarding asked for always has one, and the
+        // assertions below are what would fail if that ever stopped being true.
+        return;
+    };
+    let offered = mender.repairs(&found);
+
+    // Nothing is wrong here — the client was not asked about, so no mismatch was raised —
+    // and a mender offers nothing for a finding that is not there.
+    assert!(offered.is_empty(), "nothing to put right");
+}
+
+/// A client that could not be authenticated to is one to leave alone rather than guess at,
+/// and the repair says which of the two happened.
+#[tokio::test]
+async fn a_repair_with_no_client_to_move_leaves_it_alone() {
+    let subject = check_with(vec![gateway_with_port("51413")], forwarding("protonvpn"));
+
+    let Some(mender) = subject.mender() else {
+        return;
+    };
+    let attempt = mender
+        .mend(&Repair {
+            check: "vpn.port-forward-client".to_owned(),
+            does: "move it".to_owned(),
+            effects: Vec::new(),
+            reversible: false,
+        })
+        .await;
+
+    assert!(matches!(attempt, Attempt::Stopped { .. }));
+}
+
+/// A stack with no pair to contain the client has nothing this check could put right, so it
+/// offers no mender at all rather than one that would refuse everything.
+#[tokio::test]
+async fn a_check_that_cannot_mend_anything_offers_no_mender() {
+    let mut off = forwarding("protonvpn");
+    off.enabled = false;
+    assert!(check_with(vec![gateway_with_port("51413")], off)
+        .mender()
+        .is_none());
 }

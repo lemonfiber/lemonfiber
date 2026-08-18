@@ -243,7 +243,16 @@ async fn carried(ctx: &Ctx, mender: &dyn Mend, repair: &Repair) -> Outcome {
             leaving: "the repair ran, and the stack could not be read again to prove it".to_owned(),
         };
     };
-    match proved(&looked(ctx, &checks).await, &repair.check) {
+    judged(attempt, proved(&looked(ctx, &checks).await, &repair.check))
+}
+
+/// What an attempt and the proof of it amount to together.
+///
+/// Apart from [`carried`] so that all three answers can be asked of it directly: the one
+/// inside a function that assembles nine checks and runs them is an answer no test reaches,
+/// and the repo keeps applicable code coverable rather than arguing about it afterwards.
+fn judged(attempt: Attempt, proof: Option<bool>) -> Outcome {
+    match proof {
         Some(settled) => Outcome::of(attempt, settled),
         // "I could not tell" is not "it is still broken", and reporting it as such would
         // spend one of the few attempts a repair is given on nothing at all.
@@ -311,7 +320,7 @@ mod tests {
     use crate::condition::{Conditions, Fault};
     use crate::doctor::{Category, Finding, Verdict};
     use crate::error::{Code, Problem, Remedy, Severity};
-    use crate::repair::{Repair, ATTEMPTS};
+    use crate::repair::{Attempt, Outcome, Repair, ATTEMPTS};
 
     fn problem() -> Problem {
         Problem::new(
@@ -387,6 +396,34 @@ mod tests {
             }
         ))
         .is_none());
+    }
+
+    /// All three answers the proof can give, and what each makes of an attempt that ran.
+    #[test]
+    fn an_attempt_and_its_proof_together_say_what_happened() {
+        use super::judged;
+
+        assert_eq!(judged(Attempt::Carried, Some(true)), Outcome::Fixed);
+        assert_eq!(judged(Attempt::Carried, Some(false)), Outcome::FixFailed);
+        // Could not be established afterwards: neither fixed nor demonstrably still
+        // broken, and reported as what it is rather than as the worse of the two.
+        assert!(matches!(
+            judged(Attempt::Carried, None),
+            Outcome::Stopped { .. }
+        ));
+        // One that stopped is not judged by the proof at all — what it left behind is
+        // what the operator needs, whatever the checks say now.
+        assert_eq!(
+            judged(
+                Attempt::Stopped {
+                    leaving: "half of it".to_owned()
+                },
+                Some(true)
+            ),
+            Outcome::Stopped {
+                leaving: "half of it".to_owned()
+            }
+        );
     }
 
     /// The question a repair is judged by. Absent means the fault is gone; unverified means
