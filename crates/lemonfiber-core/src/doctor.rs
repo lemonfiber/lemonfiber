@@ -32,7 +32,7 @@ use serde::Serialize;
 
 use crate::error::{Problem, Remedy};
 use crate::model::DoctorReport;
-use crate::repair::{Attempt, Repair};
+use crate::repair::{Attempt, Repair, Writing};
 
 /// The family a check belongs to, so a run can be narrowed to one of them.
 ///
@@ -239,6 +239,20 @@ pub trait Mend: Send + Sync {
     /// Reports what happened and no more. Whether the fault is *gone* is not this
     /// method's to say — that takes asking the check again, which the caller does.
     async fn mend(&self, repair: &Repair) -> Attempt;
+
+    /// Whether this may write what it would write.
+    ///
+    /// Asked before anything is carried out, so that a repair which must not go ahead is
+    /// never attempted rather than attempted and reported as having done nothing. Most
+    /// menders have nothing to refuse: a repair that touches no configuration cannot write
+    /// over an operator's own change, and says so by not answering the question.
+    ///
+    /// The ones that do touch configuration read the baseline, which records what
+    /// lemonfiber wrote and what it adopted from the operator — and those are different
+    /// claims about the same field.
+    fn may_proceed(&self, _repair: &Repair) -> Writing {
+        Writing::Ours
+    }
 }
 
 /// Run the checks that match, bound each by its own budget, and sum the result.
