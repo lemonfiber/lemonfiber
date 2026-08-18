@@ -10,6 +10,11 @@ permissions:
 jobs:
   sonar:
     runs-on: ubuntu-latest
+    env:
+      # The outermost edge only, where a test cannot follow — see the justfile's `coverage`
+      # recipe for what each exclusion is and why. Named once here so the gate and the step
+      # that explains the gate cannot disagree about what is being measured.
+      SKIPPED: '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -20,7 +25,13 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@75a348306ce8f67c0b06fc62c32a8546140ba955 # cargo-llvm-cov
       - name: Coverage (100% on applicable code — Q-R61)
-        run: cargo llvm-cov --workspace --ignore-filename-regex '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)' --fail-under-lines 100 --lcov --output-path lcov.info
+        run: cargo llvm-cov --workspace --ignore-filename-regex "$SKIPPED" --fail-under-lines 100 --lcov --output-path lcov.info
+      # A gate that says only "below the threshold" sends whoever tripped it looking for a
+      # line the run already knew. `report` re-reads the profile just gathered — no build,
+      # no tests, seconds — and names them.
+      - name: Which lines the gate missed
+        if: failure()
+        run: cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --show-missing-lines
       - name: SonarQube Cloud scan
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
