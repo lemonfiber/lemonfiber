@@ -35,9 +35,9 @@ pub(crate) fn mended(report: &Report, json: bool) -> Lines {
         for repair in &report.offered {
             lines.put(format!("  {}", repair.does));
         }
-        lines.spaced(
-            "Nothing has been changed. Run `lemonfiber doctor --fix` to be asked about each.",
-        );
+        lines.spaced(format!(
+            "Nothing has been changed. Run `{ASK_FOR_REPAIRS}` to be asked about each."
+        ));
         return lines;
     }
     for done in &report.mended {
