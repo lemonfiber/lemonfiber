@@ -378,6 +378,16 @@ mod tests {
         let both = render_preview(&two, 1, false).text();
         assert!(both.contains("A, B as they are"), "{both}");
 
+        // Nothing missing prints no heading: an empty "Could not be read:" reads as a
+        // list somebody forgot to fill in, which is the same mistake the bundle's own
+        // first page takes care not to make.
+        let whole = Contents {
+            missing: Vec::new(),
+            ..contents()
+        };
+        let complete = render_preview(&whole, 1, false).text();
+        assert!(!complete.contains("Could not be read"), "{complete}");
+
         assert!(render_preview(&contents(), 1, true)
             .text()
             .contains("platform.txt"));
