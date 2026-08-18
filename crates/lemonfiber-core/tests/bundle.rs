@@ -128,7 +128,10 @@ impl Engine for Engine1 {
                 service: "prowlarr".to_owned(),
                 stream: Stream::Stdout,
                 at: None,
-                line: format!("GET https://indexer.example.com/api?apikey={}&t=search", key_shaped()),
+                line: format!(
+                    "GET https://indexer.example.com/api?apikey={}&t=search",
+                    key_shaped()
+                ),
             })
             .await;
         Ok(receiving)
@@ -278,7 +281,10 @@ async fn a_bundle_holds_the_recent_logs_with_the_keys_in_them_replaced() {
         .map(|piece| piece.body.clone())
         .unwrap_or_default();
     assert!(logs.contains("https://indexer.example.com/api?"), "{logs}");
-    assert!(!logs.contains(&key_shaped()), "the key does not ride out: {logs}");
+    assert!(
+        !logs.contains(&key_shaped()),
+        "the key does not ride out: {logs}"
+    );
 
     // Stated, because an extract that does not say what it is an extract of reads as the
     // whole story — and the window is the operator's, not a fixed one.

@@ -105,8 +105,7 @@ mod tests {
     use lemonfiber_core::config::Settings;
     use lemonfiber_core::platform::Environment;
     use lemonfiber_core::ports::docker::{
-        Container, Engine, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Stats,
-        Stream,
+        Container, Engine, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Stats, Stream,
     };
     use lemonfiber_core::ports::random::Random;
     use lemonfiber_core::stack::Source;
@@ -286,8 +285,14 @@ mod tests {
             ..asked()
         };
 
-        assert_eq!(shown(run(ctx(), asking(), true).await), shown(ExitCode::SUCCESS));
-        assert_ne!(shown(run(ctx(), asking(), false).await), shown(ExitCode::SUCCESS));
+        assert_eq!(
+            shown(run(ctx(), asking(), true).await),
+            shown(ExitCode::SUCCESS)
+        );
+        assert_ne!(
+            shown(run(ctx(), asking(), false).await),
+            shown(ExitCode::SUCCESS)
+        );
         let _ = std::fs::remove_file(&dest);
     }
 
@@ -325,7 +330,10 @@ mod tests {
             ..contents()
         };
         let one = render_preview(&asked, 1, false).text();
-        assert!(one.contains("SONARR_API_KEY as it is, because you asked"), "{one}");
+        assert!(
+            one.contains("SONARR_API_KEY as it is, because you asked"),
+            "{one}"
+        );
 
         let two = Contents {
             terms: Terms {
