@@ -81,16 +81,14 @@ where
 
 /// The same errand, over checks somebody else assembled.
 ///
-/// Apart from [`mend`] so that what a repair *does* can be driven against a check written
-/// for the purpose. A runner that could only be exercised through nine real checks and a
-/// live stack would be one nobody could write a test for — which is how the two defects
-/// this module was rewritten to fix got in.
-pub(crate) async fn mending<D>(
-    ctx: &Ctx,
-    checks: &[Box<dyn Check>],
-    stance: Stance,
-    confirm: D,
-) -> Report
+/// Apart from [`mend`] so that what a repair *does* can be driven against checks somebody
+/// assembled — a runner reachable only through nine real checks and a live stack is one
+/// nobody writes a test for, which is how two defects got into this module's first draft.
+///
+/// Public for that reason rather than for a caller: the sequence is the part worth proving,
+/// and proving it from outside the crate is what keeps its coverage counted from the copy
+/// that actually runs.
+pub async fn mending<D>(ctx: &Ctx, checks: &[Box<dyn Check>], stance: Stance, confirm: D) -> Report
 where
     D: Fn(&Repair) -> bool,
 {
