@@ -65,6 +65,7 @@ pub mod qbittorrent;
 pub mod quality;
 pub mod queue;
 pub mod recyclarr;
+pub mod repair;
 pub mod retry;
 pub mod sabnzbd;
 pub mod secret;
