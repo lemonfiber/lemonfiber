@@ -54,6 +54,11 @@ pub(crate) enum Request {
     },
     /// Report the versions in play.
     Version,
+    /// List the forms this stack has, and what each one is for.
+    ///
+    /// A form says which part of the stack to run. They come from the stack rather
+    /// than from lemonfiber, so a stack of your own names its own.
+    Forms,
     /// Start a form, or the union of several.
     Up {
         /// The forms to start.

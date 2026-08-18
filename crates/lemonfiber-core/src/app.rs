@@ -13,8 +13,8 @@ use crate::audio::Format;
 use crate::doctor::Category;
 use crate::error::{Code, Problem};
 use crate::model::{
-    ConfigReport, DoctorReport, Envelope, HouseholdReport, LifecycleReport, MusicReport,
-    QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
+    ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
+    MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
     VersionReport,
 };
 use crate::quality::Preset;
@@ -76,6 +76,8 @@ pub use watch::{supervise, ALREADY_GONE, NOTHING_TO_WATCH, WATCH};
 pub enum Command {
     /// Report the binary's version, and the engine's where it can be reached.
     Version,
+    /// List the forms this stack declares.
+    Forms,
     /// Start one or more forms.
     Up {
         /// The forms to start, resolved to the union of their closures.
@@ -204,6 +206,8 @@ pub enum QualityAction {
 pub enum Outcome {
     /// The answer to [`Command::Version`].
     Version(VersionReport),
+    /// The answer to [`Command::Forms`].
+    Forms(FormsReport),
     /// What a lifecycle command did, or would have done.
     Lifecycle(LifecycleReport),
     /// The answer to a configuration command.
@@ -236,6 +240,7 @@ impl Outcome {
     pub fn envelope(self) -> Envelope<Self> {
         let kind = match self {
             Self::Version(_) => "version",
+            Self::Forms(_) => "forms",
             Self::Lifecycle(_) => "lifecycle",
             Self::Config(_) => "config",
             Self::Quality(_) => "quality",
@@ -257,6 +262,7 @@ impl serde::Serialize for Outcome {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Version(report) => report.serialize(serializer),
+            Self::Forms(report) => report.serialize(serializer),
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
@@ -285,6 +291,7 @@ pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
+        Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
         Command::Down { forms } => engine::lifecycle(ctx, &forms, &Action::Down).await,
         Command::Restart { forms, services } => {
@@ -542,6 +549,22 @@ mod tests {
             stack: "0.1.0".to_owned(),
             compose: compose.map(str::to_owned),
         })
+    }
+
+    /// Forms come from the stack rather than from lemonfiber, so this reports what the
+    /// manifest declares — including whether each one may be combined, which is what an
+    /// operator choosing between two of them needs to know before they try.
+    #[tokio::test]
+    async fn lists_the_forms_the_stack_declares_in_its_own_words() {
+        let ctx = ctx(Ok(spoke("v2.32.1\n")));
+        let listed = dispatch(Command::Forms, &ctx).await;
+
+        assert!(matches!(&listed, Ok(Outcome::Forms(report))
+            if report.forms.len() > 1
+                && report
+                    .forms
+                    .iter()
+                    .any(|form| form.id == "search" && form.name == "Search" && form.composable)));
     }
 
     #[tokio::test]

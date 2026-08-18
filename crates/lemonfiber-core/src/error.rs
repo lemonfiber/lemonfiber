@@ -109,7 +109,7 @@ impl Remedy {
 /// believe the guidance in the first place.
 fn escalation() -> Remedy {
     Remedy::new("Send a diagnostic bundle so this can be investigated")
-        .with_detail("lemonfiber support-bundle")
+        .with_detail("lemonfiber support")
 }
 
 /// Something that went wrong, in the form an operator can act on.

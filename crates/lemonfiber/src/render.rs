@@ -23,7 +23,7 @@ mod trace;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{ConfigReport, SupervisionReport, VersionReport};
+use lemonfiber_core::model::{ConfigReport, FormsReport, SupervisionReport, VersionReport};
 use lemonfiber_core::PRODUCT;
 
 /// What stands in for an answer that could not be turned into JSON.
@@ -116,6 +116,7 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
     }
     match outcome {
         Outcome::Version(report) => versions(report),
+        Outcome::Forms(report) => forms(report),
         Outcome::Config(report) => settings(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
@@ -157,6 +158,23 @@ fn versions(report: &VersionReport) -> Lines {
     lines
 }
 
+/// The forms this stack declares, in its own words.
+///
+/// The id first, because that is what gets typed, and the description after it, because
+/// that is what decides which one to type. A form that cannot be combined says so here
+/// rather than only when a combination is refused: somebody choosing between two forms is
+/// exactly who needs to know it is a choice.
+fn forms(report: &FormsReport) -> Lines {
+    let mut lines = Lines::default();
+    for form in &report.forms {
+        lines.put(format!("{} — {}", form.id, form.description));
+        if !form.composable {
+            lines.put("    on its own; it cannot be combined with another form");
+        }
+    }
+    lines
+}
+
 /// What the operator has configured.
 fn settings(report: &ConfigReport) -> Lines {
     let mut lines = Lines::default();
@@ -187,8 +205,10 @@ pub(crate) fn watched(report: &SupervisionReport, json: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::fixtures::{a_trace, a_version, a_watch, music_pick, preset, seed_report};
-    use super::{answer, machine_readable, render, settings, versions, watched, Lines};
+    use super::fixtures::{
+        a_trace, a_version, a_watch, music_pick, preset, seed_report, some_forms,
+    };
+    use super::{answer, forms, machine_readable, render, settings, versions, watched, Lines};
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
@@ -224,6 +244,21 @@ mod tests {
         lines.print();
         render(&Outcome::Version(a_version()), false);
         watched(&a_watch(), false);
+    }
+
+    /// The id first, because that is what gets typed. A form that cannot be combined
+    /// says so in the listing rather than only when a combination is refused.
+    #[test]
+    fn forms_are_listed_by_what_you_would_type_and_what_it_is_for() {
+        let text = forms(&some_forms()).text();
+        assert!(text.contains("search — Find things."), "{text}");
+        assert!(text.contains("everything — The whole stack."), "{text}");
+        assert!(text.contains("cannot be combined"), "{text}");
+        assert_eq!(
+            text.matches("cannot be combined").count(),
+            1,
+            "only the form that cannot"
+        );
     }
 
     #[test]

@@ -64,6 +64,33 @@ pub struct VersionReport {
     pub compose: Option<String>,
 }
 
+/// One form the stack declares, as a listing shows it.
+///
+/// The manifest's own words rather than lemonfiber's: forms come from the stack, so a
+/// stack of somebody's own names and describes them however it likes, and a listing that
+/// paraphrased would be describing a different stack from the one being run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FormReport {
+    /// What to type to start it.
+    pub id: String,
+    /// What it is called.
+    pub name: String,
+    /// What it is for, in one line.
+    pub description: String,
+    /// Whether it can be started alongside another form.
+    ///
+    /// Worth saying in the listing rather than only when a combination is refused: an
+    /// operator choosing between two forms is exactly who needs to know they are a choice.
+    pub composable: bool,
+}
+
+/// Every form this stack declares.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FormsReport {
+    /// The forms, in the order the stack declares them.
+    pub forms: Vec<FormReport>,
+}
+
 /// One setting, as it is safe to show.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SettingReport {

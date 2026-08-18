@@ -76,6 +76,7 @@ async fn main() -> ExitCode {
         // takes the context by value because it rewrites the settings mid-run.
         Request::Setup { flags } => return setup_from(ctx, flags).await,
         Request::Version => Command::Version,
+        Request::Forms => Command::Forms,
         Request::Up { forms } => Command::Up { forms },
         Request::Down { forms } => Command::Down { forms },
         Request::Restart { form, services } => Command::Restart {

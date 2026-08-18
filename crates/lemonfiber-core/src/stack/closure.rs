@@ -185,7 +185,7 @@ impl Diagnose for Failure {
                 format!("Nothing in {} can run yet", forms.join(" and ")),
                 "Everything these forms would start needs a download provider, and none is configured. Starting them anyway would give you services that cannot fetch anything.",
                 Remedy::new("Add a Usenet provider or a VPN and torrent client")
-                    .with_detail("lemonfiber init"),
+                    .with_detail("lemonfiber setup"),
             )
             .in_state(State::Guided),
         }
