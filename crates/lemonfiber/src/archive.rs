@@ -37,6 +37,67 @@ use unpack::{fault, free_bytes, remove_any, stage, staging_for, tree_size, write
 /// A backup archive on the local filesystem, as a gzip-compressed tar.
 pub struct Tar;
 
+/// Build an archive at `dest` and swap it into place, or leave nothing behind.
+///
+/// The part a capture and a support bundle keep identically, and so neither should own:
+/// refuse one already there, write to a temporary name beside the target, and rename over
+/// it only once it is whole. A stop part-way leaves the partial file under its staging
+/// suffix rather than a truncated archive a later listing — or a worried operator — would
+/// take for a good one.
+///
+/// What differs between the two is only what goes inside, which is `fill`'s to say. The
+/// `kind` is what the archive is called when one is already there, because "a backup
+/// already exists" and "a bundle already exists" send an operator to different places.
+fn atomically(
+    dest: &Path,
+    kind: &str,
+    fill: impl FnOnce(&mut tar::Builder<GzEncoder<File>>) -> std::io::Result<()>,
+) -> Result<(), Fault> {
+    if dest.exists() {
+        return Err(Fault::new(format!(
+            "a {kind} already exists at {}",
+            dest.display()
+        )));
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(fault)?;
+    }
+
+    let staging = write_staging(dest);
+    let _ = fs::remove_file(&staging);
+
+    let result = (|| {
+        let file = File::create(&staging)?;
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        fill(&mut builder)?;
+        builder.into_inner()?.finish()?;
+        Ok::<(), std::io::Error>(())
+    })();
+
+    if let Err(error) = result {
+        let _ = fs::remove_file(&staging);
+        return Err(fault(error));
+    }
+    fs::rename(&staging, dest).map_err(fault)
+}
+
+/// One entry whose bytes are in hand, held at a mode nobody else can read.
+///
+/// Both archives carry the operator's own configuration — one of them redacted, both of
+/// them theirs — and a mode nobody sets is a mode the umask chose.
+fn held(
+    builder: &mut tar::Builder<GzEncoder<File>>,
+    name: &str,
+    body: &[u8],
+) -> std::io::Result<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_size(body.len() as u64);
+    header.set_mode(0o600);
+    header.set_cksum();
+    builder.append_data(&mut header, name, body)
+}
+
 #[async_trait]
 impl Archive for Tar {
     async fn space(&self, dir: &Path, items: &[Item]) -> Result<Space, Fault> {
@@ -48,33 +109,9 @@ impl Archive for Tar {
     }
 
     async fn write(&self, dest: &Path, manifest: &Manifest, items: &[Item]) -> Result<(), Fault> {
-        if dest.exists() {
-            return Err(Fault::new(format!(
-                "a backup already exists at {}",
-                dest.display()
-            )));
-        }
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).map_err(fault)?;
-        }
-
-        // Written to a temporary name and renamed over the target, so a stop
-        // part-way leaves the partial file under `.restoring` rather than a
-        // truncated archive a later listing would take for a good backup.
-        let staging = write_staging(dest);
-        let _ = fs::remove_file(&staging);
-
-        let result = (|| {
-            let file = File::create(&staging)?;
-            let encoder = GzEncoder::new(file, Compression::default());
-            let mut builder = tar::Builder::new(encoder);
-
+        atomically(dest, "backup", |builder| {
             let json = serde_json::to_vec(manifest).map_err(std::io::Error::other)?;
-            let mut header = tar::Header::new_gnu();
-            header.set_size(json.len() as u64);
-            header.set_mode(0o600);
-            header.set_cksum();
-            builder.append_data(&mut header, MANIFEST, json.as_slice())?;
+            held(builder, MANIFEST, json.as_slice())?;
 
             // A missing source is left out rather than failing the capture: a stack
             // an operator runs from their own directory, or a service that has not
@@ -84,55 +121,17 @@ impl Archive for Tar {
                     builder.append_dir_all(&item.archive_path, &item.source)?;
                 }
             }
-            builder.into_inner()?.finish()?;
-            Ok::<(), std::io::Error>(())
-        })();
-
-        if let Err(error) = result {
-            let _ = fs::remove_file(&staging);
-            return Err(fault(error));
-        }
-        fs::rename(&staging, dest).map_err(fault)
+            Ok(())
+        })
     }
 
     async fn write_files(&self, dest: &Path, files: &[(String, String)]) -> Result<(), Fault> {
-        if dest.exists() {
-            return Err(Fault::new(format!(
-                "a bundle already exists at {}",
-                dest.display()
-            )));
-        }
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).map_err(fault)?;
-        }
-
-        // Staged and renamed over the target, as a capture is: a bundle half-written is a
-        // bundle somebody sends.
-        let staging = write_staging(dest);
-        let _ = fs::remove_file(&staging);
-
-        let result = (|| {
-            let file = File::create(&staging)?;
-            let encoder = GzEncoder::new(file, Compression::default());
-            let mut builder = tar::Builder::new(encoder);
+        atomically(dest, "bundle", |builder| {
             for (name, body) in files {
-                let mut header = tar::Header::new_gnu();
-                header.set_size(body.len() as u64);
-                // Readable by the operator who asked for it and nobody else: a bundle
-                // holds their configuration, redacted but still theirs.
-                header.set_mode(0o600);
-                header.set_cksum();
-                builder.append_data(&mut header, name, body.as_bytes())?;
+                held(builder, name, body.as_bytes())?;
             }
-            builder.into_inner()?.finish()?;
-            Ok::<(), std::io::Error>(())
-        })();
-
-        if let Err(error) = result {
-            let _ = fs::remove_file(&staging);
-            return Err(fault(error));
-        }
-        fs::rename(&staging, dest).map_err(fault)
+            Ok(())
+        })
     }
 
     async fn existing(&self, dir: &Path) -> Result<Vec<Existing>, Fault> {
