@@ -188,26 +188,32 @@ mod tests {
     /// machine should say however it was asked.
     #[tokio::test]
     async fn a_run_with_nothing_to_mend_succeeds_however_it_was_asked() {
-        let asking = |fix: bool, yes: bool, json: bool| async move {
-            shown(
-                run(
-                    ctx(),
-                    Mending {
-                        fix,
-                        yes,
-                        disruptive: false,
-                    },
-                    &Says("n"),
-                    json,
-                )
-                .await,
-            )
-        };
+        // Asked about each, told to go ahead, and read by a script: all three reach the
+        // same answer on a machine with nothing wrong that lemonfiber could put right.
+        assert_eq!(asked_for(false, false).await, success());
+        assert_eq!(asked_for(true, false).await, success());
+        assert_eq!(asked_for(false, true).await, success());
+    }
 
-        // Asked about each, told to go ahead, and read by a script: all three.
-        assert_eq!(asking(true, false, false).await, success());
-        assert_eq!(asking(true, true, false).await, success());
-        assert_eq!(asking(true, false, true).await, success());
+    /// One run of the command, as the flags would arrive.
+    ///
+    /// A named function rather than a closure: a closure is a function of its own as far
+    /// as coverage is concerned, and one inside a test is one the gate counts and no other
+    /// test enters.
+    async fn asked_for(yes: bool, json: bool) -> u8 {
+        shown(
+            run(
+                ctx(),
+                Mending {
+                    fix: true,
+                    yes,
+                    disruptive: false,
+                },
+                &Says("n"),
+                json,
+            )
+            .await,
+        )
     }
 
     /// An operator who asked for things to be put right and had one fail needs their
