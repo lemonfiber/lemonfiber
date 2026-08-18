@@ -166,6 +166,13 @@ fn versions(report: &VersionReport) -> Lines {
 /// exactly who needs to know it is a choice.
 fn forms(report: &FormsReport) -> Lines {
     let mut lines = Lines::default();
+    // Said rather than shown as nothing. A stack is free to declare no forms, and a
+    // command that answered that with a blank screen would read as a broken command
+    // rather than as an answer.
+    if report.forms.is_empty() {
+        lines.put("This stack declares no forms.");
+        return lines;
+    }
     for form in &report.forms {
         lines.put(format!("{} — {}", form.id, form.description));
         if !form.composable {
@@ -212,11 +219,10 @@ mod tests {
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
-
     use lemonfiber_core::model::{
-        ConfigReport, Disposition, DoctorReport, HouseholdReport, LifecycleReport, MusicReport,
-        QualityReport, ResetReport, SettingReport, StatusReport, StuckReport, UpgradeReport,
-        VersionReport,
+        ConfigReport, Disposition, DoctorReport, FormsReport, HouseholdReport, LifecycleReport,
+        MusicReport, QualityReport, ResetReport, SettingReport, StatusReport, StuckReport,
+        UpgradeReport, VersionReport,
     };
 
     #[test]
@@ -259,6 +265,14 @@ mod tests {
             1,
             "only the form that cannot"
         );
+    }
+
+    /// A stack is free to declare none, and a blank screen would read as a broken
+    /// command rather than as an answer.
+    #[test]
+    fn a_stack_with_no_forms_says_so() {
+        let text = forms(&FormsReport { forms: Vec::new() }).text();
+        assert_eq!(text, "This stack declares no forms.");
     }
 
     #[test]

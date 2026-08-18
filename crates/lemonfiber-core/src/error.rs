@@ -314,8 +314,8 @@ mod tests {
                 .remedies
                 .first()
                 .and_then(|remedy| remedy.detail.as_deref()),
-            Some("lemonfiber support-bundle"),
-            "escalation is itself a remedy"
+            Some("lemonfiber support"),
+            "escalation is itself a remedy, and names a command that exists"
         );
     }
 
