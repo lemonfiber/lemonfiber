@@ -135,7 +135,14 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
 
     Some(Contents {
         pieces,
-        missing,
+        // The gaps carry other people's words too — each is built from the summary of
+        // whatever refused to answer, and a service that fails while authenticating says
+        // so with the credential in hand. A line on the bundle's first page is as public
+        // as any other line in it.
+        missing: missing
+            .iter()
+            .map(|gap| bundle::prose(gap, marks, &terms))
+            .collect(),
         taken: Taken {
             lemonfiber: lemonfiber.to_owned(),
             stack,
@@ -295,11 +302,12 @@ pub struct Written {
 /// # Errors
 ///
 /// Returns a [`Problem`] where the assembled bundle still holds something that reads as a
-/// credential, naming the file it came from.
-pub fn measure(contents: &Contents) -> Result<u64, Problem> {
+/// credential, naming the file it came from. Boxed as a capture's refusals are, because a
+/// refusal carries a good deal more than the number it refuses to give.
+pub fn measure(contents: &Contents) -> Result<u64, Box<Problem>> {
     let files = contents.files();
     if let Some(residual) = bundle::residual(&files, &contents.terms) {
-        return Err(leaking(&residual));
+        return Err(Box::new(leaking(&residual)));
     }
     Ok(files
         .iter()
@@ -329,7 +337,7 @@ pub async fn write(
     contents: &Contents,
     dest: &Path,
 ) -> Result<Written, Problem> {
-    let bytes = measure(contents)?;
+    let bytes = measure(contents).map_err(|problem| *problem)?;
     let files = contents.files();
     let dir = dest.parent().unwrap_or(dest);
     if let Ok(space) = archive.space(dir, &[]).await {

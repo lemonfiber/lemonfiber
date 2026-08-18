@@ -15,8 +15,10 @@ use std::process::ExitCode;
 use lemonfiber_core::app::bundle::{collect, measure, unconfirmed, without_marks, write, Wanted};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::bundle::{Contents, Filenames};
+use lemonfiber_core::error::Problem;
 
 use crate::render::support::{render_preview, render_written};
+use crate::render::Lines;
 
 /// What the command line asked for, as this surface received it.
 pub(crate) struct Asked {
@@ -54,14 +56,17 @@ pub(crate) async fn run(ctx: Ctx, asked: Asked, json: bool) -> ExitCode {
         return crate::complain(&without_marks());
     };
 
-    if !asked.write {
-        return describe(&contents, json);
-    }
-
-    let dest = destination(asked.out, &contents);
-    match write(&crate::archive::Tar, &contents, &dest).await {
-        Ok(written) => {
-            render_written(&written, json).print();
+    // Both answers are built the same way and refused the same way, so there is one place
+    // that turns a refusal into an exit code rather than one per answer — two would be two
+    // chances for a bundle to be refused quietly in one of them.
+    let answer = if asked.write {
+        produce(&contents, asked.out, json).await
+    } else {
+        describe(&contents, json)
+    };
+    match answer {
+        Ok(lines) => {
+            lines.print();
             ExitCode::SUCCESS
         }
         Err(problem) => crate::complain(&problem),
@@ -71,14 +76,31 @@ pub(crate) async fn run(ctx: Ctx, asked: Asked, json: bool) -> ExitCode {
 /// Say what a bundle would hold, having done everything that producing one does except
 /// produce it — the scan included, so a bundle that would be refused is refused here
 /// rather than after the operator has been told to run the command again.
-fn describe(contents: &Contents, json: bool) -> ExitCode {
-    match measure(contents) {
-        Err(problem) => crate::complain(&problem),
-        Ok(bytes) => {
-            render_preview(contents, bytes, json).print();
-            ExitCode::SUCCESS
-        }
-    }
+///
+/// # Errors
+///
+/// Returns the [`Problem`] describing a bundle that still holds something reading as a
+/// credential, which is a refusal rather than a warning.
+fn describe(contents: &Contents, json: bool) -> Result<Lines, Box<Problem>> {
+    Ok(render_preview(contents, measure(contents)?, json))
+}
+
+/// Produce the file, and say where it went.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] for a bundle that would leak, would not fit, or could not be
+/// written — in all three of which nothing is left behind.
+async fn produce(
+    contents: &Contents,
+    out: Option<PathBuf>,
+    json: bool,
+) -> Result<Lines, Box<Problem>> {
+    let dest = destination(out, contents);
+    let written = write(&crate::archive::Tar, contents, &dest)
+        .await
+        .map_err(Box::new)?;
+    Ok(render_written(&written, json))
 }
 
 /// Where the bundle goes: where the operator said, or beside them under a name carrying
@@ -240,11 +262,37 @@ mod tests {
         assert_ne!(shown(code), shown(ExitCode::SUCCESS));
     }
 
-    /// A bare run says what a bundle would hold and writes nothing at all.
+    /// A bare run says what a bundle would hold and writes nothing at all — with the
+    /// filenames in it replaced, or kept where the operator asked for them.
     #[tokio::test]
     async fn a_bare_run_describes_a_bundle_and_writes_nothing() {
-        let code = run(ctx(), asked(), false).await;
-        assert_eq!(shown(code), shown(ExitCode::SUCCESS));
+        assert_eq!(
+            shown(run(ctx(), asked(), false).await),
+            shown(ExitCode::SUCCESS)
+        );
+        assert_eq!(
+            shown(
+                run(
+                    ctx(),
+                    Asked {
+                        filenames: true,
+                        ..asked()
+                    },
+                    false
+                )
+                .await
+            ),
+            shown(ExitCode::SUCCESS)
+        );
+    }
+
+    /// A bundle is a read-only errand: it asks an engine what is running and what it has
+    /// been saying, and never asks it to run anything or to measure anything. The two
+    /// capabilities it does not use say so rather than answering something plausible.
+    #[tokio::test]
+    async fn a_bundle_never_asks_an_engine_to_run_or_to_measure_anything() {
+        assert!(Talking.exec("abc", &[]).await.is_err());
+        assert!(Talking.stats("media-stack").await.is_err());
     }
 
     /// The second, deliberate run: it produces the file, at the path it was told.
