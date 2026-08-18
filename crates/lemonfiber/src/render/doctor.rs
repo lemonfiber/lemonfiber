@@ -6,6 +6,7 @@
 use lemonfiber_core::doctor::{Overall, Verdict};
 use lemonfiber_core::error::{Problem, State};
 use lemonfiber_core::model::DoctorReport;
+use lemonfiber_core::repair::{mendable, ASK_FOR_REPAIRS};
 
 use super::Lines;
 
@@ -59,11 +60,15 @@ pub(super) fn diagnosis(report: &DoctorReport) -> Lines {
 pub(super) fn remedies(problem: &Problem) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!("      {}", problem.meaning));
+    // Which of the three kinds this is, said where it changes what the operator can do.
+    // The other two already say so in their own remedies — one names where to go and the
+    // other offers the bundle — and only this one has an answer they would not guess at.
+    if mendable(problem.state) {
+        lines.put("      lemonfiber can put this one right for you".to_owned());
+        lines.put(format!("        {ASK_FOR_REPAIRS}"));
+    }
     for remedy in &problem.remedies {
-        lines.put(format!("      → {}", remedy.action));
-        if let Some(detail) = &remedy.detail {
-            lines.put(format!("        {detail}"));
-        }
+        lines.remedy(remedy, "      ");
     }
     lines
 }

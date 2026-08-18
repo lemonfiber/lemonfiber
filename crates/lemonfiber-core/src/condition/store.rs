@@ -93,6 +93,27 @@ impl Conditions {
         }
     }
 
+    /// Record that a repair was carried out and left the fault standing.
+    ///
+    /// Counted so a repair that is not working stops being offered. Separate from a
+    /// recurrence, which says the problem came back on its own: this one says lemonfiber
+    /// was wrong about the cause, and those want different answers.
+    pub fn attempted(&mut self, check: &str) {
+        if let Some(condition) = self.by_check.get_mut(check) {
+            condition.attempts = condition.attempts.saturating_add(1);
+        }
+    }
+
+    /// Forget the attempts against a check, a repair having put it right.
+    ///
+    /// The fault going away is what earns this rather than the repair having run: a count
+    /// cleared on the strength of an attempt would never reach the limit it exists for.
+    pub fn mended(&mut self, check: &str) {
+        if let Some(condition) = self.by_check.get_mut(check) {
+            condition.attempts = 0;
+        }
+    }
+
     /// Forget a check entirely — what removing the thing it watched over means.
     /// A provider that is gone should not keep reporting that it is unreachable.
     pub fn forget(&mut self, check: &str) {
@@ -126,6 +147,40 @@ mod tests {
             "1000",
         );
         conditions
+    }
+
+    /// Two different numbers about two different things: one says the problem keeps
+    /// coming back on its own, the other says lemonfiber keeps being wrong about it.
+    #[test]
+    fn attempts_count_repairs_that_left_the_fault_standing() {
+        let mut conditions = Conditions::new();
+        conditions.observe(
+            "vpn.port-forward-client",
+            Some(&wrong(Severity::Warning, "it is on the wrong port")),
+            "1000",
+        );
+
+        conditions.attempted("vpn.port-forward-client");
+        conditions.attempted("vpn.port-forward-client");
+        assert_eq!(
+            conditions
+                .get("vpn.port-forward-client")
+                .map(|condition| condition.attempts),
+            Some(2)
+        );
+
+        // The fault going away is what earns the reset, not the repair having run.
+        conditions.mended("vpn.port-forward-client");
+        assert_eq!(
+            conditions
+                .get("vpn.port-forward-client")
+                .map(|condition| condition.attempts),
+            Some(0)
+        );
+
+        // A check nothing has recorded is not invented by counting against it.
+        conditions.attempted("nothing.here");
+        assert!(conditions.get("nothing.here").is_none());
     }
 
     #[test]

@@ -57,7 +57,7 @@ impl Diagnose for Failure {
                 Severity::Error,
                 format!("{service} rejected the credential"),
                 "The credential lemonfiber holds no longer matches the one the service expects, usually because it was changed in the service's own interface.",
-                Remedy::new("Re-read the service's credential").with_detail("lemonfiber doctor --fix"),
+                Remedy::new("Re-read the service's credential").with_detail(crate::repair::ASK_FOR_REPAIRS),
             )
             .in_state(State::Remediable),
             Self::Refused { service, detail } => Problem::unknown(

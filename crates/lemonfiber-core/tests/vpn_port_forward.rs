@@ -223,6 +223,7 @@ async fn port_forwarding_is_checked_even_with_leak_detection_off() {
             listening: None,
             port_forward: forwarding("protonvpn"),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -246,6 +247,7 @@ async fn an_unreachable_engine_leaves_an_enabled_forward_unverified() {
             listening: None,
             port_forward: forwarding("protonvpn"),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -276,6 +278,7 @@ async fn a_gateway_with_no_client_does_not_apply() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     assert!(matches!(
@@ -313,6 +316,7 @@ async fn address_services_that_contradict_each_other_are_reported_rather_than_re
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -357,6 +361,7 @@ async fn a_client_listening_off_the_forwarded_port_is_reported_rather_than_corre
             listening: Some(51413),
             port_forward: forwarding("proton"),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;
@@ -389,6 +394,7 @@ async fn a_client_already_on_the_forwarded_port_is_not_reported() {
             listening: Some(51413),
             port_forward: forwarding("proton"),
             disruptive: false,
+            client: None,
         },
     );
     assert!(subject
@@ -457,6 +463,7 @@ async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
+            client: None,
         },
     );
     let findings = subject.run().await;

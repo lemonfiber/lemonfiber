@@ -116,15 +116,17 @@ pub(crate) enum Request {
     /// Run the checks that prove the stack is doing what it should.
     Doctor {
         /// Run only one category of check, such as `vpn`.
-        #[arg(long, value_name = "CATEGORY")]
+        #[arg(long, value_name = "CATEGORY", conflicts_with = "fix")]
         only: Option<String>,
         /// Include the checks that disturb the running system.
         #[arg(long)]
         disruptive: bool,
         /// Answer a warning about a choice — `vpn.unprotected`, say — so it stops
         /// leading. Only something this run warns about can be answered.
-        #[arg(long, value_name = "CHECK")]
+        #[arg(long, value_name = "CHECK", conflicts_with = "fix")]
         accept: Option<String>,
+        #[command(flatten)]
+        mending: Mending,
     },
     /// Guard the data location while forms run, stopping them if it disappears.
     Watch {
@@ -217,6 +219,27 @@ pub(crate) enum Request {
         #[arg(long)]
         repoint: bool,
     },
+}
+
+/// What `doctor` was asked to put right.
+///
+/// Declared here beside the subcommand rather than in the surface that reads them, as every
+/// other set of flags is — a flag added to one list and not the other is a flag that
+/// silently does nothing.
+#[derive(Debug, Args)]
+pub(crate) struct Mending {
+    /// Offer to put right what lemonfiber can, asking about each first.
+    ///
+    /// A plain run only looks. This one says what each repair would do and what else
+    /// changes if it does, and waits to be told.
+    #[arg(long)]
+    pub(crate) fix: bool,
+    /// Carry the repairs out without asking, having decided in advance.
+    #[arg(long, requires = "fix")]
+    pub(crate) yes: bool,
+    /// Include the checks that disturb the running system while repairing.
+    #[arg(long = "fix-disruptive", requires = "fix")]
+    pub(crate) disruptive: bool,
 }
 
 /// What a support bundle was asked for.

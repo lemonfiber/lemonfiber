@@ -18,11 +18,9 @@ use crate::ports::docker::Engine;
 use crate::qbittorrent::Qbittorrent;
 use crate::repair::{Attempt, Repair};
 
-use super::port_forward::Grant;
-use super::probe::{find, read_grant};
-
-/// The finding this answers, as the check names it.
-const MISMATCH: &str = "vpn.port-forward-client";
+use super::findings::PORT_MISMATCH_CHECK;
+use super::forwarding::Forwarding;
+use super::port_forward::grant_at;
 
 /// Putting the download client back on the forwarded port.
 ///
@@ -59,11 +57,7 @@ impl PortMender {
     /// move between looking and acting, and pushing a port the provider has since taken
     /// back is worse than pushing none at all.
     async fn granted(&self) -> Option<u16> {
-        let containers = self.engine.list(&self.project).await.ok()?;
-        match read_grant(self.engine.as_ref(), find(&containers, &self.gateway)).await {
-            Grant::Port(port) => Some(port),
-            Grant::Absent | Grant::Unreadable => None,
-        }
+        grant_at(self.engine.as_ref(), &self.project, &self.gateway).await
     }
 }
 
@@ -72,7 +66,7 @@ impl Mend for PortMender {
     fn repairs(&self, found: &[Finding]) -> Vec<Repair> {
         found
             .iter()
-            .filter(|finding| finding.check == MISMATCH)
+            .filter(|finding| finding.check == PORT_MISMATCH_CHECK)
             .filter(|finding| matches!(finding.verdict, Verdict::Warn(_) | Verdict::Fail(_)))
             .map(|finding| Repair {
                 check: finding.check.clone(),
@@ -81,24 +75,36 @@ impl Mend for PortMender {
                     "The client restarts its listener, so transfers in flight pause briefly"
                         .to_owned(),
                 ],
-                // The port it was on is in the journal entry, which is what reversing one
-                // of these reads — nothing about the client's own state is lost.
-                reversible: true,
+                // Not reversible, and said so rather than assumed. Nothing on the repair
+                // path writes a journal entry, so there is nothing an undo could read; a
+                // repair that claimed otherwise would be promising the operator a way back
+                // that does not exist. The client's own port is the only thing changed, and
+                // starting the stack sets it again from the grant.
+                reversible: false,
             })
             .collect()
     }
 
     async fn mend(&self, _repair: &Repair) -> Attempt {
-        let Some(granted) = self.granted().await else {
-            return Attempt::Stopped {
-                leaving: "the provider is not granting a port now, so the client was left as it was"
-                    .to_owned(),
-            };
-        };
         let Some(client) = &self.client else {
             return Attempt::Stopped {
-                leaving: "the download client could not be authenticated to, so it was left as it was"
-                    .to_owned(),
+                leaving:
+                    "the download client could not be authenticated to, so it was left as it was"
+                        .to_owned(),
+            };
+        };
+        // Read again rather than trusting the number the diagnosis saw: a grant can move
+        // between looking and acting, and pushing a port the provider has since taken back
+        // is worse than pushing none at all. The client is asked afresh for the same reason.
+        let forwarding = Forwarding {
+            granted: self.granted().await,
+            listening: client.listen_port().await.ok(),
+        };
+        let Some(granted) = forwarding.to_push() else {
+            // Nothing to move it to, or it is already there. A write that changes nothing is
+            // still a write, and this one restarts the client's listener.
+            return Attempt::Stopped {
+                leaving: "the client was left where it was, having nowhere else to be".to_owned(),
             };
         };
         match client.set_listen_port(granted).await {

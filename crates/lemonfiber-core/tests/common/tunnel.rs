@@ -292,6 +292,7 @@ pub fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnChe
             listening: None,
             port_forward,
             disruptive: false,
+            client: None,
         },
     )
 }

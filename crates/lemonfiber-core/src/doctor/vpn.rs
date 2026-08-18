@@ -347,7 +347,9 @@ impl Check for VpnCheck {
     }
 
     fn mender(&self) -> Option<&dyn crate::doctor::Mend> {
-        self.mender.as_ref().map(|mender| mender as &dyn crate::doctor::Mend)
+        self.mender
+            .as_ref()
+            .map(|mender| mender as &dyn crate::doctor::Mend)
     }
 
     async fn run(&self) -> Vec<Finding> {

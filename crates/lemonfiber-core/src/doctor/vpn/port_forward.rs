@@ -167,9 +167,17 @@ pub async fn granted_port(
     if !enabled {
         return None;
     }
-    let pair = resolve_pair(manifest)?;
+    grant_at(engine, project, &resolve_pair(manifest)?.gateway).await
+}
+
+/// What the gateway is granting, read from its own status file.
+///
+/// Apart from [`granted_port`] because the repair that moves the client already knows which
+/// gateway it is asking about and has no manifest to resolve one from — and because two
+/// readings of the same file are two chances to disagree about what was granted.
+pub(super) async fn grant_at(engine: &dyn Engine, project: &str, gateway: &str) -> Option<u16> {
     let containers = engine.list(project).await.ok()?;
-    match read_grant(engine, find(&containers, &pair.gateway)).await {
+    match read_grant(engine, find(&containers, gateway)).await {
         Grant::Port(port) => Some(port),
         Grant::Absent | Grant::Unreadable => None,
     }

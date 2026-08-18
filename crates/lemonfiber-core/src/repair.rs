@@ -14,10 +14,18 @@
 //! findings it answers at once and when to stop offering it are all decided here, with no
 //! service to reach and no file to write; carrying one out happens above.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::condition::Condition;
 use crate::error::{Remedy, State};
+
+/// What an operator types to be offered the repairs.
+///
+/// Named once. It appears in a finding's remedy, in a report that offered something and did
+/// nothing, and in the problem raised when a service's credential no longer works — and a
+/// renamed flag that only two of the three learned about would send somebody to a command
+/// that does not exist.
+pub const ASK_FOR_REPAIRS: &str = "lemonfiber doctor --fix";
 
 /// How many repairs may leave a fault standing before it stops being offered.
 ///
@@ -88,8 +96,7 @@ pub struct Repair {
 /// There is no refusal here either. Whether a repair would write over something the
 /// operator changed by hand is settled before a mender is asked, so that the rule holds
 /// for every repair rather than for each one that remembered it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "attempt")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Attempt {
     /// It ran, and did what it said it would.
     Carried,
@@ -104,7 +111,7 @@ pub enum Attempt {
 ///
 /// Deliberately not a boolean. "It ran" and "it worked" are different claims, and a model
 /// that cannot tell them apart will eventually report the first as the second.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "outcome")]
 pub enum Outcome {
     /// It ran, and the check now passes.
@@ -201,18 +208,28 @@ pub fn escalation(condition: &Condition) -> Remedy {
 /// something else being repaired in the same pass is left out, and re-verified afterwards
 /// through the check it came from rather than through a repair of its own.
 #[must_use]
-pub fn offered(repairs: &[Repair], conditions: &[Condition]) -> Vec<Repair> {
-    let offerable: Vec<&Condition> = conditions.iter().filter(|c| offerable(c)).collect();
+pub fn offered(repairs: &[Repair], conditions: &[&Condition]) -> Vec<Repair> {
+    let standing: Vec<&&Condition> = conditions
+        .iter()
+        .filter(|condition| offerable(condition))
+        .collect();
     let answering: Vec<&str> = repairs
         .iter()
-        .filter(|repair| offerable.iter().any(|c| c.check == repair.check))
+        .filter(|repair| {
+            standing
+                .iter()
+                .any(|standing| standing.check == repair.check)
+        })
         .map(|repair| repair.check.as_str())
         .collect();
 
     repairs
         .iter()
         .filter(|repair| {
-            let Some(condition) = offerable.iter().find(|c| c.check == repair.check) else {
+            let Some(condition) = standing
+                .iter()
+                .find(|standing| standing.check == repair.check)
+            else {
                 return false;
             };
             // Downstream of something else this pass will put right: left out here and
@@ -258,7 +275,7 @@ mod tests {
 
     /// The names of what would be offered, which is what every case here turns on.
     fn names(repairs: &[Repair], conditions: &[Condition]) -> Vec<String> {
-        offered(repairs, conditions)
+        offered(repairs, &conditions.iter().collect::<Vec<_>>())
             .into_iter()
             .map(|repair| repair.check)
             .collect()

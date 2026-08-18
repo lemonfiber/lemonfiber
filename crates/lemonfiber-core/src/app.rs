@@ -43,6 +43,8 @@ mod quality;
 pub mod queue;
 mod record;
 pub mod recover;
+pub mod repair;
+mod repairs;
 mod reset;
 pub mod restore;
 mod screen;

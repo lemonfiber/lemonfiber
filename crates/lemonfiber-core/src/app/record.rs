@@ -18,6 +18,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::config::store;
+
+use super::Ctx;
 use crate::error::{Diagnose, Problem};
 
 /// What the record holds, or the default where there is none to read.
@@ -29,6 +31,26 @@ pub(super) fn kept<T: Default + DeserializeOwned>(path: Option<&Path>) -> T {
     path.and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default()
+}
+
+/// Read the record kept beside the environment file, or the default where there is none.
+///
+/// The name is the whole of what differs between these records, so it is the whole of what
+/// a caller passes. This module's own doc counted five of them and said four copies of a
+/// rule is four places to drift; the body was factored then and the wrapper was not, and by
+/// the seventh record that wrapper was the duplication.
+#[must_use]
+pub(super) fn beside<T: Default + DeserializeOwned>(ctx: &Ctx, name: &str) -> T {
+    kept(super::targets::beside_env(ctx, name).as_deref())
+}
+
+/// Write one beside the environment file, best effort.
+///
+/// Best effort on the way out, unlike a record an operator decided: a history that could not
+/// be written is one the next run starts afresh from, which is a worse picture rather than a
+/// wrong claim, and never worth failing a command over.
+pub(super) fn keep_beside<T: Serialize>(ctx: &Ctx, name: &str, value: &T) {
+    let _ = keep(super::targets::beside_env(ctx, name).as_deref(), value);
 }
 
 /// Write the record where the next run will read it.

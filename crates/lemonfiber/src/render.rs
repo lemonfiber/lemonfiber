@@ -16,6 +16,7 @@ mod fixtures;
 
 mod doctor;
 mod quality;
+pub(crate) mod repair;
 mod seed;
 mod stack;
 pub(crate) mod support;
@@ -52,6 +53,17 @@ impl Lines {
     /// would be the one carrying the name somebody chose.
     pub(crate) fn put(&mut self, line: impl Into<String>) {
         self.0.push(lemonfiber_core::text::plain(&line.into()));
+    }
+
+    /// A remedy: what to do, and where to look when that helps.
+    ///
+    /// One shape wherever a remedy is shown, so the diagnosis, a repair's escalation and
+    /// anything after them cannot drift on how an action and its detail sit together.
+    pub(crate) fn remedy(&mut self, remedy: &lemonfiber_core::error::Remedy, indent: &str) {
+        self.put(format!("{indent}→ {}", remedy.action));
+        if let Some(detail) = &remedy.detail {
+            self.put(format!("{indent}  {detail}"));
+        }
     }
 
     /// A blank line, then the given one — the separated closing remark most answers end

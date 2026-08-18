@@ -21,6 +21,7 @@ mod keyboard;
 mod maintain;
 mod prompt;
 mod render;
+mod repair;
 mod setup;
 mod support;
 mod terminal;
@@ -31,7 +32,7 @@ use cli::{Cli, Request};
 use context::{context, here};
 use engine::{guard, pull, stream};
 use exit::{complain, no_config_home, settled, USAGE};
-use keyboard::Console;
+use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
 use render::render;
 use setup::{greeting, setting_up};
@@ -96,7 +97,14 @@ async fn main() -> ExitCode {
             only,
             disruptive,
             accept,
+            mending,
         } => {
+            // Repairing is its own errand: it looks, offers, acts and looks again, and
+            // renders what became of each — not one value from dispatch. A plain run falls
+            // through to the diagnosis below and changes nothing.
+            if mending.fix {
+                return repair::run(ctx, mending, &Keyboard, cli.json).await;
+            }
             let only = match only.as_deref().map(Category::parse) {
                 // A named category that lemonfiber does not know is a mistake to
                 // name, not a request to run everything.

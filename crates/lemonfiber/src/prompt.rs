@@ -20,6 +20,24 @@ pub(crate) use terminal::Terminal;
 /// ask, and what an answer means, can be proven against a script — the terminal
 /// itself is the one part of this that no test can stand in for, and it is kept
 /// behind here in [`crate::keyboard`].
+/// Ask a yes-or-no question, taking the default where the answer is neither.
+///
+/// One implementation, because two would eventually disagree about what counts as yes —
+/// and the difference between "anything but n" and "only y" is the difference between a
+/// stack somebody changed by accident and one they meant to.
+pub(crate) fn yes_no(answers: &dyn Answers, question: &str, default: bool) -> bool {
+    let hint = if default { "[Y/n]" } else { "[y/N]" };
+    match answers
+        .ask(&format!("{question} {hint}:"))
+        .to_lowercase()
+        .as_str()
+    {
+        "y" | "yes" => true,
+        "n" | "no" => false,
+        _ => default,
+    }
+}
+
 pub trait Answers {
     /// Show a question and read the trimmed answer, empty at end of input.
     fn ask(&self, question: &str) -> String;

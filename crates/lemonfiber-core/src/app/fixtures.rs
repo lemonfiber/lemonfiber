@@ -85,3 +85,37 @@ impl Archive for FakeArchive {
         self.remove.clone()
     }
 }
+
+/// A scratch directory unique to one test, emptied first.
+///
+/// Unique per test and per process because these records land beside the environment file,
+/// and two tests sharing one directory would each be reading what the other wrote.
+pub(crate) fn scratch(name: &str) -> PathBuf {
+    std::env::temp_dir().join(format!("lemonfiber-app-{}-{name}", std::process::id()))
+}
+
+/// A context whose environment file is in that scratch directory, so every record a test
+/// drives lands somewhere of its own.
+///
+/// Shared rather than copied into each module that needs one: three copies of a context
+/// builder are three places for a test to be set up subtly differently from the code it is
+/// meant to be proving.
+pub(crate) fn ctx_at(name: &str) -> crate::app::Ctx {
+    let dir = scratch(name);
+    let _ = std::fs::remove_dir_all(&dir);
+    let settings = crate::config::Settings {
+        env_file: Some(dir.join(".env")),
+        ..crate::config::Settings::default()
+    };
+    crate::app::Ctx::new(
+        std::sync::Arc::new(crate::test_support::Scripted(Ok(
+            crate::test_support::spoke(""),
+        ))),
+        std::sync::Arc::new(crate::test_support::Reporting::absent()),
+        std::sync::Arc::new(crate::adapters::System),
+        std::sync::Arc::new(crate::adapters::Disk),
+        crate::test_support::stack(),
+        settings,
+        crate::platform::Environment::MacOs,
+    )
+}

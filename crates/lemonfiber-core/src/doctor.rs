@@ -31,8 +31,8 @@ use async_trait::async_trait;
 use serde::Serialize;
 
 use crate::error::{Problem, Remedy};
-use crate::repair::{Attempt, Repair};
 use crate::model::DoctorReport;
+use crate::repair::{Attempt, Repair};
 
 /// The family a check belongs to, so a run can be narrowed to one of them.
 ///
