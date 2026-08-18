@@ -173,7 +173,7 @@ async fn a_run_that_may_not_act_offers_and_changes_nothing() {
         &ctx("report-only"),
         &checks(Attempt::Carried),
         Stance::ReportOnly,
-        |_| true,
+        &|_| true,
     )
     .await;
 
@@ -221,7 +221,7 @@ async fn a_repair_that_stopped_says_what_it_left() {
             leaving: "half of it".to_owned(),
         }),
         Stance::Unattended,
-        |_| true,
+        &|_| true,
     )
     .await;
 
@@ -246,7 +246,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
             &context,
             &checks(Attempt::Carried),
             Stance::Unattended,
-            |_| true,
+            &|_| true,
         )
         .await;
         assert_eq!(
@@ -260,7 +260,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
         &context,
         &checks(Attempt::Carried),
         Stance::Unattended,
-        |_| true,
+        &|_| true,
     )
     .await;
     assert!(past.offered.is_empty(), "it has had its chances");
