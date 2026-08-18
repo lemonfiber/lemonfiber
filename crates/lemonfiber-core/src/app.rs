@@ -291,7 +291,9 @@ pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
-        Command::Forms => engine::forms(ctx).map(Outcome::Forms),
+        Command::Forms => engine::forms(ctx)
+            .map(Outcome::Forms)
+            .map_err(|problem| *problem),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
         Command::Down { forms } => engine::lifecycle(ctx, &forms, &Action::Down).await,
         Command::Restart { forms, services } => {
@@ -662,6 +664,7 @@ mod tests {
             Ok(Outcome::Lifecycle(report)) => Some(report),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Forms(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
@@ -683,6 +686,7 @@ mod tests {
             Ok(Outcome::Doctor(report)) => Some(report),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Forms(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
@@ -1115,6 +1119,7 @@ mod tests {
             ),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Forms(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
@@ -1572,6 +1577,7 @@ mod tests {
             ),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Forms(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)

@@ -491,12 +491,14 @@ pub(super) async fn lifecycle(
 ///
 /// # Errors
 ///
-/// Returns the [`Problem`] a surface should render when the stack cannot be read.
-pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Problem> {
+/// Returns the [`Problem`] a surface should render when the stack cannot be read. Boxed
+/// as a capture's refusals are: a refusal carries a good deal more than the listing it is
+/// refusing to give.
+pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
 
     Ok(FormsReport {
         forms: manifest

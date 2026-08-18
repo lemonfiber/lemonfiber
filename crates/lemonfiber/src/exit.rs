@@ -96,6 +96,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // A trace, a stuck-item listing or the household's requests is a query — it
         // answers where things are; asking is never a failure, whatever the answer.
         Outcome::Version(_)
+        | Outcome::Forms(_)
         | Outcome::Lifecycle(_)
         | Outcome::Config(_)
         | Outcome::Trace(_)
