@@ -45,13 +45,13 @@ pub struct Tar;
 /// suffix rather than a truncated archive a later listing — or a worried operator — would
 /// take for a good one.
 ///
-/// What differs between the two is only what goes inside, which is `fill`'s to say. The
+/// What differs between the two is only what goes inside, which is `pack`'s to say. The
 /// `kind` is what the archive is called when one is already there, because "a backup
 /// already exists" and "a bundle already exists" send an operator to different places.
 fn atomically(
     dest: &Path,
     kind: &str,
-    fill: impl FnOnce(&mut tar::Builder<GzEncoder<File>>) -> std::io::Result<()>,
+    pack: impl FnOnce(&mut tar::Builder<GzEncoder<File>>) -> std::io::Result<()>,
 ) -> Result<(), Fault> {
     if dest.exists() {
         return Err(Fault::new(format!(
@@ -70,7 +70,7 @@ fn atomically(
         let file = File::create(&staging)?;
         let encoder = GzEncoder::new(file, Compression::default());
         let mut builder = tar::Builder::new(encoder);
-        fill(&mut builder)?;
+        pack(&mut builder)?;
         builder.into_inner()?.finish()?;
         Ok::<(), std::io::Error>(())
     })();
