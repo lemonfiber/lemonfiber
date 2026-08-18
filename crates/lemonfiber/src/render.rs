@@ -341,6 +341,7 @@ mod tests {
     fn every_outcome_renders_and_every_outcome_renders_as_json() {
         let outcomes = vec![
             Outcome::Version(a_version()),
+            Outcome::Forms(some_forms()),
             // A setting to list: an empty, unchanged config renders nothing at all,
             // which is correct and is covered by its own test.
             Outcome::Config(ConfigReport {
