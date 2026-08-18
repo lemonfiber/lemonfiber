@@ -59,9 +59,10 @@ fn atomically(
             dest.display()
         )));
     }
-    if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent).map_err(fault)?;
-    }
+    // No branch on whether there is a parent: `parent()` is empty for a bare filename and
+    // absent only for a root path, and `create_dir_all` treats both as nothing to do. The
+    // wrapper this replaces left its own closing brace as a line no test could reach.
+    fs::create_dir_all(dest.parent().unwrap_or(dest)).map_err(fault)?;
 
     let staging = write_staging(dest);
     let _ = fs::remove_file(&staging);
