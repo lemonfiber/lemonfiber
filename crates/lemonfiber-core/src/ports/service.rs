@@ -79,6 +79,28 @@ pub trait Client: Send + Sync {
         client: &DownloadClient,
     ) -> Result<(), Failure>;
 
+    /// Put one field of a download client back to a value, leaving everything else about
+    /// it exactly as it is.
+    ///
+    /// Narrower than [`Self::update_download_client`] deliberately, and for one reason: a
+    /// reversal knows the field it changed and what that field held, and nothing else. It
+    /// does not know the client's credential — and it must not, because what a reversal
+    /// reads from is a journal on disk, and a credential written there to make a reversal
+    /// possible is a credential that did not need to exist.
+    ///
+    /// `None` where the field held nothing before, which removes it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable, does not hold the client, or
+    /// refuses the change.
+    async fn set_client_field(
+        &self,
+        id: &str,
+        field: &str,
+        value: Option<&str>,
+    ) -> Result<(), Failure>;
+
     /// Ask the service to test every download client it holds, reporting whether
     /// each answered — the service's own verdict, one entry per client keyed by id.
     ///

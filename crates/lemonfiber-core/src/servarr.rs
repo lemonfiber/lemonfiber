@@ -178,6 +178,41 @@ impl Client for Servarr {
         self.endpoint.expect_success(&response)
     }
 
+    async fn set_client_field(
+        &self,
+        id: &str,
+        field: &str,
+        value: Option<&str>,
+    ) -> Result<(), Failure> {
+        // Read, change the one field, write back. Servarr takes a whole resource document
+        // on a PUT, so putting one field back means sending the rest of the document
+        // exactly as the service gave it — which is also what keeps a reversal from having
+        // to know the client's credential to restore its category.
+        let response = self
+            .probe(&self.request(Method::Get, &format!("/downloadclient/{id}"), None))
+            .await?;
+        let mut document: serde_json::Value = self
+            .endpoint
+            .decode(&response, "the download client could not be read")?;
+        let Some(fields) = document
+            .get_mut("fields")
+            .and_then(serde_json::Value::as_array_mut)
+        else {
+            return Err(self
+                .endpoint
+                .refused("the download client has no settings to put back"));
+        };
+        set_field(fields, field, value);
+        let response = self
+            .probe(&self.request(
+                Method::Put,
+                &format!("/downloadclient/{id}"),
+                Some(document.to_string()),
+            ))
+            .await?;
+        self.endpoint.expect_success(&response)
+    }
+
     async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
         // Servarr tests every configured client at once with a POST to `testall`,
         // answering with one result per client: its id and whether it validated,
@@ -268,6 +303,26 @@ pub fn api_key(config_xml: &str) -> Option<String> {
 /// contract: the `implementation` and `configContract` that select the schema,
 /// the protocol, and the `fields` array carrying the connection, the credential
 /// the client uses, and the category the target application files under.
+/// Put one named field of a resource's `fields` array to a value, adding it where the
+/// resource does not carry it and taking it out where it is being cleared.
+///
+/// Servarr carries a resource's settings as a list of name/value pairs rather than as
+/// object keys, so changing one is a search rather than an assignment.
+fn set_field(fields: &mut Vec<serde_json::Value>, field: &str, value: Option<&str>) {
+    let Some(value) = value else {
+        fields.retain(|held| held.get("name").and_then(serde_json::Value::as_str) != Some(field));
+        return;
+    };
+    if let Some(held) = fields
+        .iter_mut()
+        .find(|held| held.get("name").and_then(serde_json::Value::as_str) == Some(field))
+    {
+        held["value"] = serde_json::Value::String(value.to_owned());
+        return;
+    }
+    fields.push(serde_json::json!({ "name": field, "value": value }));
+}
+
 fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
     let (implementation, config_contract, protocol) = match client.kind {
         ClientKind::Sabnzbd => ("Sabnzbd", "SabnzbdSettings", "usenet"),

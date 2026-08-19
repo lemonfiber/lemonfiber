@@ -45,11 +45,10 @@ mod report;
 mod roots;
 mod services;
 
-use clients::client_field;
-pub use clients::{wire_download_clients, Baselines};
+pub use clients::{client_field, wire_download_clients, Baselines, CLIENT};
 pub(crate) use drift::observe_client;
-use drift::{canonical_root, same_base_url, same_endpoint, same_path};
-pub use drift::{intent, reconcile, wholesale_drift, Intent, Observed};
+use drift::{canonical_root, same_base_url, same_path};
+pub use drift::{intent, reconcile, same_endpoint, wholesale_drift, Intent, Observed};
 use report::{observe_or_skip, record_outcome, unreached};
 pub use report::{Assessment, Report, Severity, State, Wiring};
 pub use roots::{contested_roots, wire_root_folders};

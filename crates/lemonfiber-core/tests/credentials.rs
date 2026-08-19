@@ -13,7 +13,6 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use common::files::Files;
 use common::{Answer, Fake};
 use lemonfiber_core::doctor::credentials::{CredentialsCheck, Target, CREDENTIAL_REJECTED};

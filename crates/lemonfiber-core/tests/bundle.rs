@@ -33,9 +33,6 @@ use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
     Stats, Stream,
 };
-use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
-};
 use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::time::Clock;

@@ -20,6 +20,7 @@ use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
+use crate::doctor::wiring::WiringCheck;
 use crate::doctor::{examine, Category, Check};
 use crate::error::{Diagnose, Problem};
 use crate::model::DoctorReport;
@@ -176,6 +177,16 @@ pub(crate) async fn assembled(ctx: &Ctx, disruptive: bool) -> Result<Vec<Box<dyn
         ctx.today(),
         ctx.clock.now(),
     );
+    // Whether each download client still files where lemonfiber wired it — the one field
+    // an operator and lemonfiber both write, so the only place a fix could write over
+    // somebody's own change. Read-only here: it says which side of the field moved, and
+    // the repair it hands back refuses to move the operator's.
+    let wiring = WiringCheck::new(
+        ctx.http.clone(),
+        ctx.filesystem.clone(),
+        crate::app::seed::managed_wirings(ctx, &manifest.services, project.as_deref()).await,
+        ctx.stamp(),
+    );
     Ok(vec![
         Box::new(environment),
         Box::new(storage),
@@ -186,5 +197,6 @@ pub(crate) async fn assembled(ctx: &Ctx, disruptive: bool) -> Result<Vec<Box<dyn
         Box::new(guides),
         Box::new(headroom),
         Box::new(releases),
+        Box::new(wiring),
     ])
 }

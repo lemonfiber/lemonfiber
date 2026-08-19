@@ -10,8 +10,10 @@
 //! settled before this module sees them. What is here is the running of it.
 
 use crate::condition::Fault;
+use crate::config::paths::{Paths, JOURNAL};
 use crate::doctor::{Check, Finding, Mend, Verdict};
-use crate::error::{Problem, Remedy};
+use crate::error::{Diagnose as _, Problem, Remedy};
+use crate::journal::Undo;
 use crate::repair::{self, Attempt, Outcome, Repair, Stance};
 
 use super::repairs::Entry;
@@ -152,7 +154,7 @@ pub async fn mending(
         }
         // Asked before anything is carried out: a repair that must not go ahead is never
         // attempted, rather than attempted and reported as having changed nothing.
-        let outcome = if mender.may_proceed(&repair).allowed() {
+        let outcome = if mender.may_proceed(&repair).await.allowed() {
             carried(ctx, mender, again, &repair).await
         } else {
             Outcome::WouldOverwrite
@@ -161,6 +163,35 @@ pub async fn mending(
         report.mended.push(Mended { repair, outcome });
     }
     report
+}
+
+/// Put back what the last repair changed, and say what went back.
+///
+/// That repair and no other. The journal it reads is shared with seeding and the first-run
+/// wizard, and somebody undoing the thing they just watched happen has not asked for the
+/// wiring underneath it to come apart.
+///
+/// Two reversals, in order: the changes that live inside a service go back through that
+/// service, and what is left — settings, directories — goes back on the host. In that
+/// order because the service is the part that can be unreachable, and an operator whose
+/// Sonarr is down should still get their environment file back.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the stack cannot be read, where a setting or directory
+/// could not be put back, or where a change needed a service that would not answer — the
+/// last of which names every such change together rather than one at a time.
+pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>> {
+    let undos = repair::undoing(super::recover::journal_at(&paths.journal()).changes());
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let (left, unreached) =
+        super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
+    super::recover::undo(&left, &paths.env_file(), unreached)?;
+    Ok(undos)
 }
 
 /// Fold what this run found into the store, and answer with it.
@@ -265,6 +296,12 @@ async fn carried(
     repair: &Repair,
 ) -> Outcome {
     let attempt = mender.mend(repair).await;
+    // Recorded before the proof, and before anything else can go wrong. What a repair
+    // changed is the operator's way back, and a way back that depends on the rest of the
+    // run going well is one they find missing exactly when they need it.
+    if let Some(journal) = super::targets::beside_env(ctx, JOURNAL) {
+        super::recover::journalled(&journal, attempt.changes());
+    }
     if matches!(attempt, Attempt::Stopped { .. }) {
         // Nothing changed, or something changed half way. Either way the state it was left
         // in is what the operator needs, and asking the checks again would only rename it.
@@ -440,12 +477,12 @@ mod tests {
     fn an_attempt_and_its_proof_together_say_what_happened() {
         use super::judged;
 
-        assert_eq!(judged(Attempt::Carried, Some(true)), Outcome::Fixed);
-        assert_eq!(judged(Attempt::Carried, Some(false)), Outcome::FixFailed);
+        assert_eq!(judged(Attempt::carried(), Some(true)), Outcome::Fixed);
+        assert_eq!(judged(Attempt::carried(), Some(false)), Outcome::FixFailed);
         // Could not be established afterwards: neither fixed nor demonstrably still
         // broken, and reported as what it is rather than as the worse of the two.
         assert!(matches!(
-            judged(Attempt::Carried, None),
+            judged(Attempt::carried(), None),
             Outcome::Stopped { .. }
         ));
         // One that stopped is not judged by the proof at all — what it left behind is

@@ -5,7 +5,7 @@
 
 use super::{
     arr_download_clients, load_baseline, project_directory, read_sabnzbd_key, save_baseline,
-    seed_stamp, servarr_arrs, Ctx, Loaded,
+    servarr_arrs, Ctx, Loaded,
 };
 
 /// Revert every drifted service connection to lemonfiber's own — or, unconfirmed, report
@@ -25,7 +25,7 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
         Loaded::Fresh | Loaded::Lost => crate::baseline::Baseline::new(),
     };
     let mut records = baseline.clone();
-    let at = seed_stamp(ctx);
+    let at = ctx.stamp();
 
     let mut wirings = Vec::new();
     for arr in &arrs {

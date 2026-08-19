@@ -99,7 +99,7 @@ impl Mend for PortMender {
             };
         };
         match client.set_listen_port(granted).await {
-            Ok(()) => Attempt::Carried,
+            Ok(()) => Attempt::carried(),
             Err(failure) => Attempt::Stopped {
                 leaving: format!(
                     "the client would not take port {granted}, and stayed where it was — {}",

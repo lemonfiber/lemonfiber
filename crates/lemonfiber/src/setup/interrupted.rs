@@ -64,14 +64,14 @@ pub(super) async fn recover_setup(
             resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::RollBack(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env) {
+            if let Err(problem) = recover::undo(&undos, &env, Vec::new()) {
                 return complain(&problem);
             }
             println!("\nRolled back. Applying again.");
             resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::StartOver(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env) {
+            if let Err(problem) = recover::undo(&undos, &env, Vec::new()) {
                 return complain(&problem);
             }
             discard(paths);
@@ -119,6 +119,12 @@ pub(super) fn describe(change: &Change) -> String {
         Kind::Set { key, .. } => format!("the setting {key}"),
         Kind::Made { path } => format!("the directory {path}"),
         Kind::Created { resource, .. } => format!("a {resource}"),
+        // Not something a first run writes — a repair does — but the journal is shared, so
+        // an interrupted setup could find one that a repair left. Named the same way, so
+        // an operator reading what would be undone recognises it either way.
+        Kind::Configured {
+            resource, field, ..
+        } => format!("a {resource}'s {field}"),
     }
 }
 

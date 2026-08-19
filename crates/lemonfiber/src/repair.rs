@@ -10,13 +10,11 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::repair::{mend, Confirm};
+use lemonfiber_core::app::repair::{mend, retract, Confirm};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::repair::{Repair, Stance};
 
-use lemonfiber_core::app::recover;
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::repair;
 
 use crate::cli::Mending;
 use crate::prompt::{yes_no, Answers};
@@ -32,7 +30,7 @@ pub(crate) async fn run(
     json: bool,
 ) -> ExitCode {
     if asked.undo {
-        return undone(&paths, json);
+        return undone(&ctx, &paths, json).await;
     }
     // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
     // repairs carried out says so with --yes. So one that did not gets the offer and no
@@ -54,19 +52,16 @@ pub(crate) async fn run(
 
 /// Put back what the last repair changed.
 ///
-/// That repair and no other. The journal it reads is shared with seeding and the first-run
-/// wizard, and somebody undoing the thing they just watched happen has not asked for the
-/// wiring underneath it to come apart.
-fn undone(paths: &Paths, json: bool) -> ExitCode {
-    let journal = recover::journal_at(&paths.journal());
-    let undos = repair::undoing(journal.changes());
-    // Nothing to put back carries none of it out and says so, without a case of its own:
-    // reversing an empty list is the same errand with nothing in it.
-    if let Err(problem) = recover::undo(&undos, &paths.env_file()) {
-        return crate::complain(&problem);
+/// The deciding and the doing are the core's — which repair was last, what reversing it
+/// takes, and which of those need a service to reach. What is here is the saying.
+async fn undone(ctx: &Ctx, paths: &Paths, json: bool) -> ExitCode {
+    match retract(ctx, paths).await {
+        Ok(undos) => {
+            reversed(&undos, json).print();
+            ExitCode::SUCCESS
+        }
+        Err(problem) => crate::complain(&problem),
     }
-    reversed(&undos, json).print();
-    ExitCode::SUCCESS
 }
 
 /// Asking whoever is at the terminal.

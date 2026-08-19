@@ -26,19 +26,25 @@ const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
 /// How one container should answer the check.
 #[derive(Clone)]
 pub struct Behavior {
+    /// The compose service this behaviour is for.
     pub service: &'static str,
+    /// Whether the container is up.
     pub running: bool,
+    /// The public address it reports, or nothing where it reports none.
     pub address: Option<&'static str>,
+    /// The country that address resolves to, where the test cares.
     pub country: Option<&'static str>,
     /// What the container's forwarded-port status file reads, where it has one.
     pub forwarded_port: Option<&'static str>,
     /// A different answer for a second address service, where the test is about
     /// the sources contradicting each other.
     pub second_opinion: Option<&'static str>,
+    /// Whether an exec into it fails outright, rather than answering.
     pub exec_fails: bool,
 }
 
 impl Behavior {
+    /// A container that is running, reporting this address where it is asked for one.
     pub fn up(service: &'static str, address: Option<&'static str>) -> Self {
         Self {
             service,
@@ -82,7 +88,9 @@ impl Link {
 
 /// An engine that answers exec and list from a fixed script.
 pub struct Fake {
+    /// Whether the engine itself answers at all.
     pub reachable: bool,
+    /// How each container answers, one entry per service.
     pub behaviors: Vec<Behavior>,
     /// How the killswitch probe is answered, where a test scripts it. Absent is
     /// an image with no `ip` in it.
@@ -92,6 +100,7 @@ pub struct Fake {
 }
 
 impl Fake {
+    /// An engine answering with these behaviours, in the order they are given.
     pub fn new(behaviors: Vec<Behavior>) -> Self {
         Self {
             reachable: true,
@@ -317,6 +326,7 @@ pub fn forwarding(provider: &str) -> PortForward {
     }
 }
 
+/// The verdict one named check reached, for a test asserting on exactly it.
 pub fn verdict<'a>(findings: &'a [Finding], check: &str) -> Option<&'a Verdict> {
     findings
         .iter()

@@ -15,6 +15,9 @@ use std::path::{Path, PathBuf};
 use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Action, Change, Journal, Undo};
+use crate::ports::service::Client as _;
+
+use super::Ctx;
 
 /// The change journal saved at `path`, empty where none is there or it does not
 /// read.
@@ -32,6 +35,86 @@ pub fn journal_at(path: &Path) -> Journal {
     Journal::replay(changes)
 }
 
+/// Add what a change made to the journal a reversal reads, keeping what is already there.
+///
+/// Appended rather than rewritten, because the journal is shared: the first-run wizard
+/// wrote what it applied, seeding wrote what it wired, and a repair adding its own must not
+/// take either away. Each entry is one line, so a stop part way through costs at most the
+/// line being written — which [`journal_at`] then drops as torn.
+///
+/// Written through the same seam every other record lemonfiber keeps goes through, so the
+/// journal is created private to its owner. It holds what a value was before it changed,
+/// and a record of an operator's configuration is not something to leave world-readable
+/// because this one caller wrote it a different way.
+///
+/// Silent where it cannot be written. A repair has already changed the thing it was asked
+/// to change by the time this runs, and failing the repair over the record of it would
+/// report a change that did happen as one that did not.
+pub fn journalled(path: &Path, changes: &[Change]) {
+    if changes.is_empty() {
+        return;
+    }
+    let mut written = std::fs::read_to_string(path).unwrap_or_default();
+    if !written.is_empty() && !written.ends_with('\n') {
+        written.push('\n');
+    }
+    for change in changes {
+        if let Ok(line) = serde_json::to_string(change) {
+            written.push_str(&line);
+            written.push('\n');
+        }
+    }
+    let _ = store::write(path, &written);
+}
+
+/// Put back the changes that live inside a service, answering with the ones left for
+/// [`undo`] to carry out on the filesystem and the environment file.
+///
+/// Ahead of that reversal rather than inside it, because this is the only part that needs
+/// to speak to a service — and a reversal that could not reach one would otherwise have to
+/// choose between failing everything and silently skipping the part it could not do.
+///
+/// A service that cannot be reached leaves its changes named in the returned list, and the
+/// caller reports them together. What was put back is put back either way: an operator with
+/// one service down should not be left with a half-reversed repair *and* no account of
+/// which half.
+pub async fn reconfigured(
+    ctx: &Ctx,
+    undos: &[Undo],
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> (Vec<Undo>, Vec<String>) {
+    let mut left = Vec::new();
+    let mut unreached = Vec::new();
+    for undo in undos {
+        let Action::Reconfigure {
+            resource,
+            id,
+            field,
+            value,
+        } = &undo.action
+        else {
+            left.push(undo.clone());
+            continue;
+        };
+        let reached = match super::targets::target_named(services, project, &undo.target) {
+            Some(target) => target.open(&ctx.http, ctx.filesystem.as_ref()).await,
+            None => None,
+        };
+        let put_back = match reached {
+            Some(client) => client
+                .set_client_field(id, field, value.as_deref())
+                .await
+                .is_ok(),
+            None => false,
+        };
+        if !put_back {
+            unreached.push(format!("{resource} in {}", undo.target));
+        }
+    }
+    (left, unreached)
+}
+
 /// Carry out a reversal, undo by undo, in the order given.
 ///
 /// The undos come most-recent-first from [`crate::journal::Journal::rewind`], so a
@@ -45,8 +128,12 @@ pub fn journal_at(path: &Path) -> Journal {
 /// compound it. A change that needs the service that made it does not stop the
 /// rest: those are set aside and reported together at the end, so everything this
 /// reversal can undo is undone first.
-pub fn undo(undos: &[Undo], env_file: &Path) -> Result<(), Box<Problem>> {
-    let mut beyond_reach = Vec::new();
+///
+/// `already` carries the ones an earlier step — [`reconfigured`] — could not reach, so an
+/// operator is told about every change still standing in one sentence rather than learning
+/// about them a service at a time.
+pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(), Box<Problem>> {
+    let mut beyond_reach = already;
     for undo in undos {
         match carry_out(&undo.action, env_file).map_err(|fault| Box::new(fault.problem()))? {
             Step::Done => {}
@@ -73,6 +160,11 @@ enum Step {
 /// Carry out one undo against the filesystem or the environment file.
 fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
     match action {
+        // A field inside a service. Only that service can put it back, so this reports it
+        // rather than writing the field's name into the environment file — which is what a
+        // reversal that took it for an ordinary setting would do, leaving the operator with
+        // a polluted file and a service unchanged.
+        Action::Reconfigure { resource, .. } => Ok(Step::BeyondReach(resource.clone())),
         Action::Restore {
             key,
             value: Some(value),
@@ -224,6 +316,49 @@ mod tests {
         assert_eq!(super::journal_at(&path).changes(), changes);
     }
 
+    /// A repair adding what it changed keeps what is already there. The journal is
+    /// shared: the first run wrote what it applied and seeding wrote what it wired, and a
+    /// repair that rewrote the file would take an operator's way back to both.
+    #[test]
+    fn a_change_added_to_a_journal_keeps_what_was_already_in_it() {
+        let dir = scratch("journal-append");
+        let path = dir.join("journal.jsonl");
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        let first = serde_json::to_string(&a_set("USENET")).unwrap_or_default();
+        // Written without a closing newline, as a file whose last line was the last thing
+        // anybody wrote to it would be.
+        assert!(std::fs::write(&path, first).is_ok());
+
+        super::journalled(&path, &[a_set("TORRENT")]);
+
+        assert_eq!(
+            super::journal_at(&path).changes(),
+            [a_set("USENET"), a_set("TORRENT")]
+        );
+    }
+
+    /// A repair that changed nothing reversible writes nothing at all — including no
+    /// empty file where a reversal would then find a journal that says nothing.
+    #[test]
+    fn a_repair_that_changed_nothing_writes_no_journal() {
+        let path = scratch("journal-none").join("journal.jsonl");
+
+        super::journalled(&path, &[]);
+
+        assert!(!path.exists());
+    }
+
+    /// The directory is made where it is not there yet — a repair on a stack whose
+    /// configuration directory nobody has written to is still a repair worth recording.
+    #[test]
+    fn a_journal_is_written_where_no_directory_has_been_made_yet() {
+        let path = scratch("journal-fresh").join("journal.jsonl");
+
+        super::journalled(&path, &[a_set("USENET")]);
+
+        assert_eq!(super::journal_at(&path).changes(), [a_set("USENET")]);
+    }
+
     #[test]
     fn a_torn_final_line_is_dropped_and_the_rest_kept() {
         let dir = scratch("journal-torn");
@@ -248,7 +383,7 @@ mod tests {
         let env = dir.join(".env");
         assert!(store::set(&env, "TZ", "Pacific/Auckland").is_ok());
 
-        assert!(undo(&[restore("TZ", Some("Europe/Amsterdam"))], &env).is_ok());
+        assert!(undo(&[restore("TZ", Some("Europe/Amsterdam"))], &env, Vec::new()).is_ok());
 
         let file = store::read(&env).unwrap_or_default();
         assert_eq!(file.get("TZ"), Some("Europe/Amsterdam"));
@@ -260,7 +395,7 @@ mod tests {
         let env = dir.join(".env");
         assert!(store::set(&env, "USENET", "on").is_ok());
 
-        assert!(undo(&[restore("USENET", None)], &env).is_ok());
+        assert!(undo(&[restore("USENET", None)], &env, Vec::new()).is_ok());
 
         let file = store::read(&env).unwrap_or_default();
         assert_eq!(file.get("USENET"), None);
@@ -272,7 +407,7 @@ mod tests {
         let made = dir.join("made");
         assert!(std::fs::create_dir_all(&made).is_ok());
 
-        assert!(undo(&[delete(&made)], &dir.join(".env")).is_ok());
+        assert!(undo(&[delete(&made)], &dir.join(".env"), Vec::new()).is_ok());
 
         assert!(!made.exists(), "the directory was removed");
     }
@@ -282,7 +417,7 @@ mod tests {
         let dir = scratch("gone");
         let never = dir.join("never-made");
 
-        assert!(undo(&[delete(&never)], &dir.join(".env")).is_ok());
+        assert!(undo(&[delete(&never)], &dir.join(".env"), Vec::new()).is_ok());
     }
 
     #[test]
@@ -319,7 +454,7 @@ mod tests {
         journal.record(write("USENET"));
         journal.record(write("TORRENT"));
 
-        assert!(undo(&journal.rewind(), &env).is_ok());
+        assert!(undo(&journal.rewind(), &env, Vec::new()).is_ok());
 
         // Read back through a readable file, so a read failure could not pass this
         // off as "no settings" — every setting is restored to absent, the directory
@@ -341,7 +476,7 @@ mod tests {
         // is reported rather than force-removed.
         assert!(std::fs::create_dir_all(made.join("inside")).is_ok());
 
-        let stopped = undo(&[delete(&made)], &dir.join(".env"));
+        let stopped = undo(&[delete(&made)], &dir.join(".env"), Vec::new());
 
         assert!(matches!(stopped, Err(problem) if problem.code == super::NOT_REMOVED));
         assert!(made.exists(), "and it is left where it is");
@@ -363,7 +498,7 @@ mod tests {
         // A setting to reverse and a service resource that only the service can
         // undo: the setting is still reversed, and the service resource is reported
         // at the end rather than stopping the reversible work before it.
-        let outcome = undo(&[restore("USENET", None), created], &env);
+        let outcome = undo(&[restore("USENET", None), created], &env, Vec::new());
 
         assert!(matches!(outcome, Err(problem) if problem.code == super::NEEDS_SERVICE));
         let file = store::read(&env).unwrap_or_default();
@@ -378,7 +513,7 @@ mod tests {
         let env = dir.join("env-is-a-directory");
         assert!(std::fs::create_dir_all(&env).is_ok());
 
-        let stopped = undo(&[restore("TZ", Some("Europe/Amsterdam"))], &env);
+        let stopped = undo(&[restore("TZ", Some("Europe/Amsterdam"))], &env, Vec::new());
 
         assert!(stopped.is_err(), "the setting could not be restored");
     }
@@ -391,7 +526,7 @@ mod tests {
         let env = dir.join("env-is-a-directory");
         assert!(std::fs::create_dir_all(&env).is_ok());
 
-        let stopped = undo(&[restore("USENET", None)], &env);
+        let stopped = undo(&[restore("USENET", None)], &env, Vec::new());
 
         assert!(stopped.is_err(), "the key could not be removed");
     }

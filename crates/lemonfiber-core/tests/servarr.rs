@@ -327,6 +327,106 @@ async fn an_updated_download_client_is_put_to_its_id_carrying_it() {
     assert!(sent.is_some_and(|request| request.body.is_some_and(|body| body.contains(r#""id":7"#))));
 }
 
+/// Putting one field back reads the client, changes that field, and writes the rest of the
+/// document exactly as the service gave it — which is what lets a reversal restore a
+/// category without ever having held the client's credential.
+#[tokio::test]
+async fn one_field_is_put_back_leaving_the_rest_of_the_client_alone() {
+    let held = r#"{"id":7,"name":"SABnzbd","fields":[{"name":"host","value":"sabnzbd"},
+        {"name":"apiKey","value":"kept"},{"name":"tvCategory","value":"mine"}]}"#;
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, held),
+        Answer::reply(200, String::new()),
+    ]);
+
+    assert!(sonarr(&fake)
+        .set_client_field("7", "tvCategory", Some("tv-sonarr"))
+        .await
+        .is_ok());
+
+    let sent = fake.request();
+    assert!(sent
+        .as_ref()
+        .is_some_and(|request| request.method == Method::Put
+            && request.url.ends_with("/api/v3/downloadclient/7")));
+    let body = sent.and_then(|request| request.body).unwrap_or_default();
+    assert!(body.contains("tv-sonarr"), "{body}");
+    // Everything the reversal never knew about goes back untouched, credential included.
+    assert!(body.contains("kept"), "{body}");
+    assert!(!body.contains("mine"), "{body}");
+}
+
+/// A field that held nothing before is taken out rather than set to the empty string,
+/// which a service would read as a value somebody chose.
+#[tokio::test]
+async fn a_field_put_back_to_nothing_is_taken_out() {
+    let held = r#"{"id":7,"fields":[{"name":"host","value":"sabnzbd"},
+        {"name":"tvCategory","value":"mine"}]}"#;
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, held),
+        Answer::reply(200, String::new()),
+    ]);
+
+    assert!(sonarr(&fake)
+        .set_client_field("7", "tvCategory", None)
+        .await
+        .is_ok());
+
+    let body = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    assert!(!body.contains("tvCategory"), "{body}");
+}
+
+/// A field the client does not carry is added, so a reversal can put back a category the
+/// service dropped rather than reporting success and changing nothing.
+#[tokio::test]
+async fn a_field_the_client_does_not_carry_is_added() {
+    let held = r#"{"id":7,"fields":[{"name":"host","value":"sabnzbd"}]}"#;
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, held),
+        Answer::reply(200, String::new()),
+    ]);
+
+    assert!(sonarr(&fake)
+        .set_client_field("7", "tvCategory", Some("tv-sonarr"))
+        .await
+        .is_ok());
+
+    let body = fake
+        .request()
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    assert!(body.contains("tv-sonarr"), "{body}");
+}
+
+/// A client whose document carries no settings at all is refused rather than written to on
+/// a guess about a shape this build does not recognise.
+#[tokio::test]
+async fn a_client_with_no_settings_to_put_back_is_refused() {
+    let fake = Fake::always(Answer::reply(200, r#"{"id":7}"#));
+
+    assert!(matches!(
+        sonarr(&fake)
+            .set_client_field("7", "tvCategory", None)
+            .await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+/// A service that will not hand the client over cannot have one field put back, and says
+/// so rather than writing a document it never read.
+#[tokio::test]
+async fn a_client_that_cannot_be_read_is_not_written_back() {
+    let fake = Fake::always(Answer::reply(500, "boom"));
+
+    assert!(sonarr(&fake)
+        .set_client_field("7", "tvCategory", None)
+        .await
+        .is_err());
+}
+
 #[tokio::test]
 async fn an_update_with_an_id_the_service_did_not_assign_is_refused() {
     // A non-numeric id is not one a Servarr service assigns, so there is nothing to
