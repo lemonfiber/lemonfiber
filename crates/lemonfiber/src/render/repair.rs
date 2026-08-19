@@ -4,6 +4,7 @@
 //! lemonfiber ran something, but whether the fault is gone.
 
 use lemonfiber_core::app::repair::Report;
+use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::repair::{Outcome, ASK_FOR_REPAIRS};
 
 use super::{Lines, UNRENDERABLE};
@@ -46,6 +47,38 @@ pub(crate) fn mended(report: &Report, json: bool) -> Lines {
     lines
 }
 
+/// What was put back, or that there was nothing to put back.
+pub(crate) fn reversed(undos: &[Undo], json: bool) -> Lines {
+    let mut lines = Lines::default();
+    if json {
+        lines.put(format!(r#"{{"reversed":{}}}"#, undos.len()));
+        return lines;
+    }
+    if undos.is_empty() {
+        lines.put("There is no repair to put back.");
+        return lines;
+    }
+    lines.put("Put back what the last repair changed:");
+    for undo in undos {
+        lines.put(format!("  {} — {}", undo.target, restoring(&undo.action)));
+    }
+    lines
+}
+
+/// What one reversal did, in the words of the thing it acted on.
+fn restoring(action: &Action) -> String {
+    match action {
+        Action::Restore {
+            key,
+            value: Some(value),
+        } => format!("{key} back to {value}"),
+        // Nothing was there before, so putting it back means taking it away again.
+        Action::Restore { key, value: None } => format!("{key} removed, as it was"),
+        Action::Remove { resource, id } => format!("{resource} {id} removed"),
+        Action::Delete { path } => format!("{path} removed"),
+    }
+}
+
 /// How one outcome reads.
 ///
 /// A repair that ran and left the fault standing says so plainly rather than borrowing the
@@ -69,7 +102,8 @@ mod tests {
     use lemonfiber_core::error::Remedy;
     use lemonfiber_core::repair::{Outcome, Repair};
 
-    use super::mended;
+    use super::{mended, reversed};
+    use lemonfiber_core::journal::{Action, Undo};
 
     fn repair() -> Repair {
         Repair {
@@ -186,5 +220,54 @@ mod tests {
     fn the_machine_readable_form_carries_the_outcomes() {
         let json = mended(&report(true, vec![Outcome::Fixed]), true).text();
         assert!(json.contains(r#""outcome":"fixed""#), "{json}");
+    }
+
+    /// Every kind of reversal reads in the words of the thing it acted on, because "undone"
+    /// on its own does not tell an operator what their stack now holds.
+    #[test]
+    fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
+        let undos = vec![
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Restore {
+                    key: "PORT".to_owned(),
+                    value: Some("8080".to_owned()),
+                },
+            },
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Restore {
+                    key: "PROXY".to_owned(),
+                    value: None,
+                },
+            },
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Remove {
+                    resource: "downloadclient".to_owned(),
+                    id: "3".to_owned(),
+                },
+            },
+            Undo {
+                target: "disk".to_owned(),
+                action: Action::Delete {
+                    path: "/tmp/lemonfiber-scratch".to_owned(),
+                },
+            },
+        ];
+
+        let said = reversed(&undos, false).text();
+
+        assert!(said.contains("PORT back to 8080"), "{said}");
+        assert!(said.contains("PROXY removed, as it was"), "{said}");
+        assert!(said.contains("downloadclient 3 removed"), "{said}");
+        assert!(said.contains("/tmp/lemonfiber-scratch removed"), "{said}");
+    }
+
+    /// A run with nothing to put back says so, and says it in whichever form was asked for.
+    #[test]
+    fn nothing_to_put_back_is_said_plainly_and_counted_for_a_script() {
+        assert!(reversed(&[], false).text().contains("no repair"));
+        assert!(reversed(&[], true).text().contains(r#""reversed":0"#));
     }
 }

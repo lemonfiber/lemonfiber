@@ -14,29 +14,59 @@ use lemonfiber_core::app::repair::{mend, Confirm};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::repair::{Repair, Stance};
 
+use lemonfiber_core::app::recover;
+use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::repair;
+
 use crate::cli::Mending;
 use crate::prompt::{yes_no, Answers};
-use crate::render::repair::mended;
+use crate::render::repair::{mended, reversed};
 use crate::render::Lines;
 
-/// Offer the repairs, and carry out the ones agreed to.
-pub(crate) async fn run(ctx: Ctx, asked: Mending, answers: &dyn Answers, json: bool) -> ExitCode {
+/// Offer the repairs and carry out the ones agreed to, or put back what the last one did.
+pub(crate) async fn run(
+    ctx: Ctx,
+    paths: Paths,
+    asked: Mending,
+    answers: &dyn Answers,
+    json: bool,
+) -> ExitCode {
+    if asked.undo {
+        return undone(&paths, json);
+    }
     // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
     // repairs carried out says so with --yes. So one that did not gets the offer and no
     // action, which is what report-only is for.
-    let stance = match (asked.yes, json) {
+    let stance = match (asked.fixing.yes, json) {
         (true, _) => Stance::Unattended,
         (false, true) => Stance::ReportOnly,
         (false, false) => Stance::Ask,
     };
 
-    match mend(&ctx, stance, asked.disruptive, &Asking(answers)).await {
+    match mend(&ctx, stance, asked.fixing.disruptive, &Asking(answers)).await {
         Ok(report) => {
             mended(&report, json).print();
             crate::exit::repairing(&report)
         }
         Err(problem) => crate::complain(&problem),
     }
+}
+
+/// Put back what the last repair changed.
+///
+/// That repair and no other. The journal it reads is shared with seeding and the first-run
+/// wizard, and somebody undoing the thing they just watched happen has not asked for the
+/// wiring underneath it to come apart.
+fn undone(paths: &Paths, json: bool) -> ExitCode {
+    let journal = recover::journal_at(&paths.journal());
+    let undos = repair::undoing(journal.changes());
+    // Nothing to put back carries none of it out and says so, without a case of its own:
+    // reversing an empty list is the same errand with nothing in it.
+    if let Err(problem) = recover::undo(&undos, &paths.env_file()) {
+        return crate::complain(&problem);
+    }
+    reversed(&undos, json).print();
+    ExitCode::SUCCESS
 }
 
 /// Asking whoever is at the terminal.
@@ -80,7 +110,19 @@ mod tests {
     use crate::exit::{repairing, shown, success};
     use crate::prompt::Answers;
 
-    use super::{run, Asking, Confirm as _, Ctx, Mending};
+    use super::{run, Asking, Confirm as _, Ctx, Mending, Paths};
+    use crate::cli::Fixing;
+
+    /// Where a test's records live, in a scratch directory of its own — named, because a
+    /// test that undoes a journal must not be reading one another test wrote.
+    fn paths(name: &str) -> Paths {
+        let root = std::env::temp_dir().join(format!(
+            "lemonfiber-repair-cli-{}-{name}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        Paths::rooted(&root.join("config"), &root.join("data"))
+    }
 
     /// A context over the stack this binary ships, with nothing configured — so nothing is
     /// wrong that lemonfiber could put right, which is the state a healthy machine is in.
@@ -155,6 +197,124 @@ mod tests {
         assert_eq!(Says("y").secret("anything"), "y");
     }
 
+    /// Nothing repaired is nothing to put back — said plainly rather than by reversing
+    /// the whole journal, which holds the wiring lemonfiber seeded and what the first run
+    /// wrote as well.
+    #[tokio::test]
+    async fn an_undo_with_nothing_repaired_puts_nothing_back() {
+        let code = run(
+            ctx(),
+            paths("nothing-undone"),
+            Mending {
+                fixing: Fixing {
+                    fix: false,
+                    yes: false,
+                    disruptive: false,
+                },
+                undo: true,
+            },
+            &Says("n"),
+            false,
+        )
+        .await;
+
+        assert_eq!(shown(code), success());
+    }
+
+    /// The reversal itself: what the last repair set goes back to what it was, read from
+    /// the journal that repair wrote rather than from anything the run still holds.
+    #[tokio::test]
+    async fn an_undo_puts_back_what_the_last_repair_set() {
+        use lemonfiber_core::journal::{Change, Kind};
+
+        let paths = paths("undone");
+        let journal = paths.journal();
+        if let Some(dir) = journal.parent() {
+            std::fs::create_dir_all(dir).ok();
+        }
+        let recorded = Change {
+            at: "1000".to_owned(),
+            operation: lemonfiber_core::repair::OPERATION.to_owned(),
+            target: "qbittorrent".to_owned(),
+            kind: Kind::Set {
+                key: "QBITTORRENT_PORT".to_owned(),
+                previous: Some("8080".to_owned()),
+                current: "51413".to_owned(),
+            },
+        };
+        std::fs::write(
+            &journal,
+            serde_json::to_string(&recorded).unwrap_or_default() + "\n",
+        )
+        .ok();
+
+        let code = run(
+            ctx(),
+            paths.clone(),
+            Mending {
+                fixing: Fixing {
+                    fix: false,
+                    yes: false,
+                    disruptive: false,
+                },
+                undo: true,
+            },
+            &Says("n"),
+            false,
+        )
+        .await;
+
+        assert_eq!(shown(code), success());
+        let env = std::fs::read_to_string(paths.env_file()).unwrap_or_default();
+        assert!(env.contains("QBITTORRENT_PORT=8080"), "{env}");
+    }
+
+    /// A repair that registered something can only be put back by the service that holds
+    /// it, so an undo run when that service is gone says which one it needed rather than
+    /// reporting a reversal that did not happen.
+    #[tokio::test]
+    async fn an_undo_that_needs_a_service_that_is_gone_says_so() {
+        use lemonfiber_core::journal::{Change, Kind};
+
+        let paths = paths("beyond-reach");
+        let journal = paths.journal();
+        if let Some(dir) = journal.parent() {
+            std::fs::create_dir_all(dir).ok();
+        }
+        let recorded = Change {
+            at: "1000".to_owned(),
+            operation: lemonfiber_core::repair::OPERATION.to_owned(),
+            target: "sonarr".to_owned(),
+            kind: Kind::Created {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+            },
+        };
+        std::fs::write(
+            &journal,
+            serde_json::to_string(&recorded).unwrap_or_default() + "\n",
+        )
+        .ok();
+
+        let code = run(
+            ctx(),
+            paths,
+            Mending {
+                fixing: Fixing {
+                    fix: false,
+                    yes: false,
+                    disruptive: false,
+                },
+                undo: true,
+            },
+            &Says("n"),
+            false,
+        )
+        .await;
+
+        assert_ne!(shown(code), success());
+    }
+
     /// A stack that will not read is the one thing every check needs before any of them
     /// can run, so the operator hears about it rather than being told there is nothing to
     /// put right — which would be true of a machine lemonfiber cannot see at all.
@@ -172,10 +332,14 @@ mod tests {
 
         let code = run(
             nowhere,
+            paths("unreadable"),
             Mending {
-                fix: true,
-                yes: true,
-                disruptive: false,
+                fixing: Fixing {
+                    fix: true,
+                    yes: true,
+                    disruptive: false,
+                },
+                undo: false,
             },
             &Says("n"),
             false,
@@ -208,10 +372,14 @@ mod tests {
         shown(
             run(
                 ctx(),
+                paths("offers"),
                 Mending {
-                    fix: true,
-                    yes,
-                    disruptive: false,
+                    fixing: Fixing {
+                        fix: true,
+                        yes,
+                        disruptive: false,
+                    },
+                    undo: false,
                 },
                 &Says("n"),
                 json,

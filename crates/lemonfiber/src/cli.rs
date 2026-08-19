@@ -228,6 +228,34 @@ pub(crate) enum Request {
 /// silently does nothing.
 #[derive(Debug, Args)]
 pub(crate) struct Mending {
+    #[command(flatten)]
+    pub(crate) fixing: Fixing,
+    /// Put back what the last repair changed.
+    ///
+    /// Asked for the same way a repair is, because it is the same errand read
+    /// backwards. It reverses that one repair and nothing else: the wiring lemonfiber
+    /// seeded and the choices your first run wrote are left where they are.
+    #[arg(long, conflicts_with = "fix")]
+    pub(crate) undo: bool,
+}
+
+impl Mending {
+    /// Whether this run was asked to change anything at all, forwards or back.
+    ///
+    /// Asked as one question so the caller deciding between looking and acting does not
+    /// have to know which combination of flags amounts to acting.
+    pub(crate) fn acts(&self) -> bool {
+        self.fixing.fix || self.undo
+    }
+}
+
+/// How much of the putting-right was agreed to in advance.
+///
+/// Apart from `--undo` because these are two errands rather than four settings: the three
+/// here describe one run that changes things forward, and each is meaningless without the
+/// first of them.
+#[derive(Debug, Args)]
+pub(crate) struct Fixing {
     /// Offer to put right what lemonfiber can, asking about each first.
     ///
     /// A plain run only looks. This one says what each repair would do and what else
@@ -238,7 +266,11 @@ pub(crate) struct Mending {
     #[arg(long, requires = "fix")]
     pub(crate) yes: bool,
     /// Include the checks that disturb the running system while repairing.
-    #[arg(long = "fix-disruptive", requires = "fix")]
+    ///
+    /// Named apart from the field it sits beside: `doctor` already has a `--disruptive`,
+    /// and clap keys an argument by the field name unless told otherwise — so two flags
+    /// that read differently on the command line would be one argument underneath.
+    #[arg(id = "fix-disruptive", long = "fix-disruptive", requires = "fix")]
     pub(crate) disruptive: bool,
 }
 
@@ -323,4 +355,66 @@ pub(crate) enum ConfigAction {
     },
     /// Show every setting, with credentials withheld.
     Show,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Mending, Request};
+    use clap::Parser;
+
+    /// What `doctor` was asked to do about what it finds, for one command line.
+    ///
+    /// Answered through the parser rather than by building the flags by hand, because the
+    /// question being asked is what a person typing this actually gets — including the
+    /// combinations the parser is meant to refuse. Nothing for a line that is not a
+    /// `doctor` run, or that the parser turns away.
+    fn doctoring(args: &[&str]) -> Option<(bool, Mending)> {
+        match Cli::try_parse_from(args).ok()?.command? {
+            Request::Doctor {
+                disruptive,
+                mending,
+                ..
+            } => Some((disruptive, mending)),
+            _ => None,
+        }
+    }
+
+    /// Looking and acting are told apart by what was asked for, not by which flag carries
+    /// it: a run that reverses a repair changes as much as one that makes it.
+    #[test]
+    fn a_run_that_changes_something_is_told_from_one_that_only_looks() {
+        let acts = |args: &[&str]| doctoring(args).map(|(_, mending)| mending.acts());
+
+        assert_eq!(acts(&["lemonfiber", "doctor"]), Some(false));
+        assert_eq!(acts(&["lemonfiber", "doctor", "--fix"]), Some(true));
+        assert_eq!(acts(&["lemonfiber", "doctor", "--undo"]), Some(true));
+        // The question is doctor's alone — every other command already says what it does.
+        assert_eq!(acts(&["lemonfiber", "seed"]), None);
+    }
+
+    /// Repairing and reversing a repair in one run is not a thing to guess the order of,
+    /// so it is refused at the parser rather than resolved somewhere further in.
+    #[test]
+    fn repairing_and_reversing_at_once_is_refused() {
+        assert!(doctoring(&["lemonfiber", "doctor", "--fix", "--undo"]).is_none());
+    }
+
+    /// Two flags that read differently on the command line must be two arguments
+    /// underneath. `doctor` has a `--disruptive` of its own, and a repairing run has
+    /// `--fix-disruptive`; keyed by field name they would collide, and the one that lost
+    /// would silently do nothing.
+    #[test]
+    fn disturbing_the_stack_while_repairing_is_its_own_flag() {
+        let disturbs =
+            |args: &[&str]| doctoring(args).map(|(all, mending)| (all, mending.fixing.disruptive));
+
+        assert_eq!(
+            disturbs(&["lemonfiber", "doctor", "--disruptive"]),
+            Some((true, false))
+        );
+        assert_eq!(
+            disturbs(&["lemonfiber", "doctor", "--fix", "--fix-disruptive"]),
+            Some((false, true))
+        );
+    }
 }
