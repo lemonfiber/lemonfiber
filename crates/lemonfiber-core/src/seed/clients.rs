@@ -235,6 +235,7 @@ pub const CLIENT: &str = "downloadclient";
 /// The baseline field a download client's value is recorded under: the endpoint it
 /// reaches, host and port, so it is keyed the way the client itself is matched —
 /// by connection, not by the label an operator can rename.
+#[must_use]
 pub fn client_field(client: &DownloadClient) -> String {
     format!("{CLIENT}:{}:{}", client.host, client.port)
 }

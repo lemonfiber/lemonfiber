@@ -160,11 +160,6 @@ enum Step {
 /// Carry out one undo against the filesystem or the environment file.
 fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
     match action {
-        // A field inside a service. Only that service can put it back, so this reports it
-        // rather than writing the field's name into the environment file — which is what a
-        // reversal that took it for an ordinary setting would do, leaving the operator with
-        // a polluted file and a service unchanged.
-        Action::Reconfigure { resource, .. } => Ok(Step::BeyondReach(resource.clone())),
         Action::Restore {
             key,
             value: Some(value),
@@ -175,7 +170,13 @@ fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
             .map(|()| Step::Done)
             .map_err(Fault::Store),
         Action::Delete { path } => remove(Path::new(path)).map(|()| Step::Done),
-        Action::Remove { resource, .. } => Ok(Step::BeyondReach(resource.clone())),
+        // Both need the service that made the change: one to delete what it created, the
+        // other to put a field of it back. Neither is something the host can do, and a
+        // reversal that took the second for an ordinary setting would write the field's
+        // name into the environment file and leave the service exactly as it was.
+        Action::Remove { resource, .. } | Action::Reconfigure { resource, .. } => {
+            Ok(Step::BeyondReach(resource.clone()))
+        }
     }
 }
 
