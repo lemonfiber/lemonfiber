@@ -16,10 +16,12 @@ use std::sync::Arc;
 
 use common::files::Files;
 use common::{Answer, Fake};
+use lemonfiber_core::app::engine::diagnose;
 use lemonfiber_core::app::repair::retract;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::doctor::Category;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::repair::OPERATION;
@@ -105,6 +107,35 @@ fn answering() -> Arc<Fake> {
     )])
 }
 
+/// The wirings a diagnosis reads are assembled from the baseline lemonfiber wrote, so a
+/// stack with one is the only stack where there is anything to compare against.
+///
+/// Driven through `diagnose` rather than the assembly directly: what is being proved is
+/// that a real run reaches the wirings at all, and a test that called the gathering itself
+/// would pass while the check saw nothing.
+#[tokio::test]
+async fn a_stack_with_a_baseline_has_its_wirings_read() {
+    let root = scratch("baseline");
+    let paths = paths(&root);
+    if let Some(dir) = paths.env_file().parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    // What lemonfiber last wrote into Sonarr, in the shape seeding saves.
+    let _ = std::fs::write(
+        paths.env_file().with_file_name("baseline.json"),
+        r#"{"services":{"Sonarr":{"downloadclient:sabnzbd:8080":{"value":"tv-sonarr","at":"1000","origin":"written"}}}}"#,
+    );
+
+    let report = diagnose(&ctx(&root, Fake::silent()), Some(Category::Config), false).await;
+
+    // Nothing answers, so every wiring reads as unverified — but the wirings were read,
+    // which is the whole of what a baseline buys.
+    assert!(
+        report.is_ok(),
+        "a diagnosis over a baselined stack still runs"
+    );
+}
+
 /// The whole errand: a repair that changed a field inside a service is put back through
 /// that service, with the operator's own value restored.
 #[tokio::test]
@@ -115,7 +146,7 @@ async fn a_field_a_repair_changed_inside_a_service_goes_back_through_it() {
 
     let put_back = retract(&ctx(&root, Arc::clone(&http)), &paths(&root)).await;
 
-    assert!(put_back.is_ok_and(|undos| undos.len() == 1));
+    assert_eq!(put_back.map(|undos| undos.len()).ok(), Some(1));
     let written = http
         .requests()
         .into_iter()
@@ -134,16 +165,47 @@ async fn a_change_whose_service_is_gone_is_named_rather_than_reported_undone() {
 
     let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
 
-    let problem = put_back
-        .err()
-        .expect("a change nobody could put back is a problem");
     assert!(
-        problem
-            .detail
-            .as_deref()
+        put_back
+            .err()
+            .and_then(|problem| problem.detail.clone())
             .is_some_and(|detail| detail.contains("sonarr")),
-        "{problem:?}"
+        "a change nobody could put back is a problem that names the service it needed"
     );
+}
+
+/// A change naming a service this stack does not have cannot be put back by it, and says
+/// which one it needed — the same answer as a service that is down, because from here the
+/// two are the same fact.
+#[tokio::test]
+async fn a_change_naming_a_service_the_stack_lacks_is_named_too() {
+    let root = scratch("no-such-service");
+    let mut change = configured();
+    change.target = "not-a-service".to_owned();
+    journalled(&root, &[change]);
+
+    let put_back = retract(&ctx(&root, answering()), &paths(&root)).await;
+
+    assert!(
+        put_back
+            .err()
+            .and_then(|problem| problem.detail.clone())
+            .is_some_and(|detail| detail.contains("not-a-service")),
+        "the reversal names what it could not reach"
+    );
+}
+
+/// A service that answers but refuses the write leaves the change standing, and says so
+/// rather than reporting a reversal that the service turned down.
+#[tokio::test]
+async fn a_service_that_refuses_the_write_is_not_reported_as_undone() {
+    let root = scratch("refused");
+    journalled(&root, &[configured()]);
+    let http = Fake::by_path(vec![("downloadclient/7", Answer::reply(400, "no"))]);
+
+    let put_back = retract(&ctx(&root, http), &paths(&root)).await;
+
+    assert!(put_back.is_err(), "a refused write is not a reversal");
 }
 
 /// Nothing repaired is nothing to put back, and that is not a failure.

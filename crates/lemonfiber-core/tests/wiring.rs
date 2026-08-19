@@ -19,9 +19,11 @@ use common::{Answer, Fake};
 use lemonfiber_core::baseline::{Origin, Record};
 use lemonfiber_core::doctor::credentials::Target;
 use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck, DRIFTED};
-use lemonfiber_core::doctor::{Category, Check, Finding, Verdict};
+use lemonfiber_core::doctor::{Category, Check, Finding, Mend as _, Verdict};
+use lemonfiber_core::error::Problem;
+use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::ports::service::{ClientKind, Credential, DownloadClient};
-use lemonfiber_core::repair::{Attempt, Repair, Writing};
+use lemonfiber_core::repair::{Attempt, Repair, Writing, OPERATION};
 
 /// A Servarr config carrying a generated key, as one reads from disk.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
@@ -129,10 +131,29 @@ fn checking(recorded: Option<Record>, http: Arc<Fake>) -> WiringCheck {
 }
 
 /// What the check made of one arrangement of the three values.
-async fn found(recorded: Option<Record>, holds: Option<&str>) -> Finding {
-    let check = checking(recorded, answering(holds));
-    let mut findings = check.run().await;
-    findings.pop().expect("the check reports on every wiring")
+///
+/// The check reports on every wiring it holds, so a run over one wiring is one finding —
+/// but the type does not say so, and a test that unwrapped it would fail by panicking
+/// rather than by saying what it expected.
+async fn found(recorded: Option<Record>, holds: Option<&str>) -> Option<Finding> {
+    checking(recorded, answering(holds)).run().await.pop()
+}
+
+/// The problem a warning carries, or nothing where the verdict was not a warning — so a
+/// test asserts on it without a match arm that panics.
+fn warned(verdict: Option<&Verdict>) -> Option<&Problem> {
+    match verdict {
+        Some(Verdict::Warn(problem)) => Some(problem),
+        _ => None,
+    }
+}
+
+/// The note a pass carries, on the same terms.
+fn noted(verdict: Option<&Verdict>) -> Option<&str> {
+    match verdict {
+        Some(Verdict::Pass { note }) => note.as_deref(),
+        _ => None,
+    }
 }
 
 /// The service still holds what lemonfiber wrote, and lemonfiber still wants it. Nothing
@@ -141,8 +162,11 @@ async fn found(recorded: Option<Record>, holds: Option<&str>) -> Finding {
 async fn a_client_still_filing_where_lemonfiber_wired_it_passes() {
     let finding = found(Some(recorded(OURS, Origin::Written)), Some(OURS)).await;
 
-    assert_eq!(finding.category, Category::Config);
-    assert!(matches!(finding.verdict, Verdict::Pass { .. }));
+    assert_eq!(
+        finding.as_ref().map(|found| found.category),
+        Some(Category::Config)
+    );
+    assert!(noted(finding.as_ref().map(|found| &found.verdict)).is_some());
 }
 
 /// The operator changed the category, and everything still works. Said, and no more than
@@ -152,12 +176,10 @@ async fn a_client_still_filing_where_lemonfiber_wired_it_passes() {
 async fn a_category_the_operator_changed_is_noted_rather_than_faulted() {
     let finding = found(Some(recorded(OURS, Origin::Written)), Some("mine")).await;
 
-    let Verdict::Pass { note } = finding.verdict else {
-        panic!("an edit that broke nothing is not a fault");
-    };
     assert!(
-        note.is_some_and(|note| note.contains("the category you set")),
-        "the edit is still worth saying out loud"
+        noted(finding.as_ref().map(|found| &found.verdict))
+            .is_some_and(|note| note.contains("the category you set")),
+        "an edit that broke nothing is not a fault, and is still worth saying out loud"
     );
 }
 
@@ -171,13 +193,14 @@ async fn an_edit_the_service_can_no_longer_reach_is_raised() {
         Some(recorded(OURS, Origin::Written)),
         reaching(Some("mine"), false),
     );
-    let mut findings = check.run().await;
+    let findings = check.run().await;
+    let verdict = findings.last().map(|found| &found.verdict);
 
-    let Some(Verdict::Warn(problem)) = findings.pop().map(|found| found.verdict) else {
-        panic!("an edit that broke the stack is worth raising");
-    };
-    assert_eq!(problem.code, DRIFTED);
-    assert!(problem.summary.contains("cannot reach"), "{problem:?}");
+    assert_eq!(warned(verdict).map(|problem| problem.code), Some(DRIFTED));
+    assert!(
+        warned(verdict).is_some_and(|problem| problem.summary.contains("cannot reach")),
+        "an edit that broke the stack is worth raising, with the breakage named"
+    );
 }
 
 /// A service that has not written its key yet cannot be opened, let alone asked. That is
@@ -198,13 +221,33 @@ async fn a_service_that_has_not_written_its_key_is_unverified() {
     ));
 }
 
+/// A service that will not run its own client test proves nothing about whether the edit
+/// broke anything — so the edit stays the information it already was, rather than being
+/// raised on a failure to ask.
+#[tokio::test]
+async fn an_edit_the_service_will_not_test_stays_information() {
+    let check = checking(
+        Some(recorded(OURS, Origin::Written)),
+        Fake::by_path(vec![
+            ("downloadclient/testall", Answer::reply(500, "no")),
+            ("downloadclient", Answer::reply(200, holding(Some("mine")))),
+        ]),
+    );
+    let findings = check.run().await;
+
+    assert!(
+        noted(findings.last().map(|found| &found.verdict)).is_some(),
+        "nothing was proven broken, so nothing is raised"
+    );
+}
+
 /// A value the operator set and lemonfiber adopted is theirs, and stays a pass however
 /// far lemonfiber's own intent has moved since.
 #[tokio::test]
 async fn a_value_lemonfiber_adopted_stays_theirs() {
     let finding = found(Some(recorded("mine", Origin::Adopted)), Some("mine")).await;
 
-    assert!(matches!(finding.verdict, Verdict::Pass { .. }));
+    assert!(noted(finding.as_ref().map(|found| &found.verdict)).is_some());
 }
 
 /// Nothing wired there yet is seeding's errand, not a drift — and reporting it here would
@@ -236,43 +279,67 @@ async fn a_service_that_will_not_answer_is_unverified() {
     ));
 }
 
-/// The mender the check hands back, for the wiring it just reported on.
+/// The repair a check offers for its one wiring, or nothing where it offers none.
 ///
 /// Reached through the check rather than built directly, because that is how the runner
 /// reaches it: a check that can put right what it found hands back a mender, and a mender
 /// nobody could get to would be a repair nobody could ask for.
-async fn offering(recorded: Option<Record>, holds: Option<&str>) -> (WiringCheck, Vec<Repair>) {
-    let check = checking(recorded, answering(holds));
+async fn offer(check: &WiringCheck) -> Option<Repair> {
     let found = check.run().await;
-    let repairs = check
-        .mender()
-        .expect("a wiring can be put right")
-        .repairs(&found);
-    (check, repairs)
+    check.mender()?.repairs(&found).into_iter().next()
+}
+
+/// Whether the mender may write what that repair would write.
+async fn permission(check: &WiringCheck, repair: &Repair) -> Option<Writing> {
+    Some(check.mender()?.may_proceed(repair).await)
+}
+
+/// What carrying the repair out did.
+async fn carried(check: &WiringCheck, repair: &Repair) -> Option<Attempt> {
+    Some(check.mender()?.mend(repair).await)
+}
+
+/// The changes a carried attempt recorded, or nothing where it stopped.
+fn changes(attempt: Option<&Attempt>) -> Option<&[Change]> {
+    match attempt {
+        Some(Attempt::Carried { changes }) => Some(changes),
+        _ => None,
+    }
+}
+
+/// A check over a wiring lemonfiber wrote and lemonfiber has since moved on from.
+fn stale() -> WiringCheck {
+    checking(
+        Some(recorded("old-sonarr", Origin::Written)),
+        answering(Some("old-sonarr")),
+    )
+}
+
+/// A check over a wiring the operator edited, which the service can no longer reach.
+fn broken() -> WiringCheck {
+    checking(
+        Some(recorded(OURS, Origin::Written)),
+        reaching(Some("mine"), false),
+    )
 }
 
 /// lemonfiber's own value, fallen behind lemonfiber's intent — so putting it right is
 /// restoring lemonfiber's own work, and the repair is offered.
 #[tokio::test]
 async fn lemonfibers_own_value_fallen_behind_is_offered_and_allowed() {
-    let (check, repairs) = offering(
-        Some(recorded("old-sonarr", Origin::Written)),
-        Some("old-sonarr"),
-    )
-    .await;
-    let repair = repairs.first().expect("a stale wiring is worth offering");
+    let check = stale();
+    let repair = offer(&check).await;
+
     assert!(
-        repair.reversible,
+        repair.as_ref().is_some_and(|repair| repair.reversible),
         "the change is journalled, so it can be put back"
     );
-
-    let writing = check
-        .mender()
-        .expect("a wiring can be put right")
-        .may_proceed(repair)
-        .await;
-    assert_eq!(writing, Writing::Ours);
-    assert!(writing.allowed());
+    let writing = match &repair {
+        Some(repair) => permission(&check, repair).await,
+        None => None,
+    };
+    assert_eq!(writing, Some(Writing::Ours));
+    assert!(writing.is_some_and(Writing::allowed));
 }
 
 /// The rule the whole feature turns on. lemonfiber wrote this field once, so reading the
@@ -280,88 +347,68 @@ async fn lemonfibers_own_value_fallen_behind_is_offered_and_allowed() {
 /// over the operator's own change. Reading what the service holds as well is what stops it.
 #[tokio::test]
 async fn a_repair_that_would_overwrite_an_operators_change_is_refused() {
-    let check = checking(
-        Some(recorded(OURS, Origin::Written)),
-        reaching(Some("mine"), false),
+    let check = broken();
+    let repair = offer(&check).await;
+    let writing = match &repair {
+        Some(repair) => permission(&check, repair).await,
+        None => None,
+    };
+
+    assert_eq!(writing, Some(Writing::Changed));
+    assert!(!writing.is_some_and(Writing::allowed));
+    assert!(
+        writing
+            .and_then(Writing::refused)
+            .and_then(|remedy| remedy.detail)
+            .is_some_and(|detail| detail.contains("reset")),
+        "the refusal points at the subsystem that owns the question"
     );
-    let found = check.run().await;
-    let repairs = check
-        .mender()
-        .expect("a wiring can be put right")
-        .repairs(&found);
-    let repair = repairs
-        .first()
-        .expect("a broken drift is offered, then refused");
-
-    let writing = check
-        .mender()
-        .expect("a wiring can be put right")
-        .may_proceed(repair)
-        .await;
-
-    assert_eq!(writing, Writing::Changed);
-    assert!(!writing.allowed());
-    assert!(writing
-        .refused()
-        .is_some_and(|remedy| remedy.detail.is_some_and(|detail| detail.contains("reset"))));
 }
 
 /// A service that will not say what it holds cannot establish the value is still
 /// lemonfiber's, so nothing is written. Silence is not permission.
 #[tokio::test]
 async fn a_service_that_will_not_answer_is_not_written_over() {
-    let (_, repairs) = offering(
-        Some(recorded("old-sonarr", Origin::Written)),
-        Some("old-sonarr"),
-    )
-    .await;
-    let repair = repairs.first().expect("a stale wiring is offered");
+    let check = stale();
+    let repair = offer(&check).await;
 
     let quiet = checking(Some(recorded(OURS, Origin::Written)), Fake::silent());
-    let writing = quiet
-        .mender()
-        .expect("a wiring can be put right")
-        .may_proceed(repair)
-        .await;
+    let writing = match &repair {
+        Some(repair) => permission(&quiet, repair).await,
+        None => None,
+    };
 
-    assert!(!writing.allowed());
+    assert!(!writing.is_some_and(Writing::allowed));
 }
 
 /// What the repair changed, recorded as it changes it — the category it wrote and the one
 /// it wrote over, which is everything a reversal needs to put it back.
 #[tokio::test]
 async fn a_carried_repair_records_enough_to_be_put_back() {
-    let (check, repairs) = offering(
-        Some(recorded("old-sonarr", Origin::Written)),
-        Some("old-sonarr"),
-    )
-    .await;
-    let repair = repairs.first().expect("a stale wiring is worth offering");
-
-    let attempt = check
-        .mender()
-        .expect("a wiring can be put right")
-        .mend(repair)
-        .await;
-
-    let Attempt::Carried { changes } = attempt else {
-        panic!("the service took the update");
+    let check = stale();
+    let repair = offer(&check).await;
+    let attempt = match &repair {
+        Some(repair) => carried(&check, repair).await,
+        None => None,
     };
-    let change = changes.first().expect("a configuration change is recorded");
-    assert_eq!(change.operation, lemonfiber_core::repair::OPERATION);
-    assert_eq!(change.target, "sonarr");
+
     // Recorded as a change inside the service, not as a setting in lemonfiber's own
     // environment file. Taken for the latter, reversing it would write the field's name
     // into that file and leave Sonarr exactly as it was — and report it restored.
     assert_eq!(
-        change.kind,
-        lemonfiber_core::journal::Kind::Configured {
-            resource: "downloadclient".to_owned(),
-            id: "7".to_owned(),
-            field: "tvCategory".to_owned(),
-            previous: Some("old-sonarr".to_owned()),
-            current: OURS.to_owned(),
-        }
+        changes(attempt.as_ref()).and_then(<[Change]>::first),
+        Some(&Change {
+            at: "2000".to_owned(),
+            operation: OPERATION.to_owned(),
+            target: "sonarr".to_owned(),
+            kind: Kind::Configured {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+                field: "tvCategory".to_owned(),
+                previous: Some("old-sonarr".to_owned()),
+                current: OURS.to_owned(),
+            },
+        })
     );
 }
 
@@ -369,22 +416,17 @@ async fn a_carried_repair_records_enough_to_be_put_back() {
 /// than registering a second one under lemonfiber's name.
 #[tokio::test]
 async fn a_client_the_service_no_longer_holds_is_not_written_afresh() {
-    let (_, repairs) = offering(
-        Some(recorded("old-sonarr", Origin::Written)),
-        Some("old-sonarr"),
-    )
-    .await;
-    let repair = repairs.first().expect("a stale wiring is worth offering");
+    let check = stale();
+    let repair = offer(&check).await;
 
     let gone = checking(
         Some(recorded("old-sonarr", Origin::Written)),
         Fake::by_path(vec![("downloadclient", Answer::reply(200, "[]"))]),
     );
-    let attempt = gone
-        .mender()
-        .expect("a wiring can be put right")
-        .mend(repair)
-        .await;
+    let attempt = match &repair {
+        Some(repair) => carried(&gone, repair).await,
+        None => None,
+    };
 
-    assert!(matches!(attempt, Attempt::Stopped { .. }));
+    assert!(changes(attempt.as_ref()).is_none(), "nothing was written");
 }

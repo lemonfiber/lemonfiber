@@ -210,6 +210,19 @@ mod tests {
             })),
             "a root folder"
         );
+        // A repair's own record. Not something a first run writes, but the journal is
+        // shared, so an interrupted setup can find one — and an operator deciding whether
+        // to roll back is owed a name for it rather than silence.
+        assert_eq!(
+            describe(&change(Kind::Configured {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+                field: "tvCategory".to_owned(),
+                previous: None,
+                current: "tv-sonarr".to_owned(),
+            })),
+            "a downloadclient's tvCategory"
+        );
     }
 
     #[test]
