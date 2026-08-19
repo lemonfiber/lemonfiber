@@ -240,6 +240,13 @@ pub(crate) struct Mending {
     /// Include the checks that disturb the running system while repairing.
     #[arg(long = "fix-disruptive", requires = "fix")]
     pub(crate) disruptive: bool,
+    /// Put back what the last repair changed.
+    ///
+    /// Asked for the same way a repair is, because it is the same errand read
+    /// backwards. It reverses that one repair and nothing else: the wiring lemonfiber
+    /// seeded and the choices your first run wrote are left where they are.
+    #[arg(long, conflicts_with = "fix")]
+    pub(crate) undo: bool,
 }
 
 /// What a support bundle was asked for.

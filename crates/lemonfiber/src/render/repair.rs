@@ -4,6 +4,7 @@
 //! lemonfiber ran something, but whether the fault is gone.
 
 use lemonfiber_core::app::repair::Report;
+use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::repair::{Outcome, ASK_FOR_REPAIRS};
 
 use super::{Lines, UNRENDERABLE};
@@ -44,6 +45,38 @@ pub(crate) fn mended(report: &Report, json: bool) -> Lines {
         lines.put(format!("{} — {}", said(&done.outcome), done.repair.does));
     }
     lines
+}
+
+/// What was put back, or that there was nothing to put back.
+pub(crate) fn reversed(undos: &[Undo], json: bool) -> Lines {
+    let mut lines = Lines::default();
+    if json {
+        lines.put(format!(r#"{{"reversed":{}}}"#, undos.len()));
+        return lines;
+    }
+    if undos.is_empty() {
+        lines.put("There is no repair to put back.");
+        return lines;
+    }
+    lines.put("Put back what the last repair changed:");
+    for undo in undos {
+        lines.put(format!("  {} — {}", undo.target, restoring(&undo.action)));
+    }
+    lines
+}
+
+/// What one reversal did, in the words of the thing it acted on.
+fn restoring(action: &Action) -> String {
+    match action {
+        Action::Restore {
+            key,
+            value: Some(value),
+        } => format!("{key} back to {value}"),
+        // Nothing was there before, so putting it back means taking it away again.
+        Action::Restore { key, value: None } => format!("{key} removed, as it was"),
+        Action::Remove { resource, id } => format!("{resource} {id} removed"),
+        Action::Delete { path } => format!("{path} removed"),
+    }
 }
 
 /// How one outcome reads.

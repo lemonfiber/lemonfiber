@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::baseline::Record;
 use crate::condition::Condition;
 use crate::error::{Remedy, State};
+use crate::journal::{Change, Undo};
 
 /// What an operator types to be offered the repairs.
 ///
@@ -200,6 +201,39 @@ pub fn escalation(condition: &Condition) -> Remedy {
     .with_detail("lemonfiber support --logs 500")
 }
 
+/// What a repair records itself as in the change journal.
+///
+/// Named so that undoing one can find its own work: the journal is shared with seeding and
+/// the first-run wizard, and an operator undoing a repair must not have those unwound under
+/// them.
+pub const OPERATION: &str = "repair";
+
+/// The undos that reverse the most recent repair, and nothing else.
+///
+/// Scoped to one repair rather than to the whole journal, because "undo everything
+/// lemonfiber has ever written" is not what somebody means by undoing the thing they just
+/// watched happen. Everything that repair changed goes back — a repair that set two values
+/// half-undone is a worse state than either the one before it or the one after.
+///
+/// Most recent first, for the reason [`crate::journal::Journal::rewind`] is: a later change
+/// may rest on an earlier one.
+#[must_use]
+pub fn undoing(changes: &[Change]) -> Vec<Undo> {
+    let Some(last) = changes
+        .iter()
+        .rev()
+        .find(|change| change.operation == OPERATION)
+    else {
+        return Vec::new();
+    };
+    changes
+        .iter()
+        .rev()
+        .filter(|change| change.operation == OPERATION && change.at == last.at)
+        .map(Change::undo)
+        .collect()
+}
+
 /// Whether a repair may write over what is there, and why not where it may not.
 ///
 /// The one rule that keeps auto-remediation from being something an operator has to defend
@@ -340,6 +374,52 @@ mod tests {
             .into_iter()
             .map(|repair| repair.check)
             .collect()
+    }
+
+    /// Undoing a repair undoes that repair — not the seed that ran before it, and not the
+    /// first-run wizard's writes. The journal is shared, and an operator asking to undo the
+    /// thing they just watched happen is not asking for everything lemonfiber ever wrote.
+    #[test]
+    fn undoing_a_repair_reverses_that_repair_and_nothing_else() {
+        use super::{undoing, OPERATION};
+        use crate::journal::{Change, Kind};
+
+        let change = |operation: &str, at: &str, key: &str| Change {
+            at: at.to_owned(),
+            operation: operation.to_owned(),
+            target: "sonarr".to_owned(),
+            kind: Kind::Set {
+                key: key.to_owned(),
+                previous: Some("before".to_owned()),
+                current: "after".to_owned(),
+            },
+        };
+
+        let journal = vec![
+            change("seed", "1000", "SEEDED"),
+            change(OPERATION, "2000", "FIRST"),
+            // The most recent repair, which set two values at once.
+            change(OPERATION, "3000", "SECOND"),
+            change(OPERATION, "3000", "THIRD"),
+        ];
+
+        let keys: Vec<String> = undoing(&journal)
+            .into_iter()
+            .filter_map(|undo| match undo.action {
+                crate::journal::Action::Restore { key, .. } => Some(key),
+                crate::journal::Action::Remove { .. } | crate::journal::Action::Delete { .. } => {
+                    None
+                }
+            })
+            .collect();
+
+        // Both halves of the last repair, most recent first — and neither the seed nor the
+        // repair before it.
+        assert_eq!(keys, vec!["THIRD".to_owned(), "SECOND".to_owned()]);
+
+        // Nothing repaired yet is nothing to undo, rather than the whole journal.
+        assert!(undoing(&[change("seed", "1000", "SEEDED")]).is_empty());
+        assert!(undoing(&[]).is_empty());
     }
 
     /// The rule that keeps this feature from being something an operator has to defend

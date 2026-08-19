@@ -102,8 +102,11 @@ async fn main() -> ExitCode {
             // Repairing is its own errand: it looks, offers, acts and looks again, and
             // renders what became of each — not one value from dispatch. A plain run falls
             // through to the diagnosis below and changes nothing.
-            if mending.fix {
-                return repair::run(ctx, mending, &Keyboard, cli.json).await;
+            if mending.fix || mending.undo {
+                let Some(paths) = here() else {
+                    return no_config_home();
+                };
+                return repair::run(ctx, paths, mending, &Keyboard, cli.json).await;
             }
             let only = match only.as_deref().map(Category::parse) {
                 // A named category that lemonfiber does not know is a mistake to

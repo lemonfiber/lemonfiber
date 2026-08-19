@@ -14,13 +14,26 @@ use lemonfiber_core::app::repair::{mend, Confirm};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::repair::{Repair, Stance};
 
+use lemonfiber_core::app::recover;
+use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::repair;
+
 use crate::cli::Mending;
 use crate::prompt::{yes_no, Answers};
-use crate::render::repair::mended;
+use crate::render::repair::{mended, reversed};
 use crate::render::Lines;
 
-/// Offer the repairs, and carry out the ones agreed to.
-pub(crate) async fn run(ctx: Ctx, asked: Mending, answers: &dyn Answers, json: bool) -> ExitCode {
+/// Offer the repairs and carry out the ones agreed to, or put back what the last one did.
+pub(crate) async fn run(
+    ctx: Ctx,
+    paths: Paths,
+    asked: Mending,
+    answers: &dyn Answers,
+    json: bool,
+) -> ExitCode {
+    if asked.undo {
+        return undone(&paths, json);
+    }
     // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
     // repairs carried out says so with --yes. So one that did not gets the offer and no
     // action, which is what report-only is for.
@@ -37,6 +50,25 @@ pub(crate) async fn run(ctx: Ctx, asked: Mending, answers: &dyn Answers, json: b
         }
         Err(problem) => crate::complain(&problem),
     }
+}
+
+/// Put back what the last repair changed.
+///
+/// That repair and no other. The journal it reads is shared with seeding and the first-run
+/// wizard, and somebody undoing the thing they just watched happen has not asked for the
+/// wiring underneath it to come apart.
+fn undone(paths: &Paths, json: bool) -> ExitCode {
+    let journal = recover::journal_at(&paths.journal());
+    let undos = repair::undoing(journal.changes());
+    if undos.is_empty() {
+        reversed(&undos, json).print();
+        return ExitCode::SUCCESS;
+    }
+    if let Err(problem) = recover::undo(&undos, &paths.env_file()) {
+        return crate::complain(&problem);
+    }
+    reversed(&undos, json).print();
+    ExitCode::SUCCESS
 }
 
 /// Asking whoever is at the terminal.
