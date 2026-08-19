@@ -12,7 +12,6 @@ use common::{Answer, Fake};
 use std::sync::Arc;
 
 use lemonfiber_core::ports::http::Http;
-use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::Failure;
 use lemonfiber_core::qbittorrent::{temporary_password, Qbittorrent};
 use lemonfiber_core::seed::{wire_qbittorrent_password, State};

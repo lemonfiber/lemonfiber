@@ -1116,6 +1116,7 @@ dependencies = [
  "async-trait",
  "lemonfiber-manifest",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
 ]

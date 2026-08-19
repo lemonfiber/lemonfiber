@@ -9,7 +9,6 @@ use common::service::*;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{Failure, HouseholdRequest, MediaServer, Requests};
 use lemonfiber_core::seed::{wire_jellyfin_identity, State};
 

@@ -15,7 +15,6 @@ mod common;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use common::files::Files;
@@ -34,8 +33,6 @@ use lemonfiber_core::ports::docker::{
     Stats, Stream,
 };
 use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
-use lemonfiber_core::ports::random::Random;
-use lemonfiber_core::ports::time::Clock;
 use lemonfiber_core::stack::Source;
 use tokio::sync::mpsc::Receiver;
 
