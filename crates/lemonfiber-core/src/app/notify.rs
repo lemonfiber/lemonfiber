@@ -20,7 +20,7 @@ use crate::alert::{Digest, Outbox};
 use crate::condition::{Conditions, Fault};
 use crate::error::Severity;
 use crate::health::Reach;
-use crate::ports::notify::Channel;
+use crate::notify::Channel;
 
 use super::Ctx;
 
@@ -122,8 +122,8 @@ mod tests {
     use crate::config::Settings;
     use crate::error::Severity;
     use crate::health::Reach;
+    use crate::notify::{Channel, Undelivered};
     use crate::platform::Environment;
-    use crate::ports::notify::{Channel, Undelivered};
     use crate::test_support::{spoke, stack, Reporting, Scripted as ScriptedRunner};
 
     /// A channel that records what it was given, or refuses everything.

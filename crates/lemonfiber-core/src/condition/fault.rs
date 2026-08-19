@@ -24,7 +24,7 @@ use crate::error::Severity;
 
 /// One line of a fault, as it is safe to keep and to send.
 fn withheld(text: &str) -> String {
-    crate::withheld::withheld_text(text)
+    crate::config::store::withheld_text(text)
 }
 
 /// Something a check found wrong.
