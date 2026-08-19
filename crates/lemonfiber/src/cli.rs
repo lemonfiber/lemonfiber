@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(acts(&["lemonfiber", "doctor", "--fix"]), Some(true));
         assert_eq!(acts(&["lemonfiber", "doctor", "--undo"]), Some(true));
         // The question is doctor's alone — every other command already says what it does.
-        assert_eq!(acts(&["lemonfiber", "status"]), None);
+        assert_eq!(acts(&["lemonfiber", "seed"]), None);
     }
 
     /// Repairing and reversing a repair in one run is not a thing to guess the order of,
