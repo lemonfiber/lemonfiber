@@ -112,7 +112,14 @@ mod tests {
     use crate::exit::{repairing, shown, success};
     use crate::prompt::Answers;
 
-    use super::{run, Asking, Confirm as _, Ctx, Mending};
+    use super::{run, Asking, Confirm as _, Ctx, Mending, Paths};
+
+    /// Where a test's records would live, in a scratch directory of its own.
+    fn paths() -> Paths {
+        let root =
+            std::env::temp_dir().join(format!("lemonfiber-repair-cli-{}", std::process::id()));
+        Paths::rooted(&root.join("config"), &root.join("data"))
+    }
 
     /// A context over the stack this binary ships, with nothing configured — so nothing is
     /// wrong that lemonfiber could put right, which is the state a healthy machine is in.
@@ -187,6 +194,28 @@ mod tests {
         assert_eq!(Says("y").secret("anything"), "y");
     }
 
+    /// Nothing repaired is nothing to put back — said plainly rather than by reversing
+    /// the whole journal, which holds the wiring lemonfiber seeded and what the first run
+    /// wrote as well.
+    #[tokio::test]
+    async fn an_undo_with_nothing_repaired_puts_nothing_back() {
+        let code = run(
+            ctx(),
+            paths(),
+            Mending {
+                fix: false,
+                yes: false,
+                disruptive: false,
+                undo: true,
+            },
+            &Says("n"),
+            false,
+        )
+        .await;
+
+        assert_eq!(shown(code), success());
+    }
+
     /// A stack that will not read is the one thing every check needs before any of them
     /// can run, so the operator hears about it rather than being told there is nothing to
     /// put right — which would be true of a machine lemonfiber cannot see at all.
@@ -204,10 +233,12 @@ mod tests {
 
         let code = run(
             nowhere,
+            paths(),
             Mending {
                 fix: true,
                 yes: true,
                 disruptive: false,
+                undo: false,
             },
             &Says("n"),
             false,
@@ -240,10 +271,12 @@ mod tests {
         shown(
             run(
                 ctx(),
+                paths(),
                 Mending {
                     fix: true,
                     yes,
                     disruptive: false,
+                    undo: false,
                 },
                 &Says("n"),
                 json,
