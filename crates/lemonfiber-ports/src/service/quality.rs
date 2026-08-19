@@ -54,5 +54,5 @@ pub trait MusicQuality: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses a change.
-    async fn apply_music_format(&self, format: crate::audio::Format) -> Result<(), Failure>;
+    async fn apply_music_format(&self, format: crate::media::Format) -> Result<(), Failure>;
 }

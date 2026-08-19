@@ -210,7 +210,7 @@ impl Queue {
 /// One thing in a service's queue, in the service's own terms.
 ///
 /// Deliberately close to what the API returns: interpreting it is
-/// [`crate::queue`]'s, and a port that decided what counted as stuck would put
+/// the queue model's, and a port that decided what counted as stuck would put
 /// the judgement in the one place a test cannot reach it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Queued {

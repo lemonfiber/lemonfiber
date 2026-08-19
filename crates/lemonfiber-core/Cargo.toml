@@ -17,6 +17,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 rustls-pki-types = "1"
 webpki-roots = "1"
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+lemonfiber-ports = { path = "../lemonfiber-ports" }
 async-trait = { workspace = true }
 bollard = { workspace = true }
 crc32fast = "1"

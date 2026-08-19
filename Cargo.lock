@@ -1085,6 +1085,7 @@ dependencies = [
  "getrandom 0.2.17",
  "include_dir",
  "lemonfiber-manifest",
+ "lemonfiber-ports",
  "reqwest",
  "rustls",
  "rustls-pki-types",
@@ -1106,6 +1107,16 @@ dependencies = [
  "serde",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "lemonfiber-ports"
+version = "0.6.0"
+dependencies = [
+ "async-trait",
+ "lemonfiber-manifest",
+ "serde",
+ "tokio",
 ]
 
 [[package]]
