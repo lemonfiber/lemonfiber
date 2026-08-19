@@ -450,8 +450,6 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use async_trait::async_trait;
-
     use super::{gather, vpn};
     use crate::app::Ctx;
     use crate::config::{PortForward, Protocols, Settings};
@@ -614,7 +612,7 @@ mod tests {
             Health::Healthy,
         ))
         .with_filesystem(Arc::new(fs))
-        .with_http(Arc::new(http))
+        .with_http(http)
     }
 
     #[tokio::test]

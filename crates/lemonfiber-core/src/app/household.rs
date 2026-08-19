@@ -169,13 +169,12 @@ fn unavailable(reason: &str) -> HouseholdReport {
 mod tests {
     use std::sync::Arc;
 
-    use async_trait::async_trait;
+    use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
     use super::{assemble, household, title_of, Ctx};
     use crate::config::Settings;
     use crate::household::State;
     use crate::platform::Environment;
-    use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::ports::service::HouseholdRequest;
     use crate::recyclarr::Kind;
     use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs};
@@ -217,20 +216,17 @@ mod tests {
         refuse: bool,
     }
 
-    #[async_trait]
-    impl Http for Fake {
-        async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-            let (status, body) = if request.url.contains("/auth/jellyfin") {
-                (if self.refuse { 500 } else { 200 }, self.sign_in)
-            } else if request.url.contains("/api/v1/request") {
-                (200, self.requests)
-            } else {
-                (200, self.library)
-            };
-            Ok(Response {
-                status,
-                body: body.to_owned(),
-            })
+    impl Fake {
+        /// The scripted answers as a transport, routed by what each call asks for.
+        fn transport(&self) -> Arc<Transport> {
+            Transport::by_path(vec![
+                (
+                    "/auth/jellyfin",
+                    Answer::reply(if self.refuse { 500 } else { 200 }, self.sign_in),
+                ),
+                ("/api/v1/request", Answer::reply(200, self.requests)),
+                ("", Answer::reply(200, self.library)),
+            ])
         }
     }
 
@@ -251,7 +247,7 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(Arc::new(fake));
+        .with_http(fake.transport());
         context.settings.env_file = Some(dir.join(".env"));
         crate::app::targets::record_secret(
             &context,
@@ -499,12 +495,15 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(Arc::new(Fake {
-            sign_in: "",
-            requests: "",
-            library: "[]",
-            refuse: false,
-        }));
+        .with_http(
+            Fake {
+                sign_in: "",
+                requests: "",
+                library: "[]",
+                refuse: false,
+            }
+            .transport(),
+        );
         let report = household(&context, None).await.unwrap_or_default();
         assert!(!report.available);
         assert!(report

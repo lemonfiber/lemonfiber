@@ -472,7 +472,6 @@ mod tests {
     use lemonfiber_fixtures::http::{Answer, Fake};
 
     use super::{Credential, Live, Validation, Validator};
-    use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::ports::nntp::{Endpoint, Nntp};
 
     /// A validator whose transport answers with the given body at 200.

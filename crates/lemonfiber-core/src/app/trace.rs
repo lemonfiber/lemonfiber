@@ -510,7 +510,7 @@ fn not_matched(term: &str) -> TraceReport {
 mod tests {
     use std::sync::Arc;
 
-    use async_trait::async_trait;
+    use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
     use super::{
         account_explainable, assemble, beside, library_presence, trace, troubles, Ctx, Finding,
@@ -521,7 +521,6 @@ mod tests {
     use crate::error::{Code, Problem, Remedy, Severity};
     use crate::jellyfin::Jellyfin;
     use crate::platform::Environment;
-    use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::ports::service::{ItemPart, QueueItem, TraceEvent};
     use crate::recyclarr::Kind;
     use crate::stack::Source;
@@ -586,26 +585,17 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl Http for Fake {
-        async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-            let body = if request.url.contains("/AuthenticateByName") {
-                self.sign_in
-            } else if request.url.contains("/Items") {
-                self.jellyfin_library
-            } else if request.url.contains("/history") {
-                self.history
-            } else if request.url.contains("/queue") {
-                self.queue
-            } else if request.url.contains("/episode") {
-                self.episodes
-            } else {
-                self.library
-            };
-            Ok(Response {
-                status: 200,
-                body: body.to_owned(),
-            })
+    impl Fake {
+        /// The scripted answers as a transport, routed by what each call asks for.
+        fn transport(&self) -> Arc<Transport> {
+            Transport::by_path(vec![
+                ("/AuthenticateByName", Answer::reply(200, self.sign_in)),
+                ("/Items", Answer::reply(200, self.jellyfin_library)),
+                ("/history", Answer::reply(200, self.history)),
+                ("/queue", Answer::reply(200, self.queue)),
+                ("/episode", Answer::reply(200, self.episodes)),
+                ("", Answer::reply(200, self.library)),
+            ])
         }
     }
 
@@ -663,7 +653,7 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(Arc::new(fake))
+        .with_http(fake.transport())
     }
 
     /// A context whose media server the trace cannot ask — no admin password is recorded,
@@ -698,7 +688,7 @@ mod tests {
     /// A Jellyfin reading client over a transport, for the library-presence reads.
     fn jellyfin(fake: Fake) -> Jellyfin {
         Jellyfin::authenticated(
-            Arc::new(fake),
+            fake.transport(),
             "http://127.0.0.1:8096",
             "jellyfin",
             crate::config::JELLYFIN_ADMIN_USER,
@@ -1347,7 +1337,7 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
-        .with_http(Arc::new(Fake::arr("", "", EMPTY_QUEUE)));
+        .with_http(Fake::arr("", "", EMPTY_QUEUE).transport());
         let report = super::stuck(&context).await.unwrap_or_default();
         assert!(report.items.is_empty());
         assert!(!report.incomplete);
