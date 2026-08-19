@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::baseline::Record;
 use crate::condition::Condition;
 use crate::error::{Remedy, State};
 
@@ -199,6 +200,66 @@ pub fn escalation(condition: &Condition) -> Remedy {
     .with_detail("lemonfiber support --logs 500")
 }
 
+/// Whether a repair may write over what is there, and why not where it may not.
+///
+/// The one rule that keeps auto-remediation from being something an operator has to defend
+/// their machine against. A value they set by hand is theirs, and lemonfiber pushing its
+/// own over it — however sure it is — is the behaviour that makes people stop trusting a
+/// tool that changes things.
+///
+/// Read from the baseline rather than guessed at: it records what lemonfiber wrote and what
+/// it adopted from the operator, and those are different claims about the same field.
+#[must_use]
+pub fn may_write(recorded: Option<&Record>) -> Writing {
+    match recorded {
+        // Nothing recorded: lemonfiber never wrote here, so whatever is there is the
+        // operator's own and not a difference from anything lemonfiber intended.
+        None => Writing::TheirsAlone,
+        Some(record) if record.origin.is_adopted() => Writing::Adopted,
+        Some(_) => Writing::Ours,
+    }
+}
+
+/// What the baseline says about a field a repair would write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Writing {
+    /// lemonfiber wrote this value, so putting it back is restoring its own work.
+    Ours,
+    /// The operator set it and lemonfiber adopted it. Theirs to keep.
+    Adopted,
+    /// Nothing was ever recorded here, so nothing lemonfiber knows about is being changed.
+    TheirsAlone,
+}
+
+impl Writing {
+    /// Whether a repair may go ahead.
+    #[must_use]
+    pub const fn allowed(self) -> bool {
+        matches!(self, Self::Ours)
+    }
+
+    /// Why it may not, for an operator who asked to have it put right.
+    ///
+    /// Deferred to drift rather than answered here: what to do about a value the operator
+    /// owns is a question that subsystem exists for, and a repair that argued with it would
+    /// be a second opinion about the same field.
+    #[must_use]
+    pub fn refused(self) -> Option<Remedy> {
+        match self {
+            Self::Ours => None,
+            Self::Adopted => Some(
+                Remedy::new("This is a value you set and lemonfiber adopted, so it is left alone")
+                    .with_detail("lemonfiber reset --confirm restores lemonfiber's own"),
+            ),
+            Self::TheirsAlone => Some(
+                Remedy::new("lemonfiber has never written this, so it will not start now")
+                    .with_detail("lemonfiber seed writes what is missing"),
+            ),
+        }
+    }
+}
+
 /// The repairs worth offering, once what has been declined, exhausted or already answered
 /// by another repair is taken out.
 ///
@@ -279,6 +340,44 @@ mod tests {
             .into_iter()
             .map(|repair| repair.check)
             .collect()
+    }
+
+    /// The rule that keeps this feature from being something an operator has to defend
+    /// their machine against. A value they set is theirs; lemonfiber putting its own back
+    /// over it — however sure it is — is what makes people stop trusting a tool that
+    /// changes things.
+    #[test]
+    fn a_repair_writes_over_what_lemonfiber_wrote_and_nothing_else() {
+        use super::{may_write, Writing};
+        use crate::baseline::{Origin, Record};
+
+        let recorded = |origin| Record {
+            value: "8080".to_owned(),
+            at: "1000".to_owned(),
+            origin,
+        };
+
+        // Its own work, put back.
+        assert_eq!(may_write(Some(&recorded(Origin::Written))), Writing::Ours);
+        assert!(may_write(Some(&recorded(Origin::Written))).allowed());
+        assert!(may_write(Some(&recorded(Origin::Written)))
+            .refused()
+            .is_none());
+
+        // Theirs, adopted — left alone, and the operator told where to go instead.
+        let adopted = may_write(Some(&recorded(Origin::Adopted)));
+        assert_eq!(adopted, Writing::Adopted);
+        assert!(!adopted.allowed());
+        assert!(adopted
+            .refused()
+            .is_some_and(|remedy| remedy.action.contains("you set")));
+
+        // Never written at all: a repair does not start writing somewhere lemonfiber has
+        // never been, which is how a fix turns into a surprise.
+        let theirs = may_write(None);
+        assert_eq!(theirs, Writing::TheirsAlone);
+        assert!(!theirs.allowed());
+        assert!(theirs.refused().is_some());
     }
 
     /// Report-only unless this run said otherwise. A run that changed something because

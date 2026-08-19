@@ -21,7 +21,7 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Check, Finding, Mend, Verdict};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::repair::{Attempt, Outcome, Repair, Stance};
+use lemonfiber_core::repair::{Attempt, Outcome, Repair, Stance, Writing};
 use lemonfiber_core::stack::Source;
 
 /// The repository's own stack, so the checks assemble against a real description.
@@ -236,6 +236,49 @@ async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     )
     .await;
     assert!(again.offered.is_empty(), "it was already declined");
+}
+
+/// A repair that must not go ahead is never attempted. What the operator set is theirs,
+/// and lemonfiber putting its own value back over it — however sure it is — is the
+/// behaviour that makes people stop trusting a tool that changes things.
+#[tokio::test]
+async fn a_repair_that_would_write_over_an_operators_own_change_is_refused() {
+    /// A check whose repair would touch something the operator owns.
+    struct Theirs(Sticky);
+
+    #[async_trait]
+    impl Check for Theirs {
+        fn category(&self) -> Category {
+            self.0.category()
+        }
+        async fn run(&self) -> Vec<Finding> {
+            self.0.run().await
+        }
+        fn mender(&self) -> Option<&dyn Mend> {
+            Some(self)
+        }
+    }
+
+    #[async_trait]
+    impl Mend for Theirs {
+        fn repairs(&self, found: &[Finding]) -> Vec<Repair> {
+            self.0.repairs(found)
+        }
+        async fn mend(&self, repair: &Repair) -> Attempt {
+            self.0.mend(repair).await
+        }
+        fn may_proceed(&self, _repair: &Repair) -> Writing {
+            Writing::Adopted
+        }
+    }
+
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(Theirs(Sticky::new(Attempt::Carried)))];
+    let report = drive(&ctx("theirs"), &checks, Stance::Unattended, &Always(true)).await;
+
+    assert_eq!(
+        report.mended.first().map(|mended| &mended.outcome),
+        Some(&Outcome::WouldOverwrite)
+    );
 }
 
 /// A repair that stopped partway says what it left behind, and is not judged by asking the

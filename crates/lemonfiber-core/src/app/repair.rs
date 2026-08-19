@@ -150,7 +150,13 @@ pub async fn mending(
             });
             continue;
         }
-        let outcome = carried(ctx, mender, again, &repair).await;
+        // Asked before anything is carried out: a repair that must not go ahead is never
+        // attempted, rather than attempted and reported as having changed nothing.
+        let outcome = if mender.may_proceed(&repair).allowed() {
+            carried(ctx, mender, again, &repair).await
+        } else {
+            Outcome::WouldOverwrite
+        };
         recorded(ctx, &repair, &outcome);
         report.mended.push(Mended { repair, outcome });
     }
