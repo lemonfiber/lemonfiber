@@ -19,7 +19,7 @@ use common::{Answer, Fake};
 use lemonfiber_core::baseline::{Origin, Record};
 use lemonfiber_core::doctor::credentials::Target;
 use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck, DRIFTED};
-use lemonfiber_core::doctor::{Category, Check, Finding, Mend as _, Verdict};
+use lemonfiber_core::doctor::{Category, Check, Finding, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::ports::service::{ClientKind, Credential, DownloadClient};
