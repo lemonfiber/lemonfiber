@@ -6,9 +6,7 @@
 //! another, so it is exercised from here rather than from a `#[cfg(test)]` module,
 //! where async-trait code is compiled twice and its coverage counted wrong.
 
-mod common;
-
-use common::{Answer, Fake};
+use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 use lemonfiber_core::ports::http::Http;
@@ -207,7 +205,7 @@ async fn a_qbittorrent_that_is_not_answering_is_unavailable() {
 async fn a_generated_password_is_set_confirmed_and_handed_back() {
     // Login, set, and the confirming login all succeed.
     let fake = Fake::in_turn(vec![ok(), Answer::reply(200, ""), ok()]);
-    let random = common::ports::Chance::exactly(Some(vec![0x11; 24]));
+    let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
 
     let (wiring, recorded) =
         wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword").await;
@@ -234,7 +232,7 @@ async fn without_randomness_the_password_is_not_set() {
     // Nothing to set, so the client is never even called — and nothing is handed
     // back to record.
     let fake = Fake::in_turn(Vec::new());
-    let random = common::ports::Chance::exactly(None);
+    let random = lemonfiber_fixtures::ports::Chance::exactly(None);
 
     let (wiring, recorded) =
         wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword").await;
@@ -250,7 +248,7 @@ async fn without_randomness_the_password_is_not_set() {
 #[tokio::test]
 async fn a_rejected_current_password_fails_and_records_nothing() {
     let fake = Fake::in_turn(vec![Answer::reply(200, "Fails.")]);
-    let random = common::ports::Chance::exactly(Some(vec![0x11; 24]));
+    let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
 
     let (wiring, recorded) =
         wire_qbittorrent_password(&qbittorrent(&fake), &random, "wrongword").await;

@@ -11,14 +11,10 @@
 //! exactly when it is needed, so what these prove is that it collects what it can and
 //! names what it could not.
 
-mod common;
-
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use common::files::Files;
-use common::Fake;
 use lemonfiber_core::app::bundle::{
     collect, write, Wanted, BUNDLE_LEAK, BUNDLE_NO_ROOM, BUNDLE_UNWRITTEN,
 };
@@ -33,6 +29,8 @@ use lemonfiber_core::ports::docker::{
     Stats, Stream,
 };
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::Fake;
 use tokio::sync::mpsc::Receiver;
 
 /// The repository's own copy of the stack, so what is collected is what a real
@@ -109,9 +107,9 @@ impl Engine for Engine1 {
 /// file that is or is not.
 fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx {
     Ctx::new(
-        Arc::new(common::ports::Idle),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Engine1(running)),
-        common::ports::Stopped::at(1_786_968_000),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
         configuration.map_or_else(Files::empty, Files::anywhere),
         stack,
         Settings {
@@ -122,7 +120,7 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
         Environment::MacOs,
     )
     .with_http(Fake::silent())
-    .with_random(Arc::new(common::ports::Chance::cycling()))
+    .with_random(Arc::new(lemonfiber_fixtures::ports::Chance::cycling()))
 }
 
 /// What a bundle from a working-enough machine holds: its own first page, the diagnosis,
@@ -258,7 +256,7 @@ async fn a_bundle_from_a_broken_machine_names_what_it_could_not_read() {
 #[tokio::test]
 async fn no_randomness_means_no_bundle_at_all() {
     let context = ctx(Source::External(project()), true, None)
-        .with_random(Arc::new(common::ports::Chance::exactly(None)));
+        .with_random(Arc::new(lemonfiber_fixtures::ports::Chance::exactly(None)));
     assert!(collect(&context, LEMONFIBER, &Wanted::default())
         .await
         .is_none());

@@ -96,26 +96,14 @@ fn cannot_confirm(detail: &str) -> Verdict {
 mod tests {
     use std::sync::Arc;
 
-    use async_trait::async_trait;
+    use lemonfiber_fixtures::http::{Answer, Fake};
 
     use super::GuidesCheck;
     use crate::doctor::{Category, Check, Verdict};
-    use crate::ports::http::{Http, Request, Response, Unreachable};
-
-    /// An HTTP port that answers with one fixed outcome, so the check runs with no
-    /// network.
-    struct Answer(Result<Response, Unreachable>);
-
-    #[async_trait]
-    impl Http for Answer {
-        async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-            self.0.clone()
-        }
-    }
 
     /// The single verdict the check produces for a given answer.
-    async fn verdict(answer: Result<Response, Unreachable>) -> Option<Verdict> {
-        GuidesCheck::new(Arc::new(Answer(answer)))
+    async fn verdict(answer: Arc<Fake>) -> Option<Verdict> {
+        GuidesCheck::new(answer)
             .run()
             .await
             .into_iter()
@@ -123,17 +111,15 @@ mod tests {
             .map(|finding| finding.verdict)
     }
 
-    fn answered(status: u16) -> Response {
-        Response {
-            status,
-            body: String::new(),
-        }
+    /// A transport answering every request with this status and an empty body.
+    fn answering(status: u16) -> Arc<Fake> {
+        Fake::always(Answer::reply(status, ""))
     }
 
     #[tokio::test]
     async fn a_reachable_guide_source_passes() {
         assert!(matches!(
-            verdict(Ok(answered(200))).await,
+            verdict(answering(200)).await,
             Some(Verdict::Pass { .. })
         ));
     }
@@ -143,7 +129,7 @@ mod tests {
         // The probe reached the source but got an error, so it could not confirm the
         // source is available — that is unverified, never a claim the stack is degraded.
         assert!(matches!(
-            verdict(Ok(answered(503))).await,
+            verdict(answering(503)).await,
             Some(Verdict::Unverified { .. })
         ));
     }
@@ -153,19 +139,14 @@ mod tests {
         // "Could not reach it from here" is exactly what Unverified is for: the probe
         // established nothing about whether the sync is stale, only that it could not
         // check — so it must not render as Warn (degraded) or Fail (broken).
-        let unverified = verdict(Err(Unreachable {
-            url: "https://github.com/TRaSH-Guides/Guides".to_owned(),
-            reason: "connection refused".to_owned(),
-            attempts: 1,
-        }))
-        .await;
+        let unverified = verdict(Fake::silent()).await;
         assert!(matches!(unverified, Some(Verdict::Unverified { .. })));
     }
 
     #[test]
     fn the_check_is_a_services_check() {
         assert_eq!(
-            GuidesCheck::new(Arc::new(Answer(Ok(answered(200))))).category(),
+            GuidesCheck::new(answering(200)).category(),
             Category::Services
         );
     }

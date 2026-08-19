@@ -40,6 +40,9 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 
 [dev-dependencies]
+# The fakes both this crate's own tests and its integration tests drive the real code
+# through. It depends on `lemonfiber-ports` alone, so there is no cycle back to here.
+lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "test-util"] }
 
 [lints]

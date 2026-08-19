@@ -9,13 +9,9 @@
 //! are: the crate is compiled twice, and a path exercised only in-crate has its coverage
 //! counted from the copy that never ran.
 
-mod common;
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use common::files::Files;
-use common::{Answer, Fake};
 use lemonfiber_core::app::repair::retract;
 use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::paths::Paths;
@@ -25,6 +21,8 @@ use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::repair::OPERATION;
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// The repository's own stack, so the targets resolve against a real description.
 fn project() -> &'static Path {

@@ -160,7 +160,7 @@ async fn identity(
     random: Option<Vec<u8>>,
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
-    let random = common::ports::Chance::exactly(random);
+    let random = lemonfiber_fixtures::ports::Chance::exactly(random);
     let (wiring, minted) =
         wire_jellyfin_identity(&media, &seerr, &random, recorded, "http://jellyfin:8096").await;
     (wiring.state, minted)

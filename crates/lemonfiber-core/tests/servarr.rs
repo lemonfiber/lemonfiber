@@ -7,11 +7,8 @@
 //! another, so it is driven from here rather than from an in-crate test, where it
 //! would be compiled twice and its coverage counted from the wrong copy.
 
-mod common;
-
 use std::sync::Arc;
 
-use common::{Answer, Fake};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Http, Method, Request};
 use lemonfiber_core::ports::service::{
@@ -19,6 +16,7 @@ use lemonfiber_core::ports::service::{
     QueueDepth, Queued, Queues, RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::servarr::{api_key, Servarr};
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// A Sonarr client over the given fake — the v3 the media *arrs answer at.
 fn sonarr(fake: &Arc<Fake>) -> Servarr {

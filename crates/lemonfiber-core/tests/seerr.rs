@@ -7,9 +7,7 @@
 //! The client speaks an async trait built on another, so it is driven from here
 //! rather than in-crate.
 
-mod common;
-
-use common::{Answer, Fake};
+use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 use lemonfiber_core::ports::http::Http;

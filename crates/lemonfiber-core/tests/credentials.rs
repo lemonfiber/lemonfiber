@@ -8,16 +8,14 @@
 //! `#[cfg(test)]` module, where async-trait code is compiled twice and its
 //! coverage counted from the wrong copy.
 
-mod common;
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use common::files::Files;
-use common::{Answer, Fake};
 use lemonfiber_core::doctor::credentials::{CredentialsCheck, Target, CREDENTIAL_REJECTED};
 use lemonfiber_core::doctor::{Category, Check, Verdict};
 use lemonfiber_core::error::Severity;
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// A Servarr config carrying a generated key, as one reads from disk.
 const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";

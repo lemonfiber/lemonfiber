@@ -12,14 +12,10 @@
 //! the clients write their keys to, and a transport answering as the download
 //! client and the aggregator would.
 
-mod common;
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use common::files::Files;
-use common::{Answer, Fake};
 use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Verdict};
@@ -28,6 +24,8 @@ use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, LogLine, LogQuery, Stats,
 };
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::{Answer, Fake};
 use tokio::sync::mpsc::Receiver;
 
 /// The repository's own copy of the stack, so the services resolve to the ids,
@@ -115,9 +113,9 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
         ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
     ]);
     let ctx = Ctx::new(
-        Arc::new(common::ports::Idle),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Stopped),
-        common::ports::Stopped::at(1_786_000_000),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_000_000),
         Files::ending(vec![
             ("config/sabnzbd/sabnzbd.ini", SAB_INI),
             ("config/prowlarr/config.xml", PROWLARR_XML),
@@ -163,9 +161,9 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
         ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
     ]);
     let ctx = Ctx::new(
-        Arc::new(common::ports::Idle),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Stopped),
-        common::ports::Stopped::at(1_786_000_000),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_000_000),
         Files::ending(vec![
             ("config/sabnzbd/sabnzbd.ini", SAB_INI),
             ("config/prowlarr/config.xml", PROWLARR_XML),
@@ -192,9 +190,9 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
 #[tokio::test]
 async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
     let ctx = Ctx::new(
-        Arc::new(common::ports::Idle),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Stopped),
-        common::ports::Stopped::at(1_786_000_000),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_000_000),
         Files::empty(),
         Source::External(project()),
         Settings::default(),

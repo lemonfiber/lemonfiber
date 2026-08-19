@@ -8,18 +8,16 @@
 //! another, so it is driven from here rather than from an in-crate test, where it
 //! would be compiled twice and its coverage counted from the wrong copy.
 
-mod common;
-
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use common::{Answer, Fake};
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::service::{
     AppSync, Application, ApplicationKind, Failure, IndexerUse, Indexers, Limits,
     RegisteredApplication,
 };
 use lemonfiber_core::prowlarr::Prowlarr;
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// The moment the indexer counts are asked at — noon on a fixed day, so a window taken
 /// back from it lands inside the same day and reads plainly in an assertion.

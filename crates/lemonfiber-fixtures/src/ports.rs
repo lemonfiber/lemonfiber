@@ -9,15 +9,13 @@
 //! twice is two places for the semantics to drift, and the drift is invisible until a test
 //! passes against one copy and would have failed against the other.
 
-#![allow(dead_code)]
-
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
-use lemonfiber_core::ports::random::Random;
-use lemonfiber_core::ports::time::Clock;
+use lemonfiber_ports::process::{Failure as RunFailure, Output, Runner};
+use lemonfiber_ports::random::Random;
+use lemonfiber_ports::time::Clock;
 
 /// A runner that spawns nothing.
 ///
@@ -39,6 +37,7 @@ pub struct Stopped(SystemTime);
 
 impl Stopped {
     /// Stopped this many seconds after the epoch.
+    #[must_use]
     pub fn at(seconds: u64) -> Arc<Self> {
         Arc::new(Self(SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)))
     }
@@ -68,11 +67,13 @@ pub struct Chance(Given);
 impl Chance {
     /// Exactly these bytes, or nothing at all where a test is about a source that cannot
     /// draw — which is a thing every caller has to survive.
+    #[must_use]
     pub const fn exactly(bytes: Option<Vec<u8>>) -> Self {
         Self(Given::Exactly(bytes))
     }
 
     /// Letters cycled to whatever length is asked for.
+    #[must_use]
     pub const fn cycling() -> Self {
         Self(Given::Cycling)
     }

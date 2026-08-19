@@ -15,15 +15,11 @@
 //! path that reached for one would be a path this fake was never meant to stand in
 //! for — and a plausible answer there would hide it.
 
-#![allow(dead_code)]
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
-};
+use lemonfiber_ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
 
 /// What the filesystem holds, and how a path finds it.
 pub enum Held {
@@ -45,16 +41,19 @@ pub struct Files {
 
 impl Files {
     /// One file, handed to any reader.
+    #[must_use]
     pub fn anywhere(text: impl Into<String>) -> Arc<Self> {
         Self::new(Held::Anywhere(Some(text.into())))
     }
 
     /// Nothing at all: no service has written its configuration yet.
+    #[must_use]
     pub fn empty() -> Arc<Self> {
         Self::new(Held::Anywhere(None))
     }
 
     /// Text at each of these exact paths.
+    #[must_use]
     pub fn at(files: Vec<(PathBuf, &str)>) -> Arc<Self> {
         Self::new(Held::At(
             files
@@ -65,6 +64,7 @@ impl Files {
     }
 
     /// Text for each path ending in one of these fragments.
+    #[must_use]
     pub fn ending(files: Vec<(&'static str, &str)>) -> Arc<Self> {
         Self::new(Held::Ending(
             files
