@@ -359,17 +359,22 @@ pub(crate) enum ConfigAction {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cli, Request};
+    use super::{Cli, Mending, Request};
     use clap::Parser;
 
     /// What `doctor` was asked to do about what it finds, for one command line.
     ///
     /// Answered through the parser rather than by building the flags by hand, because the
     /// question being asked is what a person typing this actually gets — including the
-    /// combinations the parser is meant to refuse.
-    fn asked(args: &[&str]) -> Option<bool> {
+    /// combinations the parser is meant to refuse. Nothing for a line that is not a
+    /// `doctor` run, or that the parser turns away.
+    fn doctoring(args: &[&str]) -> Option<(bool, Mending)> {
         match Cli::try_parse_from(args).ok()?.command? {
-            Request::Doctor { mending, .. } => Some(mending.acts()),
+            Request::Doctor {
+                disruptive,
+                mending,
+                ..
+            } => Some((disruptive, mending)),
             _ => None,
         }
     }
@@ -378,16 +383,20 @@ mod tests {
     /// it: a run that reverses a repair changes as much as one that makes it.
     #[test]
     fn a_run_that_changes_something_is_told_from_one_that_only_looks() {
-        assert_eq!(asked(&["lemonfiber", "doctor"]), Some(false));
-        assert_eq!(asked(&["lemonfiber", "doctor", "--fix"]), Some(true));
-        assert_eq!(asked(&["lemonfiber", "doctor", "--undo"]), Some(true));
+        let acts = |args: &[&str]| doctoring(args).map(|(_, mending)| mending.acts());
+
+        assert_eq!(acts(&["lemonfiber", "doctor"]), Some(false));
+        assert_eq!(acts(&["lemonfiber", "doctor", "--fix"]), Some(true));
+        assert_eq!(acts(&["lemonfiber", "doctor", "--undo"]), Some(true));
+        // The question is doctor's alone — every other command already says what it does.
+        assert_eq!(acts(&["lemonfiber", "status"]), None);
     }
 
     /// Repairing and reversing a repair in one run is not a thing to guess the order of,
     /// so it is refused at the parser rather than resolved somewhere further in.
     #[test]
     fn repairing_and_reversing_at_once_is_refused() {
-        assert_eq!(asked(&["lemonfiber", "doctor", "--fix", "--undo"]), None);
+        assert!(doctoring(&["lemonfiber", "doctor", "--fix", "--undo"]).is_none());
     }
 
     /// Two flags that read differently on the command line must be two arguments
@@ -396,21 +405,15 @@ mod tests {
     /// would silently do nothing.
     #[test]
     fn disturbing_the_stack_while_repairing_is_its_own_flag() {
-        let disruptive = |args: &[&str]| match Cli::try_parse_from(args).ok()?.command? {
-            Request::Doctor {
-                disruptive,
-                mending,
-                ..
-            } => Some((disruptive, mending.fixing.disruptive)),
-            _ => None,
-        };
+        let disturbs =
+            |args: &[&str]| doctoring(args).map(|(all, mending)| (all, mending.fixing.disruptive));
 
         assert_eq!(
-            disruptive(&["lemonfiber", "doctor", "--disruptive"]),
+            disturbs(&["lemonfiber", "doctor", "--disruptive"]),
             Some((true, false))
         );
         assert_eq!(
-            disruptive(&["lemonfiber", "doctor", "--fix", "--fix-disruptive"]),
+            disturbs(&["lemonfiber", "doctor", "--fix", "--fix-disruptive"]),
             Some((false, true))
         );
     }
