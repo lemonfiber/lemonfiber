@@ -26,7 +26,8 @@ pub use clients::{
     Queued, Queues, RegisteredClient, RegisteredFolder, RootFolder, Transfers,
 };
 pub use failure::{
-    Failure, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE, SERVICE_UNSUPPORTED,
+    Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
+    SERVICE_UNSUPPORTED,
 };
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
@@ -176,8 +177,8 @@ pub trait MediaServer: Send + Sync {
 ///
 /// The two statuses are carried as the service's own numbers rather than folded here:
 /// what became of the request and what became of the media it asked for are separate
-/// facts, and turning the pair into one word a member reads is a decision for
-/// [`crate::household::State`], not for the code that reads them off the wire.
+/// facts, and turning the pair into one word a member reads is a decision for the household
+/// model above this, not for the code that reads them off the wire.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HouseholdRequest {
     /// The member who asked, by the name the request service shows them under.

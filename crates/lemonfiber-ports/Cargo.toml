@@ -1,0 +1,17 @@
+[package]
+name = "lemonfiber-ports"
+description = "The boundary lemonfiber speaks to the outside world across, and the vocabulary that crosses it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+
+[dependencies]
+async-trait = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+
+[lints]
+workspace = true
