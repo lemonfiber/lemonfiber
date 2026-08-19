@@ -18,5 +18,10 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
+[dev-dependencies]
+# The tests round-trip a stage through its serialised form, which is the only place the
+# `serde` derives above are actually proven.
+serde_json = "1"
+
 [lints]
 workspace = true
