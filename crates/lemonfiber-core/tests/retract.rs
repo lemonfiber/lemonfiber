@@ -36,6 +36,9 @@ fn project() -> &'static Path {
 /// A Servarr config carrying a readable key, so the target opens.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
+/// SABnzbd's own configuration, carrying the key an \*arr is told to reach it with.
+const SABNZBD: &str = "[misc]\napi_key = sabkey123\n";
+
 /// Where this test's records live, in a scratch directory of its own.
 fn scratch(name: &str) -> PathBuf {
     let dir =
@@ -54,7 +57,12 @@ fn ctx(root: &Path, http: Arc<Fake>) -> Ctx {
         Arc::new(lemonfiber_core::adapters::Local),
         Arc::new(lemonfiber_core::adapters::Daemon::local()),
         Arc::new(lemonfiber_core::adapters::System),
-        Files::ending(vec![("config/sonarr/config.xml", CONFIG)]),
+        // SABnzbd's key too: the wirings a diagnosis reads are the clients lemonfiber
+        // would write, and without a credential to write there is no client to compare.
+        Files::ending(vec![
+            ("config/sonarr/config.xml", CONFIG),
+            ("config/sabnzbd/sabnzbd.ini", SABNZBD),
+        ]),
         Source::External(project()),
         Settings {
             env_file: Some(paths(root).env_file()),
