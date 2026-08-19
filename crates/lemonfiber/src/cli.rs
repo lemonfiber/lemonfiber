@@ -352,3 +352,37 @@ pub(crate) enum ConfigAction {
     /// Show every setting, with credentials withheld.
     Show,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Command};
+    use clap::Parser;
+
+    /// What `doctor` was asked to do about what it finds, for one command line.
+    ///
+    /// Answered through the parser rather than by building the flags by hand, because the
+    /// question being asked is what a person typing this actually gets — including the
+    /// combinations the parser is meant to refuse.
+    fn asked(args: &[&str]) -> Option<bool> {
+        match Cli::try_parse_from(args).ok()?.command {
+            Command::Doctor { mending, .. } => Some(mending.acts()),
+            _ => None,
+        }
+    }
+
+    /// Looking and acting are told apart by what was asked for, not by which flag carries
+    /// it: a run that reverses a repair changes as much as one that makes it.
+    #[test]
+    fn a_run_that_changes_something_is_told_from_one_that_only_looks() {
+        assert_eq!(asked(&["lemonfiber", "doctor"]), Some(false));
+        assert_eq!(asked(&["lemonfiber", "doctor", "--fix"]), Some(true));
+        assert_eq!(asked(&["lemonfiber", "doctor", "--undo"]), Some(true));
+    }
+
+    /// Repairing and reversing a repair in one run is not a thing to guess the order of,
+    /// so it is refused at the parser rather than resolved somewhere further in.
+    #[test]
+    fn repairing_and_reversing_at_once_is_refused() {
+        assert_eq!(asked(&["lemonfiber", "doctor", "--fix", "--undo"]), None);
+    }
+}

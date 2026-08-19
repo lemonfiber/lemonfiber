@@ -18,7 +18,7 @@ use lemonfiber_core::app::recover;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::repair;
 
-use crate::cli::{Fixing, Mending};
+use crate::cli::Mending;
 use crate::prompt::{yes_no, Answers};
 use crate::render::repair::{mended, reversed};
 use crate::render::Lines;
@@ -60,10 +60,8 @@ pub(crate) async fn run(
 fn undone(paths: &Paths, json: bool) -> ExitCode {
     let journal = recover::journal_at(&paths.journal());
     let undos = repair::undoing(journal.changes());
-    if undos.is_empty() {
-        reversed(&undos, json).print();
-        return ExitCode::SUCCESS;
-    }
+    // Nothing to put back carries none of it out and says so, without a case of its own:
+    // reversing an empty list is the same errand with nothing in it.
     if let Err(problem) = recover::undo(&undos, &paths.env_file()) {
         return crate::complain(&problem);
     }
@@ -112,7 +110,8 @@ mod tests {
     use crate::exit::{repairing, shown, success};
     use crate::prompt::Answers;
 
-    use super::{run, Asking, Confirm as _, Ctx, Fixing, Mending, Paths};
+    use super::{run, Asking, Confirm as _, Ctx, Mending, Paths};
+    use crate::cli::Fixing;
 
     /// Where a test's records live, in a scratch directory of its own — named, because a
     /// test that undoes a journal must not be reading one another test wrote.
@@ -268,6 +267,52 @@ mod tests {
         assert_eq!(shown(code), success());
         let env = std::fs::read_to_string(paths.env_file()).unwrap_or_default();
         assert!(env.contains("QBITTORRENT_PORT=8080"), "{env}");
+    }
+
+    /// A repair that registered something can only be put back by the service that holds
+    /// it, so an undo run when that service is gone says which one it needed rather than
+    /// reporting a reversal that did not happen.
+    #[tokio::test]
+    async fn an_undo_that_needs_a_service_that_is_gone_says_so() {
+        use lemonfiber_core::journal::{Change, Kind};
+
+        let paths = paths("beyond-reach");
+        let journal = paths.journal();
+        if let Some(dir) = journal.parent() {
+            std::fs::create_dir_all(dir).ok();
+        }
+        let recorded = Change {
+            at: "1000".to_owned(),
+            operation: lemonfiber_core::repair::OPERATION.to_owned(),
+            target: "sonarr".to_owned(),
+            kind: Kind::Created {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+            },
+        };
+        std::fs::write(
+            &journal,
+            serde_json::to_string(&recorded).unwrap_or_default() + "\n",
+        )
+        .ok();
+
+        let code = run(
+            ctx(),
+            paths,
+            Mending {
+                fixing: Fixing {
+                    fix: false,
+                    yes: false,
+                    disruptive: false,
+                },
+                undo: true,
+            },
+            &Says("n"),
+            false,
+        )
+        .await;
+
+        assert_ne!(shown(code), success());
     }
 
     /// A stack that will not read is the one thing every check needs before any of them
