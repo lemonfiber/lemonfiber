@@ -22,6 +22,7 @@
 #![allow(dead_code)]
 
 pub mod files;
+pub mod ports;
 pub mod service;
 pub mod tunnel;
 

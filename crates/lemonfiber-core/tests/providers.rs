@@ -107,28 +107,6 @@ impl Engine for Stopped {
     }
 }
 
-/// A runner that spawns nothing, for the checks this one does not run.
-struct Idle;
-
-#[async_trait]
-impl Runner for Idle {
-    async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
-        Err(RunFailure::NotFound {
-            program: "unused".to_owned(),
-        })
-    }
-}
-
-/// A clock stopped at a fixed moment, so a projection is the same run to run.
-struct StoppedClock;
-
-#[async_trait]
-impl Clock for StoppedClock {
-    fn now(&self) -> SystemTime {
-        SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_786_000_000)
-    }
-}
-
 #[tokio::test]
 async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_them() {
     let http = Fake::by_path(vec![
@@ -140,9 +118,9 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
         ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
     ]);
     let ctx = Ctx::new(
-        Arc::new(Idle),
+        Arc::new(common::ports::Idle),
         Arc::new(Stopped),
-        Arc::new(StoppedClock),
+        common::ports::Stopped::at(1_786_000_000),
         Files::ending(vec![
             ("config/sabnzbd/sabnzbd.ini", SAB_INI),
             ("config/prowlarr/config.xml", PROWLARR_XML),
@@ -188,9 +166,9 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
         ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
     ]);
     let ctx = Ctx::new(
-        Arc::new(Idle),
+        Arc::new(common::ports::Idle),
         Arc::new(Stopped),
-        Arc::new(StoppedClock),
+        common::ports::Stopped::at(1_786_000_000),
         Files::ending(vec![
             ("config/sabnzbd/sabnzbd.ini", SAB_INI),
             ("config/prowlarr/config.xml", PROWLARR_XML),
@@ -217,9 +195,9 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
 #[tokio::test]
 async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
     let ctx = Ctx::new(
-        Arc::new(Idle),
+        Arc::new(common::ports::Idle),
         Arc::new(Stopped),
-        Arc::new(StoppedClock),
+        common::ports::Stopped::at(1_786_000_000),
         Files::empty(),
         Source::External(project()),
         Settings::default(),

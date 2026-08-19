@@ -9,6 +9,8 @@
 //! a port cannot reach up into the layer it serves, and the layer above is free to keep
 //! calling them by their old names.
 
+use serde::{Deserialize, Serialize};
+
 /// The two services whose quality an operator chooses by resolution, and so the
 /// two the quality model speaks to. Music and books have a different axis and
 /// are not resolution presets, so they are not here.

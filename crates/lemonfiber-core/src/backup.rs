@@ -16,7 +16,7 @@
 //! of the archive itself live in the app layer; nothing decided here can be wrong
 //! in a way a test cannot reach.
 
-pub use lemonfiber_ports::backup::{Existing, Item, Manifest, Member};
+pub use lemonfiber_ports::backup::{Existing, Item, Manifest, Member, Scope};
 
 use std::path::{Component, Path, PathBuf};
 
@@ -30,23 +30,6 @@ use crate::config::paths::Paths;
 /// archive stamped with any other schema is refused rather than half-read, since
 /// a backup that restores into a subtly wrong state is worse than none.
 pub const SCHEMA: u32 = 1;
-
-/// How much of the stack a backup covers.
-///
-/// Whole-stack is the common case, but restoring one service is often what is
-/// actually wanted — one \*arr's configuration mangled while the rest is fine —
-/// so the scope is recorded in the archive and honoured on the way back.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "scope", rename_all = "snake_case")]
-pub enum Scope {
-    /// Every service's configuration, plus lemonfiber's own and the stack.
-    WholeStack,
-    /// One named service's configuration alone.
-    Service {
-        /// The service whose configuration this covers.
-        name: String,
-    },
-}
 
 /// What a capture will copy, decided from the layout and the scope alone.
 #[derive(Debug, Clone, PartialEq, Eq)]

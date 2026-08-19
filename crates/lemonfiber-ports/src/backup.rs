@@ -11,6 +11,23 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// How much of the stack a backup covers.
+///
+/// Whole-stack is the common case, but restoring one service is often what is
+/// actually wanted — one \*arr's configuration mangled while the rest is fine —
+/// so the scope is recorded in the archive and honoured on the way back.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "scope", rename_all = "snake_case")]
+pub enum Scope {
+    /// Every service's configuration, plus lemonfiber's own and the stack.
+    WholeStack,
+    /// One named service's configuration alone.
+    Service {
+        /// The service whose configuration this covers.
+        name: String,
+    },
+}
+
 /// One thing a capture copies into the archive.
 ///
 /// The source is where it is read from on this machine; the archive path is where

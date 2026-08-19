@@ -109,51 +109,13 @@ impl Engine for Engine1 {
     }
 }
 
-/// A runner that spawns nothing.
-struct Idle;
-
-#[async_trait]
-impl Runner for Idle {
-    async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
-        Err(RunFailure::NotFound {
-            program: "unused".to_owned(),
-        })
-    }
-}
-
-/// A clock stopped at a fixed moment, so a bundle's provenance is the same run to run.
-struct StoppedClock;
-
-#[async_trait]
-impl Clock for StoppedClock {
-    fn now(&self) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(1_786_968_000)
-    }
-}
-
-/// Randomness built rather than written, for the reason every credential-shaped fixture
-/// in this repository is built.
-struct Bytes;
-
-impl Random for Bytes {
-    fn bytes(&self, n: usize) -> Option<Vec<u8>> {
-        Some(
-            ('a'..='p')
-                .map(|letter| letter as u8)
-                .cycle()
-                .take(n)
-                .collect(),
-        )
-    }
-}
-
 /// A context over a stack that is there, an engine that is or is not, and a configuration
 /// file that is or is not.
 fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx {
     Ctx::new(
-        Arc::new(Idle),
+        Arc::new(common::ports::Idle),
         Arc::new(Engine1(running)),
-        Arc::new(StoppedClock),
+        common::ports::Stopped::at(1_786_968_000),
         configuration.map_or_else(Files::empty, Files::anywhere),
         stack,
         Settings {
@@ -164,7 +126,7 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
         Environment::MacOs,
     )
     .with_http(Fake::silent())
-    .with_random(Arc::new(Bytes))
+    .with_random(Arc::new(common::ports::Chance::cycling()))
 }
 
 /// What a bundle from a working-enough machine holds: its own first page, the diagnosis,
@@ -299,15 +261,8 @@ async fn a_bundle_from_a_broken_machine_names_what_it_could_not_read() {
 /// randomness gets no bundle rather than a guessable one.
 #[tokio::test]
 async fn no_randomness_means_no_bundle_at_all() {
-    struct Nothing;
-
-    impl Random for Nothing {
-        fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
-            None
-        }
-    }
-
-    let context = ctx(Source::External(project()), true, None).with_random(Arc::new(Nothing));
+    let context = ctx(Source::External(project()), true, None)
+        .with_random(Arc::new(common::ports::Chance::exactly(None)));
     assert!(collect(&context, LEMONFIBER, &Wanted::default())
         .await
         .is_none());
