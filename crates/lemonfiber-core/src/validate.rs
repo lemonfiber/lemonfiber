@@ -469,27 +469,15 @@ mod tests {
 
     use async_trait::async_trait;
 
+    use lemonfiber_fixtures::http::{Answer, Fake};
+
     use super::{Credential, Live, Validation, Validator};
     use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::ports::nntp::{Endpoint, Nntp};
 
-    /// An HTTP transport that answers every request the same scripted way — either
-    /// a response, or nothing at all.
-    struct Canned(Result<Response, Unreachable>);
-
-    #[async_trait]
-    impl Http for Canned {
-        async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-            self.0.clone()
-        }
-    }
-
     /// A validator whose transport answers with the given body at 200.
     fn answering(body: &str) -> Live {
-        Live::new(Arc::new(Canned(Ok(Response {
-            status: 200,
-            body: body.to_owned(),
-        }))))
+        Live::new(Fake::always(Answer::reply(200, body.to_owned())))
     }
 
     /// The indexer credential the tests prove; the URL and key are immaterial to a
@@ -588,12 +576,9 @@ mod tests {
 
     #[tokio::test]
     async fn a_refusing_status_with_no_error_element_is_still_a_refusal() {
-        let outcome = Live::new(Arc::new(Canned(Ok(Response {
-            status: 401,
-            body: String::new(),
-        }))))
-        .validate(&indexer())
-        .await;
+        let outcome = Live::new(Fake::always(Answer::reply(401, String::new())))
+            .validate(&indexer())
+            .await;
         assert!(matches!(
             outcome,
             Validation::Rejected { detail } if detail.contains("401")
@@ -622,13 +607,7 @@ mod tests {
 
     #[tokio::test]
     async fn nothing_answering_at_all_is_unreachable_with_the_transports_reason() {
-        let outcome = Live::new(Arc::new(Canned(Err(Unreachable {
-            url: "http://indexer.test/api".to_owned(),
-            reason: "connection refused".to_owned(),
-            attempts: 1,
-        }))))
-        .validate(&indexer())
-        .await;
+        let outcome = Live::new(Fake::silent()).validate(&indexer()).await;
         assert!(matches!(
             outcome,
             Validation::Unreachable { detail } if detail.contains("connection refused")
@@ -663,10 +642,7 @@ mod tests {
     fn dialling(lines: &[&str]) -> Live {
         let replies = lines.iter().map(|line| (*line).to_owned()).collect();
         Live::with_nntp(
-            Arc::new(Canned(Ok(Response {
-                status: 200,
-                body: String::new(),
-            }))),
+            Fake::always(Answer::reply(200, String::new())),
             Arc::new(Dialogue(Ok(replies))),
         )
     }
@@ -782,10 +758,7 @@ mod tests {
     #[tokio::test]
     async fn a_provider_that_cannot_be_reached_is_unreachable() {
         let live = Live::with_nntp(
-            Arc::new(Canned(Ok(Response {
-                status: 200,
-                body: String::new(),
-            }))),
+            Fake::always(Answer::reply(200, String::new())),
             Arc::new(Dialogue(Err(crate::ports::nntp::Unreachable {
                 host: "news.provider.test".to_owned(),
                 reason: "connection refused".to_owned(),
@@ -864,12 +837,9 @@ mod tests {
 
     #[tokio::test]
     async fn a_service_that_refuses_the_key_is_rejected() {
-        let outcome = Live::new(Arc::new(Canned(Ok(Response {
-            status: 401,
-            body: String::new(),
-        }))))
-        .validate(&service())
-        .await;
+        let outcome = Live::new(Fake::always(Answer::reply(401, String::new())))
+            .validate(&service())
+            .await;
         assert!(matches!(
             outcome,
             Validation::Rejected { detail } if detail.contains("401")
@@ -878,10 +848,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_service_url_that_answers_as_something_else_points_at_the_url() {
-        let outcome = Live::new(Arc::new(Canned(Ok(Response {
-            status: 404,
-            body: "<html>not found</html>".to_owned(),
-        }))))
+        let outcome = Live::new(Fake::always(Answer::reply(
+            404,
+            "<html>not found</html>".to_owned(),
+        )))
         .validate(&service())
         .await;
         assert!(matches!(
@@ -892,13 +862,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_service_that_does_not_answer_is_unreachable() {
-        let outcome = Live::new(Arc::new(Canned(Err(Unreachable {
-            url: "http://sonarr.test:8989".to_owned(),
-            reason: "connection refused".to_owned(),
-            attempts: 1,
-        }))))
-        .validate(&service())
-        .await;
+        let outcome = Live::new(Fake::silent()).validate(&service()).await;
         assert!(matches!(
             outcome,
             Validation::Unreachable { detail } if detail.contains("connection refused")
@@ -907,62 +871,29 @@ mod tests {
 
     #[tokio::test]
     async fn a_service_is_reached_with_its_key_in_the_api_header() {
-        /// A request the fake saw: its URL and the headers it carried.
-        type Seen = (String, Vec<(String, String)>);
-        struct Recording(std::sync::Mutex<Vec<Seen>>);
-        #[async_trait]
-        impl Http for Recording {
-            async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-                self.0
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .push((request.url.clone(), request.headers.clone()));
-                Ok(Response {
-                    status: 200,
-                    body: r#"{"instanceName":"Radarr"}"#.to_owned(),
-                })
-            }
-        }
-        let recording = Arc::new(Recording(std::sync::Mutex::new(Vec::new())));
+        let recording = Fake::always(Answer::reply(200, r#"{"instanceName":"Radarr"}"#));
         let outcome = Live::new(recording.clone()).validate(&service()).await;
 
         assert!(matches!(outcome, Validation::Valid { .. }));
-        let asked = recording
-            .0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let (url, headers) = asked.first().cloned().unwrap_or_default();
+        let asked = recording.request();
         assert!(
-            url.contains("system/status"),
+            asked
+                .as_ref()
+                .is_some_and(|request| request.url.contains("system/status")),
             "the identity endpoint is reached"
         );
         assert!(
-            headers
+            asked.is_some_and(|request| request
+                .headers
                 .iter()
-                .any(|(name, value)| name == "X-Api-Key" && value == "abc"),
+                .any(|(name, value)| name == "X-Api-Key" && value == "abc")),
             "the key authenticates the request as a header, not a query param"
         );
     }
 
     #[tokio::test]
     async fn the_search_carries_the_key_and_keeps_an_existing_query_intact() {
-        // A transport that records the URL it was asked for, so the request the
-        // validator builds can be inspected.
-        struct Recording(std::sync::Mutex<Vec<String>>);
-        #[async_trait]
-        impl Http for Recording {
-            async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-                self.0
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .push(request.url.clone());
-                Ok(Response {
-                    status: 200,
-                    body: "<rss><channel></channel></rss>".to_owned(),
-                })
-            }
-        }
-        let recording = Arc::new(Recording(std::sync::Mutex::new(Vec::new())));
+        let recording = Fake::always(Answer::reply(200, "<rss><channel></channel></rss>"));
         let credential = Credential::Indexer {
             url: "http://indexer.test/api?limit=1".to_owned(),
             key: "secret".to_owned(),
@@ -970,18 +901,18 @@ mod tests {
         let outcome = Live::new(recording.clone()).validate(&credential).await;
 
         assert!(matches!(outcome, Validation::Valid { .. }));
-        let asked = recording
-            .0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let url = asked.first().map(String::as_str).unwrap_or_default();
-        assert!(url.contains("t=search"), "a real search is issued");
+        let url = recording.request().map(|request| request.url);
         assert!(
-            url.contains("apikey=secret"),
+            url.as_deref().is_some_and(|url| url.contains("t=search")),
+            "a real search is issued"
+        );
+        assert!(
+            url.as_deref()
+                .is_some_and(|url| url.contains("apikey=secret")),
             "the key authenticates the query"
         );
         assert!(
-            url.contains("?limit=1&"),
+            url.as_deref().is_some_and(|url| url.contains("?limit=1&")),
             "an existing query is joined with & not a second ?"
         );
     }

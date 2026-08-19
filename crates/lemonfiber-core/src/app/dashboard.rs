@@ -460,25 +460,18 @@ mod tests {
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
-    use crate::ports::http::{Http, Request, Response, Unreachable};
+    use crate::ports::http::Http;
     use crate::stack::Source;
     use crate::test_support::{
         a_password, spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs, Tunnel,
     };
+    use lemonfiber_fixtures::http::{Answer, Fake};
 
-    /// A transport that answers every request with the same body — a service's
-    /// queue as JSON for the happy path, or something unreadable to stand in for a
-    /// service that will not answer.
-    struct HttpReturning(&'static str);
-
-    #[async_trait]
-    impl Http for HttpReturning {
-        async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-            Ok(Response {
-                status: 200,
-                body: self.0.to_owned(),
-            })
-        }
+    /// A transport answering every request with this body at 200 — the queue as JSON for
+    /// the happy path, or something unreadable to stand in for a service that will not
+    /// answer.
+    fn answering(body: &'static str) -> Arc<Fake> {
+        Fake::always(Answer::reply(200, body))
     }
 
     /// A Servarr config carrying a usable key, and one carrying none.
@@ -614,7 +607,7 @@ mod tests {
 
     /// A context configured with a fake filesystem and transport, over the stack
     /// this repo carries so its \*arr services resolve as queue targets.
-    fn ctx_with(fs: SeedFs, http: HttpReturning) -> Ctx {
+    fn ctx_with(fs: SeedFs, http: Arc<Fake>) -> Ctx {
         ctx(Reporting::holding(
             &LIBRARY,
             Lifecycle::Running,
@@ -628,7 +621,7 @@ mod tests {
     async fn the_queue_panel_fills_with_each_arrs_depth_and_stuck_count() {
         let ctx = ctx_with(
             SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
-            HttpReturning(QUEUE_JSON),
+            answering(QUEUE_JSON),
         );
         let snapshot = gather(&ctx, None).await;
         assert!(
@@ -642,7 +635,7 @@ mod tests {
     async fn a_service_still_starting_with_no_key_is_left_out_of_the_queue() {
         // No config to read: the ordinary first-start case, skipped so the panel is
         // ready-but-empty rather than failed.
-        let ctx = ctx_with(SeedFs::keyed(None, None), HttpReturning(QUEUE_JSON));
+        let ctx = ctx_with(SeedFs::keyed(None, None), answering(QUEUE_JSON));
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
     }
@@ -651,7 +644,7 @@ mod tests {
     async fn a_service_whose_config_holds_no_key_is_left_out_of_the_queue() {
         let ctx = ctx_with(
             SeedFs::keyed(Some(CONFIG_NO_KEY), None),
-            HttpReturning(QUEUE_JSON),
+            answering(QUEUE_JSON),
         );
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
@@ -663,7 +656,7 @@ mod tests {
         // dropped from the panel rather than failing it.
         let ctx = ctx_with(
             SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
-            HttpReturning("not a queue"),
+            answering("not a queue"),
         );
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
@@ -741,26 +734,12 @@ mod tests {
     /// A transport that answers each download client on its own path: qBittorrent's
     /// login and its torrent list, and — anything else being the only other call a
     /// read makes — `SABnzbd`'s queue.
-    struct Downloads {
-        torrents: &'static str,
-        queue: &'static str,
-    }
-
-    #[async_trait]
-    impl Http for Downloads {
-        async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-            let body = if request.url.contains("/auth/login") {
-                "Ok."
-            } else if request.url.contains("/torrents/info") {
-                self.torrents
-            } else {
-                self.queue
-            };
-            Ok(Response {
-                status: 200,
-                body: body.to_owned(),
-            })
-        }
+    fn downloads(torrents: &'static str, queue: &'static str) -> Arc<Fake> {
+        Fake::by_path(vec![
+            ("/auth/login", Answer::reply(200, "Ok.")),
+            ("/torrents/info", Answer::reply(200, torrents)),
+            ("", Answer::reply(200, queue)),
+        ])
     }
 
     /// One qBittorrent torrent, 30% done at a known speed with an ETA.
@@ -818,10 +797,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_transfers_panel_fills_from_each_download_client() {
-        let http: Arc<dyn Http> = Arc::new(Downloads {
-            torrents: QBIT_TORRENTS,
-            queue: SAB_QUEUE,
-        });
+        let http: Arc<dyn Http> = downloads(QBIT_TORRENTS, SAB_QUEUE);
         let ctx = ctx_downloads(
             SeedFs::keyed(None, Some(SAB_KEY_INI)),
             http,
