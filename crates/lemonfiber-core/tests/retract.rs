@@ -36,7 +36,7 @@ fn project() -> &'static Path {
 /// A Servarr config carrying a readable key, so the target opens.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
-/// SABnzbd's own configuration, carrying the key an \*arr is told to reach it with.
+/// `SABnzbd`'s own configuration, carrying the key an \*arr is told to reach it with.
 const SABNZBD: &str = "[misc]\napi_key = sabkey123\n";
 
 /// Where this test's records live, in a scratch directory of its own.
