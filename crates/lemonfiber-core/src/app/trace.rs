@@ -642,7 +642,7 @@ mod tests {
 
     /// A context over the real stack, a filesystem that opens the \*arrs, and a transport
     /// answering the given reads.
-    fn ctx_with(fake: Fake) -> Ctx {
+    fn ctx_with(fake: &Fake) -> Ctx {
         Ctx::new(
             Arc::new(Scripted(Ok(spoke("")))),
             Arc::new(Reporting::absent()),
@@ -659,13 +659,13 @@ mod tests {
     /// A context whose media server the trace cannot ask — no admin password is recorded,
     /// so the library stage is simply left unanswered, as on the \*arr-only slices.
     fn ctx(library: &'static str, history: &'static str, queue: &'static str) -> Ctx {
-        ctx_with(Fake::arr(library, history, queue))
+        ctx_with(&Fake::arr(library, history, queue))
     }
 
     /// A context whose download client's key is readable as well as the \*arrs', so a
     /// trace that asks the accounts resolves both readers rather than only one.
     fn ctx_with_accounts(fake: Fake) -> Ctx {
-        ctx_with(fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_INI))))
+        ctx_with(&fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_INI))))
     }
 
     /// A context that can reach its Jellyfin: the admin password is recorded under the
@@ -675,7 +675,7 @@ mod tests {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-trace-{tag}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        let mut context = ctx_with(fake);
+        let mut context = ctx_with(&fake);
         context.settings.env_file = Some(dir.join(".env"));
         crate::app::targets::record_secret(
             &context,
@@ -686,7 +686,7 @@ mod tests {
     }
 
     /// A Jellyfin reading client over a transport, for the library-presence reads.
-    fn jellyfin(fake: Fake) -> Jellyfin {
+    fn jellyfin(fake: &Fake) -> Jellyfin {
         Jellyfin::authenticated(
             fake.transport(),
             "http://127.0.0.1:8096",
@@ -1135,7 +1135,7 @@ mod tests {
     async fn an_unreadable_episode_listing_leaves_the_rest_of_the_trace_standing() {
         // The episodes will not read, so there is no coverage to report — but everything
         // the other services did answer still stands, and the gap is named.
-        let context = ctx_with(Fake::with_episodes(
+        let context = ctx_with(&Fake::with_episodes(
             r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
             EMPTY_QUEUE,
             "not json",
@@ -1151,7 +1151,7 @@ mod tests {
 
     #[tokio::test]
     async fn tracing_a_series_reads_its_episodes_into_coverage() {
-        let context = ctx_with(Fake::with_episodes(
+        let context = ctx_with(&Fake::with_episodes(
             r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
             EMPTY_QUEUE,
             r#"[
@@ -1272,7 +1272,7 @@ mod tests {
         // The sign-in comes back as something that is not a session: the read failed, so
         // presence is unknown — never inferred as absent.
         let presence = library_presence(
-            Some(&jellyfin(Fake::arr("", "", ""))),
+            Some(&jellyfin(&Fake::arr("", "", ""))),
             Kind::Radarr,
             "The Expanse",
         )

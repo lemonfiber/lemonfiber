@@ -233,7 +233,7 @@ mod tests {
     /// A context whose request service can be reached: the media-server password is
     /// recorded, so `seerr_reader` resolves a client. Tagged so each test keeps its own
     /// env file rather than racing on a shared one.
-    fn ctx_with(fake: Fake, tag: &str) -> Ctx {
+    fn ctx_with(fake: &Fake, tag: &str) -> Ctx {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-household-{tag}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
