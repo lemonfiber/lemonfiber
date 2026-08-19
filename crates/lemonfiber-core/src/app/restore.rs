@@ -16,10 +16,10 @@
 
 use std::path::Path;
 
+use crate::archive::{Fault, Reader};
 use crate::backup::{self, Compatibility, Manifest, Relocation, Scope};
 use crate::config::paths::Paths;
 use crate::error::{Code, Problem, Remedy, Severity, State};
-use crate::ports::archive::{Fault, Reader};
 
 /// Raised when a backup archive cannot be read to decide a restore.
 pub const CORRUPT: Code = Code::new("RESTORE-1");
@@ -253,9 +253,9 @@ mod tests {
     use super::{
         inspect, restore, CORRUPT, INCOMPATIBLE, NEEDS_REPOINT, NOT_RESTORED, TOO_NEW, UNSAFE,
     };
+    use crate::archive::{Fault, Reader};
     use crate::backup::{self, Manifest, Member, Scope, SCHEMA};
     use crate::config::paths::Paths;
-    use crate::ports::archive::{Fault, Reader};
 
     /// A reader that answers with a scripted manifest and extraction result, and
     /// records the archives it was asked to unpack.

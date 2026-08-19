@@ -1,15 +1,9 @@
-//! The one file a configuration backup lives in.
+//! Writing and reading the archive a backup lives in.
 //!
-//! What a capture *includes* is decided in [`crate::backup`], with no disk in
-//! sight; what it takes to turn that decision into a portable file — walking the
-//! chosen trees, packing them beside the manifest, measuring the room they need,
-//! listing and pruning the archives already there — is the outside world, and is
-//! reached only through here. The capture executor above drives these operations
-//! and decides what each failure means, so the whole of its policy stays testable
-//! with a fake in place of a real archive on a real disk.
-//!
-//! The read and extract side a restore needs is added with the restore executor;
-//! this is the write and retention side a capture needs.
+//! Here rather than in `lemonfiber-ports` with the other seams, and for the reason the
+//! notify port is: it speaks in backup's own terms, and a manifest is not vocabulary — it
+//! has behaviour, so its type and its methods cannot live in different crates. A port whose
+//! nouns carry logic belongs beside them.
 
 use std::path::{Path, PathBuf};
 

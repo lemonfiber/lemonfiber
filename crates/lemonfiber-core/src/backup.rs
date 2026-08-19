@@ -16,11 +16,86 @@
 //! of the archive itself live in the app layer; nothing decided here can be wrong
 //! in a way a test cannot reach.
 
-pub use lemonfiber_ports::backup::{Existing, Item, Manifest, Member, Scope};
+/// How much of the stack a backup covers.
+///
+/// Whole-stack is the common case, but restoring one service is often what is
+/// actually wanted — one \*arr's configuration mangled while the rest is fine —
+/// so the scope is recorded in the archive and honoured on the way back.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "scope", rename_all = "snake_case")]
+pub enum Scope {
+    /// Every service's configuration, plus lemonfiber's own and the stack.
+    WholeStack,
+    /// One named service's configuration alone.
+    Service {
+        /// The service whose configuration this covers.
+        name: String,
+    },
+}
 
-use std::path::{Component, Path, PathBuf};
+/// One thing a capture copies into the archive.
+///
+/// The source is where it is read from on this machine; the archive path is where
+/// it lands inside the archive, stable across machines so a restore knows where to
+/// put it back. The label is what a contents listing shows the operator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Item {
+    /// Where it is read from.
+    pub source: PathBuf,
+    /// Where it sits inside the archive, and is restored back to a data root.
+    pub archive_path: String,
+    /// What a listing calls it, in the operator's terms.
+    pub label: String,
+}
+
+/// The record written inside an archive, and read back to decide a restore.
+///
+/// Everything a restore needs to know before it overwrites anything: what made
+/// the archive, when, what data root it was taken against, what it covers, whether
+/// it is sensitive, and the contents to list. Round-trips through JSON so the same
+/// value the capture wrote is the value the restore reads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Manifest {
+    /// The archive format, checked before anything inside is trusted.
+    pub schema: u32,
+    /// The lemonfiber version that wrote it, checked against the one restoring.
+    pub product_version: String,
+    /// When it was taken. Opaque here; the surface stamps it from the clock.
+    pub created_at: String,
+    /// The data root it was taken against, to notice a restore to a different one.
+    pub data_root: String,
+    /// What it covers.
+    pub scope: Scope,
+    /// Whether it carries credentials, and so must be handled as sensitive.
+    pub sensitive: bool,
+    /// What is inside, for a listing shown before anything is overwritten.
+    pub members: Vec<Member>,
+}
+
+/// One entry in an archive's contents listing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Member {
+    /// Where it sits inside the archive.
+    pub archive_path: String,
+    /// What it is, in the operator's terms.
+    pub label: String,
+}
+
+/// One backup already on disk, as retention sees it: a name and when it was taken.
+///
+/// Ordered by when it was taken, oldest first, so the ones to prune are simply the
+/// ones the keep-count does not reach.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Existing {
+    /// What the archive is called on disk.
+    pub name: String,
+    /// When it was taken, compared lexically — the surface names archives so this
+    /// holds.
+    pub created_at: String,
+}
 
 use serde::{Deserialize, Serialize};
+use std::path::{Component, Path, PathBuf};
 
 use crate::config::paths::Paths;
 

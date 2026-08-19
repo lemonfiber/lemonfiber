@@ -12,12 +12,12 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::archive::{Archive, Fault, Space};
 use crate::bundle::{self, Contents, Filenames, Marks, Piece, Residual, Taken, Terms};
 use crate::bytes::humanize;
 use crate::doctor::Verdict;
 use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::instant;
-use crate::ports::archive::{Archive, Fault, Space};
 use crate::ports::docker::LogQuery;
 
 use super::Ctx;

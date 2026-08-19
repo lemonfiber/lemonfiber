@@ -16,10 +16,10 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
+use crate::archive::{Archive, Fault, Space};
 use crate::backup::{self, Manifest, Retention, Scope};
 use crate::config::paths::Paths;
 use crate::error::{Code, Problem, Remedy, Severity, State};
-use crate::ports::archive::{Archive, Fault, Space};
 
 /// Bytes kept free beyond the estimate, so a capture never spends the last of the
 /// disk it exists to protect.
@@ -209,9 +209,9 @@ mod tests {
 
     use super::{capture, Report, NOT_MEASURED, NOT_WRITTEN, NO_ROOM};
     use crate::app::fixtures::FakeArchive;
+    use crate::archive::{Fault, Space};
     use crate::backup::{Existing, Retention, Scope};
     use crate::config::paths::Paths;
-    use crate::ports::archive::{Fault, Space};
 
     fn paths() -> Paths {
         Paths::rooted(Path::new("/cfg"), Path::new("/data"))

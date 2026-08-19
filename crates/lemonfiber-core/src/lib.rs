@@ -42,6 +42,7 @@ pub use lemonfiber_ports::{error, trace};
 pub mod adapters;
 pub mod alert;
 pub mod app;
+pub mod archive;
 pub mod audio;
 pub mod backup;
 pub mod baseline;

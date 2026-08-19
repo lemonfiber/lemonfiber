@@ -20,8 +20,8 @@ use async_trait::async_trait;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use lemonfiber_core::archive::{Archive, Fault, Reader, Space};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
-use lemonfiber_core::ports::archive::{Archive, Fault, Reader, Space};
 
 /// Where the manifest rides inside the archive.
 const MANIFEST: &str = "manifest.json";
@@ -247,9 +247,9 @@ mod tests {
 
     use flate2::write::GzEncoder;
     use flate2::Compression;
+    use lemonfiber_core::archive::{Archive, Reader};
     use lemonfiber_core::backup::{self, Item, Manifest, Scope};
     use lemonfiber_core::config::paths::Paths;
-    use lemonfiber_core::ports::archive::{Archive, Reader};
 
     use super::{Tar, MANIFEST};
 

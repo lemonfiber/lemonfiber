@@ -9,8 +9,8 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 
+use crate::archive::{Archive, Fault, Space};
 use crate::backup::{Existing, Item, Manifest};
-use crate::ports::archive::{Archive, Fault, Space};
 
 /// More room than any writer asks to keep free, so a test that is not about room does not
 /// have to know what the writer it drives keeps in reserve.
