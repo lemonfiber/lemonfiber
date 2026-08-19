@@ -5,8 +5,6 @@
 //! makes the web API and the TUI's interface the same thing by construction —
 //! and gives the machine-readable contract exactly one thing to version.
 
-use serde::Serialize;
-
 /// The machine-readable output contract's version.
 ///
 /// Additive change leaves it alone, so a script asserting `== 1` keeps working

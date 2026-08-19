@@ -6,6 +6,8 @@
 
 use serde::Serialize;
 
+use super::API_VERSION;
+
 /// The wrapper every machine-readable payload arrives in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Envelope<T> {

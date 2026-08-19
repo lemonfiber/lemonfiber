@@ -366,7 +366,7 @@ mod tests {
     #[tokio::test]
     async fn the_household_view_reads_the_requests_and_names_them_from_the_library() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: r#"{"pageInfo":{"results":1},"results":[
                     {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
@@ -393,7 +393,7 @@ mod tests {
         // rather than one that refused, so it is skipped — the requests still report
         // where they stand, and nothing claims a read failed that was never made.
         let mut context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: r#"{"pageInfo":{"results":1},"results":[
                     {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
@@ -417,7 +417,7 @@ mod tests {
     #[tokio::test]
     async fn a_refused_sign_in_is_reported_rather_than_read_as_an_empty_household() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "no",
                 requests: "",
                 library: "[]",
@@ -437,7 +437,7 @@ mod tests {
     #[tokio::test]
     async fn an_unreadable_request_record_is_reported_as_unavailable() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: "not json",
                 library: "[]",
@@ -456,7 +456,7 @@ mod tests {
     #[tokio::test]
     async fn an_unreadable_library_costs_names_not_the_view() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: r#"{"pageInfo":{"results":1},"results":[
                     {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
@@ -515,7 +515,7 @@ mod tests {
     #[tokio::test]
     async fn a_household_view_over_an_unreadable_stack_is_an_error() {
         let mut context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: "",
                 library: "[]",

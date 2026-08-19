@@ -6,6 +6,8 @@
 
 use serde::Serialize;
 
+use super::{Disposition, Triggered};
+
 /// One preset in force, and what it means for the media it applies to — the
 /// operator's question answered in their own terms, with no scoring vocabulary.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]

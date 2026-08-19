@@ -16,6 +16,17 @@
 //! at one of those two, it asks the accounts, and what they say travels beside the stall
 //! rather than replacing it: how far the item got is still the answer to the question
 //! that was asked.
+//!
+//! Three questions, one per file: what each service holds, what the fragments amount to,
+//! and why it stopped. The entry points stay here, because they are the errand.
+
+mod assembling;
+mod explaining;
+mod reading;
+
+use assembling::*;
+use explaining::*;
+use reading::*;
 
 use std::sync::Arc;
 
@@ -103,73 +114,6 @@ pub(super) async fn trace(
     Ok(not_matched(term))
 }
 
-/// The stall an account underneath the stack could explain, where this trace has one.
-///
-/// Only two stages it could: nothing found, and nothing taken. An indexer with its
-/// allowance spent answers every search with an empty list, and an account that is
-/// refusing or empty takes nothing it is handed — and both leave a \*arr holding an
-/// absence it cannot explain, which is exactly what those two stalls are.
-///
-/// Deliberately not the stage where releases were found and none was good enough: that is
-/// a preset asking for what the indexers do not carry, and sending its operator to look at
-/// their subscriptions would be the wrong half of the answer.
-fn account_explainable(report: &TraceReport) -> Option<String> {
-    matches!(report.furthest, Stage::Monitored | Stage::Grabbed)
-        .then(|| report.stall.clone())
-        .flatten()
-}
-
-/// What the accounts underneath the stack amount to right now.
-///
-/// The provider check answers, rather than a second reading of the same services: it is
-/// already the judgment, and two paths to one verdict is one way for them to disagree.
-/// Reading it costs the providers nothing — every figure in it comes from the services
-/// that have been using the accounts.
-async fn providers(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Vec<Finding> {
-    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    ProvidersCheck::new(
-        super::targets::usenet_client(ctx, services, project.as_deref())
-            .await
-            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
-        super::targets::indexer_aggregator(ctx, services, project.as_deref())
-            .await
-            .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
-        ctx.today(),
-        ctx.clock.now(),
-    )
-    .run()
-    .await
-}
-
-/// The findings an operator would have to act on, in the check's own words.
-///
-/// Only those: an account that is fine, or one nothing could be read from, explains
-/// nothing about why an item stopped, and saying so beside a stall would bury the reason
-/// it is there to sharpen.
-fn troubles(findings: Vec<Finding>) -> Vec<String> {
-    findings
-        .into_iter()
-        .filter_map(|finding| match finding.verdict {
-            Verdict::Fail(problem) | Verdict::Warn(problem) => {
-                Some(format!("{} — {}", finding.title, problem.summary))
-            }
-            Verdict::Pass { .. } | Verdict::Skipped { .. } | Verdict::Unverified { .. } => None,
-        })
-        .collect()
-}
-
-/// The stall with what the accounts said beside it, where they said anything.
-///
-/// Beside rather than instead: how far the item got is still the answer to the question
-/// that was asked, and the account is why it got no further. Where the accounts are all
-/// well, or could not be read, the reason reads exactly as it did before.
-fn beside(reason: String, said: &[String]) -> String {
-    if said.is_empty() {
-        return reason;
-    }
-    format!("{reason} ({})", said.join("; "))
-}
-
 /// The items whose downloads are stuck, across the \*arrs — the landing point queue
 /// health leads to, so "N items stuck" becomes a named list each entry of which traces on
 /// its own. An \*arr that answered but whose queue would not read marks the list
@@ -195,315 +139,6 @@ pub(super) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
         }
     }
     Ok(StuckReport { items, incomplete })
-}
-
-/// Ask the media server whether the item is in the library, as the three-way answer a
-/// trace folds in: present, provably absent, or — where there is no media server to ask,
-/// or it will not answer — unknown, which the trace reads as "cannot tell" rather than
-/// inferring an availability it has not confirmed.
-async fn library_presence(
-    jellyfin: Option<&crate::jellyfin::Jellyfin>,
-    kind: Kind,
-    title: &str,
-) -> Option<Presence> {
-    match jellyfin?.has_item(kind, title).await {
-        Ok(true) => Some(Presence::Present),
-        Ok(false) => Some(Presence::Absent),
-        Err(_) => None,
-    }
-}
-
-/// What the services could tell about the item: the stage-advancing events, what the queue
-/// holds now, whether the media server has it — and, for each read that can fail, whether
-/// it was actually read. An unreadable fragment is not an empty one, so the trace can tell
-/// "nothing happened" apart from "this could not be read".
-struct Fragments {
-    events: Vec<TraceEvent>,
-    queue: Vec<QueueItem>,
-    parts: Vec<ItemPart>,
-    library: Option<Presence>,
-    reads: Reads,
-}
-
-/// Which of the fragments the services actually answered with. They travel together
-/// because they mean one thing — what the trace is entitled to conclude from a silence —
-/// and because a run of loose booleans is the shape a caller transposes without noticing.
-#[derive(Debug, Clone, Copy)]
-struct Reads {
-    history: bool,
-    queue: bool,
-    parts: bool,
-}
-
-#[cfg(test)]
-impl Reads {
-    /// Every fragment answered — the ordinary case.
-    const ALL: Self = Self {
-        history: true,
-        queue: true,
-        parts: true,
-    };
-}
-
-/// Build the trace from what one \*arr knows and what the media server confirms: the
-/// stages its history records, what its queue is doing now, whether it is finally in the
-/// library, the furthest reached, and — where a record proves it — why it stopped.
-fn assemble(service: &str, title: &str, monitored: bool, fragments: Fragments) -> TraceReport {
-    let Fragments {
-        events,
-        queue,
-        parts,
-        library,
-        reads,
-    } = fragments;
-    // Presence in the media server only means something for availability once an \*arr is
-    // monitoring the item; for one nobody asked for, "not monitored" is the whole answer,
-    // and a library match is not availability but a disagreement — surfaced below as a
-    // finding, never folded into how far the item got.
-    let unmanaged_but_present = !monitored && library == Some(Presence::Present);
-    let library = monitored.then_some(library).flatten();
-
-    // The queue holds one record per part, so the item as a whole is the furthest any of
-    // them reached and stuck if any one of them is. The per-part detail is kept for the
-    // coverage below, where it is what tells a download in flight from a grab gone quiet.
-    let queue_stage = queue.iter().map(|record| record.stage).max();
-    let queue_stuck = queue.iter().any(|record| record.stuck);
-
-    // The stages the history advances the item through — a grab, an import. A failed
-    // download or a removal is history to show but advances no stage, so it is left out of
-    // how far the item got.
-    let advancing: Vec<Stage> = events
-        .iter()
-        .filter_map(|event| event.outcome.stage())
-        .collect();
-    let max_history = advancing.iter().copied().max();
-    // Built while the events are still to hand: a part is placed by its own history and
-    // queue records, not by the item-wide stages those collapse into.
-    //
-    // Only an item made of parts has coverage to report. A film is the whole item, and one
-    // whose parts could not be read reports that as a finding rather than as a series with
-    // nothing in it.
-    let coverage = (!parts.is_empty()).then(|| coverage_of(parts, &queue, &events));
-    let mut reached = advancing;
-    reached.extend(queue_stage);
-    // The library is the last word on how far an item got: confirmed present, it is
-    // available whatever the \*arr's own record stops at.
-    let present = library == Some(Presence::Present);
-    if present {
-        reached.push(Stage::Available);
-    }
-    let furthest = Stage::furthest(monitored, &reached);
-
-    let mut stages = Vec::new();
-    if monitored {
-        stages.push(TraceStage {
-            stage: Stage::Monitored,
-            service: service.to_owned(),
-            at: None,
-        });
-    }
-    // The reader gives history newest-first; a trace reads oldest-first, the order things
-    // happened — building both the stages it advanced through and the full log of what was
-    // tried, so a repeated grab or a download that failed is seen rather than flattened
-    // into the single furthest stage.
-    let mut history = Vec::new();
-    for event in events.into_iter().rev() {
-        if let Some(stage) = event.outcome.stage() {
-            stages.push(TraceStage {
-                stage,
-                service: service.to_owned(),
-                at: Some(event.at.clone()),
-            });
-        }
-        history.push(TraceMoment {
-            outcome: event.outcome,
-            at: event.at,
-        });
-    }
-    // The queue is the live state; add it only where it carries the item past what its
-    // history already shows, so it is the current step rather than a repeat.
-    if let Some(stage) = queue_stage {
-        if max_history.is_none_or(|reached| stage > reached) {
-            stages.push(TraceStage {
-                stage,
-                service: service.to_owned(),
-                at: None,
-            });
-        }
-    }
-    // The media server's confirmation is the final stage — a present fact, so untimed, and
-    // always past what a \*arr's history and queue can show.
-    if present {
-        stages.push(TraceStage {
-            stage: Stage::Available,
-            service: "Jellyfin".to_owned(),
-            at: None,
-        });
-    }
-
-    TraceReport {
-        item: title.to_owned(),
-        matched: monitored,
-        furthest,
-        stall: stall_reason(furthest, queue_stuck, library, reads),
-        stages,
-        history,
-        coverage,
-        findings: trace_findings(unmanaged_but_present, reads),
-        // A presence found by matching titles across to the media server — the two ends
-        // share no id — may not be the item asked for, so it is marked, never claimed.
-        confidence: if present {
-            Confidence::Uncertain
-        } else {
-            Confidence::Certain
-        },
-    }
-}
-
-/// Aggregate an item's parts into per-season coverage, each part's resting stage lifted by
-/// what the queue is doing with it now.
-///
-/// The lift is the point: a part the service records as grabbed and nothing more has, on
-/// its own record, been handed to a download client that never took it — but a queue record
-/// for that same part says it is downloading right now. Without the join, every episode in
-/// flight would read as a stalled grab, which is the one reading a trace exists to prevent.
-fn coverage_of(parts: Vec<ItemPart>, queue: &[QueueItem], events: &[TraceEvent]) -> Coverage {
-    Coverage::of(
-        parts
-            .into_iter()
-            .map(|part| Part {
-                stage: part_stage(&part, queue, events),
-                season: part.season,
-                number: part.number,
-                title: part.title,
-            })
-            .collect(),
-    )
-}
-
-/// How far one part got: where the service's current record puts it, lifted by what the
-/// queue holds for it now and what its history proves was tried.
-///
-/// A file on disk settles it — the file is the fact, and an import recorded in a history
-/// the file no longer backs is stale news rather than a part that is here.
-///
-/// Otherwise a live queue record lifts any part, since a download under way is a fact
-/// whoever is monitoring it, while a grab from the history lifts only a part someone is
-/// still asking for: an old grab against a part nobody monitors explains nothing worth
-/// chasing. The grab has to come from the history because the episode listing carries no
-/// such flag — the one it defines is never populated there.
-fn part_stage(part: &ItemPart, queue: &[QueueItem], events: &[TraceEvent]) -> Stage {
-    let resting = Stage::of_part(part.monitored, part.has_file);
-    if resting == Stage::Imported {
-        return resting;
-    }
-    let mut stage = resting;
-    if let Some(live) = queue
-        .iter()
-        .filter(|record| record.part == Some(part.id))
-        .map(|record| record.stage)
-        .max()
-    {
-        stage = stage.max(live);
-    }
-    let attempted = events
-        .iter()
-        .any(|event| event.part == Some(part.id) && event.outcome == Outcome::Grabbed);
-    if resting == Stage::Monitored && attempted {
-        stage = stage.max(Stage::Grabbed);
-    }
-    stage
-}
-
-/// The disagreements and unreadable-fragment notes a trace surfaces on their own, apart
-/// from the linear pipeline: a media server holding what nothing monitors, and each read
-/// that failed reported as unavailable rather than inferred as nothing — the honesty the
-/// trace keeps about a silence it did not actually hear.
-fn trace_findings(unmanaged_but_present: bool, reads: Reads) -> Vec<String> {
-    let mut findings = Vec::new();
-    if unmanaged_but_present {
-        findings.push(
-            "the media server has this, but no service is monitoring it — it will not be \
-             maintained, upgraded, or repaired if it is lost"
-                .to_owned(),
-        );
-    }
-    if !reads.history {
-        findings.push(
-            "this service's history could not be read, so how far the item got may be \
-             understated — reported as unavailable, not read as nothing happened"
-                .to_owned(),
-        );
-    }
-    if !reads.queue {
-        findings.push(
-            "the download queue could not be read, so whether it is downloading now is \
-             unknown — reported as unavailable, not read as stopped"
-                .to_owned(),
-        );
-    }
-    if !reads.parts {
-        findings.push(
-            "the episodes could not be read, so how much of this is here is unknown — \
-             reported as unavailable, not read as a series with nothing in it"
-                .to_owned(),
-        );
-    }
-    findings
-}
-
-/// Why the item stopped where it did, in plain language — or `None` where nothing proves
-/// it stopped. The generic reason a resting stage carries, sharpened by what only the live
-/// reads can settle: a stuck queue names the download client; an import confirmed absent
-/// from the library names the missing scan; downloading and beyond are otherwise either in
-/// progress or beyond what the \*arr alone can judge.
-fn stall_reason(
-    furthest: Stage,
-    queue_stuck: bool,
-    library: Option<Presence>,
-    reads: Reads,
-) -> Option<String> {
-    if queue_stuck {
-        // The C7 signal: queued but not progressing — a real problem the operator can act
-        // on, distinct from a download merely still running.
-        return Some(
-            "the download is in the queue but not progressing — the download client needs \
-             attention"
-                .to_owned(),
-        );
-    }
-    // A stall claimed from an absence stands only where that absence was actually read.
-    // Imported but confirmed absent from the library is provably awaiting a scan — a reason
-    // only the media server can supply, so it stands only on a confirmed absence.
-    match furthest {
-        // Nobody asked — settled from the monitored flag alone, always known.
-        Stage::NotMonitored => furthest.stall().map(str::to_owned),
-        // Monitored and nothing since — but a "never found" is a claim about an empty
-        // history, so only where the history was actually read, not where it could not be.
-        Stage::Monitored if reads.history => furthest.stall().map(str::to_owned),
-        // Grabbed and not in the queue — a claim about an empty queue, so only where the
-        // queue was actually read.
-        Stage::Grabbed if reads.queue => furthest.stall().map(str::to_owned),
-        Stage::Imported if library == Some(Presence::Absent) => {
-            Stage::Imported.stall().map(str::to_owned)
-        }
-        _ => None,
-    }
-}
-
-/// The trace for a term no monitored item matches — nobody has asked for it.
-fn not_matched(term: &str) -> TraceReport {
-    TraceReport {
-        item: term.to_owned(),
-        matched: false,
-        furthest: Stage::NotMonitored,
-        stall: Stage::NotMonitored.stall().map(str::to_owned),
-        stages: Vec::new(),
-        history: Vec::new(),
-        coverage: None,
-        confidence: Confidence::Certain,
-        findings: Vec::new(),
-    }
 }
 
 #[cfg(test)]
@@ -671,11 +306,11 @@ mod tests {
     /// A context that can reach its Jellyfin: the admin password is recorded under the
     /// env file, so the trace's `jellyfin_reader` resolves a reading client. Tagged so
     /// each test keeps its own env file rather than racing on a shared one.
-    fn ctx_with_jellyfin(fake: Fake, tag: &str) -> Ctx {
+    fn ctx_with_jellyfin(fake: &Fake, tag: &str) -> Ctx {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-trace-{tag}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        let mut context = ctx_with(&fake);
+        let mut context = ctx_with(fake);
         context.settings.env_file = Some(dir.join(".env"));
         crate::app::targets::record_secret(
             &context,
@@ -1228,7 +863,7 @@ mod tests {
         // Imported in history, and the media server confirms it is in the library: the
         // trace runs all the way to available, on the Jellyfin stage, marked uncertain.
         let context = ctx_with_jellyfin(
-            Fake {
+            &Fake {
                 library: r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
                 history: r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-01-01T00:00:00Z"}]}"#,
                 queue: EMPTY_QUEUE,
@@ -1252,7 +887,7 @@ mod tests {
         // The sign-in is accepted and the library answers, holding nothing: a confirmed
         // absence, not an unknown.
         let presence = library_presence(
-            Some(&jellyfin(Fake {
+            Some(&jellyfin(&Fake {
                 library: "",
                 history: "",
                 queue: "",
