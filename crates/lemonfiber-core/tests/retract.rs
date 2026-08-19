@@ -215,6 +215,29 @@ async fn a_service_that_refuses_the_write_is_not_reported_as_undone() {
     assert!(put_back.is_err(), "a refused write is not a reversal");
 }
 
+/// A stack that will not read is the one thing a reversal needs before anything else: it
+/// has to know which services exist to know which one a change belongs to. Said as the
+/// stack's own problem rather than as a reversal that quietly did nothing.
+#[tokio::test]
+async fn a_stack_that_will_not_read_stops_the_reversal() {
+    let root = scratch("no-stack");
+    journalled(&root, &[configured()]);
+    let nowhere = Ctx::new(
+        Arc::new(lemonfiber_core::adapters::Local),
+        Arc::new(lemonfiber_core::adapters::Daemon::local()),
+        Arc::new(lemonfiber_core::adapters::System),
+        Files::empty(),
+        Source::External(Path::new("/lemonfiber/no/such/stack")),
+        Settings {
+            env_file: Some(paths(&root).env_file()),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    );
+
+    assert!(retract(&nowhere, &paths(&root)).await.is_err());
+}
+
 /// Nothing repaired is nothing to put back, and that is not a failure.
 #[tokio::test]
 async fn nothing_repaired_puts_nothing_back() {
