@@ -75,6 +75,16 @@ fn restoring(action: &Action) -> String {
         // Nothing was there before, so putting it back means taking it away again.
         Action::Restore { key, value: None } => format!("{key} removed, as it was"),
         Action::Remove { resource, id } => format!("{resource} {id} removed"),
+        Action::Reconfigure {
+            resource,
+            field,
+            value: Some(value),
+            ..
+        } => format!("{resource}'s {field} back to {value}"),
+        // Nothing was there before, so putting it back means clearing it again.
+        Action::Reconfigure {
+            resource, field, ..
+        } => format!("{resource}'s {field} cleared, as it was"),
         Action::Delete { path } => format!("{path} removed"),
     }
 }
@@ -254,6 +264,24 @@ mod tests {
                     path: "/tmp/lemonfiber-scratch".to_owned(),
                 },
             },
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Reconfigure {
+                    resource: "downloadclient".to_owned(),
+                    id: "7".to_owned(),
+                    field: "tvCategory".to_owned(),
+                    value: Some("old-sonarr".to_owned()),
+                },
+            },
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Reconfigure {
+                    resource: "downloadclient".to_owned(),
+                    id: "8".to_owned(),
+                    field: "movieCategory".to_owned(),
+                    value: None,
+                },
+            },
         ];
 
         let said = reversed(&undos, false).text();
@@ -262,6 +290,14 @@ mod tests {
         assert!(said.contains("PROXY removed, as it was"), "{said}");
         assert!(said.contains("downloadclient 3 removed"), "{said}");
         assert!(said.contains("/tmp/lemonfiber-scratch removed"), "{said}");
+        assert!(
+            said.contains("downloadclient's tvCategory back to old-sonarr"),
+            "{said}"
+        );
+        assert!(
+            said.contains("downloadclient's movieCategory cleared, as it was"),
+            "{said}"
+        );
     }
 
     /// A run with nothing to put back says so, and says it in whichever form was asked for.

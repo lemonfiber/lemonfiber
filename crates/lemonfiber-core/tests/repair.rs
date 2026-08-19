@@ -4,7 +4,7 @@
 //! credential checks are: the app layer is compiled twice, and a path exercised only
 //! in-crate has its coverage counted from the copy that never ran.
 //!
-//! The check driven is written for the purpose rather than being one of the nine real
+//! The check driven is written for the purpose rather than being one of the ten real
 //! ones. What is being proved is the *sequence* — offer, confirm, act, prove, remember —
 //! and a test that needed a live VPN gateway and a torrent client to reach it would be a
 //! test nobody writes, which is exactly how the two defects this runner was rewritten to
@@ -171,7 +171,7 @@ fn checks(attempt: Attempt) -> Vec<Box<dyn Check>> {
 
 /// Checks whose repair actually works.
 fn settling() -> Vec<Box<dyn Check>> {
-    vec![Box::new(Sticky::settling(Attempt::Carried))]
+    vec![Box::new(Sticky::settling(Attempt::carried()))]
 }
 
 /// A run that was not told to act says what could be put right and puts none of it right.
@@ -180,7 +180,7 @@ fn settling() -> Vec<Box<dyn Check>> {
 async fn a_run_that_may_not_act_offers_and_changes_nothing() {
     let report = drive(
         &ctx("report-only"),
-        &checks(Attempt::Carried),
+        &checks(Attempt::carried()),
         Stance::ReportOnly,
         &Always(true),
     )
@@ -216,7 +216,7 @@ async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     let context = ctx("declined");
     let first = drive(
         &context,
-        &checks(Attempt::Carried),
+        &checks(Attempt::carried()),
         Stance::Ask,
         &Always(false),
     )
@@ -230,7 +230,7 @@ async fn a_declined_repair_is_left_alone_and_not_offered_again() {
     // The next run does not ask again, because nothing has changed since they said no.
     let again = drive(
         &context,
-        &checks(Attempt::Carried),
+        &checks(Attempt::carried()),
         Stance::Ask,
         &Always(true),
     )
@@ -267,12 +267,12 @@ async fn a_repair_that_would_write_over_an_operators_own_change_is_refused() {
         async fn mend(&self, repair: &Repair) -> Attempt {
             self.0.mend(repair).await
         }
-        fn may_proceed(&self, _repair: &Repair) -> Writing {
+        async fn may_proceed(&self, _repair: &Repair) -> Writing {
             Writing::Adopted
         }
     }
 
-    let checks: Vec<Box<dyn Check>> = vec![Box::new(Theirs(Sticky::new(Attempt::Carried)))];
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(Theirs(Sticky::new(Attempt::carried())))];
     let report = drive(&ctx("theirs"), &checks, Stance::Unattended, &Always(true)).await;
 
     assert_eq!(
@@ -314,7 +314,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
     for _ in 0..3 {
         let report = drive(
             &context,
-            &checks(Attempt::Carried),
+            &checks(Attempt::carried()),
             Stance::Unattended,
             &Always(true),
         )
@@ -328,7 +328,7 @@ async fn a_repair_that_keeps_failing_stops_being_offered_and_says_where_to_go() 
 
     let past = drive(
         &context,
-        &checks(Attempt::Carried),
+        &checks(Attempt::carried()),
         Stance::Unattended,
         &Always(true),
     )

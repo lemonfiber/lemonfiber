@@ -66,16 +66,6 @@ pub(super) fn baseline_path(ctx: &Ctx) -> Option<std::path::PathBuf> {
     crate::app::targets::beside_env(ctx, "baseline.json")
 }
 
-/// A timestamp for the change journal — seconds since the epoch, the clock's own
-/// account of now.
-pub(super) fn seed_stamp(ctx: &Ctx) -> String {
-    ctx.clock
-        .now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs().to_string())
-        .unwrap_or_default()
-}
-
 /// The baseline field a service's own version is recorded under — a reserved key
 /// that cannot collide with a download client's (keyed by endpoint) or any other
 /// managed value, so the version rides in the same per-service record without a

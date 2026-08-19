@@ -21,8 +21,8 @@ mod reset;
 use applications::{seed_applications, skipped};
 use arrs::{arr_download_clients, read_servarr_key, seed_arr, servarr_arrs, ArrSeeding};
 use baseline::{
-    escalate_broken_roots, load_baseline, save_baseline, seed_stamp, wanted_roots, Loaded,
-    DATA_ROOT, SCHEMA_VERSION_FIELD,
+    escalate_broken_roots, load_baseline, save_baseline, wanted_roots, Loaded, DATA_ROOT,
+    SCHEMA_VERSION_FIELD,
 };
 use clients::{
     category_for, download_clients, qbittorrent_target, read_sabnzbd_key, seed_qbittorrent_password,
@@ -158,6 +158,52 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         wirings,
         assessment,
     })
+}
+
+/// The download-client wirings lemonfiber manages, as a caller that only reads them needs
+/// them: each \*arr, the clients lemonfiber would write there, and what it last recorded
+/// for each.
+///
+/// Here rather than where it is used, so the read-only half of drift and the writing half
+/// gather their inputs the same way. A diagnosis that worked out the wanted clients for
+/// itself would be a second opinion about what lemonfiber intends, and the two would drift
+/// apart exactly where an operator most needs them not to.
+///
+/// Nothing where the baseline could not be read. A record that is there but unreadable
+/// cannot tell an operator's edit from lemonfiber's own value, and reporting drift against
+/// a baseline that is not there would call every wiring in the stack an edit.
+pub(super) async fn managed_wirings(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+) -> Vec<crate::doctor::wiring::Managed> {
+    let Loaded::Formed(baseline) = load_baseline(ctx) else {
+        return Vec::new();
+    };
+    let sabnzbd_key = read_sabnzbd_key(ctx, services, project).await;
+    let qbittorrent_password = super::targets::recorded_qbittorrent_password(ctx);
+    servarr_arrs(services, project)
+        .into_iter()
+        .map(|arr| {
+            let clients = arr_download_clients(
+                &arr,
+                sabnzbd_key.as_deref(),
+                qbittorrent_password.as_deref(),
+            )
+            .into_iter()
+            .map(|want| crate::doctor::wiring::Wired {
+                recorded: baseline
+                    .entry(&arr.target.name, &crate::seed::client_field(&want))
+                    .cloned(),
+                want,
+            })
+            .collect();
+            crate::doctor::wiring::Managed {
+                target: arr.target,
+                clients,
+            }
+        })
+        .collect()
 }
 
 /// The temporary password qBittorrent announced in its log, if it has.

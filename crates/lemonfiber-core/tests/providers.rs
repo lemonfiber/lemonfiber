@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
+use common::files::Files;
 use common::{Answer, Fake};
 use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::Settings;
@@ -26,9 +27,6 @@ use lemonfiber_core::doctor::{Category, Verdict};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, LogLine, LogQuery, Stats,
-};
-use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
 };
 use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_core::ports::time::Clock;
@@ -77,47 +75,6 @@ const INDEXERS: &str = r#"[{"id":1,"name":"Fast Indexer","enable":true,"status":
 const STANDINGS: &str = "[]";
 const COUNTS: &str = r#"{"indexers":[{"indexerId":1,"numberOfQueries":12,"numberOfGrabs":2,
     "numberOfFailedQueries":0,"numberOfFailedGrabs":0}]}"#;
-
-/// A filesystem holding the two configuration files the clients write, and
-/// nothing else — every other capability is one this path never reaches for.
-struct Files;
-
-#[async_trait]
-impl FileSystem for Files {
-    async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        Ok(path.to_path_buf())
-    }
-    async fn touch(&self, _path: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn remove(&self, _path: &Path) {}
-    async fn read(&self, path: &Path) -> Option<String> {
-        let path = path.to_string_lossy().replace('\\', "/");
-        if path.ends_with("config/sabnzbd/sabnzbd.ini") {
-            return Some(SAB_INI.to_owned());
-        }
-        path.ends_with("config/prowlarr/config.xml")
-            .then(|| PROWLARR_XML.to_owned())
-    }
-    async fn write(&self, _path: &Path, _contents: &str) {}
-    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-        None
-    }
-    async fn describe(&self, _path: &Path) -> StorageFacts {
-        StorageFacts {
-            kind: FsKind::Linking("test".to_owned()),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
-    }
-}
 
 /// An engine with nothing running: the checks that ask it are not this one, and a
 /// stack that is down still has accounts worth reading.
@@ -186,7 +143,10 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
         Arc::new(Idle),
         Arc::new(Stopped),
         Arc::new(StoppedClock),
-        Arc::new(Files),
+        Files::ending(vec![
+            ("config/sabnzbd/sabnzbd.ini", SAB_INI),
+            ("config/prowlarr/config.xml", PROWLARR_XML),
+        ]),
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,
@@ -231,7 +191,10 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
         Arc::new(Idle),
         Arc::new(Stopped),
         Arc::new(StoppedClock),
-        Arc::new(Files),
+        Files::ending(vec![
+            ("config/sabnzbd/sabnzbd.ini", SAB_INI),
+            ("config/prowlarr/config.xml", PROWLARR_XML),
+        ]),
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,
@@ -253,45 +216,11 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
 /// which is a later run's business, not a fault.
 #[tokio::test]
 async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
-    struct Empty;
-
-    #[async_trait]
-    impl FileSystem for Empty {
-        async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-            Ok(path.to_path_buf())
-        }
-        async fn touch(&self, _path: &Path) -> Result<(), Fault> {
-            Err(Fault::new("unused"))
-        }
-        async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-            Err(Fault::new("unused"))
-        }
-        async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
-            Err(Fault::new("unused"))
-        }
-        async fn remove(&self, _path: &Path) {}
-        async fn read(&self, _path: &Path) -> Option<String> {
-            None
-        }
-        async fn write(&self, _path: &Path, _contents: &str) {}
-        async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-            None
-        }
-        async fn describe(&self, _path: &Path) -> StorageFacts {
-            StorageFacts {
-                kind: FsKind::Linking("test".to_owned()),
-                removable: false,
-                available: 0,
-                total: 0,
-            }
-        }
-    }
-
     let ctx = Ctx::new(
         Arc::new(Idle),
         Arc::new(Stopped),
         Arc::new(StoppedClock),
-        Arc::new(Empty),
+        Files::empty(),
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,

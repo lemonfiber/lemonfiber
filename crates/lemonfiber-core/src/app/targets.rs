@@ -54,6 +54,19 @@ pub(super) fn servarr_targets(
         .collect()
 }
 
+/// The one Servarr-shape service with this id, or nothing where the stack has none — the
+/// lookup a reversal makes, which knows the name of the service it has to reach and
+/// nothing else about it.
+pub(super) fn target_named(
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+    id: &str,
+) -> Option<Target> {
+    servarr_targets(services, project)
+        .into_iter()
+        .find(|target| target.id == id)
+}
+
 /// The host path a service's config file is read from, per the stack's bind-mount
 /// convention: a service's `/config` mount is `config/<id>` under the project root,
 /// so its `api.path` of `/config/<inside>` is read from there. Nothing where the api

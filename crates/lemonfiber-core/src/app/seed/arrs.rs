@@ -3,8 +3,8 @@
 //! Everything a single \*arr needs pointed at it, and the order it has to happen in.
 
 use super::{
-    category_for, download_clients, escalate_broken_roots, seed_stamp, skipped, target_for,
-    wanted_roots, Ctx, Path, DATA_ROOT, SCHEMA_VERSION_FIELD,
+    category_for, download_clients, escalate_broken_roots, skipped, target_for, wanted_roots, Ctx,
+    Path, DATA_ROOT, SCHEMA_VERSION_FIELD,
 };
 use crate::ports::service::Client;
 
@@ -102,7 +102,7 @@ pub(super) async fn seed_arr(
     // The journal seed records each write into is not persisted: seeding is
     // idempotent, so a partial run is recovered by running it again, not reversed
     // — see the seed module doc.
-    let at = seed_stamp(ctx);
+    let at = ctx.stamp();
     let mut journal = crate::journal::Journal::new();
 
     // A schema change re-baselines rather than reporting mass drift. The service's own

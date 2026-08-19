@@ -10,13 +10,14 @@
 use async_trait::async_trait;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{
-    Client, ClientProbe, DownloadClient, Failure, Identity, RegisteredClient, RegisteredFolder,
-    RootFolder,
+    Category, Client, ClientProbe, DownloadClient, Failure, Identity, RegisteredClient,
+    RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::seed::{wire_root_folders, State};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
+/// How the service answers — the script a test picks before it starts.
 pub enum Mode {
     /// Answers normally; registering a folder adds it.
     Normal,
@@ -53,6 +54,7 @@ pub struct FakeService {
 }
 
 impl FakeService {
+    /// A service answering in this mode, already holding these root folders.
     pub fn with(mode: Mode, folders: Vec<RegisteredFolder>) -> Self {
         Self {
             mode,
@@ -64,6 +66,7 @@ impl FakeService {
         }
     }
 
+    /// A service answering in this mode, already holding these download clients.
     pub fn with_clients(mode: Mode, clients: Vec<RegisteredClient>) -> Self {
         Self {
             mode,
@@ -94,6 +97,7 @@ impl FakeService {
     }
 }
 
+/// The failure a service that is not answering produces, in its own words.
 pub fn down(service: &str) -> Failure {
     Failure::Unavailable {
         service: service.to_owned(),
@@ -149,6 +153,26 @@ impl Client for FakeService {
         if let Ok(mut clients) = self.clients.lock() {
             if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
                 existing.category = Some(client.category.clone());
+            }
+        }
+        Ok(())
+    }
+
+    async fn set_client_field(
+        &self,
+        id: &str,
+        field: &str,
+        value: Option<&str>,
+    ) -> Result<(), Failure> {
+        if matches!(self.mode, Mode::Down) {
+            return Err(down("sonarr"));
+        }
+        if let Ok(mut clients) = self.clients.lock() {
+            if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
+                existing.category = value.map(|value| Category {
+                    field: field.to_owned(),
+                    value: value.to_owned(),
+                });
             }
         }
         Ok(())
@@ -236,6 +260,7 @@ impl Client for FakeService {
     }
 }
 
+/// A root folder to wire, at the given path.
 pub fn folder(path: &str) -> RootFolder {
     RootFolder {
         path: path.to_owned(),

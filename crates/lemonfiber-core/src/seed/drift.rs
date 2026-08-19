@@ -216,7 +216,8 @@ pub(super) fn canonical_category(value: &str) -> &str {
 /// The host and port together, never the name: this is what makes the match by
 /// connection rather than by label, so a client already present under a different
 /// name is not registered again.
-pub(super) fn same_endpoint(have: &RegisteredClient, want: &DownloadClient) -> bool {
+#[must_use]
+pub fn same_endpoint(have: &RegisteredClient, want: &DownloadClient) -> bool {
     have.host == want.host && have.port == want.port
 }
 

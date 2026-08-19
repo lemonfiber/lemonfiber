@@ -60,6 +60,26 @@ pub enum Kind {
         /// The path that was created.
         path: String,
     },
+    /// A setting *inside a service* was changed — one field of one resource the
+    /// service holds. Undoing puts the field back through the service's own API.
+    ///
+    /// Apart from [`Self::Set`], which is a value in lemonfiber's environment file.
+    /// The two read alike and are reversed nothing alike: one is a line in a file
+    /// anything can write, the other needs the service that owns it. Recording a
+    /// service's field as a `Set` would have a reversal write the field's name into
+    /// the environment file and leave the service exactly as it was.
+    Configured {
+        /// The kind of resource, such as `downloadclient`.
+        resource: String,
+        /// The identifier the service assigned it.
+        id: String,
+        /// The field of that resource that was changed.
+        field: String,
+        /// What it held before, if anything.
+        previous: Option<String>,
+        /// What it was changed to.
+        current: String,
+    },
 }
 
 impl Change {
@@ -76,6 +96,18 @@ impl Change {
                 value: previous.clone(),
             },
             Kind::Made { path } => Action::Delete { path: path.clone() },
+            Kind::Configured {
+                resource,
+                id,
+                field,
+                previous,
+                ..
+            } => Action::Reconfigure {
+                resource: resource.clone(),
+                id: id.clone(),
+                field: field.clone(),
+                value: previous.clone(),
+            },
         };
         Undo {
             target: self.target.clone(),
@@ -114,6 +146,21 @@ pub enum Action {
     Delete {
         /// The path to remove.
         path: String,
+    },
+    /// Put one field of a service's own resource back to what it held.
+    ///
+    /// The only reversal that needs the service itself: the value lives inside it,
+    /// and nothing on the host can write it. A reversal that cannot reach the
+    /// service says so rather than reporting the field restored.
+    Reconfigure {
+        /// The kind of resource.
+        resource: String,
+        /// The identifier to change.
+        id: String,
+        /// The field to put back.
+        field: String,
+        /// What to put back, or `None` where it held nothing.
+        value: Option<String>,
     },
 }
 
@@ -173,6 +220,56 @@ mod tests {
                 id: id.to_owned(),
             },
         }
+    }
+
+    fn configured(previous: Option<&str>) -> Change {
+        Change {
+            at: "t".to_owned(),
+            operation: "repair".to_owned(),
+            target: "sonarr".to_owned(),
+            kind: Kind::Configured {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+                field: "tvCategory".to_owned(),
+                previous: previous.map(str::to_owned),
+                current: "tv-sonarr".to_owned(),
+            },
+        }
+    }
+
+    /// A field inside a service goes back through that service, and only through it.
+    /// Reversed as though it were a setting in the environment file, it would write the
+    /// field's name into that file and leave the service exactly as it was — which is
+    /// worse than not reversing it, because it reads as having worked.
+    #[test]
+    fn undoing_a_services_own_field_goes_back_through_the_service() {
+        assert_eq!(
+            configured(Some("old-sonarr")).undo(),
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Reconfigure {
+                    resource: "downloadclient".to_owned(),
+                    id: "7".to_owned(),
+                    field: "tvCategory".to_owned(),
+                    value: Some("old-sonarr".to_owned()),
+                },
+            }
+        );
+    }
+
+    /// A field that held nothing before goes back to holding nothing, rather than to the
+    /// empty string — which a service would take as a value somebody chose.
+    #[test]
+    fn a_field_that_held_nothing_is_put_back_to_nothing() {
+        assert_eq!(
+            configured(None).undo().action,
+            Action::Reconfigure {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+                field: "tvCategory".to_owned(),
+                value: None,
+            }
+        );
     }
 
     fn made(path: &str) -> Change {

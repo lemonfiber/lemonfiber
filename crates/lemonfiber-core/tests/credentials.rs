@@ -13,61 +13,11 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use common::files::Files;
 use common::{Answer, Fake};
 use lemonfiber_core::doctor::credentials::{CredentialsCheck, Target, CREDENTIAL_REJECTED};
 use lemonfiber_core::doctor::{Category, Check, Verdict};
 use lemonfiber_core::error::Severity;
-use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
-};
-
-/// A filesystem that hands back the config text a test placed at a path, and
-/// nothing for any other. Only `read` is meaningful; the rest are unused here.
-struct FakeFs {
-    files: Vec<(PathBuf, &'static str)>,
-}
-
-impl FakeFs {
-    fn with(files: Vec<(PathBuf, &'static str)>) -> Arc<Self> {
-        Arc::new(Self { files })
-    }
-}
-
-#[async_trait]
-impl FileSystem for FakeFs {
-    async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        Ok(path.to_path_buf())
-    }
-    async fn touch(&self, _path: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn remove(&self, _path: &Path) {}
-    async fn read(&self, path: &Path) -> Option<String> {
-        self.files
-            .iter()
-            .find(|(at, _)| at == path)
-            .map(|(_, text)| (*text).to_owned())
-    }
-    async fn write(&self, _path: &Path, _contents: &str) {}
-    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-        None
-    }
-    async fn describe(&self, _path: &Path) -> StorageFacts {
-        StorageFacts {
-            kind: FsKind::Linking("test".to_owned()),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
-    }
-}
 
 /// A Servarr config carrying a generated key, as one reads from disk.
 const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
@@ -89,7 +39,7 @@ fn sonarr(config: &Path) -> Target {
 }
 
 /// Run the check over one target with the given filesystem and transport.
-async fn only(target: Target, fs: Arc<FakeFs>, http: Arc<Fake>) -> Verdict {
+async fn only(target: Target, fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
     let check = CredentialsCheck::new(http, fs, vec![target]);
     let mut findings = check.run().await;
     findings.pop().map_or(
@@ -103,7 +53,7 @@ async fn only(target: Target, fs: Arc<FakeFs>, http: Arc<Fake>) -> Verdict {
 #[tokio::test]
 async fn a_proven_credential_names_the_service_and_its_version() {
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
+    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
     let http = Fake::by_path(vec![("8989", Answer::reply(200, SONARR_STATUS))]);
 
     let verdict = only(sonarr(&config), fs, http).await;
@@ -119,7 +69,7 @@ async fn a_proven_credential_names_the_service_and_its_version() {
 #[tokio::test]
 async fn a_service_that_refuses_its_own_key_is_a_failure() {
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
+    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
     let http = Fake::by_path(vec![("8989", Answer::reply(401, ""))]);
 
     let problem = match only(sonarr(&config), fs, http).await {
@@ -139,7 +89,7 @@ async fn a_service_that_does_not_answer_is_unverified_rather_than_failed() {
     // Nothing answered, so the credential is unproven — never a pass, but not a
     // fault either: the honest verdict is that it could not be established.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
+    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
     let http = Fake::by_path(vec![("8989", Answer::Silent)]);
 
     assert!(matches!(
@@ -151,7 +101,7 @@ async fn a_service_that_does_not_answer_is_unverified_rather_than_failed() {
 #[tokio::test]
 async fn a_service_answering_unusably_carries_its_own_words() {
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
+    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
     let http = Fake::by_path(vec![("8989", Answer::reply(500, "database is locked"))]);
 
     let reason = match only(sonarr(&config), fs, http).await {
@@ -170,7 +120,7 @@ async fn a_service_on_an_unsupported_api_version_is_unverified_with_that_reason(
     // (or stands before) the version this build speaks, so the credential cannot
     // be proven through it — unverified, pointed at aligning the versions.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
+    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
     let http = Fake::by_path(vec![("8989", Answer::reply(404, ""))]);
 
     let reason = match only(sonarr(&config), fs, http).await {
@@ -187,7 +137,7 @@ async fn a_service_on_an_unsupported_api_version_is_unverified_with_that_reason(
 async fn a_service_with_no_config_file_yet_is_skipped() {
     // The file is not there because the service has not finished first start.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = FakeFs::with(Vec::new());
+    let fs = Files::at(Vec::new());
     let http = Fake::by_path(vec![("8989", Answer::reply(200, SONARR_STATUS))]);
 
     assert!(matches!(
@@ -200,7 +150,7 @@ async fn a_service_with_no_config_file_yet_is_skipped() {
 async fn a_service_whose_key_is_not_generated_yet_is_skipped() {
     // The config exists but the key element is still empty mid-first-start.
     let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = FakeFs::with(vec![(config.clone(), "<Config><ApiKey></ApiKey></Config>")]);
+    let fs = Files::at(vec![(config.clone(), "<Config><ApiKey></ApiKey></Config>")]);
     let http = Fake::by_path(vec![("8989", Answer::reply(200, SONARR_STATUS))]);
 
     assert!(matches!(
@@ -215,7 +165,7 @@ async fn each_service_is_reported_independently() {
     // does not stop the reachable one being proven.
     let sonarr_config = PathBuf::from("/stack/config/sonarr/config.xml");
     let radarr_config = PathBuf::from("/stack/config/radarr/config.xml");
-    let fs = FakeFs::with(vec![
+    let fs = Files::at(vec![
         (sonarr_config.clone(), CONFIG_WITH_KEY),
         (radarr_config.clone(), CONFIG_WITH_KEY),
     ]);
@@ -253,7 +203,7 @@ async fn each_service_is_reported_independently() {
 
 #[tokio::test]
 async fn nothing_to_prove_produces_no_findings() {
-    let fs = FakeFs::with(Vec::new());
+    let fs = Files::at(Vec::new());
     let http = Fake::by_path(Vec::new());
     let check = CredentialsCheck::new(http, fs, Vec::new());
     assert!(check.run().await.is_empty());
@@ -261,7 +211,7 @@ async fn nothing_to_prove_produces_no_findings() {
 
 #[tokio::test]
 async fn the_check_belongs_to_the_credentials_category() {
-    let fs = FakeFs::with(Vec::new());
+    let fs = Files::at(Vec::new());
     let http = Fake::by_path(Vec::new());
     let check = CredentialsCheck::new(http, fs, Vec::new());
     assert_eq!(check.category(), Category::Credentials);
@@ -278,7 +228,7 @@ async fn the_credential_never_appears_in_a_finding() {
         Answer::reply(500, "database is locked"),
         Answer::Silent,
     ] {
-        let fs = FakeFs::with(vec![(config.clone(), CONFIG_WITH_KEY)]);
+        let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
         let http = Fake::by_path(vec![("8989", answer)]);
         let check = CredentialsCheck::new(http, fs, vec![sonarr(&config)]);
         let rendered = serde_json::to_string(&check.run().await).unwrap_or_default();

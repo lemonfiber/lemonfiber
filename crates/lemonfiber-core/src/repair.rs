@@ -101,12 +101,46 @@ pub struct Repair {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Attempt {
     /// It ran, and did what it said it would.
-    Carried,
+    Carried {
+        /// What it changed, in the form a reversal reads — enough to put each change
+        /// back, and empty where it changed nothing that could be put back.
+        ///
+        /// Carried by the attempt rather than written by the mender, so the recording is
+        /// something a repair *reports* rather than something each mender is trusted to
+        /// remember. One place persists them, which is also the place that knows where
+        /// the journal lives.
+        changes: Vec<Change>,
+    },
     /// It stopped partway, leaving this.
     Stopped {
         /// What the machine is now in, said plainly.
         leaving: String,
     },
+}
+
+impl Attempt {
+    /// Carried out, changing nothing a reversal could read back.
+    #[must_use]
+    pub const fn carried() -> Self {
+        Self::Carried {
+            changes: Vec::new(),
+        }
+    }
+
+    /// Carried out, with what it changed recorded so it can be put back.
+    #[must_use]
+    pub const fn recorded(changes: Vec<Change>) -> Self {
+        Self::Carried { changes }
+    }
+
+    /// What this attempt changed, for the caller that persists it.
+    #[must_use]
+    pub fn changes(&self) -> &[Change] {
+        match self {
+            Self::Carried { changes } => changes,
+            Self::Stopped { .. } => &[],
+        }
+    }
 }
 
 /// How a repair turned out, once the check that raised the finding has been asked again.
@@ -146,8 +180,8 @@ impl Outcome {
     pub fn of(attempt: Attempt, settled: bool) -> Self {
         match attempt {
             Attempt::Stopped { leaving } => Self::Stopped { leaving },
-            Attempt::Carried if settled => Self::Fixed,
-            Attempt::Carried => Self::FixFailed,
+            Attempt::Carried { .. } if settled => Self::Fixed,
+            Attempt::Carried { .. } => Self::FixFailed,
         }
     }
 
@@ -243,13 +277,23 @@ pub fn undoing(changes: &[Change]) -> Vec<Undo> {
 ///
 /// Read from the baseline rather than guessed at: it records what lemonfiber wrote and what
 /// it adopted from the operator, and those are different claims about the same field.
+///
+/// And compared with `holds` — what the service has now — rather than read alone. "lemonfiber
+/// wrote this once" and "lemonfiber's value is what is there" are different claims too, and
+/// only the second of them makes a field lemonfiber's to write again. A field it wrote and
+/// somebody has since changed reads as theirs, whoever wrote it first.
 #[must_use]
-pub fn may_write(recorded: Option<&Record>) -> Writing {
+pub fn may_write(recorded: Option<&Record>, holds: Option<&str>) -> Writing {
     match recorded {
         // Nothing recorded: lemonfiber never wrote here, so whatever is there is the
         // operator's own and not a difference from anything lemonfiber intended.
         None => Writing::TheirsAlone,
         Some(record) if record.origin.is_adopted() => Writing::Adopted,
+        // Recorded as lemonfiber's own, but the service no longer holds it. Something
+        // moved it, and the only hand that reaches a service's settings besides
+        // lemonfiber's is the operator's. Reading the origin alone would call this
+        // lemonfiber's to overwrite, which is the whole thing this rule exists to stop.
+        Some(record) if holds != Some(record.value.as_str()) => Writing::Changed,
         Some(_) => Writing::Ours,
     }
 }
@@ -260,6 +304,9 @@ pub fn may_write(recorded: Option<&Record>) -> Writing {
 pub enum Writing {
     /// lemonfiber wrote this value, so putting it back is restoring its own work.
     Ours,
+    /// lemonfiber wrote it and the operator has since changed it in the service. Theirs
+    /// now, whoever wrote it first.
+    Changed,
     /// The operator set it and lemonfiber adopted it. Theirs to keep.
     Adopted,
     /// Nothing was ever recorded here, so nothing lemonfiber knows about is being changed.
@@ -282,6 +329,10 @@ impl Writing {
     pub fn refused(self) -> Option<Remedy> {
         match self {
             Self::Ours => None,
+            Self::Changed => Some(
+                Remedy::new("You have changed this since lemonfiber wrote it, so it is left alone")
+                    .with_detail("lemonfiber reset --confirm restores lemonfiber's own"),
+            ),
             Self::Adopted => Some(
                 Remedy::new("This is a value you set and lemonfiber adopted, so it is left alone")
                     .with_detail("lemonfiber reset --confirm restores lemonfiber's own"),
@@ -427,6 +478,10 @@ mod tests {
     /// their machine against. A value they set is theirs; lemonfiber putting its own back
     /// over it — however sure it is — is what makes people stop trusting a tool that
     /// changes things.
+    ///
+    /// Which is why the baseline is compared and not merely read. "lemonfiber wrote this
+    /// once" and "lemonfiber's value is what is there now" are different claims, and only
+    /// the second of them makes a field lemonfiber's to write again.
     #[test]
     fn a_repair_writes_over_what_lemonfiber_wrote_and_nothing_else() {
         use super::{may_write, Writing};
@@ -438,15 +493,33 @@ mod tests {
             origin,
         };
 
-        // Its own work, put back.
-        assert_eq!(may_write(Some(&recorded(Origin::Written))), Writing::Ours);
-        assert!(may_write(Some(&recorded(Origin::Written))).allowed());
-        assert!(may_write(Some(&recorded(Origin::Written)))
-            .refused()
-            .is_none());
+        // Its own work, still standing where it left it, put back.
+        let ours = may_write(Some(&recorded(Origin::Written)), Some("8080"));
+        assert_eq!(ours, Writing::Ours);
+        assert!(ours.allowed());
+        assert!(ours.refused().is_none());
 
-        // Theirs, adopted — left alone, and the operator told where to go instead.
-        let adopted = may_write(Some(&recorded(Origin::Adopted)));
+        // Its own work, but the service no longer holds it. Reading the origin alone
+        // would call this lemonfiber's to overwrite; what it actually is, is the edit
+        // this rule exists to protect.
+        let changed = may_write(Some(&recorded(Origin::Written)), Some("9090"));
+        assert_eq!(changed, Writing::Changed);
+        assert!(!changed.allowed());
+        assert!(changed
+            .refused()
+            .is_some_and(|remedy| remedy.action.contains("since lemonfiber wrote it")));
+
+        // Cleared rather than changed is still theirs — an emptied field is a decision
+        // somebody took, not an absence to fill in.
+        assert_eq!(
+            may_write(Some(&recorded(Origin::Written)), None),
+            Writing::Changed
+        );
+
+        // Theirs, adopted — left alone, and the operator told where to go instead. Read
+        // before the comparison, so a value they have since moved again stays theirs
+        // rather than becoming a change to argue about.
+        let adopted = may_write(Some(&recorded(Origin::Adopted)), Some("7070"));
         assert_eq!(adopted, Writing::Adopted);
         assert!(!adopted.allowed());
         assert!(adopted
@@ -455,7 +528,7 @@ mod tests {
 
         // Never written at all: a repair does not start writing somewhere lemonfiber has
         // never been, which is how a fix turns into a surprise.
-        let theirs = may_write(None);
+        let theirs = may_write(None, Some("8080"));
         assert_eq!(theirs, Writing::TheirsAlone);
         assert!(!theirs.allowed());
         assert!(theirs.refused().is_some());

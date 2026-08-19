@@ -7,6 +7,14 @@
 //! needs them.
 //!
 //! In-crate test support only: compiled under `cfg(test)`, so nothing here ships.
+//!
+//! Apart from `tests/common` for a reason the language sets rather than a choice
+//! anyone made: an in-crate test reaches its module's private items, and an
+//! integration test cannot see them at all. The two sides genuinely need different
+//! access, so they cannot share one module — a crate holding both would have to be
+//! a dependency of this one, and this crate's own tests cannot use a dependency
+//! that depends back on it. Deduplication belongs within each side until the ports
+//! live in a crate of their own.
 
 use crate::ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
@@ -67,10 +75,15 @@ pub(crate) struct Reporting {
 /// absent — the exit code a missing value produces.
 #[derive(Clone)]
 pub(crate) struct Tunnel {
+    /// The compose service id of the gateway, which tells its answers from the client's.
     pub(crate) gateway: &'static str,
+    /// The public address the gateway reports.
     pub(crate) gateway_ip: Option<&'static str>,
+    /// The public address a container behind it reports.
     pub(crate) client_ip: Option<&'static str>,
+    /// The country those addresses resolve to.
     pub(crate) country: Option<&'static str>,
+    /// The forwarded port the gateway reports holding.
     pub(crate) port: Option<&'static str>,
     /// What a second address service says the gateway's egress is, where a test
     /// is about the sources contradicting each other. Absent means both agree.
@@ -237,6 +250,7 @@ pub(crate) struct ScriptedHttp {
 }
 
 impl ScriptedHttp {
+    /// A transport answering these replies in order, and nothing once they run out.
     pub(crate) fn new(replies: Vec<(u16, &'static str)>) -> Self {
         Self {
             replies: std::sync::Mutex::new(replies.into()),
@@ -326,6 +340,7 @@ pub(crate) struct SeedFs {
 }
 
 impl SeedFs {
+    /// A transport answering by the shape of the URL, with these two keys in place.
     pub(crate) fn keyed(servarr: Option<&'static str>, sabnzbd: Option<&'static str>) -> Self {
         Self {
             servarr,

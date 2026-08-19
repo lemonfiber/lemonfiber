@@ -24,6 +24,7 @@ pub mod providers;
 pub mod releases;
 pub mod storage;
 pub mod vpn;
+pub mod wiring;
 
 use std::time::Duration;
 
@@ -249,8 +250,11 @@ pub trait Mend: Send + Sync {
     ///
     /// The ones that do touch configuration read the baseline, which records what
     /// lemonfiber wrote and what it adopted from the operator — and those are different
-    /// claims about the same field.
-    fn may_proceed(&self, _repair: &Repair) -> Writing {
+    /// claims about the same field. They also read what the service holds *now*: "lemonfiber
+    /// wrote this once" and "lemonfiber's value is what is there" are different claims too,
+    /// and only the second makes a field lemonfiber's to write again. That takes asking the
+    /// service, which is why this may await.
+    async fn may_proceed(&self, _repair: &Repair) -> Writing {
         Writing::Ours
     }
 }

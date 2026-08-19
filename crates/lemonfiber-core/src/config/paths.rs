@@ -19,6 +19,11 @@ pub struct Paths {
     data: PathBuf,
 }
 
+/// The change journal's file name, named once so a caller placing it beside the
+/// environment file — as a repair recording what it changed does — cannot place it
+/// somewhere the reversal will not look.
+pub const JOURNAL: &str = "journal.jsonl";
+
 impl Paths {
     /// The layout beneath a configuration base and a data base.
     ///
@@ -55,7 +60,7 @@ impl Paths {
     /// The change journal, so a write can be undone.
     #[must_use]
     pub fn journal(&self) -> PathBuf {
-        self.config.join("journal.jsonl")
+        self.config.join(JOURNAL)
     }
 
     /// The setup wizard's saved progress, so quitting mid-setup resumes rather

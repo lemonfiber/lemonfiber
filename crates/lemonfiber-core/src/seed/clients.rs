@@ -159,7 +159,7 @@ async fn wire_by_intent(
                 },
                 Naming {
                     service,
-                    resource: "downloadclient",
+                    resource: CLIENT,
                     noun: "download client",
                 },
                 journal,
@@ -227,11 +227,17 @@ pub(super) fn describe_client(service: &str, client: &DownloadClient) -> String 
     format!("{} into {service}", client.name)
 }
 
+/// The kind of resource a download-client wiring is, as the journal and the service both
+/// name it. Named once so a change seeding creates and a change a repair rewrites read as
+/// one story about download clients rather than two about differently-spelled things.
+pub const CLIENT: &str = "downloadclient";
+
 /// The baseline field a download client's value is recorded under: the endpoint it
 /// reaches, host and port, so it is keyed the way the client itself is matched —
 /// by connection, not by the label an operator can rename.
-pub(super) fn client_field(client: &DownloadClient) -> String {
-    format!("downloadclient:{}:{}", client.host, client.port)
+#[must_use]
+pub fn client_field(client: &DownloadClient) -> String {
+    format!("{CLIENT}:{}:{}", client.host, client.port)
 }
 
 /// The baseline a drift-aware wiring reads against and records into, and whether

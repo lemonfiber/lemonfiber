@@ -3,7 +3,7 @@
 //! The indexer needs to know what to search on behalf of, which is the one connection
 //! that runs from the indexer outward rather than into it.
 
-use super::{read_servarr_key, seed_stamp, target_for, Ctx, Path, PathBuf};
+use super::{read_servarr_key, target_for, Ctx, Path, PathBuf};
 
 /// Prowlarr as the app-sync source, and the media-filing \*arrs to register into
 /// it — the resolution app sync starts from.
@@ -78,7 +78,7 @@ pub(super) async fn seed_applications(
         &source.target.name,
         &wanted,
         &mut journal,
-        &seed_stamp(ctx),
+        &ctx.stamp(),
     )
     .await;
     wirings.extend(skipped);

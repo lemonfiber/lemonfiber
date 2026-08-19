@@ -64,14 +64,14 @@ pub(super) async fn recover_setup(
             resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::RollBack(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env) {
+            if let Err(problem) = recover::undo(&undos, &env, Vec::new()) {
                 return complain(&problem);
             }
             println!("\nRolled back. Applying again.");
             resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::StartOver(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env) {
+            if let Err(problem) = recover::undo(&undos, &env, Vec::new()) {
                 return complain(&problem);
             }
             discard(paths);
@@ -119,6 +119,12 @@ pub(super) fn describe(change: &Change) -> String {
         Kind::Set { key, .. } => format!("the setting {key}"),
         Kind::Made { path } => format!("the directory {path}"),
         Kind::Created { resource, .. } => format!("a {resource}"),
+        // Not something a first run writes — a repair does — but the journal is shared, so
+        // an interrupted setup could find one that a repair left. Named the same way, so
+        // an operator reading what would be undone recognises it either way.
+        Kind::Configured {
+            resource, field, ..
+        } => format!("a {resource}'s {field}"),
     }
 }
 
@@ -203,6 +209,19 @@ mod tests {
                 id: "1".to_owned(),
             })),
             "a root folder"
+        );
+        // A repair's own record. Not something a first run writes, but the journal is
+        // shared, so an interrupted setup can find one — and an operator deciding whether
+        // to roll back is owed a name for it rather than silence.
+        assert_eq!(
+            describe(&change(Kind::Configured {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+                field: "tvCategory".to_owned(),
+                previous: None,
+                current: "tv-sonarr".to_owned(),
+            })),
+            "a downloadclient's tvCategory"
         );
     }
 
