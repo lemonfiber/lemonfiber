@@ -16,9 +16,8 @@ use std::sync::Arc;
 
 use common::files::Files;
 use common::{Answer, Fake};
-use lemonfiber_core::app::engine::diagnose;
 use lemonfiber_core::app::repair::retract;
-use lemonfiber_core::app::Ctx;
+use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::Category;
