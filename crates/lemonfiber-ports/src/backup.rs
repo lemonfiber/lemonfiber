@@ -9,6 +9,8 @@
 
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
+
 /// One thing a capture copies into the archive.
 ///
 /// The source is where it is read from on this machine; the archive path is where

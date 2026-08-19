@@ -7,10 +7,14 @@ rust-version.workspace = true
 repository.workspace = true
 authors.workspace = true
 license-file = "../../LICENSE"
+# Not published, as `lemonfiber-manifest` is not: the release ships one binary, and a
+# crate nobody can depend on separately is one fewer surface to keep compatible.
+publish = false
 
 [dependencies]
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 async-trait = { workspace = true }
+thiserror = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 

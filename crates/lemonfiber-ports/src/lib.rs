@@ -22,19 +22,14 @@
 //! Module names avoid repeating their trait's name, so call sites read `ports::Engine`
 //! rather than `docker::DockerApi`. See `.docs/architecture/ports-and-adapters.md`.
 
-pub mod alert;
 pub mod archive;
 pub mod backup;
-pub mod condition;
 pub mod docker;
 pub mod error;
 pub mod filesystem;
-pub mod health;
 pub mod http;
 pub mod media;
 pub mod nntp;
-pub mod notify;
-pub mod plural;
 pub mod process;
 pub mod random;
 pub mod service;

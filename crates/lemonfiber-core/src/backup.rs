@@ -48,7 +48,6 @@ pub enum Scope {
     },
 }
 
-
 /// What a capture will copy, decided from the layout and the scope alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
@@ -137,8 +136,6 @@ pub fn destinations(paths: &Paths) -> Vec<(String, PathBuf)> {
         (area::STACK.to_owned(), paths.stack()),
     ]
 }
-
-
 
 impl Manifest {
     /// Build the manifest that describes a capture, given the version and time the
@@ -360,7 +357,6 @@ pub fn relocation(manifest: &Manifest, current_root: &Path) -> Option<Relocation
         })
     }
 }
-
 
 /// How many backups to keep before the oldest are pruned.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

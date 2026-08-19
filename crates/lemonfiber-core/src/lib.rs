@@ -36,8 +36,8 @@
 // already uses. The traits and the vocabulary that crosses them are a crate of their own —
 // see `lemonfiber-ports` — so the fakes that stand in for them are reachable from this
 // crate's own tests and from its integration tests alike.
-pub use lemonfiber_ports::{condition, error, health, plural, trace};
 pub use lemonfiber_ports as ports;
+pub use lemonfiber_ports::{error, trace};
 
 pub mod adapters;
 pub mod alert;
@@ -47,11 +47,13 @@ pub mod backup;
 pub mod baseline;
 pub mod bundle;
 pub mod bytes;
+pub mod condition;
 pub mod config;
 pub mod dashboard;
 pub mod docker;
 pub mod doctor;
 mod endpoint;
+pub mod health;
 pub mod household;
 mod instant;
 pub mod jellyfin;
@@ -59,7 +61,9 @@ pub mod journal;
 pub mod lidarr;
 pub mod materialised;
 pub mod model;
+pub mod notify;
 pub mod platform;
+pub mod plural;
 pub mod prerequisites;
 pub mod provider;
 pub mod prowlarr;

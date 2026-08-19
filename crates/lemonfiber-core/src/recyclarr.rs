@@ -24,7 +24,6 @@ pub use lemonfiber_ports::media::Kind;
 
 use crate::quality::{Preset, Selection};
 
-
 /// The three TRaSH-guide templates that carry a preset out for one service: the
 /// quality definition that sets the size limits, the quality profile that ranks
 /// releases, and the custom formats the profile scores by — the exact three

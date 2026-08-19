@@ -15,9 +15,16 @@
 //! Nothing here delivers anything. What a channel is and how it fails is the next
 //! layer's; deciding what is worth saying is this one's.
 
+mod appetite;
+mod class;
+mod digest;
+mod kind;
+mod moment;
 mod outbox;
 
-pub use lemonfiber_ports::alert::{
-    is_ours, Alert, Appetite, Class, Digest, Moment, Wants, FLAPPING,
-};
+pub use appetite::{Appetite, Wants};
+pub use class::Class;
+pub use digest::{Digest, FLAPPING};
+pub use kind::is_ours;
+pub use moment::{Alert, Moment};
 pub use outbox::{Outbox, KEPT};

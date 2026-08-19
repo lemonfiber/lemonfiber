@@ -18,7 +18,6 @@ pub use lemonfiber_ports::media::Format;
 
 use serde::{Deserialize, Serialize};
 
-
 #[cfg(test)]
 mod tests {
     use super::Format;
