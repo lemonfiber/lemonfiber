@@ -228,6 +228,34 @@ pub(crate) enum Request {
 /// silently does nothing.
 #[derive(Debug, Args)]
 pub(crate) struct Mending {
+    #[command(flatten)]
+    pub(crate) fixing: Fixing,
+    /// Put back what the last repair changed.
+    ///
+    /// Asked for the same way a repair is, because it is the same errand read
+    /// backwards. It reverses that one repair and nothing else: the wiring lemonfiber
+    /// seeded and the choices your first run wrote are left where they are.
+    #[arg(long, conflicts_with = "fix")]
+    pub(crate) undo: bool,
+}
+
+impl Mending {
+    /// Whether this run was asked to change anything at all, forwards or back.
+    ///
+    /// Asked as one question so the caller deciding between looking and acting does not
+    /// have to know which combination of flags amounts to acting.
+    pub(crate) fn acts(&self) -> bool {
+        self.fixing.fix || self.undo
+    }
+}
+
+/// How much of the putting-right was agreed to in advance.
+///
+/// Apart from `--undo` because these are two errands rather than four settings: the three
+/// here describe one run that changes things forward, and each is meaningless without the
+/// first of them.
+#[derive(Debug, Args)]
+pub(crate) struct Fixing {
     /// Offer to put right what lemonfiber can, asking about each first.
     ///
     /// A plain run only looks. This one says what each repair would do and what else
@@ -240,13 +268,6 @@ pub(crate) struct Mending {
     /// Include the checks that disturb the running system while repairing.
     #[arg(long = "fix-disruptive", requires = "fix")]
     pub(crate) disruptive: bool,
-    /// Put back what the last repair changed.
-    ///
-    /// Asked for the same way a repair is, because it is the same errand read
-    /// backwards. It reverses that one repair and nothing else: the wiring lemonfiber
-    /// seeded and the choices your first run wrote are left where they are.
-    #[arg(long, conflicts_with = "fix")]
-    pub(crate) undo: bool,
 }
 
 /// What a support bundle was asked for.

@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn undoing_a_repair_reverses_that_repair_and_nothing_else() {
         use super::{undoing, OPERATION};
-        use crate::journal::{Change, Kind};
+        use crate::journal::{Change, Kind, Undo};
 
         let change = |operation: &str, at: &str, key: &str| Change {
             at: at.to_owned(),
@@ -403,19 +403,20 @@ mod tests {
             change(OPERATION, "3000", "THIRD"),
         ];
 
-        let keys: Vec<String> = undoing(&journal)
-            .into_iter()
-            .filter_map(|undo| match undo.action {
-                crate::journal::Action::Restore { key, .. } => Some(key),
-                crate::journal::Action::Remove { .. } | crate::journal::Action::Delete { .. } => {
-                    None
-                }
-            })
-            .collect();
+        let put_back = |key: &str| Undo {
+            target: "sonarr".to_owned(),
+            action: crate::journal::Action::Restore {
+                key: key.to_owned(),
+                value: Some("before".to_owned()),
+            },
+        };
 
         // Both halves of the last repair, most recent first — and neither the seed nor the
         // repair before it.
-        assert_eq!(keys, vec!["THIRD".to_owned(), "SECOND".to_owned()]);
+        assert_eq!(
+            undoing(&journal),
+            vec![put_back("THIRD"), put_back("SECOND")]
+        );
 
         // Nothing repaired yet is nothing to undo, rather than the whole journal.
         assert!(undoing(&[change("seed", "1000", "SEEDED")]).is_empty());

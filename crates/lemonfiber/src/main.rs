@@ -102,7 +102,7 @@ async fn main() -> ExitCode {
             // Repairing is its own errand: it looks, offers, acts and looks again, and
             // renders what became of each — not one value from dispatch. A plain run falls
             // through to the diagnosis below and changes nothing.
-            if mending.fix || mending.undo {
+            if mending.acts() {
                 let Some(paths) = here() else {
                     return no_config_home();
                 };

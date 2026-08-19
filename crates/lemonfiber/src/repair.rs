@@ -18,7 +18,7 @@ use lemonfiber_core::app::recover;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::repair;
 
-use crate::cli::Mending;
+use crate::cli::{Fixing, Mending};
 use crate::prompt::{yes_no, Answers};
 use crate::render::repair::{mended, reversed};
 use crate::render::Lines;
@@ -37,13 +37,13 @@ pub(crate) async fn run(
     // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
     // repairs carried out says so with --yes. So one that did not gets the offer and no
     // action, which is what report-only is for.
-    let stance = match (asked.yes, json) {
+    let stance = match (asked.fixing.yes, json) {
         (true, _) => Stance::Unattended,
         (false, true) => Stance::ReportOnly,
         (false, false) => Stance::Ask,
     };
 
-    match mend(&ctx, stance, asked.disruptive, &Asking(answers)).await {
+    match mend(&ctx, stance, asked.fixing.disruptive, &Asking(answers)).await {
         Ok(report) => {
             mended(&report, json).print();
             crate::exit::repairing(&report)
@@ -112,12 +112,16 @@ mod tests {
     use crate::exit::{repairing, shown, success};
     use crate::prompt::Answers;
 
-    use super::{run, Asking, Confirm as _, Ctx, Mending, Paths};
+    use super::{run, Asking, Confirm as _, Ctx, Fixing, Mending, Paths};
 
-    /// Where a test's records would live, in a scratch directory of its own.
-    fn paths() -> Paths {
-        let root =
-            std::env::temp_dir().join(format!("lemonfiber-repair-cli-{}", std::process::id()));
+    /// Where a test's records live, in a scratch directory of its own — named, because a
+    /// test that undoes a journal must not be reading one another test wrote.
+    fn paths(name: &str) -> Paths {
+        let root = std::env::temp_dir().join(format!(
+            "lemonfiber-repair-cli-{}-{name}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
         Paths::rooted(&root.join("config"), &root.join("data"))
     }
 
@@ -201,11 +205,13 @@ mod tests {
     async fn an_undo_with_nothing_repaired_puts_nothing_back() {
         let code = run(
             ctx(),
-            paths(),
+            paths("nothing-undone"),
             Mending {
-                fix: false,
-                yes: false,
-                disruptive: false,
+                fixing: Fixing {
+                    fix: false,
+                    yes: false,
+                    disruptive: false,
+                },
                 undo: true,
             },
             &Says("n"),
@@ -214,6 +220,54 @@ mod tests {
         .await;
 
         assert_eq!(shown(code), success());
+    }
+
+    /// The reversal itself: what the last repair set goes back to what it was, read from
+    /// the journal that repair wrote rather than from anything the run still holds.
+    #[tokio::test]
+    async fn an_undo_puts_back_what_the_last_repair_set() {
+        use lemonfiber_core::journal::{Change, Kind};
+
+        let paths = paths("undone");
+        let journal = paths.journal();
+        if let Some(dir) = journal.parent() {
+            std::fs::create_dir_all(dir).ok();
+        }
+        let recorded = Change {
+            at: "1000".to_owned(),
+            operation: lemonfiber_core::repair::OPERATION.to_owned(),
+            target: "qbittorrent".to_owned(),
+            kind: Kind::Set {
+                key: "QBITTORRENT_PORT".to_owned(),
+                previous: Some("8080".to_owned()),
+                current: "51413".to_owned(),
+            },
+        };
+        std::fs::write(
+            &journal,
+            serde_json::to_string(&recorded).unwrap_or_default() + "\n",
+        )
+        .ok();
+
+        let code = run(
+            ctx(),
+            paths.clone(),
+            Mending {
+                fixing: Fixing {
+                    fix: false,
+                    yes: false,
+                    disruptive: false,
+                },
+                undo: true,
+            },
+            &Says("n"),
+            false,
+        )
+        .await;
+
+        assert_eq!(shown(code), success());
+        let env = std::fs::read_to_string(paths.env_file()).unwrap_or_default();
+        assert!(env.contains("QBITTORRENT_PORT=8080"), "{env}");
     }
 
     /// A stack that will not read is the one thing every check needs before any of them
@@ -233,11 +287,13 @@ mod tests {
 
         let code = run(
             nowhere,
-            paths(),
+            paths("unreadable"),
             Mending {
-                fix: true,
-                yes: true,
-                disruptive: false,
+                fixing: Fixing {
+                    fix: true,
+                    yes: true,
+                    disruptive: false,
+                },
                 undo: false,
             },
             &Says("n"),
@@ -271,11 +327,13 @@ mod tests {
         shown(
             run(
                 ctx(),
-                paths(),
+                paths("offers"),
                 Mending {
-                    fix: true,
-                    yes,
-                    disruptive: false,
+                    fixing: Fixing {
+                        fix: true,
+                        yes,
+                        disruptive: false,
+                    },
                     undo: false,
                 },
                 &Says("n"),

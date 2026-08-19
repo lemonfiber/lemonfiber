@@ -102,7 +102,8 @@ mod tests {
     use lemonfiber_core::error::Remedy;
     use lemonfiber_core::repair::{Outcome, Repair};
 
-    use super::mended;
+    use super::{mended, reversed};
+    use lemonfiber_core::journal::{Action, Undo};
 
     fn repair() -> Repair {
         Repair {
@@ -219,5 +220,54 @@ mod tests {
     fn the_machine_readable_form_carries_the_outcomes() {
         let json = mended(&report(true, vec![Outcome::Fixed]), true).text();
         assert!(json.contains(r#""outcome":"fixed""#), "{json}");
+    }
+
+    /// Every kind of reversal reads in the words of the thing it acted on, because "undone"
+    /// on its own does not tell an operator what their stack now holds.
+    #[test]
+    fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
+        let undos = vec![
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Restore {
+                    key: "PORT".to_owned(),
+                    value: Some("8080".to_owned()),
+                },
+            },
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Restore {
+                    key: "PROXY".to_owned(),
+                    value: None,
+                },
+            },
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Remove {
+                    resource: "downloadclient".to_owned(),
+                    id: "3".to_owned(),
+                },
+            },
+            Undo {
+                target: "disk".to_owned(),
+                action: Action::Delete {
+                    path: "/tmp/lemonfiber-scratch".to_owned(),
+                },
+            },
+        ];
+
+        let said = reversed(&undos, false).text();
+
+        assert!(said.contains("PORT back to 8080"), "{said}");
+        assert!(said.contains("PROXY removed, as it was"), "{said}");
+        assert!(said.contains("downloadclient 3 removed"), "{said}");
+        assert!(said.contains("/tmp/lemonfiber-scratch removed"), "{said}");
+    }
+
+    /// A run with nothing to put back says so, and says it in whichever form was asked for.
+    #[test]
+    fn nothing_to_put_back_is_said_plainly_and_counted_for_a_script() {
+        assert!(reversed(&[], false).text().contains("no repair"));
+        assert!(reversed(&[], true).text().contains(r#""reversed":0"#));
     }
 }
