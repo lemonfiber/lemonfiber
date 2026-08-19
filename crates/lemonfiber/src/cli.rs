@@ -266,7 +266,11 @@ pub(crate) struct Fixing {
     #[arg(long, requires = "fix")]
     pub(crate) yes: bool,
     /// Include the checks that disturb the running system while repairing.
-    #[arg(long = "fix-disruptive", requires = "fix")]
+    ///
+    /// Named apart from the field it sits beside: `doctor` already has a `--disruptive`,
+    /// and clap keys an argument by the field name unless told otherwise — so two flags
+    /// that read differently on the command line would be one argument underneath.
+    #[arg(id = "fix-disruptive", long = "fix-disruptive", requires = "fix")]
     pub(crate) disruptive: bool,
 }
 
@@ -384,5 +388,30 @@ mod tests {
     #[test]
     fn repairing_and_reversing_at_once_is_refused() {
         assert_eq!(asked(&["lemonfiber", "doctor", "--fix", "--undo"]), None);
+    }
+
+    /// Two flags that read differently on the command line must be two arguments
+    /// underneath. `doctor` has a `--disruptive` of its own, and a repairing run has
+    /// `--fix-disruptive`; keyed by field name they would collide, and the one that lost
+    /// would silently do nothing.
+    #[test]
+    fn disturbing_the_stack_while_repairing_is_its_own_flag() {
+        let disruptive = |args: &[&str]| match Cli::try_parse_from(args).ok()?.command? {
+            Request::Doctor {
+                disruptive,
+                mending,
+                ..
+            } => Some((disruptive, mending.fixing.disruptive)),
+            _ => None,
+        };
+
+        assert_eq!(
+            disruptive(&["lemonfiber", "doctor", "--disruptive"]),
+            Some((true, false))
+        );
+        assert_eq!(
+            disruptive(&["lemonfiber", "doctor", "--fix", "--fix-disruptive"]),
+            Some((false, true))
+        );
     }
 }
