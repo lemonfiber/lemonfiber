@@ -355,7 +355,7 @@ pub(crate) enum ConfigAction {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cli, Command};
+    use super::{Cli, Request};
     use clap::Parser;
 
     /// What `doctor` was asked to do about what it finds, for one command line.
@@ -364,8 +364,8 @@ mod tests {
     /// question being asked is what a person typing this actually gets — including the
     /// combinations the parser is meant to refuse.
     fn asked(args: &[&str]) -> Option<bool> {
-        match Cli::try_parse_from(args).ok()?.command {
-            Command::Doctor { mending, .. } => Some(mending.acts()),
+        match Cli::try_parse_from(args).ok()?.command? {
+            Request::Doctor { mending, .. } => Some(mending.acts()),
             _ => None,
         }
     }
