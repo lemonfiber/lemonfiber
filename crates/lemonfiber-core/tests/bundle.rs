@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use common::files::Files;
 use common::Fake;
 use lemonfiber_core::app::bundle::{
     collect, write, Wanted, BUNDLE_LEAK, BUNDLE_NO_ROOM, BUNDLE_UNWRITTEN,
@@ -51,43 +52,6 @@ fn project() -> &'static Path {
 
 /// The version this build calls itself, as the command would pass it in.
 const LEMONFIBER: &str = "0.7.0-test";
-
-/// A filesystem holding one configuration file and nothing else.
-struct Files {
-    configuration: Option<&'static str>,
-}
-
-#[async_trait]
-impl FileSystem for Files {
-    async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        Ok(path.to_path_buf())
-    }
-    async fn touch(&self, _path: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn remove(&self, _path: &Path) {}
-    async fn read(&self, _path: &Path) -> Option<String> {
-        self.configuration.map(str::to_owned)
-    }
-    async fn write(&self, _path: &Path, _contents: &str) {}
-    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-        None
-    }
-    async fn describe(&self, _path: &Path) -> StorageFacts {
-        StorageFacts {
-            kind: FsKind::Linking("test".to_owned()),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
-    }
-}
 
 /// An engine with nothing running, and one that cannot be reached at all.
 struct Engine1(bool);
@@ -193,7 +157,7 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
         Arc::new(Idle),
         Arc::new(Engine1(running)),
         Arc::new(StoppedClock),
-        Arc::new(Files { configuration }),
+        configuration.map_or_else(Files::empty, Files::anywhere),
         stack,
         Settings {
             env_file: Some(PathBuf::from("/tmp/lemonfiber-bundle-test/.env")),

@@ -10,71 +10,15 @@
 
 mod common;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use common::files::Files;
 use common::{Answer, Fake};
 use lemonfiber_core::doctor::credentials::Target;
 use lemonfiber_core::doctor::releases::{ReleasesCheck, NONE_AVAILABLE, PRESET_UNMET};
 use lemonfiber_core::doctor::{Category, Check, Verdict};
-use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
-};
-
-/// A filesystem that hands back the config text placed at a path; only `read` matters.
-struct FakeFs {
-    files: Vec<(PathBuf, &'static str)>,
-}
-
-impl FakeFs {
-    fn with(files: Vec<(PathBuf, &'static str)>) -> Arc<Self> {
-        Arc::new(Self { files })
-    }
-}
-
-#[async_trait]
-impl FileSystem for FakeFs {
-    async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        Ok(path.to_path_buf())
-    }
-    async fn touch(&self, _path: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
-        Err(Fault::new("unused"))
-    }
-    async fn remove(&self, _path: &Path) {}
-    async fn read(&self, path: &Path) -> Option<String> {
-        self.files
-            .iter()
-            .find(|(at, _)| at == path)
-            .map(|(_, text)| (*text).to_owned())
-    }
-    async fn write(&self, _path: &Path, _contents: &str) {}
-    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-        None
-    }
-    async fn describe(&self, _path: &Path) -> StorageFacts {
-        StorageFacts {
-            kind: FsKind::Linking("test".to_owned()),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
-    }
-}
-
-/// The Servarr config that opens a target, carrying a readable key.
-const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
-
-/// Where the Sonarr config is read from.
-fn config_path() -> PathBuf {
-    PathBuf::from("/stack/config/sonarr/config.xml")
-}
 
 fn sonarr() -> Target {
     Target {
@@ -87,12 +31,12 @@ fn sonarr() -> Target {
 }
 
 /// A filesystem that opens the Sonarr target.
-fn opening_fs() -> Arc<FakeFs> {
-    FakeFs::with(vec![(config_path(), CONFIG_WITH_KEY)])
+fn opening_fs() -> Arc<Files> {
+    Files::at(vec![(config_path(), CONFIG_WITH_KEY)])
 }
 
 /// Run a disruptive check over one Sonarr target and return its single verdict.
-async fn sonarr_verdict(fs: Arc<FakeFs>, http: Arc<Fake>) -> Verdict {
+async fn sonarr_verdict(fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
     let check = ReleasesCheck::new(http, fs, vec![sonarr()], true);
     let mut findings = check.run().await;
     findings.pop().map_or(
@@ -183,7 +127,7 @@ async fn nothing_wanted_is_skipped_rather_than_searched() {
 async fn a_service_that_has_not_started_is_skipped() {
     // No config on disk, so the target does not open and there is nothing to search.
     let http = Fake::by_path(vec![("wanted/missing", Answer::reply(200, ONE_WANTED))]);
-    let fs = FakeFs::with(Vec::new());
+    let fs = Files::at(Vec::new());
     assert!(matches!(
         sonarr_verdict(fs, http).await,
         Verdict::Skipped { .. }
@@ -227,7 +171,7 @@ async fn a_film_service_is_searched_by_its_own_id() {
         config: PathBuf::from("/stack/config/radarr/config.xml"),
         version: 3,
     };
-    let fs = FakeFs::with(vec![(
+    let fs = Files::at(vec![(
         PathBuf::from("/stack/config/radarr/config.xml"),
         CONFIG_WITH_KEY,
     )]);
