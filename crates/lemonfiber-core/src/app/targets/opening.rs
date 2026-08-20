@@ -15,10 +15,10 @@ use std::path::Path;
 
 use crate::recyclarr::Kind;
 
-use super::downloads::*;
-use super::layout::*;
-use super::secrets::*;
-use super::servarr::*;
+use super::downloads::download_targets;
+use super::layout::project_directory;
+use super::secrets::recorded_secret;
+use super::servarr::{servarr_targets, target_for, DownloadKind};
 
 /// The household's Jellyfin as a reading client, for the last stage of a trace —
 /// whether the item is finally in the library. Present only where the stack has a

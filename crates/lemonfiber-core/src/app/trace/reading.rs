@@ -10,12 +10,9 @@ use crate::app::Ctx;
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::{Check, Finding, Verdict};
 use crate::model::TraceReport;
-use crate::ports::service::UsenetAccounts;
-use crate::ports::service::{Indexers, ItemPart, QueueItem, TraceEvent};
+use crate::ports::service::{Indexers, ItemPart, Library, QueueItem, TraceEvent, UsenetAccounts};
 use crate::recyclarr::Kind;
-use crate::trace::Presence;
-
-use super::explaining::*;
+use crate::trace::{Presence, Stage};
 
 /// The stall an account underneath the stack could explain, where this trace has one.
 ///
@@ -109,11 +106,11 @@ pub(crate) async fn library_presence(
 /// it was actually read. An unreadable fragment is not an empty one, so the trace can tell
 /// "nothing happened" apart from "this could not be read".
 pub(crate) struct Fragments {
-    events: Vec<TraceEvent>,
-    queue: Vec<QueueItem>,
-    parts: Vec<ItemPart>,
-    library: Option<Presence>,
-    reads: Reads,
+    pub(crate) events: Vec<TraceEvent>,
+    pub(crate) queue: Vec<QueueItem>,
+    pub(crate) parts: Vec<ItemPart>,
+    pub(crate) library: Option<Presence>,
+    pub(crate) reads: Reads,
 }
 
 /// Which of the fragments the services actually answered with. They travel together
@@ -121,15 +118,15 @@ pub(crate) struct Fragments {
 /// and because a run of loose booleans is the shape a caller transposes without noticing.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Reads {
-    history: bool,
-    queue: bool,
-    parts: bool,
+    pub(crate) history: bool,
+    pub(crate) queue: bool,
+    pub(crate) parts: bool,
 }
 
 #[cfg(test)]
 impl Reads {
     /// Every fragment answered — the ordinary case.
-    const ALL: Self = Self {
+    pub(crate) const ALL: Self = Self {
         history: true,
         queue: true,
         parts: true,

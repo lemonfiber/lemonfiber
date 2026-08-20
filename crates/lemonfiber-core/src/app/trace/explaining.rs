@@ -4,7 +4,7 @@
 //! that never came, and those are said. What it cannot see — whether an indexer found
 //! anything, whether the client took it — is left to the services that can.
 
-use super::reading::*;
+use super::reading::Reads;
 use crate::model::TraceReport;
 use crate::trace::{Confidence, Presence, Stage};
 

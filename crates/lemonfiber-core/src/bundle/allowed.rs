@@ -71,6 +71,17 @@ pub struct Marks {
     salt: Vec<u8>,
 }
 
+#[cfg(test)]
+impl Marks {
+    /// Stand-ins over a salt handed straight in, for the one case a test cannot
+    /// reach through [`Marks::new`]: the branch where the randomness source
+    /// refuses. That fallback has to be covered, and covering it means building
+    /// the value the source would not.
+    pub(crate) const fn from_salt(salt: Vec<u8>) -> Self {
+        Self { salt }
+    }
+}
+
 impl Marks {
     /// Stand-ins for one bundle, or nothing where the machine could not provide the
     /// randomness — which is not something to paper over with a fixed salt, because a

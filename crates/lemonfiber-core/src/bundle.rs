@@ -256,7 +256,7 @@ mod tests {
     fn marks(salt: Vec<u8>) -> Marks {
         // Built directly where the source will not answer: a fallback nothing can reach
         // is a branch no test can cover, and this file is held to covering all of them.
-        Marks::new(&Fixed(salt.clone())).unwrap_or(Marks { salt })
+        Marks::new(&Fixed(salt.clone())).unwrap_or_else(|| Marks::from_salt(salt))
     }
 
     /// Terms that hold what a test is about and default for the rest.

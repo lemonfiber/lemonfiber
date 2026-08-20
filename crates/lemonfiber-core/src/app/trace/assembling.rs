@@ -5,10 +5,10 @@
 
 use crate::model::{TraceMoment, TraceReport, TraceStage};
 use crate::ports::service::{ItemPart, QueueItem, TraceEvent};
-use crate::trace::{Coverage, Outcome, Part, Stage};
+use crate::trace::{Confidence, Coverage, Outcome, Part, Presence, Stage};
 
-use super::explaining::*;
-use super::reading::*;
+use super::explaining::{stall_reason, trace_findings};
+use super::reading::Fragments;
 
 /// Build the trace from what one \*arr knows and what the media server confirms: the
 /// stages its history records, what its queue is doing now, whether it is finally in the

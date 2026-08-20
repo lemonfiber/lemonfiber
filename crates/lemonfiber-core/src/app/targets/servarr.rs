@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::doctor::credentials::Target;
 
-use super::layout::*;
+use super::layout::config_path;
 
 /// The Servarr-shape services whose credential can be proven, and where to read
 /// each one's key and reach it.

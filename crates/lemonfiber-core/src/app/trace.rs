@@ -24,23 +24,17 @@ mod assembling;
 mod explaining;
 mod reading;
 
-use assembling::*;
-use explaining::*;
-use reading::*;
-
-use std::sync::Arc;
+use assembling::assemble;
+use explaining::not_matched;
+use reading::{
+    account_explainable, beside, library_presence, providers, troubles, Fragments, Reads,
+};
 
 use super::targets::{jellyfin_reader, open_servarrs};
 use super::Ctx;
-use crate::doctor::providers::ProvidersCheck;
-use crate::doctor::{Check, Finding, Verdict};
 use crate::error::{Diagnose, Problem};
-use crate::model::{StuckEntry, StuckReport, TraceMoment, TraceReport, TraceStage};
-use crate::ports::service::{
-    Indexers, ItemPart, Library, Pipeline, QueueItem, TraceEvent, UsenetAccounts,
-};
-use crate::recyclarr::Kind;
-use crate::trace::{Confidence, Coverage, Outcome, Part, Presence, Stage};
+use crate::model::{StuckEntry, StuckReport, TraceReport};
+use crate::ports::service::Pipeline;
 
 /// Trace one item by a human term, across the resolution services.
 ///
@@ -148,11 +142,11 @@ mod tests {
     use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
     use super::{
-        account_explainable, assemble, beside, library_presence, trace, troubles, Ctx, Finding,
-        Fragments, Reads, TraceReport, Verdict,
+        account_explainable, assemble, beside, library_presence, trace, troubles, Ctx, Fragments,
+        Reads, TraceReport,
     };
     use crate::config::Settings;
-    use crate::doctor::Category;
+    use crate::doctor::{Category, Finding, Verdict};
     use crate::error::{Code, Problem, Remedy, Severity};
     use crate::jellyfin::Jellyfin;
     use crate::platform::Environment;
@@ -299,8 +293,8 @@ mod tests {
 
     /// A context whose download client's key is readable as well as the \*arrs', so a
     /// trace that asks the accounts resolves both readers rather than only one.
-    fn ctx_with_accounts(fake: Fake) -> Ctx {
-        ctx_with(&fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_INI))))
+    fn ctx_with_accounts(fake: &Fake) -> Ctx {
+        ctx_with(fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_INI))))
     }
 
     /// A context that can reach its Jellyfin: the admin password is recorded under the
@@ -998,7 +992,7 @@ mod tests {
     /// had asked and heard something.
     #[tokio::test]
     async fn a_stall_reads_unchanged_where_the_accounts_cannot_be_read() {
-        let context = ctx_with_accounts(Fake::arr(
+        let context = ctx_with_accounts(&Fake::arr(
             r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
             r#"{"records":[]}"#,
             EMPTY_QUEUE,

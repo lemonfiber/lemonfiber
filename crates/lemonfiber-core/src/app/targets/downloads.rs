@@ -10,9 +10,9 @@ use crate::ports::service::{Download, Transfers};
 use crate::qbittorrent::Qbittorrent;
 use crate::sabnzbd::Sabnzbd;
 
-use super::layout::*;
-use super::secrets::*;
-use super::servarr::*;
+use super::layout::config_path;
+use super::secrets::recorded_qbittorrent_password;
+use super::servarr::{DownloadKind, DownloadTarget};
 
 /// The stack's download clients, resolved to host-side read targets.
 ///
