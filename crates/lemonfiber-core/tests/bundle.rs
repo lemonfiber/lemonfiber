@@ -11,6 +11,9 @@
 //! exactly when it is needed, so what these prove is that it collects what it can and
 //! names what it could not.
 
+mod common;
+
+use common::stack::project;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -32,14 +35,6 @@ use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::Fake;
 use tokio::sync::mpsc::Receiver;
-
-/// The repository's own copy of the stack, so what is collected is what a real
-/// installation would have rather than an invented shape.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
 
 /// The version this build calls itself, as the command would pass it in.
 const LEMONFIBER: &str = "0.7.0-test";

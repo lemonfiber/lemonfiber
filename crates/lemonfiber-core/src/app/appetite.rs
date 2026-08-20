@@ -52,6 +52,7 @@ fn path(ctx: &Ctx) -> Option<PathBuf> {
 mod tests {
     use super::{record, recorded};
     use crate::alert::{Appetite, Wants};
+    use crate::test_support::a_context;
 
     /// Where a test's scratch answer lives. Naming it does not touch it.
     fn scratch(name: &str) -> std::path::PathBuf {
@@ -72,17 +73,12 @@ mod tests {
             env_file,
             ..crate::config::Settings::default()
         };
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            settings,
-            crate::platform::Environment::MacOs,
-        )
+            ))))
+            .settings(settings)
+            .build()
     }
 
     #[test]

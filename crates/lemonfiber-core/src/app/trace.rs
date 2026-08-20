@@ -145,15 +145,12 @@ mod tests {
         account_explainable, assemble, beside, library_presence, trace, troubles, Ctx, Fragments,
         Reads, TraceReport,
     };
-    use crate::config::Settings;
     use crate::doctor::{Category, Finding, Verdict};
     use crate::error::{Code, Problem, Remedy, Severity};
     use crate::jellyfin::Jellyfin;
-    use crate::platform::Environment;
     use crate::ports::service::{ItemPart, QueueItem, TraceEvent};
     use crate::recyclarr::Kind;
-    use crate::stack::Source;
-    use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs};
+    use crate::test_support::{a_context, a_password, nowhere, SeedFs};
     use crate::trace::{Coverage, Outcome, Presence, Stage};
 
     /// A Servarr config that opens a target, carrying a readable key.
@@ -272,17 +269,10 @@ mod tests {
     /// A context over the real stack, a filesystem that opens the \*arrs, and a transport
     /// answering the given reads.
     fn ctx_with(fake: &Fake) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(fake.transport())
+        a_context()
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .with_http(fake.transport())
     }
 
     /// A context whose media server the trace cannot ask — no admin password is recorded,
@@ -911,15 +901,7 @@ mod tests {
 
     #[tokio::test]
     async fn tracing_over_an_unreadable_stack_is_an_error() {
-        let bad = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let bad = a_context().over(nowhere()).build();
         assert!(trace(&bad, "anything", None).await.is_err());
     }
 
@@ -956,17 +938,10 @@ mod tests {
     async fn stuck_over_arrs_that_have_not_started_finds_nothing() {
         // No key is readable, so no \*arr opens: nothing was asked, so the list is empty
         // and complete rather than incomplete.
-        let context = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
-        .with_http(Fake::arr("", "", EMPTY_QUEUE).transport());
+        let context = a_context()
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
+            .with_http(Fake::arr("", "", EMPTY_QUEUE).transport());
         let report = super::stuck(&context).await.unwrap_or_default();
         assert!(report.items.is_empty());
         assert!(!report.incomplete);
@@ -974,15 +949,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_stuck_query_over_an_unreadable_stack_is_an_error() {
-        let bad = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let bad = a_context().over(nowhere()).build();
         assert!(super::stuck(&bad).await.is_err());
     }
 

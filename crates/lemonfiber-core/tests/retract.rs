@@ -9,6 +9,9 @@
 //! are: the crate is compiled twice, and a path exercised only in-crate has its coverage
 //! counted from the copy that never ran.
 
+mod common;
+
+use common::stack::project;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -23,13 +26,6 @@ use lemonfiber_core::repair::OPERATION;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
-
-/// The repository's own stack, so the targets resolve against a real description.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
 
 /// A Servarr config carrying a readable key, so the target opens.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";

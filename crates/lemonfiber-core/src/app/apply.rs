@@ -261,6 +261,7 @@ fn not_reviewed() -> Problem {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_support::a_fresh_write;
     use std::path::{Path, PathBuf};
 
     use super::apply;
@@ -271,23 +272,6 @@ mod tests {
     use crate::platform::Environment;
     use crate::stack::Source;
     use crate::wizard::{Answer, Library, Phase, Wizard};
-
-    /// A journal line for a setting written over nothing — a fresh file, so the
-    /// prior value is absent. Built from a key and value stated here, independent
-    /// of the plan apply derives, so the test pins what should land rather than
-    /// echoing how apply computes it.
-    fn fresh_write(key: &str, value: &str) -> Change {
-        Change {
-            at: "t".to_owned(),
-            operation: "apply".to_owned(),
-            target: ".env".to_owned(),
-            kind: Kind::Set {
-                key: key.to_owned(),
-                previous: None,
-                current: value.to_owned(),
-            },
-        }
-    }
 
     /// A journal line for a directory apply created, pinned to the path stated
     /// here.
@@ -411,12 +395,12 @@ mod tests {
             written,
             journal_text(&[
                 made_dir(&root),
-                fresh_write("LEMONFIBER_USENET", "on"),
-                fresh_write("LEMONFIBER_TORRENT", "on"),
-                fresh_write("DATA_ROOT", &root_shown),
-                fresh_write("PUID", "1000"),
-                fresh_write("PGID", "1000"),
-                fresh_write("JELLYFIN_MODE", "docker"),
+                a_fresh_write("LEMONFIBER_USENET", "on"),
+                a_fresh_write("LEMONFIBER_TORRENT", "on"),
+                a_fresh_write("DATA_ROOT", &root_shown),
+                a_fresh_write("PUID", "1000"),
+                a_fresh_write("PGID", "1000"),
+                a_fresh_write("JELLYFIN_MODE", "docker"),
             ]),
         );
     }
@@ -441,12 +425,12 @@ mod tests {
             journal_text(&[
                 made_dir(&parent),
                 made_dir(&root),
-                fresh_write("LEMONFIBER_USENET", "on"),
-                fresh_write("LEMONFIBER_TORRENT", "on"),
-                fresh_write("DATA_ROOT", &root_shown),
-                fresh_write("PUID", "1000"),
-                fresh_write("PGID", "1000"),
-                fresh_write("JELLYFIN_MODE", "docker"),
+                a_fresh_write("LEMONFIBER_USENET", "on"),
+                a_fresh_write("LEMONFIBER_TORRENT", "on"),
+                a_fresh_write("DATA_ROOT", &root_shown),
+                a_fresh_write("PUID", "1000"),
+                a_fresh_write("PGID", "1000"),
+                a_fresh_write("JELLYFIN_MODE", "docker"),
             ]),
         );
     }

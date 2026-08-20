@@ -251,14 +251,11 @@ mod tests {
     use crate::app::{dispatch, Command, Ctx, Outcome};
     use crate::config::{store, Settings};
     use crate::model::VersionReport;
-    use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::service::RootFolder;
     use crate::seed::{Severity, State, Wiring};
     use crate::stack::Source;
-    use crate::test_support::{
-        seeding, seeding_with, spoke, stack, FixedRandom, Reporting, Scripted, SeedFs,
-    };
+    use crate::test_support::{a_context, seeding, seeding_with, FixedRandom, Reporting, SeedFs};
     use lemonfiber_fixtures::http::{Answer, Fake};
     use lemonfiber_ports::http::Method;
 
@@ -509,17 +506,12 @@ mod tests {
             env_file: env,
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .with_http(Fake::scripted(replies))
-        .with_random(Arc::new(FixedRandom(bytes)))
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            .with_http(Fake::scripted(replies))
+            .with_random(Arc::new(FixedRandom(bytes)))
     }
 
     /// The three replies a full password exchange expects: log in, set, confirm.
@@ -737,20 +729,14 @@ mod tests {
             r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
         );
 
-        let context = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings {
+        let context = a_context()
+            .settings(Settings {
                 env_file: Some(env.clone()),
                 ..Settings::default()
-            },
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(seeding());
+            })
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .with_http(seeding());
 
         // Preview: the drifted connection is named, and nothing is written.
         let preview = super::reset_connections(&context, false).await;
@@ -817,20 +803,14 @@ mod tests {
         let env = dir.join(".env");
         let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
         let _ = crate::config::store::write(&dir.join("baseline.json"), baseline);
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings {
+        a_context()
+            .settings(Settings {
                 env_file: Some(env),
                 ..Settings::default()
-            },
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(http)
+            })
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .with_http(http)
     }
 
     /// The state of the `qBittorrent into Sonarr` wiring in a seed report.
@@ -922,20 +902,14 @@ mod tests {
         let _ = std::fs::create_dir_all(dir);
         let env = dir.join(".env");
         let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings {
+        a_context()
+            .settings(Settings {
                 env_file: Some(env),
                 ..Settings::default()
-            },
-            Environment::MacOs,
-        )
-        .with_filesystem(filesystem)
-        .with_http(http)
+            })
+            .build()
+            .with_filesystem(filesystem)
+            .with_http(http)
     }
 
     #[tokio::test]
@@ -1075,15 +1049,10 @@ mod tests {
     #[tokio::test]
     async fn seed_reports_an_unreadable_stack_rather_than_guessing() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let outcome = dispatch(Command::Seed, &ctx).await;
         assert_eq!(
             outcome.err().map(|problem| problem.code),

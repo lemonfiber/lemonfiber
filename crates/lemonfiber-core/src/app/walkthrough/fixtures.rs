@@ -10,9 +10,8 @@ use std::sync::Arc;
 
 use super::super::Ctx;
 use crate::config::Settings;
-use crate::platform::Environment;
 use crate::ports::http::Method;
-use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs};
+use crate::test_support::{a_context, a_password, Reporting, SeedFs};
 use crate::walkthrough::{Line, Narrator};
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
@@ -187,20 +186,14 @@ impl Narrator for Recording {
 /// answering as `fake` says — with no media server credential, so the library stage is
 /// simply unreachable.
 pub(super) fn ctx_with(fake: &Fake) -> Ctx {
-    Ctx::new(
-        Arc::new(Scripted(Ok(spoke("")))),
-        Arc::new(Reporting::absent()),
-        Arc::new(crate::adapters::System),
-        Arc::new(crate::adapters::Disk),
-        stack(),
-        over_usenet(),
-        Environment::MacOs,
-    )
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_KEYED))))
-    .with_http(fake.transport())
-    // No waiting: every test would otherwise sit through the real poll, and what the wait
-    // does at its bound is exactly what the tests are about.
-    .waiting(std::time::Duration::ZERO)
+    a_context()
+        .settings(over_usenet())
+        .build()
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_KEYED))))
+        .with_http(fake.transport())
+        // No waiting: every test would otherwise sit through the real poll, and what the wait
+        // does at its bound is exactly what the tests are about.
+        .waiting(std::time::Duration::ZERO)
 }
 
 /// The same, reachable media server and all — the admin password recorded under a scratch

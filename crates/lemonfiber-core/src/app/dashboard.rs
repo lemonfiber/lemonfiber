@@ -455,12 +455,11 @@ mod tests {
     use crate::config::{PortForward, Protocols, Settings};
     use crate::dashboard::{Hardlink, Panel, Protocol, Reading, Telemetry, Transfer, Vpn};
     use crate::health::Standing;
-    use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
     use crate::ports::http::Http;
     use crate::stack::Source;
-    use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs, Tunnel};
+    use crate::test_support::{a_context, a_password, nowhere, Reporting, SeedFs, Tunnel};
     use lemonfiber_fixtures::http::{Answer, Fake};
 
     /// A transport answering every request with this body at 200 — the queue as JSON for
@@ -495,16 +494,11 @@ mod tests {
             data_root: Some(std::path::PathBuf::from("/srv/media")),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
     }
 
     /// Every service the `library` form declares.
@@ -575,19 +569,15 @@ mod tests {
             data_root: Some(std::path::PathBuf::from("/srv/media")),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::holding(
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Healthy,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            settings,
-            Environment::MacOs,
-        );
+            )))
+            .over(nowhere)
+            .settings(settings)
+            .build();
         let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.telemetry, Telemetry::Disconnected);
         assert!(!snapshot.services.is_available());
@@ -678,19 +668,14 @@ mod tests {
             data_root: None,
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::holding(
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Healthy,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            )))
+            .settings(settings)
+            .build();
         let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.telemetry, Telemetry::Unconfigured);
         assert_eq!(snapshot.health.standing, Standing::Unconfigured);
@@ -758,22 +743,17 @@ mod tests {
             env_file,
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::holding(
+        a_context()
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Healthy,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
-        .with_filesystem(Arc::new(fs))
-        .with_http(http)
+            )))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
+            .with_filesystem(Arc::new(fs))
+            .with_http(http)
     }
 
     /// A private env file recording qBittorrent's password, at a scratch path
@@ -918,16 +898,11 @@ mod tests {
             port_forward,
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
     }
 
     /// The VPN panel the way `gather` reads it — the manifest resolved from the
@@ -1143,15 +1118,11 @@ mod tests {
             port_forward: forwarding(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(tunnel_engine(true, Some(healthy_tunnel()))),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            settings,
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(tunnel_engine(true, Some(healthy_tunnel()))))
+            .over(nowhere())
+            .settings(settings)
+            .build();
         assert!(matches!(
             vpn_panel(&ctx).await,
             Some(Panel::Unavailable { .. })
@@ -1380,16 +1351,11 @@ mod tests {
             env_file: Some(dir.join(".env")),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
     }
 
     #[tokio::test]

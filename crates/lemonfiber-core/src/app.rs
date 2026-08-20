@@ -361,25 +361,19 @@ mod tests {
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
-    use crate::platform::Environment;
     use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
     use crate::ports::process::{Failure, Output, Progress};
     use crate::quality::Preset;
     use crate::stack::Source;
-    use crate::test_support::{refused, spoke, stack, Reporting, Scripted};
+    use crate::test_support::{a_context, nowhere, refused, spoke, Reporting, Scripted};
     use lemonfiber_fixtures::http::Fake;
     use std::time::Duration;
 
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(scripted)),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
+        a_context()
+            .runner(Arc::new(Scripted(scripted)))
+            .engine(Arc::new(Reporting::default()))
+            .build()
     }
 
     #[tokio::test]
@@ -528,15 +522,10 @@ mod tests {
     async fn a_dispatched_upgrade_over_an_unreadable_stack_is_an_error() {
         // The dispatch arm unboxes the driver's error: a confirmed upgrade cannot read
         // an unreadable stack's services, so it fails rather than half-acting.
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere())
+            .build();
         assert!(dispatch(Command::QualityUpgrade { confirm: true }, &ctx)
             .await
             .is_err());
@@ -624,15 +613,11 @@ mod tests {
     #[tokio::test]
     async fn a_stack_that_cannot_be_read_is_reported_rather_than_left_out() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("v2.32.1")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(spoke("v2.32.1")))))
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let refusal = dispatch(Command::Version, &ctx)
             .await
             .err()
@@ -650,16 +635,11 @@ mod tests {
             protocols,
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .rehearsing()
+        a_context()
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build()
+            .rehearsing()
     }
 
     fn report(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::LifecycleReport> {
@@ -780,15 +760,11 @@ mod tests {
     #[tokio::test]
     async fn doctor_reports_an_unreadable_stack_rather_than_guessing() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("v2.32.1")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(spoke("v2.32.1")))))
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let outcome = dispatch(
             Command::Doctor {
                 only: None,
@@ -855,15 +831,10 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
         let command = Command::Down {
             forms: vec!["library".to_owned()],
         };
@@ -881,17 +852,13 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Err(Failure::NotFound {
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Err(Failure::NotFound {
                 program: "docker".to_owned(),
-            }))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            }))))
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
         let command = Command::Pull {
             forms: vec!["library".to_owned()],
         };
@@ -908,19 +875,15 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(Output {
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(Output {
                 status: Some(0),
                 stdout: "library Pulling\nlibrary Pulled\n".to_owned(),
                 stderr: String::new(),
-            }))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            }))))
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
 
         let (closed, silent) = tokio::sync::mpsc::channel(1);
         drop(closed);
@@ -950,17 +913,13 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Err(Failure::NotFound {
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Err(Failure::NotFound {
                 program: "docker".to_owned(),
-            }))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            }))))
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
         let refusal = pull_progress(&ctx, &["library".to_owned()])
             .await
             .err()
@@ -1000,15 +959,10 @@ mod tests {
     #[tokio::test]
     async fn an_unreadable_stack_is_reported_before_anything_is_started() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let command = Command::Up {
             forms: vec!["library".to_owned()],
         };
@@ -1028,15 +982,11 @@ mod tests {
             stack_dir: None,
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::Embedded(&EMBEDDED),
-            settings,
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(Source::Embedded(&EMBEDDED))
+            .settings(settings)
+            .build();
         let command = Command::Up {
             forms: vec!["library".to_owned()],
         };
@@ -1053,15 +1003,10 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/invalid"
         )));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            invalid,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(invalid)
+            .build();
         let command = Command::Up {
             forms: vec!["library".to_owned()],
         };
@@ -1093,15 +1038,10 @@ mod tests {
             env_file: Some(path.to_path_buf()),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
+        a_context()
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build()
     }
 
     fn config_scratch(name: &str) -> std::path::PathBuf {
@@ -1330,15 +1270,7 @@ mod tests {
 
     #[tokio::test]
     async fn settings_with_nowhere_to_live_say_setup_has_not_run() {
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context().engine(Arc::new(Reporting::default())).build();
         assert_eq!(
             dispatch(Command::ConfigShow, &ctx)
                 .await
@@ -1376,19 +1308,14 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        // An HTTP port that answers nothing, so a diagnostic check reaching one — the
-        // guide-source probe, a credential — resolves to unreachable rather than the
-        // real network. Keeps the doctor tests self-contained and offline.
-        .with_http(Fake::scripted(Vec::new()))
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            // An HTTP port that answers nothing, so a diagnostic check reaching one — the
+            // guide-source probe, a credential — resolves to unreachable rather than the
+            // real network. Keeps the doctor tests self-contained and offline.
+            .with_http(Fake::scripted(Vec::new()))
     }
 
     /// Everything the `library` form declares.
@@ -1530,20 +1457,16 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(refused("no such image")))),
-            Arc::new(Reporting::holding(
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(refused("no such image")))))
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Starting,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO);
+            )))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO);
 
         let command = Command::Up {
             forms: vec!["library".to_owned()],
@@ -1666,15 +1589,10 @@ mod tests {
     #[tokio::test]
     async fn asking_what_is_running_from_a_stack_that_cannot_be_read_is_refused() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         assert_eq!(
             dispatch(Command::Ps { forms: Vec::new() }, &ctx)
                 .await
@@ -1793,15 +1711,10 @@ mod tests {
     #[tokio::test]
     async fn reading_logs_from_a_stack_that_cannot_be_read_is_refused() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let query = LogQuery::recent(10);
         assert_eq!(
             super::logs(&ctx, &[], &[], query)

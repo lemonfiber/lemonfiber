@@ -344,6 +344,7 @@ impl Wizard {
 #[cfg(test)]
 mod tests {
     use crate::alert::Appetite;
+    use crate::test_support::a_fresh_write;
     use std::path::PathBuf;
 
     use super::{
@@ -854,20 +855,6 @@ mod tests {
         }
     }
 
-    /// One `.env` write an apply made: a new key, with nothing there before.
-    fn wrote(key: &str, value: &str) -> Change {
-        Change {
-            at: "t".to_owned(),
-            operation: "apply".to_owned(),
-            target: ".env".to_owned(),
-            kind: Kind::Set {
-                key: key.to_owned(),
-                previous: None,
-                current: value.to_owned(),
-            },
-        }
-    }
-
     /// The reversal of writing a fresh `.env` key: remove it again.
     fn removed(key: &str) -> Undo {
         Undo {
@@ -882,8 +869,8 @@ mod tests {
     /// The two writes an apply had managed to make before it was interrupted.
     fn partial_apply() -> Journal {
         Journal::replay(vec![
-            wrote("DATA_ROOT", "/srv/media"),
-            wrote("USENET", "on"),
+            a_fresh_write("DATA_ROOT", "/srv/media"),
+            a_fresh_write("USENET", "on"),
         ])
     }
 
@@ -955,7 +942,10 @@ mod tests {
         let journal = partial_apply();
         assert_eq!(
             Recovery::of(&journal).written(),
-            [wrote("DATA_ROOT", "/srv/media"), wrote("USENET", "on")],
+            [
+                a_fresh_write("DATA_ROOT", "/srv/media"),
+                a_fresh_write("USENET", "on")
+            ],
         );
     }
 

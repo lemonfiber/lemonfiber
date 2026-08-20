@@ -50,6 +50,7 @@ mod tests {
     use crate::app::fixtures::{ctx_at, scratch};
     use crate::condition::{Conditions, Fault};
     use crate::error::Severity;
+    use crate::test_support::a_context;
 
     /// A store with one thing wrong, raised at a fixed moment.
     fn stalled() -> Conditions {
@@ -106,17 +107,12 @@ mod tests {
     #[test]
     fn a_machine_with_nothing_configured_has_nowhere_to_keep_one() {
         let settings = crate::config::Settings::default();
-        let ctx = crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        let ctx = a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            settings,
-            crate::platform::Environment::MacOs,
-        );
+            ))))
+            .settings(settings)
+            .build();
         // Saving is a no-op rather than an error, and loading gives an empty store.
         save(&ctx, &stalled());
         assert!(load(&ctx).is_empty());

@@ -8,7 +8,10 @@
 //! no network, no files of its own — so the real adapters go in and none of them is
 //! reached. That is the claim worth making here as much as the listing itself.
 
-use std::path::{Path, PathBuf};
+mod common;
+
+use common::stack::project;
+use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
@@ -16,14 +19,6 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::stack::Source;
-
-/// The repository's own copy of the stack, so what is listed is what a real installation
-/// declares rather than an invented shape.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
 
 fn ctx(stack: Source) -> Ctx {
     Ctx::new(

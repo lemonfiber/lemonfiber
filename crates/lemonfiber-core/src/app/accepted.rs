@@ -128,6 +128,7 @@ fn not_warned(report: &DoctorReport, check: &str) -> Problem {
 mod tests {
     use super::{load, save};
     use crate::doctor::acknowledged::Accepted;
+    use crate::test_support::a_context;
 
     /// Where a test's scratch record lives. Naming it does not touch it.
     fn scratch(name: &str) -> std::path::PathBuf {
@@ -143,20 +144,15 @@ mod tests {
 
     /// A context with the given environment file, or none at all.
     fn ctx_with(env_file: Option<std::path::PathBuf>) -> crate::app::Ctx {
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            crate::config::Settings {
+            ))))
+            .settings(crate::config::Settings {
                 env_file,
                 ..crate::config::Settings::default()
-            },
-            crate::platform::Environment::MacOs,
-        )
+            })
+            .build()
     }
 
     #[test]

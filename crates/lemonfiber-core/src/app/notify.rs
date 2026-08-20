@@ -119,12 +119,10 @@ mod tests {
     use super::{notify, Notified, CHANNEL_CHECK};
     use crate::alert::{Digest, Outbox};
     use crate::condition::{Conditions, Fault};
-    use crate::config::Settings;
     use crate::error::Severity;
     use crate::health::Reach;
     use crate::notify::{Channel, Undelivered};
-    use crate::platform::Environment;
-    use crate::test_support::{spoke, stack, Reporting, Scripted as ScriptedRunner};
+    use crate::test_support::{a_context, spoke, Reporting, Scripted as ScriptedRunner};
 
     /// A channel that records what it was given, or refuses everything.
     struct Scripted {
@@ -176,15 +174,10 @@ mod tests {
 
     /// A context that needs nothing but a clock — notifying reaches no service.
     fn plain_ctx() -> crate::app::Ctx {
-        crate::app::Ctx::new(
-            std::sync::Arc::new(ScriptedRunner(Ok(spoke("")))),
-            std::sync::Arc::new(Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
+        a_context()
+            .runner(std::sync::Arc::new(ScriptedRunner(Ok(spoke("")))))
+            .engine(std::sync::Arc::new(Reporting::absent()))
+            .build()
     }
 
     /// A store with one thing wrong.

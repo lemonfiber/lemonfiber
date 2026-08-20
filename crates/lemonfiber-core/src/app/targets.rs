@@ -22,27 +22,16 @@ pub(super) use servarr::*;
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
 
     use super::{aggregator_target, project_directory};
     use crate::app::targets::downloads::committed_of;
     use crate::app::Ctx;
-    use crate::config::Settings;
-    use crate::platform::Environment;
     use crate::ports::service::Download;
-    use crate::test_support::{spoke, stack, Reporting, Scripted};
+    use crate::test_support::a_context;
 
     /// A context over the real stack, for the resolution that reads only the manifest.
     fn ctx() -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
+        a_context().build()
     }
 
     /// Every service the embedded stack declares, with the project it is read from.

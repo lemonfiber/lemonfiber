@@ -87,11 +87,8 @@ mod tests {
     use super::music;
     use super::Ctx;
     use crate::audio::Format;
-    use crate::config::Settings;
     use crate::model::{Disposition, Triggered};
-    use crate::platform::Environment;
-    use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted, SeedFs};
+    use crate::test_support::{a_context, nowhere, SeedFs};
     use lemonfiber_fixtures::http::Fake;
 
     /// The Lidarr config file `SeedFs` hands back, carrying a readable key so the target
@@ -108,17 +105,10 @@ mod tests {
     /// A context over the real stack (which names Lidarr), the given filesystem, and HTTP
     /// answering from `replies`.
     fn ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(fs)
-        .with_http(Fake::scripted(replies))
+        a_context()
+            .build()
+            .with_filesystem(fs)
+            .with_http(Fake::scripted(replies))
     }
 
     /// A context with a writable choice file, so recording succeeds. `tag` names a
@@ -194,16 +184,10 @@ mod tests {
     async fn an_unreadable_stack_records_the_choice_and_reports_not_started() {
         let dir = std::env::temp_dir().join(format!("lemonfiber-music-bad-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        let mut context = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        let mut context = a_context()
+            .over(nowhere())
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
         context.settings.env_file = Some(dir.join(".env"));
         let report = music(&context, Format::Lossless).await.unwrap_or_default();
         assert_eq!(report.disposition, Disposition::Recorded);

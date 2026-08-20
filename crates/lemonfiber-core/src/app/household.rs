@@ -172,12 +172,10 @@ mod tests {
     use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
     use super::{assemble, household, title_of, Ctx};
-    use crate::config::Settings;
     use crate::household::State;
-    use crate::platform::Environment;
     use crate::ports::service::HouseholdRequest;
     use crate::recyclarr::Kind;
-    use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs};
+    use crate::test_support::{a_context, a_password, SeedFs};
     use std::collections::BTreeMap;
 
     /// A Servarr config that opens a target, carrying a readable key.
@@ -237,17 +235,10 @@ mod tests {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-household-{tag}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        let mut context = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(fake.transport());
+        let mut context = a_context()
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .with_http(fake.transport());
         context.settings.env_file = Some(dir.join(".env"));
         crate::app::targets::record_secret(
             &context,
@@ -485,25 +476,18 @@ mod tests {
         // No env file, so no recorded media-server password — there is no account to
         // sign in as, which is said rather than shown as a household that asked for
         // nothing.
-        let context = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(
-            Fake {
-                sign_in: "",
-                requests: "",
-                library: "[]",
-                refuse: false,
-            }
-            .transport(),
-        );
+        let context = a_context()
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .with_http(
+                Fake {
+                    sign_in: "",
+                    requests: "",
+                    library: "[]",
+                    refuse: false,
+                }
+                .transport(),
+            );
         let report = household(&context, None).await.unwrap_or_default();
         assert!(!report.available);
         assert!(report

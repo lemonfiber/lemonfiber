@@ -12,7 +12,9 @@
 //! the clients write their keys to, and a transport answering as the download
 //! client and the aggregator would.
 
-use std::path::{Path, PathBuf};
+mod common;
+
+use common::stack::project;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -27,14 +29,6 @@ use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use tokio::sync::mpsc::Receiver;
-
-/// The repository's own copy of the stack, so the services resolve to the ids,
-/// ports and config paths a real installation has rather than to invented ones.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
 
 /// `SABnzbd`'s configuration, carrying the key it generated for itself.
 const SAB_INI: &str = "[misc]\napi_key = sabkey123\n";

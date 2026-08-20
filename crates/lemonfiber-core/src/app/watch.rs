@@ -178,10 +178,9 @@ mod tests {
     use crate::config::{Protocols, Settings};
     use crate::error::Problem;
     use crate::model::SupervisionReport;
-    use crate::platform::Environment;
     use crate::ports::filesystem::{Presence, Volume};
     use crate::ports::process::{Failure, Output};
-    use crate::test_support::{spoke, stack, Reporting, Scripted};
+    use crate::test_support::{a_context, spoke, Reporting, Scripted};
 
     /// A volume that answers each check with the next reading a test scripted,
     /// then stays gone once the script runs out.
@@ -215,15 +214,11 @@ mod tests {
             data_root: data_root.map(std::path::PathBuf::from),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(result)),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
+        a_context()
+            .runner(Arc::new(Scripted(result)))
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build()
     }
 
     async fn watch(ctx: &Ctx, drive: Drive) -> Result<SupervisionReport, Problem> {
