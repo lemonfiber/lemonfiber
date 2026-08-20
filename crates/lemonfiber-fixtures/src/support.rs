@@ -5,6 +5,9 @@
 //! `lemonfiber-core`, where being private to the crate meant its integration tests could
 //! not see them.
 
+use std::sync::Arc;
+
+use crate::http::{Answer, Fake};
 use async_trait::async_trait;
 use lemonfiber_ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
@@ -237,46 +240,6 @@ impl Engine for Reporting {
     }
 }
 
-/// A transport that answers seeding's HTTP calls from a scripted queue.
-pub struct ScriptedHttp {
-    replies: std::sync::Mutex<std::collections::VecDeque<(u16, &'static str)>>,
-}
-
-impl ScriptedHttp {
-    /// A transport answering these replies in order, and nothing once they run out.
-    #[must_use]
-    pub fn new(replies: Vec<(u16, &'static str)>) -> Self {
-        Self {
-            replies: std::sync::Mutex::new(replies.into()),
-        }
-    }
-}
-
-#[async_trait]
-impl lemonfiber_ports::http::Http for ScriptedHttp {
-    async fn send(
-        &self,
-        request: &lemonfiber_ports::http::Request,
-    ) -> Result<lemonfiber_ports::http::Response, lemonfiber_ports::http::Unreachable> {
-        let reply = self
-            .replies
-            .lock()
-            .ok()
-            .and_then(|mut replies| replies.pop_front());
-        match reply {
-            Some((status, body)) => Ok(lemonfiber_ports::http::Response {
-                status,
-                body: body.to_owned(),
-            }),
-            None => Err(lemonfiber_ports::http::Unreachable {
-                url: request.url.clone(),
-                reason: "nothing scripted".to_owned(),
-                attempts: 1,
-            }),
-        }
-    }
-}
-
 /// A randomness source answering with exactly the bytes a test scripts.
 pub struct FixedRandom(pub Option<Vec<u8>>);
 
@@ -286,32 +249,55 @@ impl lemonfiber_ports::random::Random for FixedRandom {
     }
 }
 
-/// A transport that answers by the shape of the URL, so a combined seed run's
-/// many calls need no exact ordering. Root-folder, download-client and Prowlarr
-/// application lists hold exactly what each service wants, so every connection
-/// reads back as already wired; qBittorrent's auth and set both answer success.
-pub struct RoutedHttp;
+/// The routes a whole seed run reads, so its many calls need no exact ordering.
+///
+/// Root-folder, download-client and Prowlarr application lists hold exactly what each
+/// service wants, so every connection reads back as already wired; qBittorrent's auth
+/// and set both answer success. The catch-all is last because the first matching route
+/// wins, and an empty fragment is contained in every URL.
+#[must_use]
+pub fn seeding_routes() -> Vec<(&'static str, Answer)> {
+    vec![
+        (
+            "/downloadclient",
+            Answer::reply(
+                200,
+                r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081}]}]"#,
+            ),
+        ),
+        (
+            "/rootfolder",
+            Answer::reply(
+                200,
+                r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#,
+            ),
+        ),
+        (
+            "/applications",
+            Answer::reply(
+                200,
+                r#"[{"id":1,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]},{"id":2,"fields":[{"name":"baseUrl","value":"http://radarr:7878"}]},{"id":3,"fields":[{"name":"baseUrl","value":"http://lidarr:8686"}]}]"#,
+            ),
+        ),
+        ("", Answer::reply(200, "Ok.")),
+    ]
+}
 
-#[async_trait]
-impl lemonfiber_ports::http::Http for RoutedHttp {
-    async fn send(
-        &self,
-        request: &lemonfiber_ports::http::Request,
-    ) -> Result<lemonfiber_ports::http::Response, lemonfiber_ports::http::Unreachable> {
-        let body = if request.url.contains("/downloadclient") {
-            r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081}]}]"#
-        } else if request.url.contains("/rootfolder") {
-            r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#
-        } else if request.url.contains("/applications") {
-            r#"[{"id":1,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]},{"id":2,"fields":[{"name":"baseUrl","value":"http://radarr:7878"}]},{"id":3,"fields":[{"name":"baseUrl","value":"http://lidarr:8686"}]}]"#
-        } else {
-            "Ok."
-        };
-        Ok(lemonfiber_ports::http::Response {
-            status: 200,
-            body: body.to_owned(),
-        })
-    }
+/// A transport answering a whole seed run, every connection already wired.
+#[must_use]
+pub fn seeding() -> Arc<Fake> {
+    Fake::by_path(seeding_routes())
+}
+
+/// A seed run answering `extra` first and falling through to the ordinary routes.
+///
+/// For the tests that need one service to say something different — a version, a
+/// second download client — without restating the whole table around it.
+#[must_use]
+pub fn seeding_with(extra: Vec<(&'static str, Answer)>) -> Arc<Fake> {
+    let mut routes = extra;
+    routes.extend(seeding_routes());
+    Fake::by_path(routes)
 }
 
 /// A filesystem that hands back a Servarr configuration for a Servarr path and

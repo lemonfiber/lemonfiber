@@ -15,9 +15,13 @@
 //! a helpful default — a test that reaches an endpoint it did not script has found
 //! something, and quietly handing it a `200` would hide it.
 //!
-//! What is *not* here: the fakes that speak lemonfiber's own models rather than a port —
-//! the Servarr service and the VPN gateway. Those need the seeding and diagnosis models to
-//! say anything, so they stay beside the integration tests that use them.
+//! What is *not* here, and why. The fakes that speak lemonfiber's own models rather than a
+//! port — the Servarr service and the VPN gateway — need the seeding and diagnosis models to
+//! say anything, so they stay beside the integration tests that use them. And the two that
+//! drive the retry wrapper stay with it: `Retrying<H>` takes a concrete transport by value,
+//! so wrapping a shared `Arc<Fake>` would mean widening a production signature to suit a
+//! test, and what they are for — counting how many times a blip was retried — is the thing
+//! under test rather than a service standing in for another.
 
 pub mod files;
 pub mod http;

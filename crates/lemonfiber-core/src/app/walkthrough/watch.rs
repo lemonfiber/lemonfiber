@@ -382,7 +382,7 @@ mod tests {
     async fn a_failure_is_quoted_with_the_lines_about_the_item_first() {
         // An operator who has to go and find the explanation has been handed a fault
         // report rather than a diagnosis.
-        let mut ctx = ctx_with(Fake::default());
+        let mut ctx = ctx_with(&Fake::default());
         ctx.engine = Arc::new(
             Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
                 .saying("sonarr", "something else entirely")
@@ -399,7 +399,7 @@ mod tests {
     async fn a_failure_with_nothing_said_about_the_item_quotes_what_there_is() {
         // Something is better than a silent failure: the recent output is where the
         // explanation usually is even when it does not name the item.
-        let mut ctx = ctx_with(Fake::default());
+        let mut ctx = ctx_with(&Fake::default());
         ctx.engine = Arc::new(
             Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
                 .saying("sonarr", "permission denied writing /data/media"),
@@ -410,7 +410,7 @@ mod tests {
 
     #[tokio::test]
     async fn nothing_to_ask_and_nothing_that_answers_are_both_simply_no_quote() {
-        let ctx = ctx_with(Fake::default());
+        let ctx = ctx_with(&Fake::default());
         assert!(what_was_said(&ctx, &[], "Sintel").await.is_empty());
         // The default fixture's engine is absent, so the logs cannot be read at all.
         assert!(what_was_said(&ctx, &services(&ctx), "Sintel")
@@ -422,7 +422,7 @@ mod tests {
     async fn a_download_the_client_is_carrying_is_narrated_with_its_own_figures() {
         // A size and a rate are what make a download look like progress rather than a
         // hang, and they come from the client rather than being guessed.
-        let ctx = ctx_with(Fake {
+        let ctx = ctx_with(&Fake {
             transfers: CARRYING_IT,
             ..Fake::default()
         });
@@ -438,13 +438,13 @@ mod tests {
 
     #[tokio::test]
     async fn a_client_carrying_nothing_of_ours_has_no_figures_to_offer() {
-        let ctx = ctx_with(Fake::default());
+        let ctx = ctx_with(&Fake::default());
         assert_eq!(speed_of(&ctx, "Sintel").await, None);
     }
 
     #[tokio::test]
     async fn a_stack_that_cannot_be_read_offers_no_figures_either() {
-        let mut ctx = ctx_with(Fake::default());
+        let mut ctx = ctx_with(&Fake::default());
         ctx.stack = crate::stack::Source::External(std::path::Path::new("/not-a-stack"));
         assert_eq!(speed_of(&ctx, "Sintel").await, None);
     }
@@ -454,7 +454,7 @@ mod tests {
         // The poll is the difference between watching a download and taking one reading
         // of it. Time is faked at both ends: tokio's, so nothing actually sleeps, and the
         // stack's, so the bound is reached deterministically.
-        let mut ctx = ctx_with(Fake {
+        let mut ctx = ctx_with(&Fake {
             history: r#"{"records":[{"eventType":"grabbed","date":"2026-08-08T00:00:00Z"}]}"#,
             queue: r#"{"records":[{"seriesId":7,"movieId":7,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}],"totalRecords":1}"#,
             ..Fake::default()

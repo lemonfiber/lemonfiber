@@ -86,7 +86,8 @@ mod tests {
     use crate::platform::Environment;
     use crate::quality::Preset;
     use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs};
+    use crate::test_support::{spoke, stack, Reporting, Scripted, SeedFs};
+    use lemonfiber_fixtures::http::Fake;
 
     /// The Servarr config file `SeedFs` hands back for any \*arr, carrying a readable
     /// key so a target opens.
@@ -105,7 +106,7 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(fs)
-        .with_http(Arc::new(ScriptedHttp::new(replies)))
+        .with_http(Fake::scripted(replies))
     }
 
     fn outcomes(report: &crate::model::UpgradeReport) -> Vec<Option<&Triggered>> {

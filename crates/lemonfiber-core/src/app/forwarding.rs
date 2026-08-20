@@ -343,9 +343,7 @@ mod tests {
             settings,
             crate::platform::Environment::MacOs,
         )
-        .with_http(std::sync::Arc::new(crate::test_support::ScriptedHttp::new(
-            replies,
-        )))
+        .with_http(lemonfiber_fixtures::http::Fake::scripted(replies))
     }
 
     #[tokio::test]

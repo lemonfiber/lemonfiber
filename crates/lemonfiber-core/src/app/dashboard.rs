@@ -460,9 +460,7 @@ mod tests {
     use crate::ports::filesystem::{FsKind, StorageFacts};
     use crate::ports::http::Http;
     use crate::stack::Source;
-    use crate::test_support::{
-        a_password, spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs, Tunnel,
-    };
+    use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs, Tunnel};
     use lemonfiber_fixtures::http::{Answer, Fake};
 
     /// A transport answering every request with this body at 200 — the queue as JSON for
@@ -834,7 +832,7 @@ mod tests {
         // No recorded qBittorrent password and no SABnzbd key on disk: both are
         // still finishing first start, so each is skipped and the panel is
         // ready-but-empty rather than failed.
-        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let http: Arc<dyn Http> = Fake::scripted(Vec::new());
         let ctx = ctx_downloads(SeedFs::keyed(None, None), http, None);
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
@@ -844,7 +842,7 @@ mod tests {
     async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
         // SABnzbd has written a config but not its key; qBittorrent has no recorded
         // password. Neither can be read, so neither appears.
-        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let http: Arc<dyn Http> = Fake::scripted(Vec::new());
         let ctx = ctx_downloads(SeedFs::keyed(None, Some(SAB_NO_KEY_INI)), http, None);
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
@@ -854,7 +852,7 @@ mod tests {
     async fn a_download_client_that_will_not_answer_is_left_out() {
         // The password is recorded, but qBittorrent's login goes unanswered, so it
         // is dropped from the panel rather than failing it.
-        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let http: Arc<dyn Http> = Fake::scripted(Vec::new());
         let ctx = ctx_downloads(
             SeedFs::keyed(None, None),
             http,

@@ -378,7 +378,11 @@ mod tests {
     static EMBEDDED: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
 
     /// A directory that is certainly not a stack.
-    static NOT_A_STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/ports");
+    ///
+    /// `adapters` because the crate cannot compile without it. The previous choice was a
+    /// directory that later moved out to its own crate, and an emptied directory fails
+    /// here rather than where it was emptied.
+    static NOT_A_STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/adapters");
 
     /// The stack this repository carries as a submodule, read from disk.
     fn checked_out() -> Source {

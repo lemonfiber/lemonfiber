@@ -155,7 +155,6 @@ nzb_key = ffffffffffff
 
 #[cfg(test)]
 mod client_tests {
-    use std::sync::Arc;
     use std::time::Duration;
 
     use lemonfiber_manifest::Date;
@@ -163,18 +162,14 @@ mod client_tests {
     use crate::ports::service::{
         Failure, Recorded, Standing, Transfers, UsenetAccount, UsenetAccounts,
     };
-    use crate::test_support::ScriptedHttp;
+    use lemonfiber_fixtures::http::Fake;
 
     use super::accounts::{recorded_quota, size_of};
     use super::Sabnzbd;
 
     /// A client whose transport answers the queue call from `replies`.
     fn client(replies: Vec<(u16, &'static str)>) -> Sabnzbd {
-        Sabnzbd::new(
-            Arc::new(ScriptedHttp::new(replies)),
-            "http://127.0.0.1:8080",
-            "key",
-        )
+        Sabnzbd::new(Fake::scripted(replies), "http://127.0.0.1:8080", "key")
     }
 
     /// One slot downloading with a real speed and countdown, one queued behind it.

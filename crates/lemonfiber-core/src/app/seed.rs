@@ -257,8 +257,10 @@ mod tests {
     use crate::seed::{Severity, State, Wiring};
     use crate::stack::Source;
     use crate::test_support::{
-        spoke, stack, FixedRandom, Reporting, RoutedHttp, Scripted, ScriptedHttp, SeedFs,
+        seeding, seeding_with, spoke, stack, FixedRandom, Reporting, Scripted, SeedFs,
     };
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    use lemonfiber_ports::http::Method;
 
     /// A manifest service with the few fields the credential resolver reads, and
     /// filler for the rest, so a test can vary the shape, port and key file.
@@ -308,8 +310,12 @@ mod tests {
 
     #[test]
     fn the_project_directory_is_the_external_path_or_the_materialise_target() {
+        // Any directory does: what is under test is which path is chosen, not what is
+        // in it. `adapters` is named because the crate cannot compile without it — the
+        // previous choice was a directory that later moved to its own crate, which broke
+        // this at a distance with an error naming neither.
         static EMBEDDED: include_dir::Dir<'_> =
-            include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/ports");
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/adapters");
         assert_eq!(
             project_directory(&Source::External(std::path::Path::new("/srv/stack")), None)
                 .as_deref(),
@@ -512,7 +518,7 @@ mod tests {
             settings,
             Environment::MacOs,
         )
-        .with_http(Arc::new(ScriptedHttp::new(replies)))
+        .with_http(Fake::scripted(replies))
         .with_random(Arc::new(FixedRandom(bytes)))
     }
 
@@ -744,7 +750,7 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(Arc::new(RoutedHttp));
+        .with_http(seeding());
 
         // Preview: the drifted connection is named, and nothing is written.
         let preview = super::reset_connections(&context, false).await;
@@ -769,32 +775,46 @@ mod tests {
     /// The Servarr routing, but answering `system/status` with a set version and
     /// holding each download client under a drifted category — so a schema change
     /// (version bumped, every client moved) can be driven end to end.
-    struct VersionedRoutedHttp {
-        version: &'static str,
+    /// A seed run whose \*arrs report the given major version, and hold a second
+    /// download client the ordinary routes do not.
+    ///
+    /// Three routes over the ordinary table rather than a transport of its own: the
+    /// first match wins, so stating what differs is enough and the rest stays shared.
+    fn versioned(version: &'static str) -> Arc<Fake> {
+        seeding_with(vec![
+            (
+                "system/status",
+                Answer::reply(
+                    200,
+                    match version {
+                        "5" => r#"{"appName":"Sonarr","version":"5"}"#,
+                        _ => r#"{"appName":"Sonarr","version":"4"}"#,
+                    },
+                ),
+            ),
+            ("/downloadclient/testall", Answer::reply(200, "[]")),
+            (
+                "/downloadclient",
+                Answer::reply(
+                    200,
+                    r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080},{"name":"tvCategory","value":"shows"}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#,
+                ),
+            ),
+        ])
     }
 
-    #[async_trait::async_trait]
-    impl crate::ports::http::Http for VersionedRoutedHttp {
-        async fn send(
-            &self,
-            request: &crate::ports::http::Request,
-        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-            let body = if request.url.contains("system/status") {
-                format!(r#"{{"appName":"Sonarr","version":"{}"}}"#, self.version)
-            } else if request.url.contains("/downloadclient/testall") {
-                "[]".to_owned()
-            } else if request.url.contains("/downloadclient") {
-                r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080},{"name":"tvCategory","value":"shows"}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#.to_owned()
-            } else {
-                return RoutedHttp.send(request).await;
-            };
-            Ok(crate::ports::http::Response { status: 200, body })
-        }
+    /// A transport answering the client list with `clients`, and success to everything
+    /// else — the reset previews turn on what that one list says, including its refusal.
+    fn clients_answering(clients: Answer) -> Arc<Fake> {
+        Fake::by_path(vec![
+            ("/downloadclient", clients),
+            ("", Answer::reply(200, "Ok.")),
+        ])
     }
 
     /// A context seeding the real stack over the given transport, with a
     /// qBittorrent password recorded and the given baseline written beside it.
-    fn schema_ctx(dir: &std::path::Path, baseline: &str, http: VersionedRoutedHttp) -> Ctx {
+    fn schema_ctx(dir: &std::path::Path, baseline: &str, http: Arc<Fake>) -> Ctx {
         const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
         let _ = std::fs::create_dir_all(dir);
         let env = dir.join(".env");
@@ -813,7 +833,7 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(Arc::new(http))
+        .with_http(http)
     }
 
     /// The state of the `qBittorrent into Sonarr` wiring in a seed report.
@@ -835,7 +855,7 @@ mod tests {
             std::env::temp_dir().join(format!("lemonfiber-schema-adopt-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"4","at":"1"},"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#;
-        let ctx = schema_ctx(&dir, baseline, VersionedRoutedHttp { version: "5" });
+        let ctx = schema_ctx(&dir, baseline, versioned("5"));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
         assert_eq!(
@@ -861,7 +881,7 @@ mod tests {
             std::env::temp_dir().join(format!("lemonfiber-schema-partial-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"4","at":"1"}}}}"#;
-        let ctx = schema_ctx(&dir, baseline, VersionedRoutedHttp { version: "5" });
+        let ctx = schema_ctx(&dir, baseline, versioned("5"));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
         assert_eq!(
@@ -881,7 +901,7 @@ mod tests {
             std::env::temp_dir().join(format!("lemonfiber-schema-same-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"5","at":"1"},"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#;
-        let ctx = schema_ctx(&dir, baseline, VersionedRoutedHttp { version: "5" });
+        let ctx = schema_ctx(&dir, baseline, versioned("5"));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
         assert_eq!(
@@ -895,36 +915,6 @@ mod tests {
     /// A transport whose download-client list is set per test — a body to return, or
     /// nothing to fail the read — with every other call answered plainly. For the
     /// reset-connection edge cases, where what the service holds decides the preview.
-    struct ClientsHttp {
-        clients: Option<&'static str>,
-    }
-
-    #[async_trait::async_trait]
-    impl crate::ports::http::Http for ClientsHttp {
-        async fn send(
-            &self,
-            request: &crate::ports::http::Request,
-        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-            if request.url.contains("/downloadclient") {
-                return match self.clients {
-                    Some(body) => Ok(crate::ports::http::Response {
-                        status: 200,
-                        body: body.to_owned(),
-                    }),
-                    None => Err(crate::ports::http::Unreachable {
-                        url: request.url.clone(),
-                        reason: "the list could not be read".to_owned(),
-                        attempts: 1,
-                    }),
-                };
-            }
-            Ok(crate::ports::http::Response {
-                status: 200,
-                body: "Ok.".to_owned(),
-            })
-        }
-    }
-
     /// A context for the reset-connection edge cases: the real stack, a recorded
     /// qBittorrent password so a client is wanted, keys per `filesystem`, over `http`.
     fn reset_ctx(
@@ -958,11 +948,7 @@ mod tests {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-reset-noopen-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let ctx = reset_ctx(
-            &dir,
-            Arc::new(SeedFs::keyed(None, None)),
-            Arc::new(RoutedHttp),
-        );
+        let ctx = reset_ctx(&dir, Arc::new(SeedFs::keyed(None, None)), seeding());
         assert!(super::reset_connections(&ctx, false).await.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -978,9 +964,7 @@ mod tests {
         let ctx = reset_ctx(
             &dir,
             Arc::new(SeedFs::keyed(Some(KEYED), None)),
-            Arc::new(ClientsHttp {
-                clients: Some("[]"),
-            }),
+            clients_answering(Answer::reply(200, "[]")),
         );
         assert!(super::reset_connections(&ctx, false).await.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
@@ -999,9 +983,7 @@ mod tests {
         let ctx = reset_ctx(
             &dir,
             Arc::new(SeedFs::keyed(Some(KEYED), None)),
-            Arc::new(ClientsHttp {
-                clients: Some(held),
-            }),
+            clients_answering(Answer::reply(200, held)),
         );
         let _ = crate::config::store::write(
             &dir.join("baseline.json"),
@@ -1028,7 +1010,7 @@ mod tests {
         let ctx = reset_ctx(
             &dir,
             Arc::new(SeedFs::keyed(Some(KEYED), None)),
-            Arc::new(ClientsHttp { clients: None }),
+            clients_answering(Answer::Silent),
         );
         assert!(super::reset_connections(&ctx, false).await.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
@@ -1303,7 +1285,7 @@ mod tests {
         const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
         const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
         let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
-            .with_http(Arc::new(RoutedHttp))
+            .with_http(seeding())
             .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
@@ -1335,7 +1317,7 @@ mod tests {
         const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
         const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
         let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x22; 24]), None)
-            .with_http(Arc::new(RoutedHttp))
+            .with_http(seeding())
             .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
 
         let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
@@ -1357,7 +1339,7 @@ mod tests {
         // their keys, so registration is skipped for a re-run rather than failed.
         const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
         let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
-            .with_http(Arc::new(RoutedHttp))
+            .with_http(seeding())
             .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
@@ -1379,7 +1361,7 @@ mod tests {
             "minted-earlier",
         );
         let ctx = seed_ctx(None, true, Vec::new(), None, Some(path))
-            .with_http(Arc::new(RoutedHttp))
+            .with_http(seeding())
             .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
@@ -1509,7 +1491,7 @@ mod tests {
         // Prowlarr's key is readable but Sonarr's is not — Sonarr came up after
         // Prowlarr — so Sonarr's application waits while Prowlarr itself proceeds.
         let ctx = seed_ctx(None, true, Vec::new(), None, None)
-            .with_http(Arc::new(RoutedHttp))
+            .with_http(seeding())
             .with_filesystem(Arc::new(
                 SeedFs::keyed(Some(SERVARR), None).only_for_prowlarr(),
             ));
@@ -1523,10 +1505,10 @@ mod tests {
         const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
         let project = std::path::Path::new("/opt/lemonfiber/stack");
         let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
-        // RoutedHttp reports Sonarr already registered — its baseUrl is in the
+        // The seeding routes report Sonarr already registered — its baseUrl is in the
         // application list — so the connection reads back as already wired.
         let ctx = seed_ctx(None, true, Vec::new(), None, None)
-            .with_http(Arc::new(RoutedHttp))
+            .with_http(seeding())
             .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
         let wirings = super::seed_applications(&ctx, &services, Some(project)).await;
         assert_eq!(wirings.len(), 1);
@@ -1539,36 +1521,26 @@ mod tests {
     /// A Prowlarr transport that starts with no applications, captures the POST
     /// that registers one, and reports it on the next read — so the orchestrator's
     /// write path runs end to end rather than short-circuiting to already-wired.
-    struct CapturingProwlarr {
-        posted: std::sync::Mutex<Option<crate::ports::http::Request>>,
-    }
-
-    #[async_trait::async_trait]
-    impl crate::ports::http::Http for CapturingProwlarr {
-        async fn send(
-            &self,
-            request: &crate::ports::http::Request,
-        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-            if request.method == crate::ports::http::Method::Post {
-                if let Ok(mut posted) = self.posted.lock() {
-                    *posted = Some(request.clone());
-                }
-                return Ok(crate::ports::http::Response {
-                    status: 201,
-                    body: String::new(),
-                });
-            }
-            let registered = self.posted.lock().is_ok_and(|posted| posted.is_some());
-            let body = if registered {
-                r#"[{"id":9,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]}]"#
-            } else {
-                "[]"
-            };
-            Ok(crate::ports::http::Response {
-                status: 200,
-                body: body.to_owned(),
-            })
-        }
+    /// Prowlarr holding no applications until one is written, then holding it.
+    ///
+    /// The registration is a write followed by a read that has to see it, so the read
+    /// answers an empty list and then the list with Sonarr in it. What was posted is
+    /// read off the transport's own record rather than a captured copy.
+    fn registering_prowlarr() -> Arc<Fake> {
+        Fake::by_route_in_turn(vec![
+            (Method::Post, "", vec![Answer::reply(201, "")]),
+            (
+                Method::Get,
+                "",
+                vec![
+                    Answer::reply(200, "[]"),
+                    Answer::reply(
+                        200,
+                        r#"[{"id":9,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]}]"#,
+                    ),
+                ],
+            ),
+        ])
     }
 
     #[tokio::test]
@@ -1578,9 +1550,7 @@ mod tests {
         let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
         // Prowlarr holds no applications, so Sonarr is genuinely written and then
         // read back — the write path a pre-populated list would hide.
-        let http = Arc::new(CapturingProwlarr {
-            posted: std::sync::Mutex::new(None),
-        });
+        let http = registering_prowlarr();
         let ctx = seed_ctx(None, true, Vec::new(), None, None)
             .with_http(http.clone())
             .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
@@ -1595,7 +1565,10 @@ mod tests {
 
         // The orchestrator built the registration for the right *arr, reaching it
         // and Prowlarr on the stack network, and posted it to Prowlarr's v1 API.
-        let posted = http.posted.lock().ok().and_then(|guard| guard.clone());
+        let posted = http
+            .requests()
+            .into_iter()
+            .find(|request| request.method == Method::Post);
         assert!(posted
             .as_ref()
             .is_some_and(|request| request.url.ends_with("/api/v1/applications")));
@@ -1614,11 +1587,11 @@ mod tests {
     #[tokio::test]
     async fn seed_registers_each_arr_into_prowlarr() {
         // The whole command against the real manifest: Prowlarr and the three
-        // media-filing arrs, each already registered per RoutedHttp.
+        // media-filing arrs, each already registered by the seeding routes.
         const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
         const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
         let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
-            .with_http(Arc::new(RoutedHttp))
+            .with_http(seeding())
             .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
 
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
@@ -1666,36 +1639,36 @@ mod tests {
     /// public info reports whether its wizard has run, its `/Startup/*` calls
     /// succeed, Seerr's sign-in flips it to initialised, and its public settings
     /// report that state.
-    struct HouseholdHttp {
-        completed: bool,
-        signed_in: std::sync::Mutex<bool>,
-    }
-
-    #[async_trait::async_trait]
-    impl crate::ports::http::Http for HouseholdHttp {
-        async fn send(
-            &self,
-            request: &crate::ports::http::Request,
-        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-            let url = &request.url;
-            let body = if url.contains("/System/Info/Public") {
-                format!(r#"{{"StartupWizardCompleted":{}}}"#, self.completed)
-            } else if url.contains("/Startup/") || url.contains("/auth/jellyfin") {
-                // Jellyfin's setup calls and Seerr's sign-in succeed but neither
-                // by itself finishes Seerr's setup.
-                String::new()
-            } else if url.contains("/settings/initialize") {
-                // Finishing setup is what marks Seerr initialised.
-                if let Ok(mut signed) = self.signed_in.lock() {
-                    *signed = true;
-                }
-                String::new()
-            } else {
-                let done = self.signed_in.lock().is_ok_and(|signed| *signed);
-                format!(r#"{{"initialized":{done}}}"#)
-            };
-            Ok(crate::ports::http::Response { status: 200, body })
-        }
+    /// A household that answers Jellyfin's and Seerr's setup reads.
+    ///
+    /// `completed` is what Jellyfin says about its own wizard. `signed_in` is whether
+    /// Seerr is already initialised: where it is not, the catch-all answers "no" and then
+    /// "yes", which is the read-write-read the identity wiring performs. Scripting the
+    /// change in order rather than flipping a flag says which write is meant to cause it.
+    fn household(completed: bool, signed_in: bool) -> Arc<Fake> {
+        let initialised = if signed_in {
+            vec![Answer::reply(200, r#"{"initialized":true}"#)]
+        } else {
+            vec![
+                Answer::reply(200, r#"{"initialized":false}"#),
+                Answer::reply(200, r#"{"initialized":true}"#),
+            ]
+        };
+        Fake::by_path_in_turn(vec![
+            (
+                "/System/Info/Public",
+                vec![Answer::reply(
+                    200,
+                    format!(r#"{{"StartupWizardCompleted":{completed}}}"#),
+                )],
+            ),
+            // Jellyfin's setup calls and Seerr's sign-in succeed, but neither by
+            // itself finishes Seerr's setup.
+            ("/Startup/", vec![Answer::reply(200, "")]),
+            ("/auth/jellyfin", vec![Answer::reply(200, "")]),
+            ("/settings/initialize", vec![Answer::reply(200, "")]),
+            ("", initialised),
+        ])
     }
 
     #[tokio::test]
@@ -1724,12 +1697,8 @@ mod tests {
             crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
             "minted-earlier",
         );
-        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(Arc::new(
-            HouseholdHttp {
-                completed: true,
-                signed_in: std::sync::Mutex::new(true),
-            },
-        ));
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(household(true, true));
 
         let wirings = super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()]).await;
         assert_eq!(wirings.len(), 1);
@@ -1754,10 +1723,7 @@ mod tests {
             Some(vec![0x11; 24]),
             Some(env.clone()),
         )
-        .with_http(Arc::new(HouseholdHttp {
-            completed: false,
-            signed_in: std::sync::Mutex::new(false),
-        }));
+        .with_http(household(false, false));
 
         let wirings = super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()]).await;
         assert_eq!(wirings.len(), 1);
@@ -1779,10 +1745,7 @@ mod tests {
         // The whole command against the real manifest, which has both services;
         // Jellyfin reports its wizard done and no password was recorded, so the
         // household set it up and the identity is skipped for them to complete.
-        let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(Arc::new(HouseholdHttp {
-            completed: true,
-            signed_in: std::sync::Mutex::new(false),
-        }));
+        let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(household(true, false));
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
         let identity = report
             .wirings

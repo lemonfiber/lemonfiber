@@ -366,7 +366,8 @@ mod tests {
     use crate::ports::process::{Failure, Output, Progress};
     use crate::quality::Preset;
     use crate::stack::Source;
-    use crate::test_support::{refused, spoke, stack, Reporting, Scripted, ScriptedHttp};
+    use crate::test_support::{refused, spoke, stack, Reporting, Scripted};
+    use lemonfiber_fixtures::http::Fake;
     use std::time::Duration;
 
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
@@ -1387,7 +1388,7 @@ mod tests {
         // An HTTP port that answers nothing, so a diagnostic check reaching one — the
         // guide-source probe, a credential — resolves to unreachable rather than the
         // real network. Keeps the doctor tests self-contained and offline.
-        .with_http(Arc::new(ScriptedHttp::new(Vec::new())))
+        .with_http(Fake::scripted(Vec::new()))
     }
 
     /// Everything the `library` form declares.

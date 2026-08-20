@@ -91,7 +91,8 @@ mod tests {
     use crate::model::{Disposition, Triggered};
     use crate::platform::Environment;
     use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs};
+    use crate::test_support::{spoke, stack, Reporting, Scripted, SeedFs};
+    use lemonfiber_fixtures::http::Fake;
 
     /// The Lidarr config file `SeedFs` hands back, carrying a readable key so the target
     /// opens.
@@ -117,7 +118,7 @@ mod tests {
             Environment::MacOs,
         )
         .with_filesystem(fs)
-        .with_http(Arc::new(ScriptedHttp::new(replies)))
+        .with_http(Fake::scripted(replies))
     }
 
     /// A context with a writable choice file, so recording succeeds. `tag` names a
