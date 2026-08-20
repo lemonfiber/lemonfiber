@@ -290,48 +290,33 @@ pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 ///
 /// Returns the [`Problem`] a surface should render when the command could not
 /// be carried out.
-pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
+pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
-        Command::Forms => engine::forms(ctx)
-            .map(Outcome::Forms)
-            .map_err(|problem| *problem),
+        Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
         Command::Down { forms } => engine::lifecycle(ctx, &forms, &Action::Down).await,
         Command::Restart { forms, services } => {
             engine::lifecycle(ctx, &forms, &Action::Restart(services)).await
         }
         Command::Pull { forms } => engine::lifecycle(ctx, &forms, &Action::Pull).await,
-        Command::ConfigGet { key } => {
-            configuring::configuration(ctx, Some(&key), None).map_err(|p| *p)
-        }
+        Command::ConfigGet { key } => configuring::configuration(ctx, Some(&key), None),
         Command::ConfigSet { key, value } => {
-            configuring::configuration(ctx, Some(&key), Some(&value)).map_err(|p| *p)
+            configuring::configuration(ctx, Some(&key), Some(&value))
         }
-        Command::ConfigShow => configuring::configuration(ctx, None, None).map_err(|p| *p),
-        Command::Quality(action) => quality::quality(ctx, action)
-            .map(Outcome::Quality)
-            .map_err(|problem| *problem),
-        Command::QualityMusic { format } => music::music(ctx, format)
-            .await
-            .map(Outcome::Music)
-            .map_err(|problem| *problem),
-        Command::Trace { term, season } => trace::trace(ctx, &term, season)
-            .await
-            .map(Outcome::Trace)
-            .map_err(|problem| *problem),
+        Command::ConfigShow => configuring::configuration(ctx, None, None),
+        Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
+        Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
+        Command::Trace { term, season } => {
+            trace::trace(ctx, &term, season).await.map(Outcome::Trace)
+        }
         Command::Household { member } => household::household(ctx, member.as_deref())
             .await
-            .map(Outcome::Household)
-            .map_err(|problem| *problem),
-        Command::Stuck => trace::stuck(ctx)
-            .await
-            .map(Outcome::Stuck)
-            .map_err(|problem| *problem),
-        Command::QualityUpgrade { confirm } => upgrade::upgrade(ctx, confirm)
-            .await
-            .map(Outcome::Upgrade)
-            .map_err(|problem| *problem),
+            .map(Outcome::Household),
+        Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
+        Command::QualityUpgrade { confirm } => {
+            upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
+        }
         Command::Ps { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
         Command::Doctor {
             only,
@@ -339,16 +324,11 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             accept,
         } => {
             let report = engine::diagnose(ctx, only, disruptive).await?;
-            accepted::acknowledge(ctx, accept.as_deref(), report)
-                .map(Outcome::Doctor)
-                .map_err(|problem| *problem)
+            accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
         }
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
-        Command::Reset { confirm } => reset::reset(ctx, confirm)
-            .await
-            .map(Outcome::Reset)
-            .map_err(|p| *p),
+        Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
     }
 }
 
@@ -642,7 +622,9 @@ mod tests {
             .rehearsing()
     }
 
-    fn report(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::LifecycleReport> {
+    fn report(
+        outcome: Result<Outcome, Box<super::Problem>>,
+    ) -> Option<crate::model::LifecycleReport> {
         match outcome {
             Ok(Outcome::Lifecycle(report)) => Some(report),
             Ok(
@@ -664,7 +646,9 @@ mod tests {
         }
     }
 
-    fn diagnosis(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::DoctorReport> {
+    fn diagnosis(
+        outcome: Result<Outcome, Box<super::Problem>>,
+    ) -> Option<crate::model::DoctorReport> {
         match outcome {
             Ok(Outcome::Doctor(report)) => Some(report),
             Ok(
@@ -1051,7 +1035,7 @@ mod tests {
         dir.join(".env")
     }
 
-    fn settings_of(outcome: Result<Outcome, super::Problem>) -> Option<Vec<(String, String)>> {
+    fn settings_of(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, String)>> {
         match outcome {
             Ok(Outcome::Config(report)) => Some(
                 report
@@ -1492,7 +1476,9 @@ mod tests {
     }
 
     /// The status a survey produced, as pairs of service and state.
-    fn stated(outcome: Result<Outcome, super::Problem>) -> Option<Vec<(String, ServiceState)>> {
+    fn stated(
+        outcome: Result<Outcome, Box<super::Problem>>,
+    ) -> Option<Vec<(String, ServiceState)>> {
         match outcome {
             Ok(Outcome::Status(report)) => Some(
                 report

@@ -86,15 +86,11 @@ pub async fn mend(
     disruptive: bool,
     confirm: &dyn Confirm,
 ) -> Result<Report, Box<Problem>> {
-    let checks = super::engine::assembled(ctx, disruptive)
-        .await
-        .map_err(Box::new)?;
+    let checks = super::engine::assembled(ctx, disruptive).await?;
     // A second set, assembled without the disruptive ones, for proving the work. Built
     // here rather than per repair: nine checks constructed once are nine constructed once,
     // however many faults this run puts right.
-    let again = super::engine::assembled(ctx, false)
-        .await
-        .map_err(Box::new)?;
+    let again = super::engine::assembled(ctx, false).await?;
     Ok(mending(ctx, &checks, &again, stance, confirm).await)
 }
 

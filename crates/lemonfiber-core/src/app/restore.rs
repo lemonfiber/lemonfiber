@@ -307,7 +307,7 @@ mod tests {
 
     /// Restore against a machine at version 0.3.0 and data root `/srv/media`,
     /// accepting no re-point.
-    async fn restoring(reader: &FakeReader) -> Result<super::Report, super::super::Problem> {
+    async fn restoring(reader: &FakeReader) -> Result<super::Report, Box<super::super::Problem>> {
         restore(
             &archive(),
             &paths(),
@@ -318,16 +318,13 @@ mod tests {
             reader,
         )
         .await
-        .map_err(|problem| *problem)
     }
 
     async fn inspecting(
         reader: &FakeReader,
         current_root: &str,
-    ) -> Result<super::Preview, super::super::Problem> {
-        inspect(&archive(), "0.3.0", SCHEMA, Path::new(current_root), reader)
-            .await
-            .map_err(|problem| *problem)
+    ) -> Result<super::Preview, Box<super::super::Problem>> {
+        inspect(&archive(), "0.3.0", SCHEMA, Path::new(current_root), reader).await
     }
 
     #[tokio::test]

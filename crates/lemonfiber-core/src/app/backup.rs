@@ -217,7 +217,7 @@ mod tests {
         Paths::rooted(Path::new("/cfg"), Path::new("/data"))
     }
 
-    async fn capturing(archive: &FakeArchive) -> Result<Report, super::super::Problem> {
+    async fn capturing(archive: &FakeArchive) -> Result<Report, Box<super::super::Problem>> {
         capture(
             &paths(),
             Scope::WholeStack,
@@ -228,7 +228,6 @@ mod tests {
             archive,
         )
         .await
-        .map_err(|problem| *problem)
     }
 
     /// A whole-stack archive on disk, named as a capture would name it, taken at

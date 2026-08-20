@@ -100,16 +100,16 @@ pub async fn supervise(
     volume: &dyn Volume,
     forms: &[String],
     interval: Duration,
-) -> Result<SupervisionReport, Problem> {
+) -> Result<SupervisionReport, Box<Problem>> {
     let Some(root) = ctx.settings.data_root.as_deref() else {
-        return Err(nothing_to_watch());
+        return Err(Box::new(nothing_to_watch()));
     };
     let baseline = match volume.presence(root).await {
         Presence::On(volume) => volume,
         // Missing, or unreadable at the outset: either way there is no baseline
         // to watch against, so the watch does not begin. Once it is running, an
         // unreadable reading is held rather than acted on — see `assess`.
-        Presence::Gone | Presence::Unknown => return Err(already_gone(root)),
+        Presence::Gone | Presence::Unknown => return Err(Box::new(already_gone(root))),
     };
 
     let loss = watch_until_lost(volume, root, baseline, interval).await;
@@ -221,7 +221,7 @@ mod tests {
             .build()
     }
 
-    async fn watch(ctx: &Ctx, drive: Drive) -> Result<SupervisionReport, Problem> {
+    async fn watch(ctx: &Ctx, drive: Drive) -> Result<SupervisionReport, Box<Problem>> {
         supervise(
             ctx,
             &drive,

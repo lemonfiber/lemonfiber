@@ -159,7 +159,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
 /// to fail like every other source: a machine whose engine will not answer still has a
 /// diagnosis and a configuration worth reading, and it is the engine not answering that
 /// the bundle is most likely being asked for.
-async fn logs(ctx: &Ctx, lines: u32) -> Result<String, Problem> {
+async fn logs(ctx: &Ctx, lines: u32) -> Result<String, Box<Problem>> {
     let mut arriving = super::engine::logs(ctx, &[], &[], LogQuery::recent(lines)).await?;
     let mut held = Vec::new();
     while let Some(line) = arriving.recv().await {
@@ -336,8 +336,8 @@ pub async fn write(
     archive: &dyn Archive,
     contents: &Contents,
     dest: &Path,
-) -> Result<Written, Problem> {
-    let bytes = measure(contents).map_err(|problem| *problem)?;
+) -> Result<Written, Box<Problem>> {
+    let bytes = measure(contents)?;
     let files = contents.files();
     let dir = dest.parent().unwrap_or(dest);
     if let Ok(space) = archive.space(dir, &[]).await {
@@ -346,7 +346,7 @@ pub async fn write(
             available: space.available,
         };
         if !room.fits(HEADROOM) {
-            return Err(no_room(&room));
+            return Err(Box::new(no_room(&room)));
         }
     }
 

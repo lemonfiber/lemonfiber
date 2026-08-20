@@ -42,11 +42,11 @@ pub(super) use reset::reset_connections;
 /// Prowlarr's app sync registers each of those \*arrs back into Prowlarr, so it
 /// pushes them indexers. It then makes Jellyfin the identity source for Seerr, so
 /// the household signs in once. Bindery wiring lands next.
-pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Problem> {
+pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
 
     let mut wirings = Vec::new();
 
@@ -468,7 +468,7 @@ mod tests {
     }
 
     /// The seed report an outcome carried, if it was a seed outcome.
-    fn seeded(outcome: Result<Outcome, super::Problem>) -> Option<crate::seed::Report> {
+    fn seeded(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::seed::Report> {
         match outcome {
             Ok(Outcome::Seed(report)) => Some(report),
             _ => None,
