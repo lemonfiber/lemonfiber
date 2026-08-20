@@ -215,11 +215,6 @@ impl Fake {
             .is_ok_and(|seen| seen.iter().any(|request| request.url.contains(fragment)))
     }
 
-    /// How many requests it was sent.
-    pub fn asked(&self) -> usize {
-        self.seen.lock().map(|seen| seen.len()).unwrap_or_default()
-    }
-
     fn new(script: Script) -> Arc<Self> {
         Arc::new(Self {
             script,

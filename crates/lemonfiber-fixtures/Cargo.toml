@@ -19,5 +19,10 @@ lemonfiber-ports = { path = "../lemonfiber-ports" }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
+[dev-dependencies]
+# The stub half of the filesystem fake is asserted rather than assumed, and those
+# assertions are async because the port is.
+tokio = { workspace = true, features = ["macros", "rt"] }
+
 [lints]
 workspace = true

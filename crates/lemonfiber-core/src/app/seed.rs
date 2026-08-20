@@ -786,10 +786,7 @@ mod tests {
                 "system/status",
                 Answer::reply(
                     200,
-                    match version {
-                        "5" => r#"{"appName":"Sonarr","version":"5"}"#,
-                        _ => r#"{"appName":"Sonarr","version":"4"}"#,
-                    },
+                    format!(r#"{{"appName":"Sonarr","version":"{version}"}}"#),
                 ),
             ),
             ("/downloadclient/testall", Answer::reply(200, "[]")),
