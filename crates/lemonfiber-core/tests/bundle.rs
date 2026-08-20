@@ -27,83 +27,35 @@ use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
 use lemonfiber_core::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::ports::docker::{
-    Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
-    Stats, Stream,
-};
+use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::Fake;
-use tokio::sync::mpsc::Receiver;
+use lemonfiber_fixtures::support::Reporting;
 
 /// The version this build calls itself, as the command would pass it in.
 const LEMONFIBER: &str = "0.7.0-test";
-
-/// An engine with nothing running, and one that cannot be reached at all.
-struct Engine1(bool);
-
-#[async_trait]
-impl Engine for Engine1 {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
-        if self.0 {
-            return Ok(vec![Container {
-                id: "abc".to_owned(),
-                project: "media-stack".to_owned(),
-                service: "sonarr".to_owned(),
-                lifecycle: Lifecycle::Running,
-                health: Health::Healthy,
-                exit: None,
-            }]);
-        }
-        Err(EngineFailure::Unreachable {
-            reason: "no engine here".to_owned(),
-        })
-    }
-    async fn logs(
-        &self,
-        _project: &str,
-        _services: &[String],
-        _query: LogQuery,
-    ) -> Result<Receiver<LogLine>, EngineFailure> {
-        if !self.0 {
-            return Err(EngineFailure::Unreachable {
-                reason: "no engine here".to_owned(),
-            });
-        }
-        let (sending, receiving) = tokio::sync::mpsc::channel(4);
-        // A line with a key riding in a query string, which is the shape the whole
-        // free-text rule exists for and the one nobody spots by eye.
-        let _ = sending
-            .send(LogLine {
-                service: "prowlarr".to_owned(),
-                stream: Stream::Stdout,
-                at: None,
-                line: format!(
-                    "GET https://indexer.example.com/api?apikey={}&t=search",
-                    key_shaped()
-                ),
-            })
-            .await;
-        Ok(receiving)
-    }
-    async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
-    }
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
-    }
-}
 
 /// A context over a stack that is there, an engine that is or is not, and a configuration
 /// file that is or is not.
 fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx {
     Ctx::new(
         Arc::new(lemonfiber_fixtures::ports::Idle),
-        Arc::new(Engine1(running)),
+        Arc::new(if running {
+            // A line with a key riding in a query string, which is the shape the whole
+            // free-text rule exists for and the one nobody spots by eye. Said by the
+            // service the engine reports, because the collector asks for logs by the
+            // services it found and a line from anywhere else is filtered out.
+            Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy).saying(
+                "sonarr",
+                &format!(
+                    "GET https://indexer.example.com/api?apikey={}&t=search",
+                    key_shaped()
+                ),
+            )
+        } else {
+            Reporting::absent()
+        }),
         lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
         configuration.map_or_else(Files::empty, Files::anywhere),
         stack,

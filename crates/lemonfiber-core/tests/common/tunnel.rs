@@ -282,40 +282,128 @@ pub fn stack() -> Manifest {
     Manifest::from_toml(STACK).unwrap_or_else(|_| empty())
 }
 
-/// A check against the carried stack, with both protocols and leak detection on,
-/// port forwarding not configured, and the disruptive checks left off.
-pub fn check(behaviors: Vec<Behavior>) -> VpnCheck {
-    check_with(behaviors, PortForward::default())
-}
-
-/// A check as above, but with a chosen port-forward configuration, for the cases
-/// that exercise the forwarded-port finding.
-pub fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnCheck {
-    listening_on(behaviors, port_forward, None)
-}
-
-/// The same, for a client the caller says is listening somewhere.
+/// What the VPN check is asked, with everything a test does not vary already answered.
 ///
-/// Where that somewhere is not the granted port, this is the one fault in the category
-/// lemonfiber can put right itself — so it is what a repair has to be driven against.
+/// The carried stack, both protocols, one IP echo, no port forwarding configured, no
+/// client port, and the disruptive checks off. Three helpers used to cover the three
+/// axes anyone had needed, and every test needing a fourth wrote the whole `Asked` out
+/// again — fourteen of them did, which is fourteen places a new field would land.
+pub struct Asking {
+    engine: Fake,
+    manifest: Manifest,
+    asked: Asked,
+}
+
+/// A check over this engine, to vary by name from there.
+pub fn asking(engine: Fake) -> Asking {
+    Asking {
+        engine,
+        manifest: stack(),
+        asked: Asked {
+            protocols: Protocols::both(),
+            echo: vec!["https://ifconfig.me".to_owned()],
+            listening: None,
+            port_forward: PortForward::default(),
+            disruptive: false,
+            client: None,
+        },
+    }
+}
+
+impl Asking {
+    /// The stack it reads, where the test is about one shaped differently — a stack
+    /// with no gateway to contain the client, or none at all.
+    #[must_use]
+    pub fn against(mut self, manifest: Manifest) -> Self {
+        self.manifest = manifest;
+        self
+    }
+
+    /// The addresses it asks what the world sees it as.
+    #[must_use]
+    pub fn echoing(mut self, echoes: &[&str]) -> Self {
+        self.asked.echo = echoes.iter().map(|echo| (*echo).to_owned()).collect();
+        self
+    }
+
+    /// Leak detection switched off, which is what an empty echo list means: the check
+    /// has nowhere to ask, so it cannot compare.
+    #[must_use]
+    pub fn without_leak_detection(mut self) -> Self {
+        self.asked.echo = Vec::new();
+        self
+    }
+
+    /// A client the caller says is listening somewhere.
+    ///
+    /// Where that somewhere is not the granted port, this is the one fault in the
+    /// category lemonfiber can put right itself — so it is what a repair is driven
+    /// against.
+    #[must_use]
+    pub const fn listening(mut self, port: u16) -> Self {
+        self.asked.listening = Some(port);
+        self
+    }
+
+    /// A port-forward configuration, for the cases that exercise the forwarded-port
+    /// finding.
+    #[must_use]
+    pub fn forwarding(mut self, port_forward: PortForward) -> Self {
+        self.asked.port_forward = port_forward;
+        self
+    }
+
+    /// The checks that change something, which are off unless a test is about them.
+    #[must_use]
+    pub const fn disruptive(mut self) -> Self {
+        self.asked.disruptive = true;
+        self
+    }
+
+    /// The protocols the stack is configured for.
+    #[must_use]
+    pub fn over(mut self, protocols: Protocols) -> Self {
+        self.asked.protocols = protocols;
+        self
+    }
+
+    /// The check itself.
+    #[must_use]
+    pub fn check(self) -> VpnCheck {
+        VpnCheck::new(
+            Arc::new(self.engine),
+            "lemonfiber".to_owned(),
+            &self.manifest,
+            self.asked,
+        )
+    }
+}
+
+/// A check against the carried stack with nothing varied — the common case, spelled the
+/// short way because most tests want it.
+pub fn check(behaviors: Vec<Behavior>) -> VpnCheck {
+    asking(Fake::new(behaviors)).check()
+}
+
+/// The same, with a chosen port-forward configuration.
+pub fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnCheck {
+    asking(Fake::new(behaviors))
+        .forwarding(port_forward)
+        .check()
+}
+
+/// The same again, for a client the caller says is listening somewhere.
 pub fn listening_on(
     behaviors: Vec<Behavior>,
     port_forward: PortForward,
     listening: Option<u16>,
 ) -> VpnCheck {
-    VpnCheck::new(
-        Arc::new(Fake::new(behaviors)),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening,
-            port_forward,
-            disruptive: false,
-            client: None,
-        },
-    )
+    let asking = asking(Fake::new(behaviors)).forwarding(port_forward);
+    match listening {
+        Some(port) => asking.listening(port),
+        None => asking,
+    }
+    .check()
 }
 
 /// A port-forward configuration: enabled, for the named provider.
