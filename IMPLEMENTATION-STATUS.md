@@ -71,6 +71,22 @@ deliverable below is in, including the free-space projection that was the last
 `◐` — it was completed once the download-client read the dashboard work
 introduced made the queue reachable.
 
+> **Six of what `0.2.0` locked carry no citation.** `A1-R1`, `A1-R7`, `A1-R8`,
+> `A1-R9`, `A1-R10` and `A2-R12` are claimed here by the ranges below, and no commit in this
+> repository names any of them in a `Spec:` trailer — so `0.2.0` would not pass
+> its own release gate if that gate were run against it today.
+>
+> This is not the gate having arrived late: it landed four days before `0.2.0`
+> was finalised. The citations were simply never written, and they cannot be
+> added now without rewriting a released version's history.
+>
+> What that costs is exactly what the rule exists to buy. The rows below say the
+> work is done and the code broadly bears that out, but for these six there is no
+> trail from a requirement to the commit that met it — so the claim rests on the
+> row alone, and nobody reading this can check it. Recorded rather than quietly
+> corrected, because a tick nobody can audit is the thing this file is for
+> noticing.
+
 | Deliverable | Spec | Status | Landing / notes |
 |-------------|------|--------|-----------------|
 | `doctor` — Check trait, remedy per finding | `C1-R1..R12` | ✅ | #22, [`doctor.rs`](crates/lemonfiber-core/src/doctor.rs) |
@@ -241,7 +257,7 @@ See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/
 
 ## M9 — Lifecycle & maintenance · ◐
 
-`0.13.0` through `0.15.0`. Reconfiguration, migration, uninstall, notifications, remote control,
+`0.13.0`, `0.14.0` and `0.15.0`. Reconfiguration, migration, uninstall, notifications, remote control,
 autostart & boot persistence, stack and self updates, rollback, and the service
 catalogue. Only notifications are in; the rest is not started. See the
 [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m9--lifecycle--maintenance).
