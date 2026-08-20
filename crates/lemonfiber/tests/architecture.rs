@@ -86,6 +86,72 @@ fn the_core_has_no_user_interface_dependency() {
     }
 }
 
+/// A manifest with its comments stripped.
+///
+/// Both rules below are about what a crate *declares*, and both manifests explain
+/// themselves in comments that name the very crate being forbidden. Reading the raw
+/// text would fail on the documentation for the rule it is enforcing.
+fn declarations(manifest: &str) -> String {
+    manifest
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .collect::<Vec<&str>>()
+        .join("\n")
+}
+
+/// The boundary sits below the logic, and the build is what says so.
+///
+/// A port that could reach up into `lemonfiber-core` would stop being a boundary:
+/// the seam and the thing it is a seam for would depend on each other, and the
+/// claim that the boundary is the stable part would be a sentence in a document
+/// rather than a property. Cargo refuses that particular edge outright, since it
+/// is a cycle — this states the rule anyway, because the manifest is where a
+/// future dependency would be added and this is where it should be argued with.
+#[test]
+fn the_ports_crate_depends_on_nothing_of_ours_but_the_manifest() {
+    let root = workspace_root();
+    let Ok(manifest) = fs::read_to_string(root.join("crates/lemonfiber-ports/Cargo.toml")) else {
+        unreachable!("the ports crate has a manifest");
+    };
+
+    let declared = declarations(&manifest);
+    for forbidden in ["lemonfiber-core", "lemonfiber-fixtures", "lemonfiber ="] {
+        assert!(
+            !declared.contains(forbidden),
+            "lemonfiber-ports must not depend on `{forbidden}` — a boundary that reaches \
+             up into the logic is not a boundary"
+        );
+    }
+}
+
+/// The fakes have one home, and it stays reachable from both kinds of test.
+///
+/// A crate's in-source test modules and its `tests/` directory are separate
+/// compilation units, so a fake defined in either is invisible to the other. That
+/// is how one port came to be faked twice and the filesystem four times, and why
+/// the fixtures live in a crate rather than a module.
+///
+/// The rule below is the load-bearing half. Cargo *permits* a development-
+/// dependency cycle: were the fixtures to depend on `lemonfiber-core`, it would
+/// build the core twice and hand the fake a trait belonging to neither copy the
+/// test is using. Nothing fails — it compiles, and the fake simply never matches.
+/// A silent failure is worth a test that cannot be argued out of.
+#[test]
+fn the_fixtures_crate_does_not_depend_on_the_core() {
+    let root = workspace_root();
+    let Ok(manifest) = fs::read_to_string(root.join("crates/lemonfiber-fixtures/Cargo.toml"))
+    else {
+        unreachable!("the fixtures crate has a manifest");
+    };
+
+    assert!(
+        !declarations(&manifest).contains("lemonfiber-core"),
+        "lemonfiber-fixtures must not depend on lemonfiber-core — Cargo allows the \
+         development-dependency cycle and then builds the core twice, leaving every fake \
+         implementing a trait belonging to neither copy under test"
+    );
+}
+
 /// Each external dependency has exactly one legitimate home.
 ///
 /// Without this, "compose invocation and engine access live in separate modules"

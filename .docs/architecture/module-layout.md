@@ -1,47 +1,61 @@
 # Module layout
 
-Where things live inside `lemonfiber-core`, and which rules a test enforces.
+Where things live across the workspace, and which rules a test enforces.
 
 The crate boundaries and the module list are fixed in the spec's
 [component-model](https://github.com/lemonfiber/spec/blob/main/20-architecture/component-model.md).
 This page covers what that document deliberately leaves to this repo: the Rust
 mechanics.
 
-## The tree
+## The crates
 
 ```
-crates/lemonfiber-core/src/
-├── lib.rs
-├── app.rs           the one entry point — Command in, Outcome out
-├── model.rs         the values surfaces render, and serialise
-├── error.rs         Problem, Severity, State, Remedy, Diagnose
-├── ports.rs         ├── docker.rs      trait Engine
-│                    ├── filesystem.rs  trait FileSystem
-│                    ├── process.rs     trait Runner
-│                    ├── service.rs     trait Client
-│                    └── time.rs        trait Clock
-├── adapters.rs      ├── docker.rs      Daemon — the only bollard
-│                    ├── filesystem.rs  Disk — the only sysinfo
-│                    ├── process.rs     Local — the only tokio::process
-│                    └── time.rs        System — the only SystemTime::now
-├── platform.rs      the only cfg!(target_os)
-├── stack.rs         ┐
-├── docker.rs        │
-├── config.rs        ├ boundary fixed, contents arrive with their milestone
-├── doctor.rs        │
-├── seed.rs          │
-└── journal.rs       ┘
+crates/
+├── lemonfiber/           bin — the only crate that knows about a screen
+│   ├── cli/              clap definitions, non-interactive paths
+│   ├── render/           what each outcome looks like
+│   └── tests/            the architecture tests, from the top of the graph
+│
+├── lemonfiber-core/      lib — all logic, no UI, no terminal
+│   ├── app/              the one entry point: command in, outcome out
+│   ├── model/            the values surfaces render, and serialise
+│   ├── adapters/         the only code that talks to Docker, HTTP or processes
+│   ├── platform.rs       the only cfg!(target_os)
+│   └── …                 one directory per subsystem — doctor, seed, config, …
+│
+├── lemonfiber-ports/     lib — the traits the outside world is reached through,
+│                              and the vocabulary that crosses them. Depends on
+│                              nothing of ours but the manifest.
+│
+├── lemonfiber-fixtures/  lib — the fakes for those traits, reachable from both
+│                              in-crate tests and `tests/`. Depends on ports only.
+│
+└── lemonfiber-manifest/  lib — stack.toml parse + validate
 ```
 
-Modules with nothing in them yet are not placeholders. They carry the reasoning
-for what will land there, so the decision is recorded once rather than
-rediscovered when someone starts writing that subsystem.
+`lemonfiber-core` re-exports the ports crate as `crate::ports`, so call sites read
+`ports::Engine` whichever crate they are in. Why the boundary is a crate rather
+than a module — and what the orphan rule decides about which types may cross —
+is in [ports-and-adapters.md](ports-and-adapters.md).
+
+The dependency arrow only ever points down that list. A port cannot reach the
+logic above it, which is what makes the fixtures crate possible: a fake needs the
+trait and nothing else, and if it needed `lemonfiber-core` it would be a
+dev-dependency cycle.
 
 ## Files, not directories
 
-`ports.rs` + `ports/` rather than `ports/mod.rs`. Both work; the former means a
-module's own documentation is not buried under a directory listing, and
-`git log` on `ports.rs` shows changes to the module rather than to a folder.
+`doctor.rs` + `doctor/` rather than `doctor/mod.rs`. Both work; the former means
+a module's own documentation is not buried under a directory listing, and
+`git log` on `doctor.rs` shows changes to the module rather than to a folder.
+
+A file splits into a directory when it stops being one concern — or, failing
+that, when it crosses 550 production lines, which is the mechanical floor the
+architecture test puts under that judgement. The split goes at a seam the file
+already has: the parent keeps the type and the surface, and each child takes one
+question the type answers. Moved items widen to `pub(crate)` — a parent cannot
+see a child's private items, and `mod child; use child::*;` compiles happily
+while importing nothing at all.
 
 ## What the architecture test checks
 
@@ -55,6 +69,11 @@ module's own documentation is not buried under a directory listing, and
 | `no_lint_is_suppressed_in_source` | No `#[allow(…)]` anywhere in `src/` |
 | `no_requirement_identifier_appears_in_a_comment` | Spec identifiers stay in commits |
 | `no_feature_requirement_identifier_appears_in_a_comment` | The same, for area identifiers with no fixed prefix |
+| `no_source_file_outgrows_reading_in_one_sitting` | No file holds more than 550 production lines |
+| `no_test_file_covers_more_than_one_seam` | One test file per seam, so a fake has one owner |
+| `each_requirement_is_claimed_by_one_row` | Every requirement appears exactly once in the status table |
+| `no_two_problems_answer_to_the_same_code` | An error code an operator searches for means one thing |
+| `a_failure_is_reported_on_stderr_and_never_on_stdout` | A failure never lands in a piped stdout |
 
 They read source text rather than the compiled crate. That is coarse and it is
 enough — every rule above is about where a *name* is allowed to appear, and a
@@ -88,17 +107,6 @@ module:
 The spec calls the seeding trait `ServiceClient`; here it is `service::Client`,
 re-exported from `ports` so call sites read `ports::Client`. Same trait, and the
 lint stays satisfied without an exception.
-
-## Where the deferred modules pick up
-
-| Module | Arrives with |
-|--------|--------------|
-| `stack` | The compose driver — argument construction, form closure, lifecycle |
-| `docker` | Landed — interpreting what the engine reports, and the health gate |
-| `config` | The setup wizard — the environment file and paths |
-| `doctor` | Diagnostics — the check trait and findings |
-| `seed` | Seeding — wiring, drift, and the first writes |
-| `journal` | Seeding, since that is the first subsystem that changes anything |
 
 ## Related
 
