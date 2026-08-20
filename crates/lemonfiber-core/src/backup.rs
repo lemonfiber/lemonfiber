@@ -275,188 +275,20 @@ fn single_segment(name: &str) -> bool {
     )
 }
 
-/// A three-part version, compared to decide whether an archive restores here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct Version {
-    major: u32,
-    minor: u32,
-    patch: u32,
-}
+mod compatibility;
+mod retention;
 
-impl Version {
-    /// Parse a `major.minor.patch` string, ignoring any pre-release suffix, and
-    /// return nothing for anything that is not three numbers.
-    ///
-    /// Lenient about a trailing `-rc.1` because a release candidate restores like
-    /// the release it precedes; strict about the three numbers because a version
-    /// that cannot be read is a corrupt archive, not a guess to make.
-    fn parse(text: &str) -> Option<Self> {
-        // `split` always yields at least the whole string, so a version with no
-        // `-` suffix is its own first segment — `unwrap_or(text)` says that plainly.
-        let core = text.split('-').next().unwrap_or(text);
-        let mut parts = core.split('.');
-        let major = parts.next()?.parse().ok()?;
-        let minor = parts.next()?.parse().ok()?;
-        let patch = parts.next()?.parse().ok()?;
-        if parts.next().is_some() {
-            return None;
-        }
-        Some(Self {
-            major,
-            minor,
-            patch,
-        })
-    }
-}
-
-/// Whether an archive read back can be restored by the running build.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Compatibility {
-    /// The versions and schema agree; restore may proceed.
-    Compatible,
-    /// The archive was written by a newer lemonfiber; refuse, stating the gap.
-    TooNew {
-        /// The version that wrote the archive.
-        archive: String,
-        /// The version being restored with.
-        current: String,
-    },
-    /// The archive is at least a whole major version behind; attempt with a
-    /// warning.
-    Downgrade {
-        /// The version that wrote the archive.
-        archive: String,
-        /// The version being restored with.
-        current: String,
-    },
-    /// The archive's format, or its stated version, cannot be restored safely.
-    Incompatible {
-        /// Why it cannot be restored.
-        detail: String,
-    },
-}
-
-impl Compatibility {
-    /// Decide whether `manifest` can be restored by the running build.
-    ///
-    /// The schema is checked first: an archive laid out in a format this build
-    /// does not write is refused before its version is even considered, because a
-    /// format it cannot read is one it cannot restore. Then the versions: a newer
-    /// archive is refused with the gap named, since it may hold state this build
-    /// would corrupt; an archive a whole major version behind is allowed but
-    /// warned about; anything else — same major, older or level — is compatible.
-    #[must_use]
-    pub fn assess(manifest: &Manifest, current_version: &str, current_schema: u32) -> Self {
-        if manifest.schema != current_schema {
-            return Self::Incompatible {
-                detail: format!(
-                    "the archive is format {} and this lemonfiber reads format {current_schema}",
-                    manifest.schema
-                ),
-            };
-        }
-
-        let (Some(archive), Some(current)) = (
-            Version::parse(&manifest.product_version),
-            Version::parse(current_version),
-        ) else {
-            return Self::Incompatible {
-                detail: format!(
-                    "the archive states version {:?}, which cannot be read",
-                    manifest.product_version
-                ),
-            };
-        };
-
-        if archive > current {
-            Self::TooNew {
-                archive: manifest.product_version.clone(),
-                current: current_version.to_owned(),
-            }
-        } else if archive.major < current.major {
-            Self::Downgrade {
-                archive: manifest.product_version.clone(),
-                current: current_version.to_owned(),
-            }
-        } else {
-            Self::Compatible
-        }
-    }
-}
-
-/// A restore whose archive was taken against a different data root than the one
-/// configured now, so its stored paths would land where nothing exists.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Relocation {
-    /// The data root the archive was taken against.
-    pub was: String,
-    /// The data root configured now.
-    pub now: String,
-}
-
-/// Notice a restore to a different data root than the archive was taken against.
-///
-/// The difference is surfaced rather than silently followed, because restoring an
-/// archive's recorded paths onto a machine whose library lives elsewhere would
-/// recreate directories that point at nothing — the operator is offered the chance
-/// to re-point instead.
-#[must_use]
-pub fn relocation(manifest: &Manifest, current_root: &Path) -> Option<Relocation> {
-    // Compared as paths, not as strings: `/srv/media` and `/srv/media/` are the
-    // same root, and a cosmetic difference must not raise a re-point the operator
-    // then has to dismiss. Path equality is by component, so a trailing separator
-    // and other spellings of the same place fall together.
-    if Path::new(&manifest.data_root) == current_root {
-        None
-    } else {
-        Some(Relocation {
-            was: manifest.data_root.clone(),
-            now: current_root.to_string_lossy().into_owned(),
-        })
-    }
-}
-
-/// How many backups to keep before the oldest are pruned.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Retention {
-    keep: usize,
-}
-
-impl Retention {
-    /// Keep `keep` backups, pruning the oldest beyond that — but never the last
-    /// one standing.
-    ///
-    /// A keep of zero is raised to one: retention exists to bound the space
-    /// backups take, and a policy that pruned to nothing would delete the very
-    /// thing it is meant to preserve, turning a full disk into no recovery at all.
-    #[must_use]
-    pub const fn keeping(keep: usize) -> Self {
-        Self {
-            keep: if keep == 0 { 1 } else { keep },
-        }
-    }
-
-    /// The backups to prune from `existing`, oldest first, leaving `keep` newest.
-    ///
-    /// Takes the set by value and sorts it, so the caller's order does not decide
-    /// which survive — the oldest by their recorded time do, whatever order they
-    /// were listed in.
-    #[must_use]
-    pub fn prune(self, mut existing: Vec<Existing>) -> Vec<Existing> {
-        existing.sort_by(|a, b| a.created_at.cmp(&b.created_at));
-        let surplus = existing.len().saturating_sub(self.keep);
-        existing.truncate(surplus);
-        existing
-    }
-}
+pub use compatibility::{relocation, Compatibility, Relocation};
+pub use retention::Retention;
 
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
 
+    use super::compatibility::Version;
     use super::{
         area, plan, relocation, Compatibility, Existing, Item, Manifest, Member, Plan, Retention,
-        Scope, Version, SCHEMA,
+        Scope, SCHEMA,
     };
     use crate::config::paths::Paths;
 
