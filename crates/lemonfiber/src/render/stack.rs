@@ -7,6 +7,8 @@ use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::model::{
     Envelope, LifecycleReport, ResetReport, StatusReport, SupervisionReport,
 };
+use lemonfiber_core::plural::s;
+use lemonfiber_core::stack::closure::{Plan, Protocol};
 
 use super::{Lines, UNRENDERABLE};
 
@@ -39,6 +41,58 @@ pub(super) fn reset(report: &ResetReport) -> Lines {
     lines
 }
 
+/// What naming a set of forms comes to, in the words to say before acting on it.
+///
+/// The services rather than the profiles, because a profile is an implementation
+/// detail the operator was never shown and a service is the name they will see in
+/// every other report — and the count, so a form that quietly grew is visible as a
+/// number before it is a screenful.
+pub(super) fn preview(plan: &Plan) -> Lines {
+    let mut lines = Lines::default();
+    let count = plan.services.len();
+    // Two forms are a plural subject and take a plural verb. Naming several at
+    // once is ordinary — `up full proxy` is the documented way to compose them —
+    // so this is a sentence an operator reads, not a corner.
+    let starts = if plan.forms.len() == 1 {
+        "starts"
+    } else {
+        "start"
+    };
+    lines.put(format!(
+        "{} {starts} {count} service{}: {}",
+        plan.forms.join(" and "),
+        s(count),
+        plan.services.join(", ")
+    ));
+    lines.extend(left_out(plan));
+    lines
+}
+
+/// What the configuration left out of a closure, and what each one wanted.
+///
+/// Said whenever a plan is, and that is the point: an operator seeing eleven
+/// services where they expected fourteen is owed the reason at the moment they
+/// notice, not in a diagnostic they have to think to run.
+fn left_out(plan: &Plan) -> Lines {
+    let mut lines = Lines::default();
+    for out in &plan.dropped {
+        lines.put(format!(
+            "left out: {} — {}",
+            out.profile,
+            wanting(out.needs)
+        ));
+    }
+    lines
+}
+
+/// The provider a dropped profile could not run without, as a sentence.
+fn wanting(needs: Protocol) -> &'static str {
+    match needs {
+        Protocol::Usenet => "no Usenet provider is configured",
+        Protocol::Torrent => "no VPN and torrent client are configured",
+    }
+}
+
 /// What a lifecycle command did, or would have done.
 pub(super) fn lifecycle(report: &LifecycleReport) -> Lines {
     let mut lines = Lines::default();
@@ -46,16 +100,12 @@ pub(super) fn lifecycle(report: &LifecycleReport) -> Lines {
         lines.put("would run:");
         lines.put(format!("  {}", report.command.join(" ")));
     }
-    lines.put(format!("{}: {}", report.action, report.profiles.join(", ")));
+    let profiles: Vec<&str> = report.plan.profiles.iter().map(String::as_str).collect();
+    lines.put(format!("{}: {}", report.action, profiles.join(", ")));
 
     // Saying what was left out, and that it was deliberate, before the operator
     // goes looking for a service that was never going to start.
-    if !report.dropped.is_empty() {
-        lines.put(format!(
-            "left out (no provider configured): {}",
-            report.dropped.join(", ")
-        ));
-    }
+    lines.extend(left_out(&report.plan));
 
     if let Some(condition) = report.condition {
         lines.spaced(describe(condition));
@@ -150,6 +200,7 @@ mod tests {
     use lemonfiber_core::model::{
         LifecycleReport, ResetReport, StackEdit, StatusReport, SupervisionReport,
     };
+    use lemonfiber_core::stack::closure::Dropped;
 
     #[test]
     fn a_reset_names_every_change_it_would_revert() {
@@ -184,25 +235,30 @@ mod tests {
     #[test]
     fn a_lifecycle_report_names_the_command_the_drops_and_the_edits_it_kept() {
         let report = LifecycleReport {
-            action: "up".to_owned(),
-            profiles: vec!["media".to_owned()],
-            dropped: vec!["usenet".to_owned()],
             command: vec!["docker".to_owned(), "compose".to_owned()],
             rehearsed: true,
-            status: None,
             services: vec![service("sonarr", State::Healthy, None)],
             condition: Some(Condition::Active),
             stack_edits: vec![StackEdit {
                 path: "compose.yml".to_owned(),
                 diff: "-a\n+b\n".to_owned(),
             }],
-            forwarding: None,
+            ..a_lifecycle(
+                "up",
+                a_plan(
+                    "media",
+                    vec![Dropped {
+                        profile: "usenet".to_owned(),
+                        needs: Protocol::Usenet,
+                    }],
+                ),
+            )
         };
         let text = lifecycle(&report).text();
         assert!(text.contains("would run:"));
         assert!(text.contains("docker compose"));
         assert!(text.contains("up: media"));
-        assert!(text.contains("left out (no provider configured): usenet"));
+        assert!(text.contains("left out: usenet — no Usenet provider is configured"));
         assert!(text.contains("everything is up"));
         assert!(text.contains("sonarr"));
         assert!(text.contains("kept compose.yml as it is on disk"));
@@ -212,19 +268,55 @@ mod tests {
     #[test]
     fn a_run_that_was_not_rehearsed_and_reports_no_condition_says_only_what_it_did() {
         let report = LifecycleReport {
-            action: "down".to_owned(),
-            profiles: vec!["media".to_owned()],
-            dropped: Vec::new(),
-            command: Vec::new(),
-            rehearsed: false,
             status: Some(0),
-            services: Vec::new(),
-            condition: None,
-            stack_edits: Vec::new(),
-            forwarding: None,
+            ..a_lifecycle("down", a_plan("media", Vec::new()))
         };
         let text = lifecycle(&report).text();
         assert_eq!(text, "down: media");
+    }
+
+    #[test]
+    fn a_plan_says_what_starts_and_what_the_configuration_left_out() {
+        let text = preview(&a_plan(
+            "tv",
+            vec![Dropped {
+                profile: "torrent".to_owned(),
+                needs: Protocol::Torrent,
+            }],
+        ))
+        .text();
+        assert!(
+            text.contains("tv starts 1 service: sonarr"),
+            "the services, counted, in the operator's own words: {text}"
+        );
+        assert!(text.contains("left out: torrent — no VPN and torrent client are configured"));
+    }
+
+    #[test]
+    fn two_forms_named_together_take_a_plural_verb() {
+        let composed = Plan {
+            forms: vec!["full".to_owned(), "proxy".to_owned()],
+            ..a_plan("tv", Vec::new())
+        };
+        let text = preview(&composed).text();
+        assert!(
+            text.starts_with("full and proxy start 1 service"),
+            "a plural subject takes a plural verb: {text}"
+        );
+    }
+
+    #[test]
+    fn a_plan_that_starts_several_services_counts_them_as_several() {
+        let several = Plan {
+            services: vec!["sonarr".to_owned(), "bazarr".to_owned()],
+            ..a_plan("tv", Vec::new())
+        };
+        let text = preview(&several).text();
+        assert!(text.contains("starts 2 services: sonarr, bazarr"), "{text}");
+        assert!(
+            !text.contains("left out"),
+            "nothing was left out, so nothing is said about it: {text}"
+        );
     }
 
     #[test]

@@ -6,13 +6,14 @@
 use lemonfiber_core::docker::{Criticality, Service, State};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::model::{
-    FormReport, FormsReport, MusicChoice, PresetChoice, SupervisionReport, TraceReport,
-    VersionReport,
+    FormReport, FormsReport, LifecycleReport, MusicChoice, PresetChoice, SupervisionReport,
+    TraceReport, VersionReport,
 };
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
     State as SeedState, Wiring,
 };
+use lemonfiber_core::stack::closure::{Dropped, Plan};
 
 /// One wiring in the given state, with no severity raised.
 pub(super) fn wiring(connection: &str, state: SeedState) -> Wiring {
@@ -126,5 +127,38 @@ pub(super) fn some_forms() -> FormsReport {
                 composable: false,
             },
         ],
+    }
+}
+
+/// A resolved plan naming one form, which holds one profile of the same name.
+///
+/// A form and a profile sharing a name is not how a real stack reads. A fixture
+/// that made them differ would put two arbitrary names into every assertion
+/// written against it, and the assertions are about neither.
+pub(crate) fn a_plan(name: &str, dropped: Vec<Dropped>) -> Plan {
+    Plan {
+        forms: vec![name.to_owned()],
+        profiles: [name.to_owned()].into_iter().collect(),
+        services: vec!["sonarr".to_owned()],
+        dropped,
+    }
+}
+
+/// A lifecycle report over that plan, with everything else left quiet.
+///
+/// Shared across the renderer, the exit codes and the plan itself, because all
+/// three are written against the same shape and a fixture per module is a
+/// fixture that drifts per module.
+pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
+    LifecycleReport {
+        action: action.to_owned(),
+        plan,
+        command: Vec::new(),
+        rehearsed: false,
+        status: None,
+        services: Vec::new(),
+        condition: None,
+        stack_edits: Vec::new(),
+        forwarding: None,
     }
 }

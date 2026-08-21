@@ -77,8 +77,18 @@ async fn main() -> ExitCode {
         // takes the context by value because it rewrites the settings mid-run.
         Request::Setup { flags } => return setup_from(ctx, flags).await,
         Request::Version => Command::Version,
-        Request::Forms => Command::Forms,
-        Request::Up { forms } => Command::Up { forms },
+        // Naming nothing asks what forms there are; naming one asks what it would
+        // come to. Two questions about the same subject, so one word answers both.
+        Request::Forms { forms } if forms.is_empty() => Command::Forms,
+        Request::Forms { forms } => Command::Preview { forms },
+        // Only starting is announced here. Stopping and restarting affect what is
+        // running rather than what a form holds — a restart of one named service
+        // touches one service — and saying "starts eight services" before either
+        // would be a sentence about the wrong set.
+        Request::Up { forms } => {
+            announce(&ctx, &forms, cli.json).await;
+            Command::Up { forms }
+        }
         Request::Down { forms } => Command::Down { forms },
         Request::Restart { form, services } => Command::Restart {
             forms: vec![form],
@@ -167,6 +177,32 @@ async fn main() -> ExitCode {
             settled(&outcome)
         }
         Err(problem) => complain(&problem),
+    }
+}
+
+/// Say what starting these forms will start, before it starts.
+///
+/// The plan comes from the core, resolved exactly as the command about to run
+/// will resolve it, so this is the same answer arriving earlier rather than a
+/// second opinion. A failure to resolve is not reported here: the command
+/// itself is about to fail on it, and saying so twice would put the operator's
+/// own mistake in front of them as though it had happened twice.
+///
+/// Silent under `--json`, where the plan comes back inside the one document the
+/// command returns. A script reading a stream of objects is owed one per run.
+async fn announce(ctx: &Ctx, forms: &[String], json: bool) {
+    if json {
+        return;
+    }
+    if let Ok(planned) = dispatch(
+        Command::Preview {
+            forms: forms.to_vec(),
+        },
+        ctx,
+    )
+    .await
+    {
+        render(&planned, false);
     }
 }
 

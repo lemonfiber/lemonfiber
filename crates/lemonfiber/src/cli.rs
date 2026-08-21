@@ -58,7 +58,13 @@ pub(crate) enum Request {
     ///
     /// A form says which part of the stack to run. They come from the stack rather
     /// than from lemonfiber, so a stack of your own names its own.
-    Forms,
+    ///
+    /// Naming one says what starting it would come to — the services it holds, and
+    /// anything your configuration leaves out — without starting anything.
+    Forms {
+        /// The forms to describe; none lists them all.
+        forms: Vec<String>,
+    },
     /// Start a form, or the union of several.
     Up {
         /// The forms to start.
@@ -377,6 +383,37 @@ mod tests {
             } => Some((disruptive, mending)),
             _ => None,
         }
+    }
+
+    /// The forms a command line names, or nothing for a line that names none — a line
+    /// the parser turns away included, since a refused line named nothing either.
+    fn named_forms(args: &[&str]) -> Option<Vec<String>> {
+        match Cli::try_parse_from(args).ok()?.command? {
+            Request::Forms { forms } => Some(forms),
+            _ => None,
+        }
+    }
+
+    /// Asking what forms there are and asking what one of them would do are the same
+    /// word, told apart by what follows it — so the parser has to keep both open.
+    #[test]
+    fn asking_for_the_forms_and_asking_about_one_are_the_same_word() {
+        assert_eq!(named_forms(&["lemonfiber", "forms"]), Some(Vec::new()));
+        assert_eq!(
+            named_forms(&["lemonfiber", "forms", "tv"]),
+            Some(vec!["tv".to_owned()])
+        );
+        // Composition is asked about exactly as it is started.
+        assert_eq!(
+            named_forms(&["lemonfiber", "forms", "full", "proxy"]),
+            Some(vec!["full".to_owned(), "proxy".to_owned()])
+        );
+        // A profile is an implementation detail, and no surface takes one.
+        assert_eq!(
+            named_forms(&["lemonfiber", "forms", "--profile", "media"]),
+            None
+        );
+        assert_eq!(named_forms(&["lemonfiber", "version"]), None);
     }
 
     /// Looking and acting are told apart by what was asked for, not by which flag carries

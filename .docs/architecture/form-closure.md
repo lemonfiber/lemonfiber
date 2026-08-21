@@ -67,6 +67,40 @@ different direction.
 container as a label, and those labels are how the Engine API reads are
 correlated back to the services that declared them.
 
+## What a plan says
+
+`resolve` answers with more than the profiles Compose needs, because the same
+value is what an operator is shown before anything starts:
+
+```rust
+Plan { forms, profiles, services, dropped: Vec<Dropped> }
+```
+
+`services` is the manifest's own order rather than an alphabetical one — a
+preview then reads like the stack rather than like an index — and holds each
+service once, which is a property of the manifest rather than of a pass over the
+list: a service declares exactly one profile, and the union is over profiles.
+
+`Dropped` carries the profile *and* the protocol it wanted. A name on its own
+sends an operator looking for a fault they do not have; what they have is a
+stack not configured for one of the two ways of downloading.
+
+The plan is what `Command::Preview` returns and what `LifecycleReport` carries,
+so what was said before a command ran and what a script reads afterwards are one
+value rather than two that can disagree.
+
+## A mistyped form is guessed at, once
+
+An unknown name is answered with the nearest declared form where one is within
+one edit plus one per three characters of the name, and with the full listing
+either way. Beyond that tolerance nothing is suggested: the list prints anyway,
+and a confident wrong answer is worse than a list.
+
+The distance is the usual edit table kept as its one row, written over an
+iterator rather than by subscript because `clippy::indexing_slicing` is denied
+workspace-wide — the two values a cell needs from the row above are carried in
+locals instead.
+
 ## Profiles are sorted
 
 `Plan.profiles` is a `BTreeSet`, so the same request always produces the same

@@ -98,6 +98,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // answers where things are; asking is never a failure, whatever the answer.
         Outcome::Version(_)
         | Outcome::Forms(_)
+        | Outcome::Preview(_)
         | Outcome::Lifecycle(_)
         | Outcome::Config(_)
         | Outcome::Trace(_)
@@ -266,16 +267,11 @@ mod tests {
 
     fn lifecycle(status: Option<i32>) -> LifecycleReport {
         LifecycleReport {
-            action: "up".to_owned(),
-            profiles: Vec::new(),
-            dropped: Vec::new(),
-            command: Vec::new(),
-            rehearsed: false,
             status,
-            services: Vec::new(),
-            condition: None,
-            stack_edits: Vec::new(),
-            forwarding: None,
+            ..crate::render::fixtures::a_lifecycle(
+                "up",
+                crate::render::fixtures::a_plan("tv", Vec::new()),
+            )
         }
     }
 

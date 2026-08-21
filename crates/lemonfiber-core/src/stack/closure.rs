@@ -13,20 +13,48 @@
 use std::collections::BTreeSet;
 
 use lemonfiber_manifest::Manifest;
+// Re-exported because `Dropped` is written in it: a public field whose type a caller
+// cannot name is a field they cannot read. `docker::Criticality` is here for the same
+// reason, and the CLI carries the manifest crate as a build dependency only.
+pub use lemonfiber_manifest::Protocol;
 use thiserror::Error;
 
 use crate::config::Protocols;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// What will be run, and what was left out.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Serialisable because it is an answer in its own right: asking what a form
+/// would do is a question a script asks as readily as a person, and the plan a
+/// lifecycle report carries is this same value rather than a retelling of it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Plan {
     /// The forms the operator named, in the order they named them.
     pub forms: Vec<String>,
     /// The profiles to activate, sorted so the command is reproducible.
     pub profiles: BTreeSet<String>,
+    /// The services those profiles start, in the order the stack declares them.
+    ///
+    /// A service belongs to exactly one profile, so a service two named forms
+    /// both reach is here once. That is a property of the manifest rather than
+    /// of a pass over this list: the union is over profiles, and a service
+    /// appearing twice is not a state this can hold.
+    pub services: Vec<String>,
     /// Profiles the closure asked for that the configuration does not support.
-    pub dropped: BTreeSet<String>,
+    pub dropped: Vec<Dropped>,
+}
+
+/// A profile left out of a closure, and what it would have needed.
+///
+/// The provider travels with the profile because a name on its own sends the
+/// operator looking for a fault. What they have is a stack not configured for
+/// one of the two ways of downloading, which is a sentence rather than a word.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Dropped {
+    /// The profile that will not run.
+    pub profile: String,
+    /// The provider it cannot run without.
+    pub needs: Protocol,
 }
 
 impl Plan {
@@ -62,9 +90,11 @@ pub fn resolve(
     let mut seen = BTreeSet::new();
     for name in forms {
         let Some(form) = manifest.forms.iter().find(|form| &form.id == name) else {
+            let known: Vec<String> = manifest.forms.iter().map(|form| form.id.clone()).collect();
             return Err(Failure::NoSuchForm {
+                nearest: nearest(name, &known),
                 name: name.clone(),
-                known: manifest.forms.iter().map(|form| form.id.clone()).collect(),
+                known,
             });
         };
         // The same form named twice is the same form: deduped here so a repeated
@@ -88,25 +118,42 @@ pub fn resolve(
 
     // Which profiles are guarded is the manifest's answer, not one this code
     // remembers. A stack that renames its download profiles keeps working.
-    let dropped: BTreeSet<String> = manifest
+    let dropped: Vec<Dropped> = manifest
         .profiles
         .iter()
         .filter(|profile| closure.contains(&profile.id))
         .filter_map(|profile| profile.protocol.map(|needed| (profile, needed)))
         .filter(|(_, needed)| !protocols.has(*needed))
-        .map(|(profile, _)| profile.id.clone())
+        .map(|(profile, needs)| Dropped {
+            profile: profile.id.clone(),
+            needs,
+        })
         .collect();
 
-    let profiles: BTreeSet<String> = closure.difference(&dropped).cloned().collect();
+    let profiles: BTreeSet<String> = closure
+        .into_iter()
+        .filter(|id| !dropped.iter().any(|out| &out.profile == id))
+        .collect();
     if profiles.is_empty() {
         return Err(Failure::NothingLeft {
             forms: forms.to_vec(),
         });
     }
 
+    // The stack's own order rather than an alphabetical one: a manifest lists
+    // its services in the order somebody thought about them, and a preview read
+    // in that order is a description of the stack rather than of the alphabet.
+    let services: Vec<String> = manifest
+        .services
+        .iter()
+        .filter(|service| profiles.contains(&service.profile))
+        .map(|service| service.id.clone())
+        .collect();
+
     Ok(Plan {
         forms: forms.to_vec(),
         profiles,
+        services,
         dropped,
     })
 }
@@ -124,6 +171,9 @@ pub enum Failure {
         name: String,
         /// What the stack does declare.
         known: Vec<String>,
+        /// The declared form the name was probably meant to be, where one is
+        /// close enough to say so.
+        nearest: Option<String>,
     },
     /// A form that refuses to be combined was named alongside others.
     #[error("`{form}` cannot be combined with another form")]
@@ -137,6 +187,58 @@ pub enum Failure {
         /// The forms that were named.
         forms: Vec<String>,
     },
+}
+
+/// The declared form a name was probably meant to be, where one is near enough.
+///
+/// Near enough is one edit, plus one for every three characters of the name: a
+/// slip of a finger is always caught, and a longer name tolerates the extra
+/// slips a longer name attracts. Beyond that, nothing is suggested — the forms
+/// this stack does declare are listed alongside, and an operator reading a list
+/// is better served than one sent confidently to the wrong form.
+///
+/// Ties go to the shorter name and then to the alphabetically earlier one, so
+/// the same typo against the same stack is always answered the same way — and
+/// answered the same way whatever order the stack happens to declare its forms
+/// in, which is not a thing a suggestion should turn on.
+fn nearest(name: &str, known: &[String]) -> Option<String> {
+    let tolerance = 1 + name.chars().count() / 3;
+    known
+        .iter()
+        .map(|form| (distance(name, form), form.chars().count(), form))
+        .filter(|(gap, ..)| *gap <= tolerance)
+        .min()
+        .map(|(.., form)| form.clone())
+}
+
+/// How many single-character edits turn one name into the other.
+///
+/// The usual table, kept as the one row it needs. Written over an iterator
+/// rather than by subscript because reading a row by index is denied here, and
+/// the two values a cell needs from the row above — the one before it and the
+/// one at it — are carried along instead.
+fn distance(one: &str, other: &str) -> usize {
+    let compared: Vec<char> = other.chars().collect();
+    let mut row: Vec<usize> = (1..=compared.len()).collect();
+
+    // The row's own first column, held apart: it belongs to the empty prefix of
+    // `other`, which the row of comparisons has no cell for.
+    let mut edge = 0;
+    for (index, left) in one.chars().enumerate() {
+        let mut diagonal = edge;
+        edge = index + 1;
+        let mut before = edge;
+        for (cell, right) in row.iter_mut().zip(compared.iter()) {
+            let substituted = diagonal + usize::from(left != *right);
+            diagonal = *cell;
+            *cell = substituted.min(*cell + 1).min(before + 1);
+            before = *cell;
+        }
+    }
+
+    // Nothing to compare against means every character of `one` is an edit, and
+    // that count is exactly what the first column has been counting.
+    row.last().copied().unwrap_or(edge)
 }
 
 /// Raised when no form was named.
@@ -162,13 +264,30 @@ impl Diagnose for Failure {
                 Remedy::new("Name a form, or list the ones this stack has")
                     .with_detail("lemonfiber forms"),
             ),
-            Self::NoSuchForm { name, known } => Problem::new(
+            // The suggestion leads and the full list follows, because a typo is
+            // the common case and reading eleven names to find the one you
+            // already meant is work the tool can do.
+            Self::NoSuchForm {
+                name,
+                known,
+                nearest,
+            } => Problem::new(
                 NO_SUCH_FORM,
                 Severity::Error,
                 format!("This stack has no form called {name}"),
                 "Forms come from the stack rather than from lemonfiber, so a stack of your own may name them differently.",
-                Remedy::new(format!("Try one of: {}", known.join(", ")))
-                    .with_detail("lemonfiber forms"),
+                Remedy::new(nearest.as_ref().map_or_else(
+                    || format!("Try one of: {}", known.join(", ")),
+                    |guess| {
+                        let rest: Vec<&str> = known
+                            .iter()
+                            .map(String::as_str)
+                            .filter(|form| *form != guess.as_str())
+                            .collect();
+                        format!("Did you mean {guess}? The rest are: {}", rest.join(", "))
+                    },
+                ))
+                .with_detail("lemonfiber forms"),
             ),
             Self::NotComposable { form } => Problem::new(
                 FORMS_CONFLICT,
@@ -196,7 +315,9 @@ impl Diagnose for Failure {
 mod tests {
     use lemonfiber_manifest::Manifest;
 
-    use super::{resolve, Diagnose, Failure, Plan, Protocols};
+    use super::{
+        distance, nearest, resolve, Diagnose, Dropped, Failure, Plan, Protocol, Protocols,
+    };
     use crate::error::{Severity, State};
 
     const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
@@ -221,6 +342,13 @@ mod tests {
 
     fn profiles(forms: &[&str], protocols: Protocols) -> Option<Vec<String>> {
         plan(forms, protocols).map(|plan| plan.profiles.into_iter().collect())
+    }
+
+    /// What the refusal offers to do about it, which is what the operator reads.
+    fn offered(forms: &[&str]) -> Option<String> {
+        refusal(forms, Protocols::both())
+            .map(|err| err.problem())
+            .and_then(|problem| problem.remedies.first().map(|remedy| remedy.action.clone()))
     }
 
     #[test]
@@ -259,17 +387,20 @@ mod tests {
     }
 
     #[test]
-    fn what_was_narrowed_away_is_recorded_rather_than_forgotten() {
+    fn what_was_narrowed_away_is_recorded_with_what_it_wanted() {
         let usenet_only = Protocols {
             usenet: true,
             torrent: false,
         };
-        let dropped = plan(&["dl"], usenet_only).map(|plan| {
-            let mut names: Vec<String> = plan.dropped.into_iter().collect();
-            names.sort();
-            names
-        });
-        assert_eq!(dropped, Some(named(&["torrent"])));
+        assert_eq!(
+            plan(&["dl"], usenet_only).map(|plan| plan.dropped),
+            Some(vec![Dropped {
+                profile: "torrent".to_owned(),
+                needs: Protocol::Torrent,
+            }]),
+            "the profile alone would send them looking for a fault; the provider it \
+             wanted is the answer"
+        );
     }
 
     #[test]
@@ -419,6 +550,7 @@ composable = false
             Failure::NoSuchForm {
                 name: "telly".to_owned(),
                 known: named(&["tv"]),
+                nearest: None,
             },
             Failure::NotComposable {
                 form: "full".to_owned(),
@@ -437,5 +569,83 @@ composable = false
     fn a_plan_knows_when_it_is_empty() {
         let plan = plan(&["library"], Protocols::none());
         assert_eq!(plan.map(|plan| plan.is_empty()), Some(false));
+    }
+
+    /// What the operator is actually shown, rather than the field behind it: the
+    /// guess leads and the full listing follows, because a typo is the common
+    /// case and reading eleven names to find the one you meant is work the tool
+    /// can do.
+    #[test]
+    fn a_mistyped_form_is_answered_with_the_one_that_was_meant() {
+        assert_eq!(
+            offered(&["moovies"]).as_deref(),
+            Some(
+                "Did you mean movies? The rest are: search, dl, hunt, tv, music, books, auto, library, full, proxy"
+            ),
+            "the guess leads, and is not also listed among what is left"
+        );
+    }
+
+    #[test]
+    fn a_name_like_nothing_declared_is_not_guessed_at() {
+        let said = offered(&["xyzzy"]);
+        assert_eq!(
+            said.as_deref()
+                .map(|action| action.starts_with("Try one of:")),
+            Some(true),
+            "a confident wrong answer is worse than the list that prints anyway: {said:?}"
+        );
+    }
+
+    #[test]
+    fn the_nearer_of_two_candidates_wins_and_ties_are_settled_the_same_way_every_time() {
+        let known = named(&["movies", "music", "tv"]);
+        assert_eq!(nearest("movirs", &known), Some("movies".to_owned()));
+        // One edit from either, so the tie is settled without consulting the
+        // order the stack declared them in — which is not a thing a suggestion
+        // should turn on, and is the difference between an answer and a coin.
+        assert_eq!(nearest("tl", &named(&["tv", "dl"])), Some("dl".to_owned()));
+        assert_eq!(
+            nearest("tl", &named(&["dl", "tv"])),
+            nearest("tl", &named(&["tv", "dl"]))
+        );
+        assert_eq!(nearest("xyzzy", &known), None, "nothing is near enough");
+    }
+
+    #[test]
+    fn distance_counts_the_edits_between_two_names() {
+        assert_eq!(distance("tv", "tv"), 0);
+        assert_eq!(distance("tv", "tb"), 1, "one substitution");
+        assert_eq!(distance("movies", "moovies"), 1, "one insertion");
+        assert_eq!(distance("kitten", "sitting"), 3);
+        assert_eq!(distance("tv", ""), 2, "every character is an edit");
+        assert_eq!(distance("", "tv"), 2);
+    }
+
+    #[test]
+    fn a_plan_names_the_services_the_profiles_hold() {
+        let started = plan(&["library"], Protocols::none()).map(|plan| plan.services);
+        assert_eq!(
+            started,
+            Some(named(&[
+                "jellyfin",
+                "seerr",
+                "calibre-web-automated",
+                "audiobookshelf"
+            ])),
+            "the stack's own order, so the preview reads like the stack"
+        );
+    }
+
+    #[test]
+    fn a_service_two_named_forms_both_reach_is_started_once() {
+        let both = plan(&["tv", "movies"], Protocols::both()).map(|plan| plan.services);
+        let counted = both.as_ref().map(|services| {
+            services
+                .iter()
+                .filter(|service| *service == "prowlarr")
+                .count()
+        });
+        assert_eq!(counted, Some(1), "the union is over profiles, not services");
     }
 }
