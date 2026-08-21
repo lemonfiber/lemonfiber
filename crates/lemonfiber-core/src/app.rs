@@ -313,6 +313,9 @@ pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 /// Raised when stopping would take a service out from under a form still running.
 pub const STILL_NEEDED: Code = Code::new("LIFE-2");
 
+/// Another run is already working on this stack.
+pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
+
 /// Carry out a command.
 ///
 /// # Errors

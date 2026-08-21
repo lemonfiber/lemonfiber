@@ -22,6 +22,8 @@ use crate::stack::Source;
 pub struct Ctx {
     /// Whether to report what would happen and change nothing.
     pub dry_run: bool,
+    /// Whether this run takes the stack from whatever already claimed it.
+    pub force: bool,
     /// How programs are run.
     pub runner: Arc<dyn Runner>,
     /// How the engine is observed.
@@ -68,6 +70,7 @@ impl Ctx {
     ) -> Self {
         Self {
             dry_run: false,
+            force: false,
             runner,
             engine,
             clock,
@@ -161,6 +164,18 @@ impl Ctx {
     #[must_use]
     pub fn rehearsing(mut self) -> Self {
         self.dry_run = true;
+        self
+    }
+
+    /// The same context, taking the stack from whatever claimed it.
+    ///
+    /// A per-run decision rather than a setting, and carried here for the same reason
+    /// a rehearsal is: it is true of everything this invocation does, and threading it
+    /// through every call that might eventually reach a lock would put it in signatures
+    /// that have nothing to do with it.
+    #[must_use]
+    pub fn forcing(mut self) -> Self {
+        self.force = true;
         self
     }
 }

@@ -54,6 +54,25 @@ impl FileSystem for Disk {
         std::fs::read_to_string(path).ok()
     }
 
+    /// One syscall, which is the whole point: `create_new` asks the kernel to create
+    /// the file *and* fail if it already exists, so two processes racing here get one
+    /// `true` between them. Anything built from a separate look-then-write would have
+    /// a window in it, and a lock with a window is not a lock.
+    async fn claim(&self, path: &Path, contents: &str) -> bool {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .map(|mut file| {
+                use std::io::Write as _;
+                let _ = file.write_all(contents.as_bytes());
+            })
+            .is_ok()
+    }
+
     async fn write(&self, path: &Path, contents: &str) {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
@@ -348,5 +367,36 @@ mod tests {
         );
         assert!(facts.total > 0, "a real volume reports a size");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The promise the whole lock rests on: the second caller is told it lost,
+    /// rather than quietly writing over what the first one put there.
+    #[tokio::test]
+    async fn only_the_first_claim_of_a_path_succeeds() {
+        let path = scratch().join("lifecycle.lock");
+
+        assert!(
+            Disk.claim(&path, "first").await,
+            "nothing was there, so this call created it"
+        );
+        assert!(
+            !Disk.claim(&path, "second").await,
+            "it was there, so this call did not"
+        );
+        assert_eq!(
+            Disk.read(&path).await.as_deref(),
+            Some("first"),
+            "and the loser wrote nothing over the winner"
+        );
+    }
+
+    /// A claim creates the directory it belongs in, because the first run on a
+    /// machine claims before anything else has had cause to make one.
+    #[tokio::test]
+    async fn a_claim_makes_the_directory_it_needs() {
+        let path = scratch().join("nested").join("lifecycle.lock");
+
+        assert!(Disk.claim(&path, "held").await);
+        assert_eq!(Disk.read(&path).await.as_deref(), Some("held"));
     }
 }

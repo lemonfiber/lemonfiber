@@ -67,7 +67,7 @@ async fn main() -> ExitCode {
     let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {
-        let ctx = context(cli.stack_dir.take(), cli.dry_run);
+        let ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
         let Some(paths) = here() else {
             // With nowhere to keep its files there is nothing to offer and nothing
             // to point at, so the plain pointer is the only honest thing left.
@@ -77,7 +77,7 @@ async fn main() -> ExitCode {
         return greeting(ctx, &paths, &Console).await;
     };
 
-    let ctx = context(cli.stack_dir.take(), cli.dry_run);
+    let ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
 
     let command = match request {
         // Streaming is not a value that arrives once, so it does not become a

@@ -282,6 +282,30 @@ pub trait FileSystem: Send + Sync {
     /// behind is untidy, never wrong.
     async fn remove(&self, path: &Path);
 
+    /// Create this file only if it is not there yet, writing `contents` into it, and
+    /// say whether *this* call was the one that created it.
+    ///
+    /// The narrow thing a lock is built from. Two processes racing must get exactly
+    /// one `true` between them, which is why this is a port method rather than a
+    /// [`FileSystem::presence`] followed by a [`FileSystem::write`] at the call site:
+    /// between those two calls there is a window, and a lock with a window in it is
+    /// not a lock.
+    ///
+    /// The default written here has exactly that window. It is for the fakes, where
+    /// nothing races and the behaviour is all that is being checked; the
+    /// implementation that touches a real filesystem overrides it with a single
+    /// atomic call, and is the only one whose promise is worth anything.
+    ///
+    /// A path that cannot be read at all is treated as taken. Refusing to start is
+    /// the safe way to be wrong here — the alternative is two teardowns at once.
+    async fn claim(&self, path: &Path, contents: &str) -> bool {
+        if self.presence(path).await != Presence::Gone {
+            return false;
+        }
+        self.write(path, contents).await;
+        true
+    }
+
     /// Read a small file lemonfiber wrote itself, or `None` where it is not there
     /// yet or cannot be read.
     ///

@@ -15,6 +15,7 @@ use crate::stack::compose::{build, Action};
 
 mod diagnosis;
 mod inflight;
+mod lock;
 mod stopping;
 mod streaming;
 mod switch;
@@ -22,6 +23,7 @@ mod switch;
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
 pub use inflight::{in_flight, Interrupted};
+pub use lock::{claimed, released, Claim};
 pub use streaming::{logs, pull_progress, start_progress, started};
 // Reached only by the tests that drive the decision directly rather than through a
 // whole run — which is the right level for it, since which checks name a service is a
@@ -375,6 +377,17 @@ pub(super) async fn lifecycle(
     forms: &[String],
     action: &Action,
 ) -> Result<Outcome, Box<Problem>> {
+    // Claimed around the whole operation, and given back whether it worked or not —
+    // an early return between the two would leave the stack claimed by a run that has
+    // already finished, which is the one way this can be worse than no lock at all.
+    let claim = lock::claimed(ctx).await?;
+    let outcome = worked(ctx, forms, action).await;
+    lock::released(ctx, claim).await;
+    outcome
+}
+
+/// The operation itself, with the stack already claimed for it.
+async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome, Box<Problem>> {
     let (manifest, command, mut report) = readied(ctx, forms, action).await?;
 
     // A rehearsal stops here deliberately: it has already done everything except
