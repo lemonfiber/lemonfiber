@@ -3,7 +3,7 @@ default:
     @just --list
 
 # Everything CI runs.
-ci: fmt-check lint test deny
+ci: fmt-check lint test typos deny
 
 build:
     cargo build --workspace
@@ -22,6 +22,23 @@ lint:
 
 deny:
     cargo deny check
+
+# Spell-check comments and docs, the way CI's hygiene job does — same tool, same
+# `typos.toml`, run from the same place, so a pass here means a pass there.
+#
+# It is in `ci` because it is the one gate that costs a second rather than minutes,
+# and the one most often discovered from a red pull request: nothing about a
+# deliberate misspelling in a fixture looks wrong until the checker says so.
+#
+# Skipped with a word rather than a failure where the tool is absent. Somebody who
+# has not installed it should still be able to run `just ci`, and CI checks anyway.
+typos:
+    #!/usr/bin/env bash
+    if command -v typos > /dev/null; then
+        typos .
+    else
+        echo "typos not installed — skipping; CI will still check (cargo install typos-cli)"
+    fi
 
 # Regenerate the cargo-dist release workflow. Run this — never hand-edit
 # release.yml — whenever the [workspace.metadata.dist] config changes.
