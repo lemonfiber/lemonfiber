@@ -86,12 +86,12 @@ pub async fn mend(
     disruptive: bool,
     confirm: &dyn Confirm,
 ) -> Result<Report, Box<Problem>> {
-    let checks = super::engine::assembled(ctx, disruptive).await?;
+    let (manifest, checks) = super::engine::assembled(ctx, disruptive).await?;
     // A second set, assembled without the disruptive ones, for proving the work. Built
     // here rather than per repair: nine checks constructed once are nine constructed once,
     // however many faults this run puts right.
-    let again = super::engine::assembled(ctx, false).await?;
-    Ok(mending(ctx, &checks, &again, stance, confirm).await)
+    let (_, again) = super::engine::assembled(ctx, false).await?;
+    Ok(mending(ctx, &manifest.services, &checks, &again, stance, confirm).await)
 }
 
 /// The same errand, over checks somebody else assembled.
@@ -106,12 +106,13 @@ pub async fn mend(
 /// would compare a repair with the reading it was meant to change.
 pub async fn mending(
     ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
     checks: &[Box<dyn Check>],
     again: &[Box<dyn Check>],
     stance: Stance,
     confirm: &dyn Confirm,
 ) -> Report {
-    let found = looked(ctx, checks).await;
+    let found = looked(ctx, services, checks).await;
 
     // Remembered before anything is offered. Whether a fix was declined, and how often one
     // has been tried and left the fault standing, are questions about a check across runs —
@@ -151,7 +152,7 @@ pub async fn mending(
         // Asked before anything is carried out: a repair that must not go ahead is never
         // attempted, rather than attempted and reported as having changed nothing.
         let outcome = if mender.may_proceed(&repair).await.allowed() {
-            carried(ctx, mender, again, &repair).await
+            carried(ctx, services, mender, again, &repair).await
         } else {
             Outcome::WouldOverwrite
         };
@@ -272,8 +273,14 @@ fn proposed(checks: &[Box<dyn Check>], found: &[Finding]) -> Vec<(usize, Repair)
 /// Shared rather than repeated: a check the operator has already answered must not read as
 /// freshly failing because a repair asked again, and a second copy of that rule is a
 /// second place for it to be forgotten.
-async fn looked(ctx: &Ctx, checks: &[Box<dyn Check>]) -> Vec<Finding> {
-    super::engine::examined(ctx, checks, None).await.findings
+async fn looked(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    checks: &[Box<dyn Check>],
+) -> Vec<Finding> {
+    super::engine::examined(ctx, services, checks, None)
+        .await
+        .findings
 }
 
 /// Carry one out, then ask again whether the fault is gone.
@@ -287,6 +294,7 @@ async fn looked(ctx: &Ctx, checks: &[Box<dyn Check>]) -> Vec<Finding> {
 /// the default route or run a live indexer search again, once per repair.
 async fn carried(
     ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
     mender: &dyn Mend,
     again: &[Box<dyn Check>],
     repair: &Repair,
@@ -303,7 +311,7 @@ async fn carried(
         // in is what the operator needs, and asking the checks again would only rename it.
         return Outcome::of(attempt, false);
     }
-    judged(attempt, prove(ctx, again, &repair.check).await)
+    judged(attempt, prove(ctx, services, again, &repair.check).await)
 }
 
 /// Ask again whether the fault is gone.
@@ -312,8 +320,13 @@ async fn carried(
 /// what it read when it was built, so proving a repair against those very instances would
 /// compare its work with the reading it was meant to change — and report every success as
 /// a failure.
-async fn prove(ctx: &Ctx, again: &[Box<dyn Check>], check: &str) -> Option<bool> {
-    proved(&looked(ctx, again).await, check)
+async fn prove(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    again: &[Box<dyn Check>],
+    check: &str,
+) -> Option<bool> {
+    proved(&looked(ctx, services, again).await, check)
 }
 
 /// What an attempt and the proof of it amount to together.

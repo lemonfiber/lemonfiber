@@ -130,12 +130,17 @@ impl Check for CredentialsCheck {
     async fn run(&self) -> Vec<Finding> {
         let mut findings = Vec::with_capacity(self.targets.len());
         for target in &self.targets {
-            findings.push(Finding {
-                check: format!("credentials.{}", target.id),
-                category: Category::Credentials,
-                title: format!("{} credential", target.name),
-                verdict: self.prove(target).await,
-            });
+            findings.push(
+                Finding::in_category(
+                    Category::Credentials,
+                    &format!("credentials.{}", target.id),
+                    &format!("{} credential", target.name),
+                    self.prove(target).await,
+                )
+                // Said so that a service which cannot answer because the thing underneath
+                // it is down reads as one problem rather than as two.
+                .about(&target.id),
+            );
         }
         findings
     }

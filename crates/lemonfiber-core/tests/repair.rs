@@ -147,7 +147,9 @@ async fn drive(
     stance: Stance,
     confirm: &dyn Confirm,
 ) -> Report {
-    mending(ctx, checks, checks, stance, confirm).await
+    // No services: these checks are about the errand rather than about anything running,
+    // so there is nothing for one finding to be downstream of.
+    mending(ctx, &[], checks, checks, stance, confirm).await
 }
 
 /// Answers every question the same way.
