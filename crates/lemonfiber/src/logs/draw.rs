@@ -27,7 +27,8 @@ const NAMED: usize = 12;
 ///
 /// An operator who has scrolled into history and cannot remember how to get back to
 /// the tail is stuck on a screen that is still updating without them.
-const KEYS: &str = "[/] filter  [w] severity  [s] service  [c] clear  [f] follow  [q] quit";
+const KEYS: &str =
+    "[/] filter  [w] severity  [s] service  [c] clear  [e] export  [f] follow  [q] quit";
 
 /// Draw the whole screen.
 pub(crate) fn draw(frame: &mut Frame, viewer: &Viewer) {

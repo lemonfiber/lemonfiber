@@ -35,6 +35,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use lemonfiber_core::app::{dashboard::gather, logs, Ctx};
+use lemonfiber_core::bundle::Marks;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::ports::docker::{Lifecycle, LogLine, LogQuery};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -47,7 +48,7 @@ use ratatui::Terminal;
 use tokio::sync::mpsc::Receiver;
 
 use crate::exit::complain;
-use crate::logs::{sampled, Press, Viewer};
+use crate::logs::{sampled, Asked, Press, Viewer};
 use crate::setup::Bare;
 
 /// How often the screen gathers afresh.
@@ -235,6 +236,7 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
 
     let mut viewer = Viewer::opened();
     let mut looking = tokio::time::interval(LOOKING);
+    let mut written = 0_usize;
     // The stream ending is not the screen ending. A stopped service has plenty
     // worth reading in what it said on the way down, and closing the view at that
     // moment would take it away exactly when it is wanted.
@@ -245,7 +247,12 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
         }
         tokio::select! {
             press = arriving.recv() => match press {
-                Some(press) => viewer.pressed(press),
+                Some(press) => {
+                    if viewer.pressed(press) == Asked::Export {
+                        written += 1;
+                        export(&mut viewer, ctx, written).await;
+                    }
+                }
                 None => break,
             },
             line = lines.recv(), if !ended => match line {
@@ -269,6 +276,32 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
     drop(arriving);
     let _ = reader.join();
     ExitCode::SUCCESS
+}
+
+/// Write the view out and say where it went.
+///
+/// The redacting is [`Viewer::exported`]'s, where it can be tested; what is here is
+/// only the randomness the stand-ins need and the file they go into.
+///
+/// A stand-in an operator can predict is a way back to the value it stands for, so an
+/// export cannot proceed without real randomness. Saying so beats writing a file whose
+/// redaction is only as good as a fixed salt.
+async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
+    let Some(marks) = Marks::new(ctx.random.as_ref()) else {
+        viewer.remarked("this machine would not provide the randomness an export needs");
+        return;
+    };
+    // Stamped from the clock port rather than a date, so two runs on the same day
+    // cannot write over each other's export.
+    let stamp = ctx
+        .clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or_default();
+    let path = std::path::PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
+    ctx.filesystem.write(&path, &viewer.exported(&marks)).await;
+    viewer.remarked(&format!("written to {}", path.display()));
 }
 
 /// What each service is doing, or nothing where the engine will not say.

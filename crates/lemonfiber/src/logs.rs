@@ -19,6 +19,7 @@
 //! then be able to say "detached" while scrolled to the tail. So the offset is the
 //! only truth and the scrollback is told, in one place, every time it changes.
 
+use lemonfiber_core::bundle::{prose, Marks, Terms};
 use lemonfiber_core::logs::viewer::{Filter, Scrollback};
 use lemonfiber_core::logs::{declared, Level};
 use lemonfiber_core::plural::s;
@@ -88,6 +89,19 @@ pub(crate) enum Press {
     Forward,
     /// All the way to the newest line.
     Tail,
+}
+
+/// What a keypress asked for that the screen cannot do by itself.
+///
+/// Writing a file is the loop's to do, not the screen's — everything else here is
+/// decided without touching anything outside this module, and an export would be the
+/// one exception. So it is asked for rather than done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Asked {
+    /// Nothing beyond what has already been done.
+    Nothing,
+    /// Write the view out.
+    Export,
 }
 
 /// One line as the screen will show it.
@@ -210,9 +224,12 @@ impl Viewer {
     /// What was being typed is taken out of hand here, so entry ends unless the
     /// press puts it back. That way each arm below says plainly whether it is still
     /// a search being written, rather than leaving the mode to be reasoned about.
-    pub(crate) fn pressed(&mut self, press: Press) {
+    pub(crate) fn pressed(&mut self, press: Press) -> Asked {
         match self.typing.take() {
-            Some(typed) => self.while_typing(typed, press),
+            Some(typed) => {
+                self.while_typing(typed, press);
+                Asked::Nothing
+            }
             None => self.while_reading(press),
         }
     }
@@ -245,8 +262,10 @@ impl Viewer {
     }
 
     /// What a key means while the operator is reading.
-    fn while_reading(&mut self, press: Press) {
+    fn while_reading(&mut self, press: Press) -> Asked {
         match press {
+            // The one key the screen cannot answer on its own.
+            Press::Typed('e') => return Asked::Export,
             Press::Typed('q') | Press::Abandon => self.open = false,
             Press::Typed('/') => self.typing = Some(String::new()),
             Press::Typed('f') | Press::Tail => self.back_to_the_tail(),
@@ -257,6 +276,7 @@ impl Viewer {
             Press::Back => self.further_back(),
             Press::Forward => self.nearer_the_tail(),
         }
+        Asked::Nothing
     }
 
     /// Show the next service on its own, or all of them again at the end.
@@ -355,6 +375,59 @@ impl Viewer {
             .collect()
     }
 
+    /// The view as text, redacted, ready to be written out.
+    ///
+    /// Through the support bundle's own redaction rather than a second set of rules.
+    /// An exported log is the same kind of thing a bundle carries — somebody else's
+    /// copy of what this stack said — and two redactors would be two chances to
+    /// disagree about what a credential looks like.
+    ///
+    /// Redacted here rather than by whatever writes the file, so that what this
+    /// returns is the thing that lands on disk and a test can say so. A redaction
+    /// applied on the way out of the module would be a rule nothing could check.
+    ///
+    /// On the bundle's default terms, which are its most careful ones: the viewer has
+    /// no record of what the operator agreed to reveal, and an export is read by
+    /// whoever it was sent to.
+    pub(crate) fn exported(&self, marks: &Marks) -> String {
+        // `prose` rejoins the lines it split, which leaves the last one bare. A file
+        // that does not end in a newline is one that reads as truncated.
+        let mut said = prose(&self.as_text(), marks, &Terms::default());
+        said.push('\n');
+        said
+    }
+
+    /// The view as text, before redaction.
+    ///
+    /// What the filter admits rather than everything held: an export is a copy of
+    /// what the operator is looking at, and one that quietly carried the lines they
+    /// had narrowed away would be a different document from the one they asked for.
+    ///
+    /// Tagged `service | line`, which is the shape the support bundle's own log
+    /// extract takes — the redaction that runs over this was written against that
+    /// shape, and a different one would be redacted differently.
+    fn as_text(&self) -> String {
+        self.held
+            .showing(&self.filter())
+            .into_iter()
+            .fold(String::new(), |mut text, line| {
+                text.push_str(&plain(&line.service));
+                text.push_str(" | ");
+                text.push_str(&plain(&line.line));
+                text.push('\n');
+                text
+            })
+    }
+
+    /// Put a line of the viewer's own into the stream.
+    ///
+    /// In the stream rather than in a status row, for the same reason a restart is:
+    /// what the viewer did belongs where the operator was reading, at the point it
+    /// happened, and a row that is overwritten by the next thing cannot say when.
+    pub(crate) fn remarked(&mut self, said: &str) {
+        self.take(remark(SELF, said));
+    }
+
     /// What to say instead of lines, where the filter admits none.
     ///
     /// Saying how much was looked at is the point. "No matches" over an empty screen
@@ -414,17 +487,25 @@ impl Viewer {
     }
 }
 
-/// A line the viewer wrote itself, saying what the engine reported.
+/// What the viewer calls itself when a line is its own rather than a service's.
+const SELF: &str = "lemonfiber";
+
+/// A line the viewer wrote itself.
 ///
-/// Tagged with the service it is about, so it sits under the same name as that
-/// service's own output and a filter narrowed to one service keeps its notices.
-fn noticed(service: &str, lifecycle: Lifecycle) -> LogLine {
+/// Tagged with a service where it is about one, so it sits under the same name as
+/// that service's own output and a filter narrowed to it keeps the notice.
+fn remark(service: &str, said: &str) -> LogLine {
     LogLine {
         service: service.to_owned(),
         stream: Stream::Stdout,
         at: None,
-        line: format!("--- {service} {} ---", becoming(lifecycle)),
+        line: format!("--- {said} ---"),
     }
+}
+
+/// A line saying what the engine reported about a service.
+fn noticed(service: &str, lifecycle: Lifecycle) -> LogLine {
+    remark(service, &format!("{service} {}", becoming(lifecycle)))
 }
 
 /// What to say about a service that has just reached this state.
@@ -445,7 +526,8 @@ const fn becoming(lifecycle: Lifecycle) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{sampled, Press, Shown, Viewer, BATCH};
+    use super::{sampled, Asked, Press, Shown, Viewer, BATCH};
+    use lemonfiber_core::bundle::Marks;
     use lemonfiber_core::logs::Level;
     use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
 
@@ -491,6 +573,26 @@ mod tests {
         for asked in presses {
             viewer.pressed(*asked);
         }
+    }
+
+    /// Randomness a test chose, so an export reads the same on every run.
+    ///
+    /// Written here rather than borrowed from the fixtures crate, which this binary
+    /// does not depend on: the port has one method, and this calls it.
+    struct Chosen;
+
+    impl lemonfiber_core::ports::random::Random for Chosen {
+        fn bytes(&self, count: usize) -> Option<Vec<u8>> {
+            Some(vec![7; count])
+        }
+    }
+
+    /// The view, redacted — empty where the chosen randomness somehow refused, which
+    /// every caller rules out by asserting on what it got back.
+    fn exported(viewer: &Viewer) -> String {
+        Marks::new(&Chosen)
+            .map(|marks| viewer.exported(&marks))
+            .unwrap_or_default()
     }
 
     /// Type a search and apply it.
@@ -912,5 +1014,109 @@ mod tests {
             let said = shown(&viewer, 10).concat();
             assert!(said.contains(expected), "{lifecycle:?}: {said}");
         }
+    }
+
+    /// Writing a file is the loop's to do, so the screen asks rather than does.
+    #[test]
+    fn asking_to_export_is_reported_rather_than_carried_out() {
+        let mut viewer = a_viewer();
+
+        assert_eq!(viewer.pressed(Press::Typed('e')), Asked::Export);
+        assert_eq!(viewer.pressed(Press::Typed('f')), Asked::Nothing);
+        assert_eq!(
+            shown(&viewer, 10).len(),
+            3,
+            "asking changed nothing on the screen"
+        );
+    }
+
+    /// The mode exists so that letters are letters; `e` is no more special than `q`.
+    #[test]
+    fn an_e_typed_into_a_search_is_a_letter_not_an_export() {
+        let mut viewer = a_viewer();
+        viewer.pressed(Press::Typed('/'));
+
+        assert_eq!(viewer.pressed(Press::Typed('e')), Asked::Nothing);
+        assert_eq!(viewer.typing(), Some("e"));
+    }
+
+    /// An export is a copy of what the operator is looking at. One that quietly
+    /// carried the lines they had narrowed away would be a different document.
+    #[test]
+    fn an_export_carries_what_the_filter_admits_and_nothing_else() {
+        let mut viewer = a_viewer();
+        search(&mut viewer, "timed");
+
+        assert_eq!(exported(&viewer), "radarr | WARN Import timed out\n");
+    }
+
+    /// The shape the support bundle's own log extract takes, because the redaction
+    /// that runs over this was written against that shape.
+    #[test]
+    fn an_export_tags_every_line_with_the_service_that_wrote_it() {
+        let text = exported(&a_viewer());
+
+        assert_eq!(
+            text,
+            "sonarr | INFO Grabbed an episode\n\
+             radarr | WARN Import timed out\n\
+             sonarr | Torrent finished\n"
+        );
+    }
+
+    /// A log line is somebody else's text, and a file it is written into is opened
+    /// by something eventually.
+    #[test]
+    fn an_export_carries_no_instruction_a_terminal_would_obey() {
+        let viewer = fed(&[("sonarr", "INFO \u{1b}[2Jgone")]);
+
+        let text = exported(&viewer);
+        assert!(!text.contains('\u{1b}'), "{text:?}");
+        assert!(text.contains("gone"), "{text:?}");
+    }
+
+    /// The requirement: an export is redacted by the support bundle's own rules, not
+    /// by a second set that could disagree with them about what a credential is.
+    ///
+    /// Anchored on the rule that a query string goes wholesale — that is where the key
+    /// nobody spotted actually lives, riding inside something that looks like an
+    /// address — so this fails if the redaction is skipped or swapped for another.
+    #[test]
+    fn an_export_is_redacted_the_way_the_support_bundle_is() {
+        let viewer = fed(&[("sonarr", "GET /api/v3/series?apikey=letmein done")]);
+
+        let text = exported(&viewer);
+
+        assert!(!text.contains("letmein"), "the key survived: {text}");
+        assert!(
+            text.contains("/api/v3/series?"),
+            "the address it rode in on did not: {text}"
+        );
+        assert!(
+            text.contains("done"),
+            "and the rest of the line stays: {text}"
+        );
+    }
+
+    /// What the viewer did belongs where the operator was reading, at the point it
+    /// happened — a row that the next thing overwrites cannot say when.
+    #[test]
+    fn a_remark_joins_the_stream_under_the_viewers_own_name() {
+        let mut viewer = a_viewer();
+
+        viewer.remarked("written to somewhere.txt");
+
+        let said = shown(&viewer, 10);
+        assert!(
+            said.iter()
+                .any(|line| line.contains("written to somewhere.txt")),
+            "{said:?}"
+        );
+        assert_eq!(
+            said.len(),
+            4,
+            "it joined the lines rather than replacing them"
+        );
+        assert_eq!(viewer.heading(), "sonarr, radarr, lemonfiber");
     }
 }
