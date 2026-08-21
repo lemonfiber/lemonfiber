@@ -299,6 +299,9 @@ impl serde::Serialize for Outcome {
 /// Raised when a service never reached a state that starting could accept.
 pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 
+/// Raised when stopping would take a service out from under a form still running.
+pub const STILL_NEEDED: Code = Code::new("LIFE-2");
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -892,8 +895,14 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
+        // Reachable and holding nothing: stopping asks what else is running before it
+        // acts, and an engine that will not answer is a refusal rather than a run.
         let ctx = a_context()
-            .engine(Arc::new(Reporting::default()))
+            .engine(Arc::new(Reporting::holding(
+                &[],
+                Lifecycle::Exited,
+                Health::None,
+            )))
             .settings(settings)
             .build();
         let command = Command::Down {
@@ -1902,6 +1911,99 @@ mod tests {
         assert_eq!(
             produced.map(|report| report.condition),
             Some(Some(Condition::Degraded))
+        );
+    }
+
+    /// The requirement: an operator who started two overlapping forms and stops one
+    /// of them is not asking for the other to lose its services. The refusal names
+    /// the form, because one told only "cannot stop" cannot act on it.
+    #[tokio::test]
+    async fn stopping_a_form_another_running_one_needs_is_refused_by_name() {
+        // Everything `tv` and `movies` both hold, plus the one service each has of its
+        // own — so both are up in their own right and neither contains the other.
+        let running = Reporting::holding(
+            &[
+                "flaresolverr",
+                "nzbhydra2",
+                "prowlarr",
+                "sabnzbd",
+                "gluetun",
+                "qbittorrent",
+                "bazarr",
+                "sonarr",
+                "radarr",
+            ],
+            Lifecycle::Running,
+            Health::Healthy,
+        );
+        let refused = dispatch(
+            Command::Down {
+                forms: vec!["tv".to_owned()],
+            },
+            &watching(running),
+        )
+        .await
+        .err();
+
+        assert_eq!(
+            refused.as_ref().map(|problem| problem.code),
+            Some(super::STILL_NEEDED)
+        );
+        assert!(
+            refused
+                .as_ref()
+                .is_some_and(|problem| problem.summary.contains("movies")),
+            "the operator is told which form still needs it: {refused:?}"
+        );
+    }
+
+    /// Stopping asks what else is running before it acts, so an engine that will not
+    /// answer stops the stop. It cannot be overruled into taking down something it was
+    /// never able to see — and this is the one lifecycle command where that is a new
+    /// requirement, which makes it worth saying plainly rather than discovering.
+    #[tokio::test]
+    async fn stopping_reports_an_engine_it_cannot_see() {
+        let refusal = dispatch(
+            Command::Down {
+                forms: vec!["library".to_owned()],
+            },
+            &rehearsing(crate::config::Protocols::both()),
+        )
+        .await
+        .err()
+        .map(|problem| problem.code);
+
+        assert_eq!(refusal, Some(crate::ports::docker::ENGINE_UNREACHABLE));
+    }
+
+    /// The ordinary case, and the one that must not be made harder: one form up, that
+    /// form stopped, nothing else running to be deprived of anything.
+    #[tokio::test]
+    async fn stopping_the_only_form_that_is_up_is_not_refused() {
+        let running = Reporting::holding(
+            &[
+                "jellyfin",
+                "seerr",
+                "calibre-web-automated",
+                "audiobookshelf",
+            ],
+            Lifecycle::Running,
+            Health::Healthy,
+        );
+        let produced = report(
+            dispatch(
+                Command::Down {
+                    forms: vec!["library".to_owned()],
+                },
+                &watching(running),
+            )
+            .await,
+        );
+
+        assert_eq!(
+            produced.map(|report| report.action),
+            Some("down".to_owned()),
+            "nothing else holds what `library` holds, so it simply stops"
         );
     }
 

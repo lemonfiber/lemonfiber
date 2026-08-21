@@ -139,9 +139,62 @@ fn all_up(running: &[Service], services: &[String]) -> bool {
     !mine.is_empty() && mine.len() == services.len() && condition(&mine) == Condition::Active
 }
 
+/// The forms that are up and would lose a service if these ones were stopped.
+///
+/// A different question from which form supersedes which. Superseding is total
+/// containment — every service of the one inside the other — and two forms can
+/// overlap without either containing the other: `tv` and `movies` both reach the
+/// indexer, and neither is inside the other. The indexer does not care which of
+/// the two the operator had in mind when they asked for it to stop.
+///
+/// Only forms that are *up in their own right* count — active, never superseded. A
+/// form nobody started is not put out by losing a service it was never running, and
+/// refusing on its behalf would make stopping anything impossible on a stack that
+/// declares overlapping forms, which every stack does.
+///
+/// Named in the stack's own order and never including the forms being stopped,
+/// since a form losing its own services is the thing that was asked for.
+#[must_use]
+pub fn needed_by(
+    manifest: &Manifest,
+    protocols: Protocols,
+    running: &[Service],
+    stopping: &[String],
+) -> Vec<String> {
+    let Ok(going) = resolve(manifest, stopping, protocols) else {
+        // Nothing resolvable is going, so nothing can be deprived of it. The caller
+        // refuses an unresolvable form on its own account, with a better sentence
+        // than this could give.
+        return Vec::new();
+    };
+
+    // Active only, never superseded. A superseded form is up because a broader one is,
+    // not because anybody started it: `search` sits inside `tv`, so stopping `tv` would
+    // otherwise be refused on behalf of a form the operator has never named and cannot
+    // meaningfully stop. Naming those would make the refusal noise, and a refusal that
+    // is noise is one an operator learns to override without reading.
+    let up: Vec<String> = standings(manifest, protocols, running)
+        .into_iter()
+        .filter(|(_, standing)| matches!(standing, Standing::Active))
+        .map(|(form, _)| form)
+        .filter(|form| !stopping.contains(form))
+        .collect();
+
+    up.into_iter()
+        .filter(|form| {
+            resolve(manifest, std::slice::from_ref(form), protocols).is_ok_and(|theirs| {
+                theirs
+                    .services
+                    .iter()
+                    .any(|service| going.services.contains(service))
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{standings, Standing};
+    use super::{needed_by, standings, Standing};
     use crate::config::Protocols;
     use crate::docker::{Criticality, Service, State};
     use crate::stack::closure::{Dropped, Protocol};
@@ -315,5 +368,78 @@ mod tests {
             ),
             "and the reason travels with the state, rather than needing a second call"
         );
+    }
+
+    /// The case superseding does not cover. Two forms overlap without either being
+    /// inside the other, and the shared service is what makes stopping one of them
+    /// somebody else's problem.
+    #[test]
+    fn a_form_that_shares_a_service_with_a_running_one_is_named() {
+        let running = services_of("full", Protocols::both());
+        let stack = stack();
+        let told = stack
+            .as_ref()
+            .map(|manifest| needed_by(manifest, Protocols::both(), &running, &["tv".to_owned()]));
+
+        assert!(
+            told.as_ref()
+                .is_some_and(|forms| forms.iter().any(|form| form == "full")),
+            "`full` is up and holds what stopping `tv` would take away: {told:?}"
+        );
+        assert!(
+            told.as_ref()
+                .is_some_and(|forms| !forms.contains(&"tv".to_owned())),
+            "and the form being stopped is not told it needs itself: {told:?}"
+        );
+    }
+
+    /// Nobody is put out by losing a service they were not running.
+    #[test]
+    fn a_form_nobody_started_is_not_spoken_for() {
+        let stack = stack();
+        let told = stack
+            .as_ref()
+            .map(|manifest| needed_by(manifest, Protocols::both(), &[], &["tv".to_owned()]));
+
+        assert_eq!(
+            told,
+            Some(Vec::new()),
+            "nothing is up, so stopping anything deprives nobody: {told:?}"
+        );
+    }
+
+    /// A form whose services are entirely its own takes nothing from anyone.
+    #[test]
+    fn stopping_the_only_form_that_is_up_is_nobody_elses_business() {
+        let running = services_of("library", Protocols::none());
+        let stack = stack();
+        let told = stack.as_ref().map(|manifest| {
+            needed_by(
+                manifest,
+                Protocols::none(),
+                &running,
+                &["library".to_owned()],
+            )
+        });
+
+        assert_eq!(told, Some(Vec::new()), "{told:?}");
+    }
+
+    /// An unresolvable name is refused by whoever was asked, with a better sentence
+    /// than a list of forms that need it could give.
+    #[test]
+    fn a_form_that_does_not_resolve_deprives_nobody() {
+        let running = services_of("full", Protocols::both());
+        let stack = stack();
+        let told = stack.as_ref().map(|manifest| {
+            needed_by(
+                manifest,
+                Protocols::both(),
+                &running,
+                &["not-a-form".to_owned()],
+            )
+        });
+
+        assert_eq!(told, Some(Vec::new()), "{told:?}");
     }
 }
