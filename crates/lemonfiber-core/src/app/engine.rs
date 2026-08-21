@@ -22,7 +22,7 @@ mod switch;
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
 pub use inflight::{in_flight, Interrupted};
-pub use streaming::{logs, pull_progress};
+pub use streaming::{logs, pull_progress, start_progress, started};
 // Reached only by the tests that drive the decision directly rather than through a
 // whole run — which is the right level for it, since which checks name a service is a
 // separate question from what happens to a finding that does.
@@ -314,16 +314,18 @@ async fn settled_into(
     Ok(())
 }
 
-/// Resolve forms, build the command, and run it unless this is a rehearsal.
+/// Everything a lifecycle command settles before anything runs: the manifest, the
+/// command to spawn, and the report it will be filling in.
 ///
-/// Nothing here decides anything a surface could have decided differently, which
-/// is the point: `up` from a keypress and `up` from a subcommand reach this same
-/// function with the same arguments.
-pub(super) async fn lifecycle(
+/// Its own function because a start can be run two ways — waited on, or streamed as
+/// it goes — and the two must not be able to disagree about which services a form
+/// holds, what would be left out, or whether stopping is even allowed. Running the
+/// command is the only part that differs, so it is the only part that is not here.
+async fn readied(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<(lemonfiber_manifest::Manifest, Vec<String>, LifecycleReport), Box<Problem>> {
     let Composed {
         manifest,
         plan,
@@ -339,7 +341,7 @@ pub(super) async fn lifecycle(
         stopping::permitted(ctx, &manifest, forms).await?;
     }
 
-    let mut report = LifecycleReport {
+    let report = LifecycleReport {
         action: action.name().to_owned(),
         plan,
         command: command.clone(),
@@ -351,6 +353,20 @@ pub(super) async fn lifecycle(
         forwarding: None,
         switched: None,
     };
+    Ok((manifest, command, report))
+}
+
+/// Resolve forms, build the command, and run it unless this is a rehearsal.
+///
+/// Nothing here decides anything a surface could have decided differently, which
+/// is the point: `up` from a keypress and `up` from a subcommand reach this same
+/// function with the same arguments.
+pub(super) async fn lifecycle(
+    ctx: &Ctx,
+    forms: &[String],
+    action: &Action,
+) -> Result<Outcome, Box<Problem>> {
+    let (manifest, command, mut report) = readied(ctx, forms, action).await?;
 
     // A rehearsal stops here deliberately: it has already done everything except
     // the one irreversible step, so what it reports is what would run rather

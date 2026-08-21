@@ -32,7 +32,7 @@ mod walkthrough;
 
 use cli::{Cli, Request};
 use context::{context, here};
-use engine::{guard, pull, settle, stream};
+use engine::{guard, pull, settle, start, stream};
 use exit::{complain, no_config_home, settled, USAGE};
 use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
@@ -102,11 +102,11 @@ async fn main() -> ExitCode {
         // come to. Two questions about the same subject, so one word answers both.
         Request::Forms { forms } if forms.is_empty() => Command::Forms,
         Request::Forms { forms } => Command::Preview { forms },
-        // Only starting is announced here. Stopping and restarting affect what is
-        // running rather than what a form holds — a restart of one named service
-        // touches one service — and saying "starts eight services" before either
+        // Starting and stopping both say what they will affect first. Restarting does
+        // not: it affects what is running rather than what a form holds — a restart of
+        // one named service touches one service — so "starts eight services" before it
         // would be a sentence about the wrong set.
-        Request::Up { forms } => announced(&ctx, forms, cli.json, Doing::Starting).await,
+        Request::Up { forms } => return starting(&ctx, &forms, cli.json).await,
         Request::Down { forms, wait, yes } => halting(&ctx, forms, wait, yes, cli.json).await,
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
@@ -217,6 +217,16 @@ async fn main() -> ExitCode {
 /// The two directions share this because they share the sentence — only the verb
 /// differs — and a second copy of "say it, then do it" would be a second place for
 /// them to fall out of step about which half comes first.
+/// Announce what starting will affect, then start it, narrated as it goes.
+///
+/// Starting does not go through dispatch, for the same reason a pull and a watch do
+/// not: Compose narrates for minutes and the report comes at the end, which is not a
+/// value that arrives once.
+async fn starting(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
+    announce(ctx, forms, json, Doing::Starting).await;
+    start(ctx, forms, json).await
+}
+
 /// Announce what stopping would affect, settle what to do about anything still
 /// coming down, and only then ask for the stop.
 ///
@@ -231,14 +241,6 @@ async fn halting(ctx: &Ctx, forms: Vec<String>, wait: bool, yes: bool, json: boo
         settle(ctx, &forms, wait, yes).await;
     }
     Command::Down { forms }
-}
-
-async fn announced(ctx: &Ctx, forms: Vec<String>, json: bool, doing: Doing) -> Command {
-    announce(ctx, &forms, json, doing).await;
-    match doing {
-        Doing::Starting => Command::Up { forms },
-        Doing::Stopping => Command::Down { forms },
-    }
 }
 
 async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {
