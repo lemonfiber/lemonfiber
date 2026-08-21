@@ -97,7 +97,7 @@ impl Remedy {
     /// dozens of call sites: a rule you have to remember at every one of them is a
     /// rule that holds until somebody is in a hurry.
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
-        self.detail = Some(crate::config::store::withheld_text(&detail.into()));
+        self.detail = Some(crate::withheld::withheld_text(&detail.into()));
         self
     }
 }
@@ -200,7 +200,7 @@ impl Problem {
     /// dozens of call sites: a rule you have to remember at every one of them is a
     /// rule that holds until somebody is in a hurry.
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
-        self.detail = Some(crate::config::store::withheld_text(&detail.into()));
+        self.detail = Some(crate::withheld::withheld_text(&detail.into()));
         self
     }
 

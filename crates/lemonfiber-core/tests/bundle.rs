@@ -13,147 +13,50 @@
 
 mod common;
 
+use common::stack::project;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use common::files::Files;
-use common::Fake;
 use lemonfiber_core::app::bundle::{
     collect, write, Wanted, BUNDLE_LEAK, BUNDLE_NO_ROOM, BUNDLE_UNWRITTEN,
 };
 use lemonfiber_core::app::Ctx;
+use lemonfiber_core::archive::{Archive, Fault as ArchiveFault, Space};
 use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
 use lemonfiber_core::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::ports::archive::{Archive, Fault as ArchiveFault, Space};
-use lemonfiber_core::ports::docker::{
-    Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
-    Stats, Stream,
-};
-use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
-use lemonfiber_core::ports::random::Random;
-use lemonfiber_core::ports::time::Clock;
+use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::stack::Source;
-use tokio::sync::mpsc::Receiver;
-
-/// The repository's own copy of the stack, so what is collected is what a real
-/// installation would have rather than an invented shape.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_fixtures::support::Reporting;
 
 /// The version this build calls itself, as the command would pass it in.
 const LEMONFIBER: &str = "0.7.0-test";
-
-/// An engine with nothing running, and one that cannot be reached at all.
-struct Engine1(bool);
-
-#[async_trait]
-impl Engine for Engine1 {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
-        if self.0 {
-            return Ok(vec![Container {
-                id: "abc".to_owned(),
-                project: "media-stack".to_owned(),
-                service: "sonarr".to_owned(),
-                lifecycle: Lifecycle::Running,
-                health: Health::Healthy,
-                exit: None,
-            }]);
-        }
-        Err(EngineFailure::Unreachable {
-            reason: "no engine here".to_owned(),
-        })
-    }
-    async fn logs(
-        &self,
-        _project: &str,
-        _services: &[String],
-        _query: LogQuery,
-    ) -> Result<Receiver<LogLine>, EngineFailure> {
-        if !self.0 {
-            return Err(EngineFailure::Unreachable {
-                reason: "no engine here".to_owned(),
-            });
-        }
-        let (sending, receiving) = tokio::sync::mpsc::channel(4);
-        // A line with a key riding in a query string, which is the shape the whole
-        // free-text rule exists for and the one nobody spots by eye.
-        let _ = sending
-            .send(LogLine {
-                service: "prowlarr".to_owned(),
-                stream: Stream::Stdout,
-                at: None,
-                line: format!(
-                    "GET https://indexer.example.com/api?apikey={}&t=search",
-                    key_shaped()
-                ),
-            })
-            .await;
-        Ok(receiving)
-    }
-    async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
-    }
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
-    }
-}
-
-/// A runner that spawns nothing.
-struct Idle;
-
-#[async_trait]
-impl Runner for Idle {
-    async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
-        Err(RunFailure::NotFound {
-            program: "unused".to_owned(),
-        })
-    }
-}
-
-/// A clock stopped at a fixed moment, so a bundle's provenance is the same run to run.
-struct StoppedClock;
-
-#[async_trait]
-impl Clock for StoppedClock {
-    fn now(&self) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(1_786_968_000)
-    }
-}
-
-/// Randomness built rather than written, for the reason every credential-shaped fixture
-/// in this repository is built.
-struct Bytes;
-
-impl Random for Bytes {
-    fn bytes(&self, n: usize) -> Option<Vec<u8>> {
-        Some(
-            ('a'..='p')
-                .map(|letter| letter as u8)
-                .cycle()
-                .take(n)
-                .collect(),
-        )
-    }
-}
 
 /// A context over a stack that is there, an engine that is or is not, and a configuration
 /// file that is or is not.
 fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx {
     Ctx::new(
-        Arc::new(Idle),
-        Arc::new(Engine1(running)),
-        Arc::new(StoppedClock),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
+        Arc::new(if running {
+            // A line with a key riding in a query string, which is the shape the whole
+            // free-text rule exists for and the one nobody spots by eye. Said by the
+            // service the engine reports, because the collector asks for logs by the
+            // services it found and a line from anywhere else is filtered out.
+            Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy).saying(
+                "sonarr",
+                &format!(
+                    "GET https://indexer.example.com/api?apikey={}&t=search",
+                    key_shaped()
+                ),
+            )
+        } else {
+            Reporting::absent()
+        }),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
         configuration.map_or_else(Files::empty, Files::anywhere),
         stack,
         Settings {
@@ -164,7 +67,7 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
         Environment::MacOs,
     )
     .with_http(Fake::silent())
-    .with_random(Arc::new(Bytes))
+    .with_random(Arc::new(lemonfiber_fixtures::ports::Chance::cycling()))
 }
 
 /// What a bundle from a working-enough machine holds: its own first page, the diagnosis,
@@ -299,15 +202,8 @@ async fn a_bundle_from_a_broken_machine_names_what_it_could_not_read() {
 /// randomness gets no bundle rather than a guessable one.
 #[tokio::test]
 async fn no_randomness_means_no_bundle_at_all() {
-    struct Nothing;
-
-    impl Random for Nothing {
-        fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
-            None
-        }
-    }
-
-    let context = ctx(Source::External(project()), true, None).with_random(Arc::new(Nothing));
+    let context = ctx(Source::External(project()), true, None)
+        .with_random(Arc::new(lemonfiber_fixtures::ports::Chance::exactly(None)));
     assert!(collect(&context, LEMONFIBER, &Wanted::default())
         .await
         .is_none());

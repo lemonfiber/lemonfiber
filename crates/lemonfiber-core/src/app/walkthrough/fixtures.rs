@@ -8,14 +8,12 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
 use super::super::Ctx;
 use crate::config::Settings;
-use crate::platform::Environment;
-use crate::ports::http::{Http, Request, Response, Unreachable};
-use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs};
+use crate::ports::http::Method;
+use crate::test_support::{a_context, a_password, Reporting, SeedFs};
 use crate::walkthrough::{Line, Narrator};
+use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 /// A Servarr configuration that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -119,61 +117,43 @@ impl Default for Fake {
 const EGRESS: &str = "203.0.113.7";
 
 impl Fake {
-    /// What answers a request to `url`.
+    /// The transport this fake describes.
     ///
     /// A table rather than a chain of tests, because the chain was one long branch per
     /// service and read as a decision when it is really a lookup. Ordered most specific
     /// first: several of these paths are prefixes of each other, and a catalogue lookup is
     /// a `/series` request with more on the end.
-    fn answer(&self, url: &str) -> &'static str {
-        let routes = [
-            ("echo.example", EGRESS),
-            ("mode=queue", self.transfers),
-            ("/AuthenticateByName", self.sign_in),
-            ("/Library/Refresh", "{}"),
-            ("/Items", self.library),
-            ("lookup", self.lookup),
-            ("/rootfolder", self.folders),
-            ("/qualityprofile", self.profiles),
-            ("/indexer", self.indexers),
-            ("/wanted/missing", self.wanted),
-            ("/release", self.releases),
-            ("/history", self.history),
-            ("/queue", self.queue),
-        ];
-        routes
-            .iter()
-            .find(|(at, _)| url.contains(at))
-            // Everything else is the add, which is a write to the library path itself.
-            .map_or(self.added, |(_, body)| body)
-    }
-
-    /// Why a request fails, where this fake is set up to refuse it.
-    fn refusal(&self, request: &Request) -> Option<&'static str> {
-        if self.refuses_writes && request.method == crate::ports::http::Method::Post {
-            return Some("the service would not take it on");
+    ///
+    /// The refusals come first because they are about the request rather than the path —
+    /// a write this stack will not take, or a path that answers nothing at all.
+    pub(super) fn transport(&self) -> Arc<Transport> {
+        let mut routes: Vec<(Option<Method>, &'static str, Answer)> = Vec::new();
+        if self.refuses_writes {
+            routes.push((Some(Method::Post), "", Answer::Silent));
         }
-        if request.url.contains(self.refuses) {
-            return Some("nothing answered");
-        }
-        None
-    }
-}
-
-#[async_trait]
-impl Http for Fake {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Some(reason) = self.refusal(request) {
-            return Err(Unreachable {
-                url: request.url.clone(),
-                reason: reason.to_owned(),
-                attempts: 1,
-            });
-        }
-        Ok(Response {
-            status: 200,
-            body: self.answer(&request.url).to_owned(),
-        })
+        routes.push((None, self.refuses, Answer::Silent));
+        routes.extend(
+            [
+                ("echo.example", EGRESS),
+                ("mode=queue", self.transfers),
+                ("/AuthenticateByName", self.sign_in),
+                ("/Library/Refresh", "{}"),
+                ("/Items", self.library),
+                ("lookup", self.lookup),
+                ("/rootfolder", self.folders),
+                ("/qualityprofile", self.profiles),
+                ("/indexer", self.indexers),
+                ("/wanted/missing", self.wanted),
+                ("/release", self.releases),
+                ("/history", self.history),
+                ("/queue", self.queue),
+                // Everything else is the add, which is a write to the library path itself.
+                ("", self.added),
+            ]
+            .into_iter()
+            .map(|(at, body)| (None, at, Answer::reply(200, body))),
+        );
+        Transport::by_rules(routes)
     }
 }
 
@@ -205,26 +185,20 @@ impl Narrator for Recording {
 /// A stack over the real manifest, a filesystem that opens the \*arrs, and a transport
 /// answering as `fake` says — with no media server credential, so the library stage is
 /// simply unreachable.
-pub(super) fn ctx_with(fake: Fake) -> Ctx {
-    Ctx::new(
-        Arc::new(Scripted(Ok(spoke("")))),
-        Arc::new(Reporting::absent()),
-        Arc::new(crate::adapters::System),
-        Arc::new(crate::adapters::Disk),
-        stack(),
-        over_usenet(),
-        Environment::MacOs,
-    )
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_KEYED))))
-    .with_http(Arc::new(fake))
-    // No waiting: every test would otherwise sit through the real poll, and what the wait
-    // does at its bound is exactly what the tests are about.
-    .waiting(std::time::Duration::ZERO)
+pub(super) fn ctx_with(fake: &Fake) -> Ctx {
+    a_context()
+        .settings(over_usenet())
+        .build()
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_KEYED))))
+        .with_http(fake.transport())
+        // No waiting: every test would otherwise sit through the real poll, and what the wait
+        // does at its bound is exactly what the tests are about.
+        .waiting(std::time::Duration::ZERO)
 }
 
 /// The same, reachable media server and all — the admin password recorded under a scratch
 /// environment file, tagged so each test keeps its own rather than racing on a shared one.
-pub(super) fn ctx_watching(fake: Fake, tag: &str) -> Ctx {
+pub(super) fn ctx_watching(fake: &Fake, tag: &str) -> Ctx {
     let dir = std::env::temp_dir().join(format!("lemonfiber-walk-{tag}-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = ctx_with(fake);
@@ -293,7 +267,7 @@ impl crate::ports::time::Clock for Ticking {
 }
 
 /// A stack with torrents configured, which is the one that has a tunnel to prove.
-pub(super) fn ctx_with_torrents(fake: Fake) -> Ctx {
+pub(super) fn ctx_with_torrents(fake: &Fake) -> Ctx {
     let mut ctx = ctx_with(fake);
     ctx.settings.protocols = crate::config::Protocols::both();
     ctx
@@ -301,7 +275,7 @@ pub(super) fn ctx_with_torrents(fake: Fake) -> Ctx {
 
 /// A stack with torrents configured whose tunnel genuinely holds — matching egress on
 /// the pair the stack declares, which is what makes the gate open rather than stop.
-pub(super) fn ctx_through_a_tunnel(fake: Fake) -> Ctx {
+pub(super) fn ctx_through_a_tunnel(fake: &Fake) -> Ctx {
     let mut ctx = ctx_with_torrents(fake);
     // What the check needs before it can say anything: somewhere to ask what address the
     // world sees, and a forwarding choice to judge.
@@ -329,7 +303,7 @@ pub(super) fn ctx_through_a_tunnel(fake: Fake) -> Ctx {
 }
 
 /// A stack that acquires nothing, with a media server to ask about what it already has.
-pub(super) fn ctx_library_only(fake: Fake, tag: &str) -> Ctx {
+pub(super) fn ctx_library_only(fake: &Fake, tag: &str) -> Ctx {
     let mut ctx = ctx_watching(fake, tag);
     ctx.settings.protocols = acquires_nothing().protocols;
     ctx

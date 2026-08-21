@@ -2,16 +2,14 @@
 //!
 //! The reads a trace needs, kept apart from the writes that wire the stack —
 //! the same split the adapter itself makes.
-mod common;
-
 use std::sync::Arc;
 
-use common::{Answer, Fake};
 use lemonfiber_core::ports::http::{Http, Method};
 use lemonfiber_core::ports::service::{Importing, Pipeline, QueueItem, Queues};
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::Servarr;
 use lemonfiber_core::trace::{Outcome, Stage};
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// A Sonarr client over the given fake — the v3 the media *arrs answer at.
 fn sonarr(fake: &Arc<Fake>) -> Servarr {

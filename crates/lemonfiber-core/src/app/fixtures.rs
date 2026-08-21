@@ -9,8 +9,9 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 
+use crate::archive::{Archive, Fault, Space};
 use crate::backup::{Existing, Item, Manifest};
-use crate::ports::archive::{Archive, Fault, Space};
+use crate::test_support::a_context;
 
 /// More room than any writer asks to keep free, so a test that is not about room does not
 /// have to know what the writer it drives keeps in reserve.
@@ -107,15 +108,10 @@ pub(crate) fn ctx_at(name: &str) -> crate::app::Ctx {
         env_file: Some(dir.join(".env")),
         ..crate::config::Settings::default()
     };
-    crate::app::Ctx::new(
-        std::sync::Arc::new(crate::test_support::Scripted(Ok(
+    a_context()
+        .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
             crate::test_support::spoke(""),
-        ))),
-        std::sync::Arc::new(crate::test_support::Reporting::absent()),
-        std::sync::Arc::new(crate::adapters::System),
-        std::sync::Arc::new(crate::adapters::Disk),
-        crate::test_support::stack(),
-        settings,
-        crate::platform::Environment::MacOs,
-    )
+        ))))
+        .settings(settings)
+        .build()
 }

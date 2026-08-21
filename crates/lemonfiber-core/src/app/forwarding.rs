@@ -170,6 +170,7 @@ mod tests {
     use super::{push, Pushed, SETTING};
     use crate::doctor::vpn::Forwarding;
     use crate::journal::Kind;
+    use crate::test_support::{a_context, nowhere};
 
     /// What is known about the port right now.
     const fn known(granted: Option<u16>, listening: Option<u16>) -> Forwarding {
@@ -267,17 +268,11 @@ mod tests {
     /// A context whose stack is this repo's own and whose transport answers
     /// nothing — enough to reach the decision without a client.
     fn ctx() -> crate::app::Ctx {
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            crate::config::Settings::default(),
-            crate::platform::Environment::MacOs,
-        )
+            ))))
+            .build()
     }
 
     #[tokio::test]
@@ -290,17 +285,12 @@ mod tests {
 
     #[tokio::test]
     async fn a_stack_that_cannot_be_read_changes_nothing() {
-        let nowhere = crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        let nowhere = a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            crate::config::Settings::default(),
-            crate::platform::Environment::MacOs,
-        );
+            ))))
+            .over(nowhere())
+            .build();
         assert_eq!(
             super::reconcile(&nowhere, Some(51413), None).await,
             Pushed::Unchanged
@@ -332,20 +322,13 @@ mod tests {
             env_file: Some(env_at(name)),
             ..crate::config::Settings::default()
         };
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            settings,
-            crate::platform::Environment::MacOs,
-        )
-        .with_http(std::sync::Arc::new(crate::test_support::ScriptedHttp::new(
-            replies,
-        )))
+            ))))
+            .settings(settings)
+            .build()
+            .with_http(lemonfiber_fixtures::http::Fake::scripted(replies))
     }
 
     #[tokio::test]

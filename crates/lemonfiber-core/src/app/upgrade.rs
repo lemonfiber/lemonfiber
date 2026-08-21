@@ -81,12 +81,10 @@ mod tests {
 
     use super::upgrade;
     use super::Ctx;
-    use crate::config::Settings;
     use crate::model::Triggered;
-    use crate::platform::Environment;
     use crate::quality::Preset;
-    use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs};
+    use crate::test_support::{a_context, nowhere, SeedFs};
+    use lemonfiber_fixtures::http::Fake;
 
     /// The Servarr config file `SeedFs` hands back for any \*arr, carrying a readable
     /// key so a target opens.
@@ -95,17 +93,10 @@ mod tests {
     /// A context over the real stack (which names Sonarr and Radarr), the given
     /// filesystem, and HTTP that answers the upgrade POSTs from `replies`.
     fn ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(fs)
-        .with_http(Arc::new(ScriptedHttp::new(replies)))
+        a_context()
+            .build()
+            .with_filesystem(fs)
+            .with_http(Fake::scripted(replies))
     }
 
     fn outcomes(report: &crate::model::UpgradeReport) -> Vec<Option<&Triggered>> {
@@ -213,15 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_confirmed_upgrade_over_an_unreadable_stack_is_an_error() {
-        let bad = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let bad = a_context().over(nowhere()).build();
         assert!(upgrade(&bad, true).await.is_err());
     }
 }

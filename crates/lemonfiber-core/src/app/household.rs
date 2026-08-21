@@ -169,16 +169,13 @@ fn unavailable(reason: &str) -> HouseholdReport {
 mod tests {
     use std::sync::Arc;
 
-    use async_trait::async_trait;
+    use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
     use super::{assemble, household, title_of, Ctx};
-    use crate::config::Settings;
     use crate::household::State;
-    use crate::platform::Environment;
-    use crate::ports::http::{Http, Request, Response, Unreachable};
     use crate::ports::service::HouseholdRequest;
     use crate::recyclarr::Kind;
-    use crate::test_support::{a_password, spoke, stack, Reporting, Scripted, SeedFs};
+    use crate::test_support::{a_context, a_password, SeedFs};
     use std::collections::BTreeMap;
 
     /// A Servarr config that opens a target, carrying a readable key.
@@ -217,41 +214,31 @@ mod tests {
         refuse: bool,
     }
 
-    #[async_trait]
-    impl Http for Fake {
-        async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-            let (status, body) = if request.url.contains("/auth/jellyfin") {
-                (if self.refuse { 500 } else { 200 }, self.sign_in)
-            } else if request.url.contains("/api/v1/request") {
-                (200, self.requests)
-            } else {
-                (200, self.library)
-            };
-            Ok(Response {
-                status,
-                body: body.to_owned(),
-            })
+    impl Fake {
+        /// The scripted answers as a transport, routed by what each call asks for.
+        fn transport(&self) -> Arc<Transport> {
+            Transport::by_path(vec![
+                (
+                    "/auth/jellyfin",
+                    Answer::reply(if self.refuse { 500 } else { 200 }, self.sign_in),
+                ),
+                ("/api/v1/request", Answer::reply(200, self.requests)),
+                ("", Answer::reply(200, self.library)),
+            ])
         }
     }
 
     /// A context whose request service can be reached: the media-server password is
     /// recorded, so `seerr_reader` resolves a client. Tagged so each test keeps its own
     /// env file rather than racing on a shared one.
-    fn ctx_with(fake: Fake, tag: &str) -> Ctx {
+    fn ctx_with(fake: &Fake, tag: &str) -> Ctx {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-household-{tag}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        let mut context = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(Arc::new(fake));
+        let mut context = a_context()
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .with_http(fake.transport());
         context.settings.env_file = Some(dir.join(".env"));
         crate::app::targets::record_secret(
             &context,
@@ -370,7 +357,7 @@ mod tests {
     #[tokio::test]
     async fn the_household_view_reads_the_requests_and_names_them_from_the_library() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: r#"{"pageInfo":{"results":1},"results":[
                     {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
@@ -397,7 +384,7 @@ mod tests {
         // rather than one that refused, so it is skipped — the requests still report
         // where they stand, and nothing claims a read failed that was never made.
         let mut context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: r#"{"pageInfo":{"results":1},"results":[
                     {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
@@ -421,7 +408,7 @@ mod tests {
     #[tokio::test]
     async fn a_refused_sign_in_is_reported_rather_than_read_as_an_empty_household() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "no",
                 requests: "",
                 library: "[]",
@@ -441,7 +428,7 @@ mod tests {
     #[tokio::test]
     async fn an_unreadable_request_record_is_reported_as_unavailable() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: "not json",
                 library: "[]",
@@ -460,7 +447,7 @@ mod tests {
     #[tokio::test]
     async fn an_unreadable_library_costs_names_not_the_view() {
         let context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: r#"{"pageInfo":{"results":1},"results":[
                     {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
@@ -489,22 +476,18 @@ mod tests {
         // No env file, so no recorded media-server password — there is no account to
         // sign in as, which is said rather than shown as a household that asked for
         // nothing.
-        let context = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(Arc::new(Fake {
-            sign_in: "",
-            requests: "",
-            library: "[]",
-            refuse: false,
-        }));
+        let context = a_context()
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .with_http(
+                Fake {
+                    sign_in: "",
+                    requests: "",
+                    library: "[]",
+                    refuse: false,
+                }
+                .transport(),
+            );
         let report = household(&context, None).await.unwrap_or_default();
         assert!(!report.available);
         assert!(report
@@ -516,7 +499,7 @@ mod tests {
     #[tokio::test]
     async fn a_household_view_over_an_unreadable_stack_is_an_error() {
         let mut context = ctx_with(
-            Fake {
+            &Fake {
                 sign_in: "",
                 requests: "",
                 library: "[]",

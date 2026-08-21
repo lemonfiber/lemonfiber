@@ -48,7 +48,7 @@ pub async fn diagnose(
     ctx: &Ctx,
     only: Option<Category>,
     disruptive: bool,
-) -> Result<DoctorReport, Problem> {
+) -> Result<DoctorReport, Box<Problem>> {
     let checks = assembled(ctx, disruptive).await?;
     Ok(examined(ctx, &checks, only).await)
 }
@@ -81,11 +81,14 @@ pub(crate) async fn examined(
 ///
 /// Returns a [`Problem`] where the stack cannot be read, which is the one thing every
 /// check needs before any of them can run.
-pub(crate) async fn assembled(ctx: &Ctx, disruptive: bool) -> Result<Vec<Box<dyn Check>>, Problem> {
+pub(crate) async fn assembled(
+    ctx: &Ctx,
+    disruptive: bool,
+) -> Result<Vec<Box<dyn Check>>, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
 
     let environment = EnvironmentCheck::new(ctx.runner.clone());
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());

@@ -14,32 +14,18 @@
 
 mod common;
 
-use std::path::{Path, PathBuf};
+use common::stack::project;
 use std::sync::Arc;
-use std::time::SystemTime;
 
-use async_trait::async_trait;
-use common::files::Files;
-use common::{Answer, Fake};
 use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Verdict};
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::ports::docker::{
-    Container, Engine, ExecOutput, Failure as EngineFailure, LogLine, LogQuery, Stats,
-};
-use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
-use lemonfiber_core::ports::time::Clock;
+use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::stack::Source;
-use tokio::sync::mpsc::Receiver;
-
-/// The repository's own copy of the stack, so the services resolve to the ids,
-/// ports and config paths a real installation has rather than to invented ones.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::support::Reporting;
 
 /// `SABnzbd`'s configuration, carrying the key it generated for itself.
 const SAB_INI: &str = "[misc]\napi_key = sabkey123\n";
@@ -76,59 +62,6 @@ const STANDINGS: &str = "[]";
 const COUNTS: &str = r#"{"indexers":[{"indexerId":1,"numberOfQueries":12,"numberOfGrabs":2,
     "numberOfFailedQueries":0,"numberOfFailedGrabs":0}]}"#;
 
-/// An engine with nothing running: the checks that ask it are not this one, and a
-/// stack that is down still has accounts worth reading.
-struct Stopped;
-
-#[async_trait]
-impl Engine for Stopped {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
-        Ok(Vec::new())
-    }
-    async fn logs(
-        &self,
-        _project: &str,
-        _services: &[String],
-        _query: LogQuery,
-    ) -> Result<Receiver<LogLine>, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
-    }
-    async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
-    }
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
-        Err(EngineFailure::Unreachable {
-            reason: "unused".to_owned(),
-        })
-    }
-}
-
-/// A runner that spawns nothing, for the checks this one does not run.
-struct Idle;
-
-#[async_trait]
-impl Runner for Idle {
-    async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
-        Err(RunFailure::NotFound {
-            program: "unused".to_owned(),
-        })
-    }
-}
-
-/// A clock stopped at a fixed moment, so a projection is the same run to run.
-struct StoppedClock;
-
-#[async_trait]
-impl Clock for StoppedClock {
-    fn now(&self) -> SystemTime {
-        SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_786_000_000)
-    }
-}
-
 #[tokio::test]
 async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_them() {
     let http = Fake::by_path(vec![
@@ -140,9 +73,9 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
         ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
     ]);
     let ctx = Ctx::new(
-        Arc::new(Idle),
-        Arc::new(Stopped),
-        Arc::new(StoppedClock),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
+        Arc::new(Reporting::holding(&[], Lifecycle::Exited, Health::None)),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_000_000),
         Files::ending(vec![
             ("config/sabnzbd/sabnzbd.ini", SAB_INI),
             ("config/prowlarr/config.xml", PROWLARR_XML),
@@ -188,9 +121,9 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
         ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
     ]);
     let ctx = Ctx::new(
-        Arc::new(Idle),
-        Arc::new(Stopped),
-        Arc::new(StoppedClock),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
+        Arc::new(Reporting::holding(&[], Lifecycle::Exited, Health::None)),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_000_000),
         Files::ending(vec![
             ("config/sabnzbd/sabnzbd.ini", SAB_INI),
             ("config/prowlarr/config.xml", PROWLARR_XML),
@@ -217,9 +150,9 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
 #[tokio::test]
 async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
     let ctx = Ctx::new(
-        Arc::new(Idle),
-        Arc::new(Stopped),
-        Arc::new(StoppedClock),
+        Arc::new(lemonfiber_fixtures::ports::Idle),
+        Arc::new(Reporting::holding(&[], Lifecycle::Exited, Health::None)),
+        lemonfiber_fixtures::ports::Stopped::at(1_786_000_000),
         Files::empty(),
         Source::External(project()),
         Settings::default(),

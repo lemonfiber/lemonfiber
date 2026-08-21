@@ -21,13 +21,7 @@ use crate::condition::Condition;
 use crate::error::{Remedy, State};
 use crate::journal::{Change, Undo};
 
-/// What an operator types to be offered the repairs.
-///
-/// Named once. It appears in a finding's remedy, in a report that offered something and did
-/// nothing, and in the problem raised when a service's credential no longer works — and a
-/// renamed flag that only two of the three learned about would send somebody to a command
-/// that does not exist.
-pub const ASK_FOR_REPAIRS: &str = "lemonfiber doctor --fix";
+pub use crate::ports::service::ASK_FOR_REPAIRS;
 
 /// How many repairs may leave a fault standing before it stops being offered.
 ///

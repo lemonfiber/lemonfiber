@@ -234,7 +234,6 @@ fn choice(scope: &str, preset: Preset, playback: Playback) -> PresetChoice {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use std::sync::Arc;
 
     use include_dir::{include_dir, Dir};
 
@@ -244,7 +243,7 @@ mod tests {
     use crate::platform::Environment;
     use crate::quality::Preset;
     use crate::stack::Source;
-    use crate::test_support::{spoke, stack, Reporting, Scripted};
+    use crate::test_support::a_context;
 
     static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
@@ -260,18 +259,13 @@ mod tests {
     /// A context whose only wired-up parts are the environment file and platform;
     /// the quality handler reaches nothing else.
     fn ctx(env: Option<PathBuf>, environment: Environment) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings {
+        a_context()
+            .settings(Settings {
                 env_file: env,
                 ..Settings::default()
-            },
-            environment,
-        )
+            })
+            .environment(environment)
+            .build()
     }
 
     fn set(preset: Preset, media_type: Option<&str>, confirm: bool) -> QualityAction {
@@ -511,19 +505,15 @@ mod tests {
 
     /// A context operating the embedded fixture stack, materialised under `into`.
     fn embedded_ctx(env: Option<PathBuf>, into: Option<PathBuf>) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::Embedded(&STACKLET),
-            Settings {
+        a_context()
+            .over(Source::Embedded(&STACKLET))
+            .settings(Settings {
                 env_file: env,
                 stack_dir: into,
                 ..Settings::default()
-            },
-            Environment::LinuxNative,
-        )
+            })
+            .environment(Environment::LinuxNative)
+            .build()
     }
 
     #[test]

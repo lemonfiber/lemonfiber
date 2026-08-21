@@ -277,11 +277,11 @@ fn encode(fields: &[(&str, &str)]) -> String {
 
 #[cfg(test)]
 mod transfers_tests {
-    use std::sync::Arc;
     use std::time::Duration;
 
     use crate::ports::service::{Failure, Transfers};
-    use crate::test_support::{a_password, ScriptedHttp};
+    use crate::test_support::a_password;
+    use lemonfiber_fixtures::http::Fake;
 
     use super::Qbittorrent;
 
@@ -289,7 +289,7 @@ mod transfers_tests {
     /// first is the login, the second the torrent list.
     fn client(replies: Vec<(u16, &'static str)>) -> Qbittorrent {
         Qbittorrent::authenticated(
-            Arc::new(ScriptedHttp::new(replies)),
+            Fake::scripted(replies),
             "http://127.0.0.1:8080",
             a_password(),
         )
@@ -326,10 +326,7 @@ mod transfers_tests {
 
     #[tokio::test]
     async fn a_client_holding_no_password_cannot_authenticate_a_read() {
-        let qbit = Qbittorrent::new(
-            Arc::new(ScriptedHttp::new(Vec::new())),
-            "http://127.0.0.1:8080",
-        );
+        let qbit = Qbittorrent::new(Fake::scripted(Vec::new()), "http://127.0.0.1:8080");
         assert!(matches!(
             qbit.transfers().await,
             Err(Failure::Unauthorised { .. })
@@ -382,10 +379,7 @@ mod transfers_tests {
 
     #[tokio::test]
     async fn a_client_holding_no_password_cannot_read_or_set_the_port() {
-        let anonymous = Qbittorrent::new(
-            Arc::new(ScriptedHttp::new(Vec::new())),
-            "http://127.0.0.1:8080",
-        );
+        let anonymous = Qbittorrent::new(Fake::scripted(Vec::new()), "http://127.0.0.1:8080");
         assert!(anonymous.listen_port().await.is_err());
         assert!(anonymous.set_listen_port(51413).await.is_err());
     }

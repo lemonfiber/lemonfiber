@@ -53,7 +53,6 @@ pub(super) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
-    use std::sync::Arc;
 
     use include_dir::{include_dir, Dir};
 
@@ -62,7 +61,7 @@ mod tests {
     use crate::config::Settings;
     use crate::platform::Environment;
     use crate::stack::Source;
-    use crate::test_support::{spoke, Reporting, Scripted};
+    use crate::test_support::a_context;
 
     static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
@@ -76,19 +75,15 @@ mod tests {
 
     /// A context operating the embedded fixture stack, materialised under `into`.
     fn ctx(into: Option<PathBuf>, env: Option<PathBuf>) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::absent()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::Embedded(&STACKLET),
-            Settings {
+        a_context()
+            .over(Source::Embedded(&STACKLET))
+            .settings(Settings {
                 stack_dir: into,
                 env_file: env,
                 ..Settings::default()
-            },
-            Environment::LinuxNative,
-        )
+            })
+            .environment(Environment::LinuxNative)
+            .build()
     }
 
     #[tokio::test]

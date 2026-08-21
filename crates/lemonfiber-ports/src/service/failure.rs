@@ -3,6 +3,18 @@
 //! Four causes told apart because their remedies differ — a wrong key, a service that is
 //! not up, one that refused, and one speaking a version this build does not.
 
+/// What an operator types to be offered the repairs.
+///
+/// Named once. It appears in a finding's remedy, in a report that offered something and did
+/// nothing, and in the problem raised when a service's credential no longer works — and a
+/// renamed flag that only two of the three learned about would send somebody to a command
+/// that does not exist.
+///
+/// Here rather than beside the repairing model, because this is the lowest place that needs
+/// it: a port telling an operator what to type must not have to reach up into the layer that
+/// acts on what they type.
+pub const ASK_FOR_REPAIRS: &str = "lemonfiber doctor --fix";
+
 use super::{Code, Diagnose, Problem, Remedy, Severity, State};
 use thiserror::Error;
 
@@ -57,7 +69,7 @@ impl Diagnose for Failure {
                 Severity::Error,
                 format!("{service} rejected the credential"),
                 "The credential lemonfiber holds no longer matches the one the service expects, usually because it was changed in the service's own interface.",
-                Remedy::new("Re-read the service's credential").with_detail(crate::repair::ASK_FOR_REPAIRS),
+                Remedy::new("Re-read the service's credential").with_detail(ASK_FOR_REPAIRS),
             )
             .in_state(State::Remediable),
             Self::Refused { service, detail } => Problem::unknown(

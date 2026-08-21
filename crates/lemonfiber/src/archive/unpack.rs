@@ -9,7 +9,7 @@ use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
 
 use flate2::read::GzDecoder;
-use lemonfiber_core::ports::archive::Fault;
+use lemonfiber_core::archive::Fault;
 
 use super::{MANIFEST, STAGING};
 

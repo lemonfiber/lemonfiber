@@ -11,7 +11,7 @@
 
 mod proving;
 
-use proving::{resolve_credentials, resolve_location, resolve_provider};
+use proving::{resolve_credentials, resolve_location, resolve_provider, resolve_vpn};
 
 use std::path::{Path, PathBuf};
 
@@ -37,6 +37,13 @@ pub trait Prompt {
     /// Show the operator the accounts their protocol choice needs, before any is
     /// asked for — derived from what they chose, and nothing they declined.
     fn prerequisites(&self, map: &PrerequisiteMap);
+    /// Whether a VPN will carry the torrent traffic. Asked only where torrents
+    /// were chosen, and after the checklist has said what one is for.
+    fn vpn(&self) -> bool;
+    /// Torrents were chosen and nothing will carry them: state what that exposes
+    /// and ask whether to go on anyway (`true`) or reconsider (`false`). Going on
+    /// is always available — this warns, it never refuses.
+    fn unprotected(&self) -> bool;
     /// Where the library and downloads are kept.
     fn data_location(&self) -> PathBuf;
     /// The chosen location was just tested and it hardlinks — report the good
@@ -233,6 +240,9 @@ pub fn resume(
 enum How {
     /// Read the answer straight from the prompt.
     Sync(fn(&dyn Prompt) -> Answer),
+    /// Ask whether a VPN carries the torrents, and where none does, put what that
+    /// means to the operator before recording that they accepted it.
+    Vpn,
     /// Ask for a data location and prove what it can do before recording it.
     Location,
     /// Ask for a credential and prove it against its live service before keeping it.
@@ -252,11 +262,12 @@ async fn gather(
     // record, and save before moving on, so quitting mid-setup resumes at the
     // question reached rather than restarting. One loop keeps the recording a
     // single `?` rather than one tucked inside each conditional.
-    let questions: [(Step, How); 9] = [
+    let questions: [(Step, How); 10] = [
         (
             Step::Protocols,
             How::Sync(|prompt| Answer::Protocols(prompt.protocols())),
         ),
+        (Step::Vpn, How::Vpn),
         (Step::DataLocation, How::Location),
         (Step::Credentials, How::Credential),
         (Step::Provider, How::Provider),
@@ -288,6 +299,7 @@ async fn gather(
         }
         let answer = match how {
             How::Sync(ask) => ask(prompt),
+            How::Vpn => resolve_vpn(prompt),
             How::Location => Answer::DataLocation(resolve_location(prompt, filesystem).await),
             How::Credential => resolve_credentials(prompt, validator).await,
             How::Provider => resolve_provider(prompt, validator).await,
@@ -390,7 +402,7 @@ mod tests {
     use crate::prerequisites::PrerequisiteMap;
     use crate::stack::Source;
     use crate::validate::{Validation, Validator};
-    use crate::wizard::{Answer, Library, Phase, Plan, Progress, Wizard};
+    use crate::wizard::{Answer, Library, Phase, Plan, Progress, Vpn, Wizard};
 
     /// A validator that answers with scripted outcomes, so a run is driven with no
     /// network. Each call takes the next outcome, and the last is repeated once they
@@ -541,6 +553,17 @@ mod tests {
         /// The protocol choices each prerequisites checklist was derived from, in
         /// the order shown — so a test can prove the checklist reflects the answer.
         shown_prerequisites: std::cell::RefCell<Vec<Protocols>>,
+        /// What the operator answers to "will a VPN carry it?", in turn — so a test
+        /// can decline once and accept on the retry. Empty answers yes, which is the
+        /// unremarkable case every other test wants.
+        vpn: std::cell::RefCell<VecDeque<bool>>,
+        /// What the operator answers to the unprotected-torrents warning, in turn.
+        /// Empty answers yes, so a test that scripts a "no" to the VPN question and
+        /// nothing here gets the accepted-the-exposure path.
+        unprotected: std::cell::RefCell<VecDeque<bool>>,
+        /// How many times the exposure was put to the operator — a warning that
+        /// never appeared and one that appeared silently look the same otherwise.
+        warned_unprotected: std::cell::Cell<usize>,
         /// The locations offered in turn; each `data_location` call takes the next.
         /// Every test scripts as many as its run will ask for.
         locations: std::cell::RefCell<VecDeque<PathBuf>>,
@@ -578,6 +601,9 @@ mod tests {
                 autostart: false,
                 confirm: true,
                 shown_prerequisites: std::cell::RefCell::new(Vec::new()),
+                vpn: std::cell::RefCell::new(VecDeque::new()),
+                unprotected: std::cell::RefCell::new(VecDeque::new()),
+                warned_unprotected: std::cell::Cell::new(0),
                 locations: std::cell::RefCell::new(VecDeque::from([data_location])),
                 accept: Accept::Elsewhere,
                 warnings: std::cell::RefCell::new(Vec::new()),
@@ -598,6 +624,16 @@ mod tests {
         fn prerequisites(&self, map: &PrerequisiteMap) {
             self.shown_prerequisites.borrow_mut().push(map.protocols);
         }
+        fn vpn(&self) -> bool {
+            self.vpn.borrow_mut().pop_front().unwrap_or(true)
+        }
+
+        fn unprotected(&self) -> bool {
+            self.warned_unprotected
+                .set(self.warned_unprotected.get().saturating_add(1));
+            self.unprotected.borrow_mut().pop_front().unwrap_or(true)
+        }
+
         fn data_location(&self) -> PathBuf {
             self.locations.borrow_mut().pop_front().unwrap_or_default()
         }
@@ -659,6 +695,131 @@ mod tests {
     /// A stack already on disk, so a run does not materialise one.
     fn external() -> Source {
         Source::External(Path::new("/lemonfiber-not-a-real-stack"))
+    }
+
+    /// A torrent run that says it has a VPN is not warned about anything.
+    #[tokio::test]
+    async fn a_tunnelled_torrent_run_is_not_warned() {
+        let dir = scratch("vpn-carried");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = Scripted::workable(dir.join("data-root"));
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        assert_eq!(
+            prompt.warned_unprotected.get(),
+            0,
+            "nothing is exposed, so there is nothing to warn about"
+        );
+        assert_eq!(wizard.answers().vpn, Some(Vpn::Carrying));
+    }
+
+    /// The requirement itself: torrents without a VPN are warned about, the
+    /// operator has to say so a second time, and the run goes on.
+    #[tokio::test]
+    async fn torrents_without_a_vpn_are_warned_and_confirmed_and_never_refused() {
+        let dir = scratch("vpn-absent");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = Scripted::workable(dir.join("data-root"));
+        prompt.vpn.borrow_mut().push_back(false);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(
+            matches!(outcome, Ok(Outcome::Applied)),
+            "a warning, never a refusal: {outcome:?}"
+        );
+        assert_eq!(
+            prompt.warned_unprotected.get(),
+            1,
+            "the exposure was put to them"
+        );
+        assert_eq!(
+            wizard.answers().vpn,
+            Some(Vpn::Absent),
+            "recorded as accepted, so a later diagnosis reads a decision not an oversight"
+        );
+    }
+
+    /// Declining the warning returns to the question rather than ending setup —
+    /// the way out of the loop is always available, and it is not a refusal.
+    #[tokio::test]
+    async fn declining_the_exposure_asks_again_rather_than_stopping() {
+        let dir = scratch("vpn-reconsidered");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = Scripted::workable(dir.join("data-root"));
+        // No VPN, then "actually, no, do not go on" — and on the second pass they
+        // say a VPN carries it after all.
+        prompt.vpn.borrow_mut().extend([false, true]);
+        prompt.unprotected.borrow_mut().push_back(false);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        assert_eq!(prompt.warned_unprotected.get(), 1);
+        assert_eq!(wizard.answers().vpn, Some(Vpn::Carrying));
+    }
+
+    /// A Usenet-only run never meets the question: nothing about it is exposed to
+    /// a swarm, so asking would be a question with no consequence behind it.
+    #[tokio::test]
+    async fn a_usenet_only_run_is_never_asked_about_a_vpn() {
+        let dir = scratch("vpn-usenet");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let mut prompt = Scripted::workable(dir.join("data-root"));
+        prompt.protocols = Protocols {
+            usenet: true,
+            torrent: false,
+        };
+        // Scripted to answer "no VPN" — which must never be reached at all.
+        prompt.vpn.borrow_mut().push_back(false);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &proving(),
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+        assert_eq!(prompt.warned_unprotected.get(), 0);
+        assert_eq!(wizard.answers().vpn, None, "the step did not apply");
     }
 
     #[tokio::test]
@@ -855,6 +1016,7 @@ mod tests {
         let mut wizard = Wizard::new(Environment::LinuxNative);
         for answer in [
             Answer::Protocols(Protocols::both()),
+            Answer::Vpn(Vpn::Carrying),
             Answer::DataLocation(dir.join("data-root")),
             Answer::Credentials(None),
             Answer::Provider(None),
@@ -886,6 +1048,7 @@ mod tests {
         let mut wizard = Wizard::new(Environment::LinuxNative);
         for answer in [
             Answer::Protocols(Protocols::both()),
+            Answer::Vpn(Vpn::Carrying),
             Answer::DataLocation(dir.join("data-root")),
             Answer::Credentials(None),
             Answer::Provider(None),

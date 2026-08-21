@@ -69,6 +69,7 @@ pub(crate) fn raw() -> RawSetup {
         usenet_tls: None,
         library: None,
         service_user: None,
+        vpn: None,
         household: None,
         notifications: None,
         autostart: None,

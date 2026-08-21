@@ -107,6 +107,7 @@ mod tests {
     use super::{is_active, recheck, Rechecked};
     use crate::condition::Conditions;
     use crate::dashboard::{Panel, Protocol, Reading, Transfer};
+    use crate::test_support::{a_context, nowhere};
 
     /// One download, so the stack counts as having traffic to protect.
     fn a_transfer() -> Transfer {
@@ -148,45 +149,35 @@ mod tests {
     /// A context with no engine behind it — enough to reach the decisions that
     /// come before one is asked.
     fn ctx() -> crate::app::Ctx {
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            crate::config::Settings {
+            ))))
+            .settings(crate::config::Settings {
                 // A stack with a torrent client, since a stack without one has no
                 // tunnel this traffic was ever meant to be inside.
                 protocols: crate::config::Protocols::both(),
                 ..crate::config::Settings::default()
-            },
-            crate::platform::Environment::MacOs,
-        )
+            })
+            .build()
     }
 
     #[tokio::test]
     async fn a_stack_with_no_torrent_client_is_never_watched() {
         // There is no tunnel this traffic was meant to be inside, so there is
         // nothing to be outside of.
-        let usenet_only = crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        let usenet_only = a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            crate::config::Settings {
+            ))))
+            .settings(crate::config::Settings {
                 protocols: crate::config::Protocols {
                     usenet: true,
                     torrent: false,
                 },
                 ..crate::config::Settings::default()
-            },
-            crate::platform::Environment::MacOs,
-        );
+            })
+            .build();
         let mut conditions = Conditions::new();
         assert_eq!(
             recheck(&usenet_only, &mut conditions, true, "1000").await,
@@ -230,21 +221,17 @@ mod tests {
             port: None,
             second_opinion: None,
         });
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(engine),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            crate::config::Settings {
+            ))))
+            .engine(std::sync::Arc::new(engine))
+            .settings(crate::config::Settings {
                 protocols: crate::config::Protocols::both(),
                 ip_echo: vec!["https://echo".to_owned()],
                 ..crate::config::Settings::default()
-            },
-            crate::platform::Environment::MacOs,
-        )
+            })
+            .build()
     }
 
     #[tokio::test]
@@ -311,20 +298,16 @@ mod tests {
 
     #[tokio::test]
     async fn a_stack_that_cannot_be_read_establishes_nothing() {
-        let nowhere = crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        let nowhere = a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            crate::config::Settings {
+            ))))
+            .over(nowhere())
+            .settings(crate::config::Settings {
                 protocols: crate::config::Protocols::both(),
                 ..crate::config::Settings::default()
-            },
-            crate::platform::Environment::MacOs,
-        );
+            })
+            .build();
         let mut conditions = Conditions::new();
         assert_eq!(
             recheck(&nowhere, &mut conditions, true, "1000").await,

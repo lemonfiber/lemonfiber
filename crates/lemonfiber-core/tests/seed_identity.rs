@@ -9,7 +9,6 @@ use common::service::*;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{Failure, HouseholdRequest, MediaServer, Requests};
 use lemonfiber_core::seed::{wire_jellyfin_identity, State};
 
@@ -153,14 +152,6 @@ impl Requests for FakeReq {
     }
 }
 
-struct FixedRandom(Option<Vec<u8>>);
-
-impl Random for FixedRandom {
-    fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
-        self.0.clone()
-    }
-}
-
 /// Run the identity driver, returning the resulting state and the password to
 /// record (present only when the account was newly minted).
 async fn identity(
@@ -169,7 +160,7 @@ async fn identity(
     random: Option<Vec<u8>>,
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
-    let random = FixedRandom(random);
+    let random = lemonfiber_fixtures::ports::Chance::exactly(random);
     let (wiring, minted) =
         wire_jellyfin_identity(&media, &seerr, &random, recorded, "http://jellyfin:8096").await;
     (wiring.state, minted)

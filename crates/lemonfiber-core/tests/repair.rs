@@ -10,7 +10,9 @@
 //! test nobody writes, which is exactly how the two defects this runner was rewritten to
 //! fix got in.
 
-use std::path::{Path, PathBuf};
+mod common;
+
+use common::stack::project;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -23,13 +25,6 @@ use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::repair::{Attempt, Outcome, Repair, Stance, Writing};
 use lemonfiber_core::stack::Source;
-
-/// The repository's own stack, so the checks assemble against a real description.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
 
 /// A context whose records land in a scratch directory of this test's own.
 fn ctx(name: &str) -> Ctx {

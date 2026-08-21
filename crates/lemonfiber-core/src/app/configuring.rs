@@ -81,6 +81,7 @@ mod tests {
     use super::configuration;
     use crate::app::Outcome;
     use crate::config::VPN_PORT_FORWARDING_KEY;
+    use crate::test_support::a_context;
 
     /// A scratch environment file holding the given settings.
     fn env_at(name: &str, contents: &str) -> std::path::PathBuf {
@@ -96,21 +97,16 @@ mod tests {
 
     /// A context over that file, for a stack that torrents.
     fn ctx(env_file: std::path::PathBuf) -> crate::app::Ctx {
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            crate::config::Settings {
+            ))))
+            .settings(crate::config::Settings {
                 env_file: Some(env_file),
                 protocols: crate::config::Protocols::both(),
                 ..crate::config::Settings::default()
-            },
-            crate::platform::Environment::MacOs,
-        )
+            })
+            .build()
     }
 
     /// What a change said it cost, where it said anything.

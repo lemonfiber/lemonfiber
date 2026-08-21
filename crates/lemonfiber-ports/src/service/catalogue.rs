@@ -9,7 +9,7 @@
 use async_trait::async_trait;
 
 use super::Failure;
-use crate::recyclarr::Kind;
+use crate::media::Kind;
 
 /// Something the service's catalogue knows about, whether or not it holds it yet.
 #[derive(Debug, Clone, PartialEq, Eq)]

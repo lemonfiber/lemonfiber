@@ -17,6 +17,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 rustls-pki-types = "1"
 webpki-roots = "1"
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+lemonfiber-ports = { path = "../lemonfiber-ports" }
 async-trait = { workspace = true }
 bollard = { workspace = true }
 crc32fast = "1"
@@ -39,6 +40,9 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 
 [dev-dependencies]
+# The fakes both this crate's own tests and its integration tests drive the real code
+# through. It depends on `lemonfiber-ports` alone, so there is no cycle back to here.
+lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "test-util"] }
 
 [lints]

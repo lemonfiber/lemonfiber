@@ -15,15 +15,11 @@
 //! path that reached for one would be a path this fake was never meant to stand in
 //! for — and a plausible answer there would hide it.
 
-#![allow(dead_code)]
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
-};
+use lemonfiber_ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
 
 /// What the filesystem holds, and how a path finds it.
 pub enum Held {
@@ -45,16 +41,19 @@ pub struct Files {
 
 impl Files {
     /// One file, handed to any reader.
+    #[must_use]
     pub fn anywhere(text: impl Into<String>) -> Arc<Self> {
         Self::new(Held::Anywhere(Some(text.into())))
     }
 
     /// Nothing at all: no service has written its configuration yet.
+    #[must_use]
     pub fn empty() -> Arc<Self> {
         Self::new(Held::Anywhere(None))
     }
 
     /// Text at each of these exact paths.
+    #[must_use]
     pub fn at(files: Vec<(PathBuf, &str)>) -> Arc<Self> {
         Self::new(Held::At(
             files
@@ -65,6 +64,7 @@ impl Files {
     }
 
     /// Text for each path ending in one of these fragments.
+    #[must_use]
     pub fn ending(files: Vec<(&'static str, &str)>) -> Arc<Self> {
         Self::new(Held::Ending(
             files
@@ -131,5 +131,50 @@ impl FileSystem for Files {
             available: 0,
             total: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The stub half of the contract, which the doc above states and nothing checked.
+    ///
+    /// A test that reaches one of these has reached for a capability this fake was
+    /// never meant to stand in for, so each must refuse rather than answer plausibly.
+    /// Asserting that here is also what keeps them reachable: nothing else calls them,
+    /// and an unreached line is one the gate counts against a file it cannot see is
+    /// deliberate.
+    #[tokio::test]
+    async fn every_capability_but_reading_answers_as_unused() {
+        let files = Files::anywhere("held");
+        let path = Path::new("/srv/config.xml");
+
+        assert_eq!(
+            files.canonicalize(path).await.ok().as_deref(),
+            Some(path),
+            "a path canonicalises to itself: there is no filesystem to resolve it against"
+        );
+        assert!(files.touch(path).await.is_err());
+        assert!(files.link(path, path).await.is_err());
+        assert!(files.identify(path).await.is_err());
+        assert!(files.ownership(path).await.is_none());
+
+        // Neither answers anything, and neither may panic: a test that writes through
+        // this fake is one whose subject is what it read back, not what it wrote.
+        files.remove(path).await;
+        files.write(path, "ignored").await;
+        assert_eq!(
+            files.read(path).await.as_deref(),
+            Some("held"),
+            "a write changes nothing: what is held is what the test scripted"
+        );
+
+        let facts = files.describe(path).await;
+        assert!(
+            matches!(facts.kind, FsKind::Linking(_)) && !facts.removable,
+            "a filesystem that links and is not removable, so the storage probe reads \
+             as the ordinary case rather than a warning a test did not ask for"
+        );
     }
 }

@@ -117,6 +117,10 @@ pub struct RawSetup {
     /// The container user, as `UID:GID`.
     #[arg(long, value_name = "UID:GID")]
     pub service_user: Option<String>,
+    /// Whether a VPN carries the torrent traffic. Where torrents are chosen and
+    /// this is absent, the run proceeds unprotected and records that it did.
+    #[arg(long, value_name = "BOOL")]
+    pub vpn: Option<bool>,
     /// Whether others in the home will use it.
     #[arg(long, value_name = "BOOL")]
     pub household: Option<bool>,
@@ -143,6 +147,7 @@ pub struct SetupFlags {
     provider: Option<ProviderEntry>,
     service_user: Option<(u32, u32)>,
     library: Option<Library>,
+    vpn: Option<bool>,
     household: Option<bool>,
     notifications: Option<Appetite>,
     autostart: Option<bool>,
@@ -161,6 +166,7 @@ impl SetupFlags {
             provider: None,
             service_user: None,
             library: None,
+            vpn: None,
             household: None,
             notifications: None,
             autostart: None,
@@ -213,6 +219,7 @@ impl SetupFlags {
                 })
                 .transpose()?,
             library: raw.library.map(|value| parse_library(&value)).transpose()?,
+            vpn: raw.vpn,
             household: raw.household,
             notifications: raw
                 .notifications
@@ -327,6 +334,19 @@ impl Prompt for Flags {
     }
     fn library(&self) -> Library {
         self.flags.library.unwrap_or(Library::JellyfinDocker)
+    }
+    fn vpn(&self) -> bool {
+        // A non-interactive run states it with a flag; absent, it is taken as no,
+        // so a scripted torrent setup that never mentions a VPN reaches the
+        // warning rather than passing silently as though one had been claimed.
+        self.flags.vpn.unwrap_or(false)
+    }
+    fn unprotected(&self) -> bool {
+        // Nobody is here to be warned, so there is nobody to confirm. The run
+        // proceeds — refusing would be the one thing this must not do — and the
+        // answer records that it went unprotected, which is what a later
+        // diagnosis reads.
+        true
     }
     fn household(&self) -> bool {
         self.flags.household.unwrap_or(false)

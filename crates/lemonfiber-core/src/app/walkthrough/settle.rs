@@ -157,7 +157,7 @@ mod tests {
             &env,
             format!("{}={}\n", crate::config::DATA_ROOT_KEY, root.display()),
         );
-        let mut ctx = super::super::fixtures::ctx_with(super::super::fixtures::Fake::default());
+        let mut ctx = super::super::fixtures::ctx_with(&super::super::fixtures::Fake::default());
         ctx.settings.env_file = Some(env);
         ctx.filesystem = std::sync::Arc::new(crate::adapters::Disk);
         ctx

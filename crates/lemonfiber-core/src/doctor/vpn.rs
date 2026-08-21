@@ -22,6 +22,7 @@ mod mender;
 mod pair;
 mod port_forward;
 mod probe;
+mod reading;
 
 use std::sync::Arc;
 
@@ -30,13 +31,12 @@ use lemonfiber_manifest::Manifest;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::config::{PortForward, Protocols};
-use crate::error::Remedy;
 use crate::ports::docker::{Container, Engine};
 use crate::qbittorrent::Qbittorrent;
 
 pub use echo::Seen;
 use findings::{
-    assemble, disagreeing, finding, killswitch_findings, port_mismatch, skipped, unprotected,
+    assemble, disagreeing, killswitch_findings, port_mismatch, skipped, unprotected,
     unreachable_engine,
 };
 pub use forwarding::{Answer, Forwarding};
@@ -44,12 +44,13 @@ use leak::{labelled, Reach};
 use pair::torrent_client;
 pub(crate) use pair::{resolve_pair, Pair};
 pub use port_forward::granted_port;
-use port_forward::{no_port, port_forward_offline, Grant};
+use port_forward::{port_forward_offline, Grant};
 use probe::{addresses, exit_country, find, public_address, read_grant};
 
 pub use killswitch::{KILLSWITCH_LEAKS, TUNNEL_NOT_RESTORED};
 pub use leak::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
 pub use port_forward::NO_FORWARDED_PORT;
+pub(crate) use reading::{read_vpn, VpnReading};
 
 /// Gluetun's own record of the port its provider forwarded, written inside the
 /// container when port forwarding is on. Read from there rather than from the
@@ -192,153 +193,7 @@ impl VpnCheck {
     async fn country(&self, container: &Container, echo: &str) -> Option<String> {
         exit_country(self.engine.as_ref(), container, echo).await
     }
-
-    /// The port-forward finding: whether a port was granted, where the operator
-    /// asked for one.
-    ///
-    /// Independent of leak detection — the port is read from the gateway's own
-    /// status file, not from an IP-echo comparison — so it is still established
-    /// where the operator has switched leak detection off. Where the switch is
-    /// off the exec is skipped entirely: there is nothing to read.
-    async fn port_forward_finding(&self, gateway: Option<&Container>) -> Finding {
-        let verdict = if self.port_forward.enabled {
-            match self.granted_port(gateway).await {
-                Grant::Port(port) => Verdict::Pass {
-                    note: Some(format!("forwarded port {port}")),
-                },
-                Grant::Absent => no_port(self.port_forward.provider.as_deref()),
-                Grant::Unreadable => Verdict::Unverified {
-                    reason: "the VPN container did not return a forwarded port, which the tunnel \
-                             being down and the engine being unreachable both produce"
-                        .to_owned(),
-                    remedy: Remedy::new("Confirm the tunnel is up, then run this again"),
-                },
-            }
-        } else {
-            Verdict::Skipped {
-                reason: NOT_ENABLED.to_owned(),
-            }
-        };
-        finding("vpn.port-forward", "forwarded port", verdict)
-    }
-
-    /// Read the granted port from the gateway's own status file.
-    ///
-    /// A container that is not running, or an engine that cannot be reached, makes
-    /// the answer unknown rather than absent. A file that reads as no port — empty,
-    /// missing, or the zero the release path writes — is a port that was not
-    /// granted, which for an enabled provider is the failure this check exists for.
-    async fn granted_port(&self, gateway: Option<&Container>) -> Grant {
-        read_grant(self.engine.as_ref(), gateway).await
-    }
 }
-
-/// The dashboard's VPN telemetry, or why it is not available — a small reading the
-/// panel maps directly, kept apart from the leak check's `Verdict`s so the panel
-/// need not read one.
-pub(crate) enum VpnReading {
-    /// This stack has no VPN-contained torrent client, so the panel does not apply.
-    NotApplicable,
-    /// The tunnel could not be read; the reason the panel shows.
-    Unavailable(String),
-    /// The tunnel answered.
-    Ready {
-        /// The tunnel's exit address.
-        exit_ip: String,
-        /// Its country, where the endpoint supplied one.
-        country: Option<String>,
-        /// The provider's forwarded port, where forwarding is on and granted.
-        forwarded_port: Option<u16>,
-        /// Whether the download client's egress matches the tunnel's.
-        egress_matches: bool,
-    },
-}
-
-/// Read what the VPN panel shows: the tunnel's exit address and country, the
-/// forwarded port, and whether the download client's egress matches the tunnel's
-/// — the one thing that proves traffic leaves through it. The same containers and
-/// exec-reads the leak check uses, shaped for a panel rather than a verdict.
-///
-/// Every read costs a round-trip into a container, so on the refresh loop this
-/// wants caching — the tunnel's address changes rarely. That caching arrives with
-/// the loop; until then the panel reads afresh each time.
-pub(crate) async fn read_vpn(
-    engine: &dyn Engine,
-    project: &str,
-    manifest: &Manifest,
-    protocols: Protocols,
-    echoes: Vec<String>,
-    port_forward_enabled: bool,
-) -> VpnReading {
-    if !protocols.torrent {
-        return VpnReading::NotApplicable;
-    }
-    let Some(pair) = resolve_pair(manifest) else {
-        return VpnReading::NotApplicable;
-    };
-    let Ok(containers) = engine.list(project).await else {
-        return VpnReading::Unavailable(
-            "the container engine could not be reached, so the VPN could not be asked".to_owned(),
-        );
-    };
-    let gateway_container = find(&containers, &pair.gateway);
-
-    // The forwarded port comes from the gateway's status file, independent of the
-    // IP-echo, so it is read even where leak detection is off — but only where the
-    // operator asked for forwarding at all.
-    let forwarded_port = if port_forward_enabled {
-        match read_grant(engine, gateway_container).await {
-            Grant::Port(port) => Some(port),
-            Grant::Absent | Grant::Unreadable => None,
-        }
-    } else {
-        None
-    };
-
-    if echoes.is_empty() {
-        return VpnReading::Unavailable(
-            "leak detection is switched off, so the tunnel's egress cannot be read".to_owned(),
-        );
-    }
-    // The panel compares the same way the check does, so it reads the same number
-    // — a panel and a diagnostic disagreeing about the tunnel is the one thing
-    // sharing these probes exists to prevent.
-    let (gateway, gateway_seen) = addresses(engine, gateway_container, &echoes).await;
-    if let Some(disagreement) = gateway_seen.said() {
-        return VpnReading::Unavailable(disagreement);
-    }
-    let echo = echoes.first().map_or("", String::as_str);
-    // The country is the gateway's, asked only where the gateway both answered and
-    // is a container we can ask — the same case that yields an address. The
-    // catch-all absorbs every other combination (including the address-without-a-
-    // container that cannot occur), so there is no unreachable arm to leave
-    // uncovered.
-    let country = match (&gateway, gateway_container) {
-        (Reach::Address(_), Some(container)) => exit_country(engine, container, echo).await,
-        _ => None,
-    };
-    match gateway {
-        Reach::Address(exit_ip) => {
-            let (client, _) = addresses(engine, find(&containers, &pair.client), &echoes).await;
-            let egress_matches = matches!(&client, Reach::Address(ip) if *ip == exit_ip);
-            VpnReading::Ready {
-                exit_ip,
-                country,
-                forwarded_port,
-                egress_matches,
-            }
-        }
-        Reach::Down => VpnReading::Unavailable("the VPN tunnel is not running".to_owned()),
-        Reach::Blocked => {
-            VpnReading::Unavailable("the VPN tunnel did not return an exit address".to_owned())
-        }
-        Reach::Unknown => {
-            VpnReading::Unavailable("the VPN container could not be reached".to_owned())
-        }
-    }
-}
-
-/// The findings for an active check, given both containers' answers.
 
 #[async_trait]
 impl Check for VpnCheck {

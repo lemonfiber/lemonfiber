@@ -290,48 +290,33 @@ pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 ///
 /// Returns the [`Problem`] a surface should render when the command could not
 /// be carried out.
-pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
+pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
-        Command::Forms => engine::forms(ctx)
-            .map(Outcome::Forms)
-            .map_err(|problem| *problem),
+        Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
         Command::Down { forms } => engine::lifecycle(ctx, &forms, &Action::Down).await,
         Command::Restart { forms, services } => {
             engine::lifecycle(ctx, &forms, &Action::Restart(services)).await
         }
         Command::Pull { forms } => engine::lifecycle(ctx, &forms, &Action::Pull).await,
-        Command::ConfigGet { key } => {
-            configuring::configuration(ctx, Some(&key), None).map_err(|p| *p)
-        }
+        Command::ConfigGet { key } => configuring::configuration(ctx, Some(&key), None),
         Command::ConfigSet { key, value } => {
-            configuring::configuration(ctx, Some(&key), Some(&value)).map_err(|p| *p)
+            configuring::configuration(ctx, Some(&key), Some(&value))
         }
-        Command::ConfigShow => configuring::configuration(ctx, None, None).map_err(|p| *p),
-        Command::Quality(action) => quality::quality(ctx, action)
-            .map(Outcome::Quality)
-            .map_err(|problem| *problem),
-        Command::QualityMusic { format } => music::music(ctx, format)
-            .await
-            .map(Outcome::Music)
-            .map_err(|problem| *problem),
-        Command::Trace { term, season } => trace::trace(ctx, &term, season)
-            .await
-            .map(Outcome::Trace)
-            .map_err(|problem| *problem),
+        Command::ConfigShow => configuring::configuration(ctx, None, None),
+        Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
+        Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
+        Command::Trace { term, season } => {
+            trace::trace(ctx, &term, season).await.map(Outcome::Trace)
+        }
         Command::Household { member } => household::household(ctx, member.as_deref())
             .await
-            .map(Outcome::Household)
-            .map_err(|problem| *problem),
-        Command::Stuck => trace::stuck(ctx)
-            .await
-            .map(Outcome::Stuck)
-            .map_err(|problem| *problem),
-        Command::QualityUpgrade { confirm } => upgrade::upgrade(ctx, confirm)
-            .await
-            .map(Outcome::Upgrade)
-            .map_err(|problem| *problem),
+            .map(Outcome::Household),
+        Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
+        Command::QualityUpgrade { confirm } => {
+            upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
+        }
         Command::Ps { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
         Command::Doctor {
             only,
@@ -339,16 +324,11 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem> {
             accept,
         } => {
             let report = engine::diagnose(ctx, only, disruptive).await?;
-            accepted::acknowledge(ctx, accept.as_deref(), report)
-                .map(Outcome::Doctor)
-                .map_err(|problem| *problem)
+            accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
         }
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
-        Command::Reset { confirm } => reset::reset(ctx, confirm)
-            .await
-            .map(Outcome::Reset)
-            .map_err(|p| *p),
+        Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
     }
 }
 
@@ -361,24 +341,19 @@ mod tests {
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
-    use crate::platform::Environment;
     use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
     use crate::ports::process::{Failure, Output, Progress};
     use crate::quality::Preset;
     use crate::stack::Source;
-    use crate::test_support::{refused, spoke, stack, Reporting, Scripted, ScriptedHttp};
+    use crate::test_support::{a_context, nowhere, refused, spoke, Reporting, Scripted};
+    use lemonfiber_fixtures::http::Fake;
     use std::time::Duration;
 
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
-        Ctx::new(
-            Arc::new(Scripted(scripted)),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        )
+        a_context()
+            .runner(Arc::new(Scripted(scripted)))
+            .engine(Arc::new(Reporting::default()))
+            .build()
     }
 
     #[tokio::test]
@@ -527,15 +502,10 @@ mod tests {
     async fn a_dispatched_upgrade_over_an_unreadable_stack_is_an_error() {
         // The dispatch arm unboxes the driver's error: a confirmed upgrade cannot read
         // an unreadable stack's services, so it fails rather than half-acting.
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere())
+            .build();
         assert!(dispatch(Command::QualityUpgrade { confirm: true }, &ctx)
             .await
             .is_err());
@@ -623,15 +593,11 @@ mod tests {
     #[tokio::test]
     async fn a_stack_that_cannot_be_read_is_reported_rather_than_left_out() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("v2.32.1")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(spoke("v2.32.1")))))
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let refusal = dispatch(Command::Version, &ctx)
             .await
             .err()
@@ -649,19 +615,16 @@ mod tests {
             protocols,
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .rehearsing()
+        a_context()
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build()
+            .rehearsing()
     }
 
-    fn report(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::LifecycleReport> {
+    fn report(
+        outcome: Result<Outcome, Box<super::Problem>>,
+    ) -> Option<crate::model::LifecycleReport> {
         match outcome {
             Ok(Outcome::Lifecycle(report)) => Some(report),
             Ok(
@@ -683,7 +646,9 @@ mod tests {
         }
     }
 
-    fn diagnosis(outcome: Result<Outcome, super::Problem>) -> Option<crate::model::DoctorReport> {
+    fn diagnosis(
+        outcome: Result<Outcome, Box<super::Problem>>,
+    ) -> Option<crate::model::DoctorReport> {
         match outcome {
             Ok(Outcome::Doctor(report)) => Some(report),
             Ok(
@@ -779,15 +744,11 @@ mod tests {
     #[tokio::test]
     async fn doctor_reports_an_unreadable_stack_rather_than_guessing() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("v2.32.1")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(spoke("v2.32.1")))))
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let outcome = dispatch(
             Command::Doctor {
                 only: None,
@@ -854,15 +815,10 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
         let command = Command::Down {
             forms: vec!["library".to_owned()],
         };
@@ -880,17 +836,13 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Err(Failure::NotFound {
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Err(Failure::NotFound {
                 program: "docker".to_owned(),
-            }))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            }))))
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
         let command = Command::Pull {
             forms: vec!["library".to_owned()],
         };
@@ -907,19 +859,15 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(Output {
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(Output {
                 status: Some(0),
                 stdout: "library Pulling\nlibrary Pulled\n".to_owned(),
                 stderr: String::new(),
-            }))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            }))))
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
 
         let (closed, silent) = tokio::sync::mpsc::channel(1);
         drop(closed);
@@ -949,17 +897,13 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Err(Failure::NotFound {
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Err(Failure::NotFound {
                 program: "docker".to_owned(),
-            }))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            }))))
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build();
         let refusal = pull_progress(&ctx, &["library".to_owned()])
             .await
             .err()
@@ -999,15 +943,10 @@ mod tests {
     #[tokio::test]
     async fn an_unreadable_stack_is_reported_before_anything_is_started() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let command = Command::Up {
             forms: vec!["library".to_owned()],
         };
@@ -1027,15 +966,11 @@ mod tests {
             stack_dir: None,
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::Embedded(&EMBEDDED),
-            settings,
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(Source::Embedded(&EMBEDDED))
+            .settings(settings)
+            .build();
         let command = Command::Up {
             forms: vec!["library".to_owned()],
         };
@@ -1052,15 +987,10 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/invalid"
         )));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            invalid,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(invalid)
+            .build();
         let command = Command::Up {
             forms: vec!["library".to_owned()],
         };
@@ -1092,15 +1022,10 @@ mod tests {
             env_file: Some(path.to_path_buf()),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
+        a_context()
+            .engine(Arc::new(Reporting::default()))
+            .settings(settings)
+            .build()
     }
 
     fn config_scratch(name: &str) -> std::path::PathBuf {
@@ -1110,7 +1035,7 @@ mod tests {
         dir.join(".env")
     }
 
-    fn settings_of(outcome: Result<Outcome, super::Problem>) -> Option<Vec<(String, String)>> {
+    fn settings_of(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, String)>> {
         match outcome {
             Ok(Outcome::Config(report)) => Some(
                 report
@@ -1329,15 +1254,7 @@ mod tests {
 
     #[tokio::test]
     async fn settings_with_nowhere_to_live_say_setup_has_not_run() {
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context().engine(Arc::new(Reporting::default())).build();
         assert_eq!(
             dispatch(Command::ConfigShow, &ctx)
                 .await
@@ -1375,19 +1292,14 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        // An HTTP port that answers nothing, so a diagnostic check reaching one — the
-        // guide-source probe, a credential — resolves to unreachable rather than the
-        // real network. Keeps the doctor tests self-contained and offline.
-        .with_http(Arc::new(ScriptedHttp::new(Vec::new())))
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            // An HTTP port that answers nothing, so a diagnostic check reaching one — the
+            // guide-source probe, a credential — resolves to unreachable rather than the
+            // real network. Keeps the doctor tests self-contained and offline.
+            .with_http(Fake::scripted(Vec::new()))
     }
 
     /// Everything the `library` form declares.
@@ -1529,20 +1441,16 @@ mod tests {
             protocols: crate::config::Protocols::both(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(refused("no such image")))),
-            Arc::new(Reporting::holding(
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(refused("no such image")))))
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Starting,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO);
+            )))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO);
 
         let command = Command::Up {
             forms: vec!["library".to_owned()],
@@ -1568,7 +1476,9 @@ mod tests {
     }
 
     /// The status a survey produced, as pairs of service and state.
-    fn stated(outcome: Result<Outcome, super::Problem>) -> Option<Vec<(String, ServiceState)>> {
+    fn stated(
+        outcome: Result<Outcome, Box<super::Problem>>,
+    ) -> Option<Vec<(String, ServiceState)>> {
         match outcome {
             Ok(Outcome::Status(report)) => Some(
                 report
@@ -1665,15 +1575,10 @@ mod tests {
     #[tokio::test]
     async fn asking_what_is_running_from_a_stack_that_cannot_be_read_is_refused() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         assert_eq!(
             dispatch(Command::Ps { forms: Vec::new() }, &ctx)
                 .await
@@ -1792,15 +1697,10 @@ mod tests {
     #[tokio::test]
     async fn reading_logs_from_a_stack_that_cannot_be_read_is_refused() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::default()),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            Settings::default(),
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::default()))
+            .over(nowhere)
+            .build();
         let query = LogQuery::recent(10);
         assert_eq!(
             super::logs(&ctx, &[], &[], query)

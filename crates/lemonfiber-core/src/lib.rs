@@ -32,9 +32,17 @@
 //! Rust-specific detail lives in this repo's `.docs/architecture/`; the product
 //! decisions behind it live in the specification.
 
+// Moved below the boundary and re-exported here under the names the rest of this crate
+// already uses. The traits and the vocabulary that crosses them are a crate of their own —
+// see `lemonfiber-ports` — so the fakes that stand in for them are reachable from this
+// crate's own tests and from its integration tests alike.
+pub use lemonfiber_ports as ports;
+pub use lemonfiber_ports::{error, trace};
+
 pub mod adapters;
 pub mod alert;
 pub mod app;
+pub mod archive;
 pub mod audio;
 pub mod backup;
 pub mod baseline;
@@ -46,7 +54,6 @@ pub mod dashboard;
 pub mod docker;
 pub mod doctor;
 mod endpoint;
-pub mod error;
 pub mod health;
 pub mod household;
 mod instant;
@@ -55,9 +62,9 @@ pub mod journal;
 pub mod lidarr;
 pub mod materialised;
 pub mod model;
+pub mod notify;
 pub mod platform;
 pub mod plural;
-pub mod ports;
 pub mod prerequisites;
 pub mod provider;
 pub mod prowlarr;
@@ -77,7 +84,6 @@ pub mod storage;
 #[cfg(test)]
 mod test_support;
 pub mod text;
-pub mod trace;
 pub mod transcoding;
 pub mod validate;
 pub mod walkthrough;

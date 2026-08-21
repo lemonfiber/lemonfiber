@@ -43,26 +43,22 @@ fn path(ctx: &Ctx) -> Option<std::path::PathBuf> {
 mod tests {
     use super::{load, save};
     use crate::alert::{Alert, Moment, Outbox};
+    use crate::test_support::a_context;
 
     /// A context whose environment file is in an emptied scratch directory.
     fn ctx_at(name: &str) -> crate::app::Ctx {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-outbox-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        crate::app::Ctx::new(
-            std::sync::Arc::new(crate::test_support::Scripted(Ok(
+        a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
-            ))),
-            std::sync::Arc::new(crate::test_support::Reporting::absent()),
-            std::sync::Arc::new(crate::adapters::System),
-            std::sync::Arc::new(crate::adapters::Disk),
-            crate::test_support::stack(),
-            crate::config::Settings {
+            ))))
+            .settings(crate::config::Settings {
                 env_file: Some(dir.join(".env")),
                 ..crate::config::Settings::default()
-            },
-            crate::platform::Environment::MacOs,
-        )
+            })
+            .build()
     }
 
     /// One alert about the given check.

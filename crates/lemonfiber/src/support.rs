@@ -82,9 +82,7 @@ async fn produce(
     json: bool,
 ) -> Result<Lines, Box<Problem>> {
     let dest = destination(out, contents);
-    let written = write(&crate::archive::Tar, contents, &dest)
-        .await
-        .map_err(Box::new)?;
+    let written = write(&crate::archive::Tar, contents, &dest).await?;
     Ok(render_written(&written, json))
 }
 

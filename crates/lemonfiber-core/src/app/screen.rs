@@ -14,7 +14,7 @@
 use async_trait::async_trait;
 
 use crate::alert::Digest;
-use crate::ports::notify::{Channel, Undelivered};
+use crate::notify::{Channel, Undelivered};
 
 /// The screen, as a channel.
 pub(crate) struct Screen;
@@ -36,7 +36,7 @@ impl Channel for Screen {
 mod tests {
     use super::Screen;
     use crate::alert::Digest;
-    use crate::ports::notify::Channel;
+    use crate::notify::Channel;
 
     #[tokio::test]
     async fn the_screen_never_refuses_an_alert() {

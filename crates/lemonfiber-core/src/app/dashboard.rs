@@ -450,35 +450,23 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use async_trait::async_trait;
-
     use super::{gather, vpn};
     use crate::app::Ctx;
     use crate::config::{PortForward, Protocols, Settings};
     use crate::dashboard::{Hardlink, Panel, Protocol, Reading, Telemetry, Transfer, Vpn};
     use crate::health::Standing;
-    use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
     use crate::ports::filesystem::{FsKind, StorageFacts};
-    use crate::ports::http::{Http, Request, Response, Unreachable};
+    use crate::ports::http::Http;
     use crate::stack::Source;
-    use crate::test_support::{
-        a_password, spoke, stack, Reporting, Scripted, ScriptedHttp, SeedFs, Tunnel,
-    };
+    use crate::test_support::{a_context, a_password, nowhere, Reporting, SeedFs, Tunnel};
+    use lemonfiber_fixtures::http::{Answer, Fake};
 
-    /// A transport that answers every request with the same body — a service's
-    /// queue as JSON for the happy path, or something unreadable to stand in for a
-    /// service that will not answer.
-    struct HttpReturning(&'static str);
-
-    #[async_trait]
-    impl Http for HttpReturning {
-        async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-            Ok(Response {
-                status: 200,
-                body: self.0.to_owned(),
-            })
-        }
+    /// A transport answering every request with this body at 200 — the queue as JSON for
+    /// the happy path, or something unreadable to stand in for a service that will not
+    /// answer.
+    fn answering(body: &'static str) -> Arc<Fake> {
+        Fake::always(Answer::reply(200, body))
     }
 
     /// A Servarr config carrying a usable key, and one carrying none.
@@ -506,16 +494,11 @@ mod tests {
             data_root: Some(std::path::PathBuf::from("/srv/media")),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
     }
 
     /// Every service the `library` form declares.
@@ -586,19 +569,15 @@ mod tests {
             data_root: Some(std::path::PathBuf::from("/srv/media")),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::holding(
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Healthy,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            nowhere,
-            settings,
-            Environment::MacOs,
-        );
+            )))
+            .over(nowhere)
+            .settings(settings)
+            .build();
         let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.telemetry, Telemetry::Disconnected);
         assert!(!snapshot.services.is_available());
@@ -614,21 +593,21 @@ mod tests {
 
     /// A context configured with a fake filesystem and transport, over the stack
     /// this repo carries so its \*arr services resolve as queue targets.
-    fn ctx_with(fs: SeedFs, http: HttpReturning) -> Ctx {
+    fn ctx_with(fs: SeedFs, http: Arc<Fake>) -> Ctx {
         ctx(Reporting::holding(
             &LIBRARY,
             Lifecycle::Running,
             Health::Healthy,
         ))
         .with_filesystem(Arc::new(fs))
-        .with_http(Arc::new(http))
+        .with_http(http)
     }
 
     #[tokio::test]
     async fn the_queue_panel_fills_with_each_arrs_depth_and_stuck_count() {
         let ctx = ctx_with(
             SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
-            HttpReturning(QUEUE_JSON),
+            answering(QUEUE_JSON),
         );
         let snapshot = gather(&ctx, None).await;
         assert!(
@@ -642,7 +621,7 @@ mod tests {
     async fn a_service_still_starting_with_no_key_is_left_out_of_the_queue() {
         // No config to read: the ordinary first-start case, skipped so the panel is
         // ready-but-empty rather than failed.
-        let ctx = ctx_with(SeedFs::keyed(None, None), HttpReturning(QUEUE_JSON));
+        let ctx = ctx_with(SeedFs::keyed(None, None), answering(QUEUE_JSON));
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
     }
@@ -651,7 +630,7 @@ mod tests {
     async fn a_service_whose_config_holds_no_key_is_left_out_of_the_queue() {
         let ctx = ctx_with(
             SeedFs::keyed(Some(CONFIG_NO_KEY), None),
-            HttpReturning(QUEUE_JSON),
+            answering(QUEUE_JSON),
         );
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
@@ -663,7 +642,7 @@ mod tests {
         // dropped from the panel rather than failing it.
         let ctx = ctx_with(
             SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
-            HttpReturning("not a queue"),
+            answering("not a queue"),
         );
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
@@ -689,19 +668,14 @@ mod tests {
             data_root: None,
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::holding(
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Healthy,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        );
+            )))
+            .settings(settings)
+            .build();
         let snapshot = gather(&ctx, None).await;
         assert_eq!(snapshot.telemetry, Telemetry::Unconfigured);
         assert_eq!(snapshot.health.standing, Standing::Unconfigured);
@@ -741,26 +715,12 @@ mod tests {
     /// A transport that answers each download client on its own path: qBittorrent's
     /// login and its torrent list, and — anything else being the only other call a
     /// read makes — `SABnzbd`'s queue.
-    struct Downloads {
-        torrents: &'static str,
-        queue: &'static str,
-    }
-
-    #[async_trait]
-    impl Http for Downloads {
-        async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-            let body = if request.url.contains("/auth/login") {
-                "Ok."
-            } else if request.url.contains("/torrents/info") {
-                self.torrents
-            } else {
-                self.queue
-            };
-            Ok(Response {
-                status: 200,
-                body: body.to_owned(),
-            })
-        }
+    fn downloads(torrents: &'static str, queue: &'static str) -> Arc<Fake> {
+        Fake::by_path(vec![
+            ("/auth/login", Answer::reply(200, "Ok.")),
+            ("/torrents/info", Answer::reply(200, torrents)),
+            ("", Answer::reply(200, queue)),
+        ])
     }
 
     /// One qBittorrent torrent, 30% done at a known speed with an ETA.
@@ -783,22 +743,17 @@ mod tests {
             env_file,
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(Reporting::holding(
+        a_context()
+            .engine(Arc::new(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
                 Health::Healthy,
-            )),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
-        .with_filesystem(Arc::new(fs))
-        .with_http(http)
+            )))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
+            .with_filesystem(Arc::new(fs))
+            .with_http(http)
     }
 
     /// A private env file recording qBittorrent's password, at a scratch path
@@ -818,10 +773,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_transfers_panel_fills_from_each_download_client() {
-        let http: Arc<dyn Http> = Arc::new(Downloads {
-            torrents: QBIT_TORRENTS,
-            queue: SAB_QUEUE,
-        });
+        let http: Arc<dyn Http> = downloads(QBIT_TORRENTS, SAB_QUEUE);
         let ctx = ctx_downloads(
             SeedFs::keyed(None, Some(SAB_KEY_INI)),
             http,
@@ -860,7 +812,7 @@ mod tests {
         // No recorded qBittorrent password and no SABnzbd key on disk: both are
         // still finishing first start, so each is skipped and the panel is
         // ready-but-empty rather than failed.
-        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let http: Arc<dyn Http> = Fake::scripted(Vec::new());
         let ctx = ctx_downloads(SeedFs::keyed(None, None), http, None);
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
@@ -870,7 +822,7 @@ mod tests {
     async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
         // SABnzbd has written a config but not its key; qBittorrent has no recorded
         // password. Neither can be read, so neither appears.
-        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let http: Arc<dyn Http> = Fake::scripted(Vec::new());
         let ctx = ctx_downloads(SeedFs::keyed(None, Some(SAB_NO_KEY_INI)), http, None);
         let snapshot = gather(&ctx, None).await;
         assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
@@ -880,7 +832,7 @@ mod tests {
     async fn a_download_client_that_will_not_answer_is_left_out() {
         // The password is recorded, but qBittorrent's login goes unanswered, so it
         // is dropped from the panel rather than failing it.
-        let http: Arc<dyn Http> = Arc::new(ScriptedHttp::new(Vec::new()));
+        let http: Arc<dyn Http> = Fake::scripted(Vec::new());
         let ctx = ctx_downloads(
             SeedFs::keyed(None, None),
             http,
@@ -946,16 +898,11 @@ mod tests {
             port_forward,
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
     }
 
     /// The VPN panel the way `gather` reads it — the manifest resolved from the
@@ -1171,15 +1118,11 @@ mod tests {
             port_forward: forwarding(),
             ..Settings::default()
         };
-        let ctx = Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(tunnel_engine(true, Some(healthy_tunnel()))),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-            settings,
-            Environment::MacOs,
-        );
+        let ctx = a_context()
+            .engine(Arc::new(tunnel_engine(true, Some(healthy_tunnel()))))
+            .over(nowhere())
+            .settings(settings)
+            .build();
         assert!(matches!(
             vpn_panel(&ctx).await,
             Some(Panel::Unavailable { .. })
@@ -1408,16 +1351,11 @@ mod tests {
             env_file: Some(dir.join(".env")),
             ..Settings::default()
         };
-        Ctx::new(
-            Arc::new(Scripted(Ok(spoke("")))),
-            Arc::new(engine),
-            Arc::new(crate::adapters::System),
-            Arc::new(crate::adapters::Disk),
-            stack(),
-            settings,
-            Environment::MacOs,
-        )
-        .waiting(Duration::ZERO)
+        a_context()
+            .engine(Arc::new(engine))
+            .settings(settings)
+            .build()
+            .waiting(Duration::ZERO)
     }
 
     #[tokio::test]

@@ -7,10 +7,8 @@
 mod common;
 
 use common::tunnel::*;
-use std::sync::Arc;
 
-use lemonfiber_core::config::{PortForward, Protocols};
-use lemonfiber_core::doctor::vpn::{Asked, VpnCheck, NO_FORWARDED_PORT};
+use lemonfiber_core::doctor::vpn::NO_FORWARDED_PORT;
 use lemonfiber_core::doctor::{Check, Verdict};
 use lemonfiber_core::error::Severity;
 use lemonfiber_core::repair::{Attempt, Repair};
@@ -214,19 +212,10 @@ async fn a_down_gateway_leaves_the_forward_unverified() {
 async fn port_forwarding_is_checked_even_with_leak_detection_off() {
     // The port is read from the container's own file, not from an IP-echo
     // comparison, so switching leak detection off does not blind this check.
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![gateway_with_port("51413")])),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: Vec::new(),
-            listening: None,
-            port_forward: forwarding("protonvpn"),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![gateway_with_port("51413")]))
+        .without_leak_detection()
+        .forwarding(forwarding("protonvpn"))
+        .check();
     let findings = subject.run().await;
     assert!(
         pass_note(&findings, "vpn.port-forward").is_some_and(|note| note.contains("51413")),
@@ -238,19 +227,7 @@ async fn port_forwarding_is_checked_even_with_leak_detection_off() {
 async fn an_unreachable_engine_leaves_an_enabled_forward_unverified() {
     let mut engine = Fake::new(vec![]);
     engine.reachable = false;
-    let subject = VpnCheck::new(
-        Arc::new(engine),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: forwarding("protonvpn"),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(engine).forwarding(forwarding("protonvpn")).check();
     let findings = subject.run().await;
     assert!(matches!(
         verdict(&findings, "vpn.port-forward"),
@@ -269,19 +246,7 @@ async fn a_gateway_with_no_client_does_not_apply() {
             .iter()
             .any(|dependency| dependency == "gluetun")
     });
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![])),
-        "lemonfiber".to_owned(),
-        &lone_gateway,
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![])).against(lone_gateway).check();
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })
@@ -304,22 +269,9 @@ async fn address_services_that_contradict_each_other_are_reported_rather_than_re
     // The whole leak verdict is a comparison against one number. A source that is
     // cached, misconfigured or simply wrong returns a plausible address, and a
     // check that picked a winner would say `pass` while traffic left in the clear.
-    let subject = VpnCheck::new(
-        Arc::new(contradicted()),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec![
-                "https://first.example".to_owned(),
-                "https://second.example".to_owned(),
-            ],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(contradicted())
+        .echoing(&["https://first.example", "https://second.example"])
+        .check();
     let findings = subject.run().await;
 
     let disagreement = findings
@@ -349,22 +301,13 @@ async fn a_client_listening_off_the_forwarded_port_is_reported_rather_than_corre
     // then they have asked for an action.
     let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
     gateway.forwarded_port = Some("51999");
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![
-            gateway,
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ])),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: Some(51413),
-            port_forward: forwarding("proton"),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![
+        gateway,
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ]))
+    .listening(51413)
+    .forwarding(forwarding("proton"))
+    .check();
     let findings = subject.run().await;
     let mismatch = findings
         .iter()
@@ -382,22 +325,13 @@ async fn a_client_listening_off_the_forwarded_port_is_reported_rather_than_corre
 async fn a_client_already_on_the_forwarded_port_is_not_reported() {
     let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
     gateway.forwarded_port = Some("51413");
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![
-            gateway,
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ])),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: Some(51413),
-            port_forward: forwarding("proton"),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![
+        gateway,
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ]))
+    .listening(51413)
+    .forwarding(forwarding("proton"))
+    .check();
     assert!(subject
         .run()
         .await
@@ -454,19 +388,7 @@ async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
     uncontained
         .services
         .retain(|service| service.id != "gluetun");
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![])),
-        "lemonfiber".to_owned(),
-        &uncontained,
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![])).against(uncontained).check();
     let findings = subject.run().await;
     assert!(
         matches!(

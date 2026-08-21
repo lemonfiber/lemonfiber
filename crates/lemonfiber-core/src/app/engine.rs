@@ -41,7 +41,7 @@ async fn settle(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     profiles: &[String],
-) -> Result<Vec<Service>, Problem> {
+) -> Result<Vec<Service>, Box<Problem>> {
     let deadline = ctx.clock.now() + ctx.patience;
 
     loop {
@@ -49,7 +49,7 @@ async fn settle(
             .engine
             .list(&ctx.settings.project)
             .await
-            .map_err(|err| err.problem())?;
+            .map_err(|err| Box::new(err.problem()))?;
         let services = survey(manifest, profiles, &containers);
 
         let waiting: Vec<String> = unsettled(&services)
@@ -63,7 +63,7 @@ async fn settle(
         // Checked after the survey rather than before it, so a patience of zero
         // still reports what it saw rather than reporting nothing at all.
         if ctx.clock.now() >= deadline {
-            return Err(never_settled(ctx, &waiting).await);
+            return Err(Box::new(never_settled(ctx, &waiting).await));
         }
 
         tokio::time::sleep(POLL).await;
@@ -133,18 +133,18 @@ pub async fn logs(
     forms: &[String],
     services: &[String],
     query: LogQuery,
-) -> Result<Receiver<LogLine>, Problem> {
+) -> Result<Receiver<LogLine>, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
 
     // Naming forms and naming services are two ways of saying the same thing,
     // and both narrow: a form is the services its profiles declare.
     let mut wanted: Vec<String> = services.to_vec();
     if !forms.is_empty() {
-        let plan =
-            resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| err.problem())?;
+        let plan = resolve(&manifest, forms, ctx.settings.protocols)
+            .map_err(|err| Box::new(err.problem()))?;
         let profiles: Vec<String> = plan.profiles.into_iter().collect();
         wanted.extend(
             manifest
@@ -160,7 +160,7 @@ pub async fn logs(
     ctx.engine
         .logs(&ctx.settings.project, &wanted, query)
         .await
-        .map_err(|err| err.problem())
+        .map_err(|err| Box::new(err.problem()))
 }
 
 /// Pull the images the named forms need, streaming Compose's progress as it
@@ -177,12 +177,15 @@ pub async fn logs(
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be
 /// resolved or Compose cannot be spawned.
-pub async fn pull_progress(ctx: &Ctx, forms: &[String]) -> Result<Receiver<Progress>, Problem> {
-    let (_, _, command, _) = compose(ctx, forms, &Action::Pull).map_err(|err| *err)?;
+pub async fn pull_progress(
+    ctx: &Ctx,
+    forms: &[String],
+) -> Result<Receiver<Progress>, Box<Problem>> {
+    let (_, _, command, _) = compose(ctx, forms, &Action::Pull)?;
     ctx.runner
         .stream(&command)
         .await
-        .map_err(|err| err.problem())
+        .map_err(|err| Box::new(err.problem()))
 }
 
 /// Resolve the named forms to their plan and the `docker compose` argument vector
@@ -253,11 +256,11 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
 /// Naming no form reports the whole stack, because "what is running" is a
 /// question about the machine rather than about a form — and an operator asking
 /// it has usually forgotten which form they started.
-pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, Problem> {
+pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
 
     let profiles: Vec<String> = if forms.is_empty() {
         manifest
@@ -267,7 +270,7 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
             .collect()
     } else {
         resolve(&manifest, forms, ctx.settings.protocols)
-            .map_err(|err| err.problem())?
+            .map_err(|err| Box::new(err.problem()))?
             .profiles
             .into_iter()
             .collect()
@@ -277,7 +280,7 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .engine
         .list(&ctx.settings.project)
         .await
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
     let services = survey(&manifest, &profiles, &containers);
 
     Ok(StatusReport {
@@ -296,8 +299,8 @@ pub(super) async fn lifecycle(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
-) -> Result<Outcome, Problem> {
-    let (manifest, plan, command, stack_edits) = compose(ctx, forms, action).map_err(|err| *err)?;
+) -> Result<Outcome, Box<Problem>> {
+    let (manifest, plan, command, stack_edits) = compose(ctx, forms, action)?;
 
     let mut report = LifecycleReport {
         action: action.name().to_owned(),
@@ -323,7 +326,7 @@ pub(super) async fn lifecycle(
         .runner
         .run(&command)
         .await
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
     report.status = output.status;
 
     // Starting waits for the services to be usable, because "started" that
@@ -376,7 +379,7 @@ pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
     })
 }
 
-pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Problem> {
+pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
     let argv = ["docker", "compose", "version", "--short"].map(str::to_owned);
     let compose = match ctx.runner.run(&argv).await {
         Ok(output) if output.succeeded() => Some(output.stdout.trim().to_owned()),
@@ -389,7 +392,7 @@ pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Problem> {
     let stack = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|err| err.problem())?;
+        .map_err(|err| Box::new(err.problem()))?;
 
     Ok(VersionReport {
         binary: env!("CARGO_PKG_VERSION").to_owned(),

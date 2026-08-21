@@ -9,13 +9,9 @@
 //! are: the check is built on `#[async_trait]` clients built on another, and in-crate that
 //! code is compiled twice with its coverage counted from the copy that never ran.
 
-mod common;
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use common::files::Files;
-use common::{Answer, Fake};
 use lemonfiber_core::baseline::{Origin, Record};
 use lemonfiber_core::doctor::credentials::Target;
 use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck, DRIFTED};
@@ -24,6 +20,8 @@ use lemonfiber_core::error::Problem;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::ports::service::{ClientKind, Credential, DownloadClient};
 use lemonfiber_core::repair::{Attempt, Repair, Writing, OPERATION};
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// A Servarr config carrying a generated key, as one reads from disk.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";

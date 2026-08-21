@@ -258,6 +258,26 @@ impl Prompt for Terminal {
         }
     }
 
+    fn vpn(&self) -> bool {
+        // Defaulted to yes: the checklist has just explained what a VPN is for and
+        // why torrents want one, so yes is the answer that follows from what they
+        // were told. Nothing is assumed from the default — a no is asked about.
+        self.yes_no("\nWill a VPN carry your torrent traffic?", true)
+    }
+
+    fn unprotected(&self) -> bool {
+        // Said plainly and in the second person, because this is the one
+        // consequence of the protocol choice that cannot be discovered afterwards:
+        // by the time it matters, the address has already been seen.
+        println!(
+            "\nWithout a VPN, every peer you exchange torrent data with sees your \
+             home address. That includes anyone watching a swarm to record who is in it."
+        );
+        // Defaulted to no, so pressing enter goes back to the question rather than
+        // past the warning. Going on has to be typed.
+        self.yes_no("Set up torrents without a VPN anyway?", false)
+    }
+
     fn household(&self) -> bool {
         self.yes_no("\nWill others in your home use it?", false)
     }
@@ -512,6 +532,19 @@ mod tests {
         assert!(answered(&["y"]).autostart());
         // An answer that is neither takes the default.
         assert!(!answered(&["maybe"]).household());
+    }
+
+    #[test]
+    fn the_vpn_question_defaults_to_yes_and_its_warning_defaults_to_no() {
+        // The checklist has just said what a VPN is for, so yes is the answer that
+        // follows from what they were told and a bare enter takes it.
+        assert!(answered(&[""]).vpn());
+        assert!(!answered(&["no"]).vpn());
+
+        // The warning is the other way round: pressing enter goes back to the
+        // question rather than past the exposure. Going on has to be typed.
+        assert!(!answered(&[""]).unprotected());
+        assert!(answered(&["yes"]).unprotected());
     }
 
     #[test]

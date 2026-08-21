@@ -251,6 +251,7 @@ pub const NEEDS_SERVICE: Code = Code::new("SETUP-4");
 
 #[cfg(test)]
 mod tests {
+    use crate::test_support::a_fresh_write;
     use std::path::{Path, PathBuf};
 
     use super::undo;
@@ -287,26 +288,15 @@ mod tests {
         }
     }
 
-    /// One recorded change, a setting written over nothing.
-    fn a_set(key: &str) -> Change {
-        Change {
-            at: "t".to_owned(),
-            operation: "apply".to_owned(),
-            target: ".env".to_owned(),
-            kind: Kind::Set {
-                key: key.to_owned(),
-                previous: None,
-                current: "on".to_owned(),
-            },
-        }
-    }
-
     #[test]
     fn a_journal_reads_back_the_changes_that_were_written() {
         let dir = scratch("journal-read");
         let path = dir.join("journal.jsonl");
         assert!(std::fs::create_dir_all(&dir).is_ok());
-        let changes = [a_set("USENET"), a_set("TORRENT")];
+        let changes = [
+            a_fresh_write("USENET", "on"),
+            a_fresh_write("TORRENT", "on"),
+        ];
         let text = changes
             .iter()
             .map(|change| serde_json::to_string(change).unwrap_or_default())
@@ -325,16 +315,19 @@ mod tests {
         let dir = scratch("journal-append");
         let path = dir.join("journal.jsonl");
         assert!(std::fs::create_dir_all(&dir).is_ok());
-        let first = serde_json::to_string(&a_set("USENET")).unwrap_or_default();
+        let first = serde_json::to_string(&a_fresh_write("USENET", "on")).unwrap_or_default();
         // Written without a closing newline, as a file whose last line was the last thing
         // anybody wrote to it would be.
         assert!(std::fs::write(&path, first).is_ok());
 
-        super::journalled(&path, &[a_set("TORRENT")]);
+        super::journalled(&path, &[a_fresh_write("TORRENT", "on")]);
 
         assert_eq!(
             super::journal_at(&path).changes(),
-            [a_set("USENET"), a_set("TORRENT")]
+            [
+                a_fresh_write("USENET", "on"),
+                a_fresh_write("TORRENT", "on")
+            ]
         );
     }
 
@@ -355,9 +348,12 @@ mod tests {
     fn a_journal_is_written_where_no_directory_has_been_made_yet() {
         let path = scratch("journal-fresh").join("journal.jsonl");
 
-        super::journalled(&path, &[a_set("USENET")]);
+        super::journalled(&path, &[a_fresh_write("USENET", "on")]);
 
-        assert_eq!(super::journal_at(&path).changes(), [a_set("USENET")]);
+        assert_eq!(
+            super::journal_at(&path).changes(),
+            [a_fresh_write("USENET", "on")]
+        );
     }
 
     #[test]
@@ -366,7 +362,7 @@ mod tests {
         let path = dir.join("journal.jsonl");
         assert!(std::fs::create_dir_all(&dir).is_ok());
         // One entry that fully landed and one half-written — a crash mid-append.
-        let good = serde_json::to_string(&a_set("USENET")).unwrap_or_default();
+        let good = serde_json::to_string(&a_fresh_write("USENET", "on")).unwrap_or_default();
         assert!(std::fs::write(&path, format!("{good}\n{{ torn")).is_ok());
 
         assert_eq!(super::journal_at(&path).changes().len(), 1);

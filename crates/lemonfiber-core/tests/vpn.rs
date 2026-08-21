@@ -9,10 +9,8 @@
 mod common;
 
 use common::tunnel::*;
-use std::sync::Arc;
 
-use lemonfiber_core::config::{PortForward, Protocols};
-use lemonfiber_core::doctor::vpn::Asked;
+use lemonfiber_core::config::Protocols;
 use lemonfiber_core::doctor::vpn::{VpnCheck, CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
 use lemonfiber_core::doctor::{Category, Check, Verdict};
 use lemonfiber_core::error::Severity;
@@ -61,19 +59,7 @@ async fn a_matching_ipv6_address_is_also_verified() {
 
 /// The check over an engine, with the killswitch scripted.
 fn checking(engine: Fake) -> VpnCheck {
-    VpnCheck::new(
-        Arc::new(engine),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: true,
-            client: None,
-        },
-    )
+    asking(engine).disruptive().check()
 }
 
 /// A tunnel and a client that both answer from the same address — the healthy
@@ -246,19 +232,7 @@ async fn a_client_already_off_the_internet_proves_nothing_about_the_killswitch()
 
 #[tokio::test]
 async fn without_the_flag_nothing_is_touched_and_the_operator_is_told_how_to_ask() {
-    let subject = VpnCheck::new(
-        Arc::new(Fake::linked(contained(), Link::holding())),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::linked(contained(), Link::holding())).check();
     let findings = subject.run().await;
     assert!(unverified_reason(&findings, "vpn.killswitch")
         .is_some_and(|reason| reason.contains("interrupts transfers")));
@@ -435,19 +409,7 @@ async fn a_garbage_response_is_not_taken_for_an_address() {
 async fn an_unreachable_engine_leaves_the_checks_unverified() {
     let mut engine = Fake::new(vec![]);
     engine.reachable = false;
-    let subject = VpnCheck::new(
-        Arc::new(engine),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(engine).check();
     let findings = subject.run().await;
     assert!(matches!(
         verdict(&findings, "vpn.tunnel"),
@@ -470,19 +432,7 @@ async fn a_stopped_stack_skips_rather_than_fails() {
 
 #[tokio::test]
 async fn no_torrents_configured_does_not_apply() {
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![])),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::none(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![])).over(Protocols::none()).check();
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })
@@ -494,22 +444,12 @@ async fn leak_detection_switched_off_does_not_apply() {
     // A running stack, so this exercises the echo-off branch itself rather than
     // the stack-not-running one: with leak detection off the egress comparison is
     // skipped rather than run.
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![
-            Behavior::up("gluetun", Some("185.65.1.1")),
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ])),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: Vec::new(),
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ]))
+    .without_leak_detection()
+    .check();
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })
@@ -522,19 +462,7 @@ async fn leak_detection_off_holds_even_when_the_engine_is_down() {
     // be reached: egress stays skipped, never an engine-unreachable unverified.
     let mut engine = Fake::new(vec![]);
     engine.reachable = false;
-    let subject = VpnCheck::new(
-        Arc::new(engine),
-        "lemonfiber".to_owned(),
-        &stack(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: Vec::new(),
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(engine).without_leak_detection().check();
     let findings = subject.run().await;
     // The egress group is skipped, not reported unverified against a down engine.
     assert!(matches!(
@@ -549,19 +477,7 @@ async fn leak_detection_off_holds_even_when_the_engine_is_down() {
 
 #[tokio::test]
 async fn a_stack_with_no_gateway_does_not_apply() {
-    let subject = VpnCheck::new(
-        Arc::new(Fake::new(vec![])),
-        "lemonfiber".to_owned(),
-        &empty(),
-        Asked {
-            protocols: Protocols::both(),
-            echo: vec!["https://ifconfig.me".to_owned()],
-            listening: None,
-            port_forward: PortForward::default(),
-            disruptive: false,
-            client: None,
-        },
-    );
+    let subject = asking(Fake::new(vec![])).against(empty()).check();
     assert!(matches!(
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })

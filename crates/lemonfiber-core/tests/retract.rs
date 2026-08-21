@@ -11,11 +11,10 @@
 
 mod common;
 
+use common::stack::project;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use common::files::Files;
-use common::{Answer, Fake};
 use lemonfiber_core::app::repair::retract;
 use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::paths::Paths;
@@ -25,13 +24,8 @@ use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::repair::OPERATION;
 use lemonfiber_core::stack::Source;
-
-/// The repository's own stack, so the targets resolve against a real description.
-fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
-}
+use lemonfiber_fixtures::files::Files;
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// A Servarr config carrying a readable key, so the target opens.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";

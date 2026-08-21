@@ -4,11 +4,12 @@
 use super::findings::finding;
 use super::probe::{find, read_grant};
 use super::resolve_pair;
+use super::VpnCheck;
 use super::NOT_ENABLED;
 use crate::config::PortForward;
 use crate::doctor::{Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
-use crate::ports::docker::Engine;
+use crate::ports::docker::{Container, Engine};
 use lemonfiber_manifest::Manifest;
 
 /// Raised when port forwarding was asked for but the provider granted no port.
@@ -180,6 +181,42 @@ pub(super) async fn grant_at(engine: &dyn Engine, project: &str, gateway: &str) 
     match read_grant(engine, find(&containers, gateway)).await {
         Grant::Port(port) => Some(port),
         Grant::Absent | Grant::Unreadable => None,
+    }
+}
+
+impl VpnCheck {
+    /// The port-forward finding: whether a port was granted, where the operator
+    /// asked for one.
+    ///
+    /// Independent of leak detection — the port is read from the gateway's own
+    /// status file, not from an IP-echo comparison — so it is still established
+    /// where the operator has switched leak detection off. Where the switch is
+    /// off the exec is skipped entirely: there is nothing to read.
+    ///
+    /// A container that is not running, or an engine that cannot be reached, makes the
+    /// read unknown rather than absent. A file that reads as no port — empty, missing, or
+    /// the zero the release path writes — is a port that was not granted, which for an
+    /// enabled provider is the failure this check exists for.
+    pub(super) async fn port_forward_finding(&self, gateway: Option<&Container>) -> Finding {
+        let verdict = if self.port_forward.enabled {
+            match read_grant(self.engine.as_ref(), gateway).await {
+                Grant::Port(port) => Verdict::Pass {
+                    note: Some(format!("forwarded port {port}")),
+                },
+                Grant::Absent => no_port(self.port_forward.provider.as_deref()),
+                Grant::Unreadable => Verdict::Unverified {
+                    reason: "the VPN container did not return a forwarded port, which the tunnel \
+                             being down and the engine being unreachable both produce"
+                        .to_owned(),
+                    remedy: Remedy::new("Confirm the tunnel is up, then run this again"),
+                },
+            }
+        } else {
+            Verdict::Skipped {
+                reason: NOT_ENABLED.to_owned(),
+            }
+        };
+        finding("vpn.port-forward", "forwarded port", verdict)
     }
 }
 

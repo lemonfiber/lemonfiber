@@ -25,6 +25,9 @@ pub enum Step {
     Prerequisites,
     /// Usenet, torrents, both, or neither.
     Protocols,
+    /// Whether a VPN carries the torrent traffic. Asked only where torrents were
+    /// chosen, and after the checklist has explained what one is for.
+    Vpn,
     /// Where downloads and the library are kept.
     DataLocation,
     /// The indexer credential, tested against the live service. Asked only where a
@@ -49,11 +52,12 @@ pub enum Step {
 
 impl Step {
     /// The steps in presentation order.
-    pub(crate) const ORDER: [Self; 13] = [
+    pub(crate) const ORDER: [Self; 14] = [
         Self::Welcome,
         Self::Preflight,
         Self::Protocols,
         Self::Prerequisites,
+        Self::Vpn,
         Self::DataLocation,
         Self::Credentials,
         Self::Provider,
@@ -75,15 +79,16 @@ impl Step {
             Self::Preflight => 1,
             Self::Protocols => 2,
             Self::Prerequisites => 3,
-            Self::DataLocation => 4,
-            Self::Credentials => 5,
-            Self::Provider => 6,
-            Self::ServiceUser => 7,
-            Self::Library => 8,
-            Self::Household => 9,
-            Self::Notifications => 10,
-            Self::Autostart => 11,
-            Self::Review => 12,
+            Self::Vpn => 4,
+            Self::DataLocation => 5,
+            Self::Credentials => 6,
+            Self::Provider => 7,
+            Self::ServiceUser => 8,
+            Self::Library => 9,
+            Self::Household => 10,
+            Self::Notifications => 11,
+            Self::Autostart => 12,
+            Self::Review => 13,
         }
     }
 
@@ -96,6 +101,7 @@ impl Step {
         matches!(
             self,
             Self::Protocols
+                | Self::Vpn
                 | Self::DataLocation
                 | Self::Credentials
                 | Self::Provider
