@@ -162,6 +162,19 @@ pub struct Finding {
     /// worth keeping.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caused_by: Option<String>,
+    /// What the service said for itself, lately.
+    ///
+    /// Carried on the finding rather than left for the operator to go and fetch,
+    /// because the explanation is almost always in it: a check can say a service is
+    /// not answering, and only the service can say why. Absent where the finding is
+    /// not about a service, where the service is fine, or where the engine would not
+    /// say — an empty section would be a promise of evidence that is not there.
+    ///
+    /// Set after the run, like [`Self::caused_by`], since reading a service's output
+    /// is not the check's own business and a check that did it would be doing two
+    /// things.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub said: Option<String>,
 }
 
 impl Finding {
@@ -177,6 +190,7 @@ impl Finding {
             verdict,
             service: None,
             caused_by: None,
+            said: None,
         }
     }
 
@@ -391,6 +405,7 @@ fn timed_out(check: &dyn Check) -> Finding {
         category: check.category(),
         service: None,
         caused_by: None,
+        said: None,
         title: "Check timed out".to_owned(),
         verdict: Verdict::Unverified {
             reason: format!("did not finish within {seconds} seconds"),
@@ -622,6 +637,7 @@ depends_on = ["gluetun"]
             title: title.to_owned(),
             service: None,
             caused_by: None,
+            said: None,
             verdict,
         }
     }
