@@ -444,6 +444,26 @@ depends_on = ["gluetun"]
         );
     }
 
+    /// One profile per service is a shape rather than a rule to enforce: the field is a
+    /// required string, so a service naming several is unparsable and one naming none is
+    /// too. Worth a test of its own because it is the guarantee every closure rests on —
+    /// a service in two profiles would start twice, or not at all, depending on which
+    /// pass looked at it.
+    #[test]
+    fn a_service_declares_exactly_one_profile_and_no_other_shape_parses() {
+        let several = format!("{MINIMAL}\n[[service]]\nprofiles = [\"torrent\", \"usenet\"]\n");
+        assert!(
+            Manifest::from_toml(&several).is_err(),
+            "a service naming several profiles must not parse"
+        );
+
+        let none = MINIMAL.replace("profile = \"torrent\"", "");
+        assert!(
+            Manifest::from_toml(&none).is_err(),
+            "a service naming no profile must not parse either"
+        );
+    }
+
     #[test]
     fn refuses_a_field_it_does_not_know() {
         let text = format!("{MINIMAL}\n[[service]]\nunknown_field = true\n");

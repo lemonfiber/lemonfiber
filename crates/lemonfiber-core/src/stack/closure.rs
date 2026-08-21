@@ -469,6 +469,81 @@ mod tests {
         assert_eq!(problem.state, State::Guided);
     }
 
+    /// Forms are data. `fetch` is not a form this repository ships, and nothing here was
+    /// changed to teach the code about it — the manifest declares it and resolving reads
+    /// the manifest, which is the whole of what "adding a form needs no release" means.
+    #[test]
+    fn a_form_this_binary_has_never_heard_of_resolves_from_the_manifest_alone() {
+        let resolved = Manifest::from_toml(RENAMED)
+            .ok()
+            .and_then(|manifest| resolve(&manifest, &named(&["fetch"]), Protocols::both()).ok());
+
+        assert_eq!(
+            resolved.map(|plan| plan.profiles.into_iter().collect::<Vec<_>>()),
+            Some(named(&["nntp", "swarm"]))
+        );
+    }
+
+    /// A stack whose download profiles are called something else entirely.
+    ///
+    /// The names here are deliberately nothing like the shipped stack's: if narrowing ever
+    /// went back to recognising `usenet` and `torrent` by sight, every other test in this
+    /// file would still pass and this one would not.
+    const RENAMED: &str = r#"
+schema_version = 1
+stack_version = "1.0.0"
+min_cli_version = "0.1.0"
+
+[[profile]]
+id = "nntp"
+name = "Newsgroups"
+description = "Pulling from news servers"
+protocol = "usenet"
+
+[[profile]]
+id = "swarm"
+name = "Swarms"
+description = "Pulling from peers"
+protocol = "torrent"
+
+[[form]]
+id = "fetch"
+name = "Fetch"
+description = "Either way of pulling"
+profiles = ["nntp", "swarm"]
+"#;
+
+    /// Which profiles need a provider is the manifest's answer, not a name this code
+    /// knows. The two ids were constants here once, and a fork renaming either would have
+    /// kept parsing, kept resolving, and quietly stopped being narrowed — a torrent
+    /// profile starting on a machine with no VPN configured.
+    #[test]
+    fn a_stack_that_renames_its_download_profiles_narrows_exactly_as_the_shipped_one_does() {
+        let usenet_only = Protocols {
+            usenet: true,
+            torrent: false,
+        };
+        let narrowed = Manifest::from_toml(RENAMED)
+            .ok()
+            .and_then(|manifest| resolve(&manifest, &named(&["fetch"]), usenet_only).ok());
+
+        assert_eq!(
+            narrowed
+                .as_ref()
+                .map(|plan| plan.profiles.iter().cloned().collect::<Vec<_>>()),
+            Some(named(&["nntp"])),
+            "the configured one runs, whatever it is called"
+        );
+        assert_eq!(
+            narrowed.map(|plan| plan.dropped),
+            Some(vec![Dropped {
+                profile: "swarm".to_owned(),
+                needs: Protocol::Torrent,
+            }]),
+            "and the one left out is named with the provider it wanted"
+        );
+    }
+
     /// A stack with a form that refuses company. The real stack has none, so
     /// the rule would otherwise be unexercised — and an unexercised rule is one
     /// that can be broken without anything noticing.
