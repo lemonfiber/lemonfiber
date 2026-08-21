@@ -17,14 +17,21 @@ use std::time::Duration;
 
 use lemonfiber_core::app::{start_progress, started, Ctx, Outcome};
 use lemonfiber_core::config::{Protocols, Settings};
+use lemonfiber_core::model::LifecycleReport;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::process::{Failure, Output, Progress};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
-/// The services this stack's `library` form holds.
-const LIBRARY: [&str; 4] = ["jellyfin", "sonarr", "radarr", "prowlarr"];
+/// Everything the `library` form declares — the services carrying the `media`
+/// profile, which is the one that form holds.
+const LIBRARY: [&str; 4] = [
+    "jellyfin",
+    "seerr",
+    "calibre-web-automated",
+    "audiobookshelf",
+];
 
 /// A context whose Compose answers this way, with the stack reported healthy.
 fn ctx(compose: Result<Output, Failure>) -> Ctx {
@@ -67,6 +74,19 @@ async fn narrated(ctx: &Ctx) -> Option<(Vec<String>, Option<i32>)> {
     Some((said, status))
 }
 
+/// What a start came to, or the reason it did not.
+///
+/// The reason is carried rather than folded into a `None`, because a start that
+/// refused and a start that reported something unexpected are different failures and
+/// an assertion that cannot tell them apart names neither.
+async fn reported(ctx: &Ctx, status: Option<i32>) -> Result<LifecycleReport, String> {
+    match started(ctx, &named(&["library"]), status).await {
+        Ok(Outcome::Lifecycle(report)) => Ok(report),
+        Ok(other) => Err(format!("not a lifecycle report: {other:?}")),
+        Err(problem) => Err(problem.summary.clone()),
+    }
+}
+
 /// The whole point: what Compose says reaches the caller while it is being said,
 /// rather than being swallowed and summarised once it is over.
 #[tokio::test]
@@ -107,18 +127,16 @@ async fn a_start_that_cannot_be_spawned_is_refused_rather_than_silent() {
 async fn a_start_that_succeeded_waits_for_its_services() {
     let ctx = ctx(Ok(spoke("")));
 
-    let report = match started(&ctx, &named(&["library"]), Some(0)).await {
-        Ok(Outcome::Lifecycle(report)) => Some(report),
-        _ => None,
-    };
+    let report = reported(&ctx, Some(0)).await;
 
     assert_eq!(
         report.as_ref().map(|report| report.status),
-        Some(Some(0)),
+        Ok(Some(0)),
         "the status it was given is the status it reports"
     );
-    assert!(
-        report.is_some_and(|report| !report.services.is_empty()),
+    assert_eq!(
+        report.map(|report| report.services.is_empty()),
+        Ok(false),
         "and it waited to find out what each service ended up doing"
     );
 }
@@ -129,13 +147,10 @@ async fn a_start_that_succeeded_waits_for_its_services() {
 async fn a_start_that_failed_is_not_then_waited_on() {
     let ctx = ctx(Ok(spoke("")));
 
-    let report = match started(&ctx, &named(&["library"]), Some(1)).await {
-        Ok(Outcome::Lifecycle(report)) => Some(report),
-        _ => None,
-    };
+    let report = reported(&ctx, Some(1)).await;
 
     assert_eq!(
         report.map(|report| (report.status, report.services.is_empty())),
-        Some((Some(1), true))
+        Ok((Some(1), true))
     );
 }
