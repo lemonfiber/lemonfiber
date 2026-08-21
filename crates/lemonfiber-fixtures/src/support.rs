@@ -178,6 +178,22 @@ impl Reporting {
         self
     }
 
+    /// The same engine, with something to say about a service at a given moment.
+    ///
+    /// The stamp is what the container itself claims, which is the only thing a
+    /// reader can order several services by — so a test about ordering needs to set
+    /// it, and one about content does not.
+    #[must_use]
+    pub fn saying_at(mut self, service: &str, at: &str, line: &str) -> Self {
+        self.said.push(LogLine {
+            service: service.to_owned(),
+            stream: Stream::Stdout,
+            at: Some(at.to_owned()),
+            line: line.to_owned(),
+        });
+        self
+    }
+
     /// The same engine, scripted to answer a VPN probe (public address, country,
     /// forwarded port) so the dashboard's VPN panel can be driven.
     #[must_use]
