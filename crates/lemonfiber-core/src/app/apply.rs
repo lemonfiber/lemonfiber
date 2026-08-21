@@ -271,7 +271,7 @@ mod tests {
     use crate::journal::{Change, Kind};
     use crate::platform::Environment;
     use crate::stack::Source;
-    use crate::wizard::{Answer, Library, Phase, Wizard};
+    use crate::wizard::{Answer, Library, Phase, Vpn, Wizard};
 
     /// A journal line for a directory apply created, pinned to the path stated
     /// here.
@@ -323,6 +323,7 @@ mod tests {
         wizard
             .answer(Answer::Protocols(Protocols::both()))
             .unwrap_or(());
+        wizard.answer(Answer::Vpn(Vpn::Carrying)).unwrap_or(());
         wizard
             .answer(Answer::DataLocation(data_root.to_path_buf()))
             .unwrap_or(());

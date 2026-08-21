@@ -15,9 +15,33 @@ use std::path::{Path, PathBuf};
 use crate::ports::filesystem::FileSystem;
 use crate::storage::{self, Linked};
 use crate::validate::{Credential, Validation, Validator};
-use crate::wizard::{Answer, Indexer, Provider};
+use crate::wizard::{Answer, Indexer, Provider, Vpn};
 
 use super::{CredentialChoice, Prompt, StorageWarning};
+
+/// Ask whether a VPN carries the torrents, and where none does, make sure the
+/// operator chose that knowingly.
+///
+/// Torrents put the home address in front of every peer in a swarm, which is the
+/// one consequence of a protocol choice the operator cannot discover for
+/// themselves afterwards. So a "no" is not taken at face value: what it exposes is
+/// stated, and going on has to be said a second time.
+///
+/// It never refuses. Declining the warning returns to the question rather than
+/// ending setup, and answering that a VPN carries it is always available — so the
+/// loop cannot wedge, and an operator who genuinely wants an unprotected run gets
+/// one. Warned and recorded, so a later diagnosis reads it as a decision rather
+/// than an oversight.
+pub(super) fn resolve_vpn(prompt: &dyn Prompt) -> Answer {
+    loop {
+        if prompt.vpn() {
+            return Answer::Vpn(Vpn::Carrying);
+        }
+        if prompt.unprotected() {
+            return Answer::Vpn(Vpn::Absent);
+        }
+    }
+}
 
 /// Ask for a data location and test what it can do, until one is settled on.
 ///

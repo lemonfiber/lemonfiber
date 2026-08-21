@@ -29,7 +29,9 @@ mod plan;
 mod recovery;
 mod steps;
 
-pub use answers::{Answer, Answers, Credentials, Indexer, Library, Provider, Rejected, Usenet};
+pub use answers::{
+    Answer, Answers, Credentials, Indexer, Library, Provider, Rejected, Usenet, Vpn,
+};
 pub use plan::{on_off, Plan, APPLY, ENV_FILE};
 pub use recovery::{Choice, Recovery, Resolution, Status};
 pub use steps::{offer_setup, Direction, Phase, Progress, Step};
@@ -128,6 +130,9 @@ impl Wizard {
             // A Usenet provider is only for a Usenet run; a torrent-only or
             // library-only one has no provider to give.
             Step::Provider => matches!(self.progress.answers.protocols, Some(p) if p.usenet),
+            // Only torrents expose the home address to peers, so only a torrent run
+            // has a tunnel worth asking about. Usenet goes to one provider over TLS.
+            Step::Vpn => matches!(self.progress.answers.protocols, Some(p) if p.torrent),
             _ => true,
         }
     }
@@ -142,6 +147,7 @@ impl Wizard {
     pub fn answer(&mut self, answer: Answer) -> Result<(), Rejected> {
         match answer {
             Answer::Protocols(protocols) => self.progress.answers.protocols = Some(protocols),
+            Answer::Vpn(vpn) => self.progress.answers.vpn = Some(vpn),
             Answer::DataLocation(path) => self.progress.answers.data_location = Some(path),
             Answer::Credentials(indexer) => {
                 self.progress.answers.credentials = match indexer {
@@ -237,6 +243,7 @@ impl Wizard {
         let answers = &self.progress.answers;
         match step {
             Step::Protocols => answers.protocols.is_some(),
+            Step::Vpn => answers.vpn.is_some(),
             Step::DataLocation => answers.data_location.is_some(),
             Step::Credentials => !matches!(answers.credentials, Credentials::Unanswered),
             Step::Provider => !matches!(answers.usenet, Usenet::Unanswered),
@@ -349,7 +356,7 @@ mod tests {
 
     use super::{
         offer_setup, Answer, Choice, Library, Phase, Progress, Recovery, Resolution, Status, Step,
-        Wizard,
+        Vpn, Wizard,
     };
     use crate::config::env::EnvFile;
     use crate::config::Protocols;
@@ -385,6 +392,7 @@ mod tests {
         wizard
             .answer(Answer::Protocols(Protocols::both()))
             .unwrap_or(());
+        wizard.answer(Answer::Vpn(Vpn::Carrying)).unwrap_or(());
         wizard
             .answer(Answer::DataLocation(PathBuf::from("/srv/media")))
             .unwrap_or(());

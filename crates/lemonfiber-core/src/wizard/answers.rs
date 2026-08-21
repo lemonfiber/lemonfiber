@@ -62,6 +62,23 @@ pub struct Indexer {
     pub validated: bool,
 }
 
+/// Whether a VPN carries the torrent traffic, and where none does, that the
+/// operator was told what that costs and chose to go on.
+///
+/// Two states rather than a bool, because the second is not merely "no". Torrents
+/// expose the home address to every peer, so going without is a decision the
+/// operator has to make knowingly — and one a later run must not quietly re-ask,
+/// nor a diagnosis mistake for an oversight. Recording the acceptance is what
+/// makes it theirs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Vpn {
+    /// A VPN carries it.
+    Carrying,
+    /// Nothing does, and the operator confirmed they understood that.
+    Absent,
+}
+
 /// Where the credentials step stands: not yet reached, reached and left empty, or
 /// answered with an indexer.
 ///
@@ -152,6 +169,11 @@ pub struct Answers {
     /// resume.
     #[serde(default)]
     pub notifications: Option<Appetite>,
+    /// Whether a VPN carries the torrents, where torrents were chosen. Absent from
+    /// a progress file written before the question existed, so defaulted rather
+    /// than failing the resume.
+    #[serde(default)]
+    pub vpn: Option<Vpn>,
     /// Whether the stack starts on boot.
     pub autostart: Option<bool>,
 }
@@ -161,6 +183,9 @@ pub struct Answers {
 pub enum Answer {
     /// The protocol choice.
     Protocols(Protocols),
+    /// Whether a VPN carries the torrents, and where none does, that the operator
+    /// accepted what that means.
+    Vpn(Vpn),
     /// The data location.
     DataLocation(PathBuf),
     /// The indexer credential the operator settled on, or none where they entered

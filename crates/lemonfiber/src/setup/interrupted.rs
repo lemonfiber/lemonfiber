@@ -142,7 +142,7 @@ mod tests {
     use lemonfiber_core::config::Protocols;
     use lemonfiber_core::journal::{Change, Kind};
     use lemonfiber_core::platform::Environment;
-    use lemonfiber_core::wizard::{Answer, Choice, Library, Phase, Wizard};
+    use lemonfiber_core::wizard::{Answer, Choice, Library, Phase, Vpn, Wizard};
 
     use super::{ask_recovery_choice, describe, discard, recover_setup};
     use crate::setup::tests::{ctx, working_ctx, Scripted};
@@ -277,6 +277,7 @@ mod tests {
         let mut wizard = Wizard::new(Environment::MacOs);
         for answer in [
             Answer::Protocols(Protocols::both()),
+            Answer::Vpn(Vpn::Carrying),
             Answer::DataLocation(paths.data_dir().join("media")),
             Answer::Credentials(None),
             Answer::Provider(None),
