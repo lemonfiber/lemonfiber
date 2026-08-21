@@ -1,14 +1,21 @@
 //! The reads that arrive over time rather than all at once.
 //!
-//! Logs and a pull produce their output as they go, so neither is a value that comes
-//! back from a command — they stream, and a caller gets a receiver rather than a
+//! Logs, a pull and a start produce their output as they go, so none is a value that
+//! comes back from a command — they stream, and a caller gets a receiver rather than a
 //! report. Kept apart from the engine work beside them because the shape of the answer
 //! is different: everything else there runs a thing and then says what happened.
+//!
+//! A start is the odd one, because it is both: Compose narrates while it works *and*
+//! there is a report at the end. So it is two calls rather than one — the stream, then
+//! the report — and both settle what they are about through the same [`super::readied`]
+//! the waited-on path uses, so a streamed start and a buffered one cannot disagree
+//! about which services a form holds.
 
 use tokio::sync::mpsc::Receiver;
 
-use super::{compose, Ctx};
+use super::{compose, readied, settled_into, Ctx};
 use crate::error::{Diagnose, Problem};
+use crate::model::Outcome;
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
 use crate::stack::closure::resolve;
@@ -120,4 +127,57 @@ pub async fn pull_progress(
         .stream(&command)
         .await
         .map_err(|err| Box::new(err.problem()))
+}
+
+/// Start these forms, streaming what Compose says as it says it.
+///
+/// A start is minutes of silence otherwise. Compose narrates pulling an image,
+/// creating a network and starting each container, and a surface that swallowed all
+/// of it and printed a summary at the end would be hiding the only evidence there is
+/// that anything is happening — on the one command where the operator has most reason
+/// to wonder whether it has hung.
+///
+/// The images come down here too, where a start needs any: Compose pulls what is
+/// missing before it starts anything, and that is the part that takes the minutes.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be resolved
+/// or the program cannot be spawned.
+pub async fn start_progress(
+    ctx: &Ctx,
+    forms: &[String],
+) -> Result<Receiver<Progress>, Box<Problem>> {
+    let (_, command, _) = readied(ctx, forms, &Action::Up).await?;
+    ctx.runner
+        .stream(&command)
+        .await
+        .map_err(|err| Box::new(err.problem()))
+}
+
+/// What a start came to, once its command has run and its services have settled.
+///
+/// The other half of [`start_progress`]: the stream says what happened as it happened,
+/// and this says what it amounts to. Resolving a second time costs nothing — it reads
+/// the manifest and no further — and it keeps the report identical to the one the
+/// waited-on path builds rather than a second assembly of the same fields.
+///
+/// Waits for the services to become usable, because "started" that means "a process
+/// exists" is a claim the operator will disprove by opening a browser.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be resolved
+/// or the engine cannot be reached while waiting.
+pub async fn started(
+    ctx: &Ctx,
+    forms: &[String],
+    status: Option<i32>,
+) -> Result<Outcome, Box<Problem>> {
+    let (manifest, _, mut report) = readied(ctx, forms, &Action::Up).await?;
+    report.status = status;
+    if status == Some(0) {
+        settled_into(ctx, &manifest, &mut report).await?;
+    }
+    Ok(Outcome::Lifecycle(report))
 }

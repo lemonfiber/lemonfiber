@@ -10,13 +10,14 @@ use std::time::Duration;
 
 use lemonfiber_core::adapters::Disk;
 use lemonfiber_core::app::{
-    dispatch, in_flight, logs, pull_progress, supervise, Command, Ctx, WATCH,
+    dispatch, in_flight, logs, pull_progress, start_progress, started, supervise, Command, Ctx,
+    WATCH,
 };
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
 
-use crate::exit::{complain, FAILURE};
+use crate::exit::{complain, settled, FAILURE};
 use crate::keyboard::{Console, Keyboard};
 use crate::prompt::Answers as _;
 use crate::render::downloads::interrupting;
@@ -102,7 +103,7 @@ pub(crate) async fn pull_showing(ctx: &Ctx, forms: &[String], json: bool) -> Res
     let mut failed = false;
     while let Some(event) = progress.recv().await {
         match event {
-            PullEvent::Line(line) => emit_pull_line(&line, json),
+            PullEvent::Line(line) => emit_line("pull", &line, json),
             // A non-zero exit is the pull's own report that an image did not come
             // down; the operator is told, and a script sees a non-zero code.
             PullEvent::Ended(status) => failed = status != Some(0),
@@ -142,16 +143,19 @@ pub(crate) async fn pull_rehearsal(
     }
 }
 
-/// Render one line of a pull's progress — wrapped in an envelope under `--json`,
-/// indented beneath the pull for a person to read.
-pub(crate) fn emit_pull_line(line: &str, json: bool) {
+/// Render one line a narrated command wrote — wrapped in an envelope under `--json`,
+/// indented beneath the command for a person to read.
+///
+/// The kind is the caller's, because a consumer filtering a `--json` stream is
+/// filtering on it: a pull's lines and a start's are different things happening.
+pub(crate) fn emit_line(kind: &'static str, line: &str, json: bool) {
     if !json {
         println!("  {line}");
         return;
     }
     println!(
         "{}",
-        Envelope::new("pull", line)
+        Envelope::new(kind, line)
             .to_json()
             .unwrap_or(UNRENDERABLE.to_owned())
     );
@@ -222,6 +226,61 @@ async fn drained(ctx: &Ctx, forms: &[String]) {
     }
 }
 
+/// Start the forms, showing what Compose says as it says it.
+///
+/// A start is minutes of silence otherwise, and the silence is the problem: pulling
+/// an image, creating a network and waiting on a health check all look identical from
+/// outside, and the one that has hung looks identical to all three. So Compose's own
+/// narration goes to the screen as it arrives, and the report follows it.
+pub(crate) async fn start(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
+    // A rehearsal runs nothing, so there is nothing to narrate; the buffered path
+    // already reports what would run, which is the whole of what a rehearsal is.
+    if ctx.dry_run {
+        return rehearsed(ctx, forms, json).await;
+    }
+
+    let mut progress = match start_progress(ctx, forms).await {
+        Ok(opened) => opened,
+        Err(problem) => return complain(&problem),
+    };
+    let mut status = None;
+    while let Some(event) = progress.recv().await {
+        match event {
+            PullEvent::Line(line) => emit_line("start", &line, json),
+            PullEvent::Ended(code) => status = code,
+        }
+    }
+
+    // The report is asked for whatever the status was: a start that failed part way
+    // has still started something, and which services came up is the first thing an
+    // operator needs in order to do anything about the ones that did not.
+    match started(ctx, forms, status).await {
+        Ok(outcome) => {
+            render(&outcome, json);
+            settled(&outcome)
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// A rehearsal of a start: what would run, rendered the way every other answer is.
+async fn rehearsed(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
+    match dispatch(
+        Command::Up {
+            forms: forms.to_vec(),
+        },
+        ctx,
+    )
+    .await
+    {
+        Ok(outcome) => {
+            render(&outcome, json);
+            settled(&outcome)
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::exit::{shown, success};
@@ -236,7 +295,7 @@ mod tests {
     use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
     use lemonfiber_core::stack::Source;
 
-    use super::{emit_pull_line, guard, pull, pull_showing, stream, Ctx};
+    use super::{emit_line, guard, pull, pull_showing, stream, Ctx};
 
     /// A runner that answers every command the same way.
     struct Answering {
@@ -385,8 +444,8 @@ mod tests {
     fn each_pull_line_reads_as_prose_or_as_an_envelope() {
         // Both are exercised for their own sake: a person reads one, a script the
         // other, and neither should ever be handed the wrong shape.
-        emit_pull_line("Pulling sonarr", false);
-        emit_pull_line("Pulling sonarr", true);
+        emit_line("pull", "Pulling sonarr", false);
+        emit_line("pull", "Pulling sonarr", true);
     }
 
     /// A context whose engine answers, for the paths that need one to.
