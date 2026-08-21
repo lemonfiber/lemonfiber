@@ -36,7 +36,7 @@ use std::time::Duration;
 
 use lemonfiber_core::app::{dashboard::gather, logs, Ctx};
 use lemonfiber_core::dashboard::Snapshot;
-use lemonfiber_core::ports::docker::{LogLine, LogQuery};
+use lemonfiber_core::ports::docker::{Lifecycle, LogLine, LogQuery};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -56,6 +56,13 @@ use crate::setup::Bare;
 /// finished, so a stack that takes three seconds to answer refreshes every three
 /// rather than queueing gathers it will never catch up on.
 const TICK: Duration = Duration::from_secs(1);
+
+/// How often the viewer asks the engine what each service is doing.
+///
+/// Two seconds rather than the screen's own tick: a restart is not something an
+/// operator needs told within the second, and this is the one call the log viewer
+/// makes that the stack has to answer.
+const LOOKING: Duration = Duration::from_secs(2);
 
 /// How long the input reader waits before looking again.
 ///
@@ -216,17 +223,18 @@ pub(crate) async fn watching(
             return ExitCode::FAILURE;
         }
     };
-    let outcome = following(&mut screen, lines).await;
+    let outcome = following(&mut screen, ctx, lines).await;
     drop(screen);
     outcome
 }
 
 /// The loop itself, with the terminal already in hand.
-async fn following(screen: &mut Screen, mut lines: Receiver<LogLine>) -> ExitCode {
+async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>) -> ExitCode {
     let (presses, mut arriving) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&presses, wanted));
 
     let mut viewer = Viewer::opened();
+    let mut looking = tokio::time::interval(LOOKING);
     // The stream ending is not the screen ending. A stopped service has plenty
     // worth reading in what it said on the way down, and closing the view at that
     // moment would take it away exactly when it is wanted.
@@ -247,11 +255,36 @@ async fn following(screen: &mut Screen, mut lines: Receiver<LogLine>) -> ExitCod
                 }
                 None => ended = true,
             },
+            // Awaited here rather than on a task of its own, unlike the dashboard's
+            // gather: this is one call to the local engine socket, not a dozen to
+            // services over the network, and spawning it would buy microseconds at
+            // the cost of a second moving part.
+            _ = looking.tick() => {
+                if let Some(now) = states(ctx).await {
+                    viewer.doing(&now);
+                }
+            },
         }
     }
     drop(arriving);
     let _ = reader.join();
     ExitCode::SUCCESS
+}
+
+/// What each service is doing, or nothing where the engine will not say.
+///
+/// Nothing rather than an empty list where the engine will not say. Silence is not
+/// "everything stopped", and handing the viewer an empty list would both invent that
+/// and throw away what it knew — so a hiccup leaves its account of the stack intact
+/// and the next answer is compared against the last real one.
+async fn states(ctx: &Ctx) -> Option<Vec<(String, Lifecycle)>> {
+    let containers = ctx.engine.list(&ctx.settings.project).await.ok()?;
+    Some(
+        containers
+            .into_iter()
+            .map(|container| (container.service, container.lifecycle))
+            .collect(),
+    )
 }
 
 /// Take what is already waiting, up to what one pass allows.
