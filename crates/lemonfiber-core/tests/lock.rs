@@ -160,13 +160,15 @@ async fn giving_the_stack_back_lets_the_next_run_have_it() {
         released(&ctx(&files), claim).await;
     }
 
-    assert!(
-        claimed(&ctx(&files)).await.is_ok(),
-        "the claim was given back, so the stack is free"
-    );
+    // Looked at before claiming again, because claiming again writes the marker
+    // back and would hide whether releasing had removed it.
     assert!(
         files.at(&lockfile()).is_none(),
-        "and nothing was left behind"
+        "giving it back left nothing behind"
+    );
+    assert!(
+        claimed(&ctx(&files)).await.is_ok(),
+        "so the next run can have the stack"
     );
 }
 
