@@ -22,19 +22,73 @@ pub struct Scripted(pub Result<Output, Failure>);
 #[async_trait]
 impl Runner for Scripted {
     async fn run(&self, _argv: &[String]) -> Result<Output, Failure> {
-        match &self.0 {
-            Ok(output) => Ok(output.clone()),
-            Err(Failure::NotFound { program }) => Err(Failure::NotFound {
-                program: program.clone(),
-            }),
-            Err(Failure::Unusable { program, reason }) => Err(Failure::Unusable {
-                program: program.clone(),
-                reason: reason.clone(),
-            }),
-        }
+        echoed(&self.0)
     }
     // `stream` uses the trait's default (run then replay); a test that drives a
     // streamed pull exercises it.
+}
+
+/// A runner that answers the same way every time and remembers what it was asked.
+///
+/// [`Scripted`] throws the argument vector away, which is right until a test's claim
+/// is about a command that should **not** have run. Proving that a form which failed
+/// to start was never then torn down is a statement about everything the runner was
+/// handed, and cannot be made from what came back out of it.
+pub struct Recording {
+    answer: Result<Output, Failure>,
+    seen: std::sync::Mutex<Vec<Vec<String>>>,
+}
+
+impl Recording {
+    /// A runner that always answers this way.
+    #[must_use]
+    pub fn answering(answer: Result<Output, Failure>) -> Self {
+        Self {
+            answer,
+            seen: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Whether any command it was handed used this Compose subcommand.
+    ///
+    /// A poisoned lock reads as nothing having been run. That is the answer that
+    /// fails a test asserting something happened, rather than the one that lets a
+    /// test asserting nothing happened pass without having looked.
+    #[must_use]
+    pub fn ran(&self, subcommand: &str) -> bool {
+        self.seen.lock().is_ok_and(|seen| {
+            seen.iter()
+                .any(|argv| argv.iter().any(|word| word == subcommand))
+        })
+    }
+}
+
+#[async_trait]
+impl Runner for Recording {
+    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+        if let Ok(mut seen) = self.seen.lock() {
+            seen.push(argv.to_vec());
+        }
+        echoed(&self.answer)
+    }
+}
+
+/// The scripted answer again, since a [`Failure`] cannot be cloned.
+///
+/// Shared by both runners rather than written twice: the arms exist only because the
+/// error type is not `Clone`, and a second copy would be a second place to forget a
+/// variant when one is added.
+fn echoed(answer: &Result<Output, Failure>) -> Result<Output, Failure> {
+    match answer {
+        Ok(output) => Ok(output.clone()),
+        Err(Failure::NotFound { program }) => Err(Failure::NotFound {
+            program: program.clone(),
+        }),
+        Err(Failure::Unusable { program, reason }) => Err(Failure::Unusable {
+            program: program.clone(),
+            reason: reason.clone(),
+        }),
+    }
 }
 
 /// An engine that reports whatever the test put in it.
