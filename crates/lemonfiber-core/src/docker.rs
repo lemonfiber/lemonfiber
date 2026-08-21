@@ -233,6 +233,53 @@ pub fn condition(services: &[Service]) -> Condition {
     Condition::Partial
 }
 
+/// The order to stop these in: whatever depends on a service goes down before it does.
+///
+/// A torrent client shares the tunnel's network namespace, so the moment the tunnel
+/// stops the client has no network at all — mid-write, mid-announce, with peers it
+/// cannot tell. Stopping the client first costs a few seconds and leaves it able to
+/// shut down the way it knows how.
+///
+/// Read from each service's own `depends_on` rather than from a rule about VPNs. The
+/// tunnel is the case that matters on this stack, but "stop a thing before the thing
+/// it needs" is the general shape, and a stack that adds another such pair gets the
+/// same treatment without lemonfiber learning about it.
+///
+/// Ties are broken by name so the same request always produces the same command.
+///
+/// Services that depend on each other in a circle cannot be ordered, and are emitted
+/// as they stand: refusing to stop them would be worse than stopping them in an order
+/// nobody can fault, since there is no correct one.
+#[must_use]
+pub fn stopping_order(running: &[Service], stopping: &[String]) -> Vec<String> {
+    let depends = |dependent: &str, on: &str| {
+        running
+            .iter()
+            .any(|service| service.id == dependent && service.depends_on.iter().any(|id| id == on))
+    };
+
+    let mut left: Vec<String> = stopping.to_vec();
+    left.sort();
+    let mut order = Vec::with_capacity(left.len());
+
+    while !left.is_empty() {
+        let (ready, waiting): (Vec<String>, Vec<String>) = left
+            .iter()
+            .cloned()
+            .partition(|id| !left.iter().any(|other| depends(other, id)));
+
+        if ready.is_empty() {
+            // A circle. There is no order that satisfies it, so the remainder goes as
+            // it stands rather than the whole stop being refused over it.
+            order.extend(waiting);
+            return order;
+        }
+        order.extend(ready);
+        left = waiting;
+    }
+    order
+}
+
 /// The services that starting is still waiting on.
 #[must_use]
 pub fn unsettled(services: &[Service]) -> Vec<&Service> {
@@ -247,7 +294,7 @@ pub fn unsettled(services: &[Service]) -> Vec<&Service> {
 mod tests {
     use lemonfiber_manifest::{Criticality, Manifest};
 
-    use super::{condition, read, survey, unsettled, Condition, State};
+    use super::{condition, read, stopping_order, survey, unsettled, Condition, Service, State};
     use crate::ports::docker::{Container, Health, Lifecycle};
 
     const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
@@ -279,6 +326,102 @@ mod tests {
             let running = container("sonarr", Lifecycle::Running, health);
             assert_eq!(read(&running), expected, "{health:?}");
         }
+    }
+
+    /// One service depending on another, for the ordering tests.
+    fn depending(id: &str, on: &[&str]) -> Service {
+        Service {
+            id: id.to_owned(),
+            name: id.to_owned(),
+            profile: "torrent".to_owned(),
+            state: State::Healthy,
+            criticality: Criticality::Core,
+            depends_on: on.iter().map(|id| (*id).to_owned()).collect(),
+            exit: None,
+        }
+    }
+
+    /// The case the requirement is about: the client shares the tunnel's network, so
+    /// the tunnel going first would take the client's network out from under it.
+    #[test]
+    fn the_tunnel_goes_down_after_what_is_using_its_network() {
+        let running = vec![
+            depending("gluetun", &[]),
+            depending("qbittorrent", &["gluetun"]),
+        ];
+        assert_eq!(
+            stopping_order(&running, &["gluetun".to_owned(), "qbittorrent".to_owned()]),
+            vec!["qbittorrent".to_owned(), "gluetun".to_owned()],
+            "named the other way round, and still stopped in this one"
+        );
+    }
+
+    /// Read from what each service declares rather than from a rule about VPNs, so a
+    /// stack that adds another such pair gets the same treatment.
+    #[test]
+    fn anything_depended_on_goes_last_whatever_it_is() {
+        let running = vec![
+            depending("under", &[]),
+            depending("over", &["under"]),
+            depending("above", &["over"]),
+        ];
+        assert_eq!(
+            stopping_order(
+                &running,
+                &["under".to_owned(), "over".to_owned(), "above".to_owned()]
+            ),
+            vec!["above".to_owned(), "over".to_owned(), "under".to_owned()],
+            "each one goes before the thing it needs"
+        );
+    }
+
+    /// The same request must produce the same command, or a golden file tests nothing.
+    #[test]
+    fn services_that_do_not_depend_on_each_other_are_ordered_by_name() {
+        let running = vec![
+            depending("sonarr", &[]),
+            depending("radarr", &[]),
+            depending("bazarr", &[]),
+        ];
+        assert_eq!(
+            stopping_order(
+                &running,
+                &[
+                    "sonarr".to_owned(),
+                    "bazarr".to_owned(),
+                    "radarr".to_owned()
+                ]
+            ),
+            vec![
+                "bazarr".to_owned(),
+                "radarr".to_owned(),
+                "sonarr".to_owned()
+            ]
+        );
+    }
+
+    /// A circle has no order that satisfies it. Stopping them in one nobody can fault
+    /// beats refusing to stop them at all.
+    #[test]
+    fn services_that_need_each_other_are_still_stopped() {
+        let running = vec![depending("one", &["other"]), depending("other", &["one"])];
+        let order = stopping_order(&running, &["one".to_owned(), "other".to_owned()]);
+        assert_eq!(order.len(), 2, "both are stopped: {order:?}");
+        assert!(order.contains(&"one".to_owned()) && order.contains(&"other".to_owned()));
+    }
+
+    /// A service depending on something that is staying up is not held back by it.
+    #[test]
+    fn a_dependency_that_is_not_being_stopped_does_not_hold_anything_back() {
+        let running = vec![
+            depending("gluetun", &[]),
+            depending("qbittorrent", &["gluetun"]),
+        ];
+        assert_eq!(
+            stopping_order(&running, &["qbittorrent".to_owned()]),
+            vec!["qbittorrent".to_owned()],
+            "only what was asked for is stopped, and nothing waits on the rest"
+        );
     }
 
     #[test]
