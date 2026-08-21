@@ -719,6 +719,54 @@ mod tests {
         }
     }
 
+    /// Asked for twice, an operation does the same thing twice rather than refusing the
+    /// second time. The stack is the state, not a record of what has been asked for, so
+    /// an operator who is unsure whether a command landed can simply run it again.
+    #[tokio::test]
+    async fn asking_twice_is_not_an_error_the_second_time() {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = a_context()
+            .runner(Arc::new(Scripted(Ok(spoke("")))))
+            .engine(Arc::new(Reporting::holding(
+                &LIBRARY,
+                Lifecycle::Running,
+                Health::Healthy,
+            )))
+            .settings(settings)
+            .build()
+            .with_http(Fake::scripted(Vec::new()));
+
+        for command in [
+            Command::Up {
+                forms: vec!["library".to_owned()],
+            },
+            Command::Down {
+                forms: vec!["library".to_owned()],
+            },
+            Command::Switch {
+                forms: vec!["library".to_owned()],
+            },
+        ] {
+            let once = report(dispatch(command.clone(), &ctx).await)
+                .map(|report| (report.action, report.status));
+            let again = report(dispatch(command.clone(), &ctx).await)
+                .map(|report| (report.action, report.status));
+
+            assert_eq!(
+                once, again,
+                "the second {command:?} answers as the first did"
+            );
+            assert_eq!(
+                once.as_ref().map(|(_, status)| *status),
+                Some(Some(0)),
+                "and neither is a refusal: {once:?}"
+            );
+        }
+    }
+
     /// The environment checks are about the machine rather than about anything
     /// running on it, so none of their findings names a service — and a run with
     /// nothing to quote asks the engine for nothing at all.
