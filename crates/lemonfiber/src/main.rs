@@ -18,6 +18,7 @@ mod dashboard;
 mod engine;
 mod exit;
 mod keyboard;
+mod logs;
 mod maintain;
 mod prompt;
 mod render;
@@ -65,8 +66,17 @@ async fn main() -> ExitCode {
             services,
             form,
             follow,
+            watch,
             tail,
-        } => return stream(&ctx, &form, &services, follow, tail, cli.json).await,
+        } => {
+            // A screen and a stream are different answers to the same request, and
+            // only one of them can have the terminal.
+            return if watch {
+                terminal::watching(&ctx, &form, &services, tail).await
+            } else {
+                stream(&ctx, &form, &services, follow, tail, cli.json).await
+            };
+        }
         // A watch is long-running and produces one report at its end, not a value
         // that arrives once, so like streaming it does not go through dispatch.
         Request::Watch { forms } => return guard(&ctx, &forms, cli.json).await,

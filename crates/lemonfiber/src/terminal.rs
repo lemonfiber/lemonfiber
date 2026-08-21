@@ -3,10 +3,14 @@
 //! A file of its own, and deliberately the only untested one in this feature,
 //! because it is the part no test can stand in for: a real terminal in raw mode,
 //! a real keyboard, and a loop that runs until somebody stops it. Everything
-//! about *what* the screen says is in [`crate::dashboard`], where it is drawn into
-//! a buffer and read back.
+//! about *what* a screen says lives elsewhere — [`crate::dashboard`] and
+//! [`crate::logs`] — where it is drawn into a buffer and read back.
 //!
-//! Two properties are the whole reason this is shaped the way it is.
+//! Both full-screen views are here rather than one each, because what they share is
+//! all of the hard part: taking the terminal, giving it back, and reading a keyboard
+//! without letting the reading hold anything else up.
+//!
+//! Three properties are the whole reason this is shaped the way it is.
 //!
 //! **A refresh must never hold up a keypress.** Gathering talks to Docker and to
 //! half a dozen services, and any of them may take seconds. So the gather runs as
@@ -18,14 +22,21 @@
 //! screen are global state on a device this process does not own; leaving them on
 //! hands the operator a shell that no longer echoes. The restore is a `Drop`, so
 //! it runs on the ordinary way out, on an error, and on a panic alike.
+//!
+//! **A flood must never lock the operator out.** A service in a restart loop can
+//! write faster than any screen can draw, and a viewer that worked through all of it
+//! would stop answering the one key that would narrow the filter. So a pass takes a
+//! bounded number of the lines waiting and lets the oldest of the rest go, counted
+//! and said on the screen.
 
 use std::io::{stdout, Stdout};
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{dashboard::gather, Ctx};
+use lemonfiber_core::app::{dashboard::gather, logs, Ctx};
 use lemonfiber_core::dashboard::Snapshot;
+use lemonfiber_core::ports::docker::{LogLine, LogQuery};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -33,8 +44,10 @@ use ratatui::crossterm::terminal::{
 use ratatui::crossterm::ExecutableCommand as _;
 use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
+use tokio::sync::mpsc::Receiver;
 
 use crate::exit::complain;
+use crate::logs::{sampled, Press, Viewer};
 use crate::setup::Bare;
 
 /// How often the screen gathers afresh.
@@ -86,14 +99,14 @@ async fn dashboard(ctx: Ctx) -> ExitCode {
 async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
     let ctx = Arc::new(ctx);
     let (keys, mut typed) = tokio::sync::mpsc::channel(16);
-    let reader = std::thread::spawn(move || read_keys(&keys));
+    let reader = std::thread::spawn(move || read_keyboard(&keys, meaning));
 
     let mut snapshot: Option<Snapshot> = None;
     let mut refreshing = tokio::spawn(refresh(Arc::clone(&ctx), None));
     loop {
         if let Some(snapshot) = snapshot.as_ref() {
             if let Err(err) = screen.draw(snapshot) {
-                return complain(&drawing(&err.to_string()));
+                return complain(&drawing("dashboard", &err.to_string()));
             }
         }
         tokio::select! {
@@ -143,7 +156,12 @@ enum Key {
 ///
 /// A thread rather than an async reader: reading a terminal blocks, and blocking
 /// the runtime is what would make the refresh stutter.
-fn read_keys(keys: &tokio::sync::mpsc::Sender<Key>) {
+///
+/// What a key means is the caller's, because the two screens want different things
+/// from the same keyboard — the dashboard wants two commands, the log viewer wants
+/// most characters as text. What is shared is everything else: the poll, the press
+/// filter, and knowing to stop when nobody is listening.
+fn read_keyboard<T>(keys: &tokio::sync::mpsc::Sender<T>, meaning: fn(KeyEvent) -> Option<T>) {
     loop {
         let Ok(true) = event::poll(KEYS) else {
             if keys.is_closed() {
@@ -178,7 +196,112 @@ const fn meaning(key: KeyEvent) -> Option<Key> {
     }
 }
 
-/// The terminal, in the state the dashboard needs it, for as long as it is held.
+/// Read a live log tail on a screen of its own, until the operator leaves it.
+pub(crate) async fn watching(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    tail: u32,
+) -> ExitCode {
+    // Opened before the terminal is taken, so a stack that cannot be read says why
+    // on an ordinary terminal rather than flashing an alternate screen and leaving.
+    let lines = match logs(ctx, forms, services, LogQuery { tail, follow: true }).await {
+        Ok(opened) => opened,
+        Err(problem) => return complain(&problem),
+    };
+    let mut screen = match Screen::open() {
+        Ok(screen) => screen,
+        Err(err) => {
+            eprintln!("error: this terminal cannot show the log viewer: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let outcome = following(&mut screen, lines).await;
+    drop(screen);
+    outcome
+}
+
+/// The loop itself, with the terminal already in hand.
+async fn following(screen: &mut Screen, mut lines: Receiver<LogLine>) -> ExitCode {
+    let (presses, mut pressed) = tokio::sync::mpsc::channel(16);
+    let reader = std::thread::spawn(move || read_keyboard(&presses, wanted));
+
+    let mut viewer = Viewer::opened();
+    // The stream ending is not the screen ending. A stopped service has plenty
+    // worth reading in what it said on the way down, and closing the view at that
+    // moment would take it away exactly when it is wanted.
+    let mut ended = false;
+    while viewer.open() {
+        if let Err(err) = screen.tail(&viewer) {
+            return complain(&drawing("log viewer", &err.to_string()));
+        }
+        tokio::select! {
+            press = pressed.recv() => match press {
+                Some(press) => viewer.pressed(press),
+                None => break,
+            },
+            line = lines.recv(), if !ended => match line {
+                Some(line) => {
+                    viewer.take(line);
+                    absorb(&mut viewer, &mut lines);
+                }
+                None => ended = true,
+            },
+        }
+    }
+    drop(pressed);
+    let _ = reader.join();
+    ExitCode::SUCCESS
+}
+
+/// Take what is already waiting, up to what one pass allows.
+///
+/// The oldest of a backlog go, not the newest. On a live tail what matters is what
+/// is happening now, and keeping the front of the queue would show the operator a
+/// view that falls further behind the longer the flood lasts.
+fn absorb(viewer: &mut Viewer, lines: &mut Receiver<LogLine>) {
+    let (taking, letting_go) = sampled(lines.len());
+    for _ in 0..letting_go {
+        if lines.try_recv().is_err() {
+            break;
+        }
+    }
+    if letting_go > 0 {
+        viewer.outpaced_by(letting_go);
+    }
+    for _ in 0..taking {
+        let Ok(line) = lines.try_recv() else {
+            break;
+        };
+        viewer.take(line);
+    }
+}
+
+/// What a keypress asks the viewer for, or nothing for one it has no use for.
+///
+/// Ctrl-C is read as giving up rather than as the character it is: raw mode no
+/// longer turns it into a signal, so an operator who reaches for it is asking to
+/// back out — of a filter they were typing, or of the screen where they were not.
+const fn wanted(key: KeyEvent) -> Option<Press> {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return match key.code {
+            KeyCode::Char('c') => Some(Press::Abandon),
+            _ => None,
+        };
+    }
+    match key.code {
+        KeyCode::Char(character) => Some(Press::Typed(character)),
+        KeyCode::Backspace => Some(Press::Rubout),
+        KeyCode::Enter => Some(Press::Accept),
+        KeyCode::Esc => Some(Press::Abandon),
+        KeyCode::Up => Some(Press::Back),
+        KeyCode::Down => Some(Press::Forward),
+        KeyCode::End => Some(Press::Tail),
+        _ => None,
+    }
+}
+
+/// The terminal, in the state a full-screen view needs it, for as long as it is held.
 struct Screen {
     /// The ratatui terminal drawing into the alternate screen.
     terminal: Terminal<CrosstermBackend<Stdout>>,
@@ -200,6 +323,13 @@ impl Screen {
             .draw(|frame| crate::dashboard::draw(frame, snapshot))?;
         Ok(())
     }
+
+    /// Draw one frame of the log viewer.
+    fn tail(&mut self, viewer: &Viewer) -> std::io::Result<()> {
+        self.terminal
+            .draw(|frame| crate::logs::draw::draw(frame, viewer))?;
+        Ok(())
+    }
 }
 
 impl Drop for Screen {
@@ -213,11 +343,11 @@ impl Drop for Screen {
 }
 
 /// A screen that could not be drawn, as a problem rather than a panic.
-fn drawing(reason: &str) -> lemonfiber_core::error::Problem {
+fn drawing(what: &str, reason: &str) -> lemonfiber_core::error::Problem {
     lemonfiber_core::error::Problem::new(
         lemonfiber_core::error::Code::new("TUI-1"),
         lemonfiber_core::error::Severity::Error,
-        "the dashboard could not be drawn",
+        format!("the {what} could not be drawn"),
         "The terminal stopped accepting output, which usually means it was closed or resized \
          out from under the process.",
         lemonfiber_core::error::Remedy::new("Run it again in a terminal that stays open"),
