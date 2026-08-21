@@ -63,26 +63,68 @@ async fn settle(
         // Checked after the survey rather than before it, so a patience of zero
         // still reports what it saw rather than reporting nothing at all.
         if ctx.clock.now() >= deadline {
-            return Err(Box::new(never_settled(ctx, &waiting).await));
+            return Err(Box::new(never_settled(ctx, manifest, &waiting).await));
         }
 
         tokio::time::sleep(POLL).await;
     }
 }
 
+/// What the operator loses while these services are not running, in the stack's own
+/// words.
+///
+/// Read from the manifest's `without_it` rather than described here, for the reason
+/// the closure is computed rather than hardcoded: a stack that adds a service should
+/// not need a lemonfiber release to be able to say what its absence costs. A service
+/// the manifest does not describe contributes nothing rather than a placeholder — an
+/// empty sentence is better than a wrong one.
+fn costs(manifest: &lemonfiber_manifest::Manifest, waiting: &[String]) -> String {
+    let said: Vec<String> = manifest
+        .services
+        .iter()
+        .filter(|service| waiting.contains(&service.id))
+        .filter(|service| !service.without_it.is_empty())
+        .map(|service| format!("{} — {}", service.id, service.without_it))
+        .collect();
+
+    if said.is_empty() {
+        return String::new();
+    }
+    format!("What that costs, while it lasts: {}.", said.join("; "))
+}
+
 /// What to tell an operator whose stack did not finish starting.
 ///
 /// The services' own recent output is attached, because the explanation is
 /// almost always in it and an operator who has to go and find it has been given
-/// a fault report rather than a diagnosis.
-async fn never_settled(ctx: &Ctx, waiting: &[String]) -> Problem {
+/// a fault report rather than a diagnosis. What each absence costs is said too, so
+/// the report is about the operator's evening rather than about a container.
+async fn never_settled(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    waiting: &[String],
+) -> Problem {
     let named = waiting.join(", ");
+
+    // Assembled rather than interpolated, so a stack that says nothing about what a
+    // service is for does not leave a gap where its sentence would have been.
+    let mut explanation = String::from(
+        "The containers were started and never reached a state that counts as running. \
+         The rest of the form is still up and was left alone — one service failing to \
+         start is not a reason to take down the others.",
+    );
+    let lost = costs(manifest, waiting);
+    if !lost.is_empty() {
+        explanation.push(' ');
+        explanation.push_str(&lost);
+    }
+    explanation.push_str("\nWhatever went wrong is usually in their own output, which is below.");
+
     let problem = Problem::new(
         super::NEVER_SETTLED,
         Severity::Error,
         format!("{named} did not finish starting"),
-        "The containers were started and never reached a state that counts as running. \
-         Whatever went wrong is usually in their own output, which is below.",
+        explanation,
         Remedy::new("Look at what the service said, then start it again")
             .with_detail("lemonfiber logs <service>"),
     )
@@ -430,4 +472,55 @@ pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
         stack: stack.stack_version,
         compose,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::costs;
+    use lemonfiber_manifest::Manifest;
+
+    const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
+
+    /// What the stack this repository ships would say about these services.
+    fn said(waiting: &[&str]) -> Option<String> {
+        let named: Vec<String> = waiting.iter().map(|id| (*id).to_owned()).collect();
+        Manifest::from_toml(STACK)
+            .ok()
+            .map(|manifest| costs(&manifest, &named))
+    }
+
+    #[test]
+    fn what_a_service_is_for_is_said_in_the_stacks_own_words() {
+        assert_eq!(
+            said(&["jellyfin"]).as_deref(),
+            Some(
+                "What that costs, while it lasts: jellyfin — Files on disk, no way to watch them."
+            ),
+            "the manifest's sentence, not one written here"
+        );
+    }
+
+    #[test]
+    fn several_services_are_said_together_in_the_order_the_stack_declares_them() {
+        let both = said(&["seerr", "jellyfin"]);
+        assert!(
+            both.as_ref().is_some_and(|said| {
+                said.find("jellyfin")
+                    .zip(said.find("seerr"))
+                    .is_some_and(|(jellyfin, seerr)| jellyfin < seerr)
+            }),
+            "asked for in one order, reported in the stack's: {both:?}"
+        );
+    }
+
+    /// A stack that says nothing about a service contributes nothing, rather than a
+    /// sentence with a hole in it. Reached here by naming a service the stack does
+    /// not declare, which is the same silence as one that describes itself as "".
+    #[test]
+    fn a_service_the_stack_says_nothing_about_costs_no_words() {
+        assert_eq!(
+            said(&["not-a-service-this-stack-declares"]).as_deref(),
+            Some("")
+        );
+    }
 }

@@ -356,7 +356,7 @@ mod tests {
     use crate::ports::process::{Failure, Output, Progress};
     use crate::quality::Preset;
     use crate::stack::Source;
-    use crate::test_support::{a_context, nowhere, refused, spoke, Reporting, Scripted};
+    use crate::test_support::{a_context, nowhere, refused, spoke, Recording, Reporting, Scripted};
     use lemonfiber_fixtures::http::Fake;
     use std::time::Duration;
 
@@ -1395,6 +1395,83 @@ mod tests {
             produced.map(|report| report.condition),
             Some(Some(Condition::Active)),
             "waiting is the point: the answer changed while it waited"
+        );
+    }
+
+    /// The requirement stated directly, and the only way to state it: "nothing was
+    /// torn down" is a claim about commands that were never issued, so it is asserted
+    /// against everything the runner was handed rather than against what came back.
+    #[tokio::test]
+    async fn one_service_failing_to_start_never_takes_down_the_rest() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = a_context()
+            .runner(runner.clone())
+            .engine(Arc::new(Reporting::holding(
+                &LIBRARY,
+                Lifecycle::Running,
+                Health::Starting,
+            )))
+            .settings(settings)
+            .build()
+            .with_http(Fake::scripted(Vec::new()))
+            .waiting(Duration::ZERO);
+
+        let refused = dispatch(
+            Command::Up {
+                forms: vec!["library".to_owned()],
+            },
+            &ctx,
+        )
+        .await
+        .err();
+
+        assert_eq!(
+            refused.as_ref().map(|problem| problem.code),
+            Some(super::NEVER_SETTLED),
+            "the start is reported as not having finished"
+        );
+        assert!(
+            runner.ran("up"),
+            "it did try to start the form, so the claim below is about a real run"
+        );
+        assert!(
+            !runner.ran("down"),
+            "and never tore it down again for the one service that would not settle"
+        );
+        assert!(!runner.ran("stop"), "nor stopped what had already started");
+    }
+
+    /// A report about a container is a report about the wrong thing. What the operator
+    /// lost is what the stack says the service was there to do.
+    #[tokio::test]
+    async fn a_service_that_will_not_start_says_what_its_absence_costs() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting);
+        let refused = dispatch(
+            Command::Up {
+                forms: vec!["library".to_owned()],
+            },
+            &watching(engine).waiting(Duration::ZERO),
+        )
+        .await
+        .err();
+
+        assert_eq!(
+            refused.as_ref().map(|problem| problem
+                .meaning
+                .contains("Files on disk, no way to watch them")),
+            Some(true),
+            "the manifest's own words for what jellyfin is for: {refused:?}"
+        );
+        assert_eq!(
+            refused
+                .as_ref()
+                .map(|problem| problem.meaning.contains("left alone")),
+            Some(true),
+            "and the operator is told the rest of the form was not taken down with it"
         );
     }
 
