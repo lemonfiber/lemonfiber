@@ -223,7 +223,7 @@ pub(crate) async fn watching(
 
 /// The loop itself, with the terminal already in hand.
 async fn following(screen: &mut Screen, mut lines: Receiver<LogLine>) -> ExitCode {
-    let (presses, mut pressed) = tokio::sync::mpsc::channel(16);
+    let (presses, mut arriving) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&presses, wanted));
 
     let mut viewer = Viewer::opened();
@@ -236,7 +236,7 @@ async fn following(screen: &mut Screen, mut lines: Receiver<LogLine>) -> ExitCod
             return complain(&drawing("log viewer", &err.to_string()));
         }
         tokio::select! {
-            press = pressed.recv() => match press {
+            press = arriving.recv() => match press {
                 Some(press) => viewer.pressed(press),
                 None => break,
             },
@@ -249,7 +249,7 @@ async fn following(screen: &mut Screen, mut lines: Receiver<LogLine>) -> ExitCod
             },
         }
     }
-    drop(pressed);
+    drop(arriving);
     let _ = reader.join();
     ExitCode::SUCCESS
 }

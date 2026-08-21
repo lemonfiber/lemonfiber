@@ -204,7 +204,7 @@ impl Viewer {
             }
             Press::Accept => {
                 self.text = (!typed.is_empty()).then_some(typed);
-                self.to_tail();
+                self.back_to_the_tail();
             }
             // What was typed goes and what was in force stays. Abandoning a search
             // should put the operator back where they were, not clear the filter
@@ -219,7 +219,7 @@ impl Viewer {
         match press {
             Press::Typed('q') | Press::Abandon => self.open = false,
             Press::Typed('/') => self.typing = Some(String::new()),
-            Press::Typed('f') | Press::Tail => self.to_tail(),
+            Press::Typed('f') | Press::Tail => self.back_to_the_tail(),
             Press::Typed('s') => self.next_service(),
             Press::Typed('w') => self.next_rung(),
             Press::Typed('c') => self.unfiltered(),
@@ -240,7 +240,7 @@ impl Viewer {
                 .and_then(|at| self.seen.get(at + 1))
                 .cloned(),
         };
-        self.to_tail();
+        self.back_to_the_tail();
     }
 
     /// Ask for the next severity up, or for all of them again at the top.
@@ -250,7 +250,7 @@ impl Viewer {
             .position(|rung| *rung == self.least)
             .unwrap_or(0);
         self.least = RUNGS.get(at + 1).copied().flatten();
-        self.to_tail();
+        self.back_to_the_tail();
     }
 
     /// Put every filter back to showing everything.
@@ -258,7 +258,7 @@ impl Viewer {
         self.service = None;
         self.least = None;
         self.text = None;
-        self.to_tail();
+        self.back_to_the_tail();
     }
 
     /// Further back into what has already happened, stopping at the oldest line.
@@ -275,7 +275,7 @@ impl Viewer {
     }
 
     /// All the way to the newest line.
-    fn to_tail(&mut self) {
+    fn back_to_the_tail(&mut self) {
         self.back = 0;
         self.told();
     }
