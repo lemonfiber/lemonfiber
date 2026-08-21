@@ -49,8 +49,8 @@ pub async fn diagnose(
     only: Option<Category>,
     disruptive: bool,
 ) -> Result<DoctorReport, Box<Problem>> {
-    let checks = assembled(ctx, disruptive).await?;
-    Ok(examined(ctx, &checks, only).await)
+    let (manifest, checks) = assembled(ctx, disruptive).await?;
+    Ok(examined(ctx, &manifest.services, &checks, only).await)
 }
 
 /// Run the checks and answer with what they found, acknowledged choices marked as such.
@@ -62,12 +62,16 @@ pub async fn diagnose(
 /// question as freshly wrong. A repair proving its work is exactly such a caller.
 pub(crate) async fn examined(
     ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
     checks: &[Box<dyn Check>],
     only: Option<Category>,
 ) -> DoctorReport {
     let mut report = examine(checks, only).await;
     report.findings =
         crate::doctor::acknowledged::suppressing(report.findings, &crate::app::accepted::load(ctx));
+    // Attributed after the acknowledged ones are marked, so a choice the operator has
+    // already answered is not offered as the explanation for anything else.
+    report.findings = crate::doctor::attributed(report.findings, services);
     report
 }
 
@@ -84,7 +88,7 @@ pub(crate) async fn examined(
 pub(crate) async fn assembled(
     ctx: &Ctx,
     disruptive: bool,
-) -> Result<Vec<Box<dyn Check>>, Box<Problem>> {
+) -> Result<(lemonfiber_manifest::Manifest, Vec<Box<dyn Check>>), Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -190,7 +194,7 @@ pub(crate) async fn assembled(
         crate::app::seed::managed_wirings(ctx, &manifest.services, project.as_deref()).await,
         ctx.stamp(),
     );
-    Ok(vec![
+    let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(storage),
         Box::new(vpn),
@@ -201,5 +205,6 @@ pub(crate) async fn assembled(
         Box::new(headroom),
         Box::new(releases),
         Box::new(wiring),
-    ])
+    ];
+    Ok((manifest, checks))
 }

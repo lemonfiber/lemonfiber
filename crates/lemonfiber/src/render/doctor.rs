@@ -115,6 +115,8 @@ mod tests {
                 check: "a".to_owned(),
                 category: Category::Storage,
                 title: "noted".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Pass {
                     note: Some("plenty of room".to_owned()),
                 },
@@ -123,24 +125,32 @@ mod tests {
                 check: "b".to_owned(),
                 category: Category::Storage,
                 title: "bare".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Pass { note: None },
             },
             Finding {
                 check: "c".to_owned(),
                 category: Category::Vpn,
                 title: "warned".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Warn(a_problem()),
             },
             Finding {
                 check: "d".to_owned(),
                 category: Category::Vpn,
                 title: "failed".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Fail(a_problem()),
             },
             Finding {
                 check: "e".to_owned(),
                 category: Category::Network,
                 title: "unproven".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Unverified {
                     reason: "nothing answered".to_owned(),
                     remedy: Remedy::new("start it").with_detail("compose up"),
@@ -150,6 +160,8 @@ mod tests {
                 check: "f".to_owned(),
                 category: Category::Network,
                 title: "passed over".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Skipped {
                     reason: "not applicable".to_owned(),
                 },
@@ -179,6 +191,8 @@ mod tests {
                 check: "a".to_owned(),
                 category: Category::Config,
                 title: "unproven".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Unverified {
                     reason: "nothing answered".to_owned(),
                     remedy: Remedy::new("start it"),
@@ -225,6 +239,8 @@ mod tests {
                 check: "vpn.unprotected".to_owned(),
                 category: Category::Vpn,
                 title: "Torrent traffic is contained".to_owned(),
+                service: None,
+                caused_by: None,
                 verdict: Verdict::Warn(a_problem().in_state(State::Suppressed)),
             }],
         };

@@ -26,6 +26,7 @@ pub mod storage;
 pub mod vpn;
 pub mod wiring;
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -145,6 +146,22 @@ pub struct Finding {
     pub title: String,
     /// How it turned out.
     pub verdict: Verdict,
+    /// The service this is about, where it is about one.
+    ///
+    /// Absent for the checks that are about the machine rather than about
+    /// something running on it — the environment, the filesystem, the operator's
+    /// own choices. Carried so that one service's trouble can be attributed to
+    /// the service underneath it rather than counted as one more independent
+    /// thing wrong.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+    /// The check whose finding explains this one, where another does.
+    ///
+    /// Set after the run rather than by the check itself: a check is independent
+    /// by construction and cannot see what any other found, which is a property
+    /// worth keeping.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caused_by: Option<String>,
 }
 
 impl Finding {
@@ -158,7 +175,16 @@ impl Finding {
             category,
             title: title.to_owned(),
             verdict,
+            service: None,
+            caused_by: None,
         }
+    }
+
+    /// The same finding, said to be about a particular service.
+    #[must_use]
+    pub fn about(mut self, service: &str) -> Self {
+        self.service = Some(service.to_owned());
+        self
     }
 }
 
@@ -291,12 +317,63 @@ pub async fn examine(checks: &[Box<dyn Check>], only: Option<Category>) -> Docto
     }
 }
 
+/// Attribute each finding to the finding underneath it, where one explains another.
+///
+/// A stack whose VPN is down raises a finding for every service behind it, and a flat list
+/// of them reads as a dozen unrelated faults rather than as one. What relates them is the
+/// manifest's own `depends_on`: a service that cannot work because something it needs is
+/// also in trouble is one problem with the thing underneath, not two.
+///
+/// The relationship is read from the manifest rather than from a table of check ids here,
+/// for the same reason narrowing reads `profile.protocol` rather than recognising profile
+/// names — a stack that renames or rewires its services keeps working, and nothing in this
+/// crate has to know what any service is.
+///
+/// Only a finding that is not passing can explain another: a dependency that is working
+/// explains nothing about the service on top of it. Findings about nothing in particular —
+/// the environment, the filesystem — are left alone, having no service to be downstream of.
+#[must_use]
+pub fn attributed(
+    findings: Vec<Finding>,
+    services: &[lemonfiber_manifest::Service],
+) -> Vec<Finding> {
+    let troubled: BTreeMap<&str, &str> = findings
+        .iter()
+        .filter(|finding| !matches!(finding.verdict, Verdict::Pass { .. }))
+        .filter_map(|finding| Some((finding.service.as_deref()?, finding.check.as_str())))
+        .collect();
+
+    let attributed: Vec<Option<String>> = findings
+        .iter()
+        .map(|finding| {
+            finding
+                .service
+                .as_deref()
+                .and_then(|service| services.iter().find(|had| had.id == service))
+                .into_iter()
+                .flat_map(|service| service.depends_on.iter())
+                .find_map(|needed| troubled.get(needed.as_str()).map(|&check| check.to_owned()))
+        })
+        .collect();
+
+    findings
+        .into_iter()
+        .zip(attributed)
+        .map(|(finding, cause)| Finding {
+            caused_by: cause,
+            ..finding
+        })
+        .collect()
+}
+
 /// The finding a check becomes when it does not answer within its budget.
 fn timed_out(check: &dyn Check) -> Finding {
     let seconds = check.budget().as_secs();
     Finding {
         check: check.category().as_str().to_owned(),
         category: check.category(),
+        service: None,
+        caused_by: None,
         title: "Check timed out".to_owned(),
         verdict: Verdict::Unverified {
             reason: format!("did not finish within {seconds} seconds"),
@@ -340,7 +417,7 @@ fn overall(findings: &[Finding]) -> Overall {
 
 #[cfg(test)]
 mod tests {
-    use super::{examine, Category, Check, Finding, Overall, Verdict};
+    use super::{attributed, examine, Category, Check, Finding, Overall, Verdict};
     use crate::error::{Code, Problem, Remedy, Severity};
     use async_trait::async_trait;
     use std::time::Duration;
@@ -380,11 +457,137 @@ mod tests {
         }
     }
 
+    /// Two services, one standing on the other, as a manifest declares them.
+    fn stack() -> Vec<lemonfiber_manifest::Service> {
+        let text = r#"
+schema_version = 1
+stack_version = "1.0.0"
+min_cli_version = "0.1.0"
+
+[[profile]]
+id = "torrent"
+name = "Torrents"
+description = "Downloading over a tunnel"
+
+[[form]]
+id = "dl"
+name = "Download"
+description = "Fetch a link"
+profiles = ["torrent"]
+
+[[service]]
+id = "gluetun"
+name = "Gluetun"
+profile = "torrent"
+image = "qmcgaw/gluetun"
+tag = "v3.40.0"
+criticality = "critical"
+license = "MIT"
+upstream = "https://github.com/qdm12/gluetun"
+last_release = "2026-01-01"
+describes = "The tunnel"
+without_it = "Nothing downloads over a tunnel"
+
+[[service]]
+id = "qbittorrent"
+name = "qBittorrent"
+profile = "torrent"
+image = "lscr.io/linuxserver/qbittorrent"
+tag = "5.0.3"
+criticality = "core"
+license = "GPL-2.0"
+upstream = "https://github.com/qbittorrent/qBittorrent"
+last_release = "2026-01-01"
+describes = "The client"
+without_it = "Nothing is downloaded"
+depends_on = ["gluetun"]
+"#;
+        lemonfiber_manifest::Manifest::from_toml(text)
+            .map(|manifest| manifest.services)
+            .unwrap_or_default()
+    }
+
+    /// A service that cannot work because the thing underneath it is down is one problem
+    /// with the thing underneath, not two — which is the difference between a report an
+    /// operator reads and a list they give up on.
+    #[test]
+    fn a_finding_downstream_of_another_says_which_one_explains_it() {
+        let tunnel =
+            Finding::in_category(Category::Vpn, "vpn.up", "The tunnel", failing()).about("gluetun");
+        let client = Finding::in_category(
+            Category::Credentials,
+            "credentials.qbittorrent",
+            "The client",
+            failing(),
+        )
+        .about("qbittorrent");
+
+        let linked = attributed(vec![tunnel, client], &stack());
+        assert_eq!(
+            linked
+                .iter()
+                .map(|f| f.caused_by.clone())
+                .collect::<Vec<_>>(),
+            vec![None, Some("vpn.up".to_owned())],
+            "the one underneath explains the one on top, and nothing explains the tunnel"
+        );
+    }
+
+    /// A dependency that is working explains nothing. Attributing to it would tell the
+    /// operator to go and look at a service that is behaving perfectly.
+    #[test]
+    fn a_dependency_that_is_passing_is_not_offered_as_an_explanation() {
+        let tunnel = Finding::in_category(
+            Category::Vpn,
+            "vpn.up",
+            "The tunnel",
+            Verdict::Pass { note: None },
+        )
+        .about("gluetun");
+        let client = Finding::in_category(
+            Category::Credentials,
+            "credentials.qbittorrent",
+            "The client",
+            failing(),
+        )
+        .about("qbittorrent");
+
+        let linked = attributed(vec![tunnel, client], &stack());
+        assert!(linked.iter().all(|finding| finding.caused_by.is_none()));
+    }
+
+    /// Checks about the machine rather than about something running on it have no service
+    /// to be downstream of, and are left exactly as they were.
+    #[test]
+    fn a_finding_about_no_service_is_left_alone() {
+        let environment = Finding::in_category(
+            Category::Environment,
+            "environment.compose",
+            "Compose",
+            failing(),
+        );
+        let linked = attributed(vec![environment.clone()], &stack());
+        assert_eq!(linked, vec![environment]);
+    }
+
+    /// A failing verdict, for the tests above.
+    fn failing() -> Verdict {
+        Verdict::Fail(Problem::new(
+            crate::error::Code::new("TEST-1"),
+            crate::error::Severity::Error,
+            "it is not working",
+            "it means what it says",
+            Remedy::new("put it right"),
+        ))
+    }
+
     fn finding(title: &str, verdict: Verdict) -> Finding {
         Finding {
             check: "test".to_owned(),
             category: Category::Vpn,
             title: title.to_owned(),
+            service: None,
+            caused_by: None,
             verdict,
         }
     }
