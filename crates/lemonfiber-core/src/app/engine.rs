@@ -22,6 +22,11 @@ mod switch;
 
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
+// Reached only by the tests that drive the decision directly rather than through a
+// whole run — which is the right level for it, since which checks name a service is a
+// separate question from what happens to a finding that does.
+#[cfg(test)]
+pub(super) use diagnosis::quoted;
 pub(super) use switch::switch;
 
 /// How often the engine is asked whether anything has changed.
@@ -133,32 +138,52 @@ async fn never_settled(
     )
     .in_state(State::Guided);
 
-    // An engine that will not open the stream falls back to one that is already
-    // finished, so the reading below has no second shape. There is nothing
-    // useful to say about a service whose output cannot be read that the
-    // problem does not already say.
+    // Tagged by service, because this is about several of them at once and a line
+    // nobody can attribute is a line the operator has to go and place themselves.
+    let said: String = lately(ctx, waiting)
+        .await
+        .iter()
+        .fold(String::new(), |mut said, line| {
+            said.push_str(&line.service);
+            said.push_str(": ");
+            said.push_str(&line.line);
+            said.push('\n');
+            said
+        });
+
+    if said.is_empty() {
+        return problem;
+    }
+    problem.with_detail(said)
+}
+
+/// The last few lines these services wrote, or nothing where the engine will not
+/// say.
+///
+/// Lines rather than text, so a caller decides how they read: a report about
+/// several services tags each line with the one that wrote it, and a report already
+/// naming one service would only be repeating itself.
+///
+/// An engine that will not open the stream falls back to one that is already
+/// finished, so the reading has no second shape. There is nothing useful to say
+/// about output that cannot be read which the report it is attached to does not
+/// already say.
+pub(super) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
     let (closed, silent) = tokio::sync::mpsc::channel(1);
     drop(closed);
 
     let query = LogQuery::recent(LAST_WORDS);
     let mut lines = ctx
         .engine
-        .logs(&ctx.settings.project, waiting, query)
+        .logs(&ctx.settings.project, services, query)
         .await
         .unwrap_or(silent);
 
-    let mut said = String::new();
+    let mut said = Vec::new();
     while let Some(line) = lines.recv().await {
-        said.push_str(&line.service);
-        said.push_str(": ");
-        said.push_str(&line.line);
-        said.push('\n');
+        said.push(line);
     }
-
-    if said.is_empty() {
-        return problem;
-    }
-    problem.with_detail(said)
+    said
 }
 
 /// Stream a project's log lines, tagged by the service that wrote them.

@@ -50,10 +50,40 @@ pub(super) fn diagnosis(report: &DoctorReport) -> Lines {
                 lines.put(format!("  – {title}   skipped: {reason}"));
             }
         }
+
+        // What the service said for itself, under the finding it explains. A check
+        // can say a service is not answering; only the service can say why, and an
+        // operator who has to go and fetch that has been handed a fault report
+        // rather than a diagnosis.
+        lines.extend(said(finding.said.as_deref()));
     }
 
     lines.spaced(overall(report.overall));
     lines
+}
+
+/// A service's own recent output, indented under the finding it belongs to.
+///
+/// Nothing at all where there is none: a heading with no lines under it promises
+/// evidence that is not there, which is worse than saying nothing.
+fn said(output: Option<&str>) -> Lines {
+    let mut lines = Lines::default();
+    let Some(output) = output.filter(|output| !output.trim().is_empty()) else {
+        return lines;
+    };
+    lines.put("      it said:");
+    lines.block(&indented(output));
+    lines
+}
+
+/// Each line of the output, indented to sit under its finding.
+fn indented(output: &str) -> String {
+    output.lines().fold(String::new(), |mut block, line| {
+        block.push_str("        ");
+        block.push_str(line);
+        block.push('\n');
+        block
+    })
 }
 
 /// The problem's meaning and remedies, indented under a finding.
@@ -90,6 +120,55 @@ mod tests {
     use lemonfiber_core::doctor::{Category, Finding, Overall, Verdict};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 
+    /// A finding that failed, for the tests that are about what is shown beside one.
+    fn a_failing_finding() -> Finding {
+        Finding {
+            check: "services.sonarr".to_owned(),
+            category: Category::Services,
+            title: "Sonarr answers".to_owned(),
+            service: Some("sonarr".to_owned()),
+            caused_by: None,
+            said: None,
+            verdict: Verdict::Fail(a_problem()),
+        }
+    }
+
+    /// The point of the requirement: the evidence is at the failure, not somewhere
+    /// the operator has to go and look for it.
+    #[test]
+    fn a_failing_finding_quotes_what_the_service_said() {
+        let report = DoctorReport {
+            overall: Overall::Broken,
+            findings: vec![Finding {
+                said: Some("Database is locked\nRetrying in 30s\n".to_owned()),
+                ..a_failing_finding()
+            }],
+        };
+
+        let text = diagnosis(&report).text();
+        assert!(text.contains("it said:"), "{text}");
+        assert!(text.contains("Database is locked"), "{text}");
+        assert!(
+            text.contains("        Retrying in 30s"),
+            "every line is indented under the finding, not just the first: {text}"
+        );
+    }
+
+    /// A heading with nothing under it promises evidence that is not there.
+    #[test]
+    fn a_finding_with_nothing_said_shows_no_heading() {
+        for said in [None, Some(String::new()), Some("   \n".to_owned())] {
+            let report = DoctorReport {
+                overall: Overall::Broken,
+                findings: vec![Finding {
+                    said,
+                    ..a_failing_finding()
+                }],
+            };
+            assert!(!diagnosis(&report).text().contains("it said:"));
+        }
+    }
+
     /// The classification an operator can act on. A finding lemonfiber can put right
     /// itself says so and names the command; the ones only they can act on already say
     /// where to go in their own remedies, so a label there would be noise.
@@ -117,6 +196,7 @@ mod tests {
                 title: "noted".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Pass {
                     note: Some("plenty of room".to_owned()),
                 },
@@ -127,6 +207,7 @@ mod tests {
                 title: "bare".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Pass { note: None },
             },
             Finding {
@@ -135,6 +216,7 @@ mod tests {
                 title: "warned".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Warn(a_problem()),
             },
             Finding {
@@ -143,6 +225,7 @@ mod tests {
                 title: "failed".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Fail(a_problem()),
             },
             Finding {
@@ -151,6 +234,7 @@ mod tests {
                 title: "unproven".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Unverified {
                     reason: "nothing answered".to_owned(),
                     remedy: Remedy::new("start it").with_detail("compose up"),
@@ -162,6 +246,7 @@ mod tests {
                 title: "passed over".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Skipped {
                     reason: "not applicable".to_owned(),
                 },
@@ -193,6 +278,7 @@ mod tests {
                 title: "unproven".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Unverified {
                     reason: "nothing answered".to_owned(),
                     remedy: Remedy::new("start it"),
@@ -241,6 +327,7 @@ mod tests {
                 title: "Torrent traffic is contained".to_owned(),
                 service: None,
                 caused_by: None,
+                said: None,
                 verdict: Verdict::Warn(a_problem().in_state(State::Suppressed)),
             }],
         };

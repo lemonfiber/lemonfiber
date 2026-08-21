@@ -719,6 +719,106 @@ mod tests {
         }
     }
 
+    /// The environment checks are about the machine rather than about anything
+    /// running on it, so none of their findings names a service — and a run with
+    /// nothing to quote asks the engine for nothing at all.
+    #[tokio::test]
+    async fn a_run_with_no_service_in_trouble_quotes_nothing() {
+        let report = diagnosis(
+            dispatch(
+                Command::Doctor {
+                    only: Some(Category::Environment),
+                    disruptive: false,
+                    accept: None,
+                },
+                &watching(Reporting::holding(
+                    &LIBRARY,
+                    Lifecycle::Running,
+                    Health::Healthy,
+                )),
+            )
+            .await,
+        );
+
+        assert!(
+            report
+                .as_ref()
+                .is_some_and(|report| !report.findings.is_empty()),
+            "the environment checks did run: {report:?}"
+        );
+        assert!(
+            report
+                .iter()
+                .flat_map(|report| report.findings.iter())
+                .all(|finding| finding.said.is_none()),
+            "nothing here is about a service, so nothing has a service to quote"
+        );
+    }
+
+    /// A check can say a service is not answering; only the service can say why. So
+    /// what it said lately travels with the finding rather than waiting for the
+    /// operator to go and fetch it.
+    ///
+    /// Driven against the decision itself rather than through a whole run, because
+    /// which checks name a service is a separate question from what happens to a
+    /// finding that does — today only the credential check names one, and this has to
+    /// keep working as more of them do.
+    #[tokio::test]
+    async fn a_failing_finding_carries_what_its_service_said() {
+        let ctx = watching(
+            Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+                .saying("jellyfin", "auth failed: bad credentials"),
+        );
+
+        let quoted = super::engine::quoted(
+            &ctx,
+            vec![crate::doctor::Finding::in_category(
+                Category::Services,
+                "services.jellyfin",
+                "Jellyfin answers",
+                crate::doctor::Verdict::Fail(crate::error::Problem::new(
+                    crate::error::Code::new("TEST-1"),
+                    crate::error::Severity::Error,
+                    "it is not answering",
+                    "it means what it says",
+                    crate::error::Remedy::new("put it right"),
+                )),
+            )
+            .about("jellyfin")],
+        )
+        .await;
+
+        assert_eq!(
+            quoted.first().and_then(|finding| finding.said.clone()),
+            Some("auth failed: bad credentials\n".to_owned()),
+            "the service's own words, unprefixed — the finding already names it"
+        );
+    }
+
+    /// Evidence for something that works is noise, and on a healthy run it would be
+    /// the bulk of the output.
+    #[tokio::test]
+    async fn a_finding_that_passed_carries_nothing() {
+        let ctx = watching(
+            Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+                .saying("jellyfin", "started"),
+        );
+
+        let quoted = super::engine::quoted(
+            &ctx,
+            vec![crate::doctor::Finding::in_category(
+                Category::Services,
+                "services.jellyfin",
+                "Jellyfin answers",
+                crate::doctor::Verdict::Pass { note: None },
+            )
+            .about("jellyfin")],
+        )
+        .await;
+
+        assert!(quoted.first().is_some_and(|finding| finding.said.is_none()));
+    }
+
     #[tokio::test]
     async fn doctor_runs_the_checks_and_reports_them_in_the_envelope() {
         // The engine here does not host the torrent pair, so the findings are

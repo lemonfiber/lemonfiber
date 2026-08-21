@@ -21,7 +21,7 @@ use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::wiring::WiringCheck;
-use crate::doctor::{examine, Category, Check};
+use crate::doctor::{examine, Category, Check, Finding, Verdict};
 use crate::error::{Diagnose, Problem};
 use crate::model::DoctorReport;
 use crate::ports::service::{Indexers, UsenetAccounts};
@@ -72,7 +72,65 @@ pub(crate) async fn examined(
     // Attributed after the acknowledged ones are marked, so a choice the operator has
     // already answered is not offered as the explanation for anything else.
     report.findings = crate::doctor::attributed(report.findings, services);
+    // Last, so a finding already explained by another service's trouble is quoted with
+    // its own output rather than instead of it. Reading a service's output is not the
+    // check's own business, which is why it happens here and not inside one.
+    report.findings = quoted(ctx, report.findings).await;
     report
+}
+
+/// Every finding in trouble, carrying what its service said for itself lately.
+///
+/// A check can say a service is not answering; only the service can say why, and an
+/// operator who has to go and fetch that has been handed a fault report rather than a
+/// diagnosis.
+///
+/// Passing findings are left alone. Evidence for something that is working is noise,
+/// and it would be the bulk of a healthy run — nineteen services' scrollback attached
+/// to nineteen findings that all say the same thing.
+///
+/// One request for all of them rather than one each: the engine is asked for the
+/// services in trouble together, and the lines are dealt back out by the service that
+/// wrote them.
+pub(crate) async fn quoted(ctx: &Ctx, findings: Vec<Finding>) -> Vec<Finding> {
+    let troubled: Vec<String> = findings
+        .iter()
+        .filter(|finding| !matches!(finding.verdict, Verdict::Pass { .. }))
+        .filter_map(|finding| finding.service.clone())
+        .collect();
+
+    if troubled.is_empty() {
+        return findings;
+    }
+
+    let lines = super::lately(ctx, &troubled).await;
+    findings
+        .into_iter()
+        .map(|finding| {
+            let said: String = finding
+                .service
+                .as_deref()
+                .filter(|_| !matches!(finding.verdict, Verdict::Pass { .. }))
+                .map(|service| {
+                    lines.iter().filter(|line| line.service == service).fold(
+                        String::new(),
+                        |mut said, line| {
+                            said.push_str(&line.line);
+                            said.push('\n');
+                            said
+                        },
+                    )
+                })
+                .unwrap_or_default();
+
+            // Absent rather than empty: a heading with nothing under it promises
+            // evidence that is not there.
+            Finding {
+                said: (!said.is_empty()).then_some(said),
+                ..finding
+            }
+        })
+        .collect()
 }
 
 /// The checks this stack is examined by, built and ready to run.
