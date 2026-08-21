@@ -3,8 +3,6 @@
 //! version reports a surface renders. The command model and the dispatcher that routes to
 //! these live in the parent module; this is the engine work each command carries out.
 
-use tokio::sync::mpsc::Receiver;
-
 use super::{Ctx, Outcome};
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::error::{Diagnose, Problem, Remedy, Severity, State};
@@ -12,16 +10,17 @@ use crate::model::{
     FormReport, FormsReport, LifecycleReport, StackEdit, StatusReport, VersionReport,
 };
 use crate::ports::docker::{LogLine, LogQuery};
-use crate::ports::process::Progress;
 use crate::stack::closure::{resolve, Plan};
 use crate::stack::compose::{build, Action};
 
 mod diagnosis;
 mod stopping;
+mod streaming;
 mod switch;
 
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
+pub use streaming::{logs, pull_progress};
 // Reached only by the tests that drive the decision directly rather than through a
 // whole run — which is the right level for it, since which checks name a service is a
 // separate question from what happens to a finding that does.
@@ -184,78 +183,6 @@ pub(super) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
         said.push(line);
     }
     said
-}
-
-/// Stream a project's log lines, tagged by the service that wrote them.
-///
-/// Streaming has its own entry point rather than an [`Outcome`], because a log
-/// stream is not a value that arrives once. Forcing it into one would mean
-/// either buffering output that has no end or giving each surface its own way
-/// of reading it, and the second is the drift [`dispatch`] exists to prevent —
-/// so there is still exactly one implementation, and all three surfaces call it.
-///
-/// # Errors
-///
-/// Returns the [`Problem`] a surface should render when the stack cannot be
-/// resolved or the engine cannot be reached.
-pub async fn logs(
-    ctx: &Ctx,
-    forms: &[String],
-    services: &[String],
-    query: LogQuery,
-) -> Result<Receiver<LogLine>, Box<Problem>> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(err.problem()))?;
-
-    // Naming forms and naming services are two ways of saying the same thing,
-    // and both narrow: a form is the services its profiles declare.
-    let mut wanted: Vec<String> = services.to_vec();
-    if !forms.is_empty() {
-        let plan = resolve(&manifest, forms, ctx.settings.protocols)
-            .map_err(|err| Box::new(err.problem()))?;
-        let profiles: Vec<String> = plan.profiles.into_iter().collect();
-        wanted.extend(
-            manifest
-                .services
-                .iter()
-                .filter(|service| profiles.contains(&service.profile))
-                .filter(|service| services.is_empty() || services.contains(&service.id))
-                .map(|service| service.id.clone()),
-        );
-        wanted.retain(|id| manifest.services.iter().any(|service| &service.id == id));
-    }
-
-    ctx.engine
-        .logs(&ctx.settings.project, &wanted, query)
-        .await
-        .map_err(|err| Box::new(err.problem()))
-}
-
-/// Pull the images the named forms need, streaming Compose's progress as it
-/// happens rather than waiting on it in silence.
-///
-/// Like [`logs`], this is a standalone streaming entry point rather than a
-/// command that returns an `Outcome`: its value is the progress arriving over
-/// time, which a one-shot report cannot carry. It drives the very
-/// `docker compose pull` a buffered [`Command::Pull`] runs — same argument vector
-/// from [`build`] — so the two agree on exactly what is pulled, differing only in
-/// whether the output is watched or waited for.
-///
-/// # Errors
-///
-/// Returns the [`Problem`] a surface should render when the stack cannot be
-/// resolved or Compose cannot be spawned.
-pub async fn pull_progress(
-    ctx: &Ctx,
-    forms: &[String],
-) -> Result<Receiver<Progress>, Box<Problem>> {
-    let command = compose(ctx, forms, &Action::Pull)?.command;
-    ctx.runner
-        .stream(&command)
-        .await
-        .map_err(|err| Box::new(err.problem()))
 }
 
 /// What resolving the forms into a runnable Compose command produced.

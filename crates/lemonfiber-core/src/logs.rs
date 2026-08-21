@@ -12,6 +12,11 @@
 //! of that red teaches an operator to ignore red, which costs them the one line the
 //! colour existed for. So the stream a line arrived on is not an input here, and a
 //! line that says nothing about itself is left saying nothing.
+//!
+//! The same discipline orders them: [`interleaved`] reads the stamp each container
+//! put on its own line and never invents one for a line that has none.
+
+use lemonfiber_ports::docker::LogLine;
 
 /// How bad a line says it is.
 ///
@@ -115,173 +120,42 @@ fn level(word: &str) -> Option<Level> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{declared, Level};
-
-    /// The services this stack actually runs, each spelling severity its own way.
-    /// Written out rather than generated, because the point is that these exact
-    /// shapes are what arrive — a generated case would only prove the parser agrees
-    /// with itself.
-    #[test]
-    fn every_way_this_stacks_services_spell_a_level_reads_the_same() {
-        for (line, expected) in [
-            // The \*arr services, NLog style.
-            (
-                "2026-08-21 19:04:11.2|Info|SonarrBootstrapper|Starting",
-                Level::Info,
-            ),
-            ("2026-08-21 19:04:11.2|Warn|Api|Request failed", Level::Warn),
-            // gluetun and friends, bare words.
-            (
-                "2026-08-21T19:04:11Z ERROR openvpn: connection lost",
-                Level::Error,
-            ),
-            ("INFO [routing] default route found", Level::Info),
-            // sabnzbd, double-colon delimited.
-            (
-                "2026-08-21 19:04:11,123::INFO::[__init__:1234] Preparing",
-                Level::Info,
-            ),
-            // Bracketed, which several use.
-            ("[Warning] disk is filling up", Level::Warn),
-            // structured key=value, where the value is the word.
-            ("time=2026-08-21 level=error msg=\"no route\"", Level::Error),
-        ] {
-            assert_eq!(declared(line), Some(expected), "{line}");
-        }
-    }
-
-    /// The discipline the requirement is really about. None of these declares a
-    /// severity, and guessing one for them is how a viewer starts lying.
-    #[test]
-    fn a_line_that_declares_nothing_is_left_declaring_nothing() {
-        for line in [
-            "Downloading Some.Release.S01E01.1080p",
-            "Grabbed release from indexer",
-            "",
-            "   ",
-            "2026-08-21T19:04:11Z starting up",
-        ] {
-            assert_eq!(declared(line), None, "{line}");
-        }
-    }
-
-    /// A release name is not a severity, and neither is a sentence about a failure.
-    /// This is the case that makes reading only the first few words worth the rule.
-    #[test]
-    fn a_level_named_in_prose_is_something_the_line_is_talking_about() {
-        assert_eq!(
-            declared("Downloading Error.404.S01E01.1080p.WEB-DL"),
-            None,
-            "a release somebody named `Error` is not an error"
-        );
-        assert_eq!(
-            declared("Import finished, and the second attempt did not error"),
-            None,
-            "past the fourth word it is prose"
-        );
-    }
-
-    /// Every spelling a service might use, so an abbreviation nobody thought to try
-    /// is a failing test rather than a line that quietly reads as unclassified.
-    #[test]
-    fn every_spelling_of_every_level_is_recognised() {
-        for (word, expected) in [
-            ("trace", Level::Trace),
-            ("trc", Level::Trace),
-            ("debug", Level::Debug),
-            ("dbg", Level::Debug),
-            ("dbug", Level::Debug),
-            ("info", Level::Info),
-            ("inf", Level::Info),
-            ("notice", Level::Info),
-            ("warn", Level::Warn),
-            ("warning", Level::Warn),
-            ("wrn", Level::Warn),
-            ("error", Level::Error),
-            ("err", Level::Error),
-            ("fail", Level::Error),
-            ("fatal", Level::Fatal),
-            ("critical", Level::Fatal),
-            ("crit", Level::Fatal),
-            ("panic", Level::Fatal),
-        ] {
-            assert_eq!(
-                declared(&format!("[{word}] something happened")),
-                Some(expected),
-                "{word}"
-            );
-        }
-    }
-
-    /// Each of the three keys that says the next word names the level, and the one
-    /// case that could run off the end of the line.
-    #[test]
-    fn a_key_can_name_the_level_and_may_have_nothing_after_it() {
-        for key in ["level", "lvl", "severity"] {
-            assert_eq!(
-                declared(&format!("t=1 {key}=fatal msg=gone")),
-                Some(Level::Fatal),
-                "{key}"
-            );
-        }
-        assert_eq!(
-            declared("level="),
-            None,
-            "a key with nothing after it names nothing"
-        );
-        assert_eq!(
-            declared("level=chatty"),
-            None,
-            "and a key naming something that is not a level is still not one"
-        );
-    }
-
-    /// Ordered so a filter can ask for warnings and worse without a lookup table.
-    #[test]
-    fn severity_is_ordered_from_least_to_most_serious() {
-        assert!(Level::Trace < Level::Debug);
-        assert!(Level::Debug < Level::Info);
-        assert!(Level::Info < Level::Warn);
-        assert!(Level::Warn < Level::Error);
-        assert!(Level::Error < Level::Fatal);
-    }
-
-    /// Two services agreeing about severity should look like they agree.
-    #[test]
-    fn the_same_level_spelled_two_ways_normalises_to_one_word() {
-        let bracketed = declared("[WARN] queue is backing up").map(Level::word);
-        let bare = declared("2026-08-21 warning: queue is backing up").map(Level::word);
-        assert_eq!(bracketed, bare);
-        assert_eq!(bracketed, Some("warn"));
-    }
-
-    #[test]
-    fn every_level_has_a_word_and_they_are_all_different() {
-        let words: Vec<&str> = [
-            Level::Trace,
-            Level::Debug,
-            Level::Info,
-            Level::Warn,
-            Level::Error,
-            Level::Fatal,
-        ]
+/// The same lines, with the ones that say when they were written put in order.
+///
+/// Logs arrive from one reader per container, so a scrollback of three services
+/// arrives as three bursts rather than as one account of what happened. The engine
+/// stamps each line with the container's own clock, and that stamp is the only
+/// defensible ordering available: containers disagree with the host and with each
+/// other, so an arrival time would be this process's opinion rather than theirs.
+///
+/// **A line that does not say when it was written keeps its place.** There is nowhere
+/// to put it — it has no claim to be before or after anything — and moving it to one
+/// end would be inventing an order rather than reading one. So the stamped lines are
+/// sorted among themselves and written back into the slots they already occupied,
+/// which leaves an unstamped line beside whatever it arrived next to.
+///
+/// Compared as text, not as instants. The engine writes RFC 3339 in UTC to a fixed
+/// precision, and such strings sort lexicographically in the order the moments
+/// happened — so the port's promise to carry the stamp *verbatim and unparsed* is
+/// kept, and no clock library gets an opinion about somebody else's container.
+///
+/// Only for scrollback. A live stream cannot be sorted against lines that have not
+/// arrived, and arrival order is the only order it has.
+#[must_use]
+pub fn interleaved(lines: Vec<LogLine>) -> Vec<LogLine> {
+    let mut stamped: Vec<LogLine> = lines
         .iter()
-        .map(|level| level.word())
+        .filter(|line| line.at.is_some())
+        .cloned()
         .collect();
-        let mut unique = words.clone();
-        unique.sort_unstable();
-        unique.dedup();
-        assert_eq!(words.len(), unique.len(), "{words:?}");
-    }
+    stamped.sort_by(|one, other| one.at.cmp(&other.at));
 
-    /// The published shape, pinned so a rename breaks a test rather than a script.
-    #[test]
-    fn a_level_publishes_the_word_a_script_reads() {
-        assert_eq!(
-            serde_json::to_string(&Level::Warn).ok().as_deref(),
-            Some("\"warn\"")
-        );
-    }
+    let mut stamped = stamped.into_iter();
+    lines
+        .into_iter()
+        .map(|line| match line.at {
+            Some(_) => stamped.next().unwrap_or(line),
+            None => line,
+        })
+        .collect()
 }

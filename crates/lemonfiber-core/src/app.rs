@@ -2302,6 +2302,23 @@ mod tests {
         );
     }
 
+    /// The lines a log stream carried, in the order it handed them over.
+    ///
+    /// Shaped like [`heard`] beside it: a closed channel stands in for a stream that
+    /// could not be opened, so there is no branch here for a test to leave unrun.
+    async fn spoken(ctx: &Ctx, forms: &[String], query: LogQuery) -> Vec<String> {
+        let (closed, silent) = tokio::sync::mpsc::channel(1);
+        drop(closed);
+
+        let mut lines = super::logs(ctx, forms, &[], query).await.unwrap_or(silent);
+
+        let mut seen = Vec::new();
+        while let Some(line) = lines.recv().await {
+            seen.push(line.line);
+        }
+        seen
+    }
+
     /// The services a log stream actually carried lines for.
     async fn heard(ctx: &Ctx, forms: &[String], services: &[String]) -> Vec<String> {
         let (closed, silent) = tokio::sync::mpsc::channel(1);
@@ -2319,6 +2336,54 @@ mod tests {
         seen.sort();
         seen.dedup();
         seen
+    }
+
+    /// One reader per container means a scrollback arrives in bursts. Read back, it
+    /// should be one account of what happened rather than three.
+    #[tokio::test]
+    async fn a_scrollback_reads_as_one_timeline_rather_than_one_burst_per_service() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+            .saying_at("jellyfin", "2026-08-21T19:00:03.000000000Z", "third")
+            .saying_at("jellyfin", "2026-08-21T19:00:04.000000000Z", "fourth")
+            .saying_at("seerr", "2026-08-21T19:00:01.000000000Z", "first")
+            .saying_at("seerr", "2026-08-21T19:00:02.000000000Z", "second");
+
+        let said = spoken(
+            &watching(engine),
+            &["library".to_owned()],
+            LogQuery::recent(20),
+        )
+        .await;
+
+        assert_eq!(
+            said,
+            ["first", "second", "third", "fourth"],
+            "the containers' own stamps decide, not which reader finished first"
+        );
+    }
+
+    /// A live stream has nothing to sort against, so it is handed straight back.
+    #[tokio::test]
+    async fn following_hands_the_stream_back_as_it_arrives() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+            .saying_at("jellyfin", "2026-08-21T19:00:09.000000000Z", "later")
+            .saying_at("seerr", "2026-08-21T19:00:01.000000000Z", "earlier");
+
+        let said = spoken(
+            &watching(engine),
+            &["library".to_owned()],
+            LogQuery {
+                tail: 20,
+                follow: true,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            said,
+            ["later", "earlier"],
+            "arrival order is the only order a live stream has"
+        );
     }
 
     #[tokio::test]
