@@ -291,7 +291,15 @@ async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
         viewer.remarked("this machine would not provide the randomness an export needs");
         return;
     };
-    let path = std::path::PathBuf::from(format!("lemonfiber-logs-{}-{written}.txt", ctx.today()));
+    // Stamped from the clock port rather than a date, so two runs on the same day
+    // cannot write over each other's export.
+    let stamp = ctx
+        .clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or_default();
+    let path = std::path::PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
     ctx.filesystem.write(&path, &viewer.exported(&marks)).await;
     viewer.remarked(&format!("written to {}", path.display()));
 }

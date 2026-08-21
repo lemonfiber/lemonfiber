@@ -527,6 +527,7 @@ const fn becoming(lifecycle: Lifecycle) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{sampled, Asked, Press, Shown, Viewer, BATCH};
+    use lemonfiber_core::bundle::Marks;
     use lemonfiber_core::logs::Level;
     use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
 
