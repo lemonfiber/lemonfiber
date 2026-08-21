@@ -106,16 +106,20 @@ async fn main() -> ExitCode {
         // not: it affects what is running rather than what a form holds — a restart of
         // one named service touches one service — so "starts eight services" before it
         // would be a sentence about the wrong set.
-        Request::Up { forms } => return starting(&ctx, &forms, cli.json).await,
-        Request::Down { forms, wait, yes } => halting(&ctx, forms, wait, yes, cli.json).await,
+        Request::Up { forms, services } => {
+            return starting(&ctx, &forms, &services, cli.json).await
+        }
+        Request::Down {
+            forms,
+            services,
+            wait,
+            yes,
+        } => halting(&ctx, forms, services, wait, yes, cli.json).await,
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.
         Request::Switch { forms } => Command::Switch { forms },
-        Request::Restart { form, services } => Command::Restart {
-            forms: vec![form],
-            services,
-        },
+        Request::Restart { form, services } => restarting(form, services),
         // A pull is watched as it happens rather than waited on in silence, so like
         // streaming and watching it runs its own way instead of through dispatch.
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
@@ -140,16 +144,9 @@ async fn main() -> ExitCode {
                 };
                 return repair::run(ctx, paths, mending, &Keyboard, cli.json).await;
             }
-            let only = match only.as_deref().map(Category::parse) {
-                // A named category that lemonfiber does not know is a mistake to
-                // name, not a request to run everything.
-                Some(None) => {
-                    let named = only.unwrap_or_default();
-                    eprintln!("error: no diagnostic category named `{named}`");
-                    return ExitCode::from(USAGE);
-                }
-                Some(Some(category)) => Some(category),
-                None => None,
+            let only = match narrowed(only.as_deref()) {
+                Ok(only) => only,
+                Err(code) => return code,
             };
             Command::Doctor {
                 only,
@@ -165,9 +162,7 @@ async fn main() -> ExitCode {
         },
         // A walkthrough narrates for minutes and produces one report at its end, not a
         // value that arrives once, so like streaming and watching it runs its own way.
-        Request::Walkthrough { item } => {
-            return walk(&ctx, &item.join(" "), cli.json).await;
-        }
+        Request::Walkthrough { item } => return walk(&ctx, &item.join(" "), cli.json).await,
         Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,
@@ -217,14 +212,44 @@ async fn main() -> ExitCode {
 /// The two directions share this because they share the sentence — only the verb
 /// differs — and a second copy of "say it, then do it" would be a second place for
 /// them to fall out of step about which half comes first.
+/// A restart of named services, or of everything the form holds where none are named.
+fn restarting(form: String, services: Vec<String>) -> Command {
+    Command::Restart {
+        forms: vec![form],
+        services,
+    }
+}
+
+/// The category a diagnosis was narrowed to, or the code to exit with for a name
+/// that is not one.
+///
+/// A named category lemonfiber does not know is a mistake to correct rather than a
+/// request to run everything — refused here, before the core is reached.
+fn narrowed(only: Option<&str>) -> Result<Option<Category>, ExitCode> {
+    match only.map(Category::parse) {
+        Some(None) => {
+            let named = only.unwrap_or_default();
+            eprintln!("error: no diagnostic category named `{named}`");
+            Err(ExitCode::from(USAGE))
+        }
+        Some(Some(category)) => Ok(Some(category)),
+        None => Ok(None),
+    }
+}
+
 /// Announce what starting will affect, then start it, narrated as it goes.
 ///
 /// Starting does not go through dispatch, for the same reason a pull and a watch do
 /// not: Compose narrates for minutes and the report comes at the end, which is not a
 /// value that arrives once.
-async fn starting(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
-    announce(ctx, forms, json, Doing::Starting).await;
-    start(ctx, forms, json).await
+async fn starting(ctx: &Ctx, forms: &[String], services: &[String], json: bool) -> ExitCode {
+    // Not announced where services are named. The announcement is about what a form
+    // holds, and saying "starts eight services" before starting two of them would be
+    // a sentence about a set the operator did not ask for.
+    if services.is_empty() {
+        announce(ctx, forms, json, Doing::Starting).await;
+    }
+    start(ctx, forms, services, json).await
 }
 
 /// Announce what stopping would affect, settle what to do about anything still
@@ -233,14 +258,36 @@ async fn starting(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
 /// Both happen before the teardown rather than during it: an operator who is going to
 /// be told a download is at ninety per cent wants to be told while stopping is still
 /// a question, not while it is already happening.
-async fn halting(ctx: &Ctx, forms: Vec<String>, wait: bool, yes: bool, json: bool) -> Command {
-    announce(ctx, &forms, json, Doing::Stopping).await;
-    // Machine-readable runs are left alone. A prompt has nobody to answer it, and a
-    // report that is not in the envelope is noise on a stream something is parsing.
-    if !json {
+async fn halting(
+    ctx: &Ctx,
+    forms: Vec<String>,
+    services: Vec<String>,
+    wait: bool,
+    yes: bool,
+    json: bool,
+) -> Command {
+    // Not announced where services are named, for the same reason starting is not:
+    // the announcement is about what a form holds, and naming two services is not a
+    // request about the form.
+    if services.is_empty() {
+        announce(ctx, &forms, json, Doing::Stopping).await;
+    }
+    // Asked only of a whole teardown. What is in flight is a question about the
+    // download clients a form holds, and stopping two named services that are not
+    // download clients would report downloads that stopping them cannot interrupt.
+    //
+    // Machine-readable runs are left alone either way. A prompt has nobody to answer
+    // it, and a report not in the envelope is noise on a stream something is parsing.
+    if !json && services.is_empty() {
         settle(ctx, &forms, wait, yes).await;
     }
-    Command::Down { forms }
+    // Stopping named services and tearing a form down are different requests rather
+    // than one request with an argument, and Compose spells them differently too.
+    if services.is_empty() {
+        Command::Down { forms }
+    } else {
+        Command::Halt { forms, services }
+    }
 }
 
 async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {

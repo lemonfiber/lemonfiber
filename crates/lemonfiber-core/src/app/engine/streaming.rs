@@ -147,8 +147,9 @@ pub async fn pull_progress(
 pub async fn start_progress(
     ctx: &Ctx,
     forms: &[String],
+    services: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
-    let (_, command, _) = readied(ctx, forms, &Action::Up).await?;
+    let (_, command, _) = readied(ctx, forms, &aimed(services)).await?;
     ctx.runner
         .stream(&command)
         .await
@@ -172,12 +173,26 @@ pub async fn start_progress(
 pub async fn started(
     ctx: &Ctx,
     forms: &[String],
+    services: &[String],
     status: Option<i32>,
 ) -> Result<Outcome, Box<Problem>> {
-    let (manifest, _, mut report) = readied(ctx, forms, &Action::Up).await?;
+    let (manifest, _, mut report) = readied(ctx, forms, &aimed(services)).await?;
     report.status = status;
     if status == Some(0) {
         settled_into(ctx, &manifest, &mut report).await?;
     }
     Ok(Outcome::Lifecycle(report))
+}
+
+/// What a start is aimed at: the named services, or everything the plan holds.
+///
+/// Naming none is not a narrower request that happens to be empty — it is the whole
+/// plan, which is a different Compose invocation rather than the same one with no
+/// arguments.
+fn aimed(services: &[String]) -> Action {
+    if services.is_empty() {
+        Action::Up
+    } else {
+        Action::Start(services.to_vec())
+    }
 }

@@ -26,6 +26,8 @@ use super::closure::Plan;
 pub enum Action {
     /// Start, detached.
     Up,
+    /// Start named services, detached, leaving the rest alone.
+    Start(Vec<String>),
     /// Stop and remove.
     Down,
     /// Stop named services without removing them, leaving the rest alone.
@@ -43,7 +45,7 @@ impl Action {
     #[must_use]
     pub const fn name(&self) -> &'static str {
         match self {
-            Self::Up => "up",
+            Self::Up | Self::Start(_) => "up",
             Self::Down => "down",
             Self::Stop(_) => "stop",
             Self::Restart(_) => "restart",
@@ -56,24 +58,24 @@ impl Action {
     pub(crate) fn argv(&self) -> Vec<String> {
         match self {
             Self::Up => vec!["up".to_owned(), "--detach".to_owned()],
+            Self::Start(services) => fenced(vec!["up".to_owned(), "--detach".to_owned()], services),
             Self::Down => vec!["down".to_owned()],
-            Self::Stop(services) => aimed("stop", services),
-            Self::Restart(services) => aimed("restart", services),
+            Self::Stop(services) => fenced(vec!["stop".to_owned()], services),
+            Self::Restart(services) => fenced(vec!["restart".to_owned()], services),
             Self::Pull => vec!["pull".to_owned()],
             Self::Config => vec!["config".to_owned()],
         }
     }
 }
 
-/// A Compose subcommand aimed at named services, or at the whole project where
-/// none are named.
+/// A Compose invocation aimed at named services, or at the whole project where none
+/// are named.
 ///
-/// Stopping and restarting differ in the word and in nothing else, and the part
-/// that is easy to get wrong is shared: a `--` fences the service names off from
-/// option parsing, so one that begins with a dash is treated as a name and not a
-/// flag.
-fn aimed(subcommand: &str, services: &[String]) -> Vec<String> {
-    let mut argv = vec![subcommand.to_owned()];
+/// Starting, stopping and restarting differ in the words in front and in nothing
+/// else, and the part that is easy to get wrong is shared: a `--` fences the service
+/// names off from option parsing, so one that begins with a dash is treated as a name
+/// and not as a flag.
+fn fenced(mut argv: Vec<String>, services: &[String]) -> Vec<String> {
     if !services.is_empty() {
         argv.push("--".to_owned());
         argv.extend(services.iter().cloned());
@@ -265,12 +267,18 @@ mod tests {
             Some("stop -- qbittorrent"),
             "stopping part of what is up names only that part, fenced the same way"
         );
+        assert_eq!(
+            ending(&Action::Start(vec!["sonarr".to_owned()])).as_deref(),
+            Some("up --detach -- sonarr"),
+            "a start aimed at services keeps the detach and fences the names after it"
+        );
     }
 
     #[test]
     fn every_action_reports_the_name_it_runs_under() {
         for (action, name) in [
             (Action::Up, "up"),
+            (Action::Start(Vec::new()), "up"),
             (Action::Down, "down"),
             (Action::Stop(Vec::new()), "stop"),
             (Action::Restart(Vec::new()), "restart"),

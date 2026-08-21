@@ -96,6 +96,17 @@ pub enum Command {
         /// The forms to stop.
         forms: Vec<String>,
     },
+    /// Stop named services, leaving the rest of what is running alone.
+    ///
+    /// Apart from [`Command::Down`] because they are different requests, not one
+    /// request with an argument: a teardown removes what a form started, and this
+    /// stops services that stay where they are. Compose spells them differently too.
+    Halt {
+        /// The forms the services belong to; none means the whole stack.
+        forms: Vec<String>,
+        /// The services to stop.
+        services: Vec<String>,
+    },
     /// Make these forms the active set, stopping only what falls outside them.
     Switch {
         /// The forms to switch to, resolved to the union of their closures.
@@ -315,6 +326,9 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
         Command::Down { forms } => engine::lifecycle(ctx, &forms, &Action::Down).await,
+        Command::Halt { forms, services } => {
+            engine::lifecycle(ctx, &forms, &Action::Stop(services)).await
+        }
         Command::Switch { forms } => engine::switch(ctx, &forms).await,
         Command::Restart { forms, services } => {
             engine::lifecycle(ctx, &forms, &Action::Restart(services)).await
@@ -2168,6 +2182,36 @@ mod tests {
             produced.map(|report| (report.condition, report.services.is_empty())),
             Some((None, true)),
             "stopping is finished when Compose says so"
+        );
+    }
+
+    /// Stopping named services is a different request from tearing a form down, and
+    /// it reaches Compose as a different word — `stop`, which leaves them where they
+    /// are, rather than `down`, which removes what the form started.
+    #[tokio::test]
+    async fn stopping_named_services_stops_only_those() {
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let ctx = watching(engine).waiting(Duration::ZERO);
+        let command = Command::Halt {
+            forms: vec!["library".to_owned()],
+            services: vec!["sonarr".to_owned()],
+        };
+
+        let produced = report(dispatch(command, &ctx).await);
+        assert_eq!(
+            produced
+                .as_ref()
+                .map(|report| report.action.clone())
+                .as_deref(),
+            Some("stop")
+        );
+        assert!(
+            produced.is_some_and(|report| report.command.ends_with(&[
+                "stop".to_owned(),
+                "--".to_owned(),
+                "sonarr".to_owned()
+            ])),
+            "the named service is fenced off from option parsing"
         );
     }
 
