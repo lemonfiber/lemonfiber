@@ -100,6 +100,16 @@ fn wanting(needs: Protocol) -> &'static str {
 /// tell the operator only that they read the report.
 fn moved(switched: &Switched) -> Lines {
     let mut lines = Lines::default();
+
+    // Nothing moved is an answer rather than an absence. An operator who asked for a
+    // shape the stack is already in should be told so, not left to infer it from a
+    // report that says only which profiles were named. What is still running is listed
+    // underneath, because "already in that shape" is worth more with the shape beside
+    // it.
+    if switched.stopped.is_empty() && switched.started.is_empty() {
+        lines.put("already in that shape — nothing was stopped or started");
+    }
+
     for (what, services) in [
         ("stopped", &switched.stopped),
         ("started", &switched.started),
@@ -328,6 +338,32 @@ mod tests {
         assert!(
             text.contains("kept running: jellyfin"),
             "the one that makes the verb worth having: {text}"
+        );
+    }
+
+    /// A switch onto the shape the stack is already in moved nothing at all, and that
+    /// is an answer. Reporting only the profiles would leave the operator to work out
+    /// for themselves that nothing happened.
+    #[test]
+    fn a_switch_that_moved_nothing_says_so_and_still_shows_what_is_up() {
+        let report = LifecycleReport {
+            switched: Some(Switched {
+                stopped: Vec::new(),
+                started: Vec::new(),
+                kept: vec!["jellyfin".to_owned(), "seerr".to_owned()],
+                stop_command: None,
+            }),
+            ..a_lifecycle("switch", a_plan("media", Vec::new()))
+        };
+
+        let text = lifecycle(&report).text();
+        assert!(
+            text.contains("already in that shape"),
+            "the no-op is stated rather than left to be inferred: {text}"
+        );
+        assert!(
+            text.contains("kept running: jellyfin, seerr"),
+            "and what is still up is worth more beside it than alone: {text}"
         );
     }
 
