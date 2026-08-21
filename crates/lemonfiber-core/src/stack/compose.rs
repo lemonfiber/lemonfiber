@@ -28,8 +28,8 @@ pub enum Action {
     Up,
     /// Stop and remove.
     Down,
-    /// Stop without removing.
-    Stop,
+    /// Stop named services without removing them, leaving the rest alone.
+    Stop(Vec<String>),
     /// Restart named services, leaving the rest alone.
     Restart(Vec<String>),
     /// Fetch newer images without applying them.
@@ -45,7 +45,7 @@ impl Action {
         match self {
             Self::Up => "up",
             Self::Down => "down",
-            Self::Stop => "stop",
+            Self::Stop(_) => "stop",
             Self::Restart(_) => "restart",
             Self::Pull => "pull",
             Self::Config => "config",
@@ -57,21 +57,28 @@ impl Action {
         match self {
             Self::Up => vec!["up".to_owned(), "--detach".to_owned()],
             Self::Down => vec!["down".to_owned()],
-            Self::Stop => vec!["stop".to_owned()],
-            Self::Restart(services) => {
-                let mut argv = vec!["restart".to_owned()];
-                // A `--` fences the service names off from option parsing, so one
-                // that begins with a dash is treated as a name and not a flag.
-                if !services.is_empty() {
-                    argv.push("--".to_owned());
-                    argv.extend(services.iter().cloned());
-                }
-                argv
-            }
+            Self::Stop(services) => aimed("stop", services),
+            Self::Restart(services) => aimed("restart", services),
             Self::Pull => vec!["pull".to_owned()],
             Self::Config => vec!["config".to_owned()],
         }
     }
+}
+
+/// A Compose subcommand aimed at named services, or at the whole project where
+/// none are named.
+///
+/// Stopping and restarting differ in the word and in nothing else, and the part
+/// that is easy to get wrong is shared: a `--` fences the service names off from
+/// option parsing, so one that begins with a dash is treated as a name and not a
+/// flag.
+fn aimed(subcommand: &str, services: &[String]) -> Vec<String> {
+    let mut argv = vec![subcommand.to_owned()];
+    if !services.is_empty() {
+        argv.push("--".to_owned());
+        argv.extend(services.iter().cloned());
+    }
+    argv
 }
 
 /// Build the argument vector for a Compose invocation.
@@ -240,7 +247,7 @@ mod tests {
 
         assert_eq!(ending(&Action::Up).as_deref(), Some("up --detach"));
         assert_eq!(ending(&Action::Down).as_deref(), Some("down"));
-        assert_eq!(ending(&Action::Stop).as_deref(), Some("stop"));
+        assert_eq!(ending(&Action::Stop(Vec::new())).as_deref(), Some("stop"));
         assert_eq!(ending(&Action::Pull).as_deref(), Some("pull"));
         assert_eq!(ending(&Action::Config).as_deref(), Some("config"));
         assert_eq!(
@@ -253,6 +260,11 @@ mod tests {
             Some("restart"),
             "restarting nothing in particular restarts the form"
         );
+        assert_eq!(
+            ending(&Action::Stop(vec!["qbittorrent".to_owned()])).as_deref(),
+            Some("stop -- qbittorrent"),
+            "stopping part of what is up names only that part, fenced the same way"
+        );
     }
 
     #[test]
@@ -260,7 +272,7 @@ mod tests {
         for (action, name) in [
             (Action::Up, "up"),
             (Action::Down, "down"),
-            (Action::Stop, "stop"),
+            (Action::Stop(Vec::new()), "stop"),
             (Action::Restart(Vec::new()), "restart"),
             (Action::Pull, "pull"),
             (Action::Config, "config"),

@@ -118,7 +118,7 @@ pub async fn supervise(
     // way, and reporting that the services could not be stopped is more use than
     // refusing to report the loss at all.
     let stopped = matches!(
-        lifecycle(ctx, forms, &Action::Stop).await,
+        lifecycle(ctx, forms, &Action::Stop(Vec::new())).await,
         Ok(Outcome::Lifecycle(report)) if report.status == Some(0)
     );
 
