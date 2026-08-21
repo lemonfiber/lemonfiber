@@ -143,7 +143,10 @@ impl Scrollback {
     /// The held lines a filter admits, oldest first.
     #[must_use]
     pub fn showing(&self, filter: &Filter) -> Vec<&LogLine> {
-        self.held.iter().filter(|line| filter.admits(line)).collect()
+        self.held
+            .iter()
+            .filter(|line| filter.admits(line))
+            .collect()
     }
 }
 
