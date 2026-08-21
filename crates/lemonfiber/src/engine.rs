@@ -238,17 +238,17 @@ pub(crate) async fn start(
     services: &[String],
     json: bool,
 ) -> ExitCode {
-    // A rehearsal runs nothing, so it has nothing to narrate — and it needs no
-    // separate path, because the report it wants is the one built from the same plan
-    // without the single irreversible step, which is what a status of nothing gets.
     // A streamed start does not go through the dispatcher, so it claims the stack
     // here rather than inheriting the claim `lifecycle` takes. Given back below on
-    // both paths out, for the same reason it is there.
+    // both paths out, for the same reason it is given back there.
     let claim = match claimed(ctx).await {
         Ok(claim) => claim,
         Err(problem) => return complain(&problem),
     };
 
+    // A rehearsal runs nothing, so it has nothing to narrate — and it needs no
+    // separate path, because the report it wants is the one built from the same plan
+    // without the single irreversible step, which is what a status of nothing gets.
     let status = if ctx.dry_run {
         None
     } else {
