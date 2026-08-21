@@ -19,7 +19,7 @@
 use crate::render::downloads::protocol;
 use lemonfiber_core::alert::Alert;
 use lemonfiber_core::dashboard::{
-    Hardlink, Panel, Protocol, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
+    Hardlink, Panel, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
 };
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;

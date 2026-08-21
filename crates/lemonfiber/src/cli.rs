@@ -79,6 +79,9 @@ pub(crate) enum Request {
         /// Let anything still downloading finish before stopping.
         #[arg(long)]
         wait: bool,
+        /// Stop without asking about anything still downloading.
+        #[arg(long, conflicts_with = "wait")]
+        yes: bool,
     },
     /// Make these forms the active set, leaving shared services running.
     ///

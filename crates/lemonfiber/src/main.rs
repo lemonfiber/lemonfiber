@@ -107,7 +107,7 @@ async fn main() -> ExitCode {
         // touches one service — and saying "starts eight services" before either
         // would be a sentence about the wrong set.
         Request::Up { forms } => announced(&ctx, forms, cli.json, Doing::Starting).await,
-        Request::Down { forms, wait } => halting(&ctx, forms, wait, cli.yes, cli.json).await,
+        Request::Down { forms, wait, yes } => halting(&ctx, forms, wait, yes, cli.json).await,
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.
