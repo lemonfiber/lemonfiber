@@ -24,6 +24,7 @@
 pub mod closure;
 pub mod compose;
 pub mod mounts;
+pub mod standing;
 
 use std::path::{Path, PathBuf};
 
