@@ -208,6 +208,23 @@ pub enum Overall {
 /// wait with no end is indistinguishable from a hang.
 const CHECK_BUDGET: Duration = Duration::from_secs(15);
 
+/// How long a check that waits on a filesystem may run.
+///
+/// Longer than [`CHECK_BUDGET`], because what it is waiting on is not a container
+/// command but a disk. A network share reached over a busy link, or an external
+/// drive that has spun down, can take tens of seconds to answer its first
+/// request — and abandoning it would report hardware that is merely slow as
+/// hardware that cannot be read, which is the worse of the two mistakes: an
+/// operator sent to diagnose a working disk.
+///
+/// Thirty seconds rather than something larger, because two promises meet here.
+/// A run's wall clock is its **slowest** check rather than the sum of them — they
+/// run concurrently — so this is exactly the largest a single check can ask for
+/// while a full non-disruptive run still finishes inside the thirty seconds it is
+/// meant to. Beyond that, one slow disk would break the promise made about every
+/// other run.
+pub(crate) const FILESYSTEM_BUDGET: Duration = Duration::from_secs(30);
+
 /// A single diagnostic, run in isolation from every other.
 ///
 /// A check reports what it could not determine as an unverified finding and
@@ -568,6 +585,23 @@ depends_on = ["gluetun"]
         );
         let linked = attributed(vec![environment.clone()], &stack());
         assert_eq!(linked, vec![environment]);
+    }
+
+    /// The two promises about time meet at this number, and a change to either has to be
+    /// made knowing about the other. A single check may ask for longer than the default,
+    /// and not for so long that one slow disk breaks the thirty seconds a full
+    /// non-disruptive run is meant to finish in — which holds only because the checks run
+    /// concurrently, so a run costs its slowest check rather than their sum.
+    #[test]
+    fn a_filesystem_may_wait_longer_than_a_container_command_but_not_past_a_whole_run() {
+        assert!(
+            super::FILESYSTEM_BUDGET > super::CHECK_BUDGET,
+            "a disk that has spun down needs longer than a container command"
+        );
+        assert!(
+            super::FILESYSTEM_BUDGET <= Duration::from_secs(30),
+            "a full non-disruptive run is meant to finish inside thirty seconds"
+        );
     }
 
     /// A failing verdict, for the tests above.

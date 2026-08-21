@@ -101,6 +101,14 @@ impl Check for HeadroomCheck {
         Category::Storage
     }
 
+    /// Longer than a check bounded by a container command. This one waits on the
+    /// operator's own storage, which may be a network share or a drive that has
+    /// spun down, and calling merely slow hardware unreadable sends them to
+    /// diagnose a disk that is working.
+    fn budget(&self) -> std::time::Duration {
+        super::FILESYSTEM_BUDGET
+    }
+
     async fn run(&self) -> Vec<Finding> {
         let verdict = match &self.data_root {
             None => Verdict::Skipped {
