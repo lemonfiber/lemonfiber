@@ -17,6 +17,7 @@ use crate::stack::closure::{resolve, Plan};
 use crate::stack::compose::{build, Action};
 
 mod diagnosis;
+mod stopping;
 mod switch;
 
 pub use diagnosis::diagnose;
@@ -376,6 +377,13 @@ pub(super) async fn lifecycle(
         stack_edits,
         ..
     } = compose(ctx, forms, action)?;
+
+    // Asked before anything is run, and only of a teardown. Bringing a form up or
+    // restarting part of one takes nothing away from anybody; stopping is the one
+    // action whose effect reaches forms the operator did not name.
+    if action == &Action::Down {
+        stopping::permitted(ctx, &manifest, forms).await?;
+    }
 
     let mut report = LifecycleReport {
         action: action.name().to_owned(),
