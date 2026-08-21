@@ -77,6 +77,16 @@ pub(crate) enum Request {
         #[arg(required = true)]
         forms: Vec<String>,
     },
+    /// Make these forms the active set, leaving shared services running.
+    ///
+    /// Only what falls outside the new shape is stopped. A service the old shape
+    /// and the new one both hold keeps running rather than being restarted, so a
+    /// download in flight is not interrupted to change the stack around it.
+    Switch {
+        /// The forms to switch to.
+        #[arg(required = true)]
+        forms: Vec<String>,
+    },
     /// Restart services without touching the rest.
     Restart {
         /// The form holding them.

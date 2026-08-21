@@ -43,6 +43,35 @@ pub struct LifecycleReport {
     /// moved, or could not be.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forwarding: Option<String>,
+    /// What narrowing moved, where the command was a switch. Absent for every
+    /// other action, which is what tells a reader that nothing was left running
+    /// on purpose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub switched: Option<Switched>,
+}
+
+/// What narrowing the active set moved.
+///
+/// Three lists rather than a before and an after, because the operator's question
+/// is not "what is running now" — they can ask that — but "what did that do". The
+/// middle list is the one that makes the verb worth having: it is the promise that
+/// a download in flight was not interrupted to change the shape of the stack
+/// around it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Switched {
+    /// Stopped, because the new closure does not hold them.
+    pub stopped: Vec<String>,
+    /// Started, because the new closure holds them and they were not up.
+    pub started: Vec<String>,
+    /// Left running: the new closure holds them too, so nothing here asked them to
+    /// stop. Not a promise that nothing touched them — Compose recreates a container
+    /// whose configuration changed — but a promise that narrowing did not.
+    pub kept: Vec<String>,
+    /// The exact Compose invocation that stopped what fell outside, so a switch is
+    /// no more a matter of trust than any other action. Absent where nothing had
+    /// to stop.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop_command: Option<Vec<String>>,
 }
 
 /// A stack file the operator edited, preserved rather than overwritten, with the

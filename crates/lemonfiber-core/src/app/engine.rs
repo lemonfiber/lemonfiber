@@ -17,9 +17,11 @@ use crate::stack::closure::{resolve, Plan};
 use crate::stack::compose::{build, Action};
 
 mod diagnosis;
+mod switch;
 
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
+pub(super) use switch::switch;
 
 /// How often the engine is asked whether anything has changed.
 const POLL: std::time::Duration = std::time::Duration::from_millis(500);
@@ -223,32 +225,31 @@ pub async fn pull_progress(
     ctx: &Ctx,
     forms: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
-    let (_, _, command, _) = compose(ctx, forms, &Action::Pull)?;
+    let command = compose(ctx, forms, &Action::Pull)?.command;
     ctx.runner
         .stream(&command)
         .await
         .map_err(|err| Box::new(err.problem()))
 }
 
-/// Resolve the named forms to their plan and the `docker compose` argument vector
-/// for `action`, materialising the stack so Compose can read it.
+/// What resolving the forms into a runnable Compose command produced.
 ///
-/// The shared prelude of every lifecycle command and of a streamed pull, so the
-/// two build the exact same invocation for the same forms and their setup
-/// failures — an unreadable manifest, a form that resolves to nothing, a stack
-/// that cannot be written — read the same wherever they surface. The manifest and
-/// plan travel back with the command because a caller that runs it needs them to
-/// report what it did and to wait on what it started.
-/// What resolving the forms into a runnable Compose command produced: the manifest
-/// and plan a caller needs to report and wait on what it ran, the command itself,
-/// and any stack file the operator had edited that was preserved rather than
-/// overwritten.
-type Composed = (
-    lemonfiber_manifest::Manifest,
-    Plan,
-    Vec<String>,
-    Vec<StackEdit>,
-);
+/// Named fields rather than a tuple because callers want different parts of it: a
+/// pull takes the command alone, a lifecycle command takes four of the five, and a
+/// switch is the one that needs the stack directory — building a second invocation
+/// means telling Compose again where the project is.
+struct Composed {
+    /// The stack's manifest, already read and validated.
+    manifest: lemonfiber_manifest::Manifest,
+    /// What the named forms came to.
+    plan: Plan,
+    /// The argument vector for the action that was asked for.
+    command: Vec<String>,
+    /// Where the materialised stack lives, which is where Compose reads it from.
+    stack: std::path::PathBuf,
+    /// Stack files the operator had edited, preserved rather than overwritten.
+    stack_edits: Vec<StackEdit>,
+}
 
 /// Whether an action should carry the quality choice into the materialised stack.
 ///
@@ -258,6 +259,13 @@ fn carries_quality(action: &Action) -> bool {
     matches!(action, Action::Up | Action::Pull)
 }
 
+/// Resolve the named forms to their plan and the `docker compose` argument vector
+/// for `action`, materialising the stack so Compose can read it.
+///
+/// The shared prelude of every lifecycle command and of a streamed pull, so the two
+/// build the exact same invocation for the same forms and their setup failures — an
+/// unreadable manifest, a form that resolves to nothing, a stack that cannot be
+/// written — read the same wherever they surface.
 fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box<Problem>> {
     let (manifest, plan) = resolved(ctx, forms)?;
     let record = ctx
@@ -285,7 +293,13 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     )
     .map_err(|err| Box::new(err.problem()))?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
-    Ok((manifest, plan, command, edits))
+    Ok(Composed {
+        manifest,
+        plan,
+        command,
+        stack,
+        stack_edits: edits,
+    })
 }
 
 /// What every service in the named forms is doing.
@@ -327,6 +341,24 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
     })
 }
 
+/// Wait for what was started to be usable, and record what it came to.
+///
+/// Shared rather than written twice, because anything that starts services owes the
+/// operator the same wait: bringing a form up and switching to one differ in what
+/// they start and not at all in what "started" has to mean before it is said.
+async fn settled_into(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    report: &mut LifecycleReport,
+) -> Result<(), Box<Problem>> {
+    let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
+    let settled = settle(ctx, manifest, &profiles).await?;
+    report.condition = Some(condition(&settled));
+    report.services = settled;
+    report.forwarding = super::forwarding::after_start(ctx, manifest).await;
+    Ok(())
+}
+
 /// Resolve forms, build the command, and run it unless this is a rehearsal.
 ///
 /// Nothing here decides anything a surface could have decided differently, which
@@ -337,7 +369,13 @@ pub(super) async fn lifecycle(
     forms: &[String],
     action: &Action,
 ) -> Result<Outcome, Box<Problem>> {
-    let (manifest, plan, command, stack_edits) = compose(ctx, forms, action)?;
+    let Composed {
+        manifest,
+        plan,
+        command,
+        stack_edits,
+        ..
+    } = compose(ctx, forms, action)?;
 
     let mut report = LifecycleReport {
         action: action.name().to_owned(),
@@ -349,6 +387,7 @@ pub(super) async fn lifecycle(
         condition: None,
         stack_edits,
         forwarding: None,
+        switched: None,
     };
 
     // A rehearsal stops here deliberately: it has already done everything except
@@ -369,11 +408,7 @@ pub(super) async fn lifecycle(
     // means "a process exists" is a claim the operator will disprove by opening
     // a browser. Nothing else waits: stopping is done when Compose says so.
     if action == &Action::Up && output.succeeded() {
-        let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
-        let settled = settle(ctx, &manifest, &profiles).await?;
-        report.condition = Some(condition(&settled));
-        report.services = settled;
-        report.forwarding = super::forwarding::after_start(ctx, &manifest).await;
+        settled_into(ctx, &manifest, &mut report).await?;
     }
 
     Ok(Outcome::Lifecycle(report))

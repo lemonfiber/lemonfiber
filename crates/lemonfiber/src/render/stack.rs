@@ -5,7 +5,7 @@
 
 use lemonfiber_core::docker::{Condition, Service, State};
 use lemonfiber_core::model::{
-    Envelope, LifecycleReport, ResetReport, StatusReport, SupervisionReport,
+    Envelope, LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
 };
 use lemonfiber_core::plural::s;
 use lemonfiber_core::stack::closure::{Plan, Protocol};
@@ -93,15 +93,51 @@ fn wanting(needs: Protocol) -> &'static str {
     }
 }
 
+/// What narrowing the active set moved, a line per direction.
+///
+/// A direction that moved nothing is left unsaid rather than reported as none: on a
+/// stack that was down, "stopped: nothing" and "kept: nothing" are two lines that
+/// tell the operator only that they read the report.
+fn moved(switched: &Switched) -> Lines {
+    let mut lines = Lines::default();
+    for (what, services) in [
+        ("stopped", &switched.stopped),
+        ("started", &switched.started),
+        ("kept running", &switched.kept),
+    ] {
+        if !services.is_empty() {
+            lines.put(format!("{what}: {}", services.join(", ")));
+        }
+    }
+    lines
+}
+
 /// What a lifecycle command did, or would have done.
 pub(super) fn lifecycle(report: &LifecycleReport) -> Lines {
     let mut lines = Lines::default();
     if report.rehearsed {
         lines.put("would run:");
+        // Both invocations, in the order they would run. A switch that stops
+        // something runs two commands, and printing one of them would make the
+        // rehearsal a smaller claim than the thing it is rehearsing.
+        if let Some(stopping) = report
+            .switched
+            .as_ref()
+            .and_then(|switched| switched.stop_command.as_ref())
+        {
+            lines.put(format!("  {}", stopping.join(" ")));
+        }
         lines.put(format!("  {}", report.command.join(" ")));
     }
     let profiles: Vec<&str> = report.plan.profiles.iter().map(String::as_str).collect();
     lines.put(format!("{}: {}", report.action, profiles.join(", ")));
+
+    // What narrowing moved. The kept list is the point of the verb — it is the
+    // promise that a download in flight was not interrupted — so it is said even
+    // though, by definition, nothing happened to it.
+    if let Some(switched) = &report.switched {
+        lines.extend(moved(switched));
+    }
 
     // Saying what was left out, and that it was deliberate, before the operator
     // goes looking for a service that was never going to start.
@@ -273,6 +309,71 @@ mod tests {
         };
         let text = lifecycle(&report).text();
         assert_eq!(text, "down: media");
+    }
+
+    #[test]
+    fn a_switch_says_what_moved_in_each_direction() {
+        let report = LifecycleReport {
+            switched: Some(Switched {
+                stopped: vec!["qbittorrent".to_owned()],
+                started: vec!["sonarr".to_owned()],
+                kept: vec!["jellyfin".to_owned()],
+                stop_command: None,
+            }),
+            ..a_lifecycle("switch", a_plan("media", Vec::new()))
+        };
+        let text = lifecycle(&report).text();
+        assert!(text.contains("stopped: qbittorrent"), "{text}");
+        assert!(text.contains("started: sonarr"), "{text}");
+        assert!(
+            text.contains("kept running: jellyfin"),
+            "the one that makes the verb worth having: {text}"
+        );
+    }
+
+    /// A direction that moved nothing says nothing, rather than saying "none" three
+    /// times to an operator who switched onto a stack that was down.
+    #[test]
+    fn a_switch_that_moved_nothing_in_a_direction_leaves_that_direction_unsaid() {
+        let report = LifecycleReport {
+            switched: Some(Switched {
+                stopped: Vec::new(),
+                started: vec!["sonarr".to_owned()],
+                kept: Vec::new(),
+                stop_command: None,
+            }),
+            ..a_lifecycle("switch", a_plan("media", Vec::new()))
+        };
+        let text = lifecycle(&report).text();
+        assert_eq!(text, "switch: media\nstarted: sonarr");
+    }
+
+    /// A switch that stops something runs two commands, and a rehearsal that printed
+    /// one of them would be a smaller claim than the thing it is rehearsing.
+    #[test]
+    fn a_rehearsed_switch_prints_both_invocations_in_the_order_they_would_run() {
+        let report = LifecycleReport {
+            rehearsed: true,
+            command: vec!["docker".to_owned(), "compose".to_owned(), "up".to_owned()],
+            switched: Some(Switched {
+                stopped: vec!["qbittorrent".to_owned()],
+                started: Vec::new(),
+                kept: Vec::new(),
+                stop_command: Some(vec![
+                    "docker".to_owned(),
+                    "compose".to_owned(),
+                    "stop".to_owned(),
+                ]),
+            }),
+            ..a_lifecycle("switch", a_plan("media", Vec::new()))
+        };
+        let text = lifecycle(&report).text();
+        let stopping = text.find("compose stop");
+        let starting = text.find("compose up");
+        assert!(
+            stopping.is_some() && starting.is_some() && stopping < starting,
+            "the stop is printed first, because it runs first: {text}"
+        );
     }
 
     #[test]

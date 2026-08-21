@@ -72,6 +72,21 @@ impl State {
     pub const fn wants_attention(self) -> bool {
         matches!(self, Self::Failed | Self::CrashLooping | Self::Unhealthy)
     }
+
+    /// Whether lemonfiber has anything here to stop.
+    ///
+    /// `Absent` and `Stopped` have nothing to stop, and `Failed` has already
+    /// stopped itself. A crash-looping service does have something to stop, and
+    /// is the case that most wants stopping. `HostManaged` has something running
+    /// too, but it is the operating system's and not lemonfiber's — which is the
+    /// whole of what leaving a native Jellyfin alone comes to.
+    #[must_use]
+    pub const fn stoppable(self) -> bool {
+        !matches!(
+            self,
+            Self::Absent | Self::Stopped | Self::Failed | Self::HostManaged
+        )
+    }
 }
 
 /// One service, as it stands.

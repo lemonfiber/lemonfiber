@@ -90,6 +90,10 @@ async fn main() -> ExitCode {
             Command::Up { forms }
         }
         Request::Down { forms } => Command::Down { forms },
+        // Not announced beforehand the way starting is. A switch's own report is the
+        // announcement — what stopped, what started, and what was left alone — and
+        // saying "starts eight services" first would name the wrong set twice over.
+        Request::Switch { forms } => Command::Switch { forms },
         Request::Restart { form, services } => Command::Restart {
             forms: vec![form],
             services,
