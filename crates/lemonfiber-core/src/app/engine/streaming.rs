@@ -14,8 +14,8 @@
 use tokio::sync::mpsc::Receiver;
 
 use super::{compose, readied, settled_into, Ctx};
+use crate::app::Outcome;
 use crate::error::{Diagnose, Problem};
-use crate::model::Outcome;
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
 use crate::stack::closure::resolve;

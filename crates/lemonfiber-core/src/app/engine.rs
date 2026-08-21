@@ -325,7 +325,7 @@ async fn readied(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
-) -> Result<(Manifest, Vec<String>, LifecycleReport), Box<Problem>> {
+) -> Result<(lemonfiber_manifest::Manifest, Vec<String>, LifecycleReport), Box<Problem>> {
     let Composed {
         manifest,
         plan,
