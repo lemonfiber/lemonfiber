@@ -787,6 +787,34 @@ mod tests {
         );
     }
 
+    /// The two budget constants are bounded beside their own definition. This is about
+    /// the suite that actually gets built: a check overriding `budget()` with a minute
+    /// of its own would break the promise without touching either constant.
+    ///
+    /// The slowest check is the whole of what has to fit, because the checks run
+    /// concurrently — a run costs its slowest rather than their sum, which is the only
+    /// reason a filesystem may ask for twice what a container command gets.
+    #[tokio::test]
+    async fn no_check_in_a_non_disruptive_run_may_outlast_the_run_itself() {
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::holding(
+                &[],
+                Lifecycle::Exited,
+                Health::None,
+            )))
+            .build();
+
+        let slowest = super::engine::assembled(&ctx, false)
+            .await
+            .ok()
+            .and_then(|(_, checks)| checks.iter().map(|check| check.budget()).max());
+
+        assert!(
+            slowest.is_some_and(|budget| budget <= Duration::from_secs(30)),
+            "a full non-disruptive run is meant to finish inside thirty seconds: {slowest:?}"
+        );
+    }
+
     #[tokio::test]
     async fn doctor_reports_an_unreadable_stack_rather_than_guessing() {
         let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
