@@ -22,7 +22,7 @@
 use lemonfiber_core::logs::viewer::{Filter, Scrollback};
 use lemonfiber_core::logs::{declared, Level};
 use lemonfiber_core::plural::s;
-use lemonfiber_core::ports::docker::LogLine;
+use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
 use lemonfiber_core::text::plain;
 
 pub(crate) mod draw;
@@ -118,6 +118,11 @@ pub(crate) struct Viewer {
     text: Option<String>,
     /// A filter part-typed, or nothing where the operator is reading.
     typing: Option<String>,
+    /// What each service was doing when the engine was last asked.
+    ///
+    /// Empty until the first look, which is what stops a viewer opening onto a
+    /// notice for every service in the stack: there is nothing to have changed from.
+    was: Vec<(String, Lifecycle)>,
     /// How far back from the newest admitted line the view sits.
     back: usize,
     /// Whether the operator is still here.
@@ -139,6 +144,7 @@ impl Viewer {
             least: None,
             text: None,
             typing: None,
+            was: Vec::new(),
             back: 0,
             open: true,
         }
@@ -158,6 +164,30 @@ impl Viewer {
             self.back += 1;
         }
         self.held.take(line);
+    }
+
+    /// Take the engine's account of what each service is doing.
+    ///
+    /// A service whose state has changed since the last look gets a line where it
+    /// happened, in the stream rather than in a banner — a banner saying a service
+    /// restarted cannot say *when*, and when is the whole of what makes it useful
+    /// beside the lines around it.
+    ///
+    /// The view is not disturbed. A restart is something to notice while reading,
+    /// not a reason to be thrown back to the tail, so the notice arrives the way any
+    /// other line does and the operator stays where they were.
+    pub(crate) fn doing(&mut self, now: &[(String, Lifecycle)]) {
+        for (service, lifecycle) in now {
+            let before = self
+                .was
+                .iter()
+                .find(|(named, _)| named == service)
+                .map(|(_, was)| *was);
+            if before.is_some_and(|before| before != *lifecycle) {
+                self.take(noticed(service, *lifecycle));
+            }
+        }
+        self.was = now.to_vec();
     }
 
     /// Note lines let go to keep the screen answering the keyboard.
@@ -384,11 +414,40 @@ impl Viewer {
     }
 }
 
+/// A line the viewer wrote itself, saying what the engine reported.
+///
+/// Tagged with the service it is about, so it sits under the same name as that
+/// service's own output and a filter narrowed to one service keeps its notices.
+fn noticed(service: &str, lifecycle: Lifecycle) -> LogLine {
+    LogLine {
+        service: service.to_owned(),
+        stream: Stream::Stdout,
+        at: None,
+        line: format!("--- {service} {} ---", becoming(lifecycle)),
+    }
+}
+
+/// What to say about a service that has just reached this state.
+///
+/// Said as what happened rather than as the engine's word for it: `Exited` is a
+/// state, "has stopped" is news.
+const fn becoming(lifecycle: Lifecycle) -> &'static str {
+    match lifecycle {
+        Lifecycle::Created => "was created",
+        Lifecycle::Running => "is running again",
+        Lifecycle::Paused => "was paused",
+        Lifecycle::Restarting => "is restarting",
+        Lifecycle::Exited => "has stopped",
+        Lifecycle::Removing => "is being removed",
+        Lifecycle::Dead => "died",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{sampled, Press, Shown, Viewer, BATCH};
     use lemonfiber_core::logs::Level;
-    use lemonfiber_core::ports::docker::{LogLine, Stream};
+    use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
 
     /// One line as the engine hands it over.
     fn line(service: &str, said: &str) -> LogLine {
@@ -757,5 +816,101 @@ mod tests {
     #[test]
     fn a_press_says_what_it_is() {
         assert!(format!("{:?}", Press::Rubout).contains("Rubout"));
+    }
+
+    /// What the engine reports for one service.
+    fn engine(service: &str, lifecycle: Lifecycle) -> Vec<(String, Lifecycle)> {
+        vec![(service.to_owned(), lifecycle)]
+    }
+
+    /// Opening a viewer onto a running stack would otherwise print a notice for
+    /// every service in it, none of which is news.
+    #[test]
+    fn the_first_look_at_the_engine_is_not_news() {
+        let mut viewer = a_viewer();
+
+        viewer.doing(&engine("sonarr", Lifecycle::Running));
+
+        assert_eq!(shown(&viewer, 10).len(), 3, "nothing was added");
+    }
+
+    /// The requirement in one test: the restart is in the stream, and the view
+    /// carries on around it.
+    #[test]
+    fn a_service_that_restarts_is_noted_without_ending_the_view() {
+        let mut viewer = a_viewer();
+        viewer.doing(&engine("sonarr", Lifecycle::Running));
+
+        viewer.doing(&engine("sonarr", Lifecycle::Restarting));
+
+        let said = shown(&viewer, 10);
+        assert!(
+            said.iter()
+                .any(|line| line.contains("sonarr is restarting")),
+            "{said:?}"
+        );
+        assert_eq!(
+            said.len(),
+            4,
+            "it joined the lines rather than replacing them"
+        );
+        assert!(viewer.open(), "the view did not end");
+        assert_eq!(viewer.footing(), "following", "and was not disturbed");
+    }
+
+    #[test]
+    fn a_service_that_has_not_changed_is_not_mentioned_again() {
+        let mut viewer = a_viewer();
+        for _ in 0..4 {
+            viewer.doing(&engine("sonarr", Lifecycle::Running));
+        }
+
+        assert_eq!(shown(&viewer, 10).len(), 3);
+    }
+
+    /// A notice is tagged with the service it is about, so narrowing to that
+    /// service keeps the reason its output stopped.
+    #[test]
+    fn a_notice_belongs_to_the_service_it_is_about() {
+        let mut viewer = a_viewer();
+        viewer.doing(&engine("sonarr", Lifecycle::Running));
+        viewer.doing(&engine("sonarr", Lifecycle::Restarting));
+
+        viewer.pressed(Press::Typed('s'));
+
+        assert_eq!(viewer.heading(), "sonarr");
+        assert!(
+            shown(&viewer, 10)
+                .iter()
+                .any(|line| line.contains("is restarting")),
+            "a notice narrowed away with its own service"
+        );
+    }
+
+    /// Every state the engine can report says what happened rather than naming
+    /// itself: `Exited` is a state, "has stopped" is news.
+    #[test]
+    fn every_state_the_engine_reports_reads_as_news() {
+        for (lifecycle, expected) in [
+            (Lifecycle::Created, "was created"),
+            (Lifecycle::Running, "is running again"),
+            (Lifecycle::Paused, "was paused"),
+            (Lifecycle::Restarting, "is restarting"),
+            (Lifecycle::Exited, "has stopped"),
+            (Lifecycle::Removing, "is being removed"),
+            (Lifecycle::Dead, "died"),
+        ] {
+            // Seeded with something this case is not, so every one is a change.
+            let seed = match lifecycle {
+                Lifecycle::Running => Lifecycle::Exited,
+                _ => Lifecycle::Running,
+            };
+            let mut viewer = a_viewer();
+            viewer.doing(&engine("sonarr", seed));
+            viewer.doing(&engine("sonarr", lifecycle));
+
+            let said = shown(&viewer, 10).concat();
+            assert!(said.contains(expected), "{lifecycle:?}: {said}");
+        }
     }
 }
