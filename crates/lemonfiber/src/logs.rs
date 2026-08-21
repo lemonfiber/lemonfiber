@@ -548,7 +548,8 @@ mod tests {
 
         assert_eq!(viewer.typing(), None);
         assert_eq!(shown(&viewer, 10), ["WARN Import timed out"]);
-        assert!(viewer.footing().contains("/ti"), "{}", viewer.footing());
+        let footing = viewer.footing();
+        assert!(footing.contains("/ti"), "{footing}");
     }
 
     #[test]
@@ -688,11 +689,8 @@ mod tests {
         viewer.take(line("sonarr", "epsilon timed"));
         assert_eq!(shown(&viewer, 1), ["beta timed"]);
 
-        assert!(
-            viewer.heading().contains("2 unseen"),
-            "{}",
-            viewer.heading()
-        );
+        let heading = viewer.heading();
+        assert!(heading.contains("2 unseen"), "{heading}");
     }
 
     #[test]
