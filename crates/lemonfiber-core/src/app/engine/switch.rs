@@ -13,7 +13,7 @@ use lemonfiber_manifest::Manifest;
 
 use super::{compose, settled_into, Composed};
 use crate::app::{Ctx, Outcome};
-use crate::docker::{survey, Service, State};
+use crate::docker::{stopping_order, survey, Service, State};
 use crate::error::{Diagnose, Problem};
 use crate::model::{LifecycleReport, Switched};
 use crate::stack::closure::Plan;
@@ -156,16 +156,17 @@ fn moved(running: &[Service], holds: &[String]) -> Switched {
         .cloned()
         .collect();
 
-    // Sorted, because what is being stopped is not in the closure and so has no
-    // declared order to borrow. The survey's own order ranks by how badly a service
-    // is doing, which says nothing about a set that is all going down together.
-    let mut stopped: Vec<String> = running
+    // Ordered so that whatever depends on a service goes down before it does — the
+    // torrent client before the tunnel whose network it is using. The survey's own
+    // order ranks by how badly a service is doing, which says nothing about a set that
+    // is all going down together.
+    let going: Vec<String> = running
         .iter()
         .filter(|service| service.state.stoppable())
         .filter(|service| !holds.contains(&service.id))
         .map(|service| service.id.clone())
         .collect();
-    stopped.sort();
+    let stopped = stopping_order(running, &going);
 
     Switched {
         stopped,
