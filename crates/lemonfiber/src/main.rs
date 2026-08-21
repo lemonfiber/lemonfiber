@@ -18,6 +18,7 @@ mod dashboard;
 mod engine;
 mod exit;
 mod keyboard;
+mod logs;
 mod maintain;
 mod prompt;
 mod render;
@@ -39,6 +40,25 @@ use render::stack::Doing;
 use setup::{greeting, setting_up};
 use translate::{configuration, quality};
 use walkthrough::walk;
+/// Logs as a screen, or logs as a stream.
+///
+/// Different answers to the same request, and only one of them can have the
+/// terminal — so which it is has to be settled before either starts.
+async fn read_logs(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    follow: bool,
+    watch: bool,
+    tail: u32,
+    json: bool,
+) -> ExitCode {
+    if watch {
+        terminal::watching(ctx, forms, services, tail).await
+    } else {
+        stream(ctx, forms, services, follow, tail, json).await
+    }
+}
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -65,8 +85,9 @@ async fn main() -> ExitCode {
             services,
             form,
             follow,
+            watch,
             tail,
-        } => return stream(&ctx, &form, &services, follow, tail, cli.json).await,
+        } => return read_logs(&ctx, &form, &services, follow, watch, tail, cli.json).await,
         // A watch is long-running and produces one report at its end, not a value
         // that arrives once, so like streaming it does not go through dispatch.
         Request::Watch { forms } => return guard(&ctx, &forms, cli.json).await,

@@ -115,6 +115,9 @@ pub(crate) enum Request {
         /// Keep reading as new lines arrive.
         #[arg(long, short)]
         follow: bool,
+        /// Read them on a screen that can be scrolled back and filtered.
+        #[arg(long, conflicts_with = "follow")]
+        watch: bool,
         /// How many existing lines to begin with.
         #[arg(long, default_value_t = 50)]
         tail: u32,
