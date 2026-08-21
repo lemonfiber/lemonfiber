@@ -18,6 +18,7 @@ use crate::model::{
     VersionReport,
 };
 use crate::quality::Preset;
+use crate::stack::closure::Plan;
 use crate::stack::compose::Action;
 
 pub mod accepted;
@@ -80,6 +81,11 @@ pub enum Command {
     Version,
     /// List the forms this stack declares.
     Forms,
+    /// Say what naming these forms would come to, without running anything.
+    Preview {
+        /// The forms to resolve, as they were named.
+        forms: Vec<String>,
+    },
     /// Start one or more forms.
     Up {
         /// The forms to start, resolved to the union of their closures.
@@ -210,6 +216,8 @@ pub enum Outcome {
     Version(VersionReport),
     /// The answer to [`Command::Forms`].
     Forms(FormsReport),
+    /// The answer to [`Command::Preview`].
+    Preview(Plan),
     /// What a lifecycle command did, or would have done.
     Lifecycle(LifecycleReport),
     /// The answer to a configuration command.
@@ -243,6 +251,7 @@ impl Outcome {
         let kind = match self {
             Self::Version(_) => "version",
             Self::Forms(_) => "forms",
+            Self::Preview(_) => "preview",
             Self::Lifecycle(_) => "lifecycle",
             Self::Config(_) => "config",
             Self::Quality(_) => "quality",
@@ -265,6 +274,7 @@ impl serde::Serialize for Outcome {
         match self {
             Self::Version(report) => report.serialize(serializer),
             Self::Forms(report) => report.serialize(serializer),
+            Self::Preview(plan) => plan.serialize(serializer),
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
@@ -294,6 +304,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
+        Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
         Command::Down { forms } => engine::lifecycle(ctx, &forms, &Action::Down).await,
         Command::Restart { forms, services } => {
@@ -541,6 +552,33 @@ mod tests {
                     .any(|form| form.id == "search" && form.name == "Search" && form.composable)));
     }
 
+    /// Also driven from `tests/forms.rs`, against the real stack. Kept here as well
+    /// because this crate is compiled twice — once with its own test modules and once as
+    /// the library those binaries link — and a command dispatched from only one of them
+    /// leaves the other's copy of the arm counted as never run.
+    #[tokio::test]
+    async fn a_preview_is_dispatched_like_any_other_command() {
+        let ctx = ctx(Ok(spoke("v2.32.1\n")));
+        let previewed = dispatch(
+            Command::Preview {
+                forms: vec!["library".to_owned()],
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            matches!(&previewed, Ok(Outcome::Preview(plan))
+                if plan.services.contains(&"jellyfin".to_owned())),
+            "{previewed:?}"
+        );
+        assert_eq!(
+            previewed.ok().map(|outcome| outcome.envelope().kind),
+            Some("preview"),
+            "the kind names the question that was asked"
+        );
+    }
+
     #[tokio::test]
     async fn reports_the_engine_version_when_the_engine_answers() {
         let ctx = ctx(Ok(spoke("v2.32.1\n")));
@@ -630,6 +668,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Forms(_)
+                | Outcome::Preview(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
@@ -654,6 +693,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Forms(_)
+                | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)
@@ -775,7 +815,7 @@ mod tests {
         assert_eq!(
             produced.map(|report| (
                 report.action,
-                report.profiles,
+                report.plan.profiles.into_iter().collect::<Vec<String>>(),
                 report.rehearsed,
                 report.status,
                 report.command.last().cloned()
@@ -803,8 +843,11 @@ mod tests {
         let produced = report(dispatch(command, &ctx).await);
 
         assert_eq!(
-            produced.map(|report| report.dropped),
-            Some(vec!["torrent".to_owned()]),
+            produced.map(|report| report.plan.dropped),
+            Some(vec![crate::stack::closure::Dropped {
+                profile: "torrent".to_owned(),
+                needs: lemonfiber_manifest::Protocol::Torrent,
+            }]),
             "the operator hears which service is missing, and why"
         );
     }
@@ -1047,6 +1090,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Forms(_)
+                | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Quality(_)
                 | Outcome::Upgrade(_)
@@ -1490,6 +1534,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Forms(_)
+                | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
                 | Outcome::Config(_)
                 | Outcome::Quality(_)

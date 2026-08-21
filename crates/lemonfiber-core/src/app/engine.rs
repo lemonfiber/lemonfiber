@@ -217,12 +217,7 @@ fn carries_quality(action: &Action) -> bool {
 }
 
 fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box<Problem>> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(err.problem()))?;
-    let plan =
-        resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| Box::new(err.problem()))?;
+    let (manifest, plan) = resolved(ctx, forms)?;
     let record = ctx
         .settings
         .env_file
@@ -304,8 +299,7 @@ pub(super) async fn lifecycle(
 
     let mut report = LifecycleReport {
         action: action.name().to_owned(),
-        profiles: plan.profiles.into_iter().collect(),
-        dropped: plan.dropped.into_iter().collect(),
+        plan,
         command: command.clone(),
         rehearsed: ctx.dry_run,
         status: None,
@@ -333,7 +327,8 @@ pub(super) async fn lifecycle(
     // means "a process exists" is a claim the operator will disprove by opening
     // a browser. Nothing else waits: stopping is done when Compose says so.
     if action == &Action::Up && output.succeeded() {
-        let settled = settle(ctx, &manifest, &report.profiles).await?;
+        let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
+        let settled = settle(ctx, &manifest, &profiles).await?;
         report.condition = Some(condition(&settled));
         report.services = settled;
         report.forwarding = super::forwarding::after_start(ctx, &manifest).await;
@@ -342,11 +337,41 @@ pub(super) async fn lifecycle(
     Ok(Outcome::Lifecycle(report))
 }
 
-/// The binary's version, and the engine's where it answers.
+/// What naming these forms would come to, without running anything.
 ///
-/// An unreachable engine is reported as absent rather than as a failure: asking
-/// what versions are in play is exactly what an operator does when something is
-/// wrong, so it must still answer when the engine is down.
+/// The same resolution a lifecycle command does, stopping where it would start
+/// spawning Compose — so what this answers and what that does cannot disagree
+/// about which services a form holds or why one was left out. A surface states
+/// it before acting; an operator can also just ask.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be read
+/// or the forms cannot be resolved — an unknown name among them, a form that
+/// refuses company, or a closure the configuration empties.
+pub(super) fn preview(ctx: &Ctx, forms: &[String]) -> Result<Plan, Box<Problem>> {
+    resolved(ctx, forms).map(|(_, plan)| plan)
+}
+
+/// The stack's manifest, and what the named forms come to in it.
+///
+/// The prelude of everything that acts on a form. Shared so that a preview, a
+/// lifecycle command and a streamed pull resolve the same names the same way
+/// and refuse them in the same words — three paths to one answer is three ways
+/// for them to differ about which services a form holds.
+fn resolved(
+    ctx: &Ctx,
+    forms: &[String],
+) -> Result<(lemonfiber_manifest::Manifest, Plan), Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+    let plan =
+        resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| Box::new(err.problem()))?;
+    Ok((manifest, plan))
+}
+
 /// Every form the stack declares, in its own words.
 ///
 /// A read of the manifest and nothing else: forms come from the stack rather than from
@@ -379,6 +404,11 @@ pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
     })
 }
 
+/// The binary's version, and the engine's where it answers.
+///
+/// An unreachable engine is reported as absent rather than as a failure: asking
+/// what versions are in play is exactly what an operator does when something is
+/// wrong, so it must still answer when the engine is down.
 pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
     let argv = ["docker", "compose", "version", "--short"].map(str::to_owned);
     let compose = match ctx.runner.run(&argv).await {

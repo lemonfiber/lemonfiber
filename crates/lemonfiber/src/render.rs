@@ -12,7 +12,7 @@
 //! words an operator actually reads be held to the same standard as the rest.
 
 #[cfg(test)]
-mod fixtures;
+pub(crate) mod fixtures;
 
 mod doctor;
 mod quality;
@@ -129,6 +129,7 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
     match outcome {
         Outcome::Version(report) => versions(report),
         Outcome::Forms(report) => forms(report),
+        Outcome::Preview(plan) => stack::preview(plan),
         Outcome::Config(report) => settings(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
@@ -225,16 +226,17 @@ pub(crate) fn watched(report: &SupervisionReport, json: bool) {
 #[cfg(test)]
 mod tests {
     use super::fixtures::{
-        a_trace, a_version, a_watch, music_pick, preset, seed_report, some_forms,
+        a_lifecycle, a_plan, a_trace, a_version, a_watch, music_pick, preset, seed_report,
+        some_forms,
     };
     use super::{answer, forms, machine_readable, render, settings, versions, watched, Lines};
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::model::{
-        ConfigReport, Disposition, DoctorReport, FormsReport, HouseholdReport, LifecycleReport,
-        MusicReport, QualityReport, ResetReport, SettingReport, StatusReport, StuckReport,
-        UpgradeReport, VersionReport,
+        ConfigReport, Disposition, DoctorReport, FormsReport, HouseholdReport, MusicReport,
+        QualityReport, ResetReport, SettingReport, StatusReport, StuckReport, UpgradeReport,
+        VersionReport,
     };
 
     #[test]
@@ -354,6 +356,7 @@ mod tests {
         let outcomes = vec![
             Outcome::Version(a_version()),
             Outcome::Forms(some_forms()),
+            Outcome::Preview(a_plan("media", Vec::new())),
             // A setting to list: an empty, unchanged config renders nothing at all,
             // which is correct and is covered by its own test.
             Outcome::Config(ConfigReport {
@@ -391,18 +394,7 @@ mod tests {
                 items: Vec::new(),
                 incomplete: false,
             }),
-            Outcome::Lifecycle(LifecycleReport {
-                action: "up".to_owned(),
-                profiles: Vec::new(),
-                dropped: Vec::new(),
-                command: Vec::new(),
-                rehearsed: false,
-                status: None,
-                services: Vec::new(),
-                condition: None,
-                stack_edits: Vec::new(),
-                forwarding: None,
-            }),
+            Outcome::Lifecycle(a_lifecycle("up", a_plan("media", Vec::new()))),
             Outcome::Status(StatusReport {
                 forms: Vec::new(),
                 condition: Condition::Inactive,

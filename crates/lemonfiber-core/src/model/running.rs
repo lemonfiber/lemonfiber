@@ -11,14 +11,14 @@ use serde::Serialize;
 pub struct LifecycleReport {
     /// The Compose subcommand that was run.
     pub action: String,
-    /// The profiles that were activated.
-    pub profiles: Vec<String>,
-    /// Profiles the forms asked for that the configuration does not support.
+    /// What the named forms came to: the profiles, the services they hold, and
+    /// what the configuration left out.
     ///
-    /// Reported rather than dropped quietly: an operator seeing fewer services
-    /// than they expected needs to be told which, and why, before they go
-    /// looking for a fault that is not there.
-    pub dropped: Vec<String>,
+    /// The resolved plan itself rather than a copy of its parts, because it is
+    /// stated to the operator before the command runs and read out of the
+    /// report afterwards — two accounts of one run, and a second shape for it
+    /// would be a way for them to differ.
+    pub plan: crate::stack::closure::Plan,
     /// The exact command, so what happened is never a matter of trust.
     pub command: Vec<String>,
     /// Whether this was a rehearsal.

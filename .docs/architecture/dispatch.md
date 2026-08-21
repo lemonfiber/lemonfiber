@@ -77,6 +77,11 @@ stack, build the command, run it — and a rehearsal returns *after* the build a
 before the run, so what it reports is the command that would run rather than an
 approximation of it.
 
+A preview is that pipeline stopped after its second step: resolve the manifest, resolve
+the forms, answer. It shares those two steps with the lifecycle path rather than repeating
+them, so a preview and the command it precedes cannot disagree about which services a form
+holds or why one was left out.
+
 `ps` and `logs` are deliberately **not** here. They are reads, and reads go
 through the Engine API rather than through Compose — polling a subprocess once a
 second across nineteen services would be both wasteful and visibly jittery.
