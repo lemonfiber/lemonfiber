@@ -14,7 +14,7 @@ use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
 
 use crate::exit::{complain, FAILURE};
-use crate::render::{render, watched, UNRENDERABLE};
+use crate::render::{logged, render, watched, UNRENDERABLE};
 
 /// Print log lines as they arrive, until the stream ends.
 ///
@@ -46,7 +46,7 @@ pub(crate) async fn stream(
                     .unwrap_or(UNRENDERABLE.to_owned())
             );
         } else {
-            println!("{:<12} {}", line.service, line.line);
+            println!("{}", logged(&line.service, &line.line));
         }
     }
 

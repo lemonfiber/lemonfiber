@@ -223,13 +223,34 @@ pub(crate) fn watched(report: &SupervisionReport, json: bool) {
     stack::watch_lines(report, json).print();
 }
 
+/// One log line, as it should reach a terminal.
+///
+/// A log line is the least trustworthy text this product shows: it is written by
+/// somebody else's container, verbatim, and a container that emits `\x1b[2J` clears
+/// the operator's screen. Everything else rendered here goes through [`Lines::put`]
+/// and is made plain on the way; a stream has no report to build, so it would
+/// otherwise be the one line that skipped it.
+///
+/// The service is made plain before it is padded rather than after, so a container
+/// whose name carries control characters cannot push the column out of true — the
+/// width has to be counted on what will actually be drawn.
+pub(crate) fn logged(service: &str, line: &str) -> String {
+    format!(
+        "{:<12} {}",
+        lemonfiber_core::text::plain(service),
+        lemonfiber_core::text::plain(line)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::fixtures::{
         a_lifecycle, a_plan, a_trace, a_version, a_watch, music_pick, preset, seed_report,
         some_forms,
     };
-    use super::{answer, forms, machine_readable, render, settings, versions, watched, Lines};
+    use super::{
+        answer, forms, logged, machine_readable, render, settings, versions, watched, Lines,
+    };
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
@@ -238,6 +259,36 @@ mod tests {
         QualityReport, ResetReport, SettingReport, StatusReport, StuckReport, UpgradeReport,
         VersionReport,
     };
+
+    /// The case this exists for. The container writes the line, the terminal reads
+    /// the escape, and the screen stops saying what this product said.
+    #[test]
+    fn a_container_cannot_clear_the_screen_through_its_own_log_line() {
+        let said = logged("sonarr", "starting\u{1b}[2Jup");
+        assert!(!said.contains('\u{1b}'), "{said:?}");
+        assert!(
+            said.ends_with("starting[2Jup"),
+            "what a terminal would have obeyed is gone; the rest is left alone: {said:?}"
+        );
+    }
+
+    /// A log line is one line. A container that puts a newline in the middle of one
+    /// is forging a second, and the column that names the service is what it would
+    /// forge its way out of.
+    #[test]
+    fn a_container_cannot_forge_a_second_log_line() {
+        let said = logged("sonarr", "innocent\nqbittorrent   leaked the password");
+        assert_eq!(said.lines().count(), 1, "{said:?}");
+    }
+
+    /// Padded on what will be drawn rather than on what arrived, or a name carrying
+    /// control characters pushes every line after it out of true.
+    #[test]
+    fn the_service_column_is_measured_after_the_name_is_made_plain() {
+        let clean = logged("sonarr", "up");
+        let sneaky = logged("son\u{7f}arr", "up");
+        assert_eq!(clean, sneaky, "the delete never counted toward the width");
+    }
 
     #[test]
     fn lines_join_in_order_and_a_spaced_one_is_preceded_by_a_blank() {
