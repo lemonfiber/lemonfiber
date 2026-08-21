@@ -18,6 +18,8 @@
 
 use lemonfiber_ports::docker::LogLine;
 
+pub mod viewer;
+
 /// How bad a line says it is.
 ///
 /// Ordered, so a filter can ask for "warnings and worse" without a table of which
