@@ -13,6 +13,7 @@ use crate::sabnzbd::Sabnzbd;
 use super::layout::config_path;
 use super::secrets::recorded_qbittorrent_password;
 use super::servarr::{DownloadKind, DownloadTarget};
+use crate::dashboard::Protocol;
 
 /// The stack's download clients, resolved to host-side read targets.
 ///
@@ -131,4 +132,12 @@ pub(crate) fn committed_of(downloads: &[Download]) -> u64 {
         .iter()
         .filter_map(|download| download.remaining)
         .fold(0, u64::saturating_add)
+}
+
+/// The protocol a client's transfers move over.
+pub(crate) fn protocol_of(kind: &DownloadKind) -> Protocol {
+    match kind {
+        DownloadKind::Qbittorrent => Protocol::Torrent,
+        DownloadKind::Sabnzbd { .. } => Protocol::Usenet,
+    }
 }

@@ -23,6 +23,7 @@
 //! test, and what they are for — counting how many times a blip was retried — is the thing
 //! under test rather than a service standing in for another.
 
+pub mod downloads;
 pub mod files;
 pub mod http;
 pub mod ports;

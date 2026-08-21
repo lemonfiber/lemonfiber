@@ -24,6 +24,7 @@ mod prompt;
 mod render;
 mod repair;
 mod setup;
+mod stopping;
 mod support;
 mod terminal;
 mod translate;
@@ -31,7 +32,7 @@ mod walkthrough;
 
 use cli::{Cli, Request};
 use context::{context, here};
-use engine::{guard, pull, stream};
+use engine::{guard, pull, settle, stream};
 use exit::{complain, no_config_home, settled, USAGE};
 use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
@@ -40,6 +41,7 @@ use render::stack::Doing;
 use setup::{greeting, setting_up};
 use translate::{configuration, quality};
 use walkthrough::walk;
+
 /// Logs as a screen, or logs as a stream.
 ///
 /// Different answers to the same request, and only one of them can have the
@@ -94,9 +96,6 @@ async fn main() -> ExitCode {
         // Setup is a conversation and then a stack coming up, not a value that
         // arrives once, so like streaming and watching it runs its own way. It
         // takes the context by value because it rewrites the settings mid-run.
-        // Setup is a conversation and then a stack coming up, not a value that
-        // arrives once, so like streaming and watching it runs its own way. It
-        // takes the context by value because it rewrites the settings mid-run.
         Request::Setup { flags } => return setup_from(ctx, flags).await,
         Request::Version => Command::Version,
         // Naming nothing asks what forms there are; naming one asks what it would
@@ -108,7 +107,7 @@ async fn main() -> ExitCode {
         // touches one service — and saying "starts eight services" before either
         // would be a sentence about the wrong set.
         Request::Up { forms } => announced(&ctx, forms, cli.json, Doing::Starting).await,
-        Request::Down { forms } => announced(&ctx, forms, cli.json, Doing::Stopping).await,
+        Request::Down { forms, wait } => halting(&ctx, forms, wait, cli.yes, cli.json).await,
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.
@@ -218,6 +217,22 @@ async fn main() -> ExitCode {
 /// The two directions share this because they share the sentence — only the verb
 /// differs — and a second copy of "say it, then do it" would be a second place for
 /// them to fall out of step about which half comes first.
+/// Announce what stopping would affect, settle what to do about anything still
+/// coming down, and only then ask for the stop.
+///
+/// Both happen before the teardown rather than during it: an operator who is going to
+/// be told a download is at ninety per cent wants to be told while stopping is still
+/// a question, not while it is already happening.
+async fn halting(ctx: &Ctx, forms: Vec<String>, wait: bool, yes: bool, json: bool) -> Command {
+    announce(ctx, &forms, json, Doing::Stopping).await;
+    // Machine-readable runs are left alone. A prompt has nobody to answer it, and a
+    // report that is not in the envelope is noise on a stream something is parsing.
+    if !json {
+        settle(ctx, &forms, wait, yes).await;
+    }
+    Command::Down { forms }
+}
+
 async fn announced(ctx: &Ctx, forms: Vec<String>, json: bool, doing: Doing) -> Command {
     announce(ctx, &forms, json, doing).await;
     match doing {

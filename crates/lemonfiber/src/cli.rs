@@ -76,6 +76,9 @@ pub(crate) enum Request {
         /// The forms to stop.
         #[arg(required = true)]
         forms: Vec<String>,
+        /// Let anything still downloading finish before stopping.
+        #[arg(long)]
+        wait: bool,
     },
     /// Make these forms the active set, leaving shared services running.
     ///
