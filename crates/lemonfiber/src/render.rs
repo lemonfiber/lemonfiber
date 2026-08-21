@@ -15,6 +15,7 @@
 pub(crate) mod fixtures;
 
 mod doctor;
+pub(crate) mod downloads;
 mod quality;
 pub(crate) mod repair;
 mod seed;

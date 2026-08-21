@@ -17,7 +17,7 @@ use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::dashboard::{
-    eta, Hardlink, Panel, Protocol, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
+    eta, Hardlink, Panel, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
 };
 use crate::docker::{survey, Service};
 use crate::doctor::vpn::{read_vpn, VpnReading};
@@ -33,7 +33,7 @@ use crate::queue::Thresholds;
 use crate::storage::{test_link, Linked};
 
 use super::targets::{
-    download_targets, project_directory, read_transfers, servarr_targets, DownloadKind,
+    download_targets, project_directory, protocol_of, read_transfers, servarr_targets,
 };
 
 /// Gather one snapshot of what the stack is doing right now.
@@ -281,14 +281,6 @@ async fn transfers(
     Panel::Ready(active)
 }
 
-/// The protocol a client's transfers move over.
-fn protocol_of(kind: &DownloadKind) -> Protocol {
-    match kind {
-        DownloadKind::Qbittorrent => Protocol::Torrent,
-        DownloadKind::Sabnzbd { .. } => Protocol::Usenet,
-    }
-}
-
 /// What the VPN is doing, and whether the download client is genuinely behind it.
 ///
 /// `None` where the stack has no VPN-contained torrent client — the panel does not
@@ -459,7 +451,10 @@ mod tests {
     use crate::ports::filesystem::{FsKind, StorageFacts};
     use crate::ports::http::Http;
     use crate::stack::Source;
-    use crate::test_support::{a_context, a_password, nowhere, Reporting, SeedFs, Tunnel};
+    use crate::test_support::{a_context, a_password, env_at, nowhere, Reporting, SeedFs, Tunnel};
+    use lemonfiber_fixtures::downloads::{
+        downloads, QBIT_TORRENTS, SAB_KEY_INI, SAB_NO_KEY_INI, SAB_QUEUE,
+    };
     use lemonfiber_fixtures::http::{Answer, Fake};
 
     /// A transport answering every request with this body at 200 — the queue as JSON for
@@ -712,27 +707,6 @@ mod tests {
         );
     }
 
-    /// A transport that answers each download client on its own path: qBittorrent's
-    /// login and its torrent list, and — anything else being the only other call a
-    /// read makes — `SABnzbd`'s queue.
-    fn downloads(torrents: &'static str, queue: &'static str) -> Arc<Fake> {
-        Fake::by_path(vec![
-            ("/auth/login", Answer::reply(200, "Ok.")),
-            ("/torrents/info", Answer::reply(200, torrents)),
-            ("", Answer::reply(200, queue)),
-        ])
-    }
-
-    /// One qBittorrent torrent, 30% done at a known speed with an ETA.
-    const QBIT_TORRENTS: &str =
-        r#"[{"name":"Ubuntu.iso","completed":300,"size":1000,"dlspeed":4096,"eta":120}]"#;
-    /// One `SABnzbd` download, whose queue speed will not parse — so its speed reads
-    /// unknown rather than a false zero.
-    const SAB_QUEUE: &str = r#"{"queue":{"kbpersec":"nan","slots":[{"filename":"Linux.nzb","percentage":"20","status":"Downloading","timeleft":"0:05:00"}]}}"#;
-    /// A `sabnzbd.ini` carrying a usable key, and one that has not written it yet.
-    const SAB_KEY_INI: &str = "[misc]\napi_key = sabkey123\n";
-    const SAB_NO_KEY_INI: &str = "[misc]\nhost = 0.0.0.0\n";
-
     /// A context configured to read download clients: the library stack running, a
     /// fake filesystem for `SABnzbd`'s key, the given transport, and — where set — an
     /// env file holding qBittorrent's recorded password.
@@ -754,21 +728,6 @@ mod tests {
             .waiting(Duration::ZERO)
             .with_filesystem(Arc::new(fs))
             .with_http(http)
-    }
-
-    /// A private env file recording qBittorrent's password, at a scratch path
-    /// unique to the test so concurrent tests do not share it.
-    fn env_at(name: &str, password: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("lemonfiber-dash-{}-{name}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let path = dir.join(".env");
-        assert!(
-            crate::config::store::set(&path, crate::config::QBITTORRENT_PASSWORD_KEY, password)
-                .is_ok(),
-            "the scratch env file is written"
-        );
-        path
     }
 
     #[tokio::test]

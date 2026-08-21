@@ -14,12 +14,14 @@ use crate::stack::closure::{resolve, Plan};
 use crate::stack::compose::{build, Action};
 
 mod diagnosis;
+mod inflight;
 mod stopping;
 mod streaming;
 mod switch;
 
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
+pub use inflight::{in_flight, Interrupted};
 pub use streaming::{logs, pull_progress};
 // Reached only by the tests that drive the decision directly rather than through a
 // whole run — which is the right level for it, since which checks name a service is a

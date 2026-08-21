@@ -16,9 +16,10 @@
 //!   tells more than a blank, as long as nobody reads it as current.
 //! * An **absent** panel says why. An empty region reads as "nothing wrong".
 
+use crate::render::downloads::protocol;
 use lemonfiber_core::alert::Alert;
 use lemonfiber_core::dashboard::{
-    Hardlink, Panel, Protocol, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
+    Hardlink, Panel, Queue, Reading, Snapshot, Storage, Telemetry, Transfer, Vpn,
 };
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;
@@ -141,14 +142,6 @@ fn speed(reading: &Reading<u64>) -> Span<'static> {
         // as long as nobody reads it as current.
         Reading::Stale(bytes) => Span::styled(format!("{:>9}/s ·", size(*bytes)), quiet()),
         Reading::Unknown => Span::styled(format!("{:>11}", "not read"), quiet()),
-    }
-}
-
-/// The word for a protocol.
-const fn protocol(protocol: Protocol) -> &'static str {
-    match protocol {
-        Protocol::Usenet => "usenet",
-        Protocol::Torrent => "torrent",
     }
 }
 

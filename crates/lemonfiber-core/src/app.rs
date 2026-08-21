@@ -62,7 +62,7 @@ pub use ctx::Ctx;
 
 // The log-following reads a surface streams from live outside dispatch, so they are the
 // engine module's functions re-exported for the binary and the log commands to reach.
-pub use engine::{diagnose, logs, pull_progress};
+pub use engine::{diagnose, in_flight, logs, pull_progress, Interrupted};
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
 

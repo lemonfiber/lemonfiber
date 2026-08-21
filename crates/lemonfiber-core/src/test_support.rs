@@ -131,3 +131,21 @@ pub(crate) fn a_fresh_write(key: &str, value: &str) -> crate::journal::Change {
         },
     }
 }
+
+/// A private env file recording qBittorrent's password, at a scratch path unique to
+/// the test so concurrent tests do not share one.
+///
+/// Here rather than beside any one test because more than one needs a client that can
+/// be logged into: the dashboard, to fill its transfers panel, and a teardown, to find
+/// out what stopping would interrupt. It names `config::store`, which is why it is on
+/// this side of the fixtures boundary.
+pub(crate) fn env_at(name: &str, password: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("lemonfiber-env-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join(".env");
+    assert!(
+        crate::config::store::set(&path, crate::config::QBITTORRENT_PASSWORD_KEY, password).is_ok(),
+        "the scratch env file is written"
+    );
+    path
+}
