@@ -62,7 +62,7 @@ fn named(forms: &[&str]) -> Vec<String> {
 /// Everything the start said and the status it ended on, or nothing where it could
 /// not be spawned at all.
 async fn narrated(ctx: &Ctx) -> Option<(Vec<String>, Option<i32>)> {
-    let mut progress = start_progress(ctx, &named(&["library"])).await.ok()?;
+    let mut progress = start_progress(ctx, &named(&["library"]), &[]).await.ok()?;
     let mut said = Vec::new();
     let mut status = None;
     while let Some(event) = progress.recv().await {
@@ -80,7 +80,7 @@ async fn narrated(ctx: &Ctx) -> Option<(Vec<String>, Option<i32>)> {
 /// refused and a start that reported something unexpected are different failures and
 /// an assertion that cannot tell them apart names neither.
 async fn reported(ctx: &Ctx, status: Option<i32>) -> Result<LifecycleReport, String> {
-    match started(ctx, &named(&["library"]), status).await {
+    match started(ctx, &named(&["library"]), &[], status).await {
         Ok(Outcome::Lifecycle(report)) => Ok(report),
         Ok(other) => Err(format!("not a lifecycle report: {other:?}")),
         Err(problem) => Err(problem.summary.clone()),
@@ -116,7 +116,7 @@ async fn a_start_that_cannot_be_spawned_is_refused_rather_than_silent() {
         program: "docker".to_owned(),
     };
 
-    let opened = start_progress(&ctx(Err(missing)), &named(&["library"])).await;
+    let opened = start_progress(&ctx(Err(missing)), &named(&["library"]), &[]).await;
 
     assert!(opened.is_err(), "the spawn failure reaches the caller");
 }
@@ -152,5 +152,53 @@ async fn a_start_that_failed_is_not_then_waited_on() {
     assert_eq!(
         report.map(|report| (report.status, report.services.is_empty())),
         Ok((Some(1), true))
+    );
+}
+
+/// A start aimed at named services asks Compose for those services rather than for
+/// the whole form — the difference an operator relies on when one thing needs
+/// bringing back without disturbing what is beside it.
+#[tokio::test]
+async fn a_start_aimed_at_services_names_only_those() {
+    let ctx = ctx(Ok(spoke("")));
+
+    let report = match started(&ctx, &named(&["library"]), &named(&["jellyfin"]), Some(1)).await {
+        Ok(Outcome::Lifecycle(report)) => Ok(report),
+        Ok(other) => Err(format!("not a lifecycle report: {other:?}")),
+        Err(problem) => Err(problem.summary.clone()),
+    };
+
+    assert!(
+        report.is_ok_and(|report| report.command.ends_with(&[
+            "--detach".to_owned(),
+            "--".to_owned(),
+            "jellyfin".to_owned()
+        ])),
+        "the named service is fenced off after the detach"
+    );
+}
+
+/// Naming no form is a request for everything the stack declares, which is a bigger
+/// plan than any one form rather than an empty one.
+#[tokio::test]
+async fn naming_no_form_starts_everything_the_stack_declares() {
+    let ctx = ctx(Ok(spoke("")));
+
+    let everything = started(&ctx, &[], &[], Some(1)).await;
+    let one_form = started(&ctx, &named(&["library"]), &[], Some(1)).await;
+
+    let counted = |outcome: Result<Outcome, Box<lemonfiber_core::error::Problem>>| match outcome {
+        Ok(Outcome::Lifecycle(report)) => Some(report.plan.services.len()),
+        _ => None,
+    };
+
+    let (all, one) = (counted(everything), counted(one_form));
+    assert!(
+        all > one,
+        "everything holds more than one form: {all:?} vs {one:?}"
+    );
+    assert!(
+        one.is_some_and(|one| one > 0),
+        "and the one form is not empty"
     );
 }

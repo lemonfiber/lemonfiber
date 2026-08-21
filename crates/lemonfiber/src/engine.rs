@@ -232,29 +232,28 @@ async fn drained(ctx: &Ctx, forms: &[String]) {
 /// an image, creating a network and waiting on a health check all look identical from
 /// outside, and the one that has hung looks identical to all three. So Compose's own
 /// narration goes to the screen as it arrives, and the report follows it.
-pub(crate) async fn start(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
-    // A rehearsal runs nothing, so there is nothing to narrate; the buffered path
-    // already reports what would run, which is the whole of what a rehearsal is.
-    if ctx.dry_run {
-        return rehearsed(ctx, forms, json).await;
-    }
-
-    let mut progress = match start_progress(ctx, forms).await {
-        Ok(opened) => opened,
-        Err(problem) => return complain(&problem),
-    };
-    let mut status = None;
-    while let Some(event) = progress.recv().await {
-        match event {
-            PullEvent::Line(line) => emit_line("start", &line, json),
-            PullEvent::Ended(code) => status = code,
+pub(crate) async fn start(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    json: bool,
+) -> ExitCode {
+    // A rehearsal runs nothing, so it has nothing to narrate — and it needs no
+    // separate path, because the report it wants is the one built from the same plan
+    // without the single irreversible step, which is what a status of nothing gets.
+    let status = if ctx.dry_run {
+        None
+    } else {
+        match narrated(ctx, forms, services, json).await {
+            Ok(status) => status,
+            Err(code) => return code,
         }
-    }
+    };
 
     // The report is asked for whatever the status was: a start that failed part way
     // has still started something, and which services came up is the first thing an
     // operator needs in order to do anything about the ones that did not.
-    match started(ctx, forms, status).await {
+    match started(ctx, forms, services, status).await {
         Ok(outcome) => {
             render(&outcome, json);
             settled(&outcome)
@@ -263,22 +262,27 @@ pub(crate) async fn start(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
     }
 }
 
-/// A rehearsal of a start: what would run, rendered the way every other answer is.
-async fn rehearsed(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
-    match dispatch(
-        Command::Up {
-            forms: forms.to_vec(),
-        },
-        ctx,
-    )
-    .await
-    {
-        Ok(outcome) => {
-            render(&outcome, json);
-            settled(&outcome)
+/// Spawn the start and put Compose's narration on the screen as it arrives.
+///
+/// Gives back the exit status Compose ended on, or the code a surface should exit
+/// with where the command could not be spawned at all.
+async fn narrated(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    json: bool,
+) -> Result<Option<i32>, ExitCode> {
+    let mut progress = start_progress(ctx, forms, services)
+        .await
+        .map_err(|problem| complain(&problem))?;
+    let mut status = None;
+    while let Some(event) = progress.recv().await {
+        match event {
+            PullEvent::Line(line) => emit_line("start", &line, json),
+            PullEvent::Ended(code) => status = code,
         }
-        Err(problem) => complain(&problem),
     }
+    Ok(status)
 }
 
 #[cfg(test)]

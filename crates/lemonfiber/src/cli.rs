@@ -67,15 +67,19 @@ pub(crate) enum Request {
     },
     /// Start a form, or the union of several.
     Up {
-        /// The forms to start.
-        #[arg(required = true)]
+        /// The forms to start; none starts everything the stack declares.
         forms: Vec<String>,
+        /// Start only these services, leaving the rest of the form alone.
+        #[arg(long = "service", value_name = "NAME")]
+        services: Vec<String>,
     },
     /// Stop and remove what a form started.
     Down {
-        /// The forms to stop.
-        #[arg(required = true)]
+        /// The forms to stop; none stops everything the stack declares.
         forms: Vec<String>,
+        /// Stop only these services, leaving the rest of the form running.
+        #[arg(long = "service", value_name = "NAME")]
+        services: Vec<String>,
         /// Let anything still downloading finish before stopping.
         #[arg(long)]
         wait: bool,

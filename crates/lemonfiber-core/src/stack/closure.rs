@@ -116,6 +116,44 @@ pub fn resolve(
         .flat_map(|form| form.profiles.iter().cloned())
         .collect();
 
+    planned(manifest, forms, closure, protocols)
+}
+
+/// A plan over everything the stack declares.
+///
+/// Deliberately **not** the union of every form. Forms can refuse each other's
+/// company, and asking for everything is not a request to compose them — it is a
+/// request for every profile, which is a property of the manifest rather than of any
+/// form. Composing all of them would refuse the moment a stack declared one
+/// non-composable form, which is exactly the stack most likely to want this.
+///
+/// Still narrowed by what the configuration supports: "everything" means everything
+/// the operator has set up, not every container somebody could have set up.
+///
+/// # Errors
+///
+/// Returns [`Failure::NothingLeft`] where the configuration supports none of the
+/// profiles the stack declares — a stack with no way of downloading at all.
+pub fn everything(manifest: &Manifest, protocols: Protocols) -> Result<Plan, Failure> {
+    let closure: BTreeSet<String> = manifest
+        .profiles
+        .iter()
+        .map(|profile| profile.id.clone())
+        .collect();
+    planned(manifest, &[], closure, protocols)
+}
+
+/// What a set of profiles comes to, once the ones this configuration cannot support
+/// have been left out of it.
+///
+/// The half of resolving that does not care how the profiles were arrived at, so
+/// naming forms and asking for everything cannot come to differently-shaped answers.
+fn planned(
+    manifest: &Manifest,
+    forms: &[String],
+    closure: BTreeSet<String>,
+    protocols: Protocols,
+) -> Result<Plan, Failure> {
     // Which profiles are guarded is the manifest's answer, not one this code
     // remembers. A stack that renames its download profiles keeps working.
     let dropped: Vec<Dropped> = manifest
@@ -316,7 +354,8 @@ mod tests {
     use lemonfiber_manifest::Manifest;
 
     use super::{
-        distance, nearest, resolve, Diagnose, Dropped, Failure, Plan, Protocol, Protocols,
+        distance, everything, nearest, resolve, Diagnose, Dropped, Failure, Plan, Protocol,
+        Protocols,
     };
     use crate::error::{Severity, State};
 
@@ -722,5 +761,57 @@ composable = false
                 .count()
         });
         assert_eq!(counted, Some(1), "the union is over profiles, not services");
+    }
+
+    /// Everything the stack declares, as the profiles it comes to.
+    fn all_profiles(protocols: Protocols) -> Option<Vec<String>> {
+        Manifest::from_toml(STACK)
+            .ok()
+            .and_then(|manifest| everything(&manifest, protocols).ok())
+            .map(|plan| plan.profiles.into_iter().collect())
+    }
+
+    /// Asking for everything is a request for every profile, not for every form
+    /// composed together — which is the distinction that makes it work at all, since
+    /// a stack declaring one form that refuses company could never compose them.
+    #[test]
+    fn everything_is_every_profile_the_stack_declares() {
+        assert_eq!(
+            all_profiles(Protocols::both()),
+            Some(named(&[
+                "books", "dash", "media", "movies", "music", "proxy", "search", "subs", "torrent",
+                "tuning", "tv", "usenet",
+            ]))
+        );
+    }
+
+    /// "Everything" means everything the operator has set up, not every container
+    /// somebody could have set up.
+    #[test]
+    fn everything_leaves_out_what_the_configuration_cannot_support() {
+        let usenet_only = Protocols {
+            usenet: true,
+            torrent: false,
+        };
+
+        assert_eq!(
+            all_profiles(usenet_only),
+            Some(named(&[
+                "books", "dash", "media", "movies", "music", "proxy", "search", "subs", "tuning",
+                "tv", "usenet",
+            ])),
+            "the torrent profile is the one left out"
+        );
+    }
+
+    /// A form names itself in its plan; asking for everything names no form, because
+    /// no form was asked for.
+    #[test]
+    fn everything_names_no_form_because_none_was_named() {
+        let plan = Manifest::from_toml(STACK)
+            .ok()
+            .and_then(|manifest| everything(&manifest, Protocols::both()).ok());
+
+        assert_eq!(plan.map(|plan| plan.forms), Some(Vec::new()));
     }
 }

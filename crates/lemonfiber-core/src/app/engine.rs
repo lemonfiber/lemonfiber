@@ -10,7 +10,7 @@ use crate::model::{
     FormReport, FormsReport, LifecycleReport, StackEdit, StatusReport, VersionReport,
 };
 use crate::ports::docker::{LogLine, LogQuery};
-use crate::stack::closure::{resolve, Plan};
+use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
 
 mod diagnosis;
@@ -314,6 +314,15 @@ async fn settled_into(
     Ok(())
 }
 
+/// Whether this action brings services up, whichever way it was addressed.
+///
+/// Both are a start, and both have to be waited on: "started" that means "a process
+/// exists" is a claim the operator will disprove by opening a browser, and that is no
+/// less true of one service than of eight.
+const fn starts(action: &Action) -> bool {
+    matches!(action, Action::Up | Action::Start(_))
+}
+
 /// Everything a lifecycle command settles before anything runs: the manifest, the
 /// command to spawn, and the report it will be filling in.
 ///
@@ -385,7 +394,7 @@ pub(super) async fn lifecycle(
     // Starting waits for the services to be usable, because "started" that
     // means "a process exists" is a claim the operator will disprove by opening
     // a browser. Nothing else waits: stopping is done when Compose says so.
-    if action == &Action::Up && output.succeeded() {
+    if starts(action) && output.succeeded() {
         settled_into(ctx, &manifest, &mut report).await?;
     }
 
@@ -422,8 +431,16 @@ fn resolved(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let plan =
-        resolve(&manifest, forms, ctx.settings.protocols).map_err(|err| Box::new(err.problem()))?;
+    // Naming no form asks for everything. The one place that choice is made, so
+    // every operation that resolves a plan means the same thing by an empty list —
+    // and `everything` is every declared profile rather than every form composed
+    // together, which forms that refuse each other's company would refuse.
+    let plan = if forms.is_empty() {
+        everything(&manifest, ctx.settings.protocols)
+    } else {
+        resolve(&manifest, forms, ctx.settings.protocols)
+    }
+    .map_err(|err| Box::new(err.problem()))?;
     Ok((manifest, plan))
 }
 
