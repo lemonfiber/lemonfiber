@@ -296,10 +296,11 @@ pub trait FileSystem: Send + Sync {
     /// implementation that touches a real filesystem overrides it with a single
     /// atomic call, and is the only one whose promise is worth anything.
     ///
-    /// A path that cannot be read at all is treated as taken. Refusing to start is
-    /// the safe way to be wrong here — the alternative is two teardowns at once.
+    /// Read rather than a presence check, because reading is what this trait can do
+    /// and it answers the same question a claim asks: something is there to be read,
+    /// or nothing is.
     async fn claim(&self, path: &Path, contents: &str) -> bool {
-        if self.presence(path).await != Presence::Gone {
+        if self.read(path).await.is_some() {
             return false;
         }
         self.write(path, contents).await;

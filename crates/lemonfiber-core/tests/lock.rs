@@ -21,7 +21,7 @@ use lemonfiber_core::app::{claimed, released, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, Presence, StorageFacts,
+    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
 };
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::support::Reporting;
@@ -90,14 +90,6 @@ impl FileSystem for Remembering {
             removable: false,
             available: 0,
             total: 0,
-        }
-    }
-
-    async fn presence(&self, path: &Path) -> Presence {
-        if self.at(path).is_some() {
-            Presence::On(1)
-        } else {
-            Presence::Gone
         }
     }
 }
