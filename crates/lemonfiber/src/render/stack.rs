@@ -48,18 +48,48 @@ pub(super) fn reset(report: &ResetReport) -> Lines {
 /// every other report — and the count, so a form that quietly grew is visible as a
 /// number before it is a screenful.
 pub(super) fn preview(plan: &Plan) -> Lines {
+    affects(plan, Doing::Starting)
+}
+
+/// Which way round an operation is about to move things.
+///
+/// Only the verb differs: the services a form holds are the same ones whether they
+/// are about to go up or come down, so an operator reads one sentence in both cases
+/// and the closure is resolved once by the same code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Doing {
+    /// About to bring them up.
+    Starting,
+    /// About to take them down.
+    Stopping,
+}
+
+impl Doing {
+    /// The verb, agreeing with however many forms were named.
+    const fn verb(self, several: bool) -> &'static str {
+        match (self, several) {
+            (Self::Starting, false) => "starts",
+            (Self::Starting, true) => "start",
+            (Self::Stopping, false) => "stops",
+            (Self::Stopping, true) => "stop",
+        }
+    }
+}
+
+/// What naming these forms will affect, said before anything is done to them.
+///
+/// The operator is told which services an operation reaches *before* it reaches them,
+/// so a command that touches more than they meant is something they see coming rather
+/// than something they read about afterwards.
+pub(crate) fn affects(plan: &Plan, doing: Doing) -> Lines {
     let mut lines = Lines::default();
     let count = plan.services.len();
     // Two forms are a plural subject and take a plural verb. Naming several at
     // once is ordinary — `up full proxy` is the documented way to compose them —
     // so this is a sentence an operator reads, not a corner.
-    let starts = if plan.forms.len() == 1 {
-        "starts"
-    } else {
-        "start"
-    };
+    let verb = doing.verb(plan.forms.len() != 1);
     lines.put(format!(
-        "{} {starts} {count} service{}: {}",
+        "{} {verb} {count} service{}: {}",
         plan.forms.join(" and "),
         s(count),
         plan.services.join(", ")
@@ -410,6 +440,33 @@ mod tests {
             stopping.is_some() && starting.is_some() && stopping < starting,
             "the stop is printed first, because it runs first: {text}"
         );
+    }
+
+    /// The operator is told what an operation reaches before it reaches it, and the
+    /// sentence says which way round. The services are the same either way — only the
+    /// verb changes — so both directions resolve through the same code.
+    #[test]
+    fn what_an_operation_affects_is_said_in_the_direction_it_is_going() {
+        let plan = a_plan("media", Vec::new());
+        let starting = affects(&plan, Doing::Starting).text();
+        let stopping = affects(&plan, Doing::Stopping).text();
+
+        assert!(starting.contains(" starts "), "{starting}");
+        assert!(stopping.contains(" stops "), "{stopping}");
+        assert!(
+            starting.contains("sonarr") && stopping.contains("sonarr"),
+            "the same services either way: {starting} / {stopping}"
+        );
+    }
+
+    /// Naming two forms at once is the documented way to compose them, so the verb has
+    /// to agree with a plural subject rather than reading as a corner nobody hits.
+    #[test]
+    fn two_forms_named_at_once_take_a_plural_verb() {
+        let mut plan = a_plan("media", Vec::new());
+        plan.forms = vec!["tv".to_owned(), "movies".to_owned()];
+        let said = affects(&plan, Doing::Stopping).text();
+        assert!(said.contains("tv and movies stop "), "{said}");
     }
 
     #[test]

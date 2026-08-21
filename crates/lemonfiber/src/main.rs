@@ -8,7 +8,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber_core::app::{dispatch, Command, Ctx};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::doctor::Category;
 
 mod archive;
@@ -35,6 +35,7 @@ use exit::{complain, no_config_home, settled, USAGE};
 use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
 use render::render;
+use render::stack::Doing;
 use setup::{greeting, setting_up};
 use translate::{configuration, quality};
 use walkthrough::walk;
@@ -85,11 +86,8 @@ async fn main() -> ExitCode {
         // running rather than what a form holds — a restart of one named service
         // touches one service — and saying "starts eight services" before either
         // would be a sentence about the wrong set.
-        Request::Up { forms } => {
-            announce(&ctx, &forms, cli.json).await;
-            Command::Up { forms }
-        }
-        Request::Down { forms } => Command::Down { forms },
+        Request::Up { forms } => announced(&ctx, forms, cli.json, Doing::Starting).await,
+        Request::Down { forms } => announced(&ctx, forms, cli.json, Doing::Stopping).await,
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.
@@ -194,11 +192,24 @@ async fn main() -> ExitCode {
 ///
 /// Silent under `--json`, where the plan comes back inside the one document the
 /// command returns. A script reading a stream of objects is owed one per run.
-async fn announce(ctx: &Ctx, forms: &[String], json: bool) {
+/// The command to run, once the operator has been told what it will affect.
+///
+/// The two directions share this because they share the sentence — only the verb
+/// differs — and a second copy of "say it, then do it" would be a second place for
+/// them to fall out of step about which half comes first.
+async fn announced(ctx: &Ctx, forms: Vec<String>, json: bool, doing: Doing) -> Command {
+    announce(ctx, &forms, json, doing).await;
+    match doing {
+        Doing::Starting => Command::Up { forms },
+        Doing::Stopping => Command::Down { forms },
+    }
+}
+
+async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {
     if json {
         return;
     }
-    if let Ok(planned) = dispatch(
+    if let Ok(Outcome::Preview(plan)) = dispatch(
         Command::Preview {
             forms: forms.to_vec(),
         },
@@ -206,7 +217,7 @@ async fn announce(ctx: &Ctx, forms: &[String], json: bool) {
     )
     .await
     {
-        render(&planned, false);
+        render::stack::affects(&plan, doing).print();
     }
 }
 

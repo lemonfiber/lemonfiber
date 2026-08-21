@@ -18,7 +18,7 @@ mod doctor;
 mod quality;
 pub(crate) mod repair;
 mod seed;
-mod stack;
+pub(crate) mod stack;
 pub(crate) mod support;
 mod trace;
 pub(crate) mod walkthrough;
