@@ -33,7 +33,7 @@ use crate::queue::Thresholds;
 use crate::storage::{test_link, Linked};
 
 use super::targets::{
-    download_targets, project_directory, protocol_of, read_transfers, servarr_targets, DownloadKind,
+    download_targets, project_directory, protocol_of, read_transfers, servarr_targets,
 };
 
 /// Gather one snapshot of what the stack is doing right now.

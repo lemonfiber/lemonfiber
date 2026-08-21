@@ -31,7 +31,7 @@ use lemonfiber_manifest::Service;
 use crate::app::targets::{download_targets, project_directory, protocol_of, read_transfers};
 use crate::app::Ctx;
 use crate::dashboard::Protocol;
-use crate::ports::service::clients::Download;
+use crate::ports::service::Download;
 use crate::stack::closure::resolve;
 
 /// One download a teardown would interrupt.
@@ -108,7 +108,7 @@ mod tests {
     use crate::app::Ctx;
     use crate::config::{Protocols, Settings};
     use crate::ports::http::Http;
-    use crate::test_support::{a_context, env_at, nowhere, SeedFs};
+    use crate::test_support::{a_context, a_password, env_at, nowhere, SeedFs};
     use lemonfiber_fixtures::downloads::{
         downloads, QBIT_FINISHED, QBIT_TORRENTS, SAB_EMPTY, SAB_KEY_INI, SAB_QUEUE,
     };
@@ -157,7 +157,7 @@ mod tests {
         let fake = downloads(QBIT_TORRENTS, SAB_QUEUE);
         let ctx = reaching(
             Arc::clone(&fake) as Arc<dyn Http>,
-            Some(env_at("in-flight", "hunter2")),
+            Some(env_at("in-flight", &a_password())),
         );
 
         let found = in_flight(&ctx, &named(&["dl"])).await;
@@ -176,7 +176,7 @@ mod tests {
         let fake = downloads(QBIT_FINISHED, SAB_EMPTY);
         let ctx = reaching(
             Arc::clone(&fake) as Arc<dyn Http>,
-            Some(env_at("finished", "hunter2")),
+            Some(env_at("finished", &a_password())),
         );
 
         assert!(in_flight(&ctx, &named(&["dl"])).await.is_empty());
