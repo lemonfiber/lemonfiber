@@ -167,6 +167,10 @@ impl WiringCheck {
                     &title,
                     verdict(managed, wired, held.as_deref(), &broken),
                 )
+                // The service whose wiring this is about — so a drifted setting on a
+                // service that is itself in trouble reads as one problem, and a failure
+                // here is quoted with what that service said for itself.
+                .about(&managed.target.id)
             })
             .collect()
     }

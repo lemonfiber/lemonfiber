@@ -146,12 +146,18 @@ impl Check for ReleasesCheck {
         let mut findings = Vec::new();
         for (target, kind) in resolution {
             let verdict = self.probe(target, kind).await;
-            findings.push(Finding::in_category(
-                Category::Services,
-                &format!("services.releases.{}", target.id),
-                &format!("Releases for {} at the chosen quality", kind.media_type()),
-                verdict,
-            ));
+            findings.push(
+                Finding::in_category(
+                    Category::Services,
+                    &format!("services.releases.{}", target.id),
+                    &format!("Releases for {} at the chosen quality", kind.media_type()),
+                    verdict,
+                )
+                // Named, so a service that cannot search because the indexer beneath it
+                // is down reads as one problem rather than two — and so a failure here
+                // is quoted with what the service itself said about it.
+                .about(&target.id),
+            );
         }
         findings
     }

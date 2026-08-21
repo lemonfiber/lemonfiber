@@ -52,6 +52,30 @@ async fn sonarr_verdict(fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
     )
 }
 
+/// A finding about one service says which, so a failure here can be attributed to the
+/// thing underneath it and quoted with what that service said for itself. Without the
+/// name, both of those features simply skip this check.
+#[tokio::test]
+async fn a_finding_about_a_service_names_it() {
+    let check = ReleasesCheck::new(Fake::silent(), opening_fs(), vec![sonarr()], true);
+
+    let named: Vec<Option<String>> = check
+        .run()
+        .await
+        .into_iter()
+        .map(|finding| finding.service)
+        .collect();
+
+    assert!(
+        !named.is_empty()
+            && named
+                .iter()
+                .all(|service| service.as_deref() == Some("sonarr")),
+        "every finding this check makes is about the service it searched, and it made at \
+         least one: {named:?}"
+    );
+}
+
 /// A wanted list naming one missing episode.
 const ONE_WANTED: &str = r#"{"records":[{"id":42}]}"#;
 
