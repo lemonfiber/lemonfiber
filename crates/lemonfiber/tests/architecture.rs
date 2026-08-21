@@ -432,6 +432,75 @@ fn no_feature_requirement_identifier_appears_in_a_comment() {
     }
 }
 
+/// Every diagnostic check is given something to ask.
+///
+/// A check must establish what it reports rather than infer it from the operator's
+/// configuration. The difference matters most exactly where an operator is least able
+/// to tell: a check that reads a port number out of the settings and calls it "bound"
+/// will pass on a machine where nothing is listening, and it will pass loudest on the
+/// machine that is broken.
+///
+/// Asserted structurally, because it is a structural property. A check that only reads
+/// configuration needs nothing but data; one that goes and looks needs a seam to look
+/// through, and in this crate that seam is always a trait object — the engine, a
+/// runner, an HTTP client, a filesystem, or a narrower port like `Validator` or
+/// `UsenetAccounts`.
+///
+/// Read from what the check is **handed**, not only from what it stores: several keep
+/// their ports inside a helper of their own rather than as a field, which is a detail
+/// of how they are built rather than of whether they can see.
+///
+/// This does not prove any particular finding was observed rather than assumed. It
+/// proves the check was built able to observe, and it fails the moment somebody adds
+/// one that was not — which is the change worth catching, since the finding itself
+/// reads the same either way.
+#[test]
+fn every_check_is_given_something_to_ask() {
+    let mut assuming: Vec<String> = Vec::new();
+    let mut seen = 0_usize;
+
+    for (path, text) in sources() {
+        if !path.to_string_lossy().contains("doctor") {
+            continue;
+        }
+        for name in text.lines().filter_map(|line| {
+            line.strip_prefix("pub struct ")
+                .and_then(|rest| rest.strip_suffix(" {"))
+                .filter(|name| name.ends_with("Check"))
+        }) {
+            seen += 1;
+            // What it holds, and what it is handed. Either is a way to go and look;
+            // a check with neither can only be repeating the configuration back.
+            let fields = text
+                .split(&format!("pub struct {name} {{"))
+                .nth(1)
+                .and_then(|rest| rest.split("\n}").next())
+                .unwrap_or_default()
+                .to_owned();
+            let built = text
+                .split(&format!("impl {name} {{"))
+                .nth(1)
+                .and_then(|rest| rest.split(") -> Self").next())
+                .unwrap_or_default()
+                .to_owned();
+
+            if !fields.contains("Arc<dyn ") && !built.contains("Arc<dyn ") {
+                assuming.push(format!("{} ({name})", path.display()));
+            }
+        }
+    }
+
+    assert!(
+        seen > 5,
+        "the scan found {seen} checks, which means it is looking in the wrong place"
+    );
+    assert!(
+        assuming.is_empty(),
+        "a check with nothing to ask can only be repeating the configuration back: {}",
+        assuming.join(", ")
+    );
+}
+
 /// No file grows past what one sitting can hold.
 ///
 /// A file that keeps accreting is how a codebase stops being navigable: the third
