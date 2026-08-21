@@ -60,6 +60,7 @@ mod instant;
 pub mod jellyfin;
 pub mod journal;
 pub mod lidarr;
+pub mod logs;
 pub mod materialised;
 pub mod model;
 pub mod notify;
