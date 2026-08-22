@@ -235,7 +235,32 @@ fn explaining(word: &str) -> ExitCode {
         return complain(&render::glossary::unrecognised(word));
     };
     lines.print();
+    remember(word);
     ExitCode::SUCCESS
+}
+
+/// Record that this word has been gone and found out about.
+///
+/// Asking what a word means is the act this rests on: a report that went past is not
+/// an acknowledgement, and recording one would stop explaining a word to somebody
+/// who never read it.
+///
+/// Best effort and silent. The answer has already been given, and a record that
+/// could not be written costs one repeated explanation rather than anything the
+/// operator needs telling about now. Written only where it actually changed, so
+/// asking twice touches nothing.
+fn remember(word: &str) {
+    let Some(paths) = here() else {
+        return;
+    };
+    let path = paths.acknowledged();
+    let mut known = lemonfiber_core::acknowledged::at(&path);
+    if !known.take(word) {
+        return;
+    }
+    if let Some(text) = known.to_json() {
+        let _ = std::fs::write(&path, text);
+    }
 }
 
 /// Say what starting these forms will start, before it starts.

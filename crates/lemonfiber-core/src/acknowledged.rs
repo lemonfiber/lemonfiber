@@ -79,6 +79,18 @@ impl Acknowledged {
     }
 }
 
+/// What was acknowledged, from where it is kept.
+///
+/// Nothing acknowledged where the file is absent or unreadable, which is the same
+/// answer and deliberately so: a first run and a damaged record both mean this
+/// operator should be told what the words are.
+#[must_use]
+pub fn at(path: &std::path::Path) -> Acknowledged {
+    std::fs::read_to_string(path)
+        .map(|text| Acknowledged::parse(&text))
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::Acknowledged;
@@ -130,6 +142,35 @@ mod tests {
             stored.find("hardlink") < stored.find("indexer"),
             "sorted, so the file reads the same twice: {stored}"
         );
+    }
+
+    /// A first run and a damaged record are the same answer, deliberately: both
+    /// mean this operator should be told what the words are.
+    #[test]
+    fn a_record_that_is_not_there_is_an_empty_one() {
+        // Stamped with the process, the way this repo's other temp fixtures are:
+        // tests run in parallel and two of them sharing a path is a flake.
+        let nowhere = std::env::temp_dir().join(format!(
+            "lemonfiber-known-absent-{}.json",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&nowhere);
+
+        assert!(super::at(&nowhere).is_empty());
+    }
+
+    #[test]
+    fn what_was_stored_is_read_back_from_where_it_was_put() {
+        let path =
+            std::env::temp_dir().join(format!("lemonfiber-known-{}.json", std::process::id()));
+        let mut held = Acknowledged::default();
+        held.take("indexer");
+        let _ = std::fs::write(&path, held.to_json().unwrap_or_default());
+
+        let read = super::at(&path);
+        let _ = std::fs::remove_file(&path);
+
+        assert!(read.holds("indexer"), "{read:?}");
     }
 
     /// The cost of getting this wrong is explaining a word somebody already knew.

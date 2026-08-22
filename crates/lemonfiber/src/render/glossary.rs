@@ -17,6 +17,7 @@
 //! nothing needs it in order to act, which is the difference between an explanation
 //! offered and an explanation imposed.
 
+use lemonfiber_core::acknowledged::Acknowledged;
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::glossary::{explain, mentioned, Term, TERMS};
 
@@ -32,6 +33,23 @@ const WIDTH: usize = 74;
 const FIRST: &str = "  ";
 /// Deeper than the word, so a wrapped explanation cannot be mistaken for a new one.
 const AFTER: &str = "      ";
+
+/// The words this operator has already gone and found out about.
+///
+/// Read once at startup like the settings beside it, and never written from here:
+/// a report is not an acknowledgement, and a renderer that recorded one would be
+/// deciding on the operator's behalf that they had read it.
+static KNOWN: std::sync::OnceLock<Acknowledged> = std::sync::OnceLock::new();
+
+/// Settle what this operator has already been told.
+pub(crate) fn settle_known(known: Acknowledged) -> &'static Acknowledged {
+    KNOWN.get_or_init(|| known)
+}
+
+/// What this operator has already been told, or nothing where none was read.
+pub(crate) fn known() -> &'static Acknowledged {
+    KNOWN.get_or_init(Acknowledged::default)
+}
 
 /// Whether this run explains its words at all, settled once at startup.
 ///
@@ -56,22 +74,38 @@ pub(crate) fn wanted() -> bool {
 }
 
 /// What this report's own words mean, or nothing where it used none of them.
-pub(crate) fn footnotes(text: &str, wanted: bool) -> Lines {
+pub(crate) fn footnotes(text: &str, wanted: bool, known: &Acknowledged) -> Lines {
     let mut lines = Lines::default();
     if !wanted {
         return lines;
     }
     let used = mentioned(text);
-    let (shown, rest) = used.split_at(used.len().min(MOST));
-    if shown.is_empty() {
+    if used.is_empty() {
         return lines;
     }
+    // A word already gone and found out about is named rather than taught again,
+    // which also means the three that are explained are spent on what is new.
+    let fresh: Vec<&'static Term> = used
+        .iter()
+        .copied()
+        .filter(|term| !known.holds(term.word))
+        .collect();
+    let (shown, capped) = fresh.split_at(fresh.len().min(MOST));
 
     lines.spaced("Words used here:");
     for term in shown {
         entry(&mut lines, term);
     }
-    if let Some(more) = remainder(rest) {
+    let named: Vec<&'static str> = capped
+        .iter()
+        .map(|term| term.word)
+        .chain(
+            used.iter()
+                .filter(|term| known.holds(term.word))
+                .map(|term| term.word),
+        )
+        .collect();
+    if let Some(more) = remainder(&named) {
         for line in wrapped(&more, WIDTH) {
             lines.put(format!("{FIRST}{line}"));
         }
@@ -168,8 +202,7 @@ fn entry(lines: &mut Lines, term: &Term) {
 }
 
 /// The words this report used and did not explain, named rather than dropped.
-fn remainder(rest: &[&Term]) -> Option<String> {
-    let words: Vec<&str> = rest.iter().map(|term| term.word).collect();
+fn remainder(words: &[&'static str]) -> Option<String> {
     if words.is_empty() {
         return None;
     }
@@ -202,11 +235,17 @@ fn wrapped(text: &str, width: usize) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::{explained, footnotes, settle, unrecognised, wanted, wrapped, WIDTH};
+    use lemonfiber_core::acknowledged::Acknowledged;
 
     /// The whole point: a report that used a word says what it meant, underneath.
     #[test]
     fn a_report_explains_the_words_it_used() {
-        let said = footnotes("no indexer answered in time", true).text();
+        let said = footnotes(
+            "no indexer answered in time",
+            true,
+            &Acknowledged::default(),
+        )
+        .text();
 
         assert!(said.contains("Words used here:"), "{said}");
         assert!(said.contains("indexer — Search engines"), "{said}");
@@ -216,7 +255,10 @@ mod tests {
     /// be under every report.
     #[test]
     fn a_report_using_none_of_them_gets_no_block() {
-        assert_eq!(footnotes("everything is running", true).text(), "");
+        assert_eq!(
+            footnotes("everything is running", true, &Acknowledged::default()).text(),
+            ""
+        );
     }
 
     /// Ten explanations at once rebuild the wall this exists to knock down.
@@ -225,6 +267,7 @@ mod tests {
         let said = footnotes(
             "the indexer, the hardlink, the VPN, the ratio and the seed",
             true,
+            &Acknowledged::default(),
         )
         .text();
 
@@ -248,6 +291,7 @@ mod tests {
         let said = footnotes(
             "the indexer, the hardlink, the VPN, the ratio and the seed",
             true,
+            &Acknowledged::default(),
         )
         .text();
 
@@ -275,17 +319,61 @@ mod tests {
         assert_eq!(wanted(), first, "and asking plainly agrees");
     }
 
+    /// A word gone and found out about is named rather than taught again — and the
+    /// three that are explained are then spent on what is new.
+    #[test]
+    fn a_word_already_gone_and_found_out_about_is_only_named() {
+        let mut known = Acknowledged::default();
+        known.take("indexer");
+
+        let said = footnotes("no indexer answered, and the hardlink failed", true, &known).text();
+
+        assert!(
+            !said.contains("indexer — Search engines"),
+            "not taught again: {said}"
+        );
+        assert!(
+            said.contains("hardlink — Lets one file"),
+            "the new one is: {said}"
+        );
+        assert!(
+            said.contains("indexer"),
+            "but still named, so it can be asked about: {said}"
+        );
+    }
+
+    /// Once every word on a report is known, the block collapses to the one line
+    /// that keeps them findable rather than disappearing.
+    #[test]
+    fn a_report_of_words_all_known_collapses_to_naming_them() {
+        let mut known = Acknowledged::default();
+        known.take("indexer");
+
+        let said = footnotes("no indexer answered", true, &known).text();
+
+        assert!(!said.contains(" — "), "nothing is explained: {said}");
+        assert!(said.contains("1 more used here: indexer."), "{said}");
+    }
+
     /// Somebody who finds them patronising can stop them wholesale, and then no
     /// report carries one at all — not a shorter block, none.
     #[test]
     fn a_run_that_wants_none_of_them_gets_none() {
-        assert_eq!(footnotes("no indexer answered in time", false).text(), "");
+        assert_eq!(
+            footnotes(
+                "no indexer answered in time",
+                false,
+                &Acknowledged::default()
+            )
+            .text(),
+            ""
+        );
     }
 
     /// Available on request and never mandatory: the block says how to ask.
     #[test]
     fn the_block_says_where_the_longer_form_is() {
-        let said = footnotes("no indexer answered", true).text();
+        let said = footnotes("no indexer answered", true, &Acknowledged::default()).text();
 
         assert!(said.contains("lemonfiber explain <word>"), "{said}");
     }
@@ -299,7 +387,7 @@ mod tests {
             .iter()
             .map(|term| term.word)
             .collect();
-        let said = footnotes(&every.join(" and the "), true).text();
+        let said = footnotes(&every.join(" and the "), true, &Acknowledged::default()).text();
 
         for line in said.lines() {
             let width = line.chars().count();
@@ -311,7 +399,7 @@ mod tests {
     /// comes after and is separated from it.
     #[test]
     fn the_block_is_separated_from_the_report_it_follows() {
-        let said = footnotes("no indexer answered", true).text();
+        let said = footnotes("no indexer answered", true, &Acknowledged::default()).text();
 
         assert!(said.starts_with('\n'), "{said:?}");
     }
