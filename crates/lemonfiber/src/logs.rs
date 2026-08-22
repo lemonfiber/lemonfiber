@@ -234,6 +234,11 @@ impl Viewer {
         self.open
     }
 
+    /// The services lines have arrived from, in the order they first did.
+    pub(crate) fn seen(&self) -> &[String] {
+        &self.seen
+    }
+
     /// The filter being typed, where one is.
     pub(crate) fn typing(&self) -> Option<&str> {
         self.typing.as_deref()
