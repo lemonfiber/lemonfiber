@@ -251,7 +251,10 @@ fn as_a_document(problem: &Problem) -> Lines {
     lines.put(
         Envelope::new("error", problem)
             .to_json()
-            .unwrap_or_else(|| crate::render::UNRENDERABLE.to_owned()),
+            // Eagerly, for the reason `machine_readable` states beside it: a
+            // lazily-built fallback is a line no test could ever run, since these
+            // payloads are plain data that cannot fail to serialise.
+            .unwrap_or(crate::render::UNRENDERABLE.to_owned()),
     );
     lines
 }

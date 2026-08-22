@@ -374,6 +374,17 @@ mod tests {
         assert_eq!(lines.text(), document, "unfolded and unaltered");
     }
 
+    /// A refusal a script asked for leaves by the same door on the other stream.
+    #[test]
+    fn what_a_parser_reads_goes_out_unfolded_on_the_error_stream_too() {
+        let document = "{\"kind\":\"error\",\"data\":{\"summary\":\"the “Burbs” — gone\"}}";
+        let mut lines = Lines::for_a_parser();
+        lines.put(document);
+        lines.eprint();
+
+        assert_eq!(lines.text(), document, "unfolded and unaltered");
+    }
+
     /// The other half of the same rule: what a person reads is made safe, because a
     /// terminal reads an escape in the middle of a name as an instruction.
     #[test]
