@@ -45,17 +45,47 @@ pub struct Term {
     pub also_called: &'static [&'static str],
 }
 
+impl Term {
+    /// A word and the sentence somebody needs, which is all most of them have.
+    ///
+    /// Built rather than written out as a struct each time. Twenty-three entries
+    /// repeating `deep: None, also_called: &[],` is the same six lines over and
+    /// over, and the words — which are the whole point of the table — end up
+    /// buried in the shape that carries them.
+    const fn new(word: &'static str, short: &'static str) -> Self {
+        Self {
+            word,
+            short,
+            deep: None,
+            also_called: &[],
+        }
+    }
+
+    /// With more, for somebody who asks. Never needed in order to act.
+    const fn explained(mut self, deep: &'static str) -> Self {
+        self.deep = Some(deep);
+        self
+    }
+
+    /// With what other services in this stack call the same thing.
+    const fn also(mut self, also_called: &'static [&'static str]) -> Self {
+        self.also_called = also_called;
+        self
+    }
+}
+
 /// Every word the interface explains.
 ///
 /// Ordered as somebody meets them rather than alphabetically: what a thing is for
 /// comes before what it is measured in.
 pub const TERMS: &[Term] = &[
-    Term {
-        word: "indexer",
-        short: "Search engines that find what you are looking for. You need at least one, \
+    Term::new(
+        "indexer",
+        "Search engines that find what you are looking for. You need at least one, \
                 and most cost a small yearly fee.",
-        deep: Some(
-            "An indexer keeps track of what has been posted and where. lemonfiber asks \
+    )
+    .explained(
+        "An indexer keeps track of what has been posted and where. lemonfiber asks \
              yours whenever something is wanted; without one, nothing can be found to \
              download, however much else is configured. Prowlarr lists Usenet indexers \
              and torrent sites together under the one word, which is why one screen \
@@ -63,190 +93,152 @@ pub const TERMS: &[Term] = &[
              that introduces peers to each other, and on a private one that same part \
              is what watches your ratio — so the two words overlap without meaning the \
              same thing.",
-        ),
-        also_called: &["search provider"],
-    },
-    Term {
-        word: "hardlink",
-        short: "Lets one file appear in two places while taking up the space once — so \
+    )
+    .also(&["search provider"]),
+    Term::new(
+        "hardlink",
+        "Lets one file appear in two places while taking up the space once — so \
                 importing is instant and costs no extra disk.",
-        deep: Some(
-            "Both names point at the same data. Deleting one leaves the other working. \
+    )
+    .explained(
+        "Both names point at the same data. Deleting one leaves the other working. \
              This is why the download folder and the library should sit on one volume: \
              across two, the file has to be copied instead, which takes time and twice \
              the room.",
-        ),
-        also_called: &[],
-    },
-    Term {
-        word: "retention",
-        short: "How far back your Usenet provider keeps things. Longer retention means \
+    ),
+    Term::new(
+        "retention",
+        "How far back your Usenet provider keeps things. Longer retention means \
                 older releases can still be downloaded.",
-        deep: Some(
-            "Measured in days, and it is the age of the post rather than of the film or \
+    )
+    .explained(
+        "Measured in days, and it is the age of the post rather than of the film or \
              episode. A provider with short retention is fine for new things and will \
              quietly fail to find old ones.",
-        ),
-        also_called: &[],
-    },
-    Term {
-        word: "usenet",
-        short: "One of the two ways this stack downloads. You pay a provider, downloads \
+    ),
+    Term::new(
+        "usenet",
+        "One of the two ways this stack downloads. You pay a provider, downloads \
                 are fast and private, and nothing is expected of you afterwards.",
-        deep: None,
-        also_called: &["nntp"],
-    },
-    Term {
-        word: "torrent",
-        short: "The other way this stack downloads. Free, and you share back what you \
+    )
+    .also(&["nntp"]),
+    Term::new(
+        "torrent",
+        "The other way this stack downloads. Free, and you share back what you \
                 take — which is why it goes through the VPN.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "peer",
-        short: "Somebody else sharing the same torrent. You take from them and they take \
+    ),
+    Term::new(
+        "peer",
+        "Somebody else sharing the same torrent. You take from them and they take \
                 from you, which is why a torrent with nobody on it never finishes.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "NZB",
-        short: "What your indexer hands the download client so it can fetch the pieces \
+    ),
+    Term::new(
+        "NZB",
+        "What your indexer hands the download client so it can fetch the pieces \
                 of a Usenet download. You rarely handle one yourself, and nothing \
                 expects you to.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "VPN",
-        short: "A tunnel your torrent traffic leaves through, so your own connection is \
+    ),
+    Term::new(
+        "VPN",
+        "A tunnel your torrent traffic leaves through, so your own connection is \
                 not the one seen doing it.",
-        deep: Some(
-            "lemonfiber checks that the torrent client's traffic genuinely leaves through \
+    )
+    .explained(
+        "lemonfiber checks that the torrent client's traffic genuinely leaves through \
              the tunnel rather than trusting that it was configured to. A tunnel that is \
              up but not carrying the traffic is the failure that looks like success.",
-        ),
-        also_called: &[],
-    },
-    Term {
-        word: "killswitch",
-        short: "Stops the torrent client reaching the internet at all if the VPN drops, \
+    ),
+    Term::new(
+        "killswitch",
+        "Stops the torrent client reaching the internet at all if the VPN drops, \
                 rather than letting it carry on unprotected.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "backbone",
-        short: "The network a Usenet provider actually stores its articles on. Two \
+    ),
+    Term::new(
+        "backbone",
+        "The network a Usenet provider actually stores its articles on. Two \
                 providers sharing one hold the same things, so a second account there \
                 finds nothing the first could not.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "block account",
-        short: "Usenet data bought as a fixed amount rather than a monthly allowance. \
+    ),
+    Term::new(
+        "block account",
+        "Usenet data bought as a fixed amount rather than a monthly allowance. \
                 Useful as a second provider, since you spend it only on what the first \
                 could not find.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "port forwarding",
-        short: "A way back in for other peers, opened by your VPN. Without it they \
+    ),
+    Term::new(
+        "port forwarding",
+        "A way back in for other peers, opened by your VPN. Without it they \
                 cannot start a connection to you, so torrents are slower and your ratio \
                 suffers.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "ratio",
-        short: "How much you have shared back compared with what you took. Some trackers \
+    ),
+    Term::new(
+        "ratio",
+        "How much you have shared back compared with what you took. Some trackers \
                 expect a minimum before they let you keep downloading.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "seed",
-        short: "To keep sharing a finished torrent so others can take it. Stopping too \
+    ),
+    Term::new(
+        "seed",
+        "To keep sharing a finished torrent so others can take it. Stopping too \
                 early is what a ratio requirement is about.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "grab",
-        short: "To send a release to the download client. It is the moment something \
+    ),
+    Term::new(
+        "grab",
+        "To send a release to the download client. It is the moment something \
                 stops being a search result and starts being a download.",
-        deep: None,
-        also_called: &["snatch"],
-    },
-    Term {
-        word: "monitored",
-        short: "Whether a service is still looking for something. Unmonitored means it \
+    )
+    .also(&["snatch"]),
+    Term::new(
+        "monitored",
+        "Whether a service is still looking for something. Unmonitored means it \
                 will not go and find it even when it is missing, which is the usual \
                 reason nothing is happening.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "stalled",
-        short: "A download that has stopped making progress without failing outright. It \
+    ),
+    Term::new(
+        "stalled",
+        "A download that has stopped making progress without failing outright. It \
                 sits there until something moves it, which is why it is worth saying \
                 rather than counting as running.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "root folder",
-        short: "Where a service files what it has finished with — the library it manages, \
+    ),
+    Term::new(
+        "root folder",
+        "Where a service files what it has finished with — the library it manages, \
                 rather than the folder downloads land in.",
-        deep: None,
-        also_called: &["library folder"],
-    },
-    Term {
-        word: "quality profile",
-        short: "The rules deciding which version of something is good enough to grab, and \
+    )
+    .also(&["library folder"]),
+    Term::new(
+        "quality profile",
+        "The rules deciding which version of something is good enough to grab, and \
                 which is worth replacing later.",
-        deep: Some(
-            "Resolution is only part of it. A profile also weighs the source, the encoder \
+    )
+    .explained(
+        "Resolution is only part of it. A profile also weighs the source, the encoder \
              and the audio, which is why two files of the same resolution are not equally \
              welcome. The services' own screens file these under Profiles, which is not \
              quite the same word: this stack also has Compose profiles, and they decide \
              which services run rather than which releases are wanted.",
-        ),
-        also_called: &[],
-    },
-    Term {
-        word: "transcode",
-        short: "Rebuilding a video into a form the device asking for it can play. It \
+    ),
+    Term::new(
+        "transcode",
+        "Rebuilding a video into a form the device asking for it can play. It \
                 costs a great deal of processing, so a machine doing it often is one \
                 that feels slow.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "bitrate",
-        short: "How much data each second of sound or video uses. Higher means better \
+    ),
+    Term::new(
+        "bitrate",
+        "How much data each second of sound or video uses. Higher means better \
                 quality and larger files, which is the whole of the trade.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "HDR",
-        short: "A wider range of brightness and colour than a screen normally shows. It \
+    ),
+    Term::new(
+        "HDR",
+        "A wider range of brightness and colour than a screen normally shows. It \
                 needs a display that can take it; on one that cannot, the picture can \
                 look washed out.",
-        deep: None,
-        also_called: &[],
-    },
-    Term {
-        word: "custom format",
-        short: "A rule that nudges a profile for or against particular releases — a \
+    ),
+    Term::new(
+        "custom format",
+        "A rule that nudges a profile for or against particular releases — a \
                 preferred group, or a thing you never want.",
-        deep: None,
-        also_called: &[],
-    },
+    ),
 ];
 
 /// What this product says a word means, where it explains it.
@@ -353,7 +345,7 @@ fn same(said: &str, wanted: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{borrowed, explain, mentioned, TERMS};
+    use super::{borrowed, explain, mentioned, Term, TERMS};
 
     #[test]
     fn a_word_is_explained_however_it_is_capitalised() {
@@ -480,6 +472,22 @@ mod tests {
             words("unseeded and reindexed").is_empty(),
             "and a word inside another word is still not the word"
         );
+    }
+
+    /// Exercised at run time as well as in the table, because a `const fn` used
+    /// only in a `const` item is evaluated by the compiler and leaves nothing for a
+    /// coverage run to see.
+    #[test]
+    fn a_term_is_built_from_the_word_and_the_sentence() {
+        let plain = Term::new("word", "what it is for.");
+        assert_eq!((plain.word, plain.short), ("word", "what it is for."));
+        assert!(plain.deep.is_none() && plain.also_called.is_empty());
+
+        let full = Term::new("word", "short.")
+            .explained("longer.")
+            .also(&["other"]);
+        assert_eq!(full.deep, Some("longer."));
+        assert_eq!(full.also_called, ["other"]);
     }
 
     /// Worth reading the first time, noise every time after.
