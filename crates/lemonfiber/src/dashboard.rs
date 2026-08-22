@@ -25,7 +25,7 @@ use ratatui::Frame;
 const TWO_COLUMNS: u16 = 96;
 
 /// Draw the whole screen.
-pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot) {
+pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
     let area = frame.area();
     let [top, body, bottom] = Layout::default()
         .direction(Direction::Vertical)
@@ -49,17 +49,35 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot) {
     );
     frame.render_widget(
         Paragraph::new(Line::styled(
-            "q quit   r refresh",
+            "q quit   r refresh   ? words",
             Style::default().add_modifier(Modifier::DIM),
         )),
         bottom,
     );
 
-    for (area, (title, lines)) in places(body).into_iter().zip(sections(snapshot)) {
+    let panels = sections(snapshot);
+    // Gathered before the panels are consumed by drawing, and only when it was
+    // asked for.
+    let showing = glossary.then(|| {
+        // The titles as well as the lines: a panel called VPN has put that word
+        // on the screen as surely as a line inside it would have.
+        let titles: Vec<&str> = panels.iter().map(|(title, _)| *title).collect();
+        let said = crate::pane::showing(panels.iter().flat_map(|(_, lines)| lines));
+        format!("{} {said}", titles.join(" "))
+    });
+
+    for (area, (title, lines)) in places(body).into_iter().zip(panels) {
         frame.render_widget(
             Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title(title)),
             area,
         );
+    }
+
+    // Last, so it is over everything: the words on this screen, when asked for.
+    // Read back from the panels' own lines rather than from the snapshot, so what
+    // is explained is what is being shown.
+    if let Some(showing) = showing {
+        crate::pane::over(frame, &showing);
     }
 }
 
@@ -149,10 +167,35 @@ pub(crate) mod tests {
 
     /// The whole screen as text, drawn at the given size.
     fn drawn(snapshot: &Snapshot, width: u16, height: u16) -> String {
+        shown(snapshot, width, height, false)
+    }
+
+    /// A full screen has no bottom to put a footnote on, so the words are a
+    /// keypress away instead — and until that key, they cost the screen nothing.
+    #[test]
+    fn the_words_on_the_screen_are_explained_when_asked_for() {
+        let snapshot = a_snapshot();
+
+        let quiet = shown(&snapshot, 90, 30, false);
+        let asked = shown(&snapshot, 90, 30, true);
+
+        assert!(
+            !quiet.contains("the words on this screen"),
+            "nothing until it is asked for"
+        );
+        assert!(asked.contains("the words on this screen"), "{asked}");
+        assert!(
+            asked.contains("A tunnel your torrent"),
+            "and it says what a word is for: {asked}"
+        );
+    }
+
+    /// The same, with the words on the screen asked for.
+    fn shown(snapshot: &Snapshot, width: u16, height: u16, glossary: bool) -> String {
         Terminal::new(TestBackend::new(width, height))
             .ok()
             .map(|mut terminal| {
-                let _ = terminal.draw(|frame| draw(frame, snapshot));
+                let _ = terminal.draw(|frame| draw(frame, snapshot, glossary));
                 terminal
                     .backend()
                     .buffer()
