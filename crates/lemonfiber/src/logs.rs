@@ -26,7 +26,10 @@ use lemonfiber_core::plural::s;
 use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
 use lemonfiber_core::text::plain;
 
+use notices::{noticed, remark, SELF};
+
 pub(crate) mod draw;
+mod notices;
 
 /// How many lines the screen holds before the oldest give way.
 ///
@@ -518,44 +521,7 @@ impl Viewer {
 /// deliberately not a flag to parse, so `NO_COLOR=0` refuses colour like everything
 /// else does, which surprises people exactly once and is what every other tool does.
 pub(crate) fn colours(no_color: Option<&str>) -> bool {
-    !no_color.is_some_and(|value| !value.is_empty())
-}
-
-/// What the viewer calls itself when a line is its own rather than a service's.
-const SELF: &str = "lemonfiber";
-
-/// A line the viewer wrote itself.
-///
-/// Tagged with a service where it is about one, so it sits under the same name as
-/// that service's own output and a filter narrowed to it keeps the notice.
-fn remark(service: &str, said: &str) -> LogLine {
-    LogLine {
-        service: service.to_owned(),
-        stream: Stream::Stdout,
-        at: None,
-        line: format!("--- {said} ---"),
-    }
-}
-
-/// A line saying what the engine reported about a service.
-fn noticed(service: &str, lifecycle: Lifecycle) -> LogLine {
-    remark(service, &format!("{service} {}", becoming(lifecycle)))
-}
-
-/// What to say about a service that has just reached this state.
-///
-/// Said as what happened rather than as the engine's word for it: `Exited` is a
-/// state, "has stopped" is news.
-const fn becoming(lifecycle: Lifecycle) -> &'static str {
-    match lifecycle {
-        Lifecycle::Created => "was created",
-        Lifecycle::Running => "is running again",
-        Lifecycle::Paused => "was paused",
-        Lifecycle::Restarting => "is restarting",
-        Lifecycle::Exited => "has stopped",
-        Lifecycle::Removing => "is being removed",
-        Lifecycle::Dead => "died",
-    }
+    no_color.is_none_or(|value| value.is_empty())
 }
 
 #[cfg(test)]
