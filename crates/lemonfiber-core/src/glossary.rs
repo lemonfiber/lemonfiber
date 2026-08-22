@@ -261,7 +261,24 @@ fn uses(words: &[String], term: &str) -> bool {
     let wanted: Vec<String> = term.split(' ').map(str::to_ascii_lowercase).collect();
     words
         .windows(wanted.len())
-        .any(|run| run == wanted.as_slice())
+        .any(|run| run.iter().zip(&wanted).all(|(said, want)| same(said, want)))
+}
+
+/// Whether a word this text used is this term's word, in either number.
+///
+/// Counted as the same word, because a plural is not a different one and this
+/// product writes the plural far more often than the singular: "there are no
+/// indexers configured", "hardlinks are not usable across an SMB share", "this is
+/// what the indexers had". Matching only the singular missed thirty sentences,
+/// among them the ones a first run shows somebody who has never met the word.
+///
+/// Only the text's word may carry the extra letter, never the term's. Going the
+/// other way would let a term match a word that merely began with it.
+fn same(said: &str, wanted: &str) -> bool {
+    said == wanted
+        || said
+            .strip_suffix('s')
+            .is_some_and(|singular| singular == wanted)
 }
 
 #[cfg(test)]
@@ -359,6 +376,27 @@ mod tests {
         assert!(
             borrowed("check the root folder").is_empty(),
             "our own word is not borrowed from anyone"
+        );
+    }
+
+    /// A plural is not a different word, and this product writes the plural far
+    /// more often — including in the sentences a first run shows somebody who has
+    /// never met the word.
+    #[test]
+    fn a_word_in_the_plural_is_still_the_word() {
+        let words = |text| {
+            mentioned(text)
+                .into_iter()
+                .map(|term| term.word)
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(words("there are no indexers configured"), ["indexer"]);
+        assert_eq!(words("check the root folders"), ["root folder"]);
+        assert_eq!(words("hardlinks are not usable here"), ["hardlink"]);
+        assert!(
+            words("unseeded and reindexed").is_empty(),
+            "and a word inside another word is still not the word"
         );
     }
 
