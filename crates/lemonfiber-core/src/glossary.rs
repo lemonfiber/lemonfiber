@@ -505,6 +505,41 @@ mod tests {
         assert_eq!(found.len(), 1);
     }
 
+    /// A simplification that leaves somebody with a false picture costs more than
+    /// the words it saved, because they will act on the picture. Truth is not
+    /// testable and this does not pretend to test it — but two shapes cause most of
+    /// them, and both can be refused.
+    ///
+    /// **An analogy that does not hold.** This module's own rule is to explain by
+    /// what a thing causes rather than by what it resembles, because an analogy
+    /// invites the reader to carry across every other property of the thing it was
+    /// compared to — and they will not stop at the one that was meant.
+    ///
+    /// **A word that makes a real cost sound like none.** *Simply* and *just* are
+    /// how a consequence gets talked past, and the rule beside them is that accurate
+    /// and longer beats simple and wrong.
+    #[test]
+    fn no_explanation_reaches_for_an_analogy_or_talks_a_cost_away() {
+        for term in TERMS {
+            let word = term.word;
+            for said in [Some(term.short), term.deep].into_iter().flatten() {
+                let plainly = said.to_ascii_lowercase();
+                for reaching in ["like a ", "like an ", "think of it", "imagine", "as if"] {
+                    assert!(
+                        !plainly.contains(reaching),
+                        "{word} explains by resemblance rather than by consequence: {said}"
+                    );
+                }
+                for away in ["simply", "just ", "merely", "nothing more than"] {
+                    assert!(
+                        !plainly.contains(away),
+                        "{word} makes a real cost sound like none: {said}"
+                    );
+                }
+            }
+        }
+    }
+
     /// The rule these were written to: say what it is for, not what it is. A
     /// definition answers a question nobody asked.
     #[test]
