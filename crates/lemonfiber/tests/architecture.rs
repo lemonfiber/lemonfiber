@@ -144,6 +144,143 @@ fn no_other_services_word_is_written_as_if_it_were_ours() {
     );
 }
 
+/// Short capitals an operator needs no help with, and why each is allowed.
+///
+/// Declaring one ordinary is a judgement. Writing it here is what makes the
+/// judgement reviewable rather than invisible, and there are four kinds.
+///
+/// **Met everywhere**, and not this ecosystem's own: somebody running a media stack
+/// has already met a URL.
+///
+/// **The operating system's**, each of which already appears in a sentence stating
+/// its consequence — "FAT filesystems cannot create hardlinks" leaves a separate
+/// entry nothing to add.
+///
+/// **Units, dates and formats**, which are read rather than understood.
+///
+/// **Ordinary English in capitals**, which is emphasis and not an abbreviation at
+/// all: `NOT` in "the client's traffic is NOT going through the tunnel" is the same
+/// word it would be in lower case.
+const ORDINARY: &[&str] = &[
+    "API", "URL", "TLS", "JSON", "DNS", "IP", "UI", "HTTP", "OSI", "FAT", "SMB", "CIFS", "NFS",
+    "WSL2", "UID", "GID", "NAT", "PMP", "P2P", "GB", "MB", "CD", "TV", "MP3", "AAC", "FLAC",
+    "ALAC", "YYYY", "MM", "DD", "NOT",
+];
+
+/// Every acronym an operator is shown is explained, or declared ordinary.
+///
+/// A domain term used without an explanation is a defect, and the hard part is that
+/// most jargon cannot be told from ordinary writing by a machine. An acronym can be,
+/// and it is jargon at its sharpest: somebody who does not know `NZB` cannot infer it
+/// from the letters, cannot look it up under a word they never saw spelled out, and
+/// has nothing to go on but the sentence around it.
+///
+/// So this refuses the whole class rather than a list of known offenders. A new
+/// acronym cannot reach an operator without somebody deciding which it is —
+/// explained in the glossary, or written into [`ORDINARY`] with a reason. Neither
+/// costs much. Not deciding is what costs.
+///
+/// **Only inside sentences.** Three things wear capitals without being acronyms —
+/// an environment variable (`LEMONFIBER_USENET`), the placeholder in a help line
+/// (`SERVICE`), and a name with a capital run inside it (`SABnzbd`) — and none of
+/// them is prose. Rather than name them, this looks only at literals shaped like
+/// something written to be read: several words, at least one of them an ordinary
+/// lower-case one. The cost is real and worth stating: an acronym shown entirely on
+/// its own, as a bare label on a screen, is not checked here.
+#[test]
+fn every_acronym_an_operator_reads_is_explained_or_declared_ordinary() {
+    let mut unexplained: Vec<String> = Vec::new();
+    for (path, number, said) in shipped_prose() {
+        for short in unexplained_acronyms(&said) {
+            unexplained.push(format!("{path}:{number}: `{short}`"));
+        }
+    }
+    assert!(
+        unexplained.is_empty(),
+        "an operator is shown these and given nothing to make sense of them — explain \
+         each in the glossary, or add it to ORDINARY with a reason: {unexplained:?}"
+    );
+}
+
+/// The acronyms in one literal that are neither explained nor declared ordinary.
+///
+/// Its own function rather than three loops inside the test, so that what the guard
+/// asks of one piece of text reads as one thing and the test reads as the sweep.
+fn unexplained_acronyms(said: &str) -> Vec<String> {
+    let prose = outside_braces(said);
+    if !reads_as_a_sentence(&prose) {
+        return Vec::new();
+    }
+    prose
+        .split_whitespace()
+        // An error code is looked up rather than read, and a path or a variable name
+        // is not addressed to anybody.
+        .filter(|word| !is_a_code(word) && !word.contains('_') && !word.contains('/'))
+        .flat_map(capitals)
+        .filter(|short| !ORDINARY.contains(&short.as_str()))
+        .filter(|short| lemonfiber_core::glossary::explain(short).is_none())
+        .collect()
+}
+
+/// The text with every `{…}` removed, a placeholder being code inside a string.
+fn outside_braces(said: &str) -> String {
+    let mut prose = String::new();
+    let mut depth = 0_usize;
+    for character in said.chars() {
+        match character {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => prose.push(character),
+            _ => {}
+        }
+    }
+    prose
+}
+
+/// Whether this was written to be read: several words, one of them an ordinary one.
+fn reads_as_a_sentence(prose: &str) -> bool {
+    let words: Vec<&str> = prose.split_whitespace().collect();
+    words.len() >= 4
+        && words
+            .iter()
+            .any(|word| word.len() > 2 && word.chars().all(|letter| letter.is_ascii_lowercase()))
+}
+
+/// Whether this is an error code — a run of capitals, a dash, and a number.
+fn is_a_code(word: &str) -> bool {
+    let trimmed = word.trim_matches(|letter: char| !letter.is_ascii_alphanumeric());
+    let Some((letters, number)) = trimmed.split_once('-') else {
+        return false;
+    };
+    !letters.is_empty()
+        && letters.chars().all(|letter| letter.is_ascii_uppercase())
+        && !number.is_empty()
+        && number.chars().all(|letter| letter.is_ascii_digit())
+}
+
+/// Every run of two or more capitals in a word, with names left out.
+///
+/// A run that runs straight into a lower-case letter is part of a word rather than
+/// an abbreviation of one: `SABnzbd` and `QBittorrent` are names, not acronyms.
+fn capitals(word: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut run = String::new();
+    for letter in word.chars() {
+        if letter.is_ascii_uppercase() || (!run.is_empty() && letter.is_ascii_digit()) {
+            run.push(letter);
+            continue;
+        }
+        if run.len() > 1 && !letter.is_ascii_lowercase() {
+            found.push(run.clone());
+        }
+        run.clear();
+    }
+    if run.len() > 1 {
+        found.push(run);
+    }
+    found
+}
+
 /// Turns of phrase that do not survive being read by somebody who learned English
 /// second, or translated.
 ///
