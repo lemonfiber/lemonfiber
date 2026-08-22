@@ -10,7 +10,7 @@
 
 use lemonfiber_core::logs::Level;
 
-use super::Viewer;
+use super::{Viewer, Words};
 
 /// The severities the screen cycles through, in the order it offers them.
 ///
@@ -110,7 +110,7 @@ impl Viewer {
             Press::Typed('q') | Press::Abandon => self.open = false,
             Press::Typed('/') => self.typing = Some(String::new()),
             Press::Typed('f') | Press::Tail => self.back_to_the_tail(),
-            Press::Typed('?') => self.glossary = self.explaining && !self.glossary,
+            Press::Typed('?') => self.show_or_hide_the_words(),
             Press::Typed('s') => self.next_service(),
             Press::Typed('w') => self.next_rung(),
             Press::Typed('c') => self.unfiltered(),
@@ -119,6 +119,18 @@ impl Viewer {
             Press::Forward => self.nearer_the_tail(),
         }
         Asked::Nothing
+    }
+
+    /// Show the words on the screen, or put them away.
+    ///
+    /// A run that explains nothing stays where it is: there is no fourth state in
+    /// which they are shown anyway.
+    fn show_or_hide_the_words(&mut self) {
+        self.words = match self.words {
+            Words::Unexplained => Words::Unexplained,
+            Words::Away => Words::Shown,
+            Words::Shown => Words::Away,
+        };
     }
 
     /// Show the next service on its own, or all of them again at the end.

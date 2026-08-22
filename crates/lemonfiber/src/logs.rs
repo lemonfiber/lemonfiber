@@ -77,6 +77,22 @@ pub(crate) struct Shown {
     pub(crate) said: String,
 }
 
+/// What a screen is doing about the words on it.
+///
+/// Three states rather than two flags, because two flags can be put into a fourth
+/// state that means nothing: shown, on a run that explains nothing. Written this way
+/// that state cannot be reached rather than being prevented by an `&&` somebody has
+/// to remember.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Words {
+    /// This run explains nothing, so there is nothing for a key to open.
+    Unexplained,
+    /// Not shown, and a key would show them.
+    Away,
+    /// Shown over whatever else is on the screen.
+    Shown,
+}
+
 /// Everything the screen knows.
 pub(crate) struct Viewer {
     /// The lines, and the account of the ones that are not here.
@@ -91,10 +107,8 @@ pub(crate) struct Viewer {
     text: Option<String>,
     /// A filter part-typed, or nothing where the operator is reading.
     typing: Option<String>,
-    /// Whether the words on this screen are being shown.
-    glossary: bool,
-    /// Whether this run explains its words at all.
-    explaining: bool,
+    /// What the screen is doing about the words on it.
+    words: Words,
     /// What each service was doing when the engine was last asked.
     ///
     /// Empty until the first look, which is what stops a viewer opening onto a
@@ -123,8 +137,7 @@ impl Viewer {
             least: None,
             text: None,
             typing: None,
-            glossary: false,
-            explaining: true,
+            words: Words::Away,
             was: Vec::new(),
             back: 0,
             open: true,
@@ -134,7 +147,7 @@ impl Viewer {
 
     /// Whether the words on this screen are being shown.
     pub(crate) const fn glossary(&self) -> bool {
-        self.glossary
+        matches!(self.words, Words::Shown)
     }
 
     /// The same viewer, explaining nothing — for a run that asked for none.
@@ -142,7 +155,7 @@ impl Viewer {
     /// A builder rather than a latch read from in here, so a test can have both
     /// kinds of viewer without settling a value that outlives it.
     pub(crate) const fn without_explanations(mut self) -> Self {
-        self.explaining = false;
+        self.words = Words::Unexplained;
         self
     }
 
