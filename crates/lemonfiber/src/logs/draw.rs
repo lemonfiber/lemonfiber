@@ -69,18 +69,22 @@ fn lines(viewer: &Viewer, rows: usize) -> Vec<Line<'static>> {
             reason,
             Style::default().add_modifier(Modifier::DIM),
         )],
-        None => viewer.showing(rows).iter().map(said).collect(),
+        None => viewer
+            .showing(rows)
+            .iter()
+            .map(|shown| said(shown, viewer.colours()))
+            .collect(),
     }
 }
 
 /// One line: who said it, and what they said.
-fn said(shown: &Shown) -> Line<'static> {
+fn said(shown: &Shown, colours: bool) -> Line<'static> {
     Line::from(vec![
         Span::styled(
             format!("{:<width$.width$} ", shown.service, width = NAMED),
             Style::default().add_modifier(Modifier::DIM),
         ),
-        Span::styled(shown.said.clone(), colour(shown.level)),
+        Span::styled(shown.said.clone(), colour(shown.level, colours)),
     ])
 }
 
@@ -96,17 +100,22 @@ fn standing(viewer: &Viewer) -> Line<'static> {
     }
 }
 
-/// What colour a severity is shown in.
+/// What colour a severity is shown in, where colour is allowed at all.
 ///
 /// A line that declares none is left alone. Guessing from the stream it arrived on
 /// would colour most of this stack's ordinary progress as failure, and a screen an
 /// operator learns to disbelieve is worse than one with no colour at all.
-fn colour(level: Option<Level>) -> Style {
+///
+/// Refusing colour costs nothing that matters, which is why it is safe to honour:
+/// the severity is a **word in the line** — `WARN`, `ERROR` — so the screen says the
+/// same thing either way and the colour was never carrying it alone. Dimming stays,
+/// being an attribute rather than a colour, and the convention is about colour.
+fn colour(level: Option<Level>, colours: bool) -> Style {
     match level {
-        Some(Level::Error | Level::Fatal) => Style::default().fg(Color::Red),
-        Some(Level::Warn) => Style::default().fg(Color::Yellow),
+        Some(Level::Error | Level::Fatal) if colours => Style::default().fg(Color::Red),
+        Some(Level::Warn) if colours => Style::default().fg(Color::Yellow),
         Some(Level::Trace | Level::Debug) => Style::default().add_modifier(Modifier::DIM),
-        Some(Level::Info) | None => Style::default(),
+        _ => Style::default(),
     }
 }
 
@@ -228,20 +237,49 @@ mod tests {
     /// is left alone.
     #[test]
     fn severity_decides_colour_and_silence_decides_nothing() {
-        assert_eq!(colour(Some(Level::Error)).fg, Some(Color::Red));
-        assert_eq!(colour(Some(Level::Fatal)).fg, Some(Color::Red));
-        assert_eq!(colour(Some(Level::Warn)).fg, Some(Color::Yellow));
+        assert_eq!(colour(Some(Level::Error), true).fg, Some(Color::Red));
+        assert_eq!(colour(Some(Level::Fatal), true).fg, Some(Color::Red));
+        assert_eq!(colour(Some(Level::Warn), true).fg, Some(Color::Yellow));
         assert_eq!(
-            colour(Some(Level::Debug)).add_modifier,
+            colour(Some(Level::Debug), true).add_modifier,
             Modifier::DIM,
             "detail asked for is shown as detail"
         );
-        assert_eq!(colour(Some(Level::Trace)).add_modifier, Modifier::DIM);
-        assert_eq!(colour(Some(Level::Info)), Style::default());
+        assert_eq!(colour(Some(Level::Trace), true).add_modifier, Modifier::DIM);
+        assert_eq!(colour(Some(Level::Info), true), Style::default());
         assert_eq!(
-            colour(None),
+            colour(None, true),
             Style::default(),
             "a line that declares no severity is not given one"
         );
+    }
+
+    /// Refused colour takes the colour and nothing else. Dimming is an attribute
+    /// rather than a colour, and the convention is about colour.
+    #[test]
+    fn refusing_colour_leaves_the_severity_uncoloured() {
+        for level in [Level::Error, Level::Fatal, Level::Warn, Level::Info] {
+            assert_eq!(
+                colour(Some(level), false).fg,
+                None,
+                "{level:?} was still coloured"
+            );
+        }
+        assert_eq!(
+            colour(Some(Level::Debug), false).add_modifier,
+            Modifier::DIM,
+            "dimming survives, being no colour at all"
+        );
+    }
+
+    /// The point of it being safe to refuse: the severity is a word in the line, so
+    /// the screen says the same thing either way.
+    #[test]
+    fn a_screen_without_colour_still_says_which_lines_are_bad() {
+        let mut viewer = Viewer::opened().without_colour();
+        viewer.take(line("radarr", "WARN Import timed out"));
+
+        let screen = drawn(&viewer, 80, 8);
+        assert!(screen.contains("WARN Import timed out"), "{screen}");
     }
 }

@@ -23,10 +23,13 @@ use lemonfiber_core::bundle::{prose, Marks, Terms};
 use lemonfiber_core::logs::viewer::{Filter, Scrollback};
 use lemonfiber_core::logs::{declared, Level};
 use lemonfiber_core::plural::s;
-use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
+use lemonfiber_core::ports::docker::{Lifecycle, LogLine};
 use lemonfiber_core::text::plain;
 
+use notices::{noticed, remark, SELF};
+
 pub(crate) mod draw;
+mod notices;
 
 /// How many lines the screen holds before the oldest give way.
 ///
@@ -141,6 +144,8 @@ pub(crate) struct Viewer {
     back: usize,
     /// Whether the operator is still here.
     open: bool,
+    /// Whether colour may be added, which `NO_COLOR` can refuse.
+    colours: bool,
 }
 
 impl Viewer {
@@ -161,7 +166,22 @@ impl Viewer {
             was: Vec::new(),
             back: 0,
             open: true,
+            colours: true,
         }
+    }
+
+    /// The same viewer, adding no colour to what it shows.
+    ///
+    /// A builder rather than an argument to `opened`, so the ordinary case stays the
+    /// short one and the tests that do not care about colour do not have to say so.
+    pub(crate) const fn without_colour(mut self) -> Self {
+        self.colours = false;
+        self
+    }
+
+    /// Whether colour may be added to what this shows.
+    pub(crate) const fn colours(&self) -> bool {
+        self.colours
     }
 
     /// Take one line in.
@@ -494,46 +514,19 @@ impl Viewer {
     }
 }
 
-/// What the viewer calls itself when a line is its own rather than a service's.
-const SELF: &str = "lemonfiber";
-
-/// A line the viewer wrote itself.
+/// Whether colour may be added to output, given what `NO_COLOR` holds.
 ///
-/// Tagged with a service where it is about one, so it sits under the same name as
-/// that service's own output and a filter narrowed to it keeps the notice.
-fn remark(service: &str, said: &str) -> LogLine {
-    LogLine {
-        service: service.to_owned(),
-        stream: Stream::Stdout,
-        at: None,
-        line: format!("--- {said} ---"),
-    }
-}
-
-/// A line saying what the engine reported about a service.
-fn noticed(service: &str, lifecycle: Lifecycle) -> LogLine {
-    remark(service, &format!("{service} {}", becoming(lifecycle)))
-}
-
-/// What to say about a service that has just reached this state.
-///
-/// Said as what happened rather than as the engine's word for it: `Exited` is a
-/// state, "has stopped" is news.
-const fn becoming(lifecycle: Lifecycle) -> &'static str {
-    match lifecycle {
-        Lifecycle::Created => "was created",
-        Lifecycle::Running => "is running again",
-        Lifecycle::Paused => "was paused",
-        Lifecycle::Restarting => "is restarting",
-        Lifecycle::Exited => "has stopped",
-        Lifecycle::Removing => "is being removed",
-        Lifecycle::Dead => "died",
-    }
+/// The convention is the variable's **presence**, not its value: set to anything at
+/// all — except the empty string — and colour is refused, whatever it says. That is
+/// deliberately not a flag to parse, so `NO_COLOR=0` refuses colour like everything
+/// else does, which surprises people exactly once and is what every other tool does.
+pub(crate) fn colours(no_color: Option<&str>) -> bool {
+    no_color.is_none_or(str::is_empty)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{sampled, Asked, Press, Shown, Viewer, BATCH};
+    use super::{colours, sampled, Asked, Press, Shown, Viewer, BATCH};
     use lemonfiber_core::bundle::Marks;
     use lemonfiber_core::logs::Level;
     use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
@@ -1125,5 +1118,30 @@ mod tests {
             "it joined the lines rather than replacing them"
         );
         assert_eq!(viewer.heading(), "sonarr, radarr, lemonfiber");
+    }
+
+    /// The convention is the variable's presence, not its value — so `NO_COLOR=0`
+    /// refuses colour like everything else does. Surprising exactly once, and what
+    /// every other tool that honours it does.
+    #[test]
+    fn any_value_at_all_refuses_colour() {
+        assert!(colours(None), "unset means colour is fine");
+        assert!(
+            colours(Some("")),
+            "set but empty is not set, by the convention"
+        );
+
+        for said in ["1", "0", "true", "false", "no", " "] {
+            assert!(
+                !colours(Some(said)),
+                "NO_COLOR={said:?} should refuse colour"
+            );
+        }
+    }
+
+    #[test]
+    fn a_viewer_may_be_asked_to_add_no_colour() {
+        assert!(Viewer::opened().colours(), "colour by default");
+        assert!(!Viewer::opened().without_colour().colours());
     }
 }

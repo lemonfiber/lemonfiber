@@ -48,7 +48,7 @@ use ratatui::Terminal;
 use tokio::sync::mpsc::Receiver;
 
 use crate::exit::complain;
-use crate::logs::{sampled, Asked, Press, Viewer};
+use crate::logs::{colours, sampled, Asked, Press, Viewer};
 use crate::setup::Bare;
 
 /// How often the screen gathers afresh.
@@ -234,7 +234,12 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
     let (presses, mut arriving) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&presses, wanted));
 
+    // Read here rather than deeper in, because this is the edge: everything below
+    // decides what to do about the answer, and only this knows where it came from.
     let mut viewer = Viewer::opened();
+    if !colours(std::env::var("NO_COLOR").ok().as_deref()) {
+        viewer = viewer.without_colour();
+    }
     let mut looking = tokio::time::interval(LOOKING);
     let mut written = 0_usize;
     // The stream ending is not the screen ending. A stopped service has plenty
