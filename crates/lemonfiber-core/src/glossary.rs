@@ -27,8 +27,10 @@
 //! in a wiki drifts from the thing it describes and nobody notices until it is
 //! wrong.
 
+use serde::Serialize;
+
 /// A word this product uses, and what somebody meeting it needs to know.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Term {
     /// The word as it appears in the interface.
     pub word: &'static str,

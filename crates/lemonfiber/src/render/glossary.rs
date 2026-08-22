@@ -59,8 +59,11 @@ pub(crate) fn footnotes(text: &str) -> Lines {
 ///
 /// `None` where this product does not explain that word, which the caller reports as
 /// a refusal rather than showing an empty answer that reads as "it means nothing".
-pub(crate) fn explained(word: &str) -> Option<Lines> {
+pub(crate) fn explained(word: &str, parsed: bool) -> Option<Lines> {
     let term = explain(word)?;
+    if parsed {
+        return Some(as_a_document(term));
+    }
     let mut lines = Lines::default();
 
     lines.put(term.word);
@@ -101,6 +104,21 @@ pub(crate) fn unrecognised(word: &str) -> Problem {
         Remedy::new("Ask about one of the words its reports use"),
     )
     .with_detail(format!("It explains these — {}.", words.join(", ")))
+}
+
+/// The same word, for something that will parse it.
+///
+/// The whole entry rather than the sentence: a script asking what a word means has
+/// no way to ask a second time for the rest, and the longer form and the other
+/// services' names are the parts it could not have guessed.
+fn as_a_document(term: &Term) -> Lines {
+    let mut lines = Lines::for_a_parser();
+    lines.put(
+        lemonfiber_core::model::Envelope::new("word", term)
+            .to_json()
+            .unwrap_or(super::UNRENDERABLE.to_owned()),
+    );
+    lines
 }
 
 /// One word and what it is for, for a surface that shows it on its own.
@@ -241,7 +259,7 @@ mod tests {
 
     #[test]
     fn asking_about_a_word_gives_the_longer_form_and_the_other_names() {
-        let said = explained("indexer")
+        let said = explained("indexer", false)
             .map(|lines| lines.text())
             .unwrap_or_default();
 
@@ -261,7 +279,7 @@ mod tests {
     /// the sentence they never had to read rather than run on from it.
     #[test]
     fn the_longer_form_is_separated_from_the_sentence() {
-        let said = explained("hardlink")
+        let said = explained("hardlink", false)
             .map(|lines| lines.text())
             .unwrap_or_default();
 
@@ -274,7 +292,7 @@ mod tests {
     /// a blank space that reads as a missing explanation.
     #[test]
     fn a_word_with_no_longer_form_still_answers() {
-        let said = explained("killswitch")
+        let said = explained("killswitch", false)
             .map(|lines| lines.text())
             .unwrap_or_default();
 
@@ -283,9 +301,28 @@ mod tests {
 
     /// Answering "it means nothing" for a word this product never explains would be
     /// a wrong answer rather than an absent one.
+    /// A script asking what a word means gets the whole entry, because it has no
+    /// way to ask a second time for the rest — and the longer form and the other
+    /// services' names are the parts it could not have guessed.
+    #[test]
+    fn a_word_a_script_asked_about_is_one_document_it_can_parse() {
+        let said = explained("indexer", true)
+            .map(|lines| lines.text())
+            .unwrap_or_default();
+
+        assert_eq!(said.lines().count(), 1, "one document: {said}");
+        assert!(said.contains("\"kind\":\"word\""), "{said}");
+        assert!(said.contains("\"word\":\"indexer\""), "{said}");
+        assert!(said.contains("Prowlarr"), "the longer form as well: {said}");
+        assert!(
+            said.contains("search provider"),
+            "and the other names: {said}"
+        );
+    }
+
     #[test]
     fn a_word_this_product_does_not_explain_has_no_answer() {
-        assert!(explained("flux capacitor").is_none());
+        assert!(explained("flux capacitor", false).is_none());
     }
 
     /// A refusal an operator cannot act on is worse than none, and here what to do

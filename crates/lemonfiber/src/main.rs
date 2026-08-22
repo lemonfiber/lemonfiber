@@ -230,7 +230,7 @@ async fn main() -> ExitCode {
 /// same error model as everything else, so it carries a code and a way forward
 /// rather than being this one command's private way of saying no.
 fn explaining(word: &str) -> ExitCode {
-    let Some(lines) = render::glossary::explained(word) else {
+    let Some(lines) = render::glossary::explained(word, say::for_a_parser()) else {
         return complain(&render::glossary::unrecognised(word));
     };
     lines.print();

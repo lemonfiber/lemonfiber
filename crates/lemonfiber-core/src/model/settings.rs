@@ -96,3 +96,38 @@ pub enum Disposition {
     /// hand-edit, and writes nothing.
     WouldReapply,
 }
+
+/// How a setup run ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SetupOutcome {
+    /// The reviewed answers were written.
+    Applied,
+    /// The plan was seen and not applied; nothing was written.
+    Abandoned,
+    /// Nothing was asked, because this machine was already set up.
+    AlreadySetUp,
+}
+
+/// What a setup run came to, and what it settled on.
+///
+/// **Deliberately not the settings themselves.** Setup writes an indexer key and a
+/// service password among them, and a report a script can read is a report a script
+/// can log — into a file, a CI transcript, somebody's terminal history. So this says
+/// what was *decided* and never what was *entered*, and the fields are chosen one at
+/// a time rather than by serialising a struct that might later gain a secret.
+///
+/// The indexer's address is left out for that reason rather than because it is
+/// itself a secret: it is entered beside its key, and the two travel together in
+/// every place an operator copies them from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SetupReport {
+    /// How the run ended.
+    pub outcome: SetupOutcome,
+    /// Which ways of downloading the stack was set up for.
+    pub protocols: crate::config::Protocols,
+    /// Where the library was put, where a location was chosen.
+    pub data_root: Option<std::path::PathBuf>,
+    /// The user the services run as, as `uid:gid`, where one was set.
+    pub service_user: Option<String>,
+}
