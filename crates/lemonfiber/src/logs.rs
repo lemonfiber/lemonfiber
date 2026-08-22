@@ -145,6 +145,19 @@ impl Viewer {
         }
     }
 
+    /// The words this screen is showing, for the loop to record what was opened.
+    ///
+    /// Built from the lines the view would draw rather than from the whole
+    /// scrollback: what an operator opened the pane over is what was in front of
+    /// them, not everything the buffer happens to hold.
+    pub(crate) fn showing_words(&self, rows: usize) -> String {
+        self.showing(rows)
+            .iter()
+            .map(|shown| format!("{} {}", shown.service, shown.said))
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+
     /// Whether the words on this screen are being shown.
     pub(crate) const fn glossary(&self) -> bool {
         matches!(self.words, Words::Shown)
@@ -435,6 +448,34 @@ mod tests {
             .into_iter()
             .map(|shown| shown.said)
             .collect()
+    }
+
+    /// Opening the words is the asking. Closing them again is not, and neither is
+    /// a key pressed on a run that explains nothing.
+    #[test]
+    fn opening_the_words_asks_and_closing_them_does_not() {
+        let mut viewer = a_viewer();
+
+        assert_eq!(viewer.pressed(Press::Typed('?')), Asked::Learned);
+        assert_eq!(viewer.pressed(Press::Typed('?')), Asked::Nothing);
+    }
+
+    #[test]
+    fn a_run_that_explains_nothing_asks_nothing_either() {
+        let mut viewer = Viewer::opened().without_explanations();
+
+        assert_eq!(viewer.pressed(Press::Typed('?')), Asked::Nothing);
+    }
+
+    /// What the loop records is what was behind the pane.
+    #[test]
+    fn the_words_on_screen_are_the_ones_showing() {
+        let viewer = fed(&[("sonarr", "no indexer answered in time")]);
+
+        let said = viewer.showing_words(10);
+
+        assert!(said.contains("indexer"), "{said}");
+        assert!(said.contains("sonarr"), "and which service said it: {said}");
     }
 
     /// Press each of these in turn.

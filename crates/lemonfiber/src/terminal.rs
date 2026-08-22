@@ -43,6 +43,7 @@ use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use ratatui::crossterm::ExecutableCommand as _;
+use ratatui::layout::Rect;
 use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 use tokio::sync::mpsc::Receiver;
@@ -132,6 +133,13 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
                 }
                 Some(Key::Glossary) => {
                     glossary = crate::render::glossary::wanted() && !glossary;
+                    // Opening them is the asking, so what was opened is recorded.
+                    if glossary {
+                        if let Some(snapshot) = snapshot.as_ref() {
+                            let area = screen.area();
+                            learned(&crate::dashboard::showing(snapshot), area, ctx.dry_run);
+                        }
+                    }
                 }
             },
             gathered = &mut refreshing => {
@@ -264,12 +272,21 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
         }
         tokio::select! {
             press = arriving.recv() => match press {
-                Some(press) => {
-                    if viewer.pressed(press) == Asked::Export {
+                Some(press) => match viewer.pressed(press) {
+                    Asked::Export => {
                         written += 1;
                         export(&mut viewer, ctx, written).await;
                     }
-                }
+                    // Opening them is the asking, so what was opened is recorded.
+                    Asked::Learned => {
+                        let area = screen.area();
+                        // What the view had room for, which is what was behind the
+                        // pane — the same arithmetic the drawing does.
+                        let rows = usize::from(area.height.saturating_sub(4));
+                        learned(&viewer.showing_words(rows), area, ctx.dry_run);
+                    }
+                    Asked::Nothing => {}
+                },
                 None => break,
             },
             line = lines.recv(), if !ended => match line {
@@ -393,6 +410,21 @@ const fn wanted(key: KeyEvent) -> Option<Press> {
     }
 }
 
+/// Record what the pane explained, since opening it is the asking.
+///
+/// **What it explained**, not what was on the screen. The pane names the words it
+/// had no room for rather than dropping them, and a named word has not been taught —
+/// recording those would stop a later report explaining a word nobody ever read,
+/// which is the one failure this whole record exists to avoid.
+fn learned(showing: &str, screen: Rect, rehearsing: bool) {
+    let known = crate::render::glossary::known();
+    let words: Vec<&str> = crate::pane::explained_in(showing, crate::pane::room_on(screen), known)
+        .into_iter()
+        .map(|term| term.word)
+        .collect();
+    crate::context::remember(&words, rehearsing);
+}
+
 /// The terminal, in the state a full-screen view needs it, for as long as it is held.
 struct Screen {
     /// The ratatui terminal drawing into the alternate screen.
@@ -407,6 +439,14 @@ impl Screen {
         Ok(Self {
             terminal: Terminal::new(CrosstermBackend::new(stdout()))?,
         })
+    }
+
+    /// How big the screen is, for deciding what was on it.
+    fn area(&self) -> Rect {
+        self.terminal.size().map_or_else(
+            |_| Rect::default(),
+            |size| Rect::new(0, 0, size.width, size.height),
+        )
     }
 
     /// Draw one frame.

@@ -98,6 +98,45 @@ pub(crate) fn read_settings() -> Settings {
     }
 }
 
+/// Record that a word has been gone and found out about.
+///
+/// Beside where the record is read, because both answer the same question about
+/// where this machine keeps its files.
+///
+/// Best effort and silent: the answer has already been given, and a record that
+/// could not be written costs one repeated explanation rather than anything the
+/// operator needs telling about now. Written only where it actually changed, so
+/// asking about the same word twice touches nothing.
+///
+/// A rehearsal writes nothing, which this is not exempt from.
+pub(crate) fn remember(words: &[&str], rehearsing: bool) {
+    if rehearsing {
+        return;
+    }
+    let Some(paths) = here() else {
+        return;
+    };
+    let path = paths.acknowledged();
+    let mut known = acknowledged::at(&path);
+    // Read and written once however many words were opened at a time, which is what
+    // a pane does — the file is small, but a screenful of separate rewrites is a
+    // screenful of chances for two of them to lose each other's.
+    // Every word is taken, and `|=` is what says so: `any` and `fold` with `||`
+    // both short-circuit, so a screenful would record its first new word and
+    // silently drop the rest. Clippy suggests `any` here and is wrong, because it
+    // cannot see that taking a word is what changes the record.
+    let mut changed = false;
+    for word in words {
+        changed |= known.take(word);
+    }
+    if !changed {
+        return;
+    }
+    if let Some(text) = known.to_json() {
+        let _ = std::fs::write(&path, text);
+    }
+}
+
 pub(crate) fn here() -> Option<Paths> {
     use etcetera::BaseStrategy as _;
 

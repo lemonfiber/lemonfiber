@@ -58,13 +58,7 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
     let panels = sections(snapshot);
     // Gathered before the panels are consumed by drawing, and only when it was
     // asked for.
-    let showing = glossary.then(|| {
-        // The titles as well as the lines: a panel called VPN has put that word
-        // on the screen as surely as a line inside it would have.
-        let titles: Vec<&str> = panels.iter().map(|(title, _)| *title).collect();
-        let said = crate::pane::showing(panels.iter().flat_map(|(_, lines)| lines));
-        format!("{} {said}", titles.join(" "))
-    });
+    let showing = glossary.then(|| words_of(&panels));
 
     for (area, (title, lines)) in places(body).into_iter().zip(panels) {
         frame.render_widget(
@@ -79,6 +73,23 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
     if let Some(showing) = showing {
         crate::pane::over(frame, &showing);
     }
+}
+
+/// The words this screen is showing.
+///
+/// The titles as well as the lines: a panel called VPN has put that word on the
+/// screen as surely as a line inside it would have.
+fn words_of(panels: &[(&'static str, Vec<Line<'static>>)]) -> String {
+    let titles: Vec<&str> = panels.iter().map(|(title, _)| *title).collect();
+    let said = crate::pane::showing(panels.iter().flat_map(|(_, lines)| lines));
+    format!("{} {said}", titles.join(" "))
+}
+
+/// The words a snapshot would put on the screen, for whoever needs them outside a
+/// frame — the loop recording what an operator opened, which the drawing cannot do
+/// because it happens every frame and this must happen once.
+pub(crate) fn showing(snapshot: &Snapshot) -> String {
+    words_of(&sections(snapshot))
 }
 
 /// Each panel, in the order they are read: what is wrong first, then what is
@@ -131,7 +142,7 @@ fn places(body: Rect) -> Vec<Rect> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{draw, places, sections, TWO_COLUMNS};
+    use super::{draw, places, sections, showing, TWO_COLUMNS};
     use lemonfiber_core::dashboard::{
         Hardlink, Panel, Protocol, Reading, Snapshot, Storage, Telemetry, Transfer,
     };
@@ -168,6 +179,15 @@ pub(crate) mod tests {
     /// The whole screen as text, drawn at the given size.
     fn drawn(snapshot: &Snapshot, width: u16, height: u16) -> String {
         shown(snapshot, width, height, false)
+    }
+
+    /// The loop needs these outside a frame, because it records what was opened
+    /// once where drawing happens every frame.
+    #[test]
+    fn the_words_a_snapshot_would_show_can_be_asked_for_outside_a_frame() {
+        let said = showing(&a_snapshot());
+
+        assert!(said.contains("VPN"), "the panel titles count: {said}");
     }
 
     /// A full screen has no bottom to put a footnote on, so the words are a
