@@ -13,7 +13,7 @@ use lemonfiber_core::app::repair::Report as RepairReport;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{Disposition, ResetReport, Triggered, UpgradeReport};
+use lemonfiber_core::model::{Disposition, Envelope, ResetReport, Triggered, UpgradeReport};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
@@ -183,7 +183,7 @@ pub(crate) fn upgrade_exit(report: &UpgradeReport) -> ExitCode {
 /// the remedies are the point of the error model, and a second copy of this is
 /// how one of them quietly starts omitting them.
 pub(crate) fn complain(problem: &Problem) -> ExitCode {
-    reported(problem).eprint();
+    reported(problem, crate::say::for_a_parser()).eprint();
     ExitCode::from(exit_code(problem))
 }
 
@@ -207,7 +207,11 @@ pub(crate) fn complain(problem: &Problem) -> ExitCode {
 ///
 /// **And a failure explains its own words**, like every other answer, which matters
 /// most here: an error is where somebody is least able to go and look one up.
-fn reported(problem: &Problem) -> Lines {
+fn reported(problem: &Problem, parsed: bool) -> Lines {
+    if parsed {
+        return as_a_document(problem);
+    }
+
     let mut lines = Lines::default();
     lines.put(format!("{}: {}", problem.code, problem.summary));
     lines.put("");
@@ -229,6 +233,26 @@ fn reported(problem: &Problem) -> Lines {
 
     let notes = crate::render::glossary::footnotes(&lines.text());
     lines.extend(notes);
+    lines
+}
+
+/// The same failure, for something that will parse it.
+///
+/// One document rather than several lines of prose, and on the error stream still:
+/// what a run was asked for goes on standard output, and what went wrong instead
+/// belongs beside it rather than in it — a script reading the answer should not have
+/// to tell an answer from an apology.
+///
+/// A script that asked for output it could parse asked about the failures too. They
+/// are the answers it most needs to act on, and an exit code alone says that
+/// something went wrong without saying what.
+fn as_a_document(problem: &Problem) -> Lines {
+    let mut lines = Lines::for_a_parser();
+    lines.put(
+        Envelope::new("error", problem)
+            .to_json()
+            .unwrap_or_else(|| crate::render::UNRENDERABLE.to_owned()),
+    );
     lines
 }
 
@@ -612,7 +636,7 @@ mod reporting {
         )
         .with_detail(format!("HTTP 500: {escape}[H database is locked"));
 
-        let said = reported(&problem).text();
+        let said = reported(&problem, false).text();
 
         assert!(
             !said.contains(escape),
@@ -637,9 +661,37 @@ mod reporting {
             Remedy::new("Check the indexer is reachable"),
         );
 
-        let said = reported(&problem).text();
+        let said = reported(&problem, false).text();
 
         assert!(said.contains("Words used here:"), "{said}");
         assert!(said.contains("indexer — Search engines"), "{said}");
+    }
+
+    /// A script that asked for output it could parse asked about the failures too.
+    /// They are the answers it most needs to act on, and an exit code alone says
+    /// that something went wrong without saying what.
+    ///
+    /// Asked of the decision rather than of the latch, so this settles nothing for
+    /// the tests beside it.
+    #[test]
+    fn a_failure_a_script_asked_for_is_one_document_it_can_parse() {
+        let problem = Problem::new(
+            Code::new("WORD-7"),
+            Severity::Error,
+            "no indexer answered in time",
+            "nothing could be searched for.",
+            Remedy::new("Check the indexer is reachable"),
+        );
+
+        let said = reported(&problem, true).text();
+
+        assert_eq!(said.lines().count(), 1, "one document, not several: {said}");
+        assert!(said.starts_with("{\"api_version\""), "{said}");
+        assert!(said.contains("\"kind\":\"error\""), "{said}");
+        assert!(said.contains("no indexer answered in time"), "{said}");
+        assert!(
+            !said.contains("Words used here:"),
+            "and nothing a person would want in it: {said}"
+        );
     }
 }

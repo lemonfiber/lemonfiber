@@ -141,7 +141,11 @@ impl Lines {
     /// which belongs beside the answer rather than in it.
     pub(crate) fn eprint(&self) {
         for line in &self.said {
-            crate::say::complained(line);
+            if self.parsed {
+                crate::say::refused(line);
+            } else {
+                crate::say::complained(line);
+            }
         }
     }
 }
