@@ -75,22 +75,27 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
         download_targets(&stopping, project.as_deref())
     };
 
-    let mut active = Vec::new();
-    for target in &targets {
-        let protocol = protocol_of(&target.kind);
-        active.extend(
-            read_transfers(ctx, target)
-                .await
+    // Asked at once rather than one client after another, for the reason the
+    // dashboard and the diagnosis both are: these are independent HTTP calls, and an
+    // operator waiting to be told whether they can stop should wait for the slowest
+    // client rather than for the sum of them. An empty list asks nothing at all.
+    let read = futures_util::future::join_all(targets.iter().map(|target| async move {
+        (protocol_of(&target.kind), read_transfers(ctx, target).await)
+    }))
+    .await;
+
+    read.into_iter()
+        .flat_map(|(protocol, downloads)| {
+            downloads
                 .into_iter()
                 .filter(underway)
-                .map(|download| Interrupted {
+                .map(move |download| Interrupted {
                     protocol,
                     name: download.name,
                     progress: download.progress,
-                }),
-        );
-    }
-    active
+                })
+        })
+        .collect()
 }
 
 /// Whether a download is still coming down.
