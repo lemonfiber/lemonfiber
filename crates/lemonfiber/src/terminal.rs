@@ -43,6 +43,7 @@ use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use ratatui::crossterm::ExecutableCommand as _;
+use ratatui::layout::Rect;
 use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 use tokio::sync::mpsc::Receiver;
@@ -135,7 +136,8 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
                     // Opening them is the asking, so what was opened is recorded.
                     if glossary {
                         if let Some(snapshot) = snapshot.as_ref() {
-                            learned(&crate::dashboard::showing(snapshot), ctx.dry_run);
+                            let area = screen.area();
+                            learned(&crate::dashboard::showing(snapshot), area, ctx.dry_run);
                         }
                     }
                 }
@@ -277,7 +279,11 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
                     }
                     // Opening them is the asking, so what was opened is recorded.
                     Asked::Learned => {
-                        learned(&viewer.showing_words(SHOWN_AT_ONCE), ctx.dry_run);
+                        let area = screen.area();
+                        // What the view had room for, which is what was behind the
+                        // pane — the same arithmetic the drawing does.
+                        let rows = usize::from(area.height.saturating_sub(4));
+                        learned(&viewer.showing_words(rows), area, ctx.dry_run);
                     }
                     Asked::Nothing => {}
                 },
@@ -404,16 +410,14 @@ const fn wanted(key: KeyEvent) -> Option<Press> {
     }
 }
 
-/// How many lines of a view count as what was opened over it.
+/// Record what the pane explained, since opening it is the asking.
 ///
-/// The pane covers most of the screen, so what an operator read is what was behind
-/// it — a generous count rather than an exact one, and generous in the direction of
-/// recording less than was there rather than more.
-const SHOWN_AT_ONCE: usize = 20;
-
-/// Record every word a screen was showing, since opening them is the asking.
-fn learned(showing: &str, rehearsing: bool) {
-    let words: Vec<&str> = lemonfiber_core::glossary::mentioned(showing)
+/// **What it explained**, not what was on the screen. The pane names the words it
+/// had no room for rather than dropping them, and a named word has not been taught —
+/// recording those would stop a later report explaining a word nobody ever read,
+/// which is the one failure this whole record exists to avoid.
+fn learned(showing: &str, screen: Rect, rehearsing: bool) {
+    let words: Vec<&str> = crate::pane::explained_in(showing, crate::pane::room_on(screen))
         .into_iter()
         .map(|term| term.word)
         .collect();
@@ -434,6 +438,14 @@ impl Screen {
         Ok(Self {
             terminal: Terminal::new(CrosstermBackend::new(stdout()))?,
         })
+    }
+
+    /// How big the screen is, for deciding what was on it.
+    fn area(&self) -> Rect {
+        self.terminal.size().map_or_else(
+            |_| Rect::default(),
+            |size| Rect::new(0, 0, size.width, size.height),
+        )
     }
 
     /// Draw one frame.

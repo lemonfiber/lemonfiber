@@ -14,7 +14,7 @@
 //! product knows. A glossary of two dozen words is a document; the four words in
 //! front of somebody is an answer.
 
-use lemonfiber_core::glossary::mentioned;
+use lemonfiber_core::glossary::{mentioned, Term};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Frame, Line, Span, Style};
 use ratatui::style::Modifier;
@@ -65,11 +65,10 @@ fn explaining(showing: &str, room: usize) -> Vec<Line<'static>> {
         return vec![Line::raw("Nothing on this screen needs a word explaining.")];
     }
 
-    let fits = room.saturating_sub(1).max(1);
-    let shown = used.len().min(fits);
-    let mut lines: Vec<Line<'static>> = used
+    let explained = explained_in(showing, room);
+    let shown = explained.len();
+    let mut lines: Vec<Line<'static>> = explained
         .iter()
-        .take(shown)
         .map(|term| {
             Line::from(vec![
                 Span::styled(
@@ -89,6 +88,22 @@ fn explaining(showing: &str, room: usize) -> Vec<Line<'static>> {
         ));
     }
     lines
+}
+
+/// The words this pane explains in full, given the room it has.
+///
+/// One place decides, because the loop that records what an operator opened must
+/// record **exactly** what was explained to them. The ones the pane only names are
+/// not explained — naming a word is how it stays findable, not how it gets taught —
+/// and recording those would stop a later report explaining a word nobody ever read.
+pub(crate) fn explained_in(showing: &str, room: usize) -> Vec<&'static Term> {
+    let fits = room.saturating_sub(1).max(1);
+    mentioned(showing).into_iter().take(fits).collect()
+}
+
+/// How much room the pane has for words, on a screen of this size.
+pub(crate) fn room_on(screen: Rect) -> usize {
+    usize::from(middle(screen).height.saturating_sub(2))
 }
 
 /// A box in the middle of the screen, leaving what is behind it visible around.
@@ -114,7 +129,7 @@ fn middle(screen: Rect) -> Rect {
 
 #[cfg(test)]
 mod tests {
-    use super::{explaining, middle, showing};
+    use super::{explained_in, explaining, middle, room_on, showing};
     use ratatui::layout::Rect;
     use ratatui::prelude::{Line, Span};
 
@@ -168,6 +183,38 @@ mod tests {
 
         let last = explained.last().map(text).unwrap_or_default();
         assert!(last.starts_with("and 2 more"), "{last}");
+    }
+
+    /// The loop that records what was opened must record exactly what was
+    /// explained — a word the pane only named has not been taught.
+    #[test]
+    fn only_the_words_it_explained_count_as_explained() {
+        let said = "the indexer, the hardlink, the VPN, the ratio and the seed";
+
+        let roomy = explained_in(said, 10);
+        let cramped = explained_in(said, 3);
+
+        let (roomy_count, cramped_count) = (roomy.len(), cramped.len());
+        assert!(
+            roomy_count > cramped_count,
+            "room decides how many: {roomy_count} against {cramped_count}"
+        );
+        assert_eq!(cramped.len(), 2, "one line goes to the ones it only names");
+        assert!(cramped.iter().all(|term| roomy.contains(term)));
+    }
+
+    /// The room is the pane's, not the screen's — what is behind it was not read.
+    #[test]
+    fn the_room_is_the_panes_rather_than_the_screens() {
+        let screen = Rect::new(0, 0, 100, 40);
+
+        let room = room_on(screen);
+
+        assert!(room > 0, "there is room for something");
+        assert!(
+            room < usize::from(screen.height),
+            "but less than the screen: {room}"
+        );
     }
 
     /// It leaves what is behind it visible around the edges, which is what makes it
