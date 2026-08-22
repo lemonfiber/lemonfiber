@@ -130,7 +130,9 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
                     refreshing.abort();
                     refreshing = tokio::spawn(refresh(Arc::clone(&ctx), None));
                 }
-                Some(Key::Glossary) => glossary = !glossary,
+                Some(Key::Glossary) => {
+                    glossary = crate::render::glossary::wanted() && !glossary;
+                }
             },
             gathered = &mut refreshing => {
                 if let Ok(fresh) = gathered {
@@ -246,6 +248,9 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
     let mut viewer = Viewer::opened();
     if !colours(std::env::var("NO_COLOR").ok().as_deref()) {
         viewer = viewer.without_colour();
+    }
+    if !crate::render::glossary::wanted() {
+        viewer = viewer.without_explanations();
     }
     let mut looking = tokio::time::interval(LOOKING);
     let mut written = 0_usize;

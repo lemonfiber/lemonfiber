@@ -12,8 +12,8 @@ use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
-    data_root_from_env, indexer_from_env, ip_echo_from_env, port_forward_from_env,
-    service_user_from_env, store, Protocols, Settings,
+    data_root_from_env, indexer_from_env, ip_echo_from_env, port_forward_from_env, reads_as_off,
+    service_user_from_env, store, Protocols, Settings, EXPLANATIONS_KEY,
 };
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::stack::Source;
@@ -30,6 +30,10 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     };
 
     let settings = read_settings();
+    // Settled here rather than at each of the surfaces that explains something,
+    // because it is a property of the run: the two places that build a context are
+    // the only two that could be told, and neither can then be told wrong.
+    crate::render::glossary::settle(settings.explanations);
 
     // Docker Engine and Docker Desktop are told apart by asking the daemon,
     // which needs the engine adapter. Until then this is what can be seen from
@@ -78,6 +82,10 @@ pub(crate) fn read_settings() -> Settings {
         service_user: service_user_from_env(&recorded),
         port_forward: port_forward_from_env(&recorded),
         indexer: indexer_from_env(&recorded),
+        // On unless it is explicitly turned off: somebody meeting this vocabulary
+        // does not know there is a setting to look for, and somebody who wants the
+        // explanations gone knows exactly what they want to stop.
+        explanations: !recorded.get(EXPLANATIONS_KEY).is_some_and(reads_as_off),
         env_file,
         stack_dir: stack_directory(),
         ..Settings::default()
