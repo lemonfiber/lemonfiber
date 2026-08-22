@@ -407,11 +407,23 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
+        // Asserted as "the film contributed no `seed`" rather than "the sentence
+        // found nothing at all". The words around a name are ordinary words until
+        // one of them is explained — `stalled` was innocuous padding here until it
+        // became a term — and a test that forbids the whole sentence from matching
+        // is asserting something it was never about.
+        let beside_a_name = words("Seed.of.Chucky.2004.1080p stalled");
         assert!(
-            words("Seed.of.Chucky.2004.1080p stalled").is_empty(),
-            "a film is not an instruction to seed"
+            !beside_a_name.contains(&"seed"),
+            "a film is not an instruction to seed: {beside_a_name:?}"
         );
-        assert!(words("calibre-web-automated is unhealthy").is_empty());
+        // The sharper case, and a real identifier this stack writes: split on its
+        // hyphens it would read as the two-word term `quality profile`.
+        let identifier = words("radarr-quality-profile-remux-web-1080p was applied");
+        assert!(
+            !identifier.contains(&"quality profile"),
+            "a name is not the words inside it: {identifier:?}"
+        );
         assert_eq!(
             words("The.Seed.2021 was not found by the indexer"),
             ["indexer"],
