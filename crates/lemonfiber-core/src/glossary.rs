@@ -234,6 +234,28 @@ fn word(token: &str) -> String {
     trimmed.to_ascii_lowercase()
 }
 
+/// Every word this text borrows from another service's vocabulary, each with the
+/// word this product uses instead.
+///
+/// The other names are recorded so an operator moving between screens can follow one
+/// concept across them — not so this product may use either. Writing both is how a
+/// reader comes to believe there are two things, which is the confusion the record
+/// exists to end.
+#[must_use]
+pub fn borrowed(text: &str) -> Vec<(&'static str, &'static str)> {
+    let words: Vec<String> = text.split_whitespace().map(word).collect();
+
+    let mut found = Vec::new();
+    for term in TERMS {
+        for also in term.also_called {
+            if uses(&words, also) {
+                found.push((*also, term.word));
+            }
+        }
+    }
+    found
+}
+
 /// Whether these words include this term, which may itself be more than one word.
 fn uses(words: &[String], term: &str) -> bool {
     let wanted: Vec<String> = term.split(' ').map(str::to_ascii_lowercase).collect();
@@ -244,7 +266,7 @@ fn uses(words: &[String], term: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{explain, mentioned, TERMS};
+    use super::{borrowed, explain, mentioned, TERMS};
 
     #[test]
     fn a_word_is_explained_however_it_is_capitalised() {
@@ -323,6 +345,21 @@ mod tests {
 
         assert_eq!(words("nothing answered the indexer."), ["indexer"]);
         assert_eq!(words("(indexer) refused"), ["indexer"]);
+    }
+
+    /// Recorded so an operator can follow one concept between screens — not so this
+    /// product may use either word, which is how a reader comes to believe there are
+    /// two things.
+    #[test]
+    fn a_word_borrowed_from_another_service_is_named_with_ours() {
+        assert_eq!(
+            borrowed("check the library folder"),
+            [("library folder", "root folder")]
+        );
+        assert!(
+            borrowed("check the root folder").is_empty(),
+            "our own word is not borrowed from anyone"
+        );
     }
 
     /// Worth reading the first time, noise every time after.

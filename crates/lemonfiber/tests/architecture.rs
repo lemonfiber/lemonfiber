@@ -50,6 +50,167 @@ fn collect(dir: &Path, root: &Path, found: &mut BTreeMap<PathBuf, String>) {
     }
 }
 
+/// The half of a file that ships, up to where its own tests begin.
+///
+/// Found by `mod tests` rather than by the first `#[cfg(test)]`, and the difference
+/// is not cosmetic: several files declare a test-only helper module near the top —
+/// `render.rs` does it on line 14 — so cutting at the first attribute would discard
+/// almost everything those files actually ship. A guard reading that half would
+/// report nothing and look as though it had checked.
+fn production(text: &str) -> &str {
+    let Some(at) = text.lines().position(|line| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with("mod tests") || trimmed.starts_with("pub(crate) mod tests")
+    }) else {
+        return text;
+    };
+    // One line back from the declaration, which is the blank line above it. The
+    // line cap has always counted it this way, and two guards disagreeing about
+    // where a file ends is how one of them starts being wrong quietly.
+    let kept = at.saturating_sub(1);
+    let taken: usize = text.lines().take(kept).map(|line| line.len() + 1).sum();
+    text.get(..taken).unwrap_or(text)
+}
+
+/// The text inside double quotes on one line, which is where an operator's words are.
+///
+/// Prose only: a word this product must not write is very often a perfectly good
+/// identifier — `nntp` names a module, a type and a Compose profile here — so a
+/// guard reading whole lines would report the code rather than the words.
+fn quoted(line: &str) -> Vec<&str> {
+    let mut found = Vec::new();
+    let mut rest = line;
+    loop {
+        let Some(open) = rest.find('"') else { break };
+        let Some(after) = rest.get(open + 1..) else {
+            break;
+        };
+        let Some(close) = after.find('"') else { break };
+        let Some(said) = after.get(..close) else {
+            break;
+        };
+        found.push(said);
+        let Some(next) = after.get(close + 1..) else {
+            break;
+        };
+        rest = next;
+    }
+    found
+}
+
+/// Every line of prose this product ships, with where it was found.
+fn shipped_prose() -> Vec<(String, usize, String)> {
+    let mut prose = Vec::new();
+    for (path, text) in sources() {
+        let where_it_lives = path.to_string_lossy().replace('\\', "/");
+        // The glossary is where the other names are written down, so it is the one
+        // file allowed to write them.
+        if !where_it_lives.contains("/src/") || where_it_lives.ends_with("glossary.rs") {
+            continue;
+        }
+        for (number, line) in production(&text).lines().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") || trimmed.starts_with("/*") {
+                continue;
+            }
+            for said in quoted(line) {
+                prose.push((where_it_lives.clone(), number + 1, said.to_owned()));
+            }
+        }
+    }
+    prose
+}
+
+/// One concept, one word — the other names are recorded, never adopted.
+///
+/// Each service in this stack names the same thing differently, and the glossary
+/// records those names so an operator moving between their screens can follow one
+/// concept across them. That record is not a licence to use either word. A product
+/// that says `indexer` on one screen and `search provider` on the next has told the
+/// reader there are two things to understand, which is the confusion the record
+/// exists to end — and it costs most exactly where it is least noticed, because
+/// whoever wrote the second screen knew they meant the same thing.
+#[test]
+fn no_other_services_word_is_written_as_if_it_were_ours() {
+    let mut borrowed_words: Vec<String> = Vec::new();
+    for (path, number, said) in shipped_prose() {
+        for (theirs, ours) in lemonfiber_core::glossary::borrowed(&said) {
+            borrowed_words.push(format!("{path}:{number}: `{theirs}` — say `{ours}`"));
+        }
+    }
+    assert!(
+        borrowed_words.is_empty(),
+        "another service's word, written as though it were this product's own: \
+         {borrowed_words:?}"
+    );
+}
+
+/// Turns of phrase that do not survive being read by somebody who learned English
+/// second, or translated.
+///
+/// Not an exhaustive list of idiom — no such list exists — but the ones that reach
+/// for a sport, a war or a piece of folk wisdom, which are the ones that fail hardest
+/// because they are opaque rather than merely unusual. Somebody who does not know
+/// the reference cannot infer it from the words.
+const IDIOMS: &[&str] = &[
+    "out of the box",
+    "under the hood",
+    "at the end of the day",
+    "on the fly",
+    "rule of thumb",
+    "silver bullet",
+    "cut corners",
+    "off the shelf",
+    "ballpark",
+    "touch base",
+    "low-hanging fruit",
+    "sanity check",
+    "bite the bullet",
+    "in the weeds",
+    "piece of cake",
+    "elephant in the room",
+    "home run",
+    "curveball",
+    "slam dunk",
+    "level playing field",
+    "spanner in the works",
+    "boil the ocean",
+    "bells and whistles",
+    "chicken and egg",
+    "smoke and mirrors",
+    "tip of the iceberg",
+    "red herring",
+    "the last straw",
+    "first base",
+    "back to square one",
+];
+
+/// Nothing an operator reads leans on an idiom.
+///
+/// This product is read by people who did not learn English first, and it will be
+/// translated. An idiom is the one kind of plain-looking sentence that cannot be
+/// worked out from its words: somebody who does not know that a ballpark is a place
+/// where baseball is played has no way to reach "approximate" from it, and no
+/// dictionary will take them there either. The plain word costs nothing and lands
+/// everywhere.
+#[test]
+fn nothing_an_operator_reads_leans_on_an_idiom() {
+    let mut figures: Vec<String> = Vec::new();
+    for (path, number, said) in shipped_prose() {
+        let plainly = said.to_lowercase();
+        for idiom in IDIOMS {
+            if plainly.contains(idiom) {
+                figures.push(format!("{path}:{number}: `{idiom}`"));
+            }
+        }
+    }
+    assert!(
+        figures.is_empty(),
+        "these do not survive translation, and say nothing a plain word would not: \
+         {figures:?}"
+    );
+}
+
 /// Files whose path contains any of `segments`.
 fn outside(path: &Path, segments: &[&str]) -> bool {
     let text = path.to_string_lossy().replace('\\', "/");
@@ -343,8 +504,7 @@ fn no_two_problems_answer_to_the_same_code() {
     for (path, text) in sources() {
         // Tests reuse real codes as fixtures, which is not a second declaration
         // of one — the production half of each file is what declares.
-        let production = text.split("#[cfg(test)]").next().unwrap_or_default();
-        for code in declared(production) {
+        for code in declared(production(&text)) {
             if let Some(first) = seen.insert(code.clone(), path.clone()) {
                 collisions.push(format!(
                     "{code} in {} and {}",
@@ -582,15 +742,9 @@ fn no_source_file_outgrows_reading_in_one_sitting() {
         if path.to_string_lossy().contains("tests") {
             continue;
         }
-        let production = text
-            .lines()
-            .position(|line| {
-                let trimmed = line.trim_start();
-                trimmed.starts_with("mod tests") || trimmed.starts_with("pub(crate) mod tests")
-            })
-            .map_or_else(|| text.lines().count(), |at| at.saturating_sub(1));
-        if production > CAP {
-            oversized.push((path, production));
+        let shipped = production(&text).lines().count();
+        if shipped > CAP {
+            oversized.push((path, shipped));
         }
     }
     oversized.sort_by_key(|(_, lines)| std::cmp::Reverse(*lines));
