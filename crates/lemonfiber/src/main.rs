@@ -20,6 +20,7 @@ mod exit;
 mod keyboard;
 mod logs;
 mod maintain;
+mod pane;
 mod prompt;
 mod render;
 mod repair;

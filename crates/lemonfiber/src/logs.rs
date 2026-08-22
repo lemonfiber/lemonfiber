@@ -135,6 +135,8 @@ pub(crate) struct Viewer {
     text: Option<String>,
     /// A filter part-typed, or nothing where the operator is reading.
     typing: Option<String>,
+    /// Whether the words on this screen are being shown.
+    glossary: bool,
     /// What each service was doing when the engine was last asked.
     ///
     /// Empty until the first look, which is what stops a viewer opening onto a
@@ -163,11 +165,17 @@ impl Viewer {
             least: None,
             text: None,
             typing: None,
+            glossary: false,
             was: Vec::new(),
             back: 0,
             open: true,
             colours: true,
         }
+    }
+
+    /// Whether the words on this screen are being shown.
+    pub(crate) const fn glossary(&self) -> bool {
+        self.glossary
     }
 
     /// The same viewer, adding no colour to what it shows.
@@ -294,6 +302,7 @@ impl Viewer {
             Press::Typed('q') | Press::Abandon => self.open = false,
             Press::Typed('/') => self.typing = Some(String::new()),
             Press::Typed('f') | Press::Tail => self.back_to_the_tail(),
+            Press::Typed('?') => self.glossary = !self.glossary,
             Press::Typed('s') => self.next_service(),
             Press::Typed('w') => self.next_rung(),
             Press::Typed('c') => self.unfiltered(),

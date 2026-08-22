@@ -111,10 +111,12 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
     let reader = std::thread::spawn(move || read_keyboard(&keys, meaning));
 
     let mut snapshot: Option<Snapshot> = None;
+    // Closed until asked for, which is what keeps it an aside.
+    let mut glossary = false;
     let mut refreshing = tokio::spawn(refresh(Arc::clone(&ctx), None));
     loop {
         if let Some(snapshot) = snapshot.as_ref() {
-            if let Err(err) = screen.draw(snapshot) {
+            if let Err(err) = screen.draw(snapshot, glossary) {
                 return complain(&drawing("dashboard", &err.to_string()));
             }
         }
@@ -128,6 +130,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
                     refreshing.abort();
                     refreshing = tokio::spawn(refresh(Arc::clone(&ctx), None));
                 }
+                Some(Key::Glossary) => glossary = !glossary,
             },
             gathered = &mut refreshing => {
                 if let Ok(fresh) = gathered {
@@ -159,6 +162,8 @@ enum Key {
     Quit,
     /// Gather again now rather than at the next tick.
     Refresh,
+    /// Show what the words on this screen mean, or stop showing them.
+    Glossary,
 }
 
 /// Read the keyboard until the channel closes, on a thread of its own.
@@ -201,6 +206,7 @@ const fn meaning(key: KeyEvent) -> Option<Key> {
         // and an operator who cannot leave with it is trapped.
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Key::Quit),
         KeyCode::Char('r') => Some(Key::Refresh),
+        KeyCode::Char('?') => Some(Key::Glossary),
         _ => None,
     }
 }
@@ -399,9 +405,9 @@ impl Screen {
     }
 
     /// Draw one frame.
-    fn draw(&mut self, snapshot: &Snapshot) -> std::io::Result<()> {
+    fn draw(&mut self, snapshot: &Snapshot, glossary: bool) -> std::io::Result<()> {
         self.terminal
-            .draw(|frame| crate::dashboard::draw(frame, snapshot))?;
+            .draw(|frame| crate::dashboard::draw(frame, snapshot, glossary))?;
         Ok(())
     }
 

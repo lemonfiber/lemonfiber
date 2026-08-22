@@ -22,7 +22,7 @@ use super::{Shown, Viewer};
 /// An operator who has scrolled into history and cannot remember how to get back to
 /// the tail is stuck on a screen that is still updating without them.
 const KEYS: &str =
-    "[/] filter  [w] severity  [s] service  [c] clear  [e] export  [f] follow  [q] quit";
+    "[/] filter  [w] severity  [s] service  [c] clear  [e] export  [f] follow  [?] words  [q] quit";
 
 /// Draw the whole screen.
 pub(crate) fn draw(frame: &mut Frame, viewer: &Viewer) {
@@ -38,8 +38,14 @@ pub(crate) fn draw(frame: &mut Frame, viewer: &Viewer) {
     // Two rows of the body are its own border, and asking for more lines than fit
     // would silently drop the newest — which on a tail is the ones being watched.
     let rows = usize::from(body.height.saturating_sub(2));
+    let shown = lines(viewer, rows);
+    // Gathered before the lines are drawn, so what is explained is what is on the
+    // screen rather than what the scrollback holds.
+    let showing = viewer
+        .glossary()
+        .then(|| crate::pane::showing(shown.iter()));
     frame.render_widget(
-        Paragraph::new(lines(viewer, rows)).block(
+        Paragraph::new(shown).block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(Line::from(viewer.heading())),
@@ -54,9 +60,17 @@ pub(crate) fn draw(frame: &mut Frame, viewer: &Viewer) {
         )),
         legend,
     );
+
+    // Last, so it is over everything.
+    if let Some(showing) = showing {
+        crate::pane::over(frame, &showing);
+    }
 }
 
 /// The body: the lines, or the reason there are none.
+///
+/// Handed back before it is drawn so the words on the screen can be found in it —
+/// what is explained is what is being shown, not what the scrollback holds.
 fn lines(viewer: &Viewer, rows: usize) -> Vec<Line<'static>> {
     if let Some(reason) = viewer.nothing() {
         return vec![Line::styled(
@@ -325,5 +339,28 @@ mod tests {
 
         let screen = drawn(&viewer, 100, 8);
         assert!(screen.contains("calibre-web-automated"), "{screen}");
+    }
+    /// A flood is competing for every row, so the words are a keypress away rather
+    /// than taking one of them — and they explain what is on the screen now.
+    #[test]
+    fn the_words_on_the_screen_are_a_keypress_away() {
+        let mut viewer = Viewer::opened().without_colour();
+        viewer.take(line("sonarr", "no indexer answered in time"));
+
+        let quiet = drawn(&viewer, 90, 20);
+        viewer.pressed(Press::Typed('?'));
+        let asked = drawn(&viewer, 90, 20);
+
+        assert!(
+            !quiet.contains("the words on this screen"),
+            "nothing until it is asked for"
+        );
+        assert!(asked.contains("Search engines that find"), "{asked}");
+
+        viewer.pressed(Press::Typed('?'));
+        assert!(
+            !drawn(&viewer, 90, 20).contains("the words on this screen"),
+            "and the same key puts it away"
+        );
     }
 }
