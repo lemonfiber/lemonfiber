@@ -46,9 +46,17 @@ pub(crate) fn settle_known(known: Acknowledged) -> &'static Acknowledged {
     KNOWN.get_or_init(|| known)
 }
 
+/// Nothing acknowledged, for a run where no record was read.
+static NOTHING_KNOWN: Acknowledged = Acknowledged::none();
+
 /// What this operator has already been told, or nothing where none was read.
+///
+/// Reading never settles, which is the point: the other latches beside this one
+/// read the same way, and one that latched on a read would let a `settle` that came
+/// afterwards be ignored — silently, and only in whatever order a future caller
+/// happened to introduce.
 pub(crate) fn known() -> &'static Acknowledged {
-    KNOWN.get_or_init(Acknowledged::default)
+    KNOWN.get().unwrap_or(&NOTHING_KNOWN)
 }
 
 /// Whether this run explains its words at all, settled once at startup.

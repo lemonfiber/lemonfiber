@@ -32,6 +32,18 @@ pub struct Acknowledged {
 }
 
 impl Acknowledged {
+    /// Nothing acknowledged, as a value a `static` can hold.
+    ///
+    /// So that reading the record can fall back to this rather than settling it:
+    /// a read that latched would leave a later `settle` silently ignored, which is
+    /// the failure nothing reports.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            words: BTreeSet::new(),
+        }
+    }
+
     /// What was recorded, or nothing recorded where the file cannot be read.
     ///
     /// An unreadable record is treated as an empty one rather than as a failure:
@@ -94,6 +106,18 @@ pub fn at(path: &std::path::Path) -> Acknowledged {
 #[cfg(test)]
 mod tests {
     use super::Acknowledged;
+
+    /// Exercised at run time as well as in the `static` it exists for, because a
+    /// `const fn` used only in a `static` is evaluated by the compiler and leaves
+    /// nothing for a coverage run to see.
+    #[test]
+    fn nothing_acknowledged_is_a_value_in_its_own_right() {
+        let none = Acknowledged::none();
+
+        assert!(none.is_empty());
+        assert!(!none.holds("indexer"));
+        assert_eq!(none, Acknowledged::default());
+    }
 
     /// The whole point: a word gone and found out about is not explained again.
     #[test]
