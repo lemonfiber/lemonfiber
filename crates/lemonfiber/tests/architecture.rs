@@ -80,8 +80,7 @@ fn production(text: &str) -> &str {
 fn quoted(line: &str) -> Vec<&str> {
     let mut found = Vec::new();
     let mut rest = line;
-    loop {
-        let Some(open) = rest.find('"') else { break };
+    while let Some(open) = rest.find('"') {
         let Some(after) = rest.get(open + 1..) else {
             break;
         };
