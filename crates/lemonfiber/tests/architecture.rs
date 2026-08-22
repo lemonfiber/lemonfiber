@@ -191,24 +191,8 @@ const ORDINARY: &[&str] = &[
 fn every_acronym_an_operator_reads_is_explained_or_declared_ordinary() {
     let mut unexplained: Vec<String> = Vec::new();
     for (path, number, said) in shipped_prose() {
-        let prose = outside_braces(&said);
-        if !reads_as_a_sentence(&prose) {
-            continue;
-        }
-        for word in prose.split_whitespace() {
-            // An error code is looked up rather than read, and a path or a variable
-            // name is not addressed to anybody.
-            if is_a_code(word) || word.contains('_') || word.contains('/') {
-                continue;
-            }
-            for short in capitals(word) {
-                if ORDINARY.contains(&short.as_str())
-                    || lemonfiber_core::glossary::explain(&short).is_some()
-                {
-                    continue;
-                }
-                unexplained.push(format!("{path}:{number}: `{short}`"));
-            }
+        for short in unexplained_acronyms(&said) {
+            unexplained.push(format!("{path}:{number}: `{short}`"));
         }
     }
     assert!(
@@ -216,6 +200,26 @@ fn every_acronym_an_operator_reads_is_explained_or_declared_ordinary() {
         "an operator is shown these and given nothing to make sense of them — explain \
          each in the glossary, or add it to ORDINARY with a reason: {unexplained:?}"
     );
+}
+
+/// The acronyms in one literal that are neither explained nor declared ordinary.
+///
+/// Its own function rather than three loops inside the test, so that what the guard
+/// asks of one piece of text reads as one thing and the test reads as the sweep.
+fn unexplained_acronyms(said: &str) -> Vec<String> {
+    let prose = outside_braces(said);
+    if !reads_as_a_sentence(&prose) {
+        return Vec::new();
+    }
+    prose
+        .split_whitespace()
+        // An error code is looked up rather than read, and a path or a variable name
+        // is not addressed to anybody.
+        .filter(|word| !is_a_code(word) && !word.contains('_') && !word.contains('/'))
+        .flat_map(capitals)
+        .filter(|short| !ORDINARY.contains(&short.as_str()))
+        .filter(|short| lemonfiber_core::glossary::explain(short).is_none())
+        .collect()
 }
 
 /// The text with every `{…}` removed, a placeholder being code inside a string.
