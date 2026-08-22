@@ -57,9 +57,14 @@ pub const TERMS: &[Term] = &[
         deep: Some(
             "An indexer keeps track of what has been posted and where. lemonfiber asks \
              yours whenever something is wanted; without one, nothing can be found to \
-             download, however much else is configured.",
+             download, however much else is configured. Prowlarr lists Usenet indexers \
+             and torrent sites together under the one word, which is why one screen \
+             holds both. A torrent site is often called a tracker after the part of it \
+             that introduces peers to each other, and on a private one that same part \
+             is what watches your ratio — so the two words overlap without meaning the \
+             same thing.",
         ),
-        also_called: &["tracker", "search provider"],
+        also_called: &["search provider"],
     },
     Term {
         word: "hardlink",
