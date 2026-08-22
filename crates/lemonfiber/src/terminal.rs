@@ -301,7 +301,16 @@ async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
         .unwrap_or_default();
     let path = std::path::PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
     ctx.filesystem.write(&path, &viewer.exported(&marks)).await;
-    viewer.remarked(&format!("written to {}", path.display()));
+
+    // Writing is best effort and says nothing about whether it worked, so the file is
+    // read back before the screen claims it is there. An operator told their export
+    // landed, on a directory they cannot write to, would find out when they went
+    // looking for it — which is the moment they were relying on it.
+    if ctx.filesystem.read(&path).await.is_some() {
+        viewer.remarked(&format!("written to {}", path.display()));
+    } else {
+        viewer.remarked(&format!("could not write {}", path.display()));
+    }
 }
 
 /// What each service is doing, or nothing where the engine will not say.

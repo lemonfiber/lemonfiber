@@ -140,6 +140,30 @@ impl Scrollback {
         self.outpaced
     }
 
+    /// The newest lines a filter admits, up to `wanted` of them, oldest first.
+    ///
+    /// Read from the newest backwards and stopped as soon as there are enough, which
+    /// is what keeps a screenful cheap on a full buffer: a viewer redraws on every
+    /// keypress and every batch of arriving lines, and a filter that had to consider
+    /// all five thousand held lines each time would do that work tens of times a
+    /// second to show forty of them.
+    ///
+    /// Costs what it shows rather than what it holds — except when the operator has
+    /// scrolled a long way back, which is the case where they are asking for an old
+    /// line and the work is what the answer costs.
+    #[must_use]
+    pub fn latest(&self, filter: &Filter, wanted: usize) -> Vec<&LogLine> {
+        let mut found: Vec<&LogLine> = self
+            .held
+            .iter()
+            .rev()
+            .filter(|line| filter.admits(line))
+            .take(wanted)
+            .collect();
+        found.reverse();
+        found
+    }
+
     /// The held lines a filter admits, oldest first.
     #[must_use]
     pub fn showing(&self, filter: &Filter) -> Vec<&LogLine> {
