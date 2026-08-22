@@ -95,6 +95,7 @@ release-workflow:
     dist generate
     python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('github-attestations = true\n', 'github-attestations = true\nallow-dirty = [\"ci\"]\n', 1))"
     python3 -c "import pathlib; p=pathlib.Path('.github/workflows/release.yml'); p.write_text(p.read_text().replace('gh release create \"', 'gh release create --draft \"'))"
+    python3 scripts/pin_release_actions.py
     @grep -q 'gh release create --draft' .github/workflows/release.yml || (echo "draft patch failed to apply" && exit 1)
     @grep -q 'allow-dirty = ' Cargo.toml || (echo "allow-dirty not restored" && exit 1)
 
