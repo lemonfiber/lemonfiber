@@ -222,14 +222,18 @@ fn nothing_a_parser_reads_is_rendered_for_a_person() {
          {rendered:?}"
     );
 
-    // And the door itself: what a parser reads goes out exactly as it was built.
+    // And the doors themselves: what a parser reads goes out exactly as it was
+    // built, on either stream. A failure is output too, and a script that asked for
+    // something it could parse asked about those most of all.
     let say = std::fs::read_to_string("src/say.rs").unwrap_or_default();
-    let emitted = body_of(&say, "pub(crate) fn emitted");
-    assert!(!emitted.is_empty(), "the parser's door was found");
-    assert!(
-        !emitted.contains("rendered") && !emitted.contains("folded"),
-        "and it does not fold: {emitted}"
-    );
+    for door in ["pub(crate) fn emitted", "pub(crate) fn refused"] {
+        let body = body_of(&say, door);
+        assert!(!body.is_empty(), "{door} was found");
+        assert!(
+            !body.contains("rendered") && !body.contains("folded"),
+            "{door} does not fold: {body}"
+        );
+    }
 }
 
 /// Short capitals an operator needs no help with, and why each is allowed.

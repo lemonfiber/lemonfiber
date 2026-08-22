@@ -119,6 +119,37 @@ pub(crate) fn complained(line: &str) {
     eprintln!("{}", rendered(line));
 }
 
+/// Whether this run's output is read or parsed, settled once at startup.
+///
+/// A latch for the same reason the locale beside it is one: it is a property of the
+/// run rather than of any call. Twenty-six places report a failure, and a flag
+/// threaded to all of them is twenty-six chances to be told wrong — while the one
+/// that was missed would report a failure as prose to a script that asked for
+/// otherwise, which is the case nobody tests.
+static FOR_A_PARSER: OnceLock<bool> = OnceLock::new();
+
+/// Settle who this run's output is for, and say what is in force.
+///
+/// The first call decides, and a later one is told what the first settled, so what
+/// comes back is what is actually in force rather than what this caller asked for.
+pub(crate) fn settle_audience(parsed: bool) -> bool {
+    *FOR_A_PARSER.get_or_init(|| parsed)
+}
+
+/// Whether what this run puts out will be parsed rather than read.
+pub(crate) fn for_a_parser() -> bool {
+    *FOR_A_PARSER.get().unwrap_or(&false)
+}
+
+/// Put a refusal out exactly as it is, for something that will parse it.
+///
+/// The error stream's half of the parser's door. A refusal is output like any
+/// other, and a script that asked for something it could parse asked about the
+/// failures too — they are the answers it most needs to act on.
+pub(crate) fn refused(line: &str) {
+    eprintln!("{line}");
+}
+
 /// Put a line out exactly as it is, for something that will parse it.
 ///
 /// The other door of the same funnel, and the reason it exists is that folding is
@@ -167,7 +198,10 @@ pub(crate) use {complain, emit, say};
 
 #[cfg(test)]
 mod tests {
-    use super::{asked, complained, emitted, folded, said, settle, shown, unicode};
+    use super::{
+        asked, complained, emitted, folded, for_a_parser, refused, said, settle, settle_audience,
+        shown, unicode,
+    };
 
     /// A locale that names a charset has told us what it can do; one that is unset
     /// has told us nothing, and the requirement asks for a fallback where Unicode
@@ -247,6 +281,28 @@ mod tests {
         );
     }
 
+    /// Settled once, like the locale beside it, and for the same reason: it is a
+    /// property of the run rather than of any call.
+    ///
+    /// The value latched here is deliberately the default one. This settles a
+    /// process-wide value, and every test beside it expects output for a person —
+    /// so what is latched has to be that, or this test would decide for them.
+    #[test]
+    fn who_the_output_is_for_is_settled_once_too() {
+        let first = settle_audience(false);
+
+        assert!(
+            !first,
+            "output is read by a person unless a run says otherwise"
+        );
+        assert_eq!(
+            settle_audience(true),
+            first,
+            "the second caller is told what is in force, not what it asked for"
+        );
+        assert_eq!(for_a_parser(), first, "and asking plainly agrees");
+    }
+
     /// The two ends of the funnel. Asserted only to the extent that they run: what
     /// they put where is the architecture test's to guard, and reading back this
     /// process's own streams would be a harness rather than a test.
@@ -256,5 +312,6 @@ mod tests {
         complained("a line about a failure");
         asked("and a question — answered beside it");
         emitted("{\"and\":\"a document nobody reads\"}");
+        refused("{\"nor\":\"this one\"}");
     }
 }

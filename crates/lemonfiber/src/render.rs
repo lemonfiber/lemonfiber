@@ -141,7 +141,11 @@ impl Lines {
     /// which belongs beside the answer rather than in it.
     pub(crate) fn eprint(&self) {
         for line in &self.said {
-            crate::say::complained(line);
+            if self.parsed {
+                crate::say::refused(line);
+            } else {
+                crate::say::complained(line);
+            }
         }
     }
 }
@@ -366,6 +370,17 @@ mod tests {
         let mut lines = Lines::for_a_parser();
         lines.put(document);
         lines.print();
+
+        assert_eq!(lines.text(), document, "unfolded and unaltered");
+    }
+
+    /// A refusal a script asked for leaves by the same door on the other stream.
+    #[test]
+    fn what_a_parser_reads_goes_out_unfolded_on_the_error_stream_too() {
+        let document = "{\"kind\":\"error\",\"data\":{\"summary\":\"the “Burbs” — gone\"}}";
+        let mut lines = Lines::for_a_parser();
+        lines.put(document);
+        lines.eprint();
 
         assert_eq!(lines.text(), document, "unfolded and unaltered");
     }

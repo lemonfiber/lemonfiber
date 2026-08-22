@@ -84,6 +84,9 @@ async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
     say::settle(locale().as_deref());
     let mut cli = Cli::parse();
+    // And who it is for, which decides the same for every failure without any of
+    // the twenty-six places that report one having to be told.
+    say::settle_audience(cli.json);
 
     let Some(request) = cli.command else {
         let ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
