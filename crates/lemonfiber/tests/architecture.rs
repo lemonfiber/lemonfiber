@@ -71,7 +71,7 @@ fn reading_a_latch_never_settles_it() {
         }
         let mut whose = String::new();
         for (number, line) in production(&text).lines().enumerate() {
-            if let Some(name) = declared(line) {
+            if let Some(name) = declaring(line) {
                 whose = name;
             }
             if line.contains("get_or_init") && !whose.starts_with("settle") {
@@ -87,7 +87,7 @@ fn reading_a_latch_never_settles_it() {
 }
 
 /// The name of the function a line declares, where it declares one.
-fn declared(line: &str) -> Option<String> {
+fn declaring(line: &str) -> Option<String> {
     let (_, rest) = line.split_once("fn ")?;
     let name: String = rest
         .chars()
