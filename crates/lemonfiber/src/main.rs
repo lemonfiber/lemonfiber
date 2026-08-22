@@ -235,7 +235,12 @@ fn explaining(word: &str) -> ExitCode {
         return complain(&render::glossary::unrecognised(word));
     };
     lines.print();
-    remember(word);
+    // A script fetching the text is not a person learning the word. Acknowledgement
+    // is about what this operator has been told, and recording a machine's lookup
+    // would quietly stop explaining it to the person who never made one.
+    if !say::for_a_parser() {
+        remember(word);
+    }
     ExitCode::SUCCESS
 }
 
