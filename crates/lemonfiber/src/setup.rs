@@ -14,6 +14,8 @@ use std::sync::Arc;
 
 use lemonfiber_core::app::{setup as core_setup, Ctx};
 use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::config::Settings;
+use lemonfiber_core::model::{Envelope, SetupOutcome, SetupReport};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::validate::Live;
 use lemonfiber_core::wizard::{offer_setup, Progress, Status, Wizard};
@@ -51,6 +53,41 @@ pub(crate) trait Surface {
         environment: Environment,
         default_data: PathBuf,
     ) -> Box<dyn core_setup::Prompt>;
+}
+
+/// Say what the run came to, in the shape whoever asked for it can use.
+///
+/// One place, so a run that can end three ways cannot answer in three shapes.
+fn concluded(outcome: SetupOutcome, settings: &Settings, prose: &[String], parsed: bool) {
+    if parsed {
+        document(outcome, settings).print();
+        return;
+    }
+    for line in prose {
+        say!("{line}");
+    }
+}
+
+/// The same conclusion, for something that will parse it.
+///
+/// Built from the settings as they stand once the run is over, so what a script is
+/// told is what the machine now holds rather than what was typed at it.
+fn document(outcome: SetupOutcome, settings: &Settings) -> crate::render::Lines {
+    let report = SetupReport {
+        outcome,
+        protocols: settings.protocols,
+        data_root: settings.data_root.clone(),
+        service_user: settings
+            .service_user
+            .map(|(user, group)| format!("{user}:{group}")),
+    };
+    let mut lines = crate::render::Lines::for_a_parser();
+    lines.put(
+        Envelope::new("setup", &report)
+            .to_json()
+            .unwrap_or(crate::render::UNRENDERABLE.to_owned()),
+    );
+    lines
 }
 
 /// Where to send an operator whose machine is already set up, for a run nobody is
@@ -182,8 +219,15 @@ async fn fresh_setup(
     // Setup is for a machine with nothing configured; a configured one is changed
     // through its settings, not walked back to its first question.
     if !offer_setup(paths.env_file().exists()) {
-        say!("This machine is already set up.");
-        say!("Change a setting with `{PRODUCT} config set`, or start it with `{PRODUCT} up`.");
+        concluded(
+            SetupOutcome::AlreadySetUp,
+            &ctx.settings,
+            &[
+                "This machine is already set up.".to_owned(),
+                format!("Change a setting with `{PRODUCT} config set`, or start it with `{PRODUCT} up`."),
+            ],
+            crate::say::for_a_parser(),
+        );
         return ExitCode::from(USAGE);
     }
 
@@ -277,11 +321,21 @@ async fn drive(
             // The settings read at startup predate the file setup just wrote, so
             // they are refreshed before the stack is brought up against them.
             ctx.settings = read_settings();
-            say!("\nSetup is done — bringing your stack up.");
+            concluded(
+                SetupOutcome::Applied,
+                &ctx.settings,
+                &["\nSetup is done — bringing your stack up.".to_owned()],
+                crate::say::for_a_parser(),
+            );
             start(&ctx, surface).await
         }
         Ok(core_setup::Outcome::Abandoned) => {
-            say!("\nSetup was left here — nothing was written.");
+            concluded(
+                SetupOutcome::Abandoned,
+                &ctx.settings,
+                &["\nSetup was left here — nothing was written.".to_owned()],
+                crate::say::for_a_parser(),
+            );
             ExitCode::SUCCESS
         }
         Err(problem) => complain(&problem),
@@ -315,7 +369,9 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use lemonfiber_core::config::Settings;
+    use lemonfiber_core::config::{Protocols, Settings};
+
+    use super::{concluded, document, SetupOutcome};
 
     use lemonfiber_core::ports::docker::{
         Container, Engine, ExecOutput, Failure as DockerFailure, LogLine, LogQuery, Stats,
@@ -828,5 +884,49 @@ pub(crate) mod tests {
         assert!(engine.exec("c", &[]).await.is_err());
         assert!(engine.stats("p").await.is_err());
         assert!(engine.logs("p", &[], LogQuery::recent(10)).await.is_err());
+    }
+    /// A script that ran setup non-interactively is told what it configured — and
+    /// deliberately not told anything that could be a credential, because a report
+    /// a script can read is one a script can log.
+    #[test]
+    fn a_setup_a_script_asked_for_is_one_document_it_can_parse() {
+        let settings = Settings {
+            protocols: Protocols::both(),
+            data_root: Some(std::path::PathBuf::from("/srv/media")),
+            service_user: Some((1000, 1000)),
+            ..Settings::default()
+        };
+
+        let said = document(SetupOutcome::Applied, &settings).text();
+
+        assert_eq!(said.lines().count(), 1, "one document: {said}");
+        assert!(said.contains("\"kind\":\"setup\""), "{said}");
+        assert!(said.contains("\"outcome\":\"applied\""), "{said}");
+        assert!(
+            said.contains("/srv/media"),
+            "and what it settled on: {said}"
+        );
+        assert!(said.contains("\"1000:1000\""), "{said}");
+    }
+
+    /// A machine that was already set up ends a different way and answers in the
+    /// same shape, which is the whole reason one place decides it.
+    #[test]
+    fn a_run_that_asked_nothing_still_says_how_it_ended() {
+        let said = document(SetupOutcome::AlreadySetUp, &Settings::default()).text();
+
+        assert!(said.contains("\"outcome\":\"already-set-up\""), "{said}");
+        assert!(
+            !said.contains("password") && !said.contains("key"),
+            "and nothing that could be a credential: {said}"
+        );
+    }
+
+    /// Both audiences, so neither branch is one nothing runs.
+    #[test]
+    fn a_conclusion_reaches_whoever_asked_for_it() {
+        let prose = ["it ended".to_owned()];
+        concluded(SetupOutcome::Abandoned, &Settings::default(), &prose, false);
+        concluded(SetupOutcome::Abandoned, &Settings::default(), &prose, true);
     }
 }
