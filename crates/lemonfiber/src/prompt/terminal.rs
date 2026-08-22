@@ -28,6 +28,8 @@ pub struct Terminal {
     answers: Box<dyn Answers>,
     /// Words this conversation has already explained.
     met: RefCell<Vec<&'static str>>,
+    /// Whether this run explains its words at all.
+    explaining: bool,
 }
 
 impl Terminal {
@@ -52,7 +54,18 @@ impl Terminal {
             default_data,
             answers,
             met: RefCell::new(Vec::new()),
+            explaining: crate::render::glossary::wanted(),
         }
+    }
+
+    /// The same prompt, explaining nothing — for a run that asked for none.
+    ///
+    /// A builder rather than a latch read inside `introduce`, so a test can have
+    /// both kinds of conversation without settling a value that outlives it.
+    #[cfg(test)]
+    pub(crate) const fn explaining_nothing(mut self) -> Self {
+        self.explaining = false;
+        self
     }
 
     /// Explain a word, once, the first time this conversation uses it.
@@ -68,6 +81,9 @@ impl Terminal {
     /// That copy was also a definition, where what somebody needs is what the thing
     /// is for and what it will cost them.
     fn introduce(&self, word: &str) {
+        if !self.explaining {
+            return;
+        }
         let Some(term) = lemonfiber_core::glossary::explain(word) else {
             return;
         };
@@ -394,6 +410,16 @@ mod tests {
             ["indexer"],
             "said once, whatever case it was asked about, and nothing invented"
         );
+    }
+
+    /// Somebody who asked for none gets none, rather than a shorter version.
+    #[test]
+    fn a_run_that_wants_no_explanations_introduces_nothing() {
+        let terminal = answered(&[]).explaining_nothing();
+
+        terminal.introduce("indexer");
+
+        assert!(terminal.met.borrow().is_empty(), "nothing was introduced");
     }
 
     #[test]

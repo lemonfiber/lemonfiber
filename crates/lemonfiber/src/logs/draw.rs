@@ -363,4 +363,19 @@ mod tests {
             "and the same key puts it away"
         );
     }
+
+    /// A run that asked for no explanations does not get a pane either, so the key
+    /// is inert rather than opening something empty.
+    #[test]
+    fn a_run_that_wants_no_explanations_has_no_pane_to_open() {
+        let mut viewer = Viewer::opened().without_colour().without_explanations();
+        viewer.take(line("sonarr", "no indexer answered in time"));
+
+        viewer.pressed(Press::Typed('?'));
+
+        assert!(
+            !drawn(&viewer, 90, 20).contains("the words on this screen"),
+            "the key opens nothing"
+        );
+    }
 }

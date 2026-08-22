@@ -93,6 +93,8 @@ pub(crate) struct Viewer {
     typing: Option<String>,
     /// Whether the words on this screen are being shown.
     glossary: bool,
+    /// Whether this run explains its words at all.
+    explaining: bool,
     /// What each service was doing when the engine was last asked.
     ///
     /// Empty until the first look, which is what stops a viewer opening onto a
@@ -122,6 +124,7 @@ impl Viewer {
             text: None,
             typing: None,
             glossary: false,
+            explaining: true,
             was: Vec::new(),
             back: 0,
             open: true,
@@ -132,6 +135,15 @@ impl Viewer {
     /// Whether the words on this screen are being shown.
     pub(crate) const fn glossary(&self) -> bool {
         self.glossary
+    }
+
+    /// The same viewer, explaining nothing — for a run that asked for none.
+    ///
+    /// A builder rather than a latch read from in here, so a test can have both
+    /// kinds of viewer without settling a value that outlives it.
+    pub(crate) const fn without_explanations(mut self) -> Self {
+        self.explaining = false;
+        self
     }
 
     /// The same viewer, adding no colour to what it shows.
