@@ -268,12 +268,17 @@ const JOINED: [char; 3] = ['.', '_', '-'];
 /// the first time and is noise every time after.
 #[must_use]
 pub fn mentioned(text: &str) -> Vec<&'static Term> {
-    let words: Vec<String> = text.split_whitespace().map(word).collect();
+    let words = words(text);
 
     TERMS
         .iter()
         .filter(|term| uses(&words, term.word))
         .collect()
+}
+
+/// The words in a piece of text, with anybody's name for something passed over.
+fn words(text: &str) -> Vec<String> {
+    text.split_whitespace().map(word).collect()
 }
 
 /// The word inside a token, or nothing where the token is a name.
@@ -305,7 +310,7 @@ fn word(token: &str) -> String {
 /// exists to end.
 #[must_use]
 pub fn borrowed(text: &str) -> Vec<(&'static str, &'static str)> {
-    let words: Vec<String> = text.split_whitespace().map(word).collect();
+    let words = words(text);
 
     let mut found = Vec::new();
     for term in TERMS {
@@ -530,6 +535,24 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// A report explains a word once, and that rests on the table holding it once.
+    /// Two entries for one word would be explained twice, and `explain` would answer
+    /// with whichever came first — so the rule the footnote block states would be
+    /// broken by the data rather than by the code that reads it.
+    #[test]
+    fn no_word_is_in_the_table_twice() {
+        let mut said: Vec<&str> = TERMS.iter().map(|term| term.word).collect();
+        said.sort_unstable();
+        let mut once = said.clone();
+        once.dedup();
+
+        assert_eq!(said, once, "a word is in the table more than once");
+        assert!(
+            TERMS.iter().all(|term| !term.word.is_empty()),
+            "and none of them is nothing"
+        );
     }
 
     /// Sonarr and `SABnzbd` do not agree on words, and an operator moving between
