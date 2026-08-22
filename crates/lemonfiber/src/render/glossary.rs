@@ -292,7 +292,7 @@ mod tests {
     /// Cutting a word in half costs a reader more than the overrun does.
     #[test]
     fn a_word_longer_than_the_width_keeps_its_shape() {
-        let long = "a ".repeat(1) + &"x".repeat(WIDTH + 10);
+        let long = format!("a {}", "x".repeat(WIDTH + 10));
 
         assert_eq!(wrapped(&long, WIDTH), ["a", &"x".repeat(WIDTH + 10)]);
     }

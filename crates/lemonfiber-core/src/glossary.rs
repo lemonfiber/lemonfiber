@@ -141,14 +141,14 @@ pub const TERMS: &[Term] = &[
         short: "To keep sharing a finished torrent so others can take it. Stopping too \
                 early is what a ratio requirement is about.",
         deep: None,
-        also_called: &["seeding"],
+        also_called: &[],
     },
     Term {
         word: "grab",
         short: "To send a release to the download client. It is the moment something \
                 stops being a search result and starts being a download.",
         deep: None,
-        also_called: &["snatch", "fetch"],
+        also_called: &["snatch"],
     },
     Term {
         word: "root folder",
@@ -164,9 +164,11 @@ pub const TERMS: &[Term] = &[
         deep: Some(
             "Resolution is only part of it. A profile also weighs the source, the encoder \
              and the audio, which is why two files of the same resolution are not equally \
-             welcome.",
+             welcome. The services' own screens file these under Profiles, which is not \
+             quite the same word: this stack also has Compose profiles, and they decide \
+             which services run rather than which releases are wanted.",
         ),
-        also_called: &["profile"],
+        also_called: &[],
     },
     Term {
         word: "custom format",
@@ -374,7 +376,6 @@ mod tests {
             .unwrap_or_default();
 
         assert!(also.contains(&"snatch"), "{also:?}");
-        assert!(also.contains(&"fetch"), "{also:?}");
     }
 
     /// One concept, one word — so no term may be listed as another's synonym while
@@ -384,8 +385,11 @@ mod tests {
         for term in TERMS {
             for also in term.also_called {
                 let word = term.word;
+                // Asked of the Option directly rather than through a closure over
+                // it: a closure here only runs in the case being forbidden, so it
+                // is a branch no passing run can reach.
                 assert!(
-                    explain(also).is_none_or(|found| found.word == word),
+                    explain(also).is_none(),
                     "{also:?} is both a term and a synonym of {word}"
                 );
             }
