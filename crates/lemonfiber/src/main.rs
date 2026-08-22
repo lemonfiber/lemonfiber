@@ -188,7 +188,7 @@ async fn main() -> ExitCode {
         Request::Walkthrough { item } => return walk(&ctx, &item.join(" "), cli.json).await,
         // Answered from a table compiled into the binary, so unlike every command
         // below it this one needs neither a stack nor a daemon to say anything.
-        Request::Explain { word } => return explaining(&word.join(" ")),
+        Request::Explain { word } => return explaining(&word.join(" "), cli.dry_run),
         Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,
@@ -230,12 +230,46 @@ async fn main() -> ExitCode {
 /// nothing" — a wrong answer where they wanted an absent one. Reported through the
 /// same error model as everything else, so it carries a code and a way forward
 /// rather than being this one command's private way of saying no.
-fn explaining(word: &str) -> ExitCode {
+fn explaining(word: &str, rehearsing: bool) -> ExitCode {
     let Some(lines) = render::glossary::explained(word, say::for_a_parser()) else {
         return complain(&render::glossary::unrecognised(word));
     };
     lines.print();
+    // A script fetching the text is not a person learning the word. Acknowledgement
+    // is about what this operator has been told, and recording a machine's lookup
+    // would quietly stop explaining it to the person who never made one.
+    // A rehearsal changes nothing, which this record is not exempt from. And a
+    // script fetching the text is not a person learning the word: recording a
+    // machine's lookup would quietly stop explaining it to the operator who never
+    // made one.
+    if !rehearsing && !say::for_a_parser() {
+        remember(word);
+    }
     ExitCode::SUCCESS
+}
+
+/// Record that this word has been gone and found out about.
+///
+/// Asking what a word means is the act this rests on: a report that went past is not
+/// an acknowledgement, and recording one would stop explaining a word to somebody
+/// who never read it.
+///
+/// Best effort and silent. The answer has already been given, and a record that
+/// could not be written costs one repeated explanation rather than anything the
+/// operator needs telling about now. Written only where it actually changed, so
+/// asking twice touches nothing.
+fn remember(word: &str) {
+    let Some(paths) = here() else {
+        return;
+    };
+    let path = paths.acknowledged();
+    let mut known = lemonfiber_core::acknowledged::at(&path);
+    if !known.take(word) {
+        return;
+    }
+    if let Some(text) = known.to_json() {
+        let _ = std::fs::write(&path, text);
+    }
 }
 
 /// Say what starting these forms will start, before it starts.

@@ -174,7 +174,7 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
     // After the `json` return, never before it: a footnote is prose for a person,
     // and appending it to a machine-readable answer would corrupt the one thing
     // that answer exists to be.
-    let notes = glossary::footnotes(&lines.text(), glossary::wanted());
+    let notes = glossary::footnotes(&lines.text(), glossary::wanted(), glossary::known());
     lines.extend(notes);
     lines
 }

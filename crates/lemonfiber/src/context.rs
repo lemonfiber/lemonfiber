@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use lemonfiber_core::acknowledged::{self, Acknowledged};
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::paths::Paths;
@@ -34,6 +35,11 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     // because it is a property of the run: the two places that build a context are
     // the only two that could be told, and neither can then be told wrong.
     crate::render::glossary::settle(settings.explanations);
+    // And what this operator has already gone and found out about, so a report names
+    // those words rather than teaching them again.
+    crate::render::glossary::settle_known(here().map_or_else(Acknowledged::default, |paths| {
+        acknowledged::at(&paths.acknowledged())
+    }));
 
     // Docker Engine and Docker Desktop are told apart by asking the daemon,
     // which needs the engine adapter. Until then this is what can be seen from

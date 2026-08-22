@@ -39,6 +39,7 @@
 pub use lemonfiber_ports as ports;
 pub use lemonfiber_ports::{error, trace};
 
+pub mod acknowledged;
 pub mod adapters;
 pub mod alert;
 pub mod app;

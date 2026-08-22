@@ -78,6 +78,16 @@ impl Paths {
         self.config.join("baseline.json")
     }
 
+    /// Where the words this operator has gone and found out about are kept.
+    ///
+    /// Beside the settings rather than beside the stack, for the same reason the
+    /// baseline is: two projects sharing one stack directory are two installations,
+    /// and what one operator has been told is not what the other has.
+    #[must_use]
+    pub fn acknowledged(&self) -> PathBuf {
+        self.config.join("acknowledged.json")
+    }
+
     /// The operator's quality choice: which preset is in force, globally and per
     /// media type. Kept with configuration so a backup carries it, and so a later
     /// run applies the same choice rather than falling back to the default.
@@ -172,6 +182,7 @@ mod tests {
             paths.journal(),
             paths.setup_progress(),
             paths.baseline(),
+            paths.acknowledged(),
             paths.materialised(),
             paths.quality(),
             paths.notifications(),
@@ -283,5 +294,17 @@ mod tests {
         let elsewhere = Paths::rooted(Path::new("/tmp/a"), Path::new("/tmp/b"));
         assert_eq!(elsewhere.env_file(), Path::new("/tmp/a/lemonfiber/.env"));
         assert_eq!(elsewhere.stack(), Path::new("/tmp/b/lemonfiber/stack"));
+    }
+    /// Beside the settings, for the same reason the baseline is: what one operator
+    /// has been told is not what another has, even sharing a stack directory.
+    #[test]
+    fn what_has_been_acknowledged_sits_with_the_configuration() {
+        let paths = paths();
+
+        let held = paths.acknowledged();
+
+        let where_it_is = held.display().to_string();
+        assert_eq!(held.parent(), paths.baseline().parent());
+        assert!(held.ends_with("acknowledged.json"), "{where_it_is}");
     }
 }
