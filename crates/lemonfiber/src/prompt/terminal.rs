@@ -5,6 +5,7 @@
 //! [`Answers`](super::Answers) instead. That is what lets the conversation be
 //! proven against a script.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 use lemonfiber_core::alert::Appetite;
@@ -25,6 +26,8 @@ pub struct Terminal {
     environment: Environment,
     default_data: PathBuf,
     answers: Box<dyn Answers>,
+    /// Words this conversation has already explained.
+    met: RefCell<Vec<&'static str>>,
 }
 
 impl Terminal {
@@ -48,7 +51,35 @@ impl Terminal {
             environment,
             default_data,
             answers,
+            met: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Explain a word, once, the first time this conversation uses it.
+    ///
+    /// Worth reading the first time and noise every time after — the rule the
+    /// footnote block follows inside one report. A setup is one long report whose
+    /// parts arrive as questions, so the rule carries across them rather than
+    /// starting again at each.
+    ///
+    /// The words come from the glossary rather than from here. Two of them were
+    /// written in this file — "an indexer is where the stack searches for content"
+    /// — and a second copy of an explanation is one that drifts from the first.
+    /// That copy was also a definition, where what somebody needs is what the thing
+    /// is for and what it will cost them.
+    fn introduce(&self, word: &str) {
+        let Some(term) = lemonfiber_core::glossary::explain(word) else {
+            return;
+        };
+        let Ok(mut met) = self.met.try_borrow_mut() else {
+            return;
+        };
+        if met.contains(&term.word) {
+            return;
+        }
+        met.push(term.word);
+        drop(met);
+        crate::render::glossary::introduced(term).print();
     }
 
     /// Ask a yes-or-no question, taking the default where the answer is neither.
@@ -174,7 +205,8 @@ impl Prompt for Terminal {
     }
 
     fn credential(&self) -> Option<(String, String)> {
-        say!("\nAn indexer is where the stack searches for content.");
+        say!("");
+        self.introduce("indexer");
         say!("Leave the URL blank to set one up later.");
         let url = self.answers.ask("Indexer URL:");
         if url.is_empty() {
@@ -213,7 +245,8 @@ impl Prompt for Terminal {
     }
 
     fn usenet_provider(&self) -> Option<ProviderEntry> {
-        say!("\nA Usenet provider is where downloads are fetched from.");
+        say!("");
+        self.introduce("usenet");
         say!("Leave the host blank to set one up later.");
         let host = self.answers.ask("Provider host:");
         if host.is_empty() {
@@ -333,6 +366,24 @@ mod tests {
 
     use super::Terminal;
     use crate::prompt::fixtures::{answered, wizard, Script};
+
+    /// Worth reading the first time and noise every time after — the rule the
+    /// footnote block follows inside one report, carried across the questions of one
+    /// setup rather than starting again at each.
+    #[test]
+    fn a_word_is_explained_once_in_one_conversation() {
+        let terminal = answered(&[]);
+
+        terminal.introduce("indexer");
+        terminal.introduce("Indexer");
+        terminal.introduce("a phrase this product does not explain");
+
+        assert_eq!(
+            terminal.met.borrow().as_slice(),
+            ["indexer"],
+            "said once, whatever case it was asked about, and nothing invented"
+        );
+    }
 
     #[test]
     fn the_review_shows_each_setting_with_a_secret_marked_present_only() {
