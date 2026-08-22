@@ -210,3 +210,49 @@ fn a_scrollback_and_a_filter_both_say_what_they_are() {
     assert!(format!("{scrollback:?}").contains("Scrollback"));
     assert!(format!("{filter:?}").contains("Error"));
 }
+
+/// What the screen asks for: the newest few, in reading order, without considering
+/// the thousands behind them.
+#[test]
+fn the_latest_lines_are_the_newest_ones_in_reading_order() {
+    let scrollback = fed(10, &["one", "two", "three", "four"]);
+    let showing = |wanted| {
+        scrollback
+            .latest(&Filter::default(), wanted)
+            .into_iter()
+            .map(|line| line.line.clone())
+            .collect::<Vec<String>>()
+    };
+
+    assert_eq!(showing(2), ["three", "four"], "newest, but oldest first");
+    assert_eq!(
+        showing(99),
+        ["one", "two", "three", "four"],
+        "more room than lines"
+    );
+    assert!(showing(0).is_empty(), "a screen with no room shows nothing");
+}
+
+/// It answers the same question the full read does, only about fewer lines — so a
+/// filter narrowing everything away is visible from the first one asked for.
+#[test]
+fn the_latest_lines_are_only_the_ones_the_filter_admits() {
+    let mut scrollback = Scrollback::holding(10);
+    scrollback.take(line("sonarr", "WARN one timed out"));
+    scrollback.take(line("radarr", "INFO two arrived"));
+    scrollback.take(line("sonarr", "WARN three timed out"));
+
+    let timed = Filter::default().containing("timed");
+    assert_eq!(scrollback.latest(&timed, 1).len(), 1);
+    assert_eq!(
+        scrollback.latest(&timed, 9).len(),
+        2,
+        "and no more than admits"
+    );
+
+    let nothing = Filter::default().containing("nothing says this");
+    assert!(
+        scrollback.latest(&nothing, 1).is_empty(),
+        "one is enough to know there is nothing"
+    );
+}

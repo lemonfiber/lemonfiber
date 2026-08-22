@@ -313,8 +313,10 @@ impl Viewer {
 
     /// Further back into what has already happened, stopping at the oldest line.
     fn further_back(&mut self) {
-        let admitted = self.held.showing(&self.filter()).len();
-        self.back = self.back.saturating_add(1).min(admitted.saturating_sub(1));
+        // Bounded by the oldest admitted line, which needs one more than the offset
+        // already reached rather than a count of everything the filter allows.
+        let reachable = self.held.latest(&self.filter(), self.back + 2).len();
+        self.back = self.back.saturating_add(1).min(reachable.saturating_sub(1));
         self.told();
     }
 
@@ -359,8 +361,11 @@ impl Viewer {
 
     /// The lines to put on a screen this many rows tall, oldest first.
     pub(crate) fn showing(&self, rows: usize) -> Vec<Shown> {
+        // Only as many as the screen and the offset between them can account for,
+        // read from the newest backwards — a redraw costs what it shows rather than
+        // what the buffer holds.
         let filter = self.filter();
-        let admitted = self.held.showing(&filter);
+        let admitted = self.held.latest(&filter, rows.saturating_add(self.back));
         let end = admitted.len().saturating_sub(self.back);
         let start = end.saturating_sub(rows);
         admitted
@@ -434,7 +439,9 @@ impl Viewer {
     /// reads the same whether the filter is too narrow or nothing has arrived at all,
     /// and those call for opposite responses.
     pub(crate) fn nothing(&self) -> Option<String> {
-        if self.held.showing(&self.filter()).is_empty() {
+        // One line is enough to know there is something; asking for the whole
+        // admitted set would scan the buffer to answer a yes-or-no question.
+        if self.held.latest(&self.filter(), 1).is_empty() {
             return Some(format!(
                 "nothing matches — {} lines scanned",
                 self.held.scanned()
