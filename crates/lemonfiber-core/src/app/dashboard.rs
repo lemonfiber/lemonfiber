@@ -257,10 +257,18 @@ async fn transfers(
     };
     let targets = download_targets(&manifest.services, project);
 
+    // Read at once rather than in series, for the reason `doctor` runs its checks
+    // that way: these are independent HTTP calls to different services, so a refresh
+    // costs the slowest client rather than the sum of them — and this one happens
+    // every second, where a diagnosis happens when it is asked for. `join_all` keeps
+    // the order, so the panel reads the same as when they were read one at a time.
+    let read = futures_util::future::join_all(targets.iter().map(|target| async move {
+        (protocol_of(&target.kind), read_transfers(ctx, target).await)
+    }))
+    .await;
+
     let mut active = Vec::new();
-    for target in &targets {
-        let downloads = read_transfers(ctx, target).await;
-        let protocol = protocol_of(&target.kind);
+    for (protocol, downloads) in read {
         active.extend(downloads.into_iter().map(|download| {
             Transfer {
                 name: download.name.clone(),
@@ -339,29 +347,36 @@ async fn queues(
     };
     let targets = servarr_targets(&manifest.services, project);
 
+    // Opened and read at once rather than one service after another: each is two
+    // round trips, and five \*arrs in series is ten waits where the slowest one would
+    // do. `join_all` keeps the order, so the panel and the answers below read the
+    // same as when they were gathered one at a time.
+    let read = futures_util::future::join_all(targets.iter().map(|target| async move {
+        let service = target.open(&ctx.http, ctx.filesystem.as_ref()).await?;
+        Some((target.name.clone(), service.queue().await))
+    }))
+    .await;
+
     let mut depths = Vec::new();
     // The items as well as the depths. A number says how much is queued and
     // cannot say which of it is stuck or why, which is what the queue check is
     // for — and asking each service twice for the same page would be a second
     // round of requests for an answer already in hand.
     let mut answers = Vec::new();
-    for target in &targets {
-        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
-            continue;
-        };
-        match service.queue().await {
+    for (name, answered) in read.into_iter().flatten() {
+        match answered {
             Ok(read) => {
                 let depth = QueueDepth::of(&read);
                 depths.push(Queue {
-                    service: target.name.clone(),
+                    service: name.clone(),
                     depth: depth.total,
                     stuck: depth.stuck,
                 });
-                answers.push((target.name.clone(), Answered::Queue(read.items)));
+                answers.push((name, Answered::Queue(read.items)));
             }
             // Silence is not an empty queue, and the check is told so rather than
             // left to infer health from an absence.
-            Err(_) => answers.push((target.name.clone(), Answered::Unreachable)),
+            Err(_) => answers.push((name, Answered::Unreachable)),
         }
     }
     (Panel::Ready(depths), answers)
