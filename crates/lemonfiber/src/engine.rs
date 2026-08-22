@@ -22,7 +22,7 @@ use crate::keyboard::{Console, Keyboard};
 use crate::prompt::Answers as _;
 use crate::render::downloads::interrupting;
 use crate::render::{logged, render, watched, UNRENDERABLE};
-use crate::say::{complain, say};
+use crate::say::{complain, emit, say};
 use crate::setup::Surface as _;
 use crate::stopping::{answered, asking, Asking, Choice, ASK_TO_WAIT};
 
@@ -49,7 +49,7 @@ pub(crate) async fn stream(
     while let Some(line) = lines.recv().await {
         seen += 1;
         if json {
-            say!(
+            emit!(
                 "{}",
                 Envelope::new("log", &line)
                     .to_json()
@@ -154,7 +154,7 @@ pub(crate) fn emit_line(kind: &'static str, line: &str, json: bool) {
         say!("  {line}");
         return;
     }
-    say!(
+    emit!(
         "{}",
         Envelope::new(kind, line)
             .to_json()

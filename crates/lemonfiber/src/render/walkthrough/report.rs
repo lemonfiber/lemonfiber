@@ -102,7 +102,7 @@ fn still_going(report: &WalkthroughReport) -> Lines {
 
 /// The whole report as one document, for a script.
 pub(crate) fn machine_readable(report: &WalkthroughReport) -> Lines {
-    let mut lines = Lines::default();
+    let mut lines = Lines::for_a_parser();
     lines.put(
         Envelope::new("walkthrough", report)
             .to_json()
