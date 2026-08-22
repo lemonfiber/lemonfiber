@@ -157,6 +157,34 @@ fn no_other_services_word_is_written_as_if_it_were_ours() {
     );
 }
 
+/// The text of a call, from its opening bracket to the one that closes it.
+///
+/// Read by counting brackets rather than by taking a fixed number of lines, because
+/// a fixed window is wrong in both directions: it misses a call that formatting has
+/// spread wider than the window, and it blames a call for a line that merely follows
+/// it. Neither is hypothetical here — `engine.rs` already has an ordinary `say!`
+/// sitting seven lines above an unrelated `to_json()`, which a six-line window
+/// cleared by one line.
+fn invocation(text: &str, opens: usize) -> &str {
+    let Some(rest) = text.get(opens..) else {
+        return "";
+    };
+    let mut depth = 0_usize;
+    for (at, character) in rest.char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return rest.get(..=at).unwrap_or(rest);
+                }
+            }
+            _ => {}
+        }
+    }
+    rest
+}
+
 /// What a parser reads is never rendered for a person.
 ///
 /// Folding decides what a person's terminal can draw, and `--json` has no person on
@@ -177,15 +205,15 @@ fn nothing_a_parser_reads_is_rendered_for_a_person() {
         if !where_it_lives.contains("/src/") {
             continue;
         }
-        let lines: Vec<&str> = production(&text).lines().collect();
-        for (number, line) in lines.iter().enumerate() {
-            if !line.contains("say!(") {
+        let shipped = production(&text);
+        for (at, _) in shipped.match_indices("say!(") {
+            if !invocation(shipped, at + "say!".len()).contains("to_json()") {
                 continue;
             }
-            let call: String = lines.iter().skip(number).take(6).copied().collect();
-            if call.contains("to_json()") {
-                rendered.push(format!("{where_it_lives}:{}", number + 1));
-            }
+            let number = shipped
+                .get(..at)
+                .map_or(0, |before| before.matches('\n').count() + 1);
+            rendered.push(format!("{where_it_lives}:{number}"));
         }
     }
     assert!(
