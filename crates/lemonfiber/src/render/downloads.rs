@@ -6,11 +6,7 @@ use lemonfiber_core::plural::s;
 
 use super::Lines;
 
-/// How wide the name column is before a title is clipped.
-///
-/// Release names run long and a wrapped one is harder to recognise than a clipped
-/// one — the front of a name is where the title is, and the tail is where the
-/// encoding and the group are.
+/// How wide the name column is before a name is shortened.
 const NAMED: usize = 40;
 
 /// The word for a protocol.
@@ -41,9 +37,9 @@ pub(crate) fn interrupting(active: &[Interrupted]) -> Lines {
     ));
     for download in active {
         lines.put(format!(
-            "  {:<8}  {:<width$.width$}  {:>3}%",
+            "  {:<8}  {:<width$}  {:>3}%",
             protocol(download.protocol),
-            download.name,
+            fitted(&download.name, NAMED),
             download.progress,
             width = NAMED
         ));
@@ -51,9 +47,32 @@ pub(crate) fn interrupting(active: &[Interrupted]) -> Lines {
     lines
 }
 
+/// A name shortened to fit, keeping both of its ends.
+///
+/// Elided in the middle rather than cut at the end, because the end of a release
+/// name is where the things that tell two of them apart live — the resolution, the
+/// encoding, the group. Cut at the tail, `…1080p` and `…2160p` read identically,
+/// and a list of what is still downloading that cannot tell two downloads apart
+/// fails at the one question it exists to answer.
+///
+/// The marker is three full stops rather than an ellipsis, so a terminal that
+/// cannot render the character is not handed one.
+fn fitted(name: &str, width: usize) -> String {
+    let counted = name.chars().count();
+    if counted <= width {
+        return name.to_owned();
+    }
+    let keep = width.saturating_sub(3);
+    let tail = keep / 2;
+    let head = keep - tail;
+    let front: String = name.chars().take(head).collect();
+    let back: String = name.chars().skip(counted - tail).collect();
+    format!("{front}...{back}")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{interrupting, protocol};
+    use super::{fitted, interrupting, protocol, NAMED};
     use lemonfiber_core::app::Interrupted;
     use lemonfiber_core::dashboard::Protocol;
 
@@ -100,22 +119,46 @@ mod tests {
         assert!(text.contains("1 download still active:"), "{text}");
     }
 
-    /// A release name longer than the column is clipped rather than wrapped: the
-    /// front of a name is the title, which is what makes it recognisable.
+    /// The defect this guards against: cut at the tail, two releases that differ
+    /// only in resolution read identically, and a list of what is downloading that
+    /// cannot tell them apart fails at the one question it exists to answer.
     #[test]
-    fn a_long_name_is_clipped_rather_than_wrapped() {
-        let long = "A.Really.Very.Long.Release.Name.That.Runs.Past.The.Column.2024.2160p";
-        let text = interrupting(&[coming(Protocol::Usenet, long, 50)]).text();
+    fn two_releases_differing_only_at_the_end_stay_distinguishable() {
+        let hd = "A.Very.Long.Release.Name.From.Some.Group.2024.1080p.WEB-DL";
+        let uhd = "A.Very.Long.Release.Name.From.Some.Group.2024.2160p.WEB-DL";
 
-        assert_eq!(
-            text.lines().count(),
-            3,
-            "a blank, the heading, one row: {text}"
+        assert_ne!(
+            fitted(hd, NAMED),
+            fitted(uhd, NAMED),
+            "both were shortened to the same thing"
         );
-        assert!(text.contains("A.Really.Very.Long.Release.Name"), "{text}");
-        assert!(
-            !text.contains("2160p"),
-            "the tail is what gives way: {text}"
-        );
+        let shortened = fitted(uhd, NAMED);
+        assert!(shortened.ends_with("WEB-DL"), "{shortened}");
+        assert!(shortened.starts_with("A.Very.Long"), "{shortened}");
+    }
+
+    /// A name that fits is left exactly as it is — shortening one that needs no
+    /// shortening would be inventing a change to it.
+    #[test]
+    fn a_name_that_fits_is_left_alone() {
+        assert_eq!(fitted("Short.Name", NAMED), "Short.Name");
+        assert_eq!(fitted(&"x".repeat(NAMED), NAMED), "x".repeat(NAMED));
+    }
+
+    /// Never wider than asked for, however it was shortened.
+    #[test]
+    fn a_shortened_name_still_fits_the_column() {
+        let long = "z".repeat(NAMED * 3);
+        assert_eq!(fitted(&long, NAMED).chars().count(), NAMED);
+    }
+
+    /// The marker is full stops rather than an ellipsis, so a terminal that cannot
+    /// render the character is never handed one.
+    #[test]
+    fn shortening_uses_no_character_a_terminal_might_not_have() {
+        let text = fitted(&"y".repeat(NAMED * 2), NAMED);
+
+        assert!(text.contains("..."), "{text}");
+        assert!(text.is_ascii(), "{text}");
     }
 }

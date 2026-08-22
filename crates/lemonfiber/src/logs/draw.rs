@@ -17,12 +17,6 @@ use ratatui::Frame;
 
 use super::{Shown, Viewer};
 
-/// How wide the service column is.
-///
-/// Wide enough for the longest name this stack runs, so the lines beside it start
-/// in the same column and the eye can run down them.
-const NAMED: usize = 12;
-
 /// What the keys do, always on the screen.
 ///
 /// An operator who has scrolled into history and cannot remember how to get back to
@@ -64,24 +58,30 @@ pub(crate) fn draw(frame: &mut Frame, viewer: &Viewer) {
 
 /// The body: the lines, or the reason there are none.
 fn lines(viewer: &Viewer, rows: usize) -> Vec<Line<'static>> {
-    match viewer.nothing() {
-        Some(reason) => vec![Line::styled(
+    if let Some(reason) = viewer.nothing() {
+        return vec![Line::styled(
             reason,
             Style::default().add_modifier(Modifier::DIM),
-        )],
-        None => viewer
-            .showing(rows)
-            .iter()
-            .map(|shown| said(shown, viewer.colours()))
-            .collect(),
+        )];
     }
+
+    let named = widest(viewer.seen());
+    viewer
+        .showing(rows)
+        .iter()
+        .map(|shown| said(shown, viewer.colours(), named))
+        .collect()
 }
 
 /// One line: who said it, and what they said.
-fn said(shown: &Shown, colours: bool) -> Line<'static> {
+///
+/// The service column is padded to the width the caller measured and never cut: a
+/// name cut short no longer says which service wrote the line, which is the one
+/// thing the column is there for.
+fn said(shown: &Shown, colours: bool, named: usize) -> Line<'static> {
     Line::from(vec![
         Span::styled(
-            format!("{:<width$.width$} ", shown.service, width = NAMED),
+            format!("{:<width$} ", shown.service, width = named),
             Style::default().add_modifier(Modifier::DIM),
         ),
         Span::styled(shown.said.clone(), colour(shown.level, colours)),
@@ -119,9 +119,26 @@ fn colour(level: Option<Level>, colours: bool) -> Style {
     }
 }
 
+/// How wide the service column has to be to hold every name that will appear in it.
+///
+/// Measured rather than fixed, because a fixed column either wastes room on a stack
+/// of short names or cuts the long ones — and a cut name no longer says which
+/// service wrote the line, which is the one thing the column is there for.
+/// `calibre-web-automated` and `audiobookshelf` both lose that at twelve
+/// characters, and both are in the stack this ships with.
+///
+/// Grows only when a service first appears, so the column is steady while a stack
+/// runs rather than shifting under whoever is reading it.
+fn widest(seen: &[String]) -> usize {
+    seen.iter()
+        .map(|name| name.chars().count())
+        .max()
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{colour, draw};
+    use super::{colour, draw, widest};
     use crate::logs::{Press, Viewer};
     use lemonfiber_core::logs::Level;
     use lemonfiber_core::ports::docker::{LogLine, Stream};
@@ -281,5 +298,32 @@ mod tests {
 
         let screen = drawn(&viewer, 80, 8);
         assert!(screen.contains("WARN Import timed out"), "{screen}");
+    }
+
+    /// A cut service name no longer says which service wrote the line. Both of
+    /// these are in the stack this ships with, and both lost that at twelve.
+    #[test]
+    fn the_column_is_wide_enough_for_every_name_in_it() {
+        assert_eq!(widest(&[]), 0, "nothing seen, nothing to hold");
+        assert_eq!(widest(&["sonarr".to_owned()]), 6);
+        assert_eq!(
+            widest(&[
+                "sonarr".to_owned(),
+                "calibre-web-automated".to_owned(),
+                "radarr".to_owned(),
+            ]),
+            21,
+            "the longest decides it, wherever it sits in the order"
+        );
+    }
+
+    /// The whole point, end to end: a long service name reaches the screen whole.
+    #[test]
+    fn a_long_service_name_is_shown_in_full() {
+        let mut viewer = Viewer::opened();
+        viewer.take(line("calibre-web-automated", "INFO shelved something"));
+
+        let screen = drawn(&viewer, 100, 8);
+        assert!(screen.contains("calibre-web-automated"), "{screen}");
     }
 }
