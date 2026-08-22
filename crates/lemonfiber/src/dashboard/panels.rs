@@ -51,7 +51,7 @@ pub(super) fn header(telemetry: Telemetry, health: &Summary) -> Line<'static> {
         Span::raw("lemonfiber  "),
         Span::styled(screen(telemetry).to_owned(), quiet()),
         Span::raw("   "),
-        Span::raw(health.said()),
+        Span::raw(plain(&health.said())),
     ])
 }
 
