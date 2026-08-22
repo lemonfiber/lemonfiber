@@ -132,16 +132,9 @@ mod tests {
             fitted(uhd, NAMED),
             "both were shortened to the same thing"
         );
-        assert!(
-            fitted(uhd, NAMED).ends_with("WEB-DL"),
-            "{}",
-            fitted(uhd, NAMED)
-        );
-        assert!(
-            fitted(uhd, NAMED).starts_with("A.Very.Long"),
-            "{}",
-            fitted(uhd, NAMED)
-        );
+        let shortened = fitted(uhd, NAMED);
+        assert!(shortened.ends_with("WEB-DL"), "{shortened}");
+        assert!(shortened.starts_with("A.Very.Long"), "{shortened}");
     }
 
     /// A name that fits is left exactly as it is — shortening one that needs no

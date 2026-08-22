@@ -58,20 +58,19 @@ pub(crate) fn draw(frame: &mut Frame, viewer: &Viewer) {
 
 /// The body: the lines, or the reason there are none.
 fn lines(viewer: &Viewer, rows: usize) -> Vec<Line<'static>> {
-    match viewer.nothing() {
-        Some(reason) => vec![Line::styled(
+    if let Some(reason) = viewer.nothing() {
+        return vec![Line::styled(
             reason,
             Style::default().add_modifier(Modifier::DIM),
-        )],
-        None => {
-            let named = widest(viewer.seen());
-            viewer
-                .showing(rows)
-                .iter()
-                .map(|shown| said(shown, viewer.colours(), named))
-                .collect()
-        }
+        )];
     }
+
+    let named = widest(viewer.seen());
+    viewer
+        .showing(rows)
+        .iter()
+        .map(|shown| said(shown, viewer.colours(), named))
+        .collect()
 }
 
 /// One line: who said it, and what they said.
