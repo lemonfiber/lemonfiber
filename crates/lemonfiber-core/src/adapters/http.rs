@@ -162,7 +162,7 @@ pub struct PerOrigin {
 
 impl reqwest::cookie::CookieStore for PerOrigin {
     fn set_cookies(&self, headers: &mut dyn Iterator<Item = &HeaderValue>, url: &Url) {
-        let pairs: Vec<(String, String)> = headers.filter_map(|header| pair(header)).collect();
+        let pairs: Vec<(String, String)> = headers.filter_map(pair).collect();
         if let Ok(mut held) = self.held.lock() {
             held.entry(origin(url)).or_default().extend(pairs);
         }
