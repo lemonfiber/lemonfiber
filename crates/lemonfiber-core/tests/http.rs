@@ -15,12 +15,16 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 /// What the fake server sends back.
+#[derive(Clone, Copy)]
 enum Reply {
     /// A complete response with this status and body.
     Whole(u16, &'static str),
     /// A response that promises more body than it sends, then closes — so the
     /// client cannot read the body it was told to expect.
     Truncated,
+    /// An empty response that sets this cookie, so what a later request carries
+    /// back can be looked at.
+    Setting(&'static str),
 }
 
 /// A running fake server on localhost, and the request it captured.
@@ -71,6 +75,16 @@ async fn serve(reply: Reply) -> Server {
 
 /// Accept one connection, record the whole request, then send the reply.
 async fn answer(listener: TcpListener, reply: Reply, captured: Arc<Mutex<String>>) {
+    // Served in a loop rather than once, because proving a cookie comes back to the
+    // origin that set it takes two requests to one server. A test that asks once is
+    // unaffected: it reads what it captured and then stops the server.
+    loop {
+        served(&listener, reply, &captured).await;
+    }
+}
+
+/// Accept one connection, record the whole request, then send the reply.
+async fn served(listener: &TcpListener, reply: Reply, captured: &Arc<Mutex<String>>) {
     let Ok((mut socket, _)) = listener.accept().await else {
         return;
     };
@@ -98,6 +112,9 @@ async fn answer(listener: TcpListener, reply: Reply, captured: Arc<Mutex<String>
         }
         // Promise a hundred bytes, send five, then close.
         Reply::Truncated => "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nshort".to_owned(),
+        Reply::Setting(cookie) => {
+            format!("HTTP/1.1 200 X\r\nSet-Cookie: {cookie}\r\nContent-Length: 0\r\n\r\n")
+        }
     };
     let _ = socket.write_all(bytes.as_bytes()).await;
     let _ = socket.flush().await;
@@ -113,6 +130,16 @@ async fn dead_url() -> String {
         .and_then(|listener| listener.local_addr().ok())
         .map_or(0, |address| address.port());
     format!("http://127.0.0.1:{port}")
+}
+
+/// A plain GET of a base, for the tests that care about headers rather than paths.
+fn asking(base: &str) -> Request {
+    Request {
+        method: Method::Get,
+        url: format!("{base}/api/v3/system/status"),
+        headers: Vec::new(),
+        body: None,
+    }
 }
 
 #[tokio::test]
@@ -266,4 +293,54 @@ async fn a_body_that_does_not_arrive_is_unreachable() {
     let outcome = Web::new().send(&request).await;
     server.stop().await;
     assert!(outcome.is_err(), "a body that never arrives is unreachable");
+}
+
+/// The whole reason this adapter does not use the default cookie store.
+///
+/// Every service in this stack is a different port on one address, and cookies are
+/// scoped to a host rather than to a port — so a specification-correct store hands
+/// the download client's session to every other service on the machine. These are
+/// somebody else's container images, and a credential that reaches them is a
+/// credential outside this product's control.
+#[tokio::test]
+async fn a_cookie_set_by_one_service_is_never_sent_to_another() {
+    let client = Web::new();
+    let downloads = serve(Reply::Setting("SID=a-session-token; path=/")).await;
+    let indexer = serve(Reply::Whole(200, "{}")).await;
+
+    let _ = client.send(&asking(&downloads.base)).await;
+    let _ = client.send(&asking(&indexer.base)).await;
+
+    let asked = indexer.request();
+    assert!(
+        !asked.contains("a-session-token"),
+        "the other service was handed the session: {asked}"
+    );
+    assert!(
+        !asked.to_lowercase().contains("cookie:"),
+        "and was sent no cookie header at all: {asked}"
+    );
+
+    downloads.stop().await;
+    indexer.stop().await;
+}
+
+/// And the half that has to keep working: qBittorrent authenticates by a cookie set
+/// at login and expected on the calls after it, so the origin that set one gets it
+/// back. A store that leaked nothing and remembered nothing would be no store.
+#[tokio::test]
+async fn a_cookie_comes_back_to_the_service_that_set_it() {
+    let client = Web::new();
+    let downloads = serve(Reply::Setting("SID=a-session-token; path=/")).await;
+
+    let _ = client.send(&asking(&downloads.base)).await;
+    let _ = client.send(&asking(&downloads.base)).await;
+
+    let asked = downloads.request();
+    assert!(
+        asked.contains("SID=a-session-token"),
+        "the session did not come back to the service that issued it: {asked}"
+    );
+
+    downloads.stop().await;
 }
