@@ -142,7 +142,7 @@ fn places(body: Rect) -> Vec<Rect> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{draw, places, sections, TWO_COLUMNS};
+    use super::{draw, places, sections, showing, TWO_COLUMNS};
     use lemonfiber_core::dashboard::{
         Hardlink, Panel, Protocol, Reading, Snapshot, Storage, Telemetry, Transfer,
     };

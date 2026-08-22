@@ -145,6 +145,19 @@ impl Viewer {
         }
     }
 
+    /// The words this screen is showing, for the loop to record what was opened.
+    ///
+    /// Built from the lines the view would draw rather than from the whole
+    /// scrollback: what an operator opened the pane over is what was in front of
+    /// them, not everything the buffer happens to hold.
+    pub(crate) fn showing_words(&self, rows: usize) -> String {
+        self.showing(rows)
+            .iter()
+            .map(|shown| format!("{} {}", shown.service, shown.said))
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+
     /// Whether the words on this screen are being shown.
     pub(crate) const fn glossary(&self) -> bool {
         matches!(self.words, Words::Shown)
