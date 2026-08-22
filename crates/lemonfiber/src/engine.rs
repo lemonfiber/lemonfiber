@@ -22,6 +22,7 @@ use crate::keyboard::{Console, Keyboard};
 use crate::prompt::Answers as _;
 use crate::render::downloads::interrupting;
 use crate::render::{logged, render, watched, UNRENDERABLE};
+use crate::say::{complain, say};
 use crate::setup::Surface as _;
 use crate::stopping::{answered, asking, Asking, Choice, ASK_TO_WAIT};
 
@@ -48,21 +49,21 @@ pub(crate) async fn stream(
     while let Some(line) = lines.recv().await {
         seen += 1;
         if json {
-            println!(
+            say!(
                 "{}",
                 Envelope::new("log", &line)
                     .to_json()
                     .unwrap_or(UNRENDERABLE.to_owned())
             );
         } else {
-            println!("{}", logged(&line.service, &line.line));
+            say!("{}", logged(&line.service, &line.line));
         }
     }
 
     // Silence and "no output" are different answers, and a viewer that renders
     // them identically leaves the operator wondering which one they got.
     if seen == 0 && !json {
-        println!("no output");
+        say!("no output");
     }
     ExitCode::SUCCESS
 }
@@ -94,7 +95,7 @@ pub(crate) async fn pull_showing(ctx: &Ctx, forms: &[String], json: bool) -> Res
     // The expected-duration statement, before the wait — qualitative, because the
     // real figure depends on the operator's line and what is already cached.
     if !json {
-        println!("Pulling images — usually a few minutes, and several gigabytes.");
+        say!("Pulling images — usually a few minutes, and several gigabytes.");
     }
 
     let mut progress = pull_progress(ctx, forms)
@@ -112,7 +113,7 @@ pub(crate) async fn pull_showing(ctx: &Ctx, forms: &[String], json: bool) -> Res
 
     if failed {
         if !json {
-            eprintln!("\nSome images could not be pulled — check the output above.");
+            complain!("\nSome images could not be pulled — check the output above.");
         }
         return Err(ExitCode::from(FAILURE));
     }
@@ -150,10 +151,10 @@ pub(crate) async fn pull_rehearsal(
 /// filtering on it: a pull's lines and a start's are different things happening.
 pub(crate) fn emit_line(kind: &'static str, line: &str, json: bool) {
     if !json {
-        println!("  {line}");
+        say!("  {line}");
         return;
     }
-    println!(
+    say!(
         "{}",
         Envelope::new(kind, line)
             .to_json()
@@ -215,7 +216,7 @@ async fn drained(ctx: &Ctx, forms: &[String]) {
     loop {
         let active = in_flight(ctx, forms).await;
         if active.is_empty() {
-            println!("downloads finished — stopping now");
+            say!("downloads finished — stopping now");
             return;
         }
         if active.len() != counted {

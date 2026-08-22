@@ -23,6 +23,7 @@ mod maintain;
 mod prompt;
 mod render;
 mod repair;
+mod say;
 mod setup;
 mod stopping;
 mod support;
@@ -30,6 +31,7 @@ mod terminal;
 mod translate;
 mod walkthrough;
 
+use crate::say::{complain, say};
 use cli::{Cli, Request};
 use context::{context, here};
 use engine::{guard, pull, settle, start, stream};
@@ -62,8 +64,25 @@ async fn read_logs(
     }
 }
 
+/// What the environment says about this terminal's character set.
+///
+/// Read here rather than deeper in, because this is the edge: what a locale means
+/// is decided in [`crate::say`] where a test can reach it, and only this knows
+/// where the locale came from. The same division the log viewer makes over
+/// `NO_COLOR`.
+///
+/// Read in the order POSIX reads it: a specific override, then the character
+/// category, then the general setting.
+fn locale() -> Option<String> {
+    ["LC_ALL", "LC_CTYPE", "LANG"]
+        .into_iter()
+        .find_map(|name| std::env::var(name).ok().filter(|said| !said.is_empty()))
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
+    // Settled before anything is printed, because it decides how everything is.
+    say::settle(locale().as_deref());
     let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {
@@ -71,7 +90,7 @@ async fn main() -> ExitCode {
         let Some(paths) = here() else {
             // With nowhere to keep its files there is nothing to offer and nothing
             // to point at, so the plain pointer is the only honest thing left.
-            println!("lemonfiber — run `lemonfiber --help` to see what it can do");
+            say!("lemonfiber — run `lemonfiber --help` to see what it can do");
             return ExitCode::SUCCESS;
         };
         return greeting(ctx, &paths, &Console).await;
@@ -229,7 +248,7 @@ fn narrowed(only: Option<&str>) -> Result<Option<Category>, ExitCode> {
     match only.map(Category::parse) {
         Some(None) => {
             let named = only.unwrap_or_default();
-            eprintln!("error: no diagnostic category named `{named}`");
+            complain!("error: no diagnostic category named `{named}`");
             Err(ExitCode::from(USAGE))
         }
         Some(Some(category)) => Ok(Some(category)),
@@ -320,7 +339,7 @@ async fn setup_from(ctx: Ctx, raw: prompt::RawSetup) -> ExitCode {
     let flags = match SetupFlags::parse(raw) {
         Ok(flags) => flags,
         Err(message) => {
-            eprintln!("error: {message}");
+            complain!("error: {message}");
             return ExitCode::from(USAGE);
         }
     };

@@ -7,6 +7,7 @@
 
 use std::process::ExitCode;
 
+use crate::say::complain;
 use lemonfiber_core::app::repair::Report as RepairReport;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
@@ -181,22 +182,22 @@ pub(crate) fn upgrade_exit(report: &UpgradeReport) -> ExitCode {
 /// the remedies are the point of the error model, and a second copy of this is
 /// how one of them quietly starts omitting them.
 pub(crate) fn complain(problem: &Problem) -> ExitCode {
-    eprintln!("{}: {}", problem.code, problem.summary);
-    eprintln!("\n  {}\n", problem.meaning);
+    complain!("{}: {}", problem.code, problem.summary);
+    complain!("\n  {}\n", problem.meaning);
 
     for remedy in &problem.remedies {
-        eprintln!("  → {}", remedy.action);
+        complain!("  → {}", remedy.action);
         if let Some(detail) = &remedy.detail {
-            eprintln!("    {detail}");
+            complain!("    {detail}");
         }
     }
 
     // Last, and indented: available to whoever wants it, and never the first
     // thing the operator has to read.
     if let Some(detail) = &problem.detail {
-        eprintln!();
+        complain!();
         for line in detail.lines() {
-            eprintln!("  {line}");
+            complain!("  {line}");
         }
     }
 
@@ -213,7 +214,7 @@ pub(crate) fn complain(problem: &Problem) -> ExitCode {
 /// this platform will not say. The one message for it, so both callers word it the
 /// same way.
 pub(crate) fn no_config_home() -> ExitCode {
-    eprintln!("error: lemonfiber could not find where its configuration is kept");
+    complain!("error: lemonfiber could not find where its configuration is kept");
     ExitCode::FAILURE
 }
 

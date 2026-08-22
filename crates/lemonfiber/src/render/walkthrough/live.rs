@@ -8,6 +8,7 @@
 //! interleaved into it — a consumer parsing that stream would be handed something that is
 //! not a document at all.
 
+use crate::say::say;
 use lemonfiber_core::walkthrough::{Line, Narrator, Step};
 
 /// How wide the said-part of a line is before its detail, so the details line up in a
@@ -25,7 +26,7 @@ impl Narrator for Narrating {
         if !is_worth_saying(line.step) {
             return;
         }
-        println!("{}", spoken(line));
+        say!("{}", spoken(line));
     }
 }
 

@@ -98,7 +98,7 @@ impl Lines {
     /// Put them on the terminal. The one place this crate reaches stdout.
     pub(crate) fn print(&self) {
         for line in &self.0 {
-            println!("{line}");
+            crate::say::said(line);
         }
     }
 
@@ -106,7 +106,7 @@ impl Lines {
     /// which belongs beside the answer rather than in it.
     pub(crate) fn eprint(&self) {
         for line in &self.0 {
-            eprintln!("{line}");
+            crate::say::complained(line);
         }
     }
 }

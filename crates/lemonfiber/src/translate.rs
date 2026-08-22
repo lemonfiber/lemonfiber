@@ -12,6 +12,7 @@ use lemonfiber_core::recyclarr::Kind;
 
 use crate::cli::{ConfigAction, QualityCommand};
 use crate::exit::USAGE;
+use crate::say::complain;
 
 /// Which setting the operator is reading or changing.
 pub(crate) fn configuration(action: ConfigAction) -> Command {
@@ -35,7 +36,7 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
             // routes to its own command.
             if media_type.as_deref() == Some("music") {
                 let Some(format) = Format::from_label(&preset) else {
-                    eprintln!(
+                    complain!(
                         "error: no music format named `{preset}` \
                          (try compact, lossless, or hi-res)"
                     );
@@ -44,7 +45,7 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
                 return Ok(Command::QualityMusic { format });
             }
             let Some(preset) = Preset::from_label(&preset) else {
-                eprintln!(
+                complain!(
                     "error: no quality preset named `{preset}` \
                      (try space-saving, balanced, high-quality, or maximum)"
                 );
@@ -52,7 +53,7 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
             };
             if let Some(media_type) = &media_type {
                 if !Kind::ALL.iter().any(|kind| kind.media_type() == media_type) {
-                    eprintln!(
+                    complain!(
                         "error: no media type named `{media_type}` (try tv, movies, or music)"
                     );
                     return Err(USAGE);

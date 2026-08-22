@@ -567,17 +567,28 @@ fn a_failure_is_reported_on_stderr_and_never_on_stdout() {
 
     assert!(!complain.is_empty(), "the reporter was found");
     assert!(
-        complain.contains("eprintln!"),
+        complain.contains("complain!("),
         "it reports something at all"
     );
+
+    // Output leaves through one place now, so this is pinned where it is decided
+    // rather than at each of a hundred call sites: `complain!` is the stderr half
+    // of that funnel, and `say!` the stdout half. A reporter reaching for the wrong
+    // one is the failure this guards, and it is still one word.
+    let say = std::fs::read_to_string("src/say.rs").unwrap_or_default();
     assert!(
-        !complain.contains("println!(") || !complain.contains(" println!"),
-        "a diagnosis on stdout would corrupt a machine-readable run"
+        say.contains("fn complained") && say.contains("eprintln!"),
+        "the funnel's error half writes to stderr"
     );
+    assert!(
+        say.contains("fn said") && say.contains("println!"),
+        "and its ordinary half writes to stdout"
+    );
+
     for line in complain.lines() {
         let statement = line.trim_start();
         assert!(
-            !statement.starts_with("println!"),
+            !statement.starts_with("println!") && !statement.starts_with("say!"),
             "reports on stdout: {statement}"
         );
         // Nothing in a failure path may wait for a person: a non-interactive run

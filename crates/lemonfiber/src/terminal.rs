@@ -49,6 +49,7 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::exit::complain;
 use crate::logs::{colours, sampled, Asked, Press, Viewer};
+use crate::say::{complain, say};
 use crate::setup::Bare;
 
 /// How often the screen gathers afresh.
@@ -80,7 +81,7 @@ pub(crate) async fn configured(ctx: Ctx, bare: Bare) -> ExitCode {
         Bare::Dashboard => dashboard(ctx).await,
         Bare::Guidance => {
             for line in crate::setup::already_set_up() {
-                println!("{line}");
+                say!("{line}");
             }
             ExitCode::SUCCESS
         }
@@ -94,7 +95,7 @@ async fn dashboard(ctx: Ctx) -> ExitCode {
         // A terminal that will not go into raw mode is not a fault in the stack,
         // and saying so beats a blank screen.
         Err(err) => {
-            eprintln!("error: this terminal cannot show the dashboard: {err}");
+            complain!("error: this terminal cannot show the dashboard: {err}");
             return ExitCode::FAILURE;
         }
     };
@@ -220,7 +221,7 @@ pub(crate) async fn watching(
     let mut screen = match Screen::open() {
         Ok(screen) => screen,
         Err(err) => {
-            eprintln!("error: this terminal cannot show the log viewer: {err}");
+            complain!("error: this terminal cannot show the log viewer: {err}");
             return ExitCode::FAILURE;
         }
     };
