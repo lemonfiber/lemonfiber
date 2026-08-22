@@ -104,6 +104,13 @@ pub const TERMS: &[Term] = &[
         also_called: &[],
     },
     Term {
+        word: "peer",
+        short: "Somebody else sharing the same torrent. You take from them and they take \
+                from you, which is why a torrent with nobody on it never finishes.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
         word: "NZB",
         short: "What your indexer hands the download client so it can fetch the pieces \
                 of a Usenet download. You rarely handle one yourself, and nothing \
@@ -130,6 +137,30 @@ pub const TERMS: &[Term] = &[
         also_called: &[],
     },
     Term {
+        word: "backbone",
+        short: "The network a Usenet provider actually stores its articles on. Two \
+                providers sharing one hold the same things, so a second account there \
+                finds nothing the first could not.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
+        word: "block account",
+        short: "Usenet data bought as a fixed amount rather than a monthly allowance. \
+                Useful as a second provider, since you spend it only on what the first \
+                could not find.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
+        word: "port forwarding",
+        short: "A way back in for other peers, opened by your VPN. Without it they \
+                cannot start a connection to you, so torrents are slower and your ratio \
+                suffers.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
         word: "ratio",
         short: "How much you have shared back compared with what you took. Some trackers \
                 expect a minimum before they let you keep downloading.",
@@ -151,6 +182,22 @@ pub const TERMS: &[Term] = &[
         also_called: &["snatch"],
     },
     Term {
+        word: "monitored",
+        short: "Whether a service is still looking for something. Unmonitored means it \
+                will not go and find it even when it is missing, which is the usual \
+                reason nothing is happening.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
+        word: "stalled",
+        short: "A download that has stopped making progress without failing outright. It \
+                sits there until something moves it, which is why it is worth saying \
+                rather than counting as running.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
         word: "root folder",
         short: "Where a service files what it has finished with — the library it manages, \
                 rather than the folder downloads land in.",
@@ -168,6 +215,29 @@ pub const TERMS: &[Term] = &[
              quite the same word: this stack also has Compose profiles, and they decide \
              which services run rather than which releases are wanted.",
         ),
+        also_called: &[],
+    },
+    Term {
+        word: "transcode",
+        short: "Rebuilding a video into a form the device asking for it can play. It \
+                costs a great deal of processing, so a machine doing it often is one \
+                that feels slow.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
+        word: "bitrate",
+        short: "How much data each second of sound or video uses. Higher means better \
+                quality and larger files, which is the whole of the trade.",
+        deep: None,
+        also_called: &[],
+    },
+    Term {
+        word: "HDR",
+        short: "A wider range of brightness and colour than a screen normally shows. It \
+                needs a display that can take it; on one that cannot, the picture can \
+                look washed out.",
+        deep: None,
         also_called: &[],
     },
     Term {
