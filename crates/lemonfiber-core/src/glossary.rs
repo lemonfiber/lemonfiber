@@ -40,7 +40,7 @@ pub struct Term {
     pub deep: Option<&'static str>,
     /// What other services in this stack call the same thing.
     ///
-    /// Sonarr and SABnzbd do not agree on words, and an operator moving between
+    /// Sonarr and `SABnzbd` do not agree on words, and an operator moving between
     /// their screens should not have to work out that two of them are one.
     pub also_called: &'static [&'static str],
 }
@@ -105,8 +105,9 @@ pub const TERMS: &[Term] = &[
     },
     Term {
         word: "NZB",
-        short: "A small file describing where the pieces of a Usenet download are. Your \
-                download client uses it to fetch them.",
+        short: "What your indexer hands the download client so it can fetch the pieces \
+                of a Usenet download. You rarely handle one yourself, and nothing \
+                expects you to.",
         deep: None,
         also_called: &[],
     },
@@ -364,7 +365,7 @@ mod tests {
         }
     }
 
-    /// Sonarr and SABnzbd do not agree on words, and an operator moving between
+    /// Sonarr and `SABnzbd` do not agree on words, and an operator moving between
     /// their screens should not have to work out that two of them are one.
     #[test]
     fn the_words_other_services_use_are_recorded() {

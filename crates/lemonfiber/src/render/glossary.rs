@@ -229,16 +229,33 @@ mod tests {
 
     #[test]
     fn asking_about_a_word_gives_the_longer_form_and_the_other_names() {
-        let said = explained("grab")
+        let said = explained("indexer")
             .map(|lines| lines.text())
             .unwrap_or_default();
 
-        assert!(said.starts_with("grab\n"), "{said}");
-        assert!(said.contains("download client"), "{said}");
+        assert!(said.starts_with("indexer\n"), "{said}");
         assert!(
-            said.contains("Other services call this: snatch, fetch."),
+            said.contains("Search engines that find"),
+            "the sentence: {said}"
+        );
+        assert!(said.contains("Prowlarr"), "and the longer form: {said}");
+        assert!(
+            said.contains("Other services call this: search provider."),
             "{said}"
         );
+    }
+
+    /// The longer form is what somebody went and asked for, so it is set apart from
+    /// the sentence they never had to read rather than run on from it.
+    #[test]
+    fn the_longer_form_is_separated_from_the_sentence() {
+        let said = explained("hardlink")
+            .map(|lines| lines.text())
+            .unwrap_or_default();
+
+        assert!(said.contains("space once"), "the sentence is there: {said}");
+        assert!(said.contains("Deleting one"), "and the longer form: {said}");
+        assert!(said.contains("\n\n"), "a blank line divides them: {said}");
     }
 
     /// A word with no longer form still answers, rather than showing a heading over
