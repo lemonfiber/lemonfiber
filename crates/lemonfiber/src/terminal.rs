@@ -132,6 +132,12 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
                 }
                 Some(Key::Glossary) => {
                     glossary = crate::render::glossary::wanted() && !glossary;
+                    // Opening them is the asking, so what was opened is recorded.
+                    if glossary {
+                        if let Some(snapshot) = snapshot.as_ref() {
+                            learned(&crate::dashboard::showing(snapshot), ctx.dry_run);
+                        }
+                    }
                 }
             },
             gathered = &mut refreshing => {
@@ -264,12 +270,17 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
         }
         tokio::select! {
             press = arriving.recv() => match press {
-                Some(press) => {
-                    if viewer.pressed(press) == Asked::Export {
+                Some(press) => match viewer.pressed(press) {
+                    Asked::Export => {
                         written += 1;
                         export(&mut viewer, ctx, written).await;
                     }
-                }
+                    // Opening them is the asking, so what was opened is recorded.
+                    Asked::Learned => {
+                        learned(&viewer.showing_words(SHOWN_AT_ONCE), ctx.dry_run);
+                    }
+                    Asked::Nothing => {}
+                },
                 None => break,
             },
             line = lines.recv(), if !ended => match line {
@@ -391,6 +402,22 @@ const fn wanted(key: KeyEvent) -> Option<Press> {
         KeyCode::End => Some(Press::Tail),
         _ => None,
     }
+}
+
+/// How many lines of a view count as what was opened over it.
+///
+/// The pane covers most of the screen, so what an operator read is what was behind
+/// it — a generous count rather than an exact one, and generous in the direction of
+/// recording less than was there rather than more.
+const SHOWN_AT_ONCE: usize = 20;
+
+/// Record every word a screen was showing, since opening them is the asking.
+fn learned(showing: &str, rehearsing: bool) {
+    let words: Vec<&str> = lemonfiber_core::glossary::mentioned(showing)
+        .into_iter()
+        .map(|term| term.word)
+        .collect();
+    crate::context::remember(&words, rehearsing);
 }
 
 /// The terminal, in the state a full-screen view needs it, for as long as it is held.

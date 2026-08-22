@@ -437,6 +437,34 @@ mod tests {
             .collect()
     }
 
+    /// Opening the words is the asking. Closing them again is not, and neither is
+    /// a key pressed on a run that explains nothing.
+    #[test]
+    fn opening_the_words_asks_and_closing_them_does_not() {
+        let mut viewer = a_viewer();
+
+        assert_eq!(viewer.pressed(Press::Typed('?')), Asked::Learned);
+        assert_eq!(viewer.pressed(Press::Typed('?')), Asked::Nothing);
+    }
+
+    #[test]
+    fn a_run_that_explains_nothing_asks_nothing_either() {
+        let mut viewer = Viewer::opened().without_explanations();
+
+        assert_eq!(viewer.pressed(Press::Typed('?')), Asked::Nothing);
+    }
+
+    /// What the loop records is what was behind the pane.
+    #[test]
+    fn the_words_on_screen_are_the_ones_showing() {
+        let viewer = fed(&[("sonarr", "no indexer answered in time")]);
+
+        let said = viewer.showing_words(10);
+
+        assert!(said.contains("indexer"), "{said}");
+        assert!(said.contains("sonarr"), "and which service said it: {said}");
+    }
+
     /// Press each of these in turn.
     fn press(viewer: &mut Viewer, presses: &[Press]) {
         for asked in presses {

@@ -57,6 +57,8 @@ pub(crate) enum Asked {
     Nothing,
     /// Write the view out.
     Export,
+    /// Record the words just opened, since opening them is asking what they mean.
+    Learned,
 }
 
 impl Viewer {
@@ -110,7 +112,7 @@ impl Viewer {
             Press::Typed('q') | Press::Abandon => self.open = false,
             Press::Typed('/') => self.typing = Some(String::new()),
             Press::Typed('f') | Press::Tail => self.back_to_the_tail(),
-            Press::Typed('?') => self.show_or_hide_the_words(),
+            Press::Typed('?') => return self.show_or_hide_the_words(),
             Press::Typed('s') => self.next_service(),
             Press::Typed('w') => self.next_rung(),
             Press::Typed('c') => self.unfiltered(),
@@ -125,12 +127,18 @@ impl Viewer {
     ///
     /// A run that explains nothing stays where it is: there is no fourth state in
     /// which they are shown anyway.
-    fn show_or_hide_the_words(&mut self) {
+    fn show_or_hide_the_words(&mut self) -> Asked {
         self.words = match self.words {
             Words::Unexplained => Words::Unexplained,
             Words::Away => Words::Shown,
             Words::Shown => Words::Away,
         };
+        // Opening them is the asking. Closing them again is not, and neither is a
+        // key pressed on a run that explains nothing.
+        if matches!(self.words, Words::Shown) {
+            return Asked::Learned;
+        }
+        Asked::Nothing
     }
 
     /// Show the next service on its own, or all of them again at the end.
