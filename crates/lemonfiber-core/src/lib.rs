@@ -54,6 +54,7 @@ pub mod dashboard;
 pub mod docker;
 pub mod doctor;
 mod endpoint;
+pub mod glossary;
 pub mod health;
 pub mod household;
 mod instant;

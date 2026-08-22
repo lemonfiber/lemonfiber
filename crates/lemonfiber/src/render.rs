@@ -16,6 +16,7 @@ pub(crate) mod fixtures;
 
 mod doctor;
 pub(crate) mod downloads;
+pub(crate) mod glossary;
 mod quality;
 pub(crate) mod repair;
 mod seed;
@@ -89,8 +90,8 @@ impl Lines {
         self.0.extend(other.0);
     }
 
-    /// The lines as one piece of text, for a test to read and for a diff to compare.
-    #[cfg(test)]
+    /// The lines as one piece of text, for a test to read, for a diff to compare,
+    /// and for the footnote block to find its own report's words in.
     pub(crate) fn text(&self) -> String {
         self.0.join("\n")
     }
@@ -127,6 +128,21 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
     if json {
         return machine_readable(outcome);
     }
+    let mut lines = shaped(outcome);
+    // Built from the finished report rather than by each renderer, because what a
+    // report explains is a property of what it ended up saying — a renderer that
+    // had to remember to do this would be a renderer that could forget.
+    //
+    // After the `json` return, never before it: a footnote is prose for a person,
+    // and appending it to a machine-readable answer would corrupt the one thing
+    // that answer exists to be.
+    let notes = glossary::footnotes(&lines.text());
+    lines.extend(notes);
+    lines
+}
+
+/// The lines one outcome renders to, before anything is said about its words.
+fn shaped(outcome: &Outcome) -> Lines {
     match outcome {
         Outcome::Version(report) => versions(report),
         Outcome::Forms(report) => forms(report),

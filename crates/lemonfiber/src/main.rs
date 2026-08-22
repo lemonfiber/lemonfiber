@@ -182,6 +182,9 @@ async fn main() -> ExitCode {
         // A walkthrough narrates for minutes and produces one report at its end, not a
         // value that arrives once, so like streaming and watching it runs its own way.
         Request::Walkthrough { item } => return walk(&ctx, &item.join(" "), cli.json).await,
+        // Answered from a table compiled into the binary, so unlike every command
+        // below it this one needs neither a stack nor a daemon to say anything.
+        Request::Explain { word } => return explaining(&word.join(" ")),
         Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,
@@ -214,6 +217,21 @@ async fn main() -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// Say what a word means, or say that this product does not explain that one.
+///
+/// A word with no entry is a refusal rather than an empty answer: somebody who typed
+/// `indexr` needs to be told they did, and a blank response reads as "it means
+/// nothing" — a wrong answer where they wanted an absent one. Reported through the
+/// same error model as everything else, so it carries a code and a way forward
+/// rather than being this one command's private way of saying no.
+fn explaining(word: &str) -> ExitCode {
+    let Some(lines) = render::glossary::explained(word) else {
+        return complain(&render::glossary::unrecognised(word));
+    };
+    lines.print();
+    ExitCode::SUCCESS
 }
 
 /// Say what starting these forms will start, before it starts.

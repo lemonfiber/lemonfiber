@@ -201,6 +201,15 @@ pub(crate) enum Request {
         /// What to add, named as you would say it.
         item: Vec<String>,
     },
+    /// Say what one of this product's words means.
+    ///
+    /// A report explains the words it used underneath itself, in a sentence. This is
+    /// the longer form, for somebody who wants it — nothing needs it in order to act,
+    /// which is the difference between an explanation offered and one imposed.
+    Explain {
+        /// The word, as you would say it.
+        word: Vec<String>,
+    },
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,
