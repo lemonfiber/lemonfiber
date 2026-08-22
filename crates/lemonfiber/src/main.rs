@@ -64,10 +64,25 @@ async fn read_logs(
     }
 }
 
+/// What the environment says about this terminal's character set.
+///
+/// Read here rather than deeper in, because this is the edge: what a locale means
+/// is decided in [`crate::say`] where a test can reach it, and only this knows
+/// where the locale came from. The same division the log viewer makes over
+/// `NO_COLOR`.
+///
+/// Read in the order POSIX reads it: a specific override, then the character
+/// category, then the general setting.
+fn locale() -> Option<String> {
+    ["LC_ALL", "LC_CTYPE", "LANG"]
+        .into_iter()
+        .find_map(|name| std::env::var(name).ok().filter(|said| !said.is_empty()))
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
-    say::from_environment();
+    say::settle(locale().as_deref());
     let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {

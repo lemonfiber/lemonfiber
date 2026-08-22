@@ -25,23 +25,19 @@ use std::sync::OnceLock;
 /// that have nothing to do with it.
 static ASCII_ONLY: OnceLock<bool> = OnceLock::new();
 
-/// Settle how output is rendered, from what the environment says.
+/// Settle how output is rendered, and say what is in force.
 ///
-/// Read in the order POSIX reads it: a specific override, then the character
-/// category, then the general setting.
-pub(crate) fn from_environment() {
-    let locale = ["LC_ALL", "LC_CTYPE", "LANG"]
-        .into_iter()
-        .find_map(|name| std::env::var(name).ok().filter(|said| !said.is_empty()));
-    settle(locale.as_deref());
-}
-
-/// Settle how output is rendered, from what the locale says.
+/// The environment is read by the caller rather than here, because the caller is
+/// the edge: what a locale *means* is decided below and can be tested, and only
+/// the edge knows where the locale came from. It is the same division the log
+/// viewer already makes over `NO_COLOR`.
 ///
-/// Called once, at the edge. Later calls are ignored, so a surface cannot change
-/// what a terminal can do halfway through printing to it.
-pub(crate) fn settle(locale: Option<&str>) {
-    let _ = ASCII_ONLY.set(!unicode(locale));
+/// The first call decides. A later one is ignored and told what the first settled,
+/// so what comes back is what is actually in force rather than what this caller
+/// asked for — a surface cannot change what a terminal can do halfway through
+/// printing to it, and it should not be told that it did.
+pub(crate) fn settle(locale: Option<&str>) -> bool {
+    *ASCII_ONLY.get_or_init(|| !unicode(locale))
 }
 
 /// Whether a terminal described this way can show more than ASCII.
@@ -137,7 +133,7 @@ pub(crate) use {complain, say};
 
 #[cfg(test)]
 mod tests {
-    use super::{folded, shown, unicode};
+    use super::{complained, folded, said, settle, shown, unicode};
 
     /// A locale that names a charset has told us what it can do; one that is unset
     /// has told us nothing, and the requirement asks for a fallback where Unicode
@@ -178,6 +174,7 @@ mod tests {
         assert_eq!(folded("→ do this"), "-> do this");
         assert_eq!(folded("wait…"), "wait...");
         assert_eq!(folded("“quoted”"), "\"quoted\"");
+        assert_eq!(folded("‘quoted’"), "'quoted'");
         assert!(folded("plain ascii").is_ascii());
     }
 
@@ -193,5 +190,35 @@ mod tests {
     fn what_a_terminal_gets_depends_on_what_it_can_show() {
         assert_eq!(shown("kept — as written", false), "kept — as written");
         assert_eq!(shown("folded — as needed", true), "folded -- as needed");
+    }
+
+    /// Settling twice is not two answers. A surface that asked second is told what
+    /// is in force, because that is what its output will actually be rendered as —
+    /// and being told otherwise is how a caller comes to believe a fold happened
+    /// that did not.
+    ///
+    /// The locale here is deliberately the one the first call would have chosen
+    /// anyway: this test settles a process-wide latch, and the tests beside it read
+    /// the decision directly rather than the latch, so what is latched must be the
+    /// ordinary answer rather than one of them.
+    #[test]
+    fn what_is_settled_first_is_what_every_later_caller_is_told() {
+        let first = settle(Some("en_GB.UTF-8"));
+
+        assert!(!first, "a UTF-8 terminal is not folded");
+        assert_eq!(
+            settle(Some("C")),
+            first,
+            "the second caller is told what is in force, not what it asked for"
+        );
+    }
+
+    /// The two ends of the funnel. Asserted only to the extent that they run: what
+    /// they put where is the architecture test's to guard, and reading back this
+    /// process's own streams would be a harness rather than a test.
+    #[test]
+    fn both_ends_of_the_funnel_take_a_line() {
+        said("an ordinary line — folded or not");
+        complained("a line about a failure");
     }
 }
