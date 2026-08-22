@@ -157,6 +157,53 @@ fn no_other_services_word_is_written_as_if_it_were_ours() {
     );
 }
 
+/// What a parser reads is never rendered for a person.
+///
+/// Folding decides what a person's terminal can draw, and `--json` has no person on
+/// the other end of it. There it is not merely unnecessary but damaging: the fold
+/// writes a curly quote as `"`, and inside a JSON string that is not a character but
+/// the end of it — so a release name carrying one arrives as something that will not
+/// parse at all. `--json` is for scripts, and a script is exactly where `LC_ALL=C`
+/// is set, which is what turns folding on. The two meet more often than not.
+///
+/// Guarded by shape rather than by output, because the fault appears only on a
+/// terminal that folds and only for text carrying one of a handful of characters. A
+/// test of what was printed would pass on the machine of whoever broke it.
+#[test]
+fn nothing_a_parser_reads_is_rendered_for_a_person() {
+    let mut rendered: Vec<String> = Vec::new();
+    for (path, text) in sources() {
+        let where_it_lives = path.to_string_lossy().replace('\\', "/");
+        if !where_it_lives.contains("/src/") {
+            continue;
+        }
+        let lines: Vec<&str> = production(&text).lines().collect();
+        for (number, line) in lines.iter().enumerate() {
+            if !line.contains("say!(") {
+                continue;
+            }
+            let call: String = lines.iter().skip(number).take(6).copied().collect();
+            if call.contains("to_json()") {
+                rendered.push(format!("{where_it_lives}:{}", number + 1));
+            }
+        }
+    }
+    assert!(
+        rendered.is_empty(),
+        "serialised output put out through the door that folds — use `emit!`: \
+         {rendered:?}"
+    );
+
+    // And the door itself: what a parser reads goes out exactly as it was built.
+    let say = std::fs::read_to_string("src/say.rs").unwrap_or_default();
+    let emitted = body_of(&say, "pub(crate) fn emitted");
+    assert!(!emitted.is_empty(), "the parser's door was found");
+    assert!(
+        !emitted.contains("rendered") && !emitted.contains("folded"),
+        "and it does not fold: {emitted}"
+    );
+}
+
 /// Short capitals an operator needs no help with, and why each is allowed.
 ///
 /// Declaring one ordinary is a judgement. Writing it here is what makes the

@@ -119,6 +119,19 @@ pub(crate) fn complained(line: &str) {
     eprintln!("{}", rendered(line));
 }
 
+/// Put a line out exactly as it is, for something that will parse it.
+///
+/// The other door of the same funnel, and the reason it exists is that folding is
+/// wrong here. Folding decides what a person's terminal can draw, and there is no
+/// person on the other end of `--json`. It is not merely unnecessary but damaging:
+/// the fold writes a curly quote as `"`, and inside a JSON string that is not a
+/// character but the end of it, so a release name containing one arrives as
+/// something that will not parse. `--json` is for scripts, and a script is exactly
+/// where `LC_ALL=C` is set.
+pub(crate) fn emitted(line: &str) {
+    println!("{line}");
+}
+
 /// Put a question out and leave the cursor beside it, for an answer on the same line.
 ///
 /// No newline, because the answer is typed where the cursor is left. Flushed for the
@@ -139,17 +152,22 @@ macro_rules! say {
     ($($arg:tt)*) => { $crate::say::said(&format!($($arg)*)) };
 }
 
+/// Print a line exactly as it is, for something that will parse it.
+macro_rules! emit {
+    ($($arg:tt)*) => { $crate::say::emitted(&format!($($arg)*)) };
+}
+
 /// Print a line to standard error, as this terminal can render it.
 macro_rules! complain {
     () => { $crate::say::complained("") };
     ($($arg:tt)*) => { $crate::say::complained(&format!($($arg)*)) };
 }
 
-pub(crate) use {complain, say};
+pub(crate) use {complain, emit, say};
 
 #[cfg(test)]
 mod tests {
-    use super::{asked, complained, folded, said, settle, shown, unicode};
+    use super::{asked, complained, emitted, folded, said, settle, shown, unicode};
 
     /// A locale that names a charset has told us what it can do; one that is unset
     /// has told us nothing, and the requirement asks for a fallback where Unicode
@@ -237,5 +255,6 @@ mod tests {
         said("an ordinary line — folded or not");
         complained("a line about a failure");
         asked("and a question — answered beside it");
+        emitted("{\"and\":\"a document nobody reads\"}");
     }
 }

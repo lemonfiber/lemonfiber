@@ -43,9 +43,34 @@ pub(crate) const UNRENDERABLE: &str = "this answer could not be rendered as JSON
 /// terminal is reached in one place, at the edge, which also means nothing here has to
 /// care whether it is being rendered for a person or for an assertion.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub(crate) struct Lines(Vec<String>);
+pub(crate) struct Lines {
+    /// The lines themselves, in order.
+    said: Vec<String>,
+    /// Whether these are for something that will parse them rather than read them.
+    ///
+    /// Carried by the lines rather than passed to whoever prints them, because the
+    /// renderer that built them is the only one that knows, and every `print` call
+    /// site would otherwise have to be told and could be told wrong.
+    parsed: bool,
+}
 
 impl Lines {
+    /// Lines for something that will parse them, which go out exactly as produced.
+    ///
+    /// Neither made plain nor folded. Both of those are decisions about what a
+    /// person's terminal can show, and there is no person here — and both of them
+    /// damage this: the fold writes a curly quote as `"`, which inside a JSON string
+    /// is not a character but the end of it, so a release name containing one would
+    /// arrive as something that will not parse at all. Serialising has already made
+    /// the text safe in the way that matters, since JSON escapes every control
+    /// character rather than carrying it.
+    pub(crate) fn for_a_parser() -> Self {
+        Self {
+            said: Vec::new(),
+            parsed: true,
+        }
+    }
+
     /// One line.
     ///
     /// Made plain on the way in, because most of what is shown here came from
@@ -54,7 +79,12 @@ impl Lines {
     /// instruction. One place rather than at each caller: a line that skipped it
     /// would be the one carrying the name somebody chose.
     pub(crate) fn put(&mut self, line: impl Into<String>) {
-        self.0.push(lemonfiber_core::text::plain(&line.into()));
+        let line = line.into();
+        if self.parsed {
+            self.said.push(line);
+            return;
+        }
+        self.said.push(lemonfiber_core::text::plain(&line));
     }
 
     /// A remedy: what to do, and where to look when that helps.
@@ -71,7 +101,7 @@ impl Lines {
     /// A blank line, then the given one — the separated closing remark most answers end
     /// on, kept as one call so the spacing is uniform rather than re-decided each time.
     pub(crate) fn spaced(&mut self, line: impl Into<String>) {
-        self.0.push(String::new());
+        self.said.push(String::new());
         self.put(line);
     }
 
@@ -87,26 +117,30 @@ impl Lines {
 
     /// Everything another renderer built, appended.
     pub(crate) fn extend(&mut self, other: Self) {
-        self.0.extend(other.0);
+        self.said.extend(other.said);
     }
 
     /// The lines as one piece of text, for a test to read, for a diff to compare,
     /// and for the footnote block to find its own report's words in.
     pub(crate) fn text(&self) -> String {
-        self.0.join("\n")
+        self.said.join("\n")
     }
 
     /// Put them on the terminal. The one place this crate reaches stdout.
     pub(crate) fn print(&self) {
-        for line in &self.0 {
-            crate::say::said(line);
+        for line in &self.said {
+            if self.parsed {
+                crate::say::emitted(line);
+            } else {
+                crate::say::said(line);
+            }
         }
     }
 
     /// Put them on the error stream — what an operator is told about a refusal,
     /// which belongs beside the answer rather than in it.
     pub(crate) fn eprint(&self) {
-        for line in &self.0 {
+        for line in &self.said {
             crate::say::complained(line);
         }
     }
@@ -164,7 +198,7 @@ fn shaped(outcome: &Outcome) -> Lines {
 
 /// The same answer, for something that will parse it.
 fn machine_readable(outcome: &Outcome) -> Lines {
-    let mut lines = Lines::default();
+    let mut lines = Lines::for_a_parser();
     lines.put(
         outcome
             .clone()
@@ -322,6 +356,29 @@ mod tests {
         let mut lines = Lines::default();
         lines.block("-old\n+new\n");
         assert_eq!(lines.text(), "-old\n+new");
+    }
+
+    #[test]
+    fn what_a_parser_reads_goes_out_exactly_as_it_was_built() {
+        // A curly quote is the one that matters: folded to `"` inside a JSON string
+        // it is not a character but the end of the string.
+        let document = "{\"name\":\"The “Burbs” 1989 — 1080p\"}";
+        let mut lines = Lines::for_a_parser();
+        lines.put(document);
+        lines.print();
+
+        assert_eq!(lines.text(), document, "unfolded and unaltered");
+    }
+
+    /// The other half of the same rule: what a person reads is made safe, because a
+    /// terminal reads an escape in the middle of a name as an instruction.
+    #[test]
+    fn what_a_person_reads_is_still_made_plain() {
+        let mut lines = Lines::default();
+        lines.put(format!("a name{}with an instruction in it", char::from(27)));
+
+        let said = lines.text();
+        assert!(!said.contains(char::from(27)), "{said}");
     }
 
     #[test]

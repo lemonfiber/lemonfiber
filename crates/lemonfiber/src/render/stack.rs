@@ -246,8 +246,8 @@ pub(super) fn show(services: &[Service]) -> Lines {
 
 /// The lines a finished watch renders to.
 pub(super) fn watch_lines(report: &SupervisionReport, json: bool) -> Lines {
-    let mut lines = Lines::default();
     if json {
+        let mut lines = Lines::for_a_parser();
         lines.put(
             Envelope::new("watch", report.clone())
                 .to_json()
@@ -255,6 +255,7 @@ pub(super) fn watch_lines(report: &SupervisionReport, json: bool) -> Lines {
         );
         return lines;
     }
+    let mut lines = Lines::default();
 
     lines.put(format!("the watch ended: {}", report.reason));
     if report.stopped {
