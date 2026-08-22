@@ -17,6 +17,7 @@ use lemonfiber_core::walkthrough::{Shape, Why};
 use lemonfiber_core::PRODUCT;
 
 use super::Surface;
+use crate::say::say;
 use crate::walkthrough::walk;
 
 /// Offer the first-content walk, once the stack is up.
@@ -37,8 +38,8 @@ pub(super) async fn offer(
         // Nothing to search with. Told rather than offered, because being asked and then
         // failing is the product demonstrating it does not know its own state.
         Ok(Why::Not(reason)) => {
-            println!("\n{}", reason.said());
-            println!("  → {}", reason.remedy());
+            say!("\n{}", reason.said());
+            say!("  → {}", reason.remedy());
             settled
         }
         Ok(Why::Offer(shape)) => ask(ctx, surface, shape, settled).await,
@@ -50,17 +51,17 @@ pub(super) async fn offer(
 
 /// Put the offer, and act on the answer.
 async fn ask(ctx: &Ctx, surface: &dyn Surface, shape: Shape, settled: ExitCode) -> ExitCode {
-    println!("\nOne more thing — {}.", shape.proves());
+    say!("\nOne more thing — {}.", shape.proves());
     if !surface.interactive() {
         // Nobody there to ask. Said as a thing they can do rather than done unasked: an
         // unattended run should not start fetching content on its own.
-        println!("Run `{PRODUCT} walkthrough` when you are at a terminal.");
+        say!("Run `{PRODUCT} walkthrough` when you are at a terminal.");
         return settled;
     }
     if !yes(surface) {
         // Declining carries no penalty, and saying so is the point: an operator who
         // thinks they have skipped something important will go looking for it.
-        println!("Nothing lost — run `{PRODUCT} walkthrough` whenever you like.");
+        say!("Nothing lost — run `{PRODUCT} walkthrough` whenever you like.");
         return settled;
     }
     walk(ctx, "", false).await

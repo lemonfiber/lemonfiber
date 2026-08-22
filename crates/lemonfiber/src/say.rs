@@ -1,0 +1,198 @@
+//! Everything this product prints, and the one place it decides how.
+//!
+//! Output used to leave through thirty-odd `println!` calls and a report renderer,
+//! which meant a question about *how* something is shown had thirty-odd answers —
+//! or, in practice, none. `NO_COLOR` had to be threaded to the one place that used
+//! colour; the next such question would have been threaded somewhere else again.
+//!
+//! So every line goes out through here, and questions about rendering get asked
+//! once. Today there is one: whether this terminal can show more than ASCII.
+//!
+//! **Folding is decided from the locale, and only where it says so.** A locale
+//! naming a non-UTF-8 charset, or the `C`/`POSIX` locale, is a terminal that has
+//! told us what it can do. A locale that is simply unset has told us nothing, and
+//! guessing ASCII there would degrade the ordinary case to serve a rare one — the
+//! requirement asks for a fallback where Unicode is *unsupported*, not wherever it
+//! is unproven.
+
+use std::sync::OnceLock;
+
+/// Whether output is folded to ASCII, settled once at startup.
+///
+/// A `OnceLock` because it is a property of the terminal this process was given,
+/// not of any call: it cannot change while the program runs, and threading it
+/// through every line that might eventually be printed would put it in signatures
+/// that have nothing to do with it.
+static ASCII_ONLY: OnceLock<bool> = OnceLock::new();
+
+/// Settle how output is rendered, from what the environment says.
+///
+/// Read in the order POSIX reads it: a specific override, then the character
+/// category, then the general setting.
+pub(crate) fn from_environment() {
+    let locale = ["LC_ALL", "LC_CTYPE", "LANG"]
+        .into_iter()
+        .find_map(|name| std::env::var(name).ok().filter(|said| !said.is_empty()));
+    settle(locale.as_deref());
+}
+
+/// Settle how output is rendered, from what the locale says.
+///
+/// Called once, at the edge. Later calls are ignored, so a surface cannot change
+/// what a terminal can do halfway through printing to it.
+pub(crate) fn settle(locale: Option<&str>) {
+    let _ = ASCII_ONLY.set(!unicode(locale));
+}
+
+/// Whether a terminal described this way can show more than ASCII.
+///
+/// Read from the charset a locale names. `C` and `POSIX` are the two that say
+/// plainly that it cannot; anything naming UTF-8 says it can; and anything else
+/// names a charset that is not UTF-8, which is the same answer as `C` for these
+/// purposes. Nothing at all is not an answer, and is taken as no objection.
+pub(crate) fn unicode(locale: Option<&str>) -> bool {
+    let Some(said) = locale.filter(|said| !said.is_empty()) else {
+        return true;
+    };
+    let said = said.to_ascii_uppercase();
+    if said.contains("UTF-8") || said.contains("UTF8") {
+        return true;
+    }
+    // A locale that names a charset has named one that is not UTF-8, and `C` and
+    // `POSIX` name the minimal one outright. Either way, it has told us.
+    !said.contains('.') && said != "C" && said != "POSIX"
+}
+
+/// The line as this terminal can render it.
+fn rendered(line: &str) -> String {
+    shown(line, *ASCII_ONLY.get().unwrap_or(&false))
+}
+
+/// The line as a terminal of this kind can render it.
+///
+/// Takes the answer rather than looking it up, so what is decided here can be
+/// tested without settling a value that outlives the test — the lookup is a
+/// process-wide latch, and a test that tripped it would decide for every test
+/// after it.
+pub(crate) fn shown(line: &str, ascii_only: bool) -> String {
+    if ascii_only {
+        return folded(line);
+    }
+    line.to_owned()
+}
+
+/// The same text with every symbol this product uses written in ASCII.
+///
+/// The marks are chosen to stay distinct from one another, because they are the
+/// whole point: six verdicts that read the same would be worse than six that look
+/// plain. Punctuation folds the way a typewriter would have written it.
+pub(crate) fn folded(text: &str) -> String {
+    text.chars().fold(String::new(), |mut said, character| {
+        match character {
+            '✓' => said.push('+'),
+            '✗' => said.push('x'),
+            '·' => said.push('.'),
+            '⚠' => said.push('!'),
+            '→' => said.push_str("->"),
+            '—' => said.push_str("--"),
+            '–' => said.push('-'),
+            '…' => said.push_str("..."),
+            '─' => said.push('-'),
+            '“' | '”' => said.push('"'),
+            '‘' | '’' => said.push('\''),
+            other => said.push(other),
+        }
+        said
+    })
+}
+
+/// Print a line to standard output, as this terminal can render it.
+pub(crate) fn said(line: &str) {
+    println!("{}", rendered(line));
+}
+
+/// Print a line to standard error, as this terminal can render it.
+///
+/// A failure goes to standard error so a script can read the answer on standard
+/// output and a person can read the problem beside it.
+pub(crate) fn complained(line: &str) {
+    eprintln!("{}", rendered(line));
+}
+
+/// Print a line, as this terminal can render it.
+///
+/// Takes what `println!` takes, so a call site changes by one word rather than
+/// being rewritten — which is what made converting thirty of them worth doing.
+macro_rules! say {
+    () => { $crate::say::said("") };
+    ($($arg:tt)*) => { $crate::say::said(&format!($($arg)*)) };
+}
+
+/// Print a line to standard error, as this terminal can render it.
+macro_rules! complain {
+    () => { $crate::say::complained("") };
+    ($($arg:tt)*) => { $crate::say::complained(&format!($($arg)*)) };
+}
+
+pub(crate) use {complain, say};
+
+#[cfg(test)]
+mod tests {
+    use super::{folded, shown, unicode};
+
+    /// A locale that names a charset has told us what it can do; one that is unset
+    /// has told us nothing, and the requirement asks for a fallback where Unicode
+    /// is unsupported rather than wherever it is unproven.
+    #[test]
+    fn a_locale_is_believed_only_where_it_says_something() {
+        for said in ["en_GB.UTF-8", "C.UTF-8", "en_US.utf8", "nl_NL.UTF-8"] {
+            assert!(unicode(Some(said)), "{said} names UTF-8");
+        }
+        for said in ["C", "POSIX", "en_US.ISO-8859-1", "ja_JP.eucJP"] {
+            assert!(!unicode(Some(said)), "{said} says it cannot");
+        }
+        assert!(unicode(None), "nothing said is not an objection");
+        assert!(unicode(Some("")), "and neither is an empty answer");
+        assert!(
+            unicode(Some("en_GB")),
+            "a locale naming no charset has not refused"
+        );
+    }
+
+    /// The marks are the point: six verdicts that folded to the same character
+    /// would be worse than six that look plain.
+    #[test]
+    fn every_mark_folds_to_something_of_its_own() {
+        let marks = "✓✗·⚠–";
+        let folded: Vec<char> = folded(marks).chars().collect();
+
+        assert_eq!(folded.len(), marks.chars().count(), "one for one");
+        let mut seen = folded.clone();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), folded.len(), "and all different: {folded:?}");
+    }
+
+    #[test]
+    fn punctuation_folds_the_way_a_typewriter_would() {
+        assert_eq!(folded("one — two"), "one -- two");
+        assert_eq!(folded("→ do this"), "-> do this");
+        assert_eq!(folded("wait…"), "wait...");
+        assert_eq!(folded("“quoted”"), "\"quoted\"");
+        assert!(folded("plain ascii").is_ascii());
+    }
+
+    #[test]
+    fn text_that_needs_no_folding_is_unchanged() {
+        assert_eq!(folded("nothing to do here"), "nothing to do here");
+    }
+
+    /// A terminal that can show it gets it as written; one that cannot gets it
+    /// folded. Asked of the decision rather than of the latch, so the test settles
+    /// nothing for the tests after it.
+    #[test]
+    fn what_a_terminal_gets_depends_on_what_it_can_show() {
+        assert_eq!(shown("kept — as written", false), "kept — as written");
+        assert_eq!(shown("folded — as needed", true), "folded -- as needed");
+    }
+}

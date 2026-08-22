@@ -18,6 +18,7 @@ use lemonfiber_core::wizard::{Library, Plan};
 
 use super::flags::{is_secret, parse_ids};
 use super::Answers;
+use crate::say::say;
 
 /// A prompt that reads the operator's answers from the terminal.
 pub struct Terminal {
@@ -68,11 +69,11 @@ impl Terminal {
 
 impl Prompt for Terminal {
     fn protocols(&self) -> Protocols {
-        println!("\nHow will you fetch content?");
-        println!("  1) Usenet only");
-        println!("  2) Torrents only");
-        println!("  3) Both");
-        println!("  4) Neither — serve an existing library only");
+        say!("\nHow will you fetch content?");
+        say!("  1) Usenet only");
+        say!("  2) Torrents only");
+        say!("  3) Both");
+        say!("  4) Neither — serve an existing library only");
         match self.answers.ask("Choose [3]:").as_str() {
             "1" => Protocols {
                 usenet: true,
@@ -96,22 +97,22 @@ impl Prompt for Terminal {
         // one. Otherwise each thing is named, explained, costed in a band, and given
         // the criteria that decide it — no vendors, since those age and vary.
         if let Some(note) = map.library_only {
-            println!("\n{note}");
+            say!("\n{note}");
             return;
         }
 
-        println!("\nBefore the questions that follow, here is what your choices will need.");
-        println!("You can go and get these, then run setup again — it remembers your answers.\n");
+        say!("\nBefore the questions that follow, here is what your choices will need.");
+        say!("You can go and get these, then run setup again — it remembers your answers.\n");
         for item in &map.items {
-            println!("  {}", item.label);
-            println!("    What it is: {}", item.what);
-            println!("    Why:        {}", item.why);
-            println!("    Cost:       {}", item.cost.phrase());
-            println!("    Look for:");
+            say!("  {}", item.label);
+            say!("    What it is: {}", item.what);
+            say!("    Why:        {}", item.why);
+            say!("    Cost:       {}", item.cost.phrase());
+            say!("    Look for:");
             for criterion in &item.criteria {
-                println!("      · {criterion}");
+                say!("      · {criterion}");
             }
-            println!("    Without it: {}\n", item.without);
+            say!("    Without it: {}\n", item.without);
         }
         let _ = self.answers.ask("Press enter when you have noted these.");
     }
@@ -131,7 +132,7 @@ impl Prompt for Terminal {
     fn hardlinks(&self, path: &Path, inferred_from: Option<&Path>) {
         match inferred_from {
             // Tested directly: the chosen location itself proved it links.
-            None => println!(
+            None => say!(
                 "  ✓ {} hardlinks — imports will be instant and cost no extra disk.",
                 path.display()
             ),
@@ -139,7 +140,7 @@ impl Prompt for Terminal {
             // for it. Say so, rather than present a parent's answer as proven of a
             // path never touched — a separate drive mounted here later could differ,
             // and the storage check re-tests the real location once it exists.
-            Some(parent) => println!(
+            Some(parent) => say!(
                 "  ✓ {} will hardlink — its filesystem ({}) does. If it becomes a \
                  separate drive, that is checked when the stack first runs.",
                 path.display(),
@@ -152,16 +153,16 @@ impl Prompt for Terminal {
         match warning {
             StorageWarning::CopyOnly { limitation } => {
                 match limitation {
-                    Some(reason) => println!("  ✗ {} cannot hardlink — {reason}.", path.display()),
-                    None => println!("  ✗ {} cannot hardlink.", path.display()),
+                    Some(reason) => say!("  ✗ {} cannot hardlink — {reason}.", path.display()),
+                    None => say!("  ✗ {} cannot hardlink.", path.display()),
                 }
                 // The consequence is stated in the same words a later diagnosis
                 // would use, indented so it reads as the explanation of the line
                 // above rather than a new claim.
-                println!("    {COPY_CONSEQUENCE}");
+                say!("    {COPY_CONSEQUENCE}");
             }
             StorageWarning::Untested { reason } => {
-                println!(
+                say!(
                     "  ? {} could not be tested for hardlinks — {reason}.",
                     path.display()
                 );
@@ -173,8 +174,8 @@ impl Prompt for Terminal {
     }
 
     fn credential(&self) -> Option<(String, String)> {
-        println!("\nAn indexer is where the stack searches for content.");
-        println!("Leave the URL blank to set one up later.");
+        say!("\nAn indexer is where the stack searches for content.");
+        say!("Leave the URL blank to set one up later.");
         let url = self.answers.ask("Indexer URL:");
         if url.is_empty() {
             return None;
@@ -186,7 +187,7 @@ impl Prompt for Terminal {
     }
 
     fn credential_valid(&self, observed: &str) {
-        println!("  ✓ {observed}");
+        say!("  ✓ {observed}");
     }
 
     fn credential_failed(&self, outcome: &Validation) -> CredentialChoice {
@@ -194,16 +195,16 @@ impl Prompt for Terminal {
         // key, a host that did not answer, and an account that cannot do the job
         // send the operator to three different places.
         match outcome {
-            Validation::Rejected { detail } => println!("  ✗ Rejected — {detail}"),
-            Validation::Unreachable { detail } => println!("  ✗ Unreachable — {detail}"),
-            Validation::Degraded { detail } => println!("  ! Degraded — {detail}"),
+            Validation::Rejected { detail } => say!("  ✗ Rejected — {detail}"),
+            Validation::Unreachable { detail } => say!("  ✗ Unreachable — {detail}"),
+            Validation::Degraded { detail } => say!("  ! Degraded — {detail}"),
             // The proven case never reaches here; setup keeps it rather than asking.
-            Validation::Valid { observed } => println!("  ✓ {observed}"),
+            Validation::Valid { observed } => say!("  ✓ {observed}"),
         }
-        println!("\nWhat would you like to do?");
-        println!("  1) Try again — re-enter it and test afresh");
-        println!("  2) Use it anyway — keep it unverified");
-        println!("  3) Skip — leave the indexer unset for now");
+        say!("\nWhat would you like to do?");
+        say!("  1) Try again — re-enter it and test afresh");
+        say!("  2) Use it anyway — keep it unverified");
+        say!("  3) Skip — leave the indexer unset for now");
         match self.answers.ask("Choose [1]:").as_str() {
             "2" => CredentialChoice::Proceed,
             "3" => CredentialChoice::Skip,
@@ -212,8 +213,8 @@ impl Prompt for Terminal {
     }
 
     fn usenet_provider(&self) -> Option<ProviderEntry> {
-        println!("\nA Usenet provider is where downloads are fetched from.");
-        println!("Leave the host blank to set one up later.");
+        say!("\nA Usenet provider is where downloads are fetched from.");
+        say!("Leave the host blank to set one up later.");
         let host = self.answers.ask("Provider host:");
         if host.is_empty() {
             return None;
@@ -235,7 +236,7 @@ impl Prompt for Terminal {
     }
 
     fn service_user(&self) -> Option<(u32, u32)> {
-        println!("\nThe containers can run as a chosen user, so the files they create are yours.");
+        say!("\nThe containers can run as a chosen user, so the files they create are yours.");
         parse_ids(
             &self
                 .answers
@@ -245,12 +246,12 @@ impl Prompt for Terminal {
 
     fn library(&self) -> Library {
         let native = self.environment.offers_native_jellyfin();
-        println!("\nServe your library with Jellyfin?");
-        println!("  1) Yes, in a container — works everywhere");
+        say!("\nServe your library with Jellyfin?");
+        say!("  1) Yes, in a container — works everywhere");
         if native {
-            println!("  2) Yes, on the host — reaches a hardware transcoder the container cannot");
+            say!("  2) Yes, on the host — reaches a hardware transcoder the container cannot");
         }
-        println!("  3) No media server");
+        say!("  3) No media server");
         match self.answers.ask("Choose [1]:").as_str() {
             "2" if native => Library::JellyfinNative,
             "3" => Library::None,
@@ -269,7 +270,7 @@ impl Prompt for Terminal {
         // Said plainly and in the second person, because this is the one
         // consequence of the protocol choice that cannot be discovered afterwards:
         // by the time it matters, the address has already been seen.
-        println!(
+        say!(
             "\nWithout a VPN, every peer you exchange torrent data with sees your \
              home address. That includes anyone watching a swarm to record who is in it."
         );
@@ -286,9 +287,9 @@ impl Prompt for Terminal {
         // Three presets rather than a checklist of thirteen events: an operator
         // setting up a media stack has no basis for deciding whether they want to
         // hear about a degraded hardlink, and every event stays switchable later.
-        println!("\nWhat should lemonfiber tell you about?");
+        say!("\nWhat should lemonfiber tell you about?");
         for (index, preset) in Appetite::ALL.iter().enumerate() {
-            println!(
+            say!(
                 "  {}) {} — {}",
                 index + 1,
                 preset.label(),
@@ -307,13 +308,13 @@ impl Prompt for Terminal {
     }
 
     fn confirm(&self, plan: &Plan) -> bool {
-        println!("\nThis is what setup will write:");
+        say!("\nThis is what setup will write:");
         for (key, value) in plan.settings() {
             // A secret is shown as present, not in the clear: the review reaches
             // the screen, scrollback and any session recording, and an API key or
             // password has no business in any of them.
             let shown = if is_secret(key) { "********" } else { value };
-            println!("  {key} = {shown}");
+            say!("  {key} = {shown}");
         }
         self.yes_no("\nApply it?", true)
     }

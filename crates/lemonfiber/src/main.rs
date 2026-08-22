@@ -23,6 +23,7 @@ mod maintain;
 mod prompt;
 mod render;
 mod repair;
+mod say;
 mod setup;
 mod stopping;
 mod support;
@@ -30,6 +31,7 @@ mod terminal;
 mod translate;
 mod walkthrough;
 
+use crate::say::{complain, say};
 use cli::{Cli, Request};
 use context::{context, here};
 use engine::{guard, pull, settle, start, stream};
@@ -64,6 +66,8 @@ async fn read_logs(
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    // Settled before anything is printed, because it decides how everything is.
+    say::from_environment();
     let mut cli = Cli::parse();
 
     let Some(request) = cli.command else {
@@ -71,7 +75,7 @@ async fn main() -> ExitCode {
         let Some(paths) = here() else {
             // With nowhere to keep its files there is nothing to offer and nothing
             // to point at, so the plain pointer is the only honest thing left.
-            println!("lemonfiber — run `lemonfiber --help` to see what it can do");
+            say!("lemonfiber — run `lemonfiber --help` to see what it can do");
             return ExitCode::SUCCESS;
         };
         return greeting(ctx, &paths, &Console).await;
@@ -229,7 +233,7 @@ fn narrowed(only: Option<&str>) -> Result<Option<Category>, ExitCode> {
     match only.map(Category::parse) {
         Some(None) => {
             let named = only.unwrap_or_default();
-            eprintln!("error: no diagnostic category named `{named}`");
+            complain!("error: no diagnostic category named `{named}`");
             Err(ExitCode::from(USAGE))
         }
         Some(Some(category)) => Ok(Some(category)),
@@ -320,7 +324,7 @@ async fn setup_from(ctx: Ctx, raw: prompt::RawSetup) -> ExitCode {
     let flags = match SetupFlags::parse(raw) {
         Ok(flags) => flags,
         Err(message) => {
-            eprintln!("error: {message}");
+            complain!("error: {message}");
             return ExitCode::from(USAGE);
         }
     };

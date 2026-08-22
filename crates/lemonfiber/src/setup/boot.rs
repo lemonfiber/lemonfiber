@@ -16,6 +16,7 @@ use crate::render::render;
 
 use super::first_content;
 use super::Surface;
+use crate::say::{complain, say};
 
 /// The form setup brings up once the answers are applied.
 ///
@@ -41,7 +42,7 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
 
     if matches!(report.overall, Overall::Broken | Overall::Unknown) {
         render(&Outcome::Doctor(report), false);
-        eprintln!("\nSetup needs these put right before it can go on.");
+        complain!("\nSetup needs these put right before it can go on.");
         return Err(ExitCode::from(PREFLIGHT));
     }
     Ok(())
@@ -70,7 +71,7 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
             if let Some(cost) =
                 seeding::at_setup(ctx.settings.protocols, &ctx.settings.port_forward)
             {
-                println!("\n{cost}");
+                say!("\n{cost}");
             }
             // The offer is the last thing setup does, and it needs to know what the stack
             // actually settled to — which is right here, and nowhere else afterwards.

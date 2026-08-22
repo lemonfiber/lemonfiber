@@ -17,6 +17,7 @@ use super::{fresh_setup, stamp, Surface};
 use crate::context::read_settings;
 use crate::exit::{complain, USAGE};
 use crate::prompt::SetupFlags;
+use crate::say::{complain, say};
 
 /// Offer the operator a way out of a setup whose apply stopped part-way.
 ///
@@ -40,34 +41,34 @@ pub(super) async fn recover_setup(
     let journal = recover::journal_at(&paths.journal());
     let recovery = Recovery::of(&journal);
 
-    println!("A previous setup was interrupted part-way through applying.");
+    say!("A previous setup was interrupted part-way through applying.");
     let written = recovery.written();
     if written.is_empty() {
-        println!("It had not written anything yet.");
+        say!("It had not written anything yet.");
     } else {
-        println!("It had written:");
+        say!("It had written:");
         for change in written {
-            println!("  · {}", describe(change));
+            say!("  · {}", describe(change));
         }
     }
 
     if !surface.interactive() {
-        eprintln!("\nerror: recovering an interrupted setup needs a terminal to choose.");
-        eprintln!("Run `{PRODUCT} setup` interactively to resume, roll back, or start over.");
+        complain!("\nerror: recovering an interrupted setup needs a terminal to choose.");
+        complain!("Run `{PRODUCT} setup` interactively to resume, roll back, or start over.");
         return ExitCode::from(USAGE);
     }
 
     let env = paths.env_file();
     match recovery.resolve(ask_recovery_choice(surface)) {
         Resolution::Resume => {
-            println!("\nResuming.");
+            say!("\nResuming.");
             resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::RollBack(undos) => {
             if let Err(problem) = recover::undo(&undos, &env, Vec::new()) {
                 return complain(&problem);
             }
-            println!("\nRolled back. Applying again.");
+            say!("\nRolled back. Applying again.");
             resume_and_start(ctx, paths, surface, progress).await
         }
         Resolution::StartOver(undos) => {
@@ -75,8 +76,8 @@ pub(super) async fn recover_setup(
                 return complain(&problem);
             }
             discard(paths);
-            println!("\nStarted over — nothing of the interrupted setup remains.");
-            println!("Run `{PRODUCT} setup` to begin again.");
+            say!("\nStarted over — nothing of the interrupted setup remains.");
+            say!("Run `{PRODUCT} setup` to begin again.");
             ExitCode::SUCCESS
         }
     }
@@ -93,7 +94,7 @@ pub(super) async fn resume_and_start(
     match core_setup::resume(&mut wizard, paths, ctx.stack, &stamp()) {
         Ok(()) => {
             ctx.settings = read_settings();
-            println!("\nSetup is done — bringing your stack up.");
+            say!("\nSetup is done — bringing your stack up.");
             start(&ctx, surface).await
         }
         Err(problem) => complain(&problem),
@@ -102,10 +103,10 @@ pub(super) async fn resume_and_start(
 
 /// Which way out of an interrupted setup the operator chooses.
 pub(super) fn ask_recovery_choice(surface: &dyn Surface) -> Choice {
-    println!("\nWhat would you like to do?");
-    println!("  1) Resume — finish applying from where it stopped");
-    println!("  2) Roll back — undo what was written, then apply again");
-    println!("  3) Start over — undo it and forget the answers");
+    say!("\nWhat would you like to do?");
+    say!("  1) Resume — finish applying from where it stopped");
+    say!("  2) Roll back — undo what was written, then apply again");
+    say!("  3) Start over — undo it and forget the answers");
     match surface.line("Choose [1]:").as_str() {
         "2" => Choice::RollBack,
         "3" => Choice::StartOver,

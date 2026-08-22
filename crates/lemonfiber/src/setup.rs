@@ -29,6 +29,7 @@ use interrupted::recover_setup;
 use crate::context::read_settings;
 use crate::exit::{complain, USAGE};
 use crate::prompt::{Flags, SetupFlags};
+use crate::say::{complain, say};
 
 /// The three ways setup reaches a person: whether one is there, what they typed,
 /// and what does the asking.
@@ -112,25 +113,25 @@ pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> 
         return crate::terminal::configured(ctx, bare_run(surface.interactive())).await;
     }
 
-    println!("No configuration found.");
+    say!("No configuration found.");
 
     // Setup applies answers, so there is nothing for --dry-run to rehearse. Said
     // here, before the offer, rather than asking a question whose yes could not be
     // honoured — the same refusal `setup` gives, and at the same point in the walk.
     if ctx.dry_run {
-        eprintln!("Setup applies your answers, so it has nothing to rehearse.");
-        eprintln!("Run `{PRODUCT} setup` without --dry-run when you are ready.");
+        complain!("Setup applies your answers, so it has nothing to rehearse.");
+        complain!("Run `{PRODUCT} setup` without --dry-run when you are ready.");
         return ExitCode::from(USAGE);
     }
 
     if !surface.interactive() {
         // No one is here to take the offer, so it is stated rather than asked —
         // never left waiting on input that will not come.
-        println!("Run `{PRODUCT} setup` to configure your stack.");
+        say!("Run `{PRODUCT} setup` to configure your stack.");
         return ExitCode::SUCCESS;
     }
     if !confirm_setup(surface) {
-        println!("No changes made — run `{PRODUCT} setup` when you are ready.");
+        say!("No changes made — run `{PRODUCT} setup` when you are ready.");
         return ExitCode::SUCCESS;
     }
     setting_up(ctx, paths, surface, SetupFlags::none()).await
@@ -181,8 +182,8 @@ async fn fresh_setup(
     // Setup is for a machine with nothing configured; a configured one is changed
     // through its settings, not walked back to its first question.
     if !offer_setup(paths.env_file().exists()) {
-        println!("This machine is already set up.");
-        println!("Change a setting with `{PRODUCT} config set`, or start it with `{PRODUCT} up`.");
+        say!("This machine is already set up.");
+        say!("Change a setting with `{PRODUCT} config set`, or start it with `{PRODUCT} up`.");
         return ExitCode::from(USAGE);
     }
 
@@ -203,7 +204,7 @@ async fn resume_gather(
     let Some(progress) = progress else {
         return fresh_setup(ctx, paths, surface, flags).await;
     };
-    println!("Picking up where a previous setup left off.");
+    say!("Picking up where a previous setup left off.");
     let environment = ctx.environment;
     drive(
         ctx,
@@ -251,11 +252,11 @@ async fn drive(
     } else {
         let missing = flags.missing(&wizard);
         if !missing.is_empty() {
-            eprintln!("error: setup here is non-interactive, so it needs values as flags:");
+            complain!("error: setup here is non-interactive, so it needs values as flags:");
             for flag in missing {
-                eprintln!("  {flag}");
+                complain!("  {flag}");
             }
-            eprintln!("\nRun it in a terminal to answer interactively instead.");
+            complain!("\nRun it in a terminal to answer interactively instead.");
             return ExitCode::from(USAGE);
         }
         Box::new(Flags::new(flags, default_data_location(paths)))
@@ -276,11 +277,11 @@ async fn drive(
             // The settings read at startup predate the file setup just wrote, so
             // they are refreshed before the stack is brought up against them.
             ctx.settings = read_settings();
-            println!("\nSetup is done — bringing your stack up.");
+            say!("\nSetup is done — bringing your stack up.");
             start(&ctx, surface).await
         }
         Ok(core_setup::Outcome::Abandoned) => {
-            println!("\nSetup was left here — nothing was written.");
+            say!("\nSetup was left here — nothing was written.");
             ExitCode::SUCCESS
         }
         Err(problem) => complain(&problem),
