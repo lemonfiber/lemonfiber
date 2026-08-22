@@ -370,6 +370,63 @@ fn declared(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Output leaves through one place, and this is what keeps it that way.
+///
+/// The funnel was worth building because a question about *how* something is shown
+/// had a hundred and six answers, or in practice none. Nothing about its shape stops
+/// the hundred and seventh: a bare print added later still compiles, still reads
+/// correctly in review, and silently opts that one line out of every rendering
+/// decision the funnel makes. The failure it produces is the cruel kind — the line
+/// that skipped the fold would be the one still carrying a tick on the terminal that
+/// cannot draw one, which is precisely the terminal the fold exists for.
+///
+/// Two files are allowed to reach a stream directly, for opposite reasons.
+/// `src/say.rs` **is** the funnel. `build.rs` is not talking to a person at all: its
+/// output is a protocol Cargo parses, and rendering a directive for a human terminal
+/// would corrupt it. Everything under a `src/` directory that is not the funnel goes
+/// through the funnel.
+#[test]
+fn nothing_reaches_a_terminal_except_through_the_one_way_out() {
+    let mut leaks: Vec<String> = Vec::new();
+    for (path, text) in sources() {
+        let where_it_lives = path.to_string_lossy().replace('\\', "/");
+        // `build.rs` sits beside `src/` rather than inside it, so naming the funnel
+        // is the whole of the exception list.
+        if !where_it_lives.contains("/src/") || where_it_lives.ends_with("src/say.rs") {
+            continue;
+        }
+        for (number, line) in text.lines().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") || trimmed.starts_with("/*") {
+                continue;
+            }
+            // One entry per line rather than one per way out: `eprintln!(` contains
+            // `println!(`, and a line reported twice reads as two faults.
+            //
+            // `prompt_password` is here because it is not a macro and was the second
+            // leak found: the password crate writes the prompt itself, so the text
+            // has to arrive already folded rather than being handed over raw.
+            if [
+                "println!(",
+                "eprintln!(",
+                "print!(",
+                "eprint!(",
+                "prompt_password(format!",
+            ]
+            .iter()
+            .any(|reaching| trimmed.contains(reaching))
+            {
+                leaks.push(format!("{where_it_lives}:{}: {trimmed}", number + 1));
+            }
+        }
+    }
+    assert!(
+        leaks.is_empty(),
+        "these reach a terminal without passing the funnel, so nothing decides how \
+         they are rendered: {leaks:?}"
+    );
+}
+
 /// Requirement identifiers do not belong in code.
 ///
 /// Provenance in a comment is worthless to the next reader and rots the moment

@@ -15,6 +15,7 @@
 //! requirement asks for a fallback where Unicode is *unsupported*, not wherever it
 //! is unproven.
 
+use std::io::Write as _;
 use std::sync::OnceLock;
 
 /// Whether output is folded to ASCII, settled once at startup.
@@ -60,7 +61,11 @@ pub(crate) fn unicode(locale: Option<&str>) -> bool {
 }
 
 /// The line as this terminal can render it.
-fn rendered(line: &str) -> String {
+///
+/// Reachable from outside because not everything that reaches a terminal does so
+/// through this module: reading a secret hands the prompt to a crate that writes it
+/// itself, and that prompt has to arrive folded like every other line.
+pub(crate) fn rendered(line: &str) -> String {
     shown(line, *ASCII_ONLY.get().unwrap_or(&false))
 }
 
@@ -114,6 +119,17 @@ pub(crate) fn complained(line: &str) {
     eprintln!("{}", rendered(line));
 }
 
+/// Put a question out and leave the cursor beside it, for an answer on the same line.
+///
+/// No newline, because the answer is typed where the cursor is left. Flushed for the
+/// same reason: standard output is buffered when it is a terminal only up to a
+/// newline, and a question without one would sit in the buffer while the program
+/// waited to be answered — the operator staring at nothing, the program at them.
+pub(crate) fn asked(line: &str) {
+    print!("{}", rendered(line));
+    let _ = std::io::stdout().flush();
+}
+
 /// Print a line, as this terminal can render it.
 ///
 /// Takes what `println!` takes, so a call site changes by one word rather than
@@ -133,7 +149,7 @@ pub(crate) use {complain, say};
 
 #[cfg(test)]
 mod tests {
-    use super::{complained, folded, said, settle, shown, unicode};
+    use super::{asked, complained, folded, said, settle, shown, unicode};
 
     /// A locale that names a charset has told us what it can do; one that is unset
     /// has told us nothing, and the requirement asks for a fallback where Unicode
@@ -220,5 +236,6 @@ mod tests {
     fn both_ends_of_the_funnel_take_a_line() {
         said("an ordinary line — folded or not");
         complained("a line about a failure");
+        asked("and a question — answered beside it");
     }
 }

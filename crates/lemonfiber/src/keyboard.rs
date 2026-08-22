@@ -6,7 +6,7 @@
 //! ask and what an answer means is in [`crate::prompt`], where it can be proven
 //! against a script; what is here is the wire to the human, and nothing else.
 
-use std::io::{IsTerminal as _, Write as _};
+use std::io::IsTerminal as _;
 use std::path::PathBuf;
 
 use lemonfiber_core::app::setup::Prompt;
@@ -20,8 +20,7 @@ pub(crate) struct Keyboard;
 
 impl Answers for Keyboard {
     fn ask(&self, question: &str) -> String {
-        print!("{question} ");
-        let _ = std::io::stdout().flush();
+        crate::say::asked(&format!("{question} "));
         let mut line = String::new();
         let _ = std::io::stdin().read_line(&mut line);
         line.trim().to_owned()
@@ -34,7 +33,9 @@ impl Answers for Keyboard {
     /// trim is the same the other fields get: a pasted key's stray newline is the
     /// common error, and removing it serves the operator.
     fn secret(&self, prompt: &str) -> String {
-        rpassword::prompt_password(format!("{prompt} "))
+        // Written by the password crate rather than by the funnel, so the folding the
+        // funnel would have done is done to the text before handing it over.
+        rpassword::prompt_password(crate::say::rendered(&format!("{prompt} ")))
             .unwrap_or_default()
             .trim()
             .to_owned()
