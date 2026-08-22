@@ -14,6 +14,7 @@
 //! product knows. A glossary of two dozen words is a document; the four words in
 //! front of somebody is an answer.
 
+use lemonfiber_core::acknowledged::Acknowledged;
 use lemonfiber_core::glossary::{mentioned, Term};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Frame, Line, Span, Style};
@@ -65,7 +66,7 @@ fn explaining(showing: &str, room: usize) -> Vec<Line<'static>> {
         return vec![Line::raw("Nothing on this screen needs a word explaining.")];
     }
 
-    let explained = explained_in(showing, room);
+    let explained = explained_in(showing, room, crate::render::glossary::known());
     let shown = explained.len();
     let mut lines: Vec<Line<'static>> = explained
         .iter()
@@ -96,9 +97,17 @@ fn explaining(showing: &str, room: usize) -> Vec<Line<'static>> {
 /// record **exactly** what was explained to them. The ones the pane only names are
 /// not explained — naming a word is how it stays findable, not how it gets taught —
 /// and recording those would stop a later report explaining a word nobody ever read.
-pub(crate) fn explained_in(showing: &str, room: usize) -> Vec<&'static Term> {
+pub(crate) fn explained_in(showing: &str, room: usize, known: &Acknowledged) -> Vec<&'static Term> {
     let fits = room.saturating_sub(1).max(1);
-    mentioned(showing).into_iter().take(fits).collect()
+    mentioned(showing)
+        .into_iter()
+        // A word already gone and found out about is named rather than taught
+        // again, exactly as a report does it — so the room this pane has goes to
+        // what is new. One rule, both surfaces: a screen and a report disagreeing
+        // about which words somebody knows would be the same feature twice.
+        .filter(|term| !known.holds(term.word))
+        .take(fits)
+        .collect()
 }
 
 /// How much room the pane has for words, on a screen of this size.
@@ -130,6 +139,7 @@ fn middle(screen: Rect) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::{explained_in, explaining, middle, room_on, showing};
+    use lemonfiber_core::acknowledged::Acknowledged;
     use ratatui::layout::Rect;
     use ratatui::prelude::{Line, Span};
 
@@ -191,8 +201,9 @@ mod tests {
     fn only_the_words_it_explained_count_as_explained() {
         let said = "the indexer, the hardlink, the VPN, the ratio and the seed";
 
-        let roomy = explained_in(said, 10);
-        let cramped = explained_in(said, 3);
+        let nothing = Acknowledged::default();
+        let roomy = explained_in(said, 10, &nothing);
+        let cramped = explained_in(said, 3, &nothing);
 
         let (roomy_count, cramped_count) = (roomy.len(), cramped.len());
         assert!(
@@ -201,6 +212,20 @@ mod tests {
         );
         assert_eq!(cramped.len(), 2, "one line goes to the ones it only names");
         assert!(cramped.iter().all(|term| roomy.contains(term)));
+    }
+
+    /// One rule, both surfaces. What a report declines to teach again a pane
+    /// declines too — the two disagreeing about which words somebody knows would
+    /// be the same feature written twice, differently.
+    #[test]
+    fn a_word_already_known_is_named_here_as_it_is_in_a_report() {
+        let mut known = Acknowledged::default();
+        known.take("indexer");
+
+        let explained = explained_in("no indexer answered, the hardlink failed", 10, &known);
+
+        let words: Vec<&str> = explained.iter().map(|term| term.word).collect();
+        assert_eq!(words, ["hardlink"], "the room goes to what is new");
     }
 
     /// The room is the pane's, not the screen's — what is behind it was not read.

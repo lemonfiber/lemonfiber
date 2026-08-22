@@ -417,7 +417,8 @@ const fn wanted(key: KeyEvent) -> Option<Press> {
 /// recording those would stop a later report explaining a word nobody ever read,
 /// which is the one failure this whole record exists to avoid.
 fn learned(showing: &str, screen: Rect, rehearsing: bool) {
-    let words: Vec<&str> = crate::pane::explained_in(showing, crate::pane::room_on(screen))
+    let known = crate::render::glossary::known();
+    let words: Vec<&str> = crate::pane::explained_in(showing, crate::pane::room_on(screen), known)
         .into_iter()
         .map(|term| term.word)
         .collect();
