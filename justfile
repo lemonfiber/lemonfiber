@@ -2,6 +2,45 @@
 default:
     @just --list
 
+# Cut and push a release tag, the way the maintainer one-click already does it.
+#
+# `git tag v0.8.0` does not work here, and the way it fails is the problem: this
+# machine sets `tag.gpgsign` globally, so a bare tag becomes a signed annotated one
+# and git refuses it for want of a message — `fatal: no tag message?`. In a `&&`
+# chain the push then silently does nothing, so it reads as a failed push rather
+# than a tag that was never made.
+#
+# Every tag through v0.8.0 is lightweight, which is what that path produced before
+# the setting existed. `release-dispatch.yml` has always made an annotated one, and
+# `release.yml` consumes either, so annotated is not a change to what the pipeline
+# accepts — only to what the two paths agree on.
+#
+# Signed, because a tag is what a release is built from and what somebody verifying
+# a download reaches for, and because this machine already says it signs tags. The
+# workflow path cannot: a runner has no key. So a signed tag means one cut here.
+
+# Cut and push a signed release tag for a version already on main.
+release-tag VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    carried=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+    if [ "{{VERSION}}" != "${carried}" ]; then
+        echo "the workspace carries ${carried}, not {{VERSION}} — cargo-dist releases what it carries, so bump first" >&2
+        exit 1
+    fi
+    if git rev-parse --verify --quiet "refs/tags/v{{VERSION}}" >/dev/null; then
+        echo "tag v{{VERSION}} already exists" >&2
+        exit 1
+    fi
+    git fetch origin --quiet
+    if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+        echo "HEAD is not origin/main — the tag must name what shipped" >&2
+        exit 1
+    fi
+    git tag -s "v{{VERSION}}" -m "lemonfiber v{{VERSION}}"
+    git push origin "v{{VERSION}}"
+    @echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
+
 # Everything CI runs.
 ci: fmt-check lint test typos deny
 
