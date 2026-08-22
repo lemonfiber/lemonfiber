@@ -21,7 +21,7 @@ use lemonfiber_core::stack::Source;
 use crate::cli::STACK;
 
 /// Everything a command needs that the command itself does not carry.
-pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
+pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) -> Ctx {
     // The path outlives the process, and `Source` is Copy so it can be handed
     // around freely; leaking one allocation at startup buys both.
     let stack = match stack_dir {
@@ -46,8 +46,14 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool) -> Ctx {
         environment,
     );
 
+    // A rehearsal takes nothing, so the two never both apply — but a rehearsal that
+    // was also asked to force is a rehearsal, because the harmless reading of an
+    // ambiguous pair of flags is the one to take.
     if dry_run {
         return ctx.rehearsing();
+    }
+    if force {
+        return ctx.forcing();
     }
     ctx
 }

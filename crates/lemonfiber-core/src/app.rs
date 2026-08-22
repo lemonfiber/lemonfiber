@@ -62,7 +62,10 @@ pub use ctx::Ctx;
 
 // The log-following reads a surface streams from live outside dispatch, so they are the
 // engine module's functions re-exported for the binary and the log commands to reach.
-pub use engine::{diagnose, in_flight, logs, pull_progress, start_progress, started, Interrupted};
+pub use engine::{
+    claimed, diagnose, in_flight, logs, pull_progress, released, start_progress, started, Claim,
+    Interrupted,
+};
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
 
@@ -312,6 +315,9 @@ pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
 
 /// Raised when stopping would take a service out from under a form still running.
 pub const STILL_NEEDED: Code = Code::new("LIFE-2");
+
+/// Another run is already working on this stack.
+pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
 
 /// Carry out a command.
 ///

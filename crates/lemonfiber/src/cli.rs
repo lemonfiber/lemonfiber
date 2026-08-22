@@ -31,6 +31,10 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) dry_run: bool,
 
+    /// Take the stack from a run that claimed it and did not give it back.
+    #[arg(long, global = true)]
+    pub(crate) force: bool,
+
     /// Operate a stack directory of your own instead of the built-in one.
     #[arg(long, global = true, value_name = "PATH")]
     pub(crate) stack_dir: Option<PathBuf>,

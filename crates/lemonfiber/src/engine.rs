@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use lemonfiber_core::adapters::Disk;
 use lemonfiber_core::app::{
-    dispatch, in_flight, logs, pull_progress, start_progress, started, supervise, Command, Ctx,
-    WATCH,
+    claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started,
+    supervise, Command, Ctx, WATCH,
 };
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogQuery;
@@ -238,6 +238,14 @@ pub(crate) async fn start(
     services: &[String],
     json: bool,
 ) -> ExitCode {
+    // A streamed start does not go through the dispatcher, so it claims the stack
+    // here rather than inheriting the claim `lifecycle` takes. Given back below on
+    // both paths out, for the same reason it is given back there.
+    let claim = match claimed(ctx).await {
+        Ok(claim) => claim,
+        Err(problem) => return complain(&problem),
+    };
+
     // A rehearsal runs nothing, so it has nothing to narrate — and it needs no
     // separate path, because the report it wants is the one built from the same plan
     // without the single irreversible step, which is what a status of nothing gets.
@@ -246,14 +254,19 @@ pub(crate) async fn start(
     } else {
         match narrated(ctx, forms, services, json).await {
             Ok(status) => status,
-            Err(code) => return code,
+            Err(code) => {
+                released(ctx, claim).await;
+                return code;
+            }
         }
     };
 
     // The report is asked for whatever the status was: a start that failed part way
     // has still started something, and which services came up is the first thing an
     // operator needs in order to do anything about the ones that did not.
-    match started(ctx, forms, services, status).await {
+    let outcome = started(ctx, forms, services, status).await;
+    released(ctx, claim).await;
+    match outcome {
         Ok(outcome) => {
             render(&outcome, json);
             settled(&outcome)
