@@ -103,6 +103,18 @@ pub(crate) fn unrecognised(word: &str) -> Problem {
     .with_detail(format!("It explains these — {}.", words.join(", ")))
 }
 
+/// One word and what it is for, for a surface that shows it on its own.
+///
+/// A conversation meets its words one at a time rather than reaching the end of a
+/// report and looking back, so setup shows them as it goes. The shape is the
+/// footnote's, because an explanation that changed shape depending on where it
+/// appeared would read as two different things.
+pub(crate) fn introduced(term: &Term) -> Lines {
+    let mut lines = Lines::default();
+    entry(&mut lines, term);
+    lines
+}
+
 /// One word and what it is for, wrapped and indented under the report.
 fn entry(lines: &mut Lines, term: &Term) {
     let mut indent = FIRST;
