@@ -182,6 +182,7 @@ mod tests {
             paths.journal(),
             paths.setup_progress(),
             paths.baseline(),
+            paths.acknowledged(),
             paths.materialised(),
             paths.quality(),
             paths.notifications(),
@@ -293,5 +294,17 @@ mod tests {
         let elsewhere = Paths::rooted(Path::new("/tmp/a"), Path::new("/tmp/b"));
         assert_eq!(elsewhere.env_file(), Path::new("/tmp/a/lemonfiber/.env"));
         assert_eq!(elsewhere.stack(), Path::new("/tmp/b/lemonfiber/stack"));
+    }
+    /// Beside the settings, for the same reason the baseline is: what one operator
+    /// has been told is not what another has, even sharing a stack directory.
+    #[test]
+    fn what_has_been_acknowledged_sits_with_the_configuration() {
+        let paths = paths();
+
+        let held = paths.acknowledged();
+
+        let where_it_is = held.display().to_string();
+        assert_eq!(held.parent(), paths.baseline().parent());
+        assert!(held.ends_with("acknowledged.json"), "{where_it_is}");
     }
 }

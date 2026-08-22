@@ -242,7 +242,9 @@ fn wrapped(text: &str, width: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{explained, footnotes, settle, unrecognised, wanted, wrapped, WIDTH};
+    use super::{
+        explained, footnotes, known, settle, settle_known, unrecognised, wanted, wrapped, WIDTH,
+    };
     use lemonfiber_core::acknowledged::Acknowledged;
 
     /// The whole point: a report that used a word says what it meant, underneath.
@@ -306,6 +308,25 @@ mod tests {
         assert!(said.contains("2 more used here:"), "{said}");
         assert!(said.contains("ratio"), "{said}");
         assert!(said.contains("seed"), "{said}");
+    }
+
+    /// Settled once, like the words it is about.
+    ///
+    /// Latching nothing, deliberately: this settles a process-wide value and every
+    /// test beside it passes its own record in explicitly, so what is latched has to
+    /// be the empty one or this test would decide for them.
+    #[test]
+    fn what_has_been_acknowledged_is_settled_once() {
+        let settled = settle_known(Acknowledged::default());
+
+        assert!(
+            settled.is_empty(),
+            "nothing acknowledged unless a run says so"
+        );
+        assert!(
+            known().is_empty(),
+            "and asking plainly agrees with what was settled"
+        );
     }
 
     /// Settled once, like the locale, and for the same reason: it is a property of
