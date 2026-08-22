@@ -28,7 +28,7 @@ jobs:
           if [ -n "$owners" ]; then gh issue edit "$NUM" --add-assignee "$owners" || true; fi
   notify:
     needs: triage
-    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@4eb85bd0ffafb9ed804bd78b23221a2bdb99db91 # main
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@7084ff5150708d594a409521dc60113350d480fc # main
     with:
       title: "📥 Needs triage · ${{ github.event.repository.name }} #${{ github.event.issue.number }}"
       body: ${{ github.event.issue.title }}
