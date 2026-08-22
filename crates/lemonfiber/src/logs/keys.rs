@@ -110,7 +110,7 @@ impl Viewer {
             Press::Typed('q') | Press::Abandon => self.open = false,
             Press::Typed('/') => self.typing = Some(String::new()),
             Press::Typed('f') | Press::Tail => self.back_to_the_tail(),
-            Press::Typed('?') => self.glossary = !self.glossary,
+            Press::Typed('?') => self.glossary = self.explaining && !self.glossary,
             Press::Typed('s') => self.next_service(),
             Press::Typed('w') => self.next_rung(),
             Press::Typed('c') => self.unfiltered(),

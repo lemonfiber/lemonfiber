@@ -231,7 +231,8 @@ fn reported(problem: &Problem, parsed: bool) -> Lines {
         }
     }
 
-    let notes = crate::render::glossary::footnotes(&lines.text());
+    let notes =
+        crate::render::glossary::footnotes(&lines.text(), crate::render::glossary::wanted());
     lines.extend(notes);
     lines
 }

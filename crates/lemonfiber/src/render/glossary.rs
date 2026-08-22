@@ -33,9 +33,34 @@ const FIRST: &str = "  ";
 /// Deeper than the word, so a wrapped explanation cannot be mistaken for a new one.
 const AFTER: &str = "      ";
 
+/// Whether this run explains its words at all, settled once at startup.
+///
+/// A latch for the same reason the locale is one: it is a property of the run rather
+/// than of any call, and the places that would otherwise each have to be told run to
+/// half a dozen across three surfaces.
+static EXPLAINING: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Settle whether this run explains its words, and say what is in force.
+///
+/// The first call decides; a later one is told what the first settled.
+pub(crate) fn settle(explaining: bool) -> bool {
+    *EXPLAINING.get_or_init(|| explaining)
+}
+
+/// Whether this run explains its words.
+///
+/// On where nothing has settled otherwise, which is the right way round: somebody
+/// meeting this vocabulary does not know there is a setting to look for.
+pub(crate) fn wanted() -> bool {
+    *EXPLAINING.get().unwrap_or(&true)
+}
+
 /// What this report's own words mean, or nothing where it used none of them.
-pub(crate) fn footnotes(text: &str) -> Lines {
+pub(crate) fn footnotes(text: &str, wanted: bool) -> Lines {
     let mut lines = Lines::default();
+    if !wanted {
+        return lines;
+    }
     let used = mentioned(text);
     let (shown, rest) = used.split_at(used.len().min(MOST));
     if shown.is_empty() {
@@ -176,12 +201,12 @@ fn wrapped(text: &str, width: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{explained, footnotes, unrecognised, wrapped, WIDTH};
+    use super::{explained, footnotes, settle, unrecognised, wanted, wrapped, WIDTH};
 
     /// The whole point: a report that used a word says what it meant, underneath.
     #[test]
     fn a_report_explains_the_words_it_used() {
-        let said = footnotes("no indexer answered in time").text();
+        let said = footnotes("no indexer answered in time", true).text();
 
         assert!(said.contains("Words used here:"), "{said}");
         assert!(said.contains("indexer — Search engines"), "{said}");
@@ -191,13 +216,17 @@ mod tests {
     /// be under every report.
     #[test]
     fn a_report_using_none_of_them_gets_no_block() {
-        assert_eq!(footnotes("everything is running").text(), "");
+        assert_eq!(footnotes("everything is running", true).text(), "");
     }
 
     /// Ten explanations at once rebuild the wall this exists to knock down.
     #[test]
     fn a_report_explains_no_more_than_a_few() {
-        let said = footnotes("the indexer, the hardlink, the VPN, the ratio and the seed").text();
+        let said = footnotes(
+            "the indexer, the hardlink, the VPN, the ratio and the seed",
+            true,
+        )
+        .text();
 
         // Asserted by which words got an entry rather than by counting them: an
         // explanation may itself contain an em dash, and counting those would have
@@ -216,17 +245,47 @@ mod tests {
     /// "these are the hard ones", which is a claim it is not making.
     #[test]
     fn the_words_it_did_not_explain_are_named_rather_than_dropped() {
-        let said = footnotes("the indexer, the hardlink, the VPN, the ratio and the seed").text();
+        let said = footnotes(
+            "the indexer, the hardlink, the VPN, the ratio and the seed",
+            true,
+        )
+        .text();
 
         assert!(said.contains("2 more used here:"), "{said}");
         assert!(said.contains("ratio"), "{said}");
         assert!(said.contains("seed"), "{said}");
     }
 
+    /// Settled once, like the locale, and for the same reason: it is a property of
+    /// the run rather than of any call.
+    ///
+    /// The value latched here is deliberately the default. This settles a
+    /// process-wide value, and every test beside it expects a run that explains —
+    /// so what is latched has to be that, or this test would decide for them.
+    #[test]
+    fn whether_a_run_explains_is_settled_once() {
+        let first = settle(true);
+
+        assert!(first, "a run explains its words unless it says otherwise");
+        assert_eq!(
+            settle(false),
+            first,
+            "the second caller is told what is in force, not what it asked for"
+        );
+        assert_eq!(wanted(), first, "and asking plainly agrees");
+    }
+
+    /// Somebody who finds them patronising can stop them wholesale, and then no
+    /// report carries one at all — not a shorter block, none.
+    #[test]
+    fn a_run_that_wants_none_of_them_gets_none() {
+        assert_eq!(footnotes("no indexer answered in time", false).text(), "");
+    }
+
     /// Available on request and never mandatory: the block says how to ask.
     #[test]
     fn the_block_says_where_the_longer_form_is() {
-        let said = footnotes("no indexer answered").text();
+        let said = footnotes("no indexer answered", true).text();
 
         assert!(said.contains("lemonfiber explain <word>"), "{said}");
     }
@@ -240,7 +299,7 @@ mod tests {
             .iter()
             .map(|term| term.word)
             .collect();
-        let said = footnotes(&every.join(" and the ")).text();
+        let said = footnotes(&every.join(" and the "), true).text();
 
         for line in said.lines() {
             let width = line.chars().count();
@@ -252,7 +311,7 @@ mod tests {
     /// comes after and is separated from it.
     #[test]
     fn the_block_is_separated_from_the_report_it_follows() {
-        let said = footnotes("no indexer answered").text();
+        let said = footnotes("no indexer answered", true).text();
 
         assert!(said.starts_with('\n'), "{said:?}");
     }

@@ -63,6 +63,14 @@ pub const SECOND_IP_ECHO: &str = "https://icanhazip.com";
 /// The setting naming the IP-echo service, or switching leak detection off.
 pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 
+/// The setting that switches the plain-language explanations off.
+///
+/// On unless it is explicitly turned off, which is the right way round: somebody
+/// meeting this vocabulary for the first time does not know there is a setting to
+/// look for, and somebody who finds the explanations patronising knows exactly what
+/// they want to stop.
+pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
+
 /// The setting naming where downloads and the library are kept.
 ///
 /// The one location the storage contract rests on: the compose driver mounts it
@@ -385,6 +393,11 @@ pub struct Settings {
     /// The indexer the operator gave at setup — its URL and key — so a diagnosis
     /// can re-prove it live. Absent where none was configured.
     pub indexer: Option<Indexer>,
+    /// Whether this product explains the words it uses.
+    ///
+    /// On unless switched off. The words are a wall to somebody meeting them, and
+    /// the operator who wants them gone is the one who knows to go and look.
+    pub explanations: bool,
 }
 
 /// An indexer credential as configuration holds it: where it is, and the key.
@@ -410,6 +423,7 @@ impl Default for Settings {
             service_user: None,
             port_forward: PortForward::default(),
             indexer: None,
+            explanations: true,
         }
     }
 }
