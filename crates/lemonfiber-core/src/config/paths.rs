@@ -78,6 +78,16 @@ impl Paths {
         self.config.join("baseline.json")
     }
 
+    /// Where the words this operator has gone and found out about are kept.
+    ///
+    /// Beside the settings rather than beside the stack, for the same reason the
+    /// baseline is: two projects sharing one stack directory are two installations,
+    /// and what one operator has been told is not what the other has.
+    #[must_use]
+    pub fn acknowledged(&self) -> PathBuf {
+        self.config.join("acknowledged.json")
+    }
+
     /// The operator's quality choice: which preset is in force, globally and per
     /// media type. Kept with configuration so a backup carries it, and so a later
     /// run applies the same choice rather than falling back to the default.
