@@ -7,6 +7,7 @@
 
 use std::process::ExitCode;
 
+use crate::render::Lines;
 use crate::say::complain;
 use lemonfiber_core::app::repair::Report as RepairReport;
 use lemonfiber_core::app::Outcome;
@@ -182,26 +183,53 @@ pub(crate) fn upgrade_exit(report: &UpgradeReport) -> ExitCode {
 /// the remedies are the point of the error model, and a second copy of this is
 /// how one of them quietly starts omitting them.
 pub(crate) fn complain(problem: &Problem) -> ExitCode {
-    complain!("{}: {}", problem.code, problem.summary);
-    complain!("\n  {}\n", problem.meaning);
+    reported(problem).eprint();
+    ExitCode::from(exit_code(problem))
+}
+
+/// What an operator is told about a failure.
+///
+/// Built rather than printed, which every other answer in this crate already did
+/// and this one did not. Three things follow, and only the first was the reason.
+///
+/// **The text is made safe on the way out.** `Lines::put` passes everything through
+/// [`lemonfiber_core::text::plain`], and a failure carries text this product did not
+/// write — a service’s own words, a filesystem’s reason. A terminal is not a text
+/// box: an escape in the middle of one clears the screen or writes over the line
+/// just printed, and a diagnosis that no longer says what this product said has lost
+/// the whole of what it was for. The redaction a detail already passed through looks
+/// for credentials, not for instructions.
+///
+/// **A remedy is rendered the one way.** [`Lines::remedy`] exists so that a
+/// diagnosis, a repair’s escalation and this cannot drift on how an action and its
+/// detail sit together — and this had drifted, by writing the identical shape by
+/// hand with nothing keeping the two the same.
+///
+/// **And a failure explains its own words**, like every other answer, which matters
+/// most here: an error is where somebody is least able to go and look one up.
+fn reported(problem: &Problem) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("{}: {}", problem.code, problem.summary));
+    lines.put("");
+    lines.put(format!("  {}", problem.meaning));
+    lines.put("");
 
     for remedy in &problem.remedies {
-        complain!("  → {}", remedy.action);
-        if let Some(detail) = &remedy.detail {
-            complain!("    {detail}");
-        }
+        lines.remedy(remedy, "  ");
     }
 
     // Last, and indented: available to whoever wants it, and never the first
     // thing the operator has to read.
     if let Some(detail) = &problem.detail {
-        complain!();
+        lines.put("");
         for line in detail.lines() {
-            complain!("  {line}");
+            lines.put(format!("  {line}"));
         }
     }
 
-    ExitCode::from(exit_code(problem))
+    let notes = crate::render::glossary::footnotes(&lines.text());
+    lines.extend(notes);
+    lines
 }
 
 /// Where this machine keeps lemonfiber's files.
@@ -557,5 +585,61 @@ mod tests {
         assert_ne!(format!("{:?}", complain(&carrying)), success());
         assert_ne!(format!("{:?}", no_config_home()), success());
         let _ = USAGE;
+    }
+}
+
+#[cfg(test)]
+mod reporting {
+    use super::reported;
+    use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+
+    /// A failure carries text this product did not write, and a terminal is not a
+    /// text box: one escape clears the screen, another writes over the line just
+    /// printed. Nothing runs, and the screen stops saying what this product said —
+    /// which, for a diagnosis, is the whole of what it was for.
+    ///
+    /// Every other answer already went out through `text::plain`. This one did not,
+    /// and the redaction it *did* pass through looks only for credentials.
+    #[test]
+    fn a_failure_cannot_carry_an_instruction_to_the_terminal() {
+        let escape = char::from(27);
+        let problem = Problem::new(
+            Code::new("WORD-9"),
+            Severity::Error,
+            format!("the service refused{escape}[2J"),
+            "it gave a reason of its own.",
+            Remedy::new("Try again"),
+        )
+        .with_detail(format!("HTTP 500: {escape}[H database is locked"));
+
+        let said = reported(&problem).text();
+
+        assert!(
+            !said.contains(escape),
+            "an escape reached the screen: {said:?}"
+        );
+        assert!(
+            said.contains("the service refused"),
+            "and the words survived: {said}"
+        );
+        assert!(said.contains("database is locked"), "{said}");
+    }
+
+    /// The words a failure uses are explained like any other answer’s, which matters
+    /// most here: an error is where somebody is least able to go and look one up.
+    #[test]
+    fn a_failure_explains_its_own_words() {
+        let problem = Problem::new(
+            Code::new("WORD-8"),
+            Severity::Error,
+            "no indexer answered in time",
+            "nothing could be searched for.",
+            Remedy::new("Check the indexer is reachable"),
+        );
+
+        let said = reported(&problem).text();
+
+        assert!(said.contains("Words used here:"), "{said}");
+        assert!(said.contains("indexer — Search engines"), "{said}");
     }
 }

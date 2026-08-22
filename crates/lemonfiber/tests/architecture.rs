@@ -50,6 +50,19 @@ fn collect(dir: &Path, root: &Path, found: &mut BTreeMap<PathBuf, String>) {
     }
 }
 
+/// The body of a named function in a piece of source, or nothing where it is absent.
+///
+/// Read from the source rather than by running it, because what this pins is which
+/// stream a failure reaches, and a test that called the reporter would have to
+/// capture this process's own stderr to find out — a harness rather than a test.
+fn body_of<'a>(source: &'a str, signature: &str) -> &'a str {
+    source
+        .split_once(signature)
+        .and_then(|(_, rest)| rest.split_once("\n}\n"))
+        .map(|(body, _)| body)
+        .unwrap_or_default()
+}
+
 /// The half of a file that ships, up to where its own tests begin.
 ///
 /// Found by `mod tests` rather than by the first `#[cfg(test)]`, and the difference
@@ -906,16 +919,22 @@ fn no_source_file_outgrows_reading_in_one_sitting() {
 #[test]
 fn a_failure_is_reported_on_stderr_and_never_on_stdout() {
     let exit = std::fs::read_to_string("src/exit.rs").unwrap_or_default();
-    let complain = exit
-        .split_once("pub(crate) fn complain")
-        .and_then(|(_, rest)| rest.split_once("\n}\n"))
-        .map(|(body, _)| body)
-        .unwrap_or_default();
+    let complain = body_of(&exit, "pub(crate) fn complain");
+    // The lines themselves are built next door now, so the per-line checks below
+    // have to follow them there. A guard that kept reading only the two-line caller
+    // would pass on anything.
+    let built = body_of(&exit, "\nfn reported");
+    let reporter = format!("{complain}\n{built}");
 
     assert!(!complain.is_empty(), "the reporter was found");
+    assert!(!built.is_empty(), "and what it builds");
     assert!(
-        complain.contains("complain!("),
+        complain.contains(".eprint()"),
         "it reports something at all"
+    );
+    assert!(
+        !complain.contains(".print()"),
+        "a diagnosis on stdout would corrupt a machine-readable run"
     );
 
     // Output leaves through one place now, so this is pinned where it is decided
@@ -932,7 +951,7 @@ fn a_failure_is_reported_on_stderr_and_never_on_stdout() {
         "and its ordinary half writes to stdout"
     );
 
-    for line in complain.lines() {
+    for line in reporter.lines() {
         let statement = line.trim_start();
         assert!(
             !statement.starts_with("println!") && !statement.starts_with("say!"),
