@@ -23,7 +23,7 @@ use lemonfiber_core::bundle::{prose, Marks, Terms};
 use lemonfiber_core::logs::viewer::{Filter, Scrollback};
 use lemonfiber_core::logs::{declared, Level};
 use lemonfiber_core::plural::s;
-use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
+use lemonfiber_core::ports::docker::{Lifecycle, LogLine};
 use lemonfiber_core::text::plain;
 
 use notices::{noticed, remark, SELF};
@@ -521,7 +521,7 @@ impl Viewer {
 /// deliberately not a flag to parse, so `NO_COLOR=0` refuses colour like everything
 /// else does, which surprises people exactly once and is what every other tool does.
 pub(crate) fn colours(no_color: Option<&str>) -> bool {
-    no_color.is_none_or(|value| value.is_empty())
+    no_color.is_none_or(str::is_empty)
 }
 
 #[cfg(test)]
