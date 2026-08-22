@@ -121,9 +121,14 @@ pub(crate) fn remember(words: &[&str], rehearsing: bool) {
     // Read and written once however many words were opened at a time, which is what
     // a pane does — the file is small, but a screenful of separate rewrites is a
     // screenful of chances for two of them to lose each other's.
-    let changed = words
-        .iter()
-        .fold(false, |any, word| known.take(word) || any);
+    // Every word is taken, and `|=` is what says so: `any` and `fold` with `||`
+    // both short-circuit, so a screenful would record its first new word and
+    // silently drop the rest. Clippy suggests `any` here and is wrong, because it
+    // cannot see that taking a word is what changes the record.
+    let mut changed = false;
+    for word in words {
+        changed |= known.take(word);
+    }
     if !changed {
         return;
     }
