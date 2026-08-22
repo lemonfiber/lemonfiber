@@ -71,15 +71,26 @@ impl Terminal {
         let Some(term) = lemonfiber_core::glossary::explain(word) else {
             return;
         };
-        let Ok(mut met) = self.met.try_borrow_mut() else {
-            return;
-        };
-        if met.contains(&term.word) {
+        if !self.first_meeting(term.word) {
             return;
         }
-        met.push(term.word);
-        drop(met);
         crate::render::glossary::introduced(term).print();
+    }
+
+    /// Whether this conversation is meeting the word for the first time, recording
+    /// it if so.
+    ///
+    /// Its own function so the borrow ends with it. Showing the word is what the
+    /// caller does next, and doing that while still holding the list would be the
+    /// only way this could be asked twice at once — so keeping the two apart is
+    /// what makes the borrow safe rather than a check that it was.
+    fn first_meeting(&self, word: &'static str) -> bool {
+        let mut met = self.met.borrow_mut();
+        if met.contains(&word) {
+            return false;
+        }
+        met.push(word);
+        true
     }
 
     /// Ask a yes-or-no question, taking the default where the answer is neither.
