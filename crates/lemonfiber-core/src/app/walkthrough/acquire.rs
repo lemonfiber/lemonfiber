@@ -77,10 +77,11 @@ async fn tunnel_is_up(walk: &mut Walk<'_>) -> Result<(), Reason> {
 
 /// Whether the VPN findings amount to a tunnel that is proved up.
 ///
-/// Not the category's own overall verdict, deliberately. That is dragged to "undetermined"
-/// for ever by the killswitch test, which cannot pass because it is not built yet — so
-/// gating on it would refuse every torrent stack for ever, which is not a safety property
-/// but a permanently closed door.
+/// Not the category's own overall verdict, deliberately. The killswitch test drops the
+/// tunnel to prove it, so it only runs where the operator asked for the disruptive checks
+/// and this diagnosis does not ask — which leaves that finding undetermined every time,
+/// dragging the category with it. Gating on the category would refuse every torrent stack
+/// for ever, which is not a safety property but a permanently closed door.
 ///
 /// What is asked instead is the honest question: did anything about the tunnel fail, and
 /// did anything about it actually pass? A failed egress comparison blocks; a check nobody
@@ -110,11 +111,11 @@ mod tests {
         Finding::in_category(Category::Vpn, "vpn.egress-match", "The tunnel", verdict)
     }
 
-    /// A verdict that could not be established — what the killswitch check always gives,
-    /// because the test it would need is not built.
+    /// A verdict that could not be established — what the killswitch check gives whenever
+    /// the disruptive checks were not asked for, which is every run that reaches here.
     fn unverified() -> Verdict {
         Verdict::Unverified {
-            reason: "not built".to_owned(),
+            reason: "not asked for".to_owned(),
             remedy: crate::error::Remedy::new("wait"),
         }
     }
