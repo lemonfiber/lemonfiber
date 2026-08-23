@@ -1,0 +1,109 @@
+//! What a request reaches, and what it gets back.
+//!
+//! The decision a request meets is made here, in one place and without a client
+//! or a socket, so that what is refused can be stated as a fact rather than
+//! demonstrated by driving a server. The routing beside it is thin on purpose:
+//! everything worth testing has already happened by the time a handler runs.
+//!
+//! No payload is serialised here. An envelope renders itself, and the same
+//! rendering answers the command line, so the two cannot say different things
+//! about the same state.
+
+use std::net::SocketAddr;
+
+use axum::body::Body;
+use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
+
+use crate::guard::{host_is_here, origin_is_here, Token, TOKEN_HEADER};
+
+/// Why a request was not answered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refusal {
+    /// It carried no token, or not this run's.
+    Unknown,
+    /// It said it came from somewhere this server is not.
+    Elsewhere,
+}
+
+impl Refusal {
+    /// The status a refusal answers with.
+    ///
+    /// Both are 403 rather than 401: 401 invites a browser to ask for
+    /// credentials it has no way to supply, and there is nothing to prompt for.
+    #[must_use]
+    pub const fn status(self) -> StatusCode {
+        StatusCode::FORBIDDEN
+    }
+
+    /// What the refusal says, in the one line a reader gets.
+    #[must_use]
+    pub const fn said(self) -> &'static str {
+        match self {
+            Self::Unknown => "This request carried no token, or not this run's.",
+            Self::Elsewhere => "This request said it came from somewhere this server is not.",
+        }
+    }
+}
+
+/// Whether a request may be answered at all.
+///
+/// Both checks hold or neither does. The token is what a cross-site request
+/// cannot read and therefore cannot send; the address check closes the window a
+/// rebound name would open, and neither alone is enough.
+///
+/// # Errors
+///
+/// Returns the refusal a caller should answer with.
+pub fn admitted(headers: &HeaderMap, token: &Token, bound: SocketAddr) -> Result<(), Refusal> {
+    // Looking a header up by name is case-insensitive, so the header may be
+    // written here the way the contract prints it.
+    let said = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
+
+    if !token.carried_by(said(TOKEN_HEADER)) {
+        return Err(Refusal::Unknown);
+    }
+    if !host_is_here(said(header::HOST.as_str()), bound)
+        || !origin_is_here(said(header::ORIGIN.as_str()), bound)
+    {
+        return Err(Refusal::Elsewhere);
+    }
+    Ok(())
+}
+
+/// The envelope, as the contract states it.
+///
+/// The body arrives already rendered, because the rendering that answers the
+/// command line is the rendering that answers here.
+#[must_use]
+pub fn answered(rendered: String) -> Response<Body> {
+    build(StatusCode::OK, rendered)
+}
+
+/// A refusal, said plainly rather than as a bare status.
+#[must_use]
+pub fn refused(refusal: Refusal) -> Response<Body> {
+    build(refusal.status(), refusal.said().to_owned())
+}
+
+/// A response carrying a body this surface produced.
+///
+/// Built rather than assembled through a builder: a builder hands back a result
+/// whose error arm nothing here can reach, and an arm nothing reaches is one no
+/// test can cover.
+fn build(status: StatusCode, body: String) -> Response<Body> {
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = status;
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
+
+/// The header a caller must send the token in, for a caller building one.
+#[must_use]
+pub const fn token_header() -> &'static str {
+    TOKEN_HEADER
+}

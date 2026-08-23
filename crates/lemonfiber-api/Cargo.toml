@@ -1,0 +1,26 @@
+[package]
+name = "lemonfiber-api"
+description = "The JSON endpoints lemonfiber answers on loopback, and the frontend it serves beside them."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+# Not published, as the other libraries are not: the release ships one binary, and a
+# crate nobody can depend on separately is one fewer surface to keep compatible.
+publish = false
+
+[dependencies]
+lemonfiber-core = { path = "../lemonfiber-core" }
+axum = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+
+[dev-dependencies]
+# Reading a response body back is asynchronous, and the tests that check what a
+# request is answered with are the reason this is a crate rather than a module.
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true
