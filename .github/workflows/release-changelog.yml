@@ -16,6 +16,11 @@
 # for a draft, and the two workflows already listening for `published`
 # (release-announce, release-record) read the body out of the event payload, so a
 # body written at publish time would reach neither.
+#
+# Two jobs, because `workflow_run` carries a write token. `changelog` reads the
+# tagged tree and can write nothing; `publish` holds the write grant and checks
+# out no code at all, taking the changelog as an artifact. Whatever a tag
+# contains, it is never read by the half that can act on the repository.
 name: release-changelog
 
 on:
@@ -35,7 +40,10 @@ jobs:
       github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
     steps:
       - name: Settle the tag
         id: tag
@@ -70,14 +78,42 @@ jobs:
           config: cliff.toml
           args: --latest --strip header
 
-      - name: Write it above what cargo-dist wrote
+      - name: Hand it on as data
         if: steps.tag.outputs.tag != ''
+        env:
+          CHANGELOG: ${{ steps.cliff.outputs.content }}
+        run: |
+          set -euo pipefail
+          mkdir -p notes
+          printf '%s\n' "$CHANGELOG" > notes/changelog.md
+          echo "generated $(wc -l < notes/changelog.md) lines."
+
+      - name: Upload it
+        if: steps.tag.outputs.tag != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-changelog
+          path: notes/changelog.md
+
+  publish:
+    needs: changelog
+    if: needs.changelog.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Take the changelog
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-changelog
+          path: notes
+
+      - name: Write it above what cargo-dist wrote
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          TAG: ${{ steps.tag.outputs.tag }}
-          VERSION: ${{ steps.tag.outputs.version }}
-          CHANGELOG: ${{ steps.cliff.outputs.content }}
+          TAG: ${{ needs.changelog.outputs.tag }}
+          VERSION: ${{ needs.changelog.outputs.version }}
         run: |
           set -euo pipefail
           # Found by id over the listing rather than by tag: a draft release is
@@ -101,14 +137,13 @@ jobs:
             mv kept.md installers.md
           fi
 
-          printf '%s\n' "$CHANGELOG" > changelog.md
           {
             printf '## What changed in %s\n\n' "$VERSION"
-            cat changelog.md
+            cat notes/changelog.md
             printf '\n%s\n\n' "$marker"
             cat installers.md
           } > body.md
 
           jq -n --rawfile body body.md '{body: $body}' > payload.json
           gh api --method PATCH "repos/${REPO}/releases/${id}" --input payload.json >/dev/null
-          echo "wrote $(wc -l < changelog.md) lines of changelog onto ${TAG}."
+          echo "wrote $(wc -l < notes/changelog.md) lines of changelog onto ${TAG}."
