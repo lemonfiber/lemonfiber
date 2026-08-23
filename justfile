@@ -2,6 +2,11 @@
 default:
     @just --list
 
+# Turn on the repository's own git hooks. Once per clone.
+hooks:
+    git config core.hooksPath .githooks
+    @echo "hooks on: .githooks/pre-push"
+
 # Cut and push a release tag, the way the maintainer one-click already does it.
 #
 # `git tag v0.8.0` does not work here, and the way it fails is the problem: this
