@@ -44,8 +44,16 @@ impl Token {
     /// Randomness arrives through the port rather than being taken directly, so
     /// a test can hand over bytes it chose and this can be exercised without
     /// depending on what the machine happens to produce.
+    ///
+    /// A source that answers with fewer bytes than it was asked for is treated as
+    /// one that would not say. The width is what makes guessing hopeless, and a
+    /// short answer is invisible in the result: a narrower secret is a secret,
+    /// and looks like one right up until somebody guesses it.
     pub fn mint(random: &dyn Random) -> Option<Self> {
         let bytes = random.bytes(WIDTH)?;
+        if bytes.len() != WIDTH {
+            return None;
+        }
         let mut held = String::with_capacity(WIDTH * 2);
         for byte in bytes {
             // Two hex digits per byte, so the printed token is one word an
@@ -126,17 +134,18 @@ fn is_loopback_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{host_is_here, origin_is_here, Token, TOKEN_HEADER};
-    use lemonfiber_core::ports::random::Random;
+    use super::{host_is_here, origin_is_here, Token, TOKEN_HEADER, WIDTH};
+    use lemonfiber_fixtures::ports::Chance;
     use std::net::SocketAddr;
 
-    /// Hands back bytes chosen by the test, or nothing.
-    struct Given(Option<Vec<u8>>);
+    /// The byte every test mints from, chosen because its hex is two of one digit,
+    /// which makes the token it is written as a repeat rather than a literal.
+    const EVERY_BYTE: u8 = 0xab;
+    const AS_HEX: &str = "ab";
 
-    impl Random for Given {
-        fn bytes(&self, _: usize) -> Option<Vec<u8>> {
-            self.0.clone()
-        }
+    /// The token those bytes are written as, built rather than spelled out.
+    fn written() -> String {
+        AS_HEX.repeat(WIDTH)
     }
 
     /// Built rather than parsed: an address made of numbers cannot fail to be one.
@@ -144,9 +153,9 @@ mod tests {
         SocketAddr::from(([127, 0, 0, 1], 8471))
     }
 
-    /// The bytes every token test is minted from.
-    fn given() -> Given {
-        Given(Some(vec![0x00, 0x0f, 0xa5, 0xff]))
+    /// The source every token test is minted from, answering in full.
+    fn given() -> Chance {
+        Chance::exactly(Some(vec![EVERY_BYTE; WIDTH]))
     }
 
     #[test]
@@ -158,28 +167,46 @@ mod tests {
     fn a_token_is_the_bytes_written_as_hex() {
         assert_eq!(
             Token::mint(&given()).map(|token| token.as_str().to_owned()),
-            Some("000fa5ff".to_owned())
+            Some(written())
+        );
+    }
+
+    #[test]
+    fn a_token_is_as_wide_as_the_secret_is_meant_to_be() {
+        // Two hex digits a byte. Asserted rather than assumed, because nothing
+        // about a short token looks wrong.
+        assert_eq!(
+            Token::mint(&given()).map(|token| token.as_str().len()),
+            Some(WIDTH * 2)
         );
     }
 
     #[test]
     fn there_is_no_token_when_the_system_will_not_say() {
-        assert!(Token::mint(&Given(None)).is_none());
+        assert!(Token::mint(&Chance::exactly(None)).is_none());
+    }
+
+    #[test]
+    fn there_is_no_token_when_the_system_says_less_than_it_was_asked() {
+        let short = Chance::exactly(Some(vec![EVERY_BYTE; WIDTH - 1]));
+        assert!(Token::mint(&short).is_none());
     }
 
     #[test]
     fn a_request_carrying_the_token_is_recognised() {
-        assert!(Token::mint(&given()).is_some_and(|token| token.carried_by(Some("000fa5ff"))));
+        assert!(Token::mint(&given()).is_some_and(|token| token.carried_by(Some(&written()))));
     }
 
     #[test]
     fn a_request_carrying_something_else_is_not() {
-        assert!(!Token::mint(&given()).is_some_and(|token| token.carried_by(Some("000fa5fe"))));
+        let wrong = written().replace('a', "b");
+        assert!(!Token::mint(&given()).is_some_and(|token| token.carried_by(Some(&wrong))));
     }
 
     #[test]
     fn a_request_carrying_a_prefix_is_not() {
-        assert!(!Token::mint(&given()).is_some_and(|token| token.carried_by(Some("000fa5"))));
+        // One byte's worth of the token, which every longer one begins with.
+        assert!(!Token::mint(&given()).is_some_and(|token| token.carried_by(Some(AS_HEX))));
     }
 
     #[test]

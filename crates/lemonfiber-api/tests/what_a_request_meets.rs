@@ -5,23 +5,21 @@
 
 use std::net::SocketAddr;
 
-use axum::body::to_bytes;
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::body::{to_bytes, Body};
+use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
+use lemonfiber_api::read::enveloped;
 use lemonfiber_api::serve::{admitted, answered, refused, token_header, Refusal};
-use lemonfiber_core::ports::random::Random;
+use lemonfiber_fixtures::ports::Chance;
 
-/// Hands back bytes the test chose, so a token is the same one twice.
-struct Given;
-
-impl Random for Given {
-    fn bytes(&self, _: usize) -> Option<Vec<u8>> {
-        Some(vec![0x00, 0x0f, 0xa5, 0xff])
-    }
+/// Bytes the test chose, so a token is the same one twice.
+///
+/// Cycled to whatever width is asked for rather than fixed at some other one: a
+/// source that answers short mints no token at all, which would quietly turn
+/// every test here into a test of that instead.
+fn given() -> Chance {
+    Chance::cycling()
 }
-
-/// The token every test here admits, and its written form.
-const WRITTEN: &str = "000fa5ff";
 
 fn bound() -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], 8471))
@@ -42,17 +40,31 @@ fn saying(pairs: &[(&str, &str)]) -> HeaderMap {
     headers
 }
 
+/// The verdict on a request saying exactly what the test states, and nothing more.
 fn verdict(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
-    Token::mint(&Given).map_or(Err(Refusal::Unknown), |token| {
+    Token::mint(&given()).map_or(Err(Refusal::Unknown), |token| {
         admitted(&saying(pairs), &token, bound())
     })
+}
+
+/// The verdict on a request that carries this run's token, plus what the test states.
+///
+/// The token is read back from the run that minted it rather than written out
+/// here, so a test states what it is about — the address — and no line of this
+/// file has to be kept in step with how a secret is written.
+fn carrying_the_token(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
+    let Some(token) = Token::mint(&given()) else {
+        return Err(Refusal::Unknown);
+    };
+    let mut every = vec![(TOKEN_HEADER, token.as_str())];
+    every.extend_from_slice(pairs);
+    admitted(&saying(&every), &token, bound())
 }
 
 #[test]
 fn a_request_carrying_the_token_from_here_is_answered() {
     assert_eq!(
-        verdict(&[
-            (TOKEN_HEADER, WRITTEN),
+        carrying_the_token(&[
             ("host", "127.0.0.1:8471"),
             ("origin", "http://localhost:8471"),
         ]),
@@ -62,10 +74,7 @@ fn a_request_carrying_the_token_from_here_is_answered() {
 
 #[test]
 fn a_browser_that_states_no_origin_is_still_answered() {
-    assert_eq!(
-        verdict(&[(TOKEN_HEADER, WRITTEN), ("host", "localhost:8471")]),
-        Ok(())
-    );
+    assert_eq!(carrying_the_token(&[("host", "localhost:8471")]), Ok(()));
 }
 
 #[test]
@@ -77,9 +86,15 @@ fn a_request_carrying_no_token_is_not() {
 }
 
 #[test]
-fn a_request_carrying_another_token_is_not() {
+fn a_request_carrying_another_token_of_the_same_width_is_not() {
+    let Some(token) = Token::mint(&given()) else {
+        unreachable!("the source above always answers");
+    };
+    // As long as the real one, so what is refused is the value and not the shape.
+    let other = token.as_str().replace('a', "b");
+    assert_eq!(other.len(), token.as_str().len());
     assert_eq!(
-        verdict(&[(TOKEN_HEADER, "000fa5fe"), ("host", "localhost:8471")]),
+        verdict(&[(TOKEN_HEADER, &other), ("host", "localhost:8471")]),
         Err(Refusal::Unknown)
     );
 }
@@ -87,7 +102,7 @@ fn a_request_carrying_another_token_is_not() {
 #[test]
 fn a_request_naming_another_address_is_not() {
     assert_eq!(
-        verdict(&[(TOKEN_HEADER, WRITTEN), ("host", "example.com:8471")]),
+        carrying_the_token(&[("host", "example.com:8471")]),
         Err(Refusal::Elsewhere)
     );
 }
@@ -95,8 +110,7 @@ fn a_request_naming_another_address_is_not() {
 #[test]
 fn a_request_sent_from_another_page_is_not() {
     assert_eq!(
-        verdict(&[
-            (TOKEN_HEADER, WRITTEN),
+        carrying_the_token(&[
             ("host", "localhost:8471"),
             ("origin", "http://elsewhere.example:8471"),
         ]),
@@ -106,7 +120,7 @@ fn a_request_sent_from_another_page_is_not() {
 
 #[test]
 fn a_request_naming_no_address_at_all_is_not() {
-    assert_eq!(verdict(&[(TOKEN_HEADER, WRITTEN)]), Err(Refusal::Elsewhere));
+    assert_eq!(carrying_the_token(&[]), Err(Refusal::Elsewhere));
 }
 
 #[tokio::test]
@@ -147,4 +161,53 @@ fn the_two_refusals_do_not_say_the_same_thing() {
 #[test]
 fn the_header_a_caller_must_use_is_the_one_the_contract_names() {
     assert_eq!(token_header(), "X-Lemonfiber-Token");
+}
+
+/// Each response this surface builds from a body it already holds.
+///
+/// The stream is built through the same call and is driven where a listener can
+/// be made; these are the three a test can put together in one line.
+fn each_response() -> [(&'static str, Response<Body>); 3] {
+    [
+        ("an answer", answered(r#"{"api_version":1}"#.to_owned())),
+        ("a refusal", refused(Refusal::Unknown)),
+        (
+            "an answer that would not render",
+            enveloped(StatusCode::OK, None),
+        ),
+    ]
+}
+
+#[test]
+fn nothing_this_surface_says_may_be_guessed_at() {
+    for (which, response) in each_response() {
+        assert_eq!(
+            response.headers().get(header::X_CONTENT_TYPE_OPTIONS),
+            Some(&HeaderValue::from_static("nosniff")),
+            "{which} let a browser decide for itself what it had been given"
+        );
+    }
+}
+
+#[test]
+fn nothing_this_surface_says_may_be_kept() {
+    for (which, response) in each_response() {
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL),
+            Some(&HeaderValue::from_static("no-store")),
+            "{which} was allowed to be stored"
+        );
+    }
+}
+
+#[test]
+fn what_this_surface_says_in_its_own_words_is_labelled_as_prose() {
+    // Not as an envelope: a caller that parses what it was told it was given
+    // would otherwise be handed a sentence to read as JSON.
+    for response in [refused(Refusal::Elsewhere), enveloped(StatusCode::OK, None)] {
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE),
+            Some(&HeaderValue::from_static("text/plain; charset=utf-8"))
+        );
+    }
 }
