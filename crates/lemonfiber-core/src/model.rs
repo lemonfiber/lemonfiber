@@ -36,7 +36,7 @@ pub use walkthrough::*;
 
 #[cfg(test)]
 mod tests {
-    use super::{Envelope, VersionReport, API_VERSION};
+    use super::{kind, Envelope, VersionReport, API_VERSION};
 
     /// These are plain data, so serialising cannot fail; an empty string on the
     /// impossible branch keeps the helper free of a line no test can cover.
@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn every_payload_carries_the_contract_version() {
-        let envelope = Envelope::new("version", 7_u32);
+        let envelope = Envelope::new(kind::VERSION, 7_u32);
         assert_eq!(envelope.api_version, API_VERSION);
         assert_eq!(
             json(&envelope),
@@ -63,7 +63,7 @@ mod tests {
             compose: Some("Docker Compose version v2.32.1".to_owned()),
         };
         assert_eq!(
-            json(&Envelope::new("version", report)),
+            json(&Envelope::new(kind::VERSION, report)),
             concat!(
                 r#"{"api_version":1,"kind":"version","data":{"binary":"0.1.0","#,
                 r#""supported_schema":[1],"stack":"0.1.0","#,
@@ -80,6 +80,6 @@ mod tests {
             stack: "0.1.0".to_owned(),
             compose: None,
         };
-        assert!(json(&Envelope::new("version", report)).contains(r#""compose":null"#));
+        assert!(json(&Envelope::new(kind::VERSION, report)).contains(r#""compose":null"#));
     }
 }

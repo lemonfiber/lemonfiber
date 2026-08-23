@@ -7,7 +7,7 @@
 use serde::Serialize;
 
 /// One thing a household member asked for, and where it stands in their words.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MemberRequest {
     /// What it is called, where the service filing it has been told about it and its
     /// library could be read. Absent for a request no service holds yet — one still
@@ -22,7 +22,7 @@ pub struct MemberRequest {
 }
 
 /// One household member and everything they have asked for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct HouseholdMember {
     /// The member, by the name the request service shows them under.
     pub name: String,
@@ -32,7 +32,7 @@ pub struct HouseholdMember {
 
 /// What the household has asked for, member by member — the simplified view of the same
 /// pipeline a trace reports in the services' own terms.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct HouseholdReport {
     /// The members who have asked for something, in name order.
     pub members: Vec<HouseholdMember>,

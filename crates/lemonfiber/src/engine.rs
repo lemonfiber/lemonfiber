@@ -105,7 +105,7 @@ pub(crate) async fn pull_showing(ctx: &Ctx, forms: &[String], json: bool) -> Res
     let mut failed = false;
     while let Some(event) = progress.recv().await {
         match event {
-            PullEvent::Line(line) => emit_line("pull", &line, json),
+            PullEvent::Line(line) => emit_line(kind::PULL, &line, json),
             // A non-zero exit is the pull's own report that an image did not come
             // down; the operator is told, and a script sees a non-zero code.
             PullEvent::Ended(status) => failed = status != Some(0),
@@ -293,7 +293,7 @@ async fn narrated(
     let mut status = None;
     while let Some(event) = progress.recv().await {
         match event {
-            PullEvent::Line(line) => emit_line("start", &line, json),
+            PullEvent::Line(line) => emit_line(kind::START, &line, json),
             PullEvent::Ended(code) => status = code,
         }
     }
@@ -314,7 +314,7 @@ mod tests {
     use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
     use lemonfiber_core::stack::Source;
 
-    use super::{emit_line, guard, pull, pull_showing, stream, Ctx};
+    use super::{emit_line, guard, kind, pull, pull_showing, stream, Ctx};
 
     /// A runner that answers every command the same way.
     struct Answering {
@@ -463,8 +463,8 @@ mod tests {
     fn each_pull_line_reads_as_prose_or_as_an_envelope() {
         // Both are exercised for their own sake: a person reads one, a script the
         // other, and neither should ever be handed the wrong shape.
-        emit_line("pull", "Pulling sonarr", false);
-        emit_line("pull", "Pulling sonarr", true);
+        emit_line(kind::PULL, "Pulling sonarr", false);
+        emit_line(kind::PULL, "Pulling sonarr", true);
     }
 
     /// A context whose engine answers, for the paths that need one to.

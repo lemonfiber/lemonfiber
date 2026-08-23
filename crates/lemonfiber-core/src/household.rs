@@ -18,7 +18,7 @@ use serde::Serialize;
 /// Deliberately coarser than a [`crate::trace::Stage`]: a member does not need to know
 /// that a release was grabbed but not imported, only that it is on its way. The trace is
 /// where that detail stays, and a request names the item so it can be asked for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum State {
     /// Asked for, and nobody has approved or refused it yet.

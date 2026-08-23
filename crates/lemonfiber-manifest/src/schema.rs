@@ -94,7 +94,19 @@ pub struct Profile {
 /// Serialisable as well as readable, for the same reason [`Criticality`] is: it
 /// reaches an operator. A profile left out of a closure is only half reported
 /// without the provider it wanted.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Deserialize,
+    Serialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
     /// Needs a Usenet provider.

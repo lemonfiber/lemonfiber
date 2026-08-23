@@ -111,7 +111,7 @@ pub struct Service {
 }
 
 /// What a whole set of services amounts to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Condition {
     /// Nothing is running.
