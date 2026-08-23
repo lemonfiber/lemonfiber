@@ -78,7 +78,7 @@ impl Serving {
         let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
         let streaming = Token::mint(&given()).map(|token| {
             Arc::new(Streaming {
-                token,
+                token: Arc::new(token),
                 bound: ([127, 0, 0, 1], 8471).into(),
                 live: Arc::clone(&live),
             })

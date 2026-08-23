@@ -9,7 +9,9 @@
 //! page the operator visits, which the command line never was, so what a request
 //! must carry to be answered is stated here rather than assumed.
 
+pub mod actions;
 pub mod events;
+pub mod frontend;
 pub mod guard;
 pub mod read;
 pub mod router;
