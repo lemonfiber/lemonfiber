@@ -17,6 +17,10 @@ authors = ["NightWorks.io"]
 [workspace.dependencies]
 schemars = "1.2"
 async-trait = "0.1"
+# The web surface's router. Default features pull in a URL query parser, tracing and
+# websockets, none of which this API has; what is left is routing, HTTP/1 and JSON,
+# which is the whole of what the contract describes.
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
 bollard = "0.21"
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"

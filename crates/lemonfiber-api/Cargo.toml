@@ -13,8 +13,14 @@ publish = false
 
 [dependencies]
 lemonfiber-core = { path = "../lemonfiber-core" }
+axum = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
+
+[dev-dependencies]
+# Reading a response body back is asynchronous, and the tests that check what a
+# request is answered with are the reason this is a crate rather than a module.
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true
