@@ -15,7 +15,9 @@ use serde::{Deserialize, Serialize};
 use super::Reason;
 
 /// Which walkthrough this stack is offered.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Shape {
     /// The full walk: search, grab, download, import, and see it in the library.

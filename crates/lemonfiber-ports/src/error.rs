@@ -39,7 +39,9 @@ impl std::fmt::Display for Code {
 ///
 /// Four levels, deliberately. More would not be applied consistently, and
 /// inconsistent severity is worse than coarse severity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// Informational; nothing is required.

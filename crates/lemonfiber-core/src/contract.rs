@@ -9,11 +9,13 @@
 
 use std::collections::BTreeMap;
 
-use schemars::{Schema, schema_for};
+use schemars::{schema_for, Schema};
 use serde::Serialize;
 
 use crate::glossary::Term;
-use crate::model::{API_VERSION, Envelope, kind, SetupReport, SupervisionReport, WalkthroughReport};
+use crate::model::{
+    kind, Envelope, SetupReport, SupervisionReport, WalkthroughReport, API_VERSION,
+};
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
 
@@ -40,8 +42,14 @@ impl Contract {
         kinds.insert(kind::ERROR.to_owned(), schema_for!(Envelope<Problem>));
         kinds.insert(kind::LOG.to_owned(), schema_for!(Envelope<LogLine>));
         kinds.insert(kind::SETUP.to_owned(), schema_for!(Envelope<SetupReport>));
-        kinds.insert(kind::WALKTHROUGH.to_owned(), schema_for!(Envelope<WalkthroughReport>));
-        kinds.insert(kind::WATCH.to_owned(), schema_for!(Envelope<SupervisionReport>));
+        kinds.insert(
+            kind::WALKTHROUGH.to_owned(),
+            schema_for!(Envelope<WalkthroughReport>),
+        );
+        kinds.insert(
+            kind::WATCH.to_owned(),
+            schema_for!(Envelope<SupervisionReport>),
+        );
         kinds.insert(kind::WORD.to_owned(), schema_for!(Envelope<Term>));
 
         Self {
@@ -63,7 +71,7 @@ impl Contract {
 
 #[cfg(test)]
 mod tests {
-    use super::{CONTRACT_PATH, Contract};
+    use super::{Contract, CONTRACT_PATH};
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -92,11 +100,8 @@ mod tests {
     /// both silent: each half is self-consistent, so only comparing them shows it.
     #[test]
     fn it_describes_every_kind_that_is_emitted_and_no_others() {
-        let described: Vec<&str> = Contract::describe()
-            .kinds
-            .keys()
-            .map(String::as_str)
-            .collect();
+        let contract = Contract::describe();
+        let described: Vec<&str> = contract.kinds.keys().map(String::as_str).collect();
         let mut emitted: Vec<&str> = crate::model::kind::ALL.to_vec();
         emitted.sort_unstable();
 
