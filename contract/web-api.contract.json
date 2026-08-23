@@ -1912,6 +1912,53 @@
         }
       }
     },
+    "job": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Started"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Started": {
+          "description": "Work that outlives the request that started it: its name, and what it was.\n\nThe action is carried beside the name because a client holding several has to\ntell them apart, and asking it to remember which name it gave which request is\nasking it to keep a second copy of what this already knows.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "The action that was asked for, as it was named.",
+              "type": "string"
+            },
+            "job": {
+              "description": "The name to follow this work by on the event stream.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "job",
+            "action"
+          ]
+        }
+      }
+    },
     "lifecycle": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

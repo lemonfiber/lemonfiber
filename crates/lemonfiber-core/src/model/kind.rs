@@ -48,6 +48,8 @@ pub const ERROR: Kind = Kind("error");
 pub const FORMS: Kind = Kind("forms");
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
+/// The name given to work that outlives the request that started it.
+pub const JOB: Kind = Kind("job");
 /// What a lifecycle command did, or would have done.
 pub const LIFECYCLE: Kind = Kind("lifecycle");
 /// One line of a service's log.
@@ -93,6 +95,7 @@ pub const ALL: &[Kind] = &[
     ERROR,
     FORMS,
     HOUSEHOLD,
+    JOB,
     LIFECYCLE,
     LOG,
     MUSIC,

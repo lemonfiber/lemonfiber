@@ -10,6 +10,9 @@ use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
+use lemonfiber_api::actions::Jobs;
+use lemonfiber_api::events::live::Live;
+use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
 use lemonfiber_api::read::enveloped;
 use lemonfiber_api::router::{routes, Serving};
@@ -19,7 +22,7 @@ use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
-use lemonfiber_fixtures::ports::{Chance, Idle};
+use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 use lemonfiber_fixtures::support::Reporting;
 use tower::ServiceExt as _;
 
@@ -88,12 +91,21 @@ async fn asked(ctx: Ctx, path: &str) -> Option<(StatusCode, String)> {
 
 /// The same, for a request that says something else about itself.
 async fn answered(ctx: Ctx, path: &str, said: &[(&str, &str)]) -> Option<(StatusCode, String)> {
-    let token = Token::mint(&given())?;
-    let router = routes(Serving {
-        ctx: Arc::new(ctx),
-        token: Arc::new(token),
-        bound: bound(),
-    });
+    let token = Arc::new(Token::mint(&given())?);
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let router = routes(
+        Serving {
+            ctx: Arc::new(ctx),
+            token: Arc::clone(&token),
+            bound: bound(),
+            jobs: Jobs::default(),
+        },
+        Arc::new(Streaming {
+            token,
+            bound: bound(),
+            live,
+        }),
+    );
 
     let mut building = Request::builder().uri(path);
     for (name, value) in said {

@@ -17,6 +17,8 @@ use axum::response::Response;
 use axum::Router;
 use lemonfiber_core::app::Ctx;
 
+use crate::actions::Jobs;
+use crate::events::Streaming;
 use crate::guard::Token;
 use crate::serve::{admitted, refused};
 
@@ -33,6 +35,9 @@ pub struct Serving {
     pub token: Arc<Token>,
     /// The address this server is listening on, which a request must name.
     pub bound: SocketAddr,
+    /// The work this run started, which the actions that take minutes are named
+    /// and left to run under.
+    pub jobs: Jobs,
 }
 
 /// Every endpoint this surface answers, behind the guard they share.
@@ -40,10 +45,17 @@ pub struct Serving {
 /// Routes are merged before the layer is applied, so the guard wraps the whole
 /// tree — a path nothing serves is refused rather than reported as missing, and
 /// which paths exist is not something an unauthenticated caller can map.
-pub fn routes(serving: Serving) -> Router {
+///
+/// The stream is merged here too, after the state the rest share and before the
+/// layer, even though it carries its own state and checks admission itself. Its
+/// own check is what makes it safe today; being inside the layer is what makes
+/// the next route added beside it guarded by having been added.
+pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
     let endpoints = Router::new()
         .merge(crate::read::routes())
-        .with_state(serving.clone());
+        .merge(crate::actions::routes())
+        .with_state(serving.clone())
+        .merge(crate::events::routes(streaming));
     endpoints.layer(middleware::from_fn_with_state(serving, guarded))
 }
 

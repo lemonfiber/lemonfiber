@@ -1112,12 +1112,15 @@ name = "lemonfiber"
 version = "0.8.0"
 dependencies = [
  "async-trait",
+ "axum",
  "clap",
  "color-eyre",
  "etcetera",
  "flate2",
  "include_dir",
+ "lemonfiber-api",
  "lemonfiber-core",
+ "lemonfiber-fixtures",
  "lemonfiber-manifest",
  "ratatui",
  "rpassword",
@@ -1125,6 +1128,7 @@ dependencies = [
  "sysinfo",
  "tar",
  "tokio",
+ "tower",
 ]
 
 [[package]]
@@ -1138,6 +1142,7 @@ dependencies = [
  "lemonfiber-core",
  "lemonfiber-fixtures",
  "serde",
+ "serde_json",
  "tokio",
  "tower",
 ]

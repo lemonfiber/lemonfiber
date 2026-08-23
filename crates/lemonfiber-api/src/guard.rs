@@ -54,14 +54,7 @@ impl Token {
         if bytes.len() != WIDTH {
             return None;
         }
-        let mut held = String::with_capacity(WIDTH * 2);
-        for byte in bytes {
-            // Two hex digits per byte, so the printed token is one word an
-            // operator can copy without it wrapping or needing quoting.
-            held.push(digit(byte >> 4));
-            held.push(digit(byte & 0x0f));
-        }
-        Some(Self(held))
+        Some(Self(hex(&bytes)))
     }
 
     /// The token as it is printed and as a caller must send it back.
@@ -87,6 +80,21 @@ impl Token {
                 .fold(0u8, |seen, (a, b)| seen | (a ^ b))
                 == 0
     }
+}
+
+/// Bytes written out as one word.
+///
+/// Two hex digits per byte, so anything minted here is a word an operator can
+/// copy and a stream can carry without it wrapping or needing quoting. Shared
+/// between the token and the names given to work, because they are the same act:
+/// bytes the operating system chose, written down once.
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    let mut written = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        written.push(digit(byte >> 4));
+        written.push(digit(byte & 0x0f));
+    }
+    written
 }
 
 /// One hex digit, low nibble.

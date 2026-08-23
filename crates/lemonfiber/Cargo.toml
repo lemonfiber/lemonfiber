@@ -24,6 +24,10 @@ lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 
 [dependencies]
 lemonfiber-core = { path = "../lemonfiber-core" }
+# The endpoints and the app the web surface serves. Only this crate starts a
+# server; the core cannot, and the api crate does not choose an address.
+lemonfiber-api = { path = "../lemonfiber-api" }
+axum = { workspace = true }
 clap = { workspace = true }
 etcetera = { workspace = true }
 color-eyre = { workspace = true }
@@ -45,6 +49,14 @@ sysinfo = { workspace = true }
 # derives live in the core; this only turns it to and from the bytes tar stores.
 serde_json = "1"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+
+[dev-dependencies]
+# The fakes the ports are driven through, shared with every other crate's tests
+# rather than written again here.
+lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
+# Driving a router without a socket, so what a route answers is checked as a fact
+# rather than by starting a server to ask it.
+tower = { version = "0.5", features = ["util"] }
 
 [lints]
 workspace = true

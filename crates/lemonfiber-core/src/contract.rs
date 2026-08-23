@@ -24,8 +24,9 @@ use serde::Serialize;
 use crate::dashboard::Snapshot;
 use crate::glossary::Term;
 use crate::model::{
-    kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
-    MusicReport, QualityReport, ResetReport, SetupReport, StatusReport, StuckReport,
+    kind::{self, Kind},
+    ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
+    MusicReport, QualityReport, ResetReport, SetupReport, Started, StatusReport, StuckReport,
     SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, API_VERSION,
 };
 use crate::ports::docker::LogLine;
@@ -52,99 +53,75 @@ impl Contract {
     #[must_use]
     pub fn describe() -> Self {
         let mut kinds = BTreeMap::new();
-        kinds.insert(
-            kind::CONFIG.as_str().to_owned(),
+        describing(
+            &mut kinds,
+            kind::CONFIG,
             schema_for!(Envelope<ConfigReport>),
         );
-        kinds.insert(
-            kind::DASHBOARD.as_str().to_owned(),
-            schema_for!(Envelope<Snapshot>),
-        );
-        kinds.insert(
-            kind::DOCTOR.as_str().to_owned(),
+        describing(&mut kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
+        describing(
+            &mut kinds,
+            kind::DOCTOR,
             schema_for!(Envelope<DoctorReport>),
         );
-        kinds.insert(
-            kind::ERROR.as_str().to_owned(),
-            schema_for!(Envelope<Problem>),
-        );
-        kinds.insert(
-            kind::FORMS.as_str().to_owned(),
-            schema_for!(Envelope<FormsReport>),
-        );
-        kinds.insert(
-            kind::HOUSEHOLD.as_str().to_owned(),
+        describing(&mut kinds, kind::ERROR, schema_for!(Envelope<Problem>));
+        describing(&mut kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
+        describing(
+            &mut kinds,
+            kind::HOUSEHOLD,
             schema_for!(Envelope<HouseholdReport>),
         );
-        kinds.insert(
-            kind::LIFECYCLE.as_str().to_owned(),
+        describing(&mut kinds, kind::JOB, schema_for!(Envelope<Started>));
+        describing(
+            &mut kinds,
+            kind::LIFECYCLE,
             schema_for!(Envelope<LifecycleReport>),
         );
-        kinds.insert(
-            kind::LOG.as_str().to_owned(),
-            schema_for!(Envelope<LogLine>),
-        );
-        kinds.insert(
-            kind::MUSIC.as_str().to_owned(),
-            schema_for!(Envelope<MusicReport>),
-        );
-        kinds.insert(
-            kind::PREVIEW.as_str().to_owned(),
-            schema_for!(Envelope<Plan>),
-        );
-        kinds.insert(
-            kind::PULL.as_str().to_owned(),
-            schema_for!(Envelope<String>),
-        );
-        kinds.insert(
-            kind::QUALITY.as_str().to_owned(),
+        describing(&mut kinds, kind::LOG, schema_for!(Envelope<LogLine>));
+        describing(&mut kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
+        describing(&mut kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
+        describing(&mut kinds, kind::PULL, schema_for!(Envelope<String>));
+        describing(
+            &mut kinds,
+            kind::QUALITY,
             schema_for!(Envelope<QualityReport>),
         );
-        kinds.insert(
-            kind::RESET.as_str().to_owned(),
-            schema_for!(Envelope<ResetReport>),
-        );
-        kinds.insert(
-            kind::SEED.as_str().to_owned(),
+        describing(&mut kinds, kind::RESET, schema_for!(Envelope<ResetReport>));
+        describing(
+            &mut kinds,
+            kind::SEED,
             schema_for!(Envelope<crate::seed::Report>),
         );
-        kinds.insert(
-            kind::SETUP.as_str().to_owned(),
-            schema_for!(Envelope<SetupReport>),
-        );
-        kinds.insert(
-            kind::START.as_str().to_owned(),
-            schema_for!(Envelope<String>),
-        );
-        kinds.insert(
-            kind::STATUS.as_str().to_owned(),
+        describing(&mut kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
+        describing(&mut kinds, kind::START, schema_for!(Envelope<String>));
+        describing(
+            &mut kinds,
+            kind::STATUS,
             schema_for!(Envelope<StatusReport>),
         );
-        kinds.insert(
-            kind::STUCK.as_str().to_owned(),
-            schema_for!(Envelope<StuckReport>),
-        );
-        kinds.insert(
-            kind::TRACE.as_str().to_owned(),
-            schema_for!(Envelope<TraceReport>),
-        );
-        kinds.insert(
-            kind::UPGRADE.as_str().to_owned(),
+        describing(&mut kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
+        describing(&mut kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
+        describing(
+            &mut kinds,
+            kind::UPGRADE,
             schema_for!(Envelope<UpgradeReport>),
         );
-        kinds.insert(
-            kind::VERSION.as_str().to_owned(),
+        describing(
+            &mut kinds,
+            kind::VERSION,
             schema_for!(Envelope<VersionReport>),
         );
-        kinds.insert(
-            kind::WALKTHROUGH.as_str().to_owned(),
+        describing(
+            &mut kinds,
+            kind::WALKTHROUGH,
             schema_for!(Envelope<WalkthroughReport>),
         );
-        kinds.insert(
-            kind::WATCH.as_str().to_owned(),
+        describing(
+            &mut kinds,
+            kind::WATCH,
             schema_for!(Envelope<SupervisionReport>),
         );
-        kinds.insert(kind::WORD.as_str().to_owned(), schema_for!(Envelope<Term>));
+        describing(&mut kinds, kind::WORD, schema_for!(Envelope<Term>));
 
         Self {
             api_version: API_VERSION,
@@ -161,6 +138,15 @@ impl Contract {
         text.push('\n');
         Some(text)
     }
+}
+
+/// One kind, and the shape of the envelope carrying it.
+///
+/// Named rather than written out at each of two dozen call sites: the pair is the
+/// whole of what a reader is here for, and the ceremony around it was three lines
+/// of noise per kind.
+fn describing(kinds: &mut BTreeMap<String, Schema>, kind: Kind, shape: Schema) {
+    kinds.insert(kind.as_str().to_owned(), shape);
 }
 
 #[cfg(test)]

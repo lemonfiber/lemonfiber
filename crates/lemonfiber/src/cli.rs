@@ -311,6 +311,16 @@ pub enum Request {
     ///
     /// Nothing is ever sent anywhere. The bundle is written here and stays here.
     Support(Asked),
+    /// Serve the web interface, for as long as you leave it running.
+    ///
+    /// Started when you ask for it and not before: nothing is installed, nothing
+    /// keeps running afterwards, and stopping it leaves nothing behind. It listens
+    /// on this machine only.
+    ///
+    /// The connection is not encrypted, which it says when it starts, along with the
+    /// whole address it was given and the token every request to it must carry. The
+    /// token is minted for this run, printed once here, and kept nowhere else.
+    Ui(RawUi),
     /// Restore your configuration from a backup archive.
     ///
     /// Verifies the archive and lists what it holds before anything is
@@ -378,6 +388,25 @@ pub struct Fixing {
     /// that read differently on the command line would be one argument underneath.
     #[arg(id = "fix-disruptive", long = "fix-disruptive", requires = "fix")]
     pub disruptive: bool,
+}
+
+/// What the web interface was asked for.
+///
+/// Declared as one thing rather than as three loose values on a variant, for the
+/// same reason the bundle's flags are: the same three would otherwise be written
+/// out again by whoever passes them on.
+#[derive(Debug, Args)]
+pub struct RawUi {
+    /// The port to listen on. Without it, whichever one is free is used and the
+    /// whole address is printed.
+    #[arg(long, value_name = "PORT")]
+    pub port: Option<u16>,
+    /// Do not ask this desktop to open a browser.
+    #[arg(long)]
+    pub no_browser: bool,
+    /// Serve the interface from this directory instead of the one built in.
+    #[arg(long, value_name = "PATH")]
+    pub assets: Option<PathBuf>,
 }
 
 /// What a support bundle was asked for.

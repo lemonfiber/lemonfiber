@@ -8,7 +8,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, RawSetup, Request};
+use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::doctor::Category;
 
@@ -30,6 +30,7 @@ mod stopping;
 mod support;
 mod terminal;
 mod translate;
+mod ui;
 mod walkthrough;
 
 use crate::say::{complain, say};
@@ -205,6 +206,11 @@ async fn main() -> ExitCode {
         // A bundle drives its own executor over the same tar adapter, and renders both
         // of the answers it can give — what one would hold, and where one went.
         Request::Support(asked) => return support::run(ctx, asked, cli.json).await,
+        // The web surface holds the process until it is stopped, and answers many
+        // requests rather than producing one value, so like the dashboard and the
+        // log viewer it runs its own way instead of through dispatch. It takes the
+        // context by value because every request it answers reaches through it.
+        Request::Ui(asked) => return serving(ctx, asked).await,
         Request::Restore { archive, repoint } => {
             let Some(paths) = here() else {
                 return no_config_home();
@@ -220,6 +226,29 @@ async fn main() -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// The app compiled into this binary, and there is not one yet.
+///
+/// The app arrives as a pinned submodule at `assets/web`, embedded exactly as the
+/// stack beside it is. That submodule does not exist, so this build carries no app
+/// and says so when a browser asks for one. What reads an embedded app is built
+/// and proven; what it would read is what is missing. See
+/// `.docs/architecture/embedded-stack.md` for the shape it arrives in.
+const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = None;
+
+/// Serve the web interface until the operator stops the process.
+///
+/// What ends the loop is a dependency rather than a choice made inside it, so the
+/// surface can be started, asked something, and stopped, in a test. A real run is
+/// handed a signal that never arrives.
+async fn serving(ctx: Ctx, asked: RawUi) -> ExitCode {
+    let asked = ui::Asked {
+        port: asked.port,
+        browser: !asked.no_browser,
+        assets: asked.assets,
+    };
+    ui::run(ctx, asked, EMBEDDED_APP, Box::pin(std::future::pending())).await
 }
 
 /// Say what a word means, or say that this product does not explain that one.

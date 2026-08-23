@@ -20,6 +20,7 @@
 //! | [`error`] | What every failure looks like |
 //! | [`platform`] | Which of the four environments this is |
 //! | [`stack`] | Building and running a slice of the stack |
+//! | [`frontend`] | Where the web app's files come from |
 //! | [`docker`] | Making sense of what the engine reports |
 //! | [`dashboard`] | One screen of what the stack is doing, assembled honestly |
 //! | [`config`] | What the operator chose, and where it is kept |
@@ -56,6 +57,7 @@ pub mod dashboard;
 pub mod docker;
 pub mod doctor;
 mod endpoint;
+pub mod frontend;
 pub mod glossary;
 pub mod health;
 pub mod household;

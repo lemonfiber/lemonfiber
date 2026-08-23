@@ -39,7 +39,11 @@ pub const LAST_EVENT_ID: &str = "Last-Event-ID";
 /// What answering the stream takes: who may listen, and what they hear.
 pub struct Streaming {
     /// This run's token, which every request must carry.
-    pub token: Token,
+    ///
+    /// The same one the rest of the surface is guarded by, shared rather than
+    /// minted again: two secrets for one run would be a run a client could be
+    /// admitted to half of.
+    pub token: Arc<Token>,
     /// The address this server is listening on, which every request must name.
     pub bound: SocketAddr,
     /// The one gather, and everyone already listening to it.
