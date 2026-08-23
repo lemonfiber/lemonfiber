@@ -53,6 +53,14 @@ test:
 fmt:
     cargo fmt
 
+# Rewrite the machine-readable contract from the types that serialise the reply.
+contract:
+    cargo run --quiet --example contract -p lemonfiber-core > contract/web-api.contract.json
+
+# Rewrite the command reference from the declarations the binary parses with.
+reference:
+    cargo run --quiet --example reference -p lemonfiber > reference/commands.md
+
 fmt-check:
     cargo fmt --check
 
@@ -112,12 +120,16 @@ release-workflow:
 # can be provoked from both of this crate's compilations at once, since one drives
 # it through the public port and the other through private functions.
 #
+# Every examples/ target is a third kind: each is a `print!` around a function in the
+# crate it belongs to, run by `just contract` and `just reference` to rewrite an
+# artefact. The function is under the gate; the redirection is not.
+#
 # Per-item exclusion would need #[coverage(off)], which is nightly-only, so
 # applicable code is instead kept coverable — see .docs/architecture/error-model.md
 # on writing assertions that leave no branch a test cannot reach.
 #
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
-skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs|crates/lemonfiber-core/examples/.*\.rs)'
+skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs|crates/.*/examples/.*\.rs)'
 
 # A failing gate says which lines it failed on, from the profile already gathered —
 # `report` re-reads it rather than building and running anything a second time. Without

@@ -17,9 +17,9 @@ use lemonfiber_core::app::Ctx;
 use lemonfiber_core::bundle::{Contents, Filenames};
 use lemonfiber_core::error::Problem;
 
-use crate::cli::Asked;
 use crate::render::support::{render_preview, render_written};
 use crate::render::Lines;
+use lemonfiber::cli::Asked;
 
 /// Describe a bundle, or produce one.
 pub(crate) async fn run(ctx: Ctx, asked: Asked, json: bool) -> ExitCode {
@@ -178,7 +178,7 @@ mod tests {
             Arc::new(Talking),
             Arc::new(adapters::System),
             Arc::new(adapters::Disk),
-            Source::Embedded(&crate::cli::STACK),
+            Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,
         )

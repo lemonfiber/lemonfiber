@@ -8,11 +8,11 @@
 use std::process::ExitCode;
 
 use clap::Parser;
+use lemonfiber::cli::{Cli, RawSetup, Request};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::doctor::Category;
 
 mod archive;
-mod cli;
 mod context;
 mod dashboard;
 mod engine;
@@ -33,7 +33,6 @@ mod translate;
 mod walkthrough;
 
 use crate::say::{complain, say};
-use cli::{Cli, Request};
 use context::{context, here};
 use engine::{guard, pull, settle, start, stream};
 use exit::{complain, no_config_home, settled, USAGE};
@@ -367,7 +366,7 @@ async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {
 /// The flags are validated before anything is applied, so a contradictory pair is a
 /// mistake to name rather than a half-configured stack — the same shape as `quality`
 /// below, which turns its own subcommand into a value or a code to exit with.
-async fn setup_from(ctx: Ctx, raw: prompt::RawSetup) -> ExitCode {
+async fn setup_from(ctx: Ctx, raw: RawSetup) -> ExitCode {
     let flags = match SetupFlags::parse(raw) {
         Ok(flags) => flags,
         Err(message) => {

@@ -566,7 +566,7 @@ pub(crate) mod tests {
             Arc::new(FakeEngine::down()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
-            Source::Embedded(&crate::cli::STACK),
+            Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,
         )
@@ -586,7 +586,7 @@ pub(crate) mod tests {
             Arc::new(FakeEngine::down()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
-            Source::Embedded(&crate::cli::STACK),
+            Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,
         )

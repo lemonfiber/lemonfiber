@@ -7,10 +7,11 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 
+use lemonfiber::cli::RawSetup;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::wizard::Wizard;
 
-use super::{Answers, RawSetup, Terminal};
+use super::{Answers, Terminal};
 
 /// Answers handed out in order, so a test reads as the conversation it is.
 ///
