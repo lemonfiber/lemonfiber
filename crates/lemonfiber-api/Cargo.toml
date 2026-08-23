@@ -1,0 +1,20 @@
+[package]
+name = "lemonfiber-api"
+description = "The JSON endpoints lemonfiber answers on loopback, and the frontend it serves beside them."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+# Not published, as the other libraries are not: the release ships one binary, and a
+# crate nobody can depend on separately is one fewer surface to keep compatible.
+publish = false
+
+[dependencies]
+lemonfiber-core = { path = "../lemonfiber-core" }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+
+[lints]
+workspace = true
