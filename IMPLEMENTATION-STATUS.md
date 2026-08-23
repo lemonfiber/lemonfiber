@@ -35,11 +35,18 @@ context only.
 CI, templates, and the citation-gated workflow are in force (DCO, CODEOWNERS,
 spec-references bot, labeler, SonarCloud gate, OpenSSF hardening).
 
-## M1 — `lemonfiber-media-stack` standalone · ✅
+## M1 — `lemonfiber-media-stack` standalone · ◐
 
 The stack ships embedded as a submodule under [`assets/`](assets/) and is read at
 build time; the manifest and compose fragments live there. The stack's own
-standalone CI lives in the `lemonfiber-media-stack` repo.
+standalone CI lives in the `lemonfiber-media-stack` repo, where every form is
+resolved by `docker compose config` on each change.
+
+Two of the milestone's three exit criteria are the two no CI can reach: a hardlink
+import verified end to end, and a killswitch verified by hand. Nothing in either
+repo starts a container, and that repo's own README says so — so this is recorded
+partial rather than done, and the milestone closes when somebody runs it on
+hardware.
 
 ---
 
