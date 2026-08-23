@@ -181,7 +181,7 @@ pub(crate) fn unrecognised(word: &str) -> Problem {
 fn as_a_document(term: &Term) -> Lines {
     let mut lines = Lines::for_a_parser();
     lines.put(
-        lemonfiber_core::model::Envelope::new("word", term)
+        lemonfiber_core::model::Envelope::new(lemonfiber_core::model::kind::WORD, term)
             .to_json()
             .unwrap_or(super::UNRENDERABLE.to_owned()),
     );

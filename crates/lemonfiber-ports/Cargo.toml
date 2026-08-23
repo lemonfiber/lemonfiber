@@ -15,6 +15,7 @@ publish = false
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 

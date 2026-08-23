@@ -4,6 +4,7 @@
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
 use lemonfiber_core::docker::{Condition, Service, State};
+use lemonfiber_core::model::kind;
 use lemonfiber_core::model::{
     Envelope, LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
 };
@@ -249,7 +250,7 @@ pub(super) fn watch_lines(report: &SupervisionReport, json: bool) -> Lines {
     if json {
         let mut lines = Lines::for_a_parser();
         lines.put(
-            Envelope::new("watch", report.clone())
+            Envelope::new(kind::WATCH, report.clone())
                 .to_json()
                 .unwrap_or(UNRENDERABLE.to_owned()),
         );

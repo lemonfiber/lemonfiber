@@ -9,7 +9,7 @@ use serde::Serialize;
 use super::API_VERSION;
 
 /// The wrapper every machine-readable payload arrives in.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Envelope<T> {
     /// The output contract's version.
     pub api_version: u32,

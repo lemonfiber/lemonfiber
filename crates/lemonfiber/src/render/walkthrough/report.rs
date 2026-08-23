@@ -6,6 +6,7 @@
 //! action — a fault report they have to research is a fault report they abandon. And one
 //! still running owes them the truth that walking away costs nothing.
 
+use lemonfiber_core::model::kind;
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::model::WalkthroughReport;
 use lemonfiber_core::walkthrough::{Handover, Stopped};
@@ -104,7 +105,7 @@ fn still_going(report: &WalkthroughReport) -> Lines {
 pub(crate) fn machine_readable(report: &WalkthroughReport) -> Lines {
     let mut lines = Lines::for_a_parser();
     lines.put(
-        Envelope::new("walkthrough", report)
+        Envelope::new(kind::WALKTHROUGH, report)
             .to_json()
             .unwrap_or(UNRENDERABLE.to_owned()),
     );

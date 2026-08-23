@@ -13,7 +13,19 @@ use serde::{Deserialize, Serialize};
 use crate::trace::Stage;
 
 /// One step of the walk, ordered from picking something to watching it play.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Step {
     /// Picking something to add, and confirming it is not already here.
@@ -103,7 +115,7 @@ impl Step {
 
 /// What the import did with the finished download — the difference between one copy of a
 /// file and two.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Link {
     /// The library entry and the download are the same file under two names, which is

@@ -82,7 +82,7 @@ pub struct Stats {
 }
 
 /// Which stream a log line arrived on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Stream {
     /// Standard output.
@@ -96,7 +96,7 @@ pub enum Stream {
 /// Serialisable because a log stream is part of the machine-readable contract:
 /// `--json` renders one envelope per line, since a stream has no last element
 /// to close a document with.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct LogLine {
     /// The Compose service it came from.
     pub service: String,

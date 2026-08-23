@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::Step;
 
 /// One narrated line: a step, and what was specifically true of it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Line {
     /// The step being narrated.
     pub step: Step,

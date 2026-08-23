@@ -8,7 +8,7 @@ use serde::Serialize;
 
 /// What a first-content walkthrough did — the whole of it, narrated line by line as it
 /// happened and gathered here so the ending can be rendered, serialised and exited on.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct WalkthroughReport {
     /// Which walk this was.
     pub shape: crate::walkthrough::Shape,

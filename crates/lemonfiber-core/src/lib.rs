@@ -51,6 +51,7 @@ pub mod bundle;
 pub mod bytes;
 pub mod condition;
 pub mod config;
+pub mod contract;
 pub mod dashboard;
 pub mod docker;
 pub mod doctor;

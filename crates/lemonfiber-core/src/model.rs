@@ -14,6 +14,7 @@ pub const API_VERSION: u32 = 1;
 mod checking;
 mod envelope;
 mod household;
+pub mod kind;
 mod quality;
 mod queue;
 mod running;
