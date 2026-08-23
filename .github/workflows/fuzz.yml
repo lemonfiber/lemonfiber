@@ -1,4 +1,4 @@
-# Fuzzing for the manifest crate (Q-R53).
+# Fuzzing for the manifest crate (Q-R63).
 #
 # `stack.toml` is the one file users are invited to edit by hand, so malformed
 # input is ordinary rather than adversarial — and the parser must answer with a
