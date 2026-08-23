@@ -1088,7 +1088,9 @@ Options:
           Do not ask this desktop to open a browser
 
       --assets <PATH>
-          Serve the interface from this directory instead of the one built in
+          Serve the interface from this directory rather than from the binary.
+
+          No build carries a web app of its own yet, so this is the only way to serve one. A build asked without it says as much rather than answering with an empty page.
 
       --force
           Take the stack from a run that claimed it and did not give it back

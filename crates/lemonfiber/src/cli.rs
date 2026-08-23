@@ -404,7 +404,11 @@ pub struct RawUi {
     /// Do not ask this desktop to open a browser.
     #[arg(long)]
     pub no_browser: bool,
-    /// Serve the interface from this directory instead of the one built in.
+    /// Serve the interface from this directory rather than from the binary.
+    ///
+    /// No build carries a web app of its own yet, so this is the only way to
+    /// serve one. A build asked without it says as much rather than answering
+    /// with an empty page.
     #[arg(long, value_name = "PATH")]
     pub assets: Option<PathBuf>,
 }
