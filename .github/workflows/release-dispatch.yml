@@ -1,9 +1,14 @@
 # One-click release for maintainers. Validates that the version is already on
-# main, tags it, and drafts the GitHub Release with the generated changelog —
-# the same draft a CLI `git tag && push` produces (release.yml), but from a
-# button. The draft is NOT published: a human still reviews it and clicks
-# Publish, which is what fires the #releases announcement (releasing.md step 3,
-# OPS-R1). Restricted to maintainers; every input is validated before any write.
+# main and tags it — the same thing `just release-tag` does from a shell, but
+# from a button. Tagging is the whole job: the tag starts release.yml, which
+# builds the artifacts and leaves a draft, and release-changelog puts the
+# changelog on that draft. The draft is NOT published: a human reviews it and
+# clicks Publish, which is what fires the #releases announcement (releasing.md
+# step 3). Restricted to maintainers; every input is validated before any write.
+#
+# This used to run git-cliff and draft the release itself. Two workflows drafting
+# one release is one release too many — cargo-dist's `gh release create` would
+# find the tag already taken — and the changelog now has a place of its own.
 name: release-dispatch
 on:
   workflow_dispatch:
@@ -61,16 +66,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "v${VERSION}" -m "lemonfiber v${VERSION}"
           git push origin "v${VERSION}"
-      - name: Generate changelog (git-cliff)
-        id: cliff
-        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
-        with:
-          config: cliff.toml
-          args: --latest --strip header
-      - name: Draft the release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
-        with:
-          tag_name: v${{ inputs.version }}
-          body: ${{ steps.cliff.outputs.content }}
-          draft: true
-          generate_release_notes: false
+      - name: Tagged — the pipeline takes it from here
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          echo "::notice title=Tagged::v${VERSION} is tagged. release.yml builds it and leaves a draft, release-changelog puts the changelog on that draft, and a maintainer publishes it."
