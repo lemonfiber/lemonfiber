@@ -1,0 +1,61 @@
+#!/bin/sh
+# Refuse a push that would leave a branch carrying nothing of its own.
+#
+# Twice, a `git checkout` that failed silently left the shell on the trunk, and
+# the push that followed sent the trunk over a feature branch — deleting its
+# commits and closing its pull request. Neither time was the mistake visible
+# while it happened: every command in the sequence succeeded on its own terms,
+# `git rebase` correctly reported "up to date", and the push was a legitimate
+# force-push to a branch that legitimately existed.
+#
+# So this asks the one question the sequence never did: does what is being pushed
+# differ from the trunk at all? A branch that does not is either a mistake of
+# this shape or a branch with nothing to say.
+#
+# It permits every ordinary force-push. A rebased branch is still ahead of the
+# trunk; only one that has been *replaced* by the trunk is not.
+
+set -eu
+
+trunk=refs/remotes/origin/main
+empty=0000000000000000000000000000000000000000
+
+# Nothing to compare against on a fresh clone that has not fetched. Silence is
+# better than a guard that fires on the wrong evidence.
+if ! git rev-parse --verify --quiet "$trunk" >/dev/null; then
+	exit 0
+fi
+
+while read -r _ pushing onto _; do
+	# A deletion pushes the empty object; there is nothing to check.
+	if [ "$pushing" = "$empty" ]; then
+		continue
+	fi
+
+	branch=${onto#refs/heads/}
+
+	case "$onto" in
+	refs/heads/main | refs/heads/master)
+		echo "pre-push: refusing to push straight to ${branch}." >&2
+		echo "          Branch, push that, and open a pull request." >&2
+		exit 1
+		;;
+	esac
+
+	if git merge-base --is-ancestor "$pushing" "$trunk"; then
+		echo "pre-push: ${branch} would carry no commit that origin/main does not." >&2
+		echo "" >&2
+		echo "          This is what pushing the trunk over a branch looks like: the" >&2
+		echo "          branch's own commits go, and its pull request closes." >&2
+		echo "" >&2
+		echo "          Check where you are before pushing again:" >&2
+		echo "              git branch --show-current" >&2
+		echo "              git rev-list --count origin/main..HEAD" >&2
+		echo "" >&2
+		echo "          If the branch really is finished with, delete it rather than" >&2
+		echo "          emptying it: git push origin --delete ${branch}" >&2
+		exit 1
+	fi
+done
+
+exit 0
