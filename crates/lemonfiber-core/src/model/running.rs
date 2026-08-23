@@ -7,7 +7,7 @@
 use serde::Serialize;
 
 /// What a lifecycle command did, or would have done.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct LifecycleReport {
     /// The Compose subcommand that was run.
     pub action: String,
@@ -57,7 +57,7 @@ pub struct LifecycleReport {
 /// middle list is the one that makes the verb worth having: it is the promise that
 /// a download in flight was not interrupted to change the shape of the stack
 /// around it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Switched {
     /// Stopped, because the new closure does not hold them.
     pub stopped: Vec<String>,
@@ -76,7 +76,7 @@ pub struct Switched {
 
 /// A stack file the operator edited, preserved rather than overwritten, with the
 /// change an upgrade would make shown against it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct StackEdit {
     /// The file's path within the stack directory.
     pub path: String,
@@ -88,7 +88,7 @@ pub struct StackEdit {
 
 /// What a full reset did, or — until it is confirmed — would do: the operator edits it
 /// reverts back to lemonfiber's own state, and whether it was carried out or only shown.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct ResetReport {
     /// The operator's edits that were reverted — or, unconfirmed, that a reset would
     /// revert — each with the diff of what is lost against what lemonfiber restores.

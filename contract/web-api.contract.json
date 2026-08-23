@@ -1,6 +1,91 @@
 {
   "api_version": 1,
   "kinds": {
+    "config": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/ConfigReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "ConfigReport": {
+          "description": "The answer to a configuration command.",
+          "type": "object",
+          "properties": {
+            "changed": {
+              "description": "Whether this command changed, or would change, a setting.",
+              "type": "boolean"
+            },
+            "consequence": {
+              "description": "What this change costs, where making it decided something with a\nconsequence — turning port forwarding off, or moving to a provider while it\nis off. Absent for every other change, and for a rehearsal, which decided\nnothing.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal, so a change that `changed` reports was one\nthat *would* be made rather than one that was.",
+              "type": "boolean"
+            },
+            "settings": {
+              "description": "The settings asked about — one for a lookup, all of them for a listing.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingReport"
+              }
+            }
+          },
+          "required": [
+            "settings",
+            "changed",
+            "rehearsed"
+          ]
+        },
+        "SettingReport": {
+          "description": "One setting, as it is safe to show.",
+          "type": "object",
+          "properties": {
+            "key": {
+              "description": "The setting's name.",
+              "type": "string"
+            },
+            "secret": {
+              "description": "Whether the value was withheld.",
+              "type": "boolean"
+            },
+            "value": {
+              "description": "Its value, or a note that it is set and withheld.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "value",
+            "secret"
+          ]
+        }
+      }
+    },
     "dashboard": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -1031,6 +1116,412 @@
         }
       }
     },
+    "doctor": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/DoctorReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Category": {
+          "description": "The family a check belongs to, so a run can be narrowed to one of them.\n\nThese are the diagnostic categories the product recognises; the checks that\nfill each one arrive over time, so a category may name more than lemonfiber\ncan yet establish.",
+          "oneOf": [
+            {
+              "description": "Docker present, the daemon reachable, the platform understood.",
+              "type": "string",
+              "const": "environment"
+            },
+            {
+              "description": "The data root: reachable, writable, one filesystem, room to grow.",
+              "type": "string",
+              "const": "storage"
+            },
+            {
+              "description": "Ports free, bindings matching policy, services reachable.",
+              "type": "string",
+              "const": "network"
+            },
+            {
+              "description": "Torrent traffic genuinely leaves through the tunnel.",
+              "type": "string",
+              "const": "vpn"
+            },
+            {
+              "description": "Each credential still valid.",
+              "type": "string",
+              "const": "credentials"
+            },
+            {
+              "description": "Health, crash loops, version skew, the wiring between services.",
+              "type": "string",
+              "const": "services"
+            },
+            {
+              "description": "Provider quota, subscription validity, indexer responsiveness.",
+              "type": "string",
+              "const": "providers"
+            },
+            {
+              "description": "Stuck items, repeated import failures, orphaned downloads.",
+              "type": "string",
+              "const": "queue"
+            },
+            {
+              "description": "Drift from lemonfiber-managed state, permissions, manifest validity.",
+              "type": "string",
+              "const": "config"
+            }
+          ]
+        },
+        "Code": {
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Codes are declared as constants beside the code\nthat raises them, and are never recycled.",
+          "type": "string"
+        },
+        "DoctorReport": {
+          "description": "What a diagnostic run found, and what it amounts to.",
+          "type": "object",
+          "properties": {
+            "findings": {
+              "description": "Each finding, in the order the checks produced them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Finding"
+              }
+            },
+            "overall": {
+              "description": "What the findings amount to, as one word.",
+              "$ref": "#/$defs/Overall"
+            }
+          },
+          "required": [
+            "overall",
+            "findings"
+          ]
+        },
+        "Finding": {
+          "description": "One thing a check established, and how it turned out.",
+          "type": "object",
+          "properties": {
+            "category": {
+              "description": "The family this belongs to.",
+              "$ref": "#/$defs/Category"
+            },
+            "caused_by": {
+              "description": "The check whose finding explains this one, where another does.\n\nSet after the run rather than by the check itself: a check is independent\nby construction and cannot see what any other found, which is a property\nworth keeping.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "check": {
+              "description": "A stable identifier for the thing checked, such as `vpn.egress-match`.",
+              "type": "string"
+            },
+            "said": {
+              "description": "What the service said for itself, lately.\n\nCarried on the finding rather than left for the operator to go and fetch,\nbecause the explanation is almost always in it: a check can say a service is\nnot answering, and only the service can say why. Absent where the finding is\nnot about a service, where the service is fine, or where the engine would not\nsay — an empty section would be a promise of evidence that is not there.\n\nSet after the run, like [`Self::caused_by`], since reading a service's output\nis not the check's own business and a check that did it would be doing two\nthings.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "service": {
+              "description": "The service this is about, where it is about one.\n\nAbsent for the checks that are about the machine rather than about\nsomething running on it — the environment, the filesystem, the operator's\nown choices. Carried so that one service's trouble can be attributed to\nthe service underneath it rather than counted as one more independent\nthing wrong.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "description": "The one-line summary of what was checked.",
+              "type": "string"
+            },
+            "verdict": {
+              "description": "How it turned out.",
+              "$ref": "#/$defs/Verdict"
+            }
+          },
+          "required": [
+            "check",
+            "category",
+            "title",
+            "verdict"
+          ]
+        },
+        "Overall": {
+          "description": "What a run's findings amount to.",
+          "oneOf": [
+            {
+              "description": "Everything that ran passed.",
+              "type": "string",
+              "const": "healthy"
+            },
+            {
+              "description": "Warnings, but nothing broken.",
+              "type": "string",
+              "const": "degraded"
+            },
+            {
+              "description": "Something is broken.",
+              "type": "string",
+              "const": "broken"
+            },
+            {
+              "description": "Something could not be determined, so health is not a settled fact.",
+              "type": "string",
+              "const": "unknown"
+            }
+          ]
+        },
+        "Problem": {
+          "description": "Something that went wrong, in the form an operator can act on.",
+          "type": "object",
+          "properties": {
+            "cause": {
+              "description": "The problem that produced this one, where several share a root.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Problem"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "code": {
+              "description": "The stable identifier for this kind of problem.",
+              "$ref": "#/$defs/Code"
+            },
+            "detail": {
+              "description": "The underlying technical detail, available but never leading.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "meaning": {
+              "description": "What it means for the operator.",
+              "type": "string"
+            },
+            "remedies": {
+              "description": "What to do, most likely first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Remedy"
+              }
+            },
+            "severity": {
+              "description": "How much it matters.",
+              "$ref": "#/$defs/Severity"
+            },
+            "state": {
+              "description": "Where it stands with respect to being fixed.",
+              "$ref": "#/$defs/State"
+            },
+            "summary": {
+              "description": "What happened, in one plain sentence.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "severity",
+            "state",
+            "summary",
+            "meaning",
+            "remedies"
+          ]
+        },
+        "Remedy": {
+          "description": "One thing the operator can do about a problem.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "The action, phrased as something to do rather than something to know.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where to look, when that helps.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        "Severity": {
+          "description": "How much a problem matters.\n\nFour levels, deliberately. More would not be applied consistently, and\ninconsistent severity is worse than coarse severity.",
+          "oneOf": [
+            {
+              "description": "Informational; nothing is required.",
+              "type": "string",
+              "const": "advisory"
+            },
+            {
+              "description": "Degraded or risky, still working.",
+              "type": "string",
+              "const": "warning"
+            },
+            {
+              "description": "Something is broken.",
+              "type": "string",
+              "const": "error"
+            },
+            {
+              "description": "Consequences outside the machine, or data at risk.",
+              "type": "string",
+              "const": "critical"
+            }
+          ]
+        },
+        "State": {
+          "description": "Where a problem stands with respect to being fixed.",
+          "oneOf": [
+            {
+              "description": "A remedy is available here.",
+              "type": "string",
+              "const": "actionable"
+            },
+            {
+              "description": "The operator must act, somewhere else.",
+              "type": "string",
+              "const": "guided"
+            },
+            {
+              "description": "lemonfiber can fix this itself.",
+              "type": "string",
+              "const": "remediable"
+            },
+            {
+              "description": "No known remedy; escalation is offered instead.",
+              "type": "string",
+              "const": "unknown"
+            },
+            {
+              "description": "Acknowledged, and not re-shown until it recurs.",
+              "type": "string",
+              "const": "suppressed"
+            }
+          ]
+        },
+        "Verdict": {
+          "description": "How a single check turned out.\n\n\"Could not check\" (`Unverified`) is its own variant rather than a level of\nseverity, so a check that could not run can never be mistaken for one that\npassed — the dishonesty this whole subsystem exists to prevent.",
+          "oneOf": [
+            {
+              "description": "Verified working, with the evidence worth showing.",
+              "type": "object",
+              "properties": {
+                "note": {
+                  "description": "What was observed, where stating it helps — an address, a port.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "pass"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "Working, but degraded or risky.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "warn"
+                }
+              },
+              "$ref": "#/$defs/Problem",
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "Not working.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "fail"
+                }
+              },
+              "$ref": "#/$defs/Problem",
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "Could not be established. Never a pass.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "unverified"
+                },
+                "reason": {
+                  "description": "Why it could not be determined.",
+                  "type": "string"
+                },
+                "remedy": {
+                  "description": "What the operator can do to get an answer.",
+                  "$ref": "#/$defs/Remedy"
+                }
+              },
+              "required": [
+                "outcome",
+                "reason",
+                "remedy"
+              ]
+            },
+            {
+              "description": "A prerequisite was absent, so the check did not apply.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "skipped"
+                },
+                "reason": {
+                  "description": "Why the check did not apply.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "outcome",
+                "reason"
+              ]
+            }
+          ]
+        }
+      }
+    },
     "error": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -1198,6 +1689,630 @@
         }
       }
     },
+    "forms": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/FormsReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "FormReport": {
+          "description": "One form the stack declares, as a listing shows it.\n\nThe manifest's own words rather than lemonfiber's: forms come from the stack, so a\nstack of somebody's own names and describes them however it likes, and a listing that\nparaphrased would be describing a different stack from the one being run.",
+          "type": "object",
+          "properties": {
+            "composable": {
+              "description": "Whether it can be started alongside another form.\n\nWorth saying in the listing rather than only when a combination is refused: an\noperator choosing between two forms is exactly who needs to know they are a choice.",
+              "type": "boolean"
+            },
+            "description": {
+              "description": "What it is for, in one line.",
+              "type": "string"
+            },
+            "id": {
+              "description": "What to type to start it.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "description",
+            "composable"
+          ]
+        },
+        "FormsReport": {
+          "description": "Every form this stack declares.",
+          "type": "object",
+          "properties": {
+            "forms": {
+              "description": "The forms, in the order the stack declares them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/FormReport"
+              }
+            }
+          },
+          "required": [
+            "forms"
+          ]
+        }
+      }
+    },
+    "household": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/HouseholdReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "HouseholdMember": {
+          "description": "One household member and everything they have asked for.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "The member, by the name the request service shows them under.",
+              "type": "string"
+            },
+            "requests": {
+              "description": "What they asked for, newest first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MemberRequest"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "requests"
+          ]
+        },
+        "HouseholdReport": {
+          "description": "What the household has asked for, member by member — the simplified view of the same\npipeline a trace reports in the services' own terms.",
+          "type": "object",
+          "properties": {
+            "available": {
+              "description": "Whether the requests were read at all. A false here is why the list is empty, and\nkeeps an unread record from being mistaken for a household that has asked for\nnothing — the same honesty a trace keeps about a silence it did not hear.",
+              "type": "boolean"
+            },
+            "findings": {
+              "description": "What could not be read, and anything else worth the operator's attention.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "members": {
+              "description": "The members who have asked for something, in name order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HouseholdMember"
+              }
+            }
+          },
+          "required": [
+            "members",
+            "available",
+            "findings"
+          ]
+        },
+        "MemberRequest": {
+          "description": "One thing a household member asked for, and where it stands in their words.",
+          "type": "object",
+          "properties": {
+            "media": {
+              "description": "What kind of thing it is — a series, a film — in the household's own words.\nAbsent where the request service names a kind this build does not know.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "state": {
+              "description": "Where the request stands, or absent where the request service reports a status\nthis build does not know rather than guessing it into the nearest word.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/State"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": {
+              "description": "What it is called, where the service filing it has been told about it and its\nlibrary could be read. Absent for a request no service holds yet — one still\nawaiting approval has been handed to nobody, so there is no title to find.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "State": {
+          "description": "Where one request stands, in the words the person who made it would use.\n\nDeliberately coarser than a [`crate::trace::Stage`]: a member does not need to know\nthat a release was grabbed but not imported, only that it is on its way. The trace is\nwhere that detail stays, and a request names the item so it can be asked for.",
+          "oneOf": [
+            {
+              "description": "Asked for, and nobody has approved or refused it yet.",
+              "type": "string",
+              "const": "waiting-for-approval"
+            },
+            {
+              "description": "Turned down — it will not be fetched.",
+              "type": "string",
+              "const": "declined"
+            },
+            {
+              "description": "Approved, but the attempt to fetch it failed.",
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "description": "Approved and on its way — being searched for, downloaded or imported.",
+              "type": "string",
+              "const": "getting"
+            },
+            {
+              "description": "Some of it is here: a series with only some of its episodes.",
+              "type": "string",
+              "const": "partly-here"
+            },
+            {
+              "description": "Here, and playable.",
+              "type": "string",
+              "const": "here"
+            },
+            {
+              "description": "It was here and has since been removed.",
+              "type": "string",
+              "const": "gone"
+            }
+          ]
+        }
+      }
+    },
+    "lifecycle": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/LifecycleReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Condition": {
+          "description": "What a whole set of services amounts to.",
+          "oneOf": [
+            {
+              "description": "Nothing is running.",
+              "type": "string",
+              "const": "inactive"
+            },
+            {
+              "description": "Running, with at least one service in a state that wants attention.",
+              "type": "string",
+              "const": "degraded"
+            },
+            {
+              "description": "Some services are up and others are not.",
+              "type": "string",
+              "const": "partial"
+            },
+            {
+              "description": "Everything expected is up and answering.",
+              "type": "string",
+              "const": "active"
+            }
+          ]
+        },
+        "Criticality": {
+          "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
+          "oneOf": [
+            {
+              "description": "Its failure has consequences outside the machine.",
+              "type": "string",
+              "const": "critical"
+            },
+            {
+              "description": "The form does not work without it.",
+              "type": "string",
+              "const": "core"
+            },
+            {
+              "description": "The form works, badly.",
+              "type": "string",
+              "const": "important"
+            },
+            {
+              "description": "Makes things better.",
+              "type": "string",
+              "const": "enhancing"
+            },
+            {
+              "description": "Nice to have.",
+              "type": "string",
+              "const": "optional"
+            }
+          ]
+        },
+        "Dropped": {
+          "description": "A profile left out of a closure, and what it would have needed.\n\nThe provider travels with the profile because a name on its own sends the\noperator looking for a fault. What they have is a stack not configured for\none of the two ways of downloading, which is a sentence rather than a word.",
+          "type": "object",
+          "properties": {
+            "needs": {
+              "description": "The provider it cannot run without.",
+              "$ref": "#/$defs/Protocol"
+            },
+            "profile": {
+              "description": "The profile that will not run.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "profile",
+            "needs"
+          ]
+        },
+        "LifecycleReport": {
+          "description": "What a lifecycle command did, or would have done.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "The Compose subcommand that was run.",
+              "type": "string"
+            },
+            "command": {
+              "description": "The exact command, so what happened is never a matter of trust.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "condition": {
+              "description": "What those services amount to, as one word.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Condition"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "forwarding": {
+              "description": "What starting the stack did about the VPN's forwarded port, where it did\nanything. Absent in the ordinary case — the client was already on it, or\nthere is no tunnel to forward through — and a sentence where the client was\nmoved, or could not be.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "plan": {
+              "description": "What the named forms came to: the profiles, the services they hold, and\nwhat the configuration left out.\n\nThe resolved plan itself rather than a copy of its parts, because it is\nstated to the operator before the command runs and read out of the\nreport afterwards — two accounts of one run, and a second shape for it\nwould be a way for them to differ.",
+              "$ref": "#/$defs/Plan"
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal.",
+              "type": "boolean"
+            },
+            "services": {
+              "description": "What each service ended up doing, where the action waited to find out.\n\nEmpty for actions that do not wait. Stopping is finished when Compose\nsays it is, and surveying afterwards would only report the absence it\nwas asked to produce.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Service"
+              }
+            },
+            "stack_edits": {
+              "description": "Stack files the operator has edited, left as they set them rather than\noverwritten with lemonfiber's own. Empty in the ordinary case; a named entry\nwarns that an upgrade would change a file they changed, and shows the diff.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StackEdit"
+              }
+            },
+            "status": {
+              "description": "The exit status, absent for a rehearsal or a signalled process.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "switched": {
+              "description": "What narrowing moved, where the command was a switch. Absent for every\nother action, which is what tells a reader that nothing was left running\non purpose.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Switched"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "action",
+            "plan",
+            "command",
+            "rehearsed",
+            "services",
+            "stack_edits"
+          ]
+        },
+        "Plan": {
+          "description": "What will be run, and what was left out.\n\nSerialisable because it is an answer in its own right: asking what a form\nwould do is a question a script asks as readily as a person, and the plan a\nlifecycle report carries is this same value rather than a retelling of it.",
+          "type": "object",
+          "properties": {
+            "dropped": {
+              "description": "Profiles the closure asked for that the configuration does not support.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Dropped"
+              }
+            },
+            "forms": {
+              "description": "The forms the operator named, in the order they named them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "profiles": {
+              "description": "The profiles to activate, sorted so the command is reproducible.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "services": {
+              "description": "The services those profiles start, in the order the stack declares them.\n\nA service belongs to exactly one profile, so a service two named forms\nboth reach is here once. That is a property of the manifest rather than\nof a pass over this list: the union is over profiles, and a service\nappearing twice is not a state this can hold.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "forms",
+            "profiles",
+            "services",
+            "dropped"
+          ]
+        },
+        "Protocol": {
+          "description": "A download provider a profile can depend on.\n\nSerialisable as well as readable, for the same reason [`Criticality`] is: it\nreaches an operator. A profile left out of a closure is only half reported\nwithout the provider it wanted.",
+          "oneOf": [
+            {
+              "description": "Needs a Usenet provider.",
+              "type": "string",
+              "const": "usenet"
+            },
+            {
+              "description": "Needs a VPN and a torrent client.",
+              "type": "string",
+              "const": "torrent"
+            }
+          ]
+        },
+        "Service": {
+          "description": "One service, as it stands.",
+          "type": "object",
+          "properties": {
+            "criticality": {
+              "description": "How much its absence costs, so a summary can weigh it.",
+              "$ref": "#/$defs/Criticality"
+            },
+            "depends_on": {
+              "description": "The services it needs before it can work, as the manifest declares them.\nCarried so a failure can be attributed to the thing underneath it rather\nthan counted as one more independent thing wrong.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exit": {
+              "description": "How it exited, where it has exited.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "id": {
+              "description": "The service's identifier, which is also its Compose service name.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "profile": {
+              "description": "The profile that declared it.",
+              "type": "string"
+            },
+            "state": {
+              "description": "What it is doing.",
+              "$ref": "#/$defs/State"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "profile",
+            "state",
+            "criticality",
+            "depends_on"
+          ]
+        },
+        "StackEdit": {
+          "description": "A stack file the operator edited, preserved rather than overwritten, with the\nchange an upgrade would make shown against it.",
+          "type": "object",
+          "properties": {
+            "diff": {
+              "description": "The lines that differ between the operator's file and what lemonfiber would\nwrite — theirs marked `-`, lemonfiber's `+`, the matching head and tail left\nout. Empty where the two differ only in ways `lines` does not see.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file's path within the stack directory.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "diff"
+          ]
+        },
+        "State": {
+          "description": "What one service is actually doing.\n\nOrdered from worst to best, so a form's condition is the minimum across its\nservices and needs no comparison table. The declaration order is therefore\nload-bearing.",
+          "oneOf": [
+            {
+              "description": "Exited without being asked to, and is not coming back on its own.",
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "description": "Exiting and restarting repeatedly.",
+              "type": "string",
+              "const": "crash-looping"
+            },
+            {
+              "description": "Running, and its own probe says it is not working.",
+              "type": "string",
+              "const": "unhealthy"
+            },
+            {
+              "description": "No container exists.",
+              "type": "string",
+              "const": "absent"
+            },
+            {
+              "description": "A container exists and is not running.",
+              "type": "string",
+              "const": "stopped"
+            },
+            {
+              "description": "Running, and still inside its probe's start period.",
+              "type": "string",
+              "const": "starting"
+            },
+            {
+              "description": "Running, and declaring no probe by which to know more.\n\nDistinct from healthy on purpose. A service that cannot be asked is not\na service that answered, and rendering the two identically is how a\ndashboard comes to be believed about something it never checked.",
+              "type": "string",
+              "const": "running"
+            },
+            {
+              "description": "Running and passing its own probe.",
+              "type": "string",
+              "const": "healthy"
+            },
+            {
+              "description": "The operating system owns this one, not lemonfiber.",
+              "type": "string",
+              "const": "host-managed"
+            }
+          ]
+        },
+        "Switched": {
+          "description": "What narrowing the active set moved.\n\nThree lists rather than a before and an after, because the operator's question\nis not \"what is running now\" — they can ask that — but \"what did that do\". The\nmiddle list is the one that makes the verb worth having: it is the promise that\na download in flight was not interrupted to change the shape of the stack\naround it.",
+          "type": "object",
+          "properties": {
+            "kept": {
+              "description": "Left running: the new closure holds them too, so nothing here asked them to\nstop. Not a promise that nothing touched them — Compose recreates a container\nwhose configuration changed — but a promise that narrowing did not.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "started": {
+              "description": "Started, because the new closure holds them and they were not up.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stop_command": {
+              "description": "The exact Compose invocation that stopped what fell outside, so a switch is\nno more a matter of trust than any other action. Absent where nothing had\nto stop.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "stopped": {
+              "description": "Stopped, because the new closure does not hold them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "stopped",
+            "started",
+            "kept"
+          ]
+        }
+      }
+    },
     "log": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -1268,6 +2383,865 @@
               "type": "string",
               "const": "stderr"
             }
+          ]
+        }
+      }
+    },
+    "music": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/MusicReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Disposition": {
+          "description": "What a quality command did to the stored choice.",
+          "oneOf": [
+            {
+              "description": "The choice was only shown; nothing was asked to change.",
+              "type": "string",
+              "const": "shown"
+            },
+            {
+              "description": "The choice was recorded.",
+              "type": "string",
+              "const": "recorded"
+            },
+            {
+              "description": "The choice would be recorded; this was a rehearsal, so it was not.",
+              "type": "string",
+              "const": "rehearsed"
+            },
+            {
+              "description": "The choice needs transcoding this host cannot do well, so it was held\nrather than recorded without explicit confirmation.",
+              "type": "string",
+              "const": "held"
+            },
+            {
+              "description": "The recorded preset was re-asserted over the Recyclarr config, overwriting\na hand-edit where an ordinary run would have preserved it.",
+              "type": "string",
+              "const": "reapplied"
+            },
+            {
+              "description": "A re-assert that was a rehearsal: it reports whether it would overwrite a\nhand-edit, and writes nothing.",
+              "type": "string",
+              "const": "would-reapply"
+            }
+          ]
+        },
+        "MusicChoice": {
+          "description": "One audio-format choice in force, for media that has no resolution — the same\nquestion as a [`PresetChoice`], answered in format terms rather than resolution.",
+          "type": "object",
+          "properties": {
+            "format": {
+              "description": "The format's plain-language name.",
+              "type": "string"
+            },
+            "means": {
+              "description": "What it means, in the operator's terms.",
+              "type": "string"
+            },
+            "note": {
+              "description": "The practical caveat worth knowing — playing it, or finding it.",
+              "type": "string"
+            },
+            "scope": {
+              "description": "What this applies to — `music`.",
+              "type": "string"
+            },
+            "size_per_hour": {
+              "description": "Roughly how much disk an hour of it takes.",
+              "type": "string"
+            },
+            "targets": {
+              "description": "The audio format it targets, in plain terms.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "scope",
+            "format",
+            "means",
+            "targets",
+            "size_per_hour",
+            "note"
+          ]
+        },
+        "MusicReport": {
+          "description": "What choosing an audio format for music did: the choice, whether it was recorded\nor only rehearsed, and — once recorded — what became of applying it to the music\nservice.\n\nMusic has no resolution and no community profile to lean on, so unlike a resolution\npreset the choice is carried straight to the service through its API. The choice is\nstill recorded first, so it is remembered even when the service cannot be reached.",
+          "type": "object",
+          "properties": {
+            "choice": {
+              "description": "The format chosen, what it means, and what it costs.",
+              "$ref": "#/$defs/MusicChoice"
+            },
+            "disposition": {
+              "description": "Whether the choice was recorded, or only rehearsed.",
+              "$ref": "#/$defs/Disposition"
+            },
+            "outcome": {
+              "description": "What became of applying it to the music service, or `None` for a rehearsal\nthat applied nothing.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Triggered"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "choice",
+            "disposition"
+          ]
+        },
+        "Triggered": {
+          "description": "What became of asking one service to re-search its existing content.",
+          "oneOf": [
+            {
+              "description": "The re-search was accepted and now runs in the service's background.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "started"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "The service had not finished starting — no key yet — so nothing was asked of\nit; running the upgrade again once it is up will reach it.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "not-started"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "The service refused the command or could not be reached.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "The service's own account of why.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "failed"
+                }
+              },
+              "required": [
+                "state",
+                "detail"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "preview": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Plan"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Dropped": {
+          "description": "A profile left out of a closure, and what it would have needed.\n\nThe provider travels with the profile because a name on its own sends the\noperator looking for a fault. What they have is a stack not configured for\none of the two ways of downloading, which is a sentence rather than a word.",
+          "type": "object",
+          "properties": {
+            "needs": {
+              "description": "The provider it cannot run without.",
+              "$ref": "#/$defs/Protocol"
+            },
+            "profile": {
+              "description": "The profile that will not run.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "profile",
+            "needs"
+          ]
+        },
+        "Plan": {
+          "description": "What will be run, and what was left out.\n\nSerialisable because it is an answer in its own right: asking what a form\nwould do is a question a script asks as readily as a person, and the plan a\nlifecycle report carries is this same value rather than a retelling of it.",
+          "type": "object",
+          "properties": {
+            "dropped": {
+              "description": "Profiles the closure asked for that the configuration does not support.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Dropped"
+              }
+            },
+            "forms": {
+              "description": "The forms the operator named, in the order they named them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "profiles": {
+              "description": "The profiles to activate, sorted so the command is reproducible.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "services": {
+              "description": "The services those profiles start, in the order the stack declares them.\n\nA service belongs to exactly one profile, so a service two named forms\nboth reach is here once. That is a property of the manifest rather than\nof a pass over this list: the union is over profiles, and a service\nappearing twice is not a state this can hold.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "forms",
+            "profiles",
+            "services",
+            "dropped"
+          ]
+        },
+        "Protocol": {
+          "description": "A download provider a profile can depend on.\n\nSerialisable as well as readable, for the same reason [`Criticality`] is: it\nreaches an operator. A profile left out of a closure is only half reported\nwithout the provider it wanted.",
+          "oneOf": [
+            {
+              "description": "Needs a Usenet provider.",
+              "type": "string",
+              "const": "usenet"
+            },
+            {
+              "description": "Needs a VPN and a torrent client.",
+              "type": "string",
+              "const": "torrent"
+            }
+          ]
+        }
+      }
+    },
+    "pull": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ]
+    },
+    "quality": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/QualityReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Disposition": {
+          "description": "What a quality command did to the stored choice.",
+          "oneOf": [
+            {
+              "description": "The choice was only shown; nothing was asked to change.",
+              "type": "string",
+              "const": "shown"
+            },
+            {
+              "description": "The choice was recorded.",
+              "type": "string",
+              "const": "recorded"
+            },
+            {
+              "description": "The choice would be recorded; this was a rehearsal, so it was not.",
+              "type": "string",
+              "const": "rehearsed"
+            },
+            {
+              "description": "The choice needs transcoding this host cannot do well, so it was held\nrather than recorded without explicit confirmation.",
+              "type": "string",
+              "const": "held"
+            },
+            {
+              "description": "The recorded preset was re-asserted over the Recyclarr config, overwriting\na hand-edit where an ordinary run would have preserved it.",
+              "type": "string",
+              "const": "reapplied"
+            },
+            {
+              "description": "A re-assert that was a rehearsal: it reports whether it would overwrite a\nhand-edit, and writes nothing.",
+              "type": "string",
+              "const": "would-reapply"
+            }
+          ]
+        },
+        "MusicChoice": {
+          "description": "One audio-format choice in force, for media that has no resolution — the same\nquestion as a [`PresetChoice`], answered in format terms rather than resolution.",
+          "type": "object",
+          "properties": {
+            "format": {
+              "description": "The format's plain-language name.",
+              "type": "string"
+            },
+            "means": {
+              "description": "What it means, in the operator's terms.",
+              "type": "string"
+            },
+            "note": {
+              "description": "The practical caveat worth knowing — playing it, or finding it.",
+              "type": "string"
+            },
+            "scope": {
+              "description": "What this applies to — `music`.",
+              "type": "string"
+            },
+            "size_per_hour": {
+              "description": "Roughly how much disk an hour of it takes.",
+              "type": "string"
+            },
+            "targets": {
+              "description": "The audio format it targets, in plain terms.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "scope",
+            "format",
+            "means",
+            "targets",
+            "size_per_hour",
+            "note"
+          ]
+        },
+        "PresetChoice": {
+          "description": "One preset in force, and what it means for the media it applies to — the\noperator's question answered in their own terms, with no scoring vocabulary.",
+          "type": "object",
+          "properties": {
+            "means": {
+              "description": "What it means, in the operator's terms rather than the tool's.",
+              "type": "string"
+            },
+            "needs_transcoding_here": {
+              "description": "Whether this host would have to transcode it in software — the caution\nstated before a choice a household cannot smoothly play.",
+              "type": "boolean"
+            },
+            "preset": {
+              "description": "The preset's plain-language name.",
+              "type": "string"
+            },
+            "resolution": {
+              "description": "The resolution and encode it targets.",
+              "type": "string"
+            },
+            "scope": {
+              "description": "What this applies to: `everything`, or a specific media type.",
+              "type": "string"
+            },
+            "size_per_hour": {
+              "description": "Roughly how much disk an hour of it takes.",
+              "type": "string"
+            },
+            "transcoding": {
+              "description": "What playback costs, in plain terms.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "scope",
+            "preset",
+            "means",
+            "resolution",
+            "size_per_hour",
+            "transcoding",
+            "needs_transcoding_here"
+          ]
+        },
+        "QualityReport": {
+          "description": "The operator's quality choice, what each preset means, and what the command\ndid with it.",
+          "type": "object",
+          "properties": {
+            "choices": {
+              "description": "The global choice first, then each media type set apart from it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PresetChoice"
+              }
+            },
+            "customised": {
+              "description": "Whether the Recyclarr config has been hand-edited since lemonfiber wrote it —\nthe `customised` state, in which the preset is no longer authoritative until\nit is deliberately re-asserted. For a reapply, whether an edit was overwritten.",
+              "type": "boolean"
+            },
+            "disposition": {
+              "description": "What became of the choice.",
+              "$ref": "#/$defs/Disposition"
+            },
+            "music": {
+              "description": "The audio-format choice for music, where one is set — media that has no\nresolution, so it is reported apart from the resolution presets rather than\nforced into their shape.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MusicChoice"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "choices",
+            "customised",
+            "disposition"
+          ]
+        }
+      }
+    },
+    "reset": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/ResetReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "ResetReport": {
+          "description": "What a full reset did, or — until it is confirmed — would do: the operator edits it\nreverts back to lemonfiber's own state, and whether it was carried out or only shown.",
+          "type": "object",
+          "properties": {
+            "confirmed": {
+              "description": "Whether the reset was carried out, or only previewed pending confirmation.",
+              "type": "boolean"
+            },
+            "reverted": {
+              "description": "The operator's edits that were reverted — or, unconfirmed, that a reset would\nrevert — each with the diff of what is lost against what lemonfiber restores.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StackEdit"
+              }
+            },
+            "reverted_connections": {
+              "description": "The service connections whose drifted value was reverted to lemonfiber's — or,\nunconfirmed, would be — each named as it reads in a seed report.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "reverted",
+            "reverted_connections",
+            "confirmed"
+          ]
+        },
+        "StackEdit": {
+          "description": "A stack file the operator edited, preserved rather than overwritten, with the\nchange an upgrade would make shown against it.",
+          "type": "object",
+          "properties": {
+            "diff": {
+              "description": "The lines that differ between the operator's file and what lemonfiber would\nwrite — theirs marked `-`, lemonfiber's `+`, the matching head and tail left\nout. Empty where the two differ only in ways `lines` does not see.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file's path within the stack directory.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "diff"
+          ]
+        }
+      }
+    },
+    "seed": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Report"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Assessment": {
+          "description": "Whether a pass could assess drift — whether it had the record of what lemonfiber\nlast wrote to compare against.",
+          "oneOf": [
+            {
+              "description": "The expected-state record was read, or genuinely absent as on a first seed,\nso each connection was judged against it.",
+              "type": "string",
+              "const": "assessed"
+            },
+            {
+              "description": "The expected-state record was there but could not be read — lost. Drift could\nnot be judged this pass, and re-baselining from the current state is offered.",
+              "type": "string",
+              "const": "unassessable"
+            }
+          ]
+        },
+        "Report": {
+          "description": "What a seed pass amounted to.",
+          "type": "object",
+          "properties": {
+            "assessment": {
+              "description": "Whether drift could be assessed, or the expected-state record was lost.",
+              "$ref": "#/$defs/Assessment"
+            },
+            "wirings": {
+              "description": "Every connection attempted, and how each turned out.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Wiring"
+              }
+            }
+          },
+          "required": [
+            "wirings",
+            "assessment"
+          ]
+        },
+        "Severity": {
+          "description": "How serious a reported connection is.\n\nDrift is normal and usually the operator's own harmless edit, so it is reported\nas information rather than a failure. It escalates to a warning only when the\ndrift breaks the stack — a root folder pointing where nothing exists, a download\nclient that no longer answers — and a warning that cannot be acted on is noise,\nso a warning always names both what broke and what to do about it.",
+          "oneOf": [
+            {
+              "description": "Nothing is broken: the connection is settled, or its drift is the operator's\nown edit that still works.",
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "type": "string",
+                  "const": "informational"
+                }
+              },
+              "required": [
+                "severity"
+              ]
+            },
+            {
+              "description": "The connection breaks the stack. Both the breakage and a remediation are\nnamed, because a warning the operator cannot act on is noise.",
+              "type": "object",
+              "properties": {
+                "breakage": {
+                  "description": "What is broken, in the operator's terms.",
+                  "type": "string"
+                },
+                "remediation": {
+                  "description": "What to do about it.",
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string",
+                  "const": "warning"
+                }
+              },
+              "required": [
+                "severity",
+                "breakage",
+                "remediation"
+              ]
+            }
+          ]
+        },
+        "State": {
+          "description": "How one connection turned out after a seed pass.",
+          "oneOf": [
+            {
+              "description": "Written and read back.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "wired"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Present and correct; nothing was done.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "already-wired"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Present but operator-changed; preserved.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "drifted"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Present and still lemonfiber's own value, but behind lemonfiber's intent —\nit should be brought up to date. Reported until an update path applies it,\nand never overwritten in the meantime.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "stale"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Both the service's value and lemonfiber's intent moved away from the\nbaseline. The conflict is presented — the value the operator set beside the\none lemonfiber would write — and the value left as it is; lemonfiber does not\nresolve it on its own.\n\nBoth values are shown in the report and serialized with it, so a\nsecret-bearing field must not report a conflict through this variant: a\nconflict in a secret is to be reported without either value on show, and\nwants a masked shape of its own rather than this one.",
+              "type": "object",
+              "properties": {
+                "ours": {
+                  "description": "The value lemonfiber would write in its place.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "conflicted"
+                },
+                "yours": {
+                  "description": "The value the service now holds, as the operator set it; `None` where\nthey cleared it.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "state",
+                "ours"
+              ]
+            },
+            {
+              "description": "An operator's edit adopted as the accepted state, kept across seeds and\nrestores. Settled: lemonfiber leaves it as it is.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "adopted"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "A value the service already held that lemonfiber never wrote — the operator's\nown, pre-existing. Adopted as the baseline this run rather than reported as\ndrift, so an existing setup is taken on instead of flagged wholesale. Its\nvalue is not shown, so a secret among the adopted is never put on display.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "unmanaged"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Prerequisite unavailable; a later run will complete it.",
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "description": "Why it could not be attempted.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "skipped"
+                }
+              },
+              "required": [
+                "state",
+                "reason"
+              ]
+            },
+            {
+              "description": "Attempted and rejected, carrying the service's own words.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "What the service said.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "failed"
+                }
+              },
+              "required": [
+                "state",
+                "detail"
+              ]
+            },
+            {
+              "description": "Refused by lemonfiber's own policy, carrying the reason a re-run will not\nresolve — such as two \\*arrs pointed at one root folder, or a service that\ndoes not serve the API version this build speaks. Either way nothing it\nnames was written, whether it was refused before the write or the write\nitself found nothing to land in.",
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "description": "Why it was refused, in lemonfiber's own words.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "refused"
+                }
+              },
+              "required": [
+                "state",
+                "reason"
+              ]
+            }
+          ]
+        },
+        "Wiring": {
+          "description": "One connection, and how it turned out.",
+          "type": "object",
+          "properties": {
+            "connection": {
+              "description": "What was being connected, such as `SABnzbd into Sonarr`.",
+              "type": "string"
+            },
+            "severity": {
+              "description": "How serious the outcome is — information by default, a warning where the\nconnection breaks the stack.",
+              "$ref": "#/$defs/Severity"
+            },
+            "state": {
+              "description": "How it turned out.",
+              "$ref": "#/$defs/State"
+            }
+          },
+          "required": [
+            "connection",
+            "state",
+            "severity"
           ]
         }
       }
@@ -1367,6 +3341,920 @@
           "required": [
             "outcome",
             "protocols"
+          ]
+        }
+      }
+    },
+    "start": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ]
+    },
+    "status": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/StatusReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Condition": {
+          "description": "What a whole set of services amounts to.",
+          "oneOf": [
+            {
+              "description": "Nothing is running.",
+              "type": "string",
+              "const": "inactive"
+            },
+            {
+              "description": "Running, with at least one service in a state that wants attention.",
+              "type": "string",
+              "const": "degraded"
+            },
+            {
+              "description": "Some services are up and others are not.",
+              "type": "string",
+              "const": "partial"
+            },
+            {
+              "description": "Everything expected is up and answering.",
+              "type": "string",
+              "const": "active"
+            }
+          ]
+        },
+        "Criticality": {
+          "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
+          "oneOf": [
+            {
+              "description": "Its failure has consequences outside the machine.",
+              "type": "string",
+              "const": "critical"
+            },
+            {
+              "description": "The form does not work without it.",
+              "type": "string",
+              "const": "core"
+            },
+            {
+              "description": "The form works, badly.",
+              "type": "string",
+              "const": "important"
+            },
+            {
+              "description": "Makes things better.",
+              "type": "string",
+              "const": "enhancing"
+            },
+            {
+              "description": "Nice to have.",
+              "type": "string",
+              "const": "optional"
+            }
+          ]
+        },
+        "Service": {
+          "description": "One service, as it stands.",
+          "type": "object",
+          "properties": {
+            "criticality": {
+              "description": "How much its absence costs, so a summary can weigh it.",
+              "$ref": "#/$defs/Criticality"
+            },
+            "depends_on": {
+              "description": "The services it needs before it can work, as the manifest declares them.\nCarried so a failure can be attributed to the thing underneath it rather\nthan counted as one more independent thing wrong.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exit": {
+              "description": "How it exited, where it has exited.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "id": {
+              "description": "The service's identifier, which is also its Compose service name.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "profile": {
+              "description": "The profile that declared it.",
+              "type": "string"
+            },
+            "state": {
+              "description": "What it is doing.",
+              "$ref": "#/$defs/State"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "profile",
+            "state",
+            "criticality",
+            "depends_on"
+          ]
+        },
+        "State": {
+          "description": "What one service is actually doing.\n\nOrdered from worst to best, so a form's condition is the minimum across its\nservices and needs no comparison table. The declaration order is therefore\nload-bearing.",
+          "oneOf": [
+            {
+              "description": "Exited without being asked to, and is not coming back on its own.",
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "description": "Exiting and restarting repeatedly.",
+              "type": "string",
+              "const": "crash-looping"
+            },
+            {
+              "description": "Running, and its own probe says it is not working.",
+              "type": "string",
+              "const": "unhealthy"
+            },
+            {
+              "description": "No container exists.",
+              "type": "string",
+              "const": "absent"
+            },
+            {
+              "description": "A container exists and is not running.",
+              "type": "string",
+              "const": "stopped"
+            },
+            {
+              "description": "Running, and still inside its probe's start period.",
+              "type": "string",
+              "const": "starting"
+            },
+            {
+              "description": "Running, and declaring no probe by which to know more.\n\nDistinct from healthy on purpose. A service that cannot be asked is not\na service that answered, and rendering the two identically is how a\ndashboard comes to be believed about something it never checked.",
+              "type": "string",
+              "const": "running"
+            },
+            {
+              "description": "Running and passing its own probe.",
+              "type": "string",
+              "const": "healthy"
+            },
+            {
+              "description": "The operating system owns this one, not lemonfiber.",
+              "type": "string",
+              "const": "host-managed"
+            }
+          ]
+        },
+        "StatusReport": {
+          "description": "What each service is doing, and what that adds up to.",
+          "type": "object",
+          "properties": {
+            "condition": {
+              "description": "What the services amount to, as one word.",
+              "$ref": "#/$defs/Condition"
+            },
+            "forms": {
+              "description": "The forms asked about; empty means the whole stack was.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "services": {
+              "description": "Each service, worst first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Service"
+              }
+            }
+          },
+          "required": [
+            "forms",
+            "condition",
+            "services"
+          ]
+        }
+      }
+    },
+    "stuck": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/StuckReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Stage": {
+          "description": "A stage in an item's journey, ordered from \"nobody asked for it\" to \"playable\". The\ndeclaration order is the pipeline order, so one stage compares less than a later one.",
+          "oneOf": [
+            {
+              "description": "Nobody has asked for it — no \\*arr is monitoring it.",
+              "type": "string",
+              "const": "not-monitored"
+            },
+            {
+              "description": "Monitored, waiting to be searched for.",
+              "type": "string",
+              "const": "monitored"
+            },
+            {
+              "description": "A search is running.",
+              "type": "string",
+              "const": "searching"
+            },
+            {
+              "description": "Releases were found by an indexer.",
+              "type": "string",
+              "const": "found"
+            },
+            {
+              "description": "A release was sent to the download client.",
+              "type": "string",
+              "const": "grabbed"
+            },
+            {
+              "description": "The download is in progress.",
+              "type": "string",
+              "const": "downloading"
+            },
+            {
+              "description": "The download finished.",
+              "type": "string",
+              "const": "downloaded"
+            },
+            {
+              "description": "The \\*arr is importing it to the library.",
+              "type": "string",
+              "const": "importing"
+            },
+            {
+              "description": "It was imported to the library on disk.",
+              "type": "string",
+              "const": "imported"
+            },
+            {
+              "description": "It is visible and playable in the media server.",
+              "type": "string",
+              "const": "available"
+            }
+          ]
+        },
+        "StuckEntry": {
+          "description": "One stuck item queue health found, named so it links straight to its own trace.",
+          "type": "object",
+          "properties": {
+            "service": {
+              "description": "The \\*arr whose queue is holding it.",
+              "type": "string"
+            },
+            "stage": {
+              "description": "The stage its download is stuck at.",
+              "$ref": "#/$defs/Stage"
+            },
+            "title": {
+              "description": "The item's title — the term a `trace` searches by.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "service",
+            "stage"
+          ]
+        },
+        "StuckReport": {
+          "description": "The items whose downloads are stuck, across the \\*arrs — the landing point for \"N\nitems stuck\" that queue health reports, each entry naming the item so the operator\ngoes straight to its per-item trace rather than to a count to investigate.",
+          "type": "object",
+          "properties": {
+            "incomplete": {
+              "description": "Whether an \\*arr's queue could not be read, so the list may be short — reported\nrather than read as \"nothing stuck\", the same honesty a trace keeps.",
+              "type": "boolean"
+            },
+            "items": {
+              "description": "The stuck items, each linkable to its trace.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StuckEntry"
+              }
+            }
+          },
+          "required": [
+            "items",
+            "incomplete"
+          ]
+        }
+      }
+    },
+    "trace": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/TraceReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Confidence": {
+          "description": "How sure the correlation behind a trace is — a release renamed between services can\nonly be matched fuzzily, and a guess presented as fact is worse than a marked one.",
+          "oneOf": [
+            {
+              "description": "Joined on identifiers the services agree on.",
+              "type": "string",
+              "const": "certain"
+            },
+            {
+              "description": "Joined by fuzzy matching; the trace may not be the item asked for.",
+              "type": "string",
+              "const": "uncertain"
+            }
+          ]
+        },
+        "Coverage": {
+          "description": "How much of a traced series is here, season by season — the aggregate that turns a\nsingle furthest stage into an answer about the whole. The counts are of parts someone\nasked for; what nobody asked for is reported beside them, never folded in.",
+          "type": "object",
+          "properties": {
+            "have": {
+              "description": "How many wanted parts are here, across every season.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "seasons": {
+              "description": "Each season, in order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SeasonCoverage"
+              }
+            },
+            "unmonitored": {
+              "description": "How many parts nobody asked for, across every season.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "wanted": {
+              "description": "How many parts were asked for, across every season.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "seasons",
+            "have",
+            "wanted",
+            "unmonitored"
+          ]
+        },
+        "Outcome": {
+          "description": "A notable thing that happened to an item, as an \\*arr's history records it. Where the\nfurthest stage answers \"how far did it get?\", the sequence of outcomes answers \"what\nhas been tried?\" — a release grabbed more than once, a download that failed and was\ntried again, a file imported and later removed. Repeated failed grabs are a pattern\nworth seeing, not something a single furthest-stage reading can show.",
+          "oneOf": [
+            {
+              "description": "A release was sent to the download client.",
+              "type": "string",
+              "const": "grabbed"
+            },
+            {
+              "description": "The download client failed the release it was handed.",
+              "type": "string",
+              "const": "download-failed"
+            },
+            {
+              "description": "The item was imported to the library on disk.",
+              "type": "string",
+              "const": "imported"
+            },
+            {
+              "description": "The item's file was removed.",
+              "type": "string",
+              "const": "removed"
+            }
+          ]
+        },
+        "Part": {
+          "description": "One part of a traced item — an episode of a series. A film has no parts: the item is\nthe whole, and a trace of it says all there is to say. A series does not, which is the\ngap this closes: \"the show is imported\" is true the moment one episode lands, and reads\nas done while nine are still missing.",
+          "type": "object",
+          "properties": {
+            "number": {
+              "description": "Its number within that season.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "season": {
+              "description": "Which season it belongs to.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "stage": {
+              "description": "How far this one part got, on the same scale as the item as a whole.",
+              "$ref": "#/$defs/Stage"
+            },
+            "title": {
+              "description": "Its title, as a person would name it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "season",
+            "number",
+            "title",
+            "stage"
+          ]
+        },
+        "SeasonCoverage": {
+          "description": "How much of one season is actually here, and what is outstanding — the season-level\nanswer, which for a series is the one an operator can act on.",
+          "type": "object",
+          "properties": {
+            "have": {
+              "description": "How many of the wanted parts are here.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "outstanding": {
+              "description": "The wanted parts that are not here yet, each carrying the stage it rests at, so\none that stalled is told apart from one still downloading.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Part"
+              }
+            },
+            "season": {
+              "description": "The season number. Season zero is where a service files specials.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "unmonitored": {
+              "description": "How many parts nobody asked for — unmonitored and not on disk.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "wanted": {
+              "description": "How many parts were asked for, or are already here — the denominator. Parts\nnobody asked for are counted separately rather than inflating this, so a season\nwith every wanted episode present reads as complete even where specials are not.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "season",
+            "have",
+            "wanted",
+            "unmonitored",
+            "outstanding"
+          ]
+        },
+        "Stage": {
+          "description": "A stage in an item's journey, ordered from \"nobody asked for it\" to \"playable\". The\ndeclaration order is the pipeline order, so one stage compares less than a later one.",
+          "oneOf": [
+            {
+              "description": "Nobody has asked for it — no \\*arr is monitoring it.",
+              "type": "string",
+              "const": "not-monitored"
+            },
+            {
+              "description": "Monitored, waiting to be searched for.",
+              "type": "string",
+              "const": "monitored"
+            },
+            {
+              "description": "A search is running.",
+              "type": "string",
+              "const": "searching"
+            },
+            {
+              "description": "Releases were found by an indexer.",
+              "type": "string",
+              "const": "found"
+            },
+            {
+              "description": "A release was sent to the download client.",
+              "type": "string",
+              "const": "grabbed"
+            },
+            {
+              "description": "The download is in progress.",
+              "type": "string",
+              "const": "downloading"
+            },
+            {
+              "description": "The download finished.",
+              "type": "string",
+              "const": "downloaded"
+            },
+            {
+              "description": "The \\*arr is importing it to the library.",
+              "type": "string",
+              "const": "importing"
+            },
+            {
+              "description": "It was imported to the library on disk.",
+              "type": "string",
+              "const": "imported"
+            },
+            {
+              "description": "It is visible and playable in the media server.",
+              "type": "string",
+              "const": "available"
+            }
+          ]
+        },
+        "TraceMoment": {
+          "description": "One moment in a traced item's history: what happened and when. Where [`TraceStage`]\nis the linear progress, this is the log an \\*arr kept — the grabs, the failed\ndownloads, the import and any later removal — so a repeated attempt is seen as the\npattern it is rather than flattened to a single furthest stage.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When the service reported it.",
+              "type": "string"
+            },
+            "outcome": {
+              "description": "What happened.",
+              "$ref": "#/$defs/Outcome"
+            }
+          },
+          "required": [
+            "outcome",
+            "at"
+          ]
+        },
+        "TraceReport": {
+          "description": "Where one item is in the pipeline: how far it got, why it stopped if it did, and the\nstages it passed through — the answer to \"where is my show?\".",
+          "type": "object",
+          "properties": {
+            "confidence": {
+              "description": "How sure the trace is of the item it followed.",
+              "$ref": "#/$defs/Confidence"
+            },
+            "coverage": {
+              "description": "How much of the item is actually here, season by season — present for an item\nmade of parts, absent for a film, which is the whole item and has none.\n\nThe furthest stage alone cannot answer this: a series is \"imported\" the moment one\nepisode lands, which reads as done while the rest are missing.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Coverage"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "findings": {
+              "description": "Disagreements between the services about this item, each in plain language — a\nmedia server holding what no service is monitoring, and the like. Orthogonal to\nthe linear pipeline: not where the item got to, but where two services' views of\nit contradict, surfaced rather than silently reconciled.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "furthest": {
+              "description": "The furthest stage the item reached.",
+              "$ref": "#/$defs/Stage"
+            },
+            "history": {
+              "description": "The notable events in its history, oldest first — the grabs, failed downloads,\nimports and removals. Repeated attempts show here as the pattern they are, which\nthe single furthest stage cannot.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TraceMoment"
+              }
+            },
+            "item": {
+              "description": "The term the item was searched for by.",
+              "type": "string"
+            },
+            "matched": {
+              "description": "Whether a monitored item matched the term at all — a false here is itself the\nanswer: nobody asked for it.",
+              "type": "boolean"
+            },
+            "stages": {
+              "description": "The stages it passed through, in order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TraceStage"
+              }
+            },
+            "stall": {
+              "description": "Why it stopped, where it plainly has — or absent where it is progressing or done.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "item",
+            "matched",
+            "furthest",
+            "stages",
+            "history",
+            "confidence",
+            "findings"
+          ]
+        },
+        "TraceStage": {
+          "description": "One stage a traced item reached, named as the operator would read it: the stage,\nthe service that recorded it, and when.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When it happened, as the service reported it — absent for a stage inferred\nrather than timed, such as being monitored.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "service": {
+              "description": "The service that recorded it.",
+              "type": "string"
+            },
+            "stage": {
+              "description": "The stage reached.",
+              "$ref": "#/$defs/Stage"
+            }
+          },
+          "required": [
+            "stage",
+            "service"
+          ]
+        }
+      }
+    },
+    "upgrade": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/UpgradeReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Triggered": {
+          "description": "What became of asking one service to re-search its existing content.",
+          "oneOf": [
+            {
+              "description": "The re-search was accepted and now runs in the service's background.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "started"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "The service had not finished starting — no key yet — so nothing was asked of\nit; running the upgrade again once it is up will reach it.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "not-started"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "The service refused the command or could not be reached.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "The service's own account of why.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "failed"
+                }
+              },
+              "required": [
+                "state",
+                "detail"
+              ]
+            }
+          ]
+        },
+        "UpgradeMedia": {
+          "description": "One media type an upgrade covers: its chosen quality, that quality's cost, and —\nonce confirmed — what became of asking its service to re-search.\n\nReported per media type rather than as one figure, because each type carries its\nown preset and so its own cost: film at maximum and television at space-saving are\nupgraded to different bars, and a single number would misstate one of them.",
+          "type": "object",
+          "properties": {
+            "media_type": {
+              "description": "The media type — `tv` or `movies`.",
+              "type": "string"
+            },
+            "outcome": {
+              "description": "What became of the re-search, or `None` where the upgrade was not confirmed\nand only the cost was stated.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Triggered"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "preset": {
+              "description": "The preset in force for it.",
+              "type": "string"
+            },
+            "size_per_hour": {
+              "description": "Roughly what an hour of it costs at that preset.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "media_type",
+            "preset",
+            "size_per_hour"
+          ]
+        },
+        "UpgradeReport": {
+          "description": "What upgrading existing content did, or — unconfirmed — would do.\n\nUpgrading re-acquires the existing library at the chosen quality, which is a\nlarge, bandwidth-expensive operation, so it is a separate explicit action whose\ncost is stated before it runs and which does nothing until confirmed. Each *arr\nre-searches against its own current cutoff, so the report speaks per media type\nrather than asserting one preset across the library.",
+          "type": "object",
+          "properties": {
+            "confirmed": {
+              "description": "Whether the operator confirmed; without it nothing was triggered, only the\ncost stated.",
+              "type": "boolean"
+            },
+            "media": {
+              "description": "Per media type: its preset, that preset's cost, and — confirmed — the outcome.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/UpgradeMedia"
+              }
+            }
+          },
+          "required": [
+            "confirmed",
+            "media"
+          ]
+        }
+      }
+    },
+    "version": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/VersionReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "VersionReport": {
+          "description": "What versions are in play: the binary, and the stack it can operate.",
+          "type": "object",
+          "properties": {
+            "binary": {
+              "description": "The running binary's version.",
+              "type": "string"
+            },
+            "compose": {
+              "description": "What the container engine reports, when it could be asked.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stack": {
+              "description": "The version of the stack this build operates.",
+              "type": "string"
+            },
+            "supported_schema": {
+              "description": "The manifest schema generations this build reads.",
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0
+              }
+            }
+          },
+          "required": [
+            "binary",
+            "supported_schema",
+            "stack"
           ]
         }
       }

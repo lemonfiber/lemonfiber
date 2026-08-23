@@ -8,6 +8,13 @@
 //! The shapes are generated rather than written, and regenerating must
 //! produce no diff — a serialised type that changes without the artefact
 //! changing with it fails the build instead of reaching an SDK.
+//!
+//! A kind is described by the report it carries rather than by the [`Outcome`]
+//! union those reports belong to. `Outcome` serialises as the report itself, with
+//! no variant name around it, so the union's own shape is never what reaches a
+//! client — and a schema derived from it would describe a document nothing writes.
+//!
+//! [`Outcome`]: crate::app::Outcome
 
 use std::collections::BTreeMap;
 
@@ -17,10 +24,13 @@ use serde::Serialize;
 use crate::dashboard::Snapshot;
 use crate::glossary::Term;
 use crate::model::{
-    kind, Envelope, SetupReport, SupervisionReport, WalkthroughReport, API_VERSION,
+    kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
+    MusicReport, QualityReport, ResetReport, SetupReport, StatusReport, StuckReport,
+    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, API_VERSION,
 };
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
+use crate::stack::closure::Plan;
 
 /// Where the generated artefact is kept, relative to the workspace root.
 pub const CONTRACT_PATH: &str = "contract/web-api.contract.json";
@@ -42,10 +52,45 @@ impl Contract {
     #[must_use]
     pub fn describe() -> Self {
         let mut kinds = BTreeMap::new();
+        kinds.insert(kind::CONFIG.to_owned(), schema_for!(Envelope<ConfigReport>));
         kinds.insert(kind::DASHBOARD.to_owned(), schema_for!(Envelope<Snapshot>));
+        kinds.insert(kind::DOCTOR.to_owned(), schema_for!(Envelope<DoctorReport>));
         kinds.insert(kind::ERROR.to_owned(), schema_for!(Envelope<Problem>));
+        kinds.insert(kind::FORMS.to_owned(), schema_for!(Envelope<FormsReport>));
+        kinds.insert(
+            kind::HOUSEHOLD.to_owned(),
+            schema_for!(Envelope<HouseholdReport>),
+        );
+        kinds.insert(
+            kind::LIFECYCLE.to_owned(),
+            schema_for!(Envelope<LifecycleReport>),
+        );
         kinds.insert(kind::LOG.to_owned(), schema_for!(Envelope<LogLine>));
+        kinds.insert(kind::MUSIC.to_owned(), schema_for!(Envelope<MusicReport>));
+        kinds.insert(kind::PREVIEW.to_owned(), schema_for!(Envelope<Plan>));
+        kinds.insert(kind::PULL.to_owned(), schema_for!(Envelope<String>));
+        kinds.insert(
+            kind::QUALITY.to_owned(),
+            schema_for!(Envelope<QualityReport>),
+        );
+        kinds.insert(kind::RESET.to_owned(), schema_for!(Envelope<ResetReport>));
+        kinds.insert(
+            kind::SEED.to_owned(),
+            schema_for!(Envelope<crate::seed::Report>),
+        );
         kinds.insert(kind::SETUP.to_owned(), schema_for!(Envelope<SetupReport>));
+        kinds.insert(kind::START.to_owned(), schema_for!(Envelope<String>));
+        kinds.insert(kind::STATUS.to_owned(), schema_for!(Envelope<StatusReport>));
+        kinds.insert(kind::STUCK.to_owned(), schema_for!(Envelope<StuckReport>));
+        kinds.insert(kind::TRACE.to_owned(), schema_for!(Envelope<TraceReport>));
+        kinds.insert(
+            kind::UPGRADE.to_owned(),
+            schema_for!(Envelope<UpgradeReport>),
+        );
+        kinds.insert(
+            kind::VERSION.to_owned(),
+            schema_for!(Envelope<VersionReport>),
+        );
         kinds.insert(
             kind::WALKTHROUGH.to_owned(),
             schema_for!(Envelope<WalkthroughReport>),
@@ -75,12 +120,141 @@ impl Contract {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeSet, HashSet};
+
+    use serde_json::Value;
+
     use super::{Contract, CONTRACT_PATH};
+    use crate::app::Outcome;
+    use crate::model::{
+        ConfigReport, DoctorReport, FormsReport, HouseholdReport, LifecycleReport, MusicReport,
+        QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
+        VersionReport,
+    };
+    use crate::stack::closure::Plan;
+
+    /// Arms in `Outcome::envelope`, so a variant added without a sample here fails.
+    const OUTCOMES: usize = 15;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         std::fs::read_to_string(root.join(CONTRACT_PATH)).ok()
+    }
+
+    /// One sample of every outcome, so each kind's description can be held against
+    /// the document that kind actually writes.
+    fn samples() -> Vec<Outcome> {
+        vec![
+            Outcome::Version(VersionReport {
+                binary: "0.1.0".to_owned(),
+                supported_schema: vec![1],
+                stack: "0.1.0".to_owned(),
+                compose: None,
+            }),
+            Outcome::Forms(FormsReport { forms: Vec::new() }),
+            Outcome::Preview(plan()),
+            Outcome::Lifecycle(LifecycleReport {
+                action: "up".to_owned(),
+                plan: plan(),
+                command: vec!["docker".to_owned()],
+                rehearsed: false,
+                status: Some(0),
+                services: Vec::new(),
+                condition: Some(crate::docker::Condition::Active),
+                stack_edits: Vec::new(),
+                forwarding: None,
+                switched: None,
+            }),
+            Outcome::Config(ConfigReport {
+                settings: Vec::new(),
+                changed: false,
+                rehearsed: false,
+                consequence: None,
+            }),
+            Outcome::Quality(QualityReport::default()),
+            Outcome::Upgrade(UpgradeReport::default()),
+            Outcome::Music(MusicReport::default()),
+            Outcome::Trace(TraceReport::default()),
+            Outcome::Household(HouseholdReport::default()),
+            Outcome::Stuck(StuckReport::default()),
+            Outcome::Status(StatusReport {
+                forms: Vec::new(),
+                condition: crate::docker::Condition::Inactive,
+                services: Vec::new(),
+            }),
+            Outcome::Doctor(DoctorReport {
+                overall: crate::doctor::Overall::Healthy,
+                findings: Vec::new(),
+            }),
+            Outcome::Seed(crate::seed::Report::default()),
+            Outcome::Reset(ResetReport::default()),
+        ]
+    }
+
+    /// An empty closure, which is all the shape comparison needs of one.
+    fn plan() -> Plan {
+        Plan {
+            forms: Vec::new(),
+            profiles: std::collections::BTreeSet::new(),
+            services: Vec::new(),
+            dropped: Vec::new(),
+        }
+    }
+
+    /// The schema the contract publishes for one kind's `data`, with its `$ref`
+    /// resolved to the definition it names.
+    fn payload(kind: &str) -> Value {
+        let contract = serde_json::to_value(Contract::describe()).unwrap_or_default();
+        let schema = contract
+            .pointer(&format!("/kinds/{kind}"))
+            .cloned()
+            .unwrap_or_default();
+        let reference = schema
+            .pointer("/properties/data/$ref")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        schema
+            .pointer(reference.trim_start_matches('#'))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The fields a payload schema describes.
+    fn described_fields(payload: &Value) -> BTreeSet<String> {
+        payload
+            .get("properties")
+            .and_then(Value::as_object)
+            .map(|fields| fields.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// The fields a payload schema insists on.
+    fn required_fields(payload: &Value) -> BTreeSet<String> {
+        payload
+            .get("required")
+            .and_then(Value::as_array)
+            .map(|names| {
+                names
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// The kind an outcome names itself, and the fields its `data` actually holds.
+    fn written(outcome: Outcome) -> (String, BTreeSet<String>) {
+        let envelope = outcome.envelope();
+        let named = envelope.kind.to_owned();
+        let document = serde_json::to_value(envelope).unwrap_or_default();
+        let fields = document
+            .pointer("/data")
+            .and_then(Value::as_object)
+            .map(|fields| fields.keys().cloned().collect())
+            .unwrap_or_default();
+        (named, fields)
     }
 
     /// The committed artefact and the types must agree.
@@ -110,6 +284,35 @@ mod tests {
         emitted.sort_unstable();
 
         assert_eq!(described, emitted);
+    }
+
+    /// A kind's schema must describe the document that kind writes.
+    ///
+    /// The two halves are generated from different things — the schema from the
+    /// report type, the document from `Outcome`'s hand-written `Serialize` — so a
+    /// variant that starts wrapping its report, or a report whose schema stops
+    /// tracking it, shows up here rather than in a client that cannot parse the reply.
+    #[test]
+    fn each_outcome_is_described_as_the_document_it_writes() {
+        let mut seen: HashSet<String> = HashSet::new();
+        for outcome in samples() {
+            let (kind, fields) = written(outcome);
+            let payload = payload(&kind);
+            let described = described_fields(&payload);
+            let required = required_fields(&payload);
+
+            assert!(
+                fields.is_subset(&described),
+                "{kind} writes fields the contract does not describe: {fields:?} against {described:?}"
+            );
+            assert!(
+                required.is_subset(&fields),
+                "{kind} omits fields the contract requires: {required:?} against {fields:?}"
+            );
+            seen.insert(kind);
+        }
+
+        assert_eq!(seen.len(), OUTCOMES, "{seen:?}");
     }
 
     #[test]

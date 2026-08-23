@@ -7,7 +7,7 @@
 use serde::Serialize;
 
 /// What versions are in play: the binary, and the stack it can operate.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct VersionReport {
     /// The running binary's version.
     pub binary: String,
@@ -24,7 +24,7 @@ pub struct VersionReport {
 /// The manifest's own words rather than lemonfiber's: forms come from the stack, so a
 /// stack of somebody's own names and describes them however it likes, and a listing that
 /// paraphrased would be describing a different stack from the one being run.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct FormReport {
     /// What to type to start it.
     pub id: String,
@@ -40,14 +40,14 @@ pub struct FormReport {
 }
 
 /// Every form this stack declares.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct FormsReport {
     /// The forms, in the order the stack declares them.
     pub forms: Vec<FormReport>,
 }
 
 /// One setting, as it is safe to show.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct SettingReport {
     /// The setting's name.
     pub key: String,
@@ -58,7 +58,7 @@ pub struct SettingReport {
 }
 
 /// The answer to a configuration command.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct ConfigReport {
     /// The settings asked about — one for a lookup, all of them for a listing.
     pub settings: Vec<SettingReport>,
@@ -76,7 +76,7 @@ pub struct ConfigReport {
 }
 
 /// What a quality command did to the stored choice.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Disposition {
     /// The choice was only shown; nothing was asked to change.

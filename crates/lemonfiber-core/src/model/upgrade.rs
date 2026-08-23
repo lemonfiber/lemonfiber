@@ -7,7 +7,7 @@
 use serde::Serialize;
 
 /// What became of asking one service to re-search its existing content.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "state", rename_all = "kebab-case")]
 pub enum Triggered {
     /// The re-search was accepted and now runs in the service's background.
@@ -28,7 +28,7 @@ pub enum Triggered {
 /// Reported per media type rather than as one figure, because each type carries its
 /// own preset and so its own cost: film at maximum and television at space-saving are
 /// upgraded to different bars, and a single number would misstate one of them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct UpgradeMedia {
     /// The media type — `tv` or `movies`.
     pub media_type: String,
@@ -48,7 +48,7 @@ pub struct UpgradeMedia {
 /// cost is stated before it runs and which does nothing until confirmed. Each *arr
 /// re-searches against its own current cutoff, so the report speaks per media type
 /// rather than asserting one preset across the library.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct UpgradeReport {
     /// Whether the operator confirmed; without it nothing was triggered, only the
     /// cost stated.

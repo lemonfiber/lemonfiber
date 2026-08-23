@@ -13,7 +13,7 @@ use crate::audio::Format;
 use crate::doctor::Category;
 use crate::error::{Code, Problem};
 use crate::model::{
-    ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
+    kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
     MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
     VersionReport,
 };
@@ -268,21 +268,21 @@ impl Outcome {
     #[must_use]
     pub fn envelope(self) -> Envelope<Self> {
         let kind = match self {
-            Self::Version(_) => "version",
-            Self::Forms(_) => "forms",
-            Self::Preview(_) => "preview",
-            Self::Lifecycle(_) => "lifecycle",
-            Self::Config(_) => "config",
-            Self::Quality(_) => "quality",
-            Self::Upgrade(_) => "upgrade",
-            Self::Music(_) => "music",
-            Self::Trace(_) => "trace",
-            Self::Household(_) => "household",
-            Self::Stuck(_) => "stuck",
-            Self::Status(_) => "status",
-            Self::Doctor(_) => "doctor",
-            Self::Seed(_) => "seed",
-            Self::Reset(_) => "reset",
+            Self::Version(_) => kind::VERSION,
+            Self::Forms(_) => kind::FORMS,
+            Self::Preview(_) => kind::PREVIEW,
+            Self::Lifecycle(_) => kind::LIFECYCLE,
+            Self::Config(_) => kind::CONFIG,
+            Self::Quality(_) => kind::QUALITY,
+            Self::Upgrade(_) => kind::UPGRADE,
+            Self::Music(_) => kind::MUSIC,
+            Self::Trace(_) => kind::TRACE,
+            Self::Household(_) => kind::HOUSEHOLD,
+            Self::Stuck(_) => kind::STUCK,
+            Self::Status(_) => kind::STATUS,
+            Self::Doctor(_) => kind::DOCTOR,
+            Self::Seed(_) => kind::SEED,
+            Self::Reset(_) => kind::RESET,
         };
         Envelope::new(kind, self)
     }

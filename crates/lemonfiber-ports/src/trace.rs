@@ -21,7 +21,19 @@ pub const HISTORY_HORIZON: usize = 100;
 
 /// A stage in an item's journey, ordered from "nobody asked for it" to "playable". The
 /// declaration order is the pipeline order, so one stage compares less than a later one.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Stage {
     /// Nobody has asked for it — no \*arr is monitoring it.
@@ -49,7 +61,9 @@ pub enum Stage {
 
 /// How sure the correlation behind a trace is — a release renamed between services can
 /// only be matched fuzzily, and a guess presented as fact is worse than a marked one.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Confidence {
     /// Joined on identifiers the services agree on.
@@ -189,7 +203,7 @@ impl Stage {
 /// the whole, and a trace of it says all there is to say. A series does not, which is the
 /// gap this closes: "the show is imported" is true the moment one episode lands, and reads
 /// as done while nine are still missing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Part {
     /// Which season it belongs to.
     pub season: u32,
@@ -219,7 +233,7 @@ impl Part {
 
 /// How much of one season is actually here, and what is outstanding — the season-level
 /// answer, which for a series is the one an operator can act on.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct SeasonCoverage {
     /// The season number. Season zero is where a service files specials.
     pub season: u32,
@@ -239,7 +253,7 @@ pub struct SeasonCoverage {
 /// How much of a traced series is here, season by season — the aggregate that turns a
 /// single furthest stage into an answer about the whole. The counts are of parts someone
 /// asked for; what nobody asked for is reported beside them, never folded in.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Coverage {
     /// Each season, in order.
     pub seasons: Vec<SeasonCoverage>,
@@ -308,7 +322,7 @@ impl SeasonCoverage {
 /// has been tried?" — a release grabbed more than once, a download that failed and was
 /// tried again, a file imported and later removed. Repeated failed grabs are a pattern
 /// worth seeing, not something a single furthest-stage reading can show.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Outcome {
     /// A release was sent to the download client.

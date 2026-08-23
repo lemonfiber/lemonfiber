@@ -27,7 +27,7 @@ use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 /// Serialisable because it is an answer in its own right: asking what a form
 /// would do is a question a script asks as readily as a person, and the plan a
 /// lifecycle report carries is this same value rather than a retelling of it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Plan {
     /// The forms the operator named, in the order they named them.
     pub forms: Vec<String>,
@@ -49,7 +49,7 @@ pub struct Plan {
 /// The provider travels with the profile because a name on its own sends the
 /// operator looking for a fault. What they have is a stack not configured for
 /// one of the two ways of downloading, which is a sentence rather than a word.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Dropped {
     /// The profile that will not run.
     pub profile: String,

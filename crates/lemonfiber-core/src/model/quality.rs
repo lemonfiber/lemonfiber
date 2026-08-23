@@ -10,7 +10,7 @@ use super::{Disposition, Triggered};
 
 /// One preset in force, and what it means for the media it applies to — the
 /// operator's question answered in their own terms, with no scoring vocabulary.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct PresetChoice {
     /// What this applies to: `everything`, or a specific media type.
     pub scope: String,
@@ -31,7 +31,7 @@ pub struct PresetChoice {
 
 /// One audio-format choice in force, for media that has no resolution — the same
 /// question as a [`PresetChoice`], answered in format terms rather than resolution.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MusicChoice {
     /// What this applies to — `music`.
     pub scope: String,
@@ -49,7 +49,7 @@ pub struct MusicChoice {
 
 /// The operator's quality choice, what each preset means, and what the command
 /// did with it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct QualityReport {
     /// The global choice first, then each media type set apart from it.
     pub choices: Vec<PresetChoice>,
@@ -72,7 +72,7 @@ pub struct QualityReport {
 /// Music has no resolution and no community profile to lean on, so unlike a resolution
 /// preset the choice is carried straight to the service through its API. The choice is
 /// still recorded first, so it is remembered even when the service cannot be reached.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MusicReport {
     /// The format chosen, what it means, and what it costs.
     pub choice: MusicChoice,

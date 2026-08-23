@@ -8,7 +8,7 @@ use serde::Serialize;
 
 /// One stage a traced item reached, named as the operator would read it: the stage,
 /// the service that recorded it, and when.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct TraceStage {
     /// The stage reached.
     pub stage: crate::trace::Stage,
@@ -23,7 +23,7 @@ pub struct TraceStage {
 /// is the linear progress, this is the log an \*arr kept — the grabs, the failed
 /// downloads, the import and any later removal — so a repeated attempt is seen as the
 /// pattern it is rather than flattened to a single furthest stage.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct TraceMoment {
     /// What happened.
     pub outcome: crate::trace::Outcome,
@@ -33,7 +33,7 @@ pub struct TraceMoment {
 
 /// Where one item is in the pipeline: how far it got, why it stopped if it did, and the
 /// stages it passed through — the answer to "where is my show?".
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct TraceReport {
     /// The term the item was searched for by.
     pub item: String,

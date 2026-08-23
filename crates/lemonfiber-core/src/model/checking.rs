@@ -7,7 +7,7 @@
 use serde::Serialize;
 
 /// What a diagnostic run found, and what it amounts to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct DoctorReport {
     /// What the findings amount to, as one word.
     pub overall: crate::doctor::Overall,
@@ -28,7 +28,7 @@ pub struct SupervisionReport {
 }
 
 /// What each service is doing, and what that adds up to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct StatusReport {
     /// The forms asked about; empty means the whole stack was.
     pub forms: Vec<String>,

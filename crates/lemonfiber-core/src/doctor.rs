@@ -41,7 +41,7 @@ use crate::repair::{Attempt, Repair, Writing};
 /// These are the diagnostic categories the product recognises; the checks that
 /// fill each one arrive over time, so a category may name more than lemonfiber
 /// can yet establish.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Category {
     /// Docker present, the daemon reachable, the platform understood.
@@ -109,7 +109,7 @@ impl Category {
 /// "Could not check" (`Unverified`) is its own variant rather than a level of
 /// severity, so a check that could not run can never be mistaken for one that
 /// passed — the dishonesty this whole subsystem exists to prevent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum Verdict {
     /// Verified working, with the evidence worth showing.
@@ -136,7 +136,7 @@ pub enum Verdict {
 }
 
 /// One thing a check established, and how it turned out.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Finding {
     /// A stable identifier for the thing checked, such as `vpn.egress-match`.
     pub check: String,
@@ -203,7 +203,7 @@ impl Finding {
 }
 
 /// What a run's findings amount to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Overall {
     /// Everything that ran passed.
