@@ -132,7 +132,7 @@ happens to do.
 ### Checked against real Compose
 
 The generated invocations were run through `docker compose … config --quiet`
-against the real media-stack checkout for `library`, `search`, `tv` and `full`;
+against the real lemonfiber-media-stack checkout for `library`, `search`, `tv` and `full`;
 all four resolve. The golden files pin the argv, and that check is what says the
 argv is the *right* one — worth repeating by hand when the shape changes.
 
