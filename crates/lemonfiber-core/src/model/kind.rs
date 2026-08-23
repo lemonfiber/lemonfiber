@@ -4,6 +4,8 @@
 //! in the contract is two literals that can drift, and the drift is a contract
 //! describing a kind nobody emits.
 
+/// One moment of what the stack is doing, as the dashboard assembles it.
+pub const DASHBOARD: &str = "dashboard";
 /// A command could not do what was asked.
 pub const ERROR: &str = "error";
 /// One line of a service's log.
@@ -18,4 +20,4 @@ pub const WATCH: &str = "watch";
 pub const WORD: &str = "word";
 
 /// Every kind, so the contract cannot describe one that is never emitted.
-pub const ALL: &[&str] = &[ERROR, LOG, SETUP, WALKTHROUGH, WATCH, WORD];
+pub const ALL: &[&str] = &[DASHBOARD, ERROR, LOG, SETUP, WALKTHROUGH, WATCH, WORD];

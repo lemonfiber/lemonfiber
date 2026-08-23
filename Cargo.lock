@@ -1131,8 +1131,10 @@ dependencies = [
 name = "lemonfiber-api"
 version = "0.8.0"
 dependencies = [
+ "async-trait",
  "axum",
  "form_urlencoded",
+ "futures-util",
  "lemonfiber-core",
  "lemonfiber-fixtures",
  "serde",
@@ -1182,6 +1184,7 @@ dependencies = [
 name = "lemonfiber-manifest"
 version = "0.8.0"
 dependencies = [
+ "schemars",
  "serde",
  "thiserror",
  "toml",

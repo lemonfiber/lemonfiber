@@ -1,6 +1,1036 @@
 {
   "api_version": 1,
   "kinds": {
+    "dashboard": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Snapshot"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Affected": {
+          "description": "One thing that is wrong, as the expanded summary lists it.",
+          "type": "object",
+          "properties": {
+            "check": {
+              "description": "The check that raised it.",
+              "type": "string"
+            },
+            "downstream": {
+              "description": "What is also wrong because of this, counted with it rather than again.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "remedies": {
+              "description": "What to do about it, most likely first.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "severity": {
+              "description": "How bad it is.",
+              "$ref": "#/$defs/Severity"
+            },
+            "summary": {
+              "description": "What is wrong, in one line.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "check",
+            "severity",
+            "summary",
+            "remedies",
+            "downstream"
+          ]
+        },
+        "Alert": {
+          "description": "One interruption: what happened, which way, and how much it matters.",
+          "type": "object",
+          "properties": {
+            "affected": {
+              "description": "Every check this alert speaks for, the first being [`Self::check`]. More\nthan one where the same event was grouped across several services.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "check": {
+              "description": "The check this came from, so an alert and its condition cannot drift apart.\nWhere several were grouped, the first of them.",
+              "type": "string"
+            },
+            "kind": {
+              "description": "What kind of event it is, shared by every instance of it.",
+              "type": "string"
+            },
+            "moment": {
+              "description": "Which way it went.",
+              "$ref": "#/$defs/Moment"
+            },
+            "remedies": {
+              "description": "What to do about it, most likely first. An alert that says what happened\nand not what to do is a notification, which is a different and worse thing.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "severity": {
+              "description": "How much it matters. A resolution takes the severity of what resolved,\nbecause \"the critical thing is over\" is itself worth the attention the\ncritical thing had.",
+              "$ref": "#/$defs/Severity"
+            },
+            "summary": {
+              "description": "What happened, in the words the condition was raised with.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "check",
+            "kind",
+            "moment",
+            "severity",
+            "summary",
+            "remedies",
+            "affected"
+          ]
+        },
+        "Criticality": {
+          "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
+          "oneOf": [
+            {
+              "description": "Its failure has consequences outside the machine.",
+              "type": "string",
+              "const": "critical"
+            },
+            {
+              "description": "The form does not work without it.",
+              "type": "string",
+              "const": "core"
+            },
+            {
+              "description": "The form works, badly.",
+              "type": "string",
+              "const": "important"
+            },
+            {
+              "description": "Makes things better.",
+              "type": "string",
+              "const": "enhancing"
+            },
+            {
+              "description": "Nice to have.",
+              "type": "string",
+              "const": "optional"
+            }
+          ]
+        },
+        "Duration": {
+          "type": "object",
+          "properties": {
+            "nanos": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "secs": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "secs",
+            "nanos"
+          ]
+        },
+        "Hardlink": {
+          "description": "Whether imports are hardlinking or copying — the difference between an import\nthat is free and one that doubles the disk it uses.",
+          "oneOf": [
+            {
+              "description": "Imports hardlink, as they should.",
+              "type": "string",
+              "const": "linking"
+            },
+            {
+              "description": "Imports copy, doubling space and slowing every import.",
+              "type": "string",
+              "const": "copying"
+            },
+            {
+              "description": "It could not be established which.",
+              "type": "string",
+              "const": "unknown"
+            }
+          ]
+        },
+        "Moment": {
+          "description": "Which way a condition went.\n\nBoth directions are worth saying and neither is worth saying twice. An operator\ntold a disk filled up and never told it was resolved goes on believing it — so\nresolution is an alert in its own right rather than the absence of one.",
+          "oneOf": [
+            {
+              "description": "It started.",
+              "type": "string",
+              "const": "onset"
+            },
+            {
+              "description": "It stopped, having previously started.",
+              "type": "string",
+              "const": "resolved"
+            }
+          ]
+        },
+        "Panel": {
+          "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+          "oneOf": [
+            {
+              "description": "The source answered; here is the panel.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/Vpn"
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            },
+            {
+              "description": "The source could not be reached, for this stated reason.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "description": "Why the panel could not be filled, in the operator's terms.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ]
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "unavailable"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            }
+          ]
+        },
+        "Panel2": {
+          "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+          "oneOf": [
+            {
+              "description": "The source answered; here is the panel.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Transfer"
+                  }
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            },
+            {
+              "description": "The source could not be reached, for this stated reason.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "description": "Why the panel could not be filled, in the operator's terms.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ]
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "unavailable"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            }
+          ]
+        },
+        "Panel3": {
+          "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+          "oneOf": [
+            {
+              "description": "The source answered; here is the panel.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Queue"
+                  }
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            },
+            {
+              "description": "The source could not be reached, for this stated reason.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "description": "Why the panel could not be filled, in the operator's terms.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ]
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "unavailable"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            }
+          ]
+        },
+        "Panel4": {
+          "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+          "oneOf": [
+            {
+              "description": "The source answered; here is the panel.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/Storage"
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            },
+            {
+              "description": "The source could not be reached, for this stated reason.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "description": "Why the panel could not be filled, in the operator's terms.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ]
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "unavailable"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            }
+          ]
+        },
+        "Panel5": {
+          "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+          "oneOf": [
+            {
+              "description": "The source answered; here is the panel.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Service"
+                  }
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            },
+            {
+              "description": "The source could not be reached, for this stated reason.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "description": "Why the panel could not be filled, in the operator's terms.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ]
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "unavailable"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            }
+          ]
+        },
+        "Protocol": {
+          "description": "Which protocol a transfer is moving over, since the same download reads\ndifferently on each — a Usenet download has no peers, a torrent has no server.",
+          "oneOf": [
+            {
+              "description": "A Usenet download.",
+              "type": "string",
+              "const": "usenet"
+            },
+            {
+              "description": "A torrent download.",
+              "type": "string",
+              "const": "torrent"
+            }
+          ]
+        },
+        "Queue": {
+          "description": "One `*arr`'s queue, and how much of it is stuck.",
+          "type": "object",
+          "properties": {
+            "depth": {
+              "description": "How many items are queued.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "service": {
+              "description": "The service whose queue this is.",
+              "type": "string"
+            },
+            "stuck": {
+              "description": "How many of them are stuck rather than progressing.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "service",
+            "depth",
+            "stuck"
+          ]
+        },
+        "Reading": {
+          "description": "A figure a source reports, kept apart from the two ways it can be missing.\n\nZero is a value a source gave; stale is the last value a source that has since\ngone quiet gave; unknown is a source that never answered at all. Collapsing any\ntwo of them sends an operator after the wrong problem — a stalled download and\na dashboard that simply stopped polling look identical only if the code lets\nthem.",
+          "oneOf": [
+            {
+              "description": "The source answered this refresh with a value — which may legitimately be\nzero.",
+              "type": "object",
+              "properties": {
+                "reading": {
+                  "type": "string",
+                  "const": "known"
+                },
+                "value": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "reading",
+                "value"
+              ]
+            },
+            {
+              "description": "The source did not answer this refresh; this is the last value it gave.",
+              "type": "object",
+              "properties": {
+                "reading": {
+                  "type": "string",
+                  "const": "stale"
+                },
+                "value": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "reading",
+                "value"
+              ]
+            },
+            {
+              "description": "The source has never answered, so nothing can be said about it.",
+              "type": "object",
+              "properties": {
+                "reading": {
+                  "type": "string",
+                  "const": "unknown"
+                }
+              },
+              "required": [
+                "reading"
+              ]
+            }
+          ]
+        },
+        "Service": {
+          "description": "One service, as it stands.",
+          "type": "object",
+          "properties": {
+            "criticality": {
+              "description": "How much its absence costs, so a summary can weigh it.",
+              "$ref": "#/$defs/Criticality"
+            },
+            "depends_on": {
+              "description": "The services it needs before it can work, as the manifest declares them.\nCarried so a failure can be attributed to the thing underneath it rather\nthan counted as one more independent thing wrong.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exit": {
+              "description": "How it exited, where it has exited.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "id": {
+              "description": "The service's identifier, which is also its Compose service name.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "profile": {
+              "description": "The profile that declared it.",
+              "type": "string"
+            },
+            "state": {
+              "description": "What it is doing.",
+              "$ref": "#/$defs/State"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "profile",
+            "state",
+            "criticality",
+            "depends_on"
+          ]
+        },
+        "Severity": {
+          "description": "How much a problem matters.\n\nFour levels, deliberately. More would not be applied consistently, and\ninconsistent severity is worse than coarse severity.",
+          "oneOf": [
+            {
+              "description": "Informational; nothing is required.",
+              "type": "string",
+              "const": "advisory"
+            },
+            {
+              "description": "Degraded or risky, still working.",
+              "type": "string",
+              "const": "warning"
+            },
+            {
+              "description": "Something is broken.",
+              "type": "string",
+              "const": "error"
+            },
+            {
+              "description": "Consequences outside the machine, or data at risk.",
+              "type": "string",
+              "const": "critical"
+            }
+          ]
+        },
+        "Snapshot": {
+          "description": "Everything the dashboard shows at one moment.\n\nEach source's panel is filled or marked unavailable on its own, so one dead\nsource degrades one region rather than the screen. The surface builds this from\nwhat it gathered; the standing is read from the same facts so it cannot\ndisagree with the panels.",
+          "type": "object",
+          "properties": {
+            "alerts": {
+              "description": "What the operator has been told, newest first: what is owed them where a\nchannel is refusing, then what has already been said.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Alert"
+              }
+            },
+            "health": {
+              "description": "The one-line health summary — the same computation every other surface\nuses, so no two of them can grade the same stack differently.\n\nAlways present, unlike the panels: a stack that could not be reached has a\nsummary, and it says `unknown`. An absent summary would leave the operator\nto infer health from a blank space, which is the one reading this must never\nbe open to.",
+              "$ref": "#/$defs/Summary"
+            },
+            "queue": {
+              "description": "The per-service queues.",
+              "$ref": "#/$defs/Panel3"
+            },
+            "services": {
+              "description": "Every service and what it is doing.",
+              "$ref": "#/$defs/Panel5"
+            },
+            "storage": {
+              "description": "The storage picture.",
+              "$ref": "#/$defs/Panel4"
+            },
+            "stuck": {
+              "description": "What in the pipeline has stopped, worst first — assessed across the\ndownload clients and the \\*arrs together, because the failure that matters\nmost is invisible inside either.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Stuck"
+              }
+            },
+            "telemetry": {
+              "description": "Whether the screen itself can be trusted to be current.",
+              "$ref": "#/$defs/Telemetry"
+            },
+            "transfers": {
+              "description": "The active transfers.",
+              "$ref": "#/$defs/Panel2"
+            },
+            "vpn": {
+              "description": "The VPN, or `None` where no VPN is configured and the panel is omitted\nrather than shown permanently red.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Panel"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "telemetry",
+            "health",
+            "transfers",
+            "queue",
+            "stuck",
+            "alerts",
+            "storage",
+            "services"
+          ]
+        },
+        "Stall": {
+          "description": "Why an item is not moving.\n\nOrdered by how much of the operator's attention each deserves, worst first, so\na summary that leads with the worst category needs no second ranking.",
+          "oneOf": [
+            {
+              "description": "Fetched over and over: import is failing silently and being retried, which\nspends bandwidth and Usenet allowance indefinitely while looking normal.",
+              "type": "string",
+              "const": "redownload-loop"
+            },
+            {
+              "description": "The same item has failed to import more than once. Structural — it will not\nresolve itself.",
+              "type": "string",
+              "const": "repeated-import-failure"
+            },
+            {
+              "description": "Downloaded successfully and never imported. The failure nobody owns: the\nclient considers it finished, the \\*arr never picked it up, and from each\nservice's own perspective there is nothing wrong.",
+              "type": "string",
+              "const": "completed-not-imported"
+            },
+            {
+              "description": "On disk, and no \\*arr knows about it.",
+              "type": "string",
+              "const": "orphaned"
+            },
+            {
+              "description": "No progress at all beyond the threshold.",
+              "type": "string",
+              "const": "stalled-download"
+            },
+            {
+              "description": "Monitored, never grabbed — nothing matched, or the indexers are answering\nwith nothing.",
+              "type": "string",
+              "const": "waiting-indefinitely"
+            },
+            {
+              "description": "Moving, but slowly enough to be worth knowing about. Deliberately its own\ncategory rather than a stall: something still arriving needs patience, not\nintervention, and reporting the two alike is how a queue check gets muted.",
+              "type": "string",
+              "const": "slow"
+            }
+          ]
+        },
+        "Standing": {
+          "description": "What the stack amounts to.\n\nOrdered from best to worst, so the worst of several is a `max` and there is no\nsecond place to encode the ranking.",
+          "oneOf": [
+            {
+              "description": "Nothing is wrong.",
+              "type": "string",
+              "const": "healthy"
+            },
+            {
+              "description": "Nothing is running, and that was on purpose.",
+              "type": "string",
+              "const": "stopped"
+            },
+            {
+              "description": "Nothing is set up.",
+              "type": "string",
+              "const": "unconfigured"
+            },
+            {
+              "description": "Worth knowing, nothing to do.",
+              "type": "string",
+              "const": "advisory"
+            },
+            {
+              "description": "Working, with something wrong.",
+              "type": "string",
+              "const": "degraded"
+            },
+            {
+              "description": "Something is broken.",
+              "type": "string",
+              "const": "broken"
+            },
+            {
+              "description": "Something is wrong outside this machine, or data is at risk.",
+              "type": "string",
+              "const": "critical"
+            },
+            {
+              "description": "It could not be established. Never reported as healthy.",
+              "type": "string",
+              "const": "unknown"
+            }
+          ]
+        },
+        "State": {
+          "description": "What one service is actually doing.\n\nOrdered from worst to best, so a form's condition is the minimum across its\nservices and needs no comparison table. The declaration order is therefore\nload-bearing.",
+          "oneOf": [
+            {
+              "description": "Exited without being asked to, and is not coming back on its own.",
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "description": "Exiting and restarting repeatedly.",
+              "type": "string",
+              "const": "crash-looping"
+            },
+            {
+              "description": "Running, and its own probe says it is not working.",
+              "type": "string",
+              "const": "unhealthy"
+            },
+            {
+              "description": "No container exists.",
+              "type": "string",
+              "const": "absent"
+            },
+            {
+              "description": "A container exists and is not running.",
+              "type": "string",
+              "const": "stopped"
+            },
+            {
+              "description": "Running, and still inside its probe's start period.",
+              "type": "string",
+              "const": "starting"
+            },
+            {
+              "description": "Running, and declaring no probe by which to know more.\n\nDistinct from healthy on purpose. A service that cannot be asked is not\na service that answered, and rendering the two identically is how a\ndashboard comes to be believed about something it never checked.",
+              "type": "string",
+              "const": "running"
+            },
+            {
+              "description": "Running and passing its own probe.",
+              "type": "string",
+              "const": "healthy"
+            },
+            {
+              "description": "The operating system owns this one, not lemonfiber.",
+              "type": "string",
+              "const": "host-managed"
+            }
+          ]
+        },
+        "Storage": {
+          "description": "The storage picture: what is free, when it runs out, and whether imports link.",
+          "type": "object",
+          "properties": {
+            "exhaustion": {
+              "description": "The time until the disk fills at the current rate of the queue draining\nonto it, or `None` where it is not projected to fill.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Duration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "free": {
+              "description": "Bytes free on the data volume — a [`Reading`], since a volume that could\nnot be read this refresh must not render as zero free.",
+              "$ref": "#/$defs/Reading"
+            },
+            "hardlink": {
+              "description": "Whether imports are linking or copying.",
+              "$ref": "#/$defs/Hardlink"
+            }
+          },
+          "required": [
+            "free",
+            "hardlink"
+          ]
+        },
+        "Stuck": {
+          "description": "One thing that is wrong, and why.",
+          "type": "object",
+          "properties": {
+            "blocking": {
+              "description": "What the service said was blocking it, in its own words, where it said\nanything. A permission denial from an import log is worth more than any\ninterpretation of it, and it is the difference between \"stuck\" and\nsomething an operator can fix.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "held_for": {
+              "description": "How long it has been that way, in seconds — what turns \"stuck\" into a\nsentence an operator can weigh.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "items": {
+              "description": "How many items this stands for. One in the ordinary case; more where they\nshare a cause and the cause is what is wrong — twenty downloads stopped by\na full disk are one thing to fix, and twenty alerts about it are how an\noperator learns to mute the queue check.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "name": {
+              "description": "Which item — or, where several share one cause, that cause.",
+              "type": "string"
+            },
+            "stall": {
+              "description": "What is wrong with it.",
+              "$ref": "#/$defs/Stall"
+            }
+          },
+          "required": [
+            "name",
+            "stall",
+            "held_for",
+            "items"
+          ]
+        },
+        "Summary": {
+          "description": "The one-line summary, and what it expands to.",
+          "type": "object",
+          "properties": {
+            "affected": {
+              "description": "Everything that is wrong, worst first, so the line expands to the affected\nitems and their remedies rather than to a number nobody can act on.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Affected"
+              }
+            },
+            "standing": {
+              "description": "The one word.",
+              "$ref": "#/$defs/Standing"
+            },
+            "wanting_attention": {
+              "description": "How many things are wrong — root causes, counted once each, so a disk that\nfilled and the nine imports that then failed is one thing and not ten.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "worst": {
+              "description": "The worst thing, named, so the line says something rather than only\ngrading. Absent where nothing is wrong.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "standing",
+            "wanting_attention",
+            "affected"
+          ]
+        },
+        "Telemetry": {
+          "description": "How the screen itself is doing, which is a different question from how the\nstack is doing.\n\nThe stack's own verdict is [`crate::health::Standing`]; this is only whether the\npicture can be trusted to be current. Kept apart because they disagree in both\ndirections: a healthy stack can be shown through half-failing telemetry, and a\nperfectly refreshing screen can be reporting a stack that is on fire.",
+          "oneOf": [
+            {
+              "description": "Telemetry is current and refreshing normally.",
+              "type": "string",
+              "const": "live"
+            },
+            {
+              "description": "Some sources are unavailable; their panels are marked.",
+              "type": "string",
+              "const": "degraded"
+            },
+            {
+              "description": "The engine cannot be reached, though the CLI path may still work.",
+              "type": "string",
+              "const": "disconnected"
+            },
+            {
+              "description": "Configured, but nothing is running.",
+              "type": "string",
+              "const": "no-stack"
+            },
+            {
+              "description": "No configuration; setup is offered instead.",
+              "type": "string",
+              "const": "unconfigured"
+            }
+          ]
+        },
+        "Transfer": {
+          "description": "One active download, as the dashboard shows it.",
+          "type": "object",
+          "properties": {
+            "eta": {
+              "description": "The time left, or `None` where it is stalled and there is none to give.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Duration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "description": "What is being downloaded.",
+              "type": "string"
+            },
+            "progress": {
+              "description": "How far along, as a percentage from zero to a hundred.",
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "protocol": {
+              "description": "How it is being downloaded.",
+              "$ref": "#/$defs/Protocol"
+            },
+            "speed": {
+              "description": "The current speed in bytes per second — a [`Reading`], because a genuine\nzero (stalled) and a source that has gone quiet mean opposite things here,\nand this is the very figure that difference is about.",
+              "$ref": "#/$defs/Reading"
+            }
+          },
+          "required": [
+            "name",
+            "protocol",
+            "progress",
+            "speed"
+          ]
+        },
+        "Vpn": {
+          "description": "What the VPN is doing, and whether the download client is actually behind it.",
+          "type": "object",
+          "properties": {
+            "country": {
+              "description": "The country that address is in.",
+              "type": "string"
+            },
+            "egress_matches": {
+              "description": "Whether the download client's own egress address matches the tunnel's —\nthe one thing that proves traffic is genuinely leaving through it.",
+              "type": "boolean"
+            },
+            "exit_ip": {
+              "description": "The tunnel's exit address as the outside world sees it.",
+              "type": "string"
+            },
+            "forwarded_port": {
+              "description": "The port the provider forwards, where forwarding is on.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            }
+          },
+          "required": [
+            "exit_ip",
+            "country",
+            "egress_matches"
+          ]
+        }
+      }
+    },
     "error": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

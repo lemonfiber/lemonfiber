@@ -27,7 +27,7 @@ pub const LOOPING: u32 = 3;
 pub const REPEATED: u32 = 2;
 
 /// One thing that is wrong, and why.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Stuck {
     /// Which item — or, where several share one cause, that cause.
     pub name: String,

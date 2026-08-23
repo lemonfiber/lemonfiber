@@ -10,7 +10,9 @@ use crate::error::Severity;
 /// Both directions are worth saying and neither is worth saying twice. An operator
 /// told a disk filled up and never told it was resolved goes on believing it — so
 /// resolution is an alert in its own right rather than the absence of one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Moment {
     /// It started.
@@ -31,7 +33,7 @@ impl Moment {
 }
 
 /// One interruption: what happened, which way, and how much it matters.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Alert {
     /// The check this came from, so an alert and its condition cannot drift apart.
     /// Where several were grouped, the first of them.

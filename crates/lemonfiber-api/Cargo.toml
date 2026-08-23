@@ -13,21 +13,29 @@ publish = false
 
 [dependencies]
 lemonfiber-core = { path = "../lemonfiber-core" }
+async-trait = { workspace = true }
 axum = { workspace = true }
 # Reading a query string, which the router carries no parser for: what this surface
 # takes are the commands' own flags, and they arrive percent-encoded. Already in the
 # tree, so it adds no crate to the graph.
 form_urlencoded = { workspace = true }
+# `unfold`, for turning one client's place in the event stream into a body that
+# stays open. Only the combinator is taken; already in the tree via reqwest.
+futures-util = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
 
 [dev-dependencies]
 # The fakes a command is driven through, so an endpoint is exercised against the
-# same world the core's own tests use rather than against a second one.
+# same world the core's own tests use rather than against a second one — and so the
+# gather that answers the terminal dashboard is the one these tests watch produce
+# an event.
 lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
 # Reading a response body back is asynchronous, and the tests that check what a
 # request is answered with are the reason this is a crate rather than a module.
-tokio = { workspace = true, features = ["macros", "rt"] }
+# `test-util` moves the clock rather than waiting on it: a fifteen-second heartbeat
+# has to be proved, and a test that waits for it is one people delete.
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 # Calling the assembled router as the service it is, so a test reaches an endpoint
 # through the guard rather than around it. Already in the tree, via axum.
 tower = { workspace = true, features = ["util"] }
