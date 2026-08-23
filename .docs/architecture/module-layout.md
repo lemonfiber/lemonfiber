@@ -12,9 +12,11 @@ mechanics.
 ```
 crates/
 ├── lemonfiber/           bin + lib — the only crate that knows about a screen
-│   ├── lib.rs            the command line, and the reference generated from it
+│   ├── lib.rs            the command line, and the references generated from it
 │   ├── cli.rs            clap definitions, non-interactive paths
 │   ├── reference.rs      renders the command reference from those definitions
+│   ├── codes.rs          renders the error-code reference from the crates' own
+│   │                     declarations, read out of their source
 │   ├── render/           what each outcome looks like
 │   ├── examples/         emitters: a `print!` around one generated artefact
 │   └── tests/            the architecture tests, from the top of the graph
@@ -37,13 +39,21 @@ crates/
 ```
 
 The `lemonfiber` package carries a library alongside its binary. The library holds
-only the clap definitions and the renderer that turns them into
-`reference/commands.md`; `main.rs` and everything it reaches stay in the binary. The
-split exists because the artefact is written by a program that is not this binary,
-and it has to read the same definitions rather than a second description of them.
-`cargo run --example reference` and `--example contract` are those programs; each is
-a `print!` around one function, and `just reference` and `just contract` redirect them
-to the file the tests compare against.
+only the clap definitions and the renderers that turn what the workspace declares
+into `reference/commands.md` and `reference/error-codes.md`; `main.rs` and everything
+it reaches stay in the binary. The split exists because an artefact is written by a
+program that is not this binary, and it has to read the same declarations rather than
+a second description of them. `cargo run --example reference`, `--example codes` and
+`--example contract` are those programs; each is a `print!` around one function, and
+`just reference`, `just codes` and `just contract` redirect them to the file the tests
+compare against.
+
+`codes.rs` reads source text rather than values, because a code is a `const` beside
+what raises it and there is no registry to enumerate. It reads it with a lexer that
+tells code from a string from a comment, so the call it looks for is invisible where
+it is merely quoted, and it reports a declaration it cannot account for rather than
+leaving it out. The same reader answers the architecture test that no two problems
+share a code, so what counts as a declaration is decided in one place.
 
 `lemonfiber-core` re-exports the ports crate as `crate::ports`, so call sites read
 `ports::Engine` whichever crate they are in. Why the boundary is a crate rather

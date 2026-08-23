@@ -61,6 +61,10 @@ contract:
 reference:
     cargo run --quiet --example reference -p lemonfiber > reference/commands.md
 
+# Rewrite the error-code reference from the codes the crates declare.
+codes:
+    cargo run --quiet --example codes -p lemonfiber > reference/error-codes.md
+
 fmt-check:
     cargo fmt --check
 
@@ -121,8 +125,8 @@ release-workflow:
 # it through the public port and the other through private functions.
 #
 # Every examples/ target is a third kind: each is a `print!` around a function in the
-# crate it belongs to, run by `just contract` and `just reference` to rewrite an
-# artefact. The function is under the gate; the redirection is not.
+# crate it belongs to, run by `just contract`, `just reference` and `just codes` to
+# rewrite an artefact. The function is under the gate; the redirection is not.
 #
 # Per-item exclusion would need #[coverage(off)], which is nightly-only, so
 # applicable code is instead kept coverable — see .docs/architecture/error-model.md
