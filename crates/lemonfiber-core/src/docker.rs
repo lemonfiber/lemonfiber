@@ -30,7 +30,7 @@ use crate::ports::docker::{Container, Health, Lifecycle};
 /// Ordered from worst to best, so a form's condition is the minimum across its
 /// services and needs no comparison table. The declaration order is therefore
 /// load-bearing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum State {
     /// Exited without being asked to, and is not coming back on its own.
@@ -90,7 +90,7 @@ impl State {
 }
 
 /// One service, as it stands.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Service {
     /// The service's identifier, which is also its Compose service name.
     pub id: String,

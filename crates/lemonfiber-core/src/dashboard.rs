@@ -32,7 +32,7 @@ use crate::health::{Reach, Summary};
 /// two of them sends an operator after the wrong problem — a stalled download and
 /// a dashboard that simply stopped polling look identical only if the code lets
 /// them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "reading", content = "value")]
 pub enum Reading<T> {
     /// The source answered this refresh with a value — which may legitimately be
@@ -87,7 +87,7 @@ impl<T: Clone> Reading<T> {
 /// unreachable" is the whole of degrading honestly: an unavailable panel says so,
 /// in its own words, rather than showing stale data as current or blank data as
 /// zero — and the panels beside it stay live.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "panel", content = "data")]
 pub enum Panel<T> {
     /// The source answered; here is the panel.
@@ -117,7 +117,7 @@ impl<T> Panel<T> {
 
 /// Which protocol a transfer is moving over, since the same download reads
 /// differently on each — a Usenet download has no peers, a torrent has no server.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Protocol {
     /// A Usenet download.
@@ -127,7 +127,7 @@ pub enum Protocol {
 }
 
 /// One active download, as the dashboard shows it.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
 pub struct Transfer {
     /// What is being downloaded.
     pub name: String,
@@ -144,7 +144,7 @@ pub struct Transfer {
 }
 
 /// One `*arr`'s queue, and how much of it is stuck.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Queue {
     /// The service whose queue this is.
     pub service: String,
@@ -156,7 +156,7 @@ pub struct Queue {
 
 /// Whether imports are hardlinking or copying — the difference between an import
 /// that is free and one that doubles the disk it uses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Hardlink {
     /// Imports hardlink, as they should.
@@ -168,7 +168,7 @@ pub enum Hardlink {
 }
 
 /// The storage picture: what is free, when it runs out, and whether imports link.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Storage {
     /// Bytes free on the data volume — a [`Reading`], since a volume that could
     /// not be read this refresh must not render as zero free.
@@ -181,7 +181,7 @@ pub struct Storage {
 }
 
 /// What the VPN is doing, and whether the download client is actually behind it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Vpn {
     /// The tunnel's exit address as the outside world sees it.
     pub exit_ip: String,
@@ -201,7 +201,7 @@ pub struct Vpn {
 /// picture can be trusted to be current. Kept apart because they disagree in both
 /// directions: a healthy stack can be shown through half-failing telemetry, and a
 /// perfectly refreshing screen can be reporting a stack that is on fire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Telemetry {
     /// Telemetry is current and refreshing normally.
@@ -248,7 +248,7 @@ impl Telemetry {
 /// source degrades one region rather than the screen. The surface builds this from
 /// what it gathered; the standing is read from the same facts so it cannot
 /// disagree with the panels.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
 pub struct Snapshot {
     /// Whether the screen itself can be trusted to be current.
     pub telemetry: Telemetry,

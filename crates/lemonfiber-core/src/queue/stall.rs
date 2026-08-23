@@ -18,7 +18,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// Ordered by how much of the operator's attention each deserves, worst first, so
 /// a summary that leads with the worst category needs no second ranking.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Stall {
     /// Fetched over and over: import is failing silently and being retried, which

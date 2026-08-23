@@ -23,7 +23,7 @@ use crate::error::Severity;
 pub const STEADY: u64 = 30;
 
 /// The one-line summary, and what it expands to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Summary {
     /// The one word.
     pub standing: Standing,
@@ -39,7 +39,7 @@ pub struct Summary {
 }
 
 /// One thing that is wrong, as the expanded summary lists it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Affected {
     /// The check that raised it.
     pub check: String,

@@ -8,7 +8,9 @@ use crate::error::Severity;
 ///
 /// Ordered from best to worst, so the worst of several is a `max` and there is no
 /// second place to encode the ranking.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Standing {
     /// Nothing is wrong.

@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 use schemars::{schema_for, Schema};
 use serde::Serialize;
 
+use crate::dashboard::Snapshot;
 use crate::glossary::Term;
 use crate::model::{
     kind, Envelope, SetupReport, SupervisionReport, WalkthroughReport, API_VERSION,
@@ -41,6 +42,7 @@ impl Contract {
     #[must_use]
     pub fn describe() -> Self {
         let mut kinds = BTreeMap::new();
+        kinds.insert(kind::DASHBOARD.to_owned(), schema_for!(Envelope<Snapshot>));
         kinds.insert(kind::ERROR.to_owned(), schema_for!(Envelope<Problem>));
         kinds.insert(kind::LOG.to_owned(), schema_for!(Envelope<LogLine>));
         kinds.insert(kind::SETUP.to_owned(), schema_for!(Envelope<SetupReport>));

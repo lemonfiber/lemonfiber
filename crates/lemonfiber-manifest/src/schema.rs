@@ -187,7 +187,7 @@ pub enum Bind {
 /// Serialisable as well as readable, because it reaches an operator: a status
 /// report that says a service is down without saying whether that matters
 /// leaves them to guess, and the manifest already holds the answer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Criticality {
     /// Its failure has consequences outside the machine.
