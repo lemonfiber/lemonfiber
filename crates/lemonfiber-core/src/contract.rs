@@ -5,7 +5,9 @@
 //! described are the ones that actually serialise the reply, which is what stops
 //! the description drifting from the thing it describes.
 //!
-//! Spec: `20-architecture/contracts/web-api.md` — `ARCH-R56`, `ARCH-R57`.
+//! The shapes are generated rather than written, and regenerating must
+//! produce no diff — a serialised type that changes without the artefact
+//! changing with it fails the build instead of reaching an SDK.
 
 use std::collections::BTreeMap;
 
@@ -79,7 +81,7 @@ mod tests {
         std::fs::read_to_string(root.join(CONTRACT_PATH)).ok()
     }
 
-    /// `ARCH-R57`: the committed artefact and the types must agree.
+    /// The committed artefact and the types must agree.
     ///
     /// A change to a serialised shape that forgets to regenerate fails here
     /// rather than reaching an SDK.
