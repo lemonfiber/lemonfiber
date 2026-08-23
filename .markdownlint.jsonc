@@ -1,11 +1,32 @@
+// Canonical markdownlint configuration for every lemonfiber repo.
+//
+// Copy this file to the repo root as `.markdownlint.jsonc`, byte for byte. The
+// `shared-files` job in the hygiene gate fails on any difference, including a
+// difference of key order (GOV-R12, Q-R56).
+//
+// Rules are listed by identifier so there is one obvious place for a new one.
+// The set is the union of what every repo needed: each entry only relaxes a
+// default, so a rule a repo does not need costs it nothing.
 {
-  "MD014": false,
-  "MD060": false,
+  // Prose is wrapped by the author, not by a column count.
   "MD013": false,
-  "MD033": false,
-  "MD040": false,
-  "MD041": false,
+  // Shell examples keep their `$` prompt; it is how the command is read aloud.
+  "MD014": false,
+  // The same sub-heading recurs under different parents ("Requirements").
   "MD024": { "siblings_only": true },
+  // Feature docs carry a frontmatter `title:` and a separate `# ID — Title`
+  // heading; don't count the frontmatter field as a second H1.
+  "MD025": { "front_matter_title": "" },
+  // Ordered lists restart per section rather than running on.
+  "MD029": false,
+  // READMEs centre their header with inline HTML.
+  "MD033": false,
+  // Bold lead-ins are emphasis, not headings.
   "MD036": false,
-  "MD029": false
+  // Fenced output blocks have no language to declare.
+  "MD040": false,
+  // A centred logo block precedes the first heading.
+  "MD041": false,
+  // Tables are written to be read as text, not aligned by a formatter.
+  "MD060": false
 }
