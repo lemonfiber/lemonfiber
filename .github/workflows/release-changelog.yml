@@ -86,6 +86,10 @@ jobs:
           set -euo pipefail
           mkdir -p notes
           printf '%s\n' "$CHANGELOG" > notes/changelog.md
+          if ! grep -q '[^[:space:]]' notes/changelog.md; then
+            echo "::error::git-cliff found no commits for this tag."
+            exit 1
+          fi
           echo "generated $(wc -l < notes/changelog.md) lines."
 
       - name: Upload it
@@ -117,10 +121,12 @@ jobs:
         run: |
           set -euo pipefail
           # Found by id over the listing rather than by tag: a draft release is
-          # not yet attached to its tag, so the by-tag endpoint cannot see it.
-          # The listing returns drafts to a token with push access.
-          id=$(gh api "repos/${REPO}/releases" --paginate \
-            --jq '.[] | select(.tag_name == env.TAG) | .id' | head -1)
+          # not yet attached to its tag, so the by-tag endpoint cannot see it,
+          # and the listing returns drafts to a token with push access. One page
+          # rather than --paginate into head, which would leave gh writing to a
+          # closed pipe; the draft is the newest release there is.
+          id=$(gh api "repos/${REPO}/releases?per_page=100" \
+            --jq '[.[] | select(.tag_name == env.TAG) | .id] | first // empty')
           if [ -z "$id" ]; then
             echo "::error::no release found for ${TAG}."
             exit 1
