@@ -34,6 +34,7 @@ Commands:
   reset        Put the stack back to lemonfiber's own state, reverting every edit you made
   backup       Back up your configuration to an archive, so it stops being precious
   support      Gather everything a person helping you would ask for, with every value not named safe replaced by a stand-in
+  ui           Serve the web interface, for as long as you leave it running
   restore      Restore your configuration from a backup archive
   help         Print this message or the help of the given subcommand(s)
 
@@ -1057,6 +1058,43 @@ Options:
 
       --confirm
           Confirm showing the settings named by `--reveal`
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber ui`
+
+```text
+Serve the web interface, for as long as you leave it running.
+
+Started when you ask for it and not before: nothing is installed, nothing keeps running afterwards, and stopping it leaves nothing behind. It listens on this machine only.
+
+The connection is not encrypted, which it says when it starts, along with the whole address it was given and the token every request to it must carry. The token is minted for this run, printed once here, and kept nowhere else.
+
+Usage: lemonfiber ui [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --port <PORT>
+          The port to listen on. Without it, whichever one is free is used and the whole address is printed
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --no-browser
+          Do not ask this desktop to open a browser
+
+      --assets <PATH>
+          Serve the interface from this directory instead of the one built in
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
 
   -h, --help
           Print help (see a summary with '-h')

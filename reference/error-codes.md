@@ -58,6 +58,8 @@ what to do about it, is written for operators at
 - `SEED-2`
 - `SEED-3`
 - `SEED-4`
+- `SERVE-1`
+- `SERVE-2`
 - `SETUP-1`
 - `SETUP-2`
 - `SETUP-3`
