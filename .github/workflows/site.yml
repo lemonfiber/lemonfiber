@@ -13,7 +13,7 @@ jobs:
   rebuild:
     permissions:
       contents: read
-    uses: lemonfiber/spec/.github/workflows/rebuild-site.yml@7084ff5150708d594a409521dc60113350d480fc # main
+    uses: lemonfiber/spec/.github/workflows/rebuild-site.yml@76ed8252bc5a9fc090dfa486039d4e164ce8ae0c # main
     with:
       because: "the tool changed"
     secrets:

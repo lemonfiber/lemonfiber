@@ -11,4 +11,4 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/spec-references.yml@940c4b171503ab1938a69e74357dca3073ba695c # main
+    uses: lemonfiber/spec/.github/workflows/spec-references.yml@76ed8252bc5a9fc090dfa486039d4e164ce8ae0c # main

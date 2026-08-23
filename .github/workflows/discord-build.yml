@@ -10,7 +10,7 @@ permissions:
   contents: read
 jobs:
   notify:
-    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@7084ff5150708d594a409521dc60113350d480fc # main
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@76ed8252bc5a9fc090dfa486039d4e164ce8ae0c # main
     with:
       title: "${{ github.event.workflow_run.name }} · ${{ github.event.workflow_run.head_branch }}"
       body: "${{ github.event.repository.name }} — ${{ github.event.workflow_run.conclusion }} · ${{ github.event.workflow_run.head_sha }}"
