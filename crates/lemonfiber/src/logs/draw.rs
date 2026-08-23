@@ -154,7 +154,7 @@ fn widest(seen: &[String]) -> usize {
 mod tests {
     use super::{colour, draw, widest};
     use crate::logs::{Press, Viewer};
-    use lemonfiber_core::logs::Level;
+    use lemonfiber_core::logs::{declared, Level};
     use lemonfiber_core::ports::docker::{LogLine, Stream};
     use ratatui::backend::TestBackend;
     use ratatui::style::{Color, Modifier, Style};
@@ -377,5 +377,80 @@ mod tests {
             !drawn(&viewer, 90, 20).contains("the words on this screen"),
             "the key opens nothing"
         );
+    }
+
+    /// The severities, in the order they get worse.
+    const EVERY: [Level; 6] = [
+        Level::Trace,
+        Level::Debug,
+        Level::Info,
+        Level::Warn,
+        Level::Error,
+        Level::Fatal,
+    ];
+
+    /// A line arriving on the error stream rather than the ordinary one.
+    fn complained(service: &str, said: &str) -> LogLine {
+        LogLine {
+            stream: Stream::Stderr,
+            ..line(service, said)
+        }
+    }
+
+    /// No line is given a severity its own words do not say.
+    ///
+    /// This is what makes the colour safe to lose rather than a second thing to
+    /// read: it is never the only carrier, because it is computed from words that
+    /// are already on the screen. Nineteen services in this stack write ordinary
+    /// progress to the error stream, so a screen that took severity from the stream
+    /// would paint most of a working night red — and it would be painting something
+    /// no word on the line agreed with, which is the case a reader who cannot see
+    /// the colour would be left with nothing at all.
+    ///
+    /// Written against what the screen is given rather than against the parser, so
+    /// it fails whether the guess is made in the parser or on the way to the screen.
+    #[test]
+    fn no_line_is_given_a_severity_its_own_words_do_not_say() {
+        let mut viewer = Viewer::opened();
+        viewer.take(line("radarr", "WARN Import timed out"));
+        viewer.take(complained("sonarr", "Grabbed an episode"));
+        viewer.take(complained("gluetun", "level=error connection refused"));
+        viewer.take(line("qbittorrent", "[Warn] the tracker did not answer"));
+        viewer.take(complained("sabnzbd", "queue paused"));
+
+        for shown in viewer.showing(20) {
+            assert_eq!(
+                shown.level,
+                declared(&shown.said),
+                "a severity nothing on the line said: {}",
+                shown.said
+            );
+        }
+    }
+
+    /// Every severity the screen paints is also a word on the screen.
+    ///
+    /// The other half: the words the colour was computed from have to survive to
+    /// the screen, or a reader without colour is told nothing where a reader with
+    /// it is told something. Each level that gets a colour at all is checked, so a
+    /// colour added for a sixth level is checked the day it is added.
+    #[test]
+    fn every_severity_the_screen_paints_is_also_a_word_on_it() {
+        for level in EVERY {
+            if colour(Some(level), true).fg.is_none() {
+                continue;
+            }
+            let mut viewer = Viewer::opened().without_colour();
+            viewer.take(line(
+                "radarr",
+                &format!("{} something happened", level.word().to_uppercase()),
+            ));
+
+            let screen = drawn(&viewer, 100, 8).to_lowercase();
+            assert!(
+                screen.contains(level.word()),
+                "colour is carrying {level:?} by itself: {screen}"
+            );
+        }
     }
 }
