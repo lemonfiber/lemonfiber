@@ -270,16 +270,16 @@ impl Outcome {
         let kind = match self {
             Self::Version(_) => kind::VERSION,
             Self::Forms(_) => kind::FORMS,
-            Self::Preview(_) => kind::PREVIEW,
-            Self::Lifecycle(_) => kind::LIFECYCLE,
-            Self::Config(_) => kind::CONFIG,
+            Self::Preview(_) => crate::model::kind::PREVIEW,
+            Self::Lifecycle(_) => crate::model::kind::LIFECYCLE,
+            Self::Config(_) => crate::model::kind::CONFIG,
             Self::Quality(_) => kind::QUALITY,
             Self::Upgrade(_) => kind::UPGRADE,
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
             Self::Household(_) => kind::HOUSEHOLD,
             Self::Stuck(_) => kind::STUCK,
-            Self::Status(_) => kind::STATUS,
+            Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Seed(_) => kind::SEED,
             Self::Reset(_) => kind::RESET,
@@ -603,7 +603,7 @@ mod tests {
         );
         assert_eq!(
             previewed.ok().map(|outcome| outcome.envelope().kind),
-            Some("preview"),
+            Some(crate::model::kind::PREVIEW),
             "the kind names the question that was asked"
         );
     }
@@ -1781,7 +1781,7 @@ mod tests {
                 json.starts_with(r#"{"api_version":1,"kind":"config","data":{"settings":["#),
                 json.contains(r#""changed":false"#)
             )),
-            Some(("config", true, true))
+            Some((crate::model::kind::CONFIG, true, true))
         );
 
         let _ = std::fs::remove_dir_all(path.parent().unwrap_or(std::path::Path::new("/")));
@@ -1868,7 +1868,7 @@ mod tests {
                 json.starts_with(r#"{"api_version":1,"kind":"lifecycle","data":{"action":"up""#),
                 json.contains(r#""rehearsed":true"#)
             )),
-            Some(("lifecycle", true, true))
+            Some((crate::model::kind::LIFECYCLE, true, true))
         );
     }
 
@@ -2396,7 +2396,7 @@ mod tests {
                 json.starts_with(r#"{"api_version":1,"kind":"status","data":{"forms":["library"]"#),
                 json.contains(r#""state":"healthy""#)
             )),
-            Some(("status", true, true))
+            Some((crate::model::kind::STATUS, true, true))
         );
     }
 

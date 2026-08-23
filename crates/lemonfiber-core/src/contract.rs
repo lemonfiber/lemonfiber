@@ -52,54 +52,99 @@ impl Contract {
     #[must_use]
     pub fn describe() -> Self {
         let mut kinds = BTreeMap::new();
-        kinds.insert(kind::CONFIG.to_owned(), schema_for!(Envelope<ConfigReport>));
-        kinds.insert(kind::DASHBOARD.to_owned(), schema_for!(Envelope<Snapshot>));
-        kinds.insert(kind::DOCTOR.to_owned(), schema_for!(Envelope<DoctorReport>));
-        kinds.insert(kind::ERROR.to_owned(), schema_for!(Envelope<Problem>));
-        kinds.insert(kind::FORMS.to_owned(), schema_for!(Envelope<FormsReport>));
         kinds.insert(
-            kind::HOUSEHOLD.to_owned(),
+            kind::CONFIG.as_str().to_owned(),
+            schema_for!(Envelope<ConfigReport>),
+        );
+        kinds.insert(
+            kind::DASHBOARD.as_str().to_owned(),
+            schema_for!(Envelope<Snapshot>),
+        );
+        kinds.insert(
+            kind::DOCTOR.as_str().to_owned(),
+            schema_for!(Envelope<DoctorReport>),
+        );
+        kinds.insert(
+            kind::ERROR.as_str().to_owned(),
+            schema_for!(Envelope<Problem>),
+        );
+        kinds.insert(
+            kind::FORMS.as_str().to_owned(),
+            schema_for!(Envelope<FormsReport>),
+        );
+        kinds.insert(
+            kind::HOUSEHOLD.as_str().to_owned(),
             schema_for!(Envelope<HouseholdReport>),
         );
         kinds.insert(
-            kind::LIFECYCLE.to_owned(),
+            kind::LIFECYCLE.as_str().to_owned(),
             schema_for!(Envelope<LifecycleReport>),
         );
-        kinds.insert(kind::LOG.to_owned(), schema_for!(Envelope<LogLine>));
-        kinds.insert(kind::MUSIC.to_owned(), schema_for!(Envelope<MusicReport>));
-        kinds.insert(kind::PREVIEW.to_owned(), schema_for!(Envelope<Plan>));
-        kinds.insert(kind::PULL.to_owned(), schema_for!(Envelope<String>));
         kinds.insert(
-            kind::QUALITY.to_owned(),
+            kind::LOG.as_str().to_owned(),
+            schema_for!(Envelope<LogLine>),
+        );
+        kinds.insert(
+            kind::MUSIC.as_str().to_owned(),
+            schema_for!(Envelope<MusicReport>),
+        );
+        kinds.insert(
+            kind::PREVIEW.as_str().to_owned(),
+            schema_for!(Envelope<Plan>),
+        );
+        kinds.insert(
+            kind::PULL.as_str().to_owned(),
+            schema_for!(Envelope<String>),
+        );
+        kinds.insert(
+            kind::QUALITY.as_str().to_owned(),
             schema_for!(Envelope<QualityReport>),
         );
-        kinds.insert(kind::RESET.to_owned(), schema_for!(Envelope<ResetReport>));
         kinds.insert(
-            kind::SEED.to_owned(),
+            kind::RESET.as_str().to_owned(),
+            schema_for!(Envelope<ResetReport>),
+        );
+        kinds.insert(
+            kind::SEED.as_str().to_owned(),
             schema_for!(Envelope<crate::seed::Report>),
         );
-        kinds.insert(kind::SETUP.to_owned(), schema_for!(Envelope<SetupReport>));
-        kinds.insert(kind::START.to_owned(), schema_for!(Envelope<String>));
-        kinds.insert(kind::STATUS.to_owned(), schema_for!(Envelope<StatusReport>));
-        kinds.insert(kind::STUCK.to_owned(), schema_for!(Envelope<StuckReport>));
-        kinds.insert(kind::TRACE.to_owned(), schema_for!(Envelope<TraceReport>));
         kinds.insert(
-            kind::UPGRADE.to_owned(),
+            kind::SETUP.as_str().to_owned(),
+            schema_for!(Envelope<SetupReport>),
+        );
+        kinds.insert(
+            kind::START.as_str().to_owned(),
+            schema_for!(Envelope<String>),
+        );
+        kinds.insert(
+            kind::STATUS.as_str().to_owned(),
+            schema_for!(Envelope<StatusReport>),
+        );
+        kinds.insert(
+            kind::STUCK.as_str().to_owned(),
+            schema_for!(Envelope<StuckReport>),
+        );
+        kinds.insert(
+            kind::TRACE.as_str().to_owned(),
+            schema_for!(Envelope<TraceReport>),
+        );
+        kinds.insert(
+            kind::UPGRADE.as_str().to_owned(),
             schema_for!(Envelope<UpgradeReport>),
         );
         kinds.insert(
-            kind::VERSION.to_owned(),
+            kind::VERSION.as_str().to_owned(),
             schema_for!(Envelope<VersionReport>),
         );
         kinds.insert(
-            kind::WALKTHROUGH.to_owned(),
+            kind::WALKTHROUGH.as_str().to_owned(),
             schema_for!(Envelope<WalkthroughReport>),
         );
         kinds.insert(
-            kind::WATCH.to_owned(),
+            kind::WATCH.as_str().to_owned(),
             schema_for!(Envelope<SupervisionReport>),
         );
-        kinds.insert(kind::WORD.to_owned(), schema_for!(Envelope<Term>));
+        kinds.insert(kind::WORD.as_str().to_owned(), schema_for!(Envelope<Term>));
 
         Self {
             api_version: API_VERSION,
@@ -247,7 +292,7 @@ mod tests {
     /// The kind an outcome names itself, and the fields its `data` actually holds.
     fn written(outcome: Outcome) -> (String, BTreeSet<String>) {
         let envelope = outcome.envelope();
-        let named = envelope.kind.to_owned();
+        let named = envelope.kind.as_str().to_owned();
         let document = serde_json::to_value(envelope).unwrap_or_default();
         let fields = document
             .pointer("/data")
@@ -280,7 +325,10 @@ mod tests {
     fn it_describes_every_kind_that_is_emitted_and_no_others() {
         let contract = Contract::describe();
         let described: Vec<&str> = contract.kinds.keys().map(String::as_str).collect();
-        let mut emitted: Vec<&str> = crate::model::kind::ALL.to_vec();
+        let mut emitted: Vec<&str> = crate::model::kind::ALL
+            .iter()
+            .map(|kind| kind.as_str())
+            .collect();
         emitted.sort_unstable();
 
         assert_eq!(described, emitted);

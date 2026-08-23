@@ -13,7 +13,7 @@ use lemonfiber_core::app::{
     claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started,
     supervise, Command, Ctx, WATCH,
 };
-use lemonfiber_core::model::kind;
+use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
@@ -150,7 +150,7 @@ pub(crate) async fn pull_rehearsal(
 ///
 /// The kind is the caller's, because a consumer filtering a `--json` stream is
 /// filtering on it: a pull's lines and a start's are different things happening.
-pub(crate) fn emit_line(kind: &'static str, line: &str, json: bool) {
+pub(crate) fn emit_line(kind: Kind, line: &str, json: bool) {
     if !json {
         say!("  {line}");
         return;
