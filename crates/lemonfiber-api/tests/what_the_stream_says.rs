@@ -220,6 +220,45 @@ fn a_gap_wider_than_the_backlog_restarts_rather_than_handing_back_part_of_it() {
     );
 }
 
+/// A service's own words cannot become a second event.
+///
+/// A log line is not ours. One carrying newlines and something shaped like a
+/// frame would, if it reached the wire as written, let whatever wrote it say
+/// anything it liked to a browser that is trusting this stream.
+///
+/// What stops it is that the payload is JSON: the line's newlines are escaped to
+/// two characters before anything is framed, so they never become line endings.
+/// The framing gives every line of the payload its own `data:` on top of that,
+/// which is why a change making the payload something other than JSON shows up
+/// here as more `data:` lines rather than as a forged event.
+///
+/// The carriage return is held separately because a browser ends a line on one
+/// where Rust does not, so a lone `\r` would split a frame that still looks
+/// whole to `lines()`.
+#[test]
+fn a_service_that_writes_a_frame_into_its_log_does_not_get_a_second_event() {
+    let forged = "up\r\n\r\nevent: status\ndata: {\"healthy\":true}\n\n";
+    let wire = Run::opened().said(Nature::Record, forged).framed(0);
+    let lines: Vec<&str> = wire.lines().collect();
+    let counted = |prefix: &str| lines.iter().filter(|line| line.starts_with(prefix)).count();
+
+    assert_eq!(counted("event: "), 1, "{wire:?}");
+    assert_eq!(counted("data: "), 1, "the payload is one line: {wire:?}");
+    assert_eq!(
+        lines.iter().filter(|line| line.is_empty()).count(),
+        1,
+        "{wire:?}"
+    );
+    assert!(
+        !wire.contains('\r'),
+        "a carriage return ends a line for a browser where Rust sees none: {wire:?}"
+    );
+    assert!(
+        wire.contains(r"up\r\n\r\nevent: status"),
+        "the line's own newlines arrive escaped, not as endings: {wire:?}"
+    );
+}
+
 /// A gather every tick must not push out the records a client came back for.
 ///
 /// The bound is on what is kept, and a state event is the one thing that is never
