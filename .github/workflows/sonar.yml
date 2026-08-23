@@ -3,10 +3,11 @@ on:
   push:
     branches: [main]
   pull_request:
+# Read-only for the workflow. The one job that writes — the gate, which posts its
+# verdict on the pull request — asks for that itself, so the scan job that has no
+# reason to write does not hold the token that could.
 permissions:
   contents: read
-  # Read the summary SonarCloud posts on the PR, and post our own verdict.
-  pull-requests: write
 jobs:
   sonar:
     runs-on: ubuntu-latest
