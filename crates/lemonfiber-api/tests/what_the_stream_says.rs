@@ -220,6 +220,30 @@ fn a_gap_wider_than_the_backlog_restarts_rather_than_handing_back_part_of_it() {
     );
 }
 
+/// A gather every tick must not push out the records a client came back for.
+///
+/// The bound is on what is kept, and a state event is the one thing that is never
+/// handed back. Keeping them spent the whole backlog on a few minutes of ticks:
+/// a client that missed one log line while the dashboard gathered was told the
+/// record was no longer whole, and handed nothing, while the line it wanted was
+/// still there to give.
+#[test]
+fn a_quiet_stretch_of_gathers_does_not_cost_a_client_the_record_it_missed() {
+    let mut run = Run::opened().said(Nature::Record, "before the gap");
+    for _ in 0..=HELD {
+        run = run.said(Nature::State, "another gather");
+    }
+    run = run.said(Nature::Record, "after the gap");
+
+    let handed = run.since(run.id(0));
+    assert_eq!(
+        handed.len(),
+        1,
+        "the record said after the gathers is still there to hand back"
+    );
+    assert!(handed.iter().all(|event| event.nature() == Nature::Record));
+}
+
 #[test]
 fn a_client_from_another_run_is_handed_nothing() {
     let run = Run::opened()
