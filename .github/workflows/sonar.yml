@@ -37,11 +37,13 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # The zero-new-issues standard (Q-R63/R64) is enforced by the shared reusable in
-  # spec, so all repos gate identically. It reads the scan's summary and fails on
-  # any new issue, posting a sticky verdict on the PR. A required check: it blocks on
-  # a counted issue and on nothing else, so a summary that never arrived or one it
-  # cannot read warns rather than holding the pull request hostage.
+  # Open SonarCloud issues must be zero (Q-R64), and the free plan's own quality
+  # gate cannot be configured to that standard (Q-R63). The shared reusable in spec
+  # holds the count there instead, so all repos gate identically: it reads the
+  # scan's summary and fails on any new issue, posting a sticky verdict on the PR.
+  # A required check: it blocks on a counted issue and on nothing else, so a summary
+  # that never arrived or one it cannot read warns rather than holding the pull
+  # request hostage.
   gate:
     needs: sonar
     permissions:
