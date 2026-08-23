@@ -13,11 +13,16 @@ use lemonfiber_core::ports::Clock;
 
 use super::wire::{Event, Nature, Rendered};
 
-/// How far back a client may have got to and still be told what it missed.
+/// How many records a client may have missed and still be told what they were.
 ///
 /// Bounded because a stream nobody is listening to must not grow: past this the
 /// record is no longer whole, and the stream restarts rather than handing back a
 /// part of it.
+///
+/// Records, because records are what can be handed back. A state event is
+/// gathered every tick and never retransmitted, so keeping one costs a whole
+/// snapshot to hold something nobody can ever be given — and, because the bound
+/// counts what is kept, it pushes out the records that could have been.
 pub const HELD: usize = 256;
 
 /// Everything one run of the stream has said, as far back as it still keeps it.
@@ -29,7 +34,7 @@ pub struct Backlog {
     /// returns to a restarted server be recognised as such, rather than told it
     /// is up to date because its number happens to be one this run has reached.
     run: String,
-    /// What has been said, oldest first, and where each was said.
+    /// The records said, oldest first, and where each was said.
     held: VecDeque<(u64, Event)>,
     /// The place the next thing said will take.
     next: u64,
@@ -47,13 +52,20 @@ impl Backlog {
     }
 
     /// Record one thing said, and give it its place in the run.
+    ///
+    /// Everything said takes a place, because the place is what a client names
+    /// when it comes back. Only a record is kept: a state event is the one thing
+    /// [`since`](Self::since) will never hand back, so keeping one holds a whole
+    /// snapshot for nothing and spends a slot a record could have had.
     pub fn say(&mut self, said: Rendered) -> Event {
         let place = self.next;
         let event = Event::placed(format!("{}-{place}", self.run), said);
         self.next = self.next.saturating_add(1);
-        self.held.push_back((place, event.clone()));
-        while self.held.len() > HELD {
-            self.held.pop_front();
+        if event.nature() == Nature::Record {
+            self.held.push_back((place, event.clone()));
+            while self.held.len() > HELD {
+                self.held.pop_front();
+            }
         }
         event
     }
