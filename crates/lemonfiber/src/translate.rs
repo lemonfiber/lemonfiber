@@ -10,9 +10,9 @@ use lemonfiber_core::audio::Format;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
-use crate::cli::{ConfigAction, QualityCommand};
 use crate::exit::USAGE;
 use crate::say::complain;
+use lemonfiber::cli::{ConfigAction, QualityCommand};
 
 /// Which setting the operator is reading or changing.
 pub(crate) fn configuration(action: ConfigAction) -> Command {
@@ -80,8 +80,8 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{configuration, quality};
-    use crate::cli::{ConfigAction, QualityCommand};
     use crate::exit::USAGE;
+    use lemonfiber::cli::{ConfigAction, QualityCommand};
 
     #[test]
     fn each_configuration_action_becomes_its_own_command() {

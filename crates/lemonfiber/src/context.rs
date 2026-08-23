@@ -19,7 +19,7 @@ use lemonfiber_core::config::{
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::stack::Source;
 
-use crate::cli::STACK;
+use lemonfiber::cli::STACK;
 
 /// Everything a command needs that the command itself does not carry.
 pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) -> Ctx {

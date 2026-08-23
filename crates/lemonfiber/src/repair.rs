@@ -16,10 +16,10 @@ use lemonfiber_core::repair::{Repair, Stance};
 
 use lemonfiber_core::config::paths::Paths;
 
-use crate::cli::Mending;
 use crate::prompt::{yes_no, Answers};
 use crate::render::repair::{mended, reversed};
 use crate::render::Lines;
+use lemonfiber::cli::Mending;
 
 /// Offer the repairs and carry out the ones agreed to, or put back what the last one did.
 pub(crate) async fn run(
@@ -106,7 +106,7 @@ mod tests {
     use crate::prompt::Answers;
 
     use super::{run, Asking, Confirm as _, Ctx, Mending, Paths};
-    use crate::cli::Fixing;
+    use lemonfiber::cli::Fixing;
 
     /// Where a test's records live, in a scratch directory of its own — named, because a
     /// test that undoes a journal must not be reading one another test wrote.
@@ -127,7 +127,7 @@ mod tests {
             Arc::new(lemonfiber_core::adapters::Daemon::local()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
-            Source::Embedded(&crate::cli::STACK),
+            Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,
         )

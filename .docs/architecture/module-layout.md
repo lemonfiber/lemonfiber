@@ -11,9 +11,12 @@ mechanics.
 
 ```
 crates/
-├── lemonfiber/           bin — the only crate that knows about a screen
+├── lemonfiber/           bin + lib — the only crate that knows about a screen
+│   ├── lib.rs            the command line, and the reference generated from it
 │   ├── cli.rs            clap definitions, non-interactive paths
+│   ├── reference.rs      renders the command reference from those definitions
 │   ├── render/           what each outcome looks like
+│   ├── examples/         emitters: a `print!` around one generated artefact
 │   └── tests/            the architecture tests, from the top of the graph
 │
 ├── lemonfiber-core/      lib — all logic, no UI, no terminal
@@ -32,6 +35,15 @@ crates/
 │
 └── lemonfiber-manifest/  lib — stack.toml parse + validate
 ```
+
+The `lemonfiber` package carries a library alongside its binary. The library holds
+only the clap definitions and the renderer that turns them into
+`reference/commands.md`; `main.rs` and everything it reaches stay in the binary. The
+split exists because the artefact is written by a program that is not this binary,
+and it has to read the same definitions rather than a second description of them.
+`cargo run --example reference` and `--example contract` are those programs; each is
+a `print!` around one function, and `just reference` and `just contract` redirect them
+to the file the tests compare against.
 
 `lemonfiber-core` re-exports the ports crate as `crate::ports`, so call sites read
 `ports::Engine` whichever crate they are in. Why the boundary is a crate rather

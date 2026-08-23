@@ -222,7 +222,7 @@ mod tests {
             Arc::new(engine),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
-            Source::Embedded(&crate::cli::STACK),
+            Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,
         )

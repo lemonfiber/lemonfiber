@@ -10,42 +10,100 @@ use clap::{Args, Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::app::bundle::LINES;
 
-use crate::prompt::RawSetup;
-
 /// The stack this binary carries.
 ///
 /// Embedding it means the common install has one thing to fetch rather than
 /// two, and `build.rs` has already refused to produce this binary if the
 /// manifest is one it could not read.
-pub(crate) static STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+pub static STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+
+/// The setup flags exactly as the command line gives them, before they are typed
+/// and checked — a plain carrier so the parse is one argument, not a dozen.
+///
+/// This is also the command line's own declaration of them, flattened into the
+/// subcommand: one list of flags rather than a definition here and a copy there,
+/// which is a copy that only ever falls out of step in one direction.
+#[derive(Debug, Default, clap::Args)]
+pub struct RawSetup {
+    /// Apply without a prompt to confirm — required for an unattended run.
+    #[arg(long)]
+    pub yes: bool,
+    /// How to fetch content: `both`, `usenet`, `torrent`, or `none`.
+    #[arg(long, value_name = "PROTOCOLS")]
+    pub protocols: Option<String>,
+    /// Where the library and downloads live.
+    #[arg(long, value_name = "PATH")]
+    pub data_location: Option<PathBuf>,
+    /// An indexer's API base URL.
+    #[arg(long, value_name = "URL")]
+    pub indexer_url: Option<String>,
+    /// The indexer's API key.
+    #[arg(long, value_name = "KEY")]
+    pub indexer_key: Option<String>,
+    /// The Usenet provider's hostname.
+    #[arg(long, value_name = "HOST")]
+    pub usenet_host: Option<String>,
+    /// The port the Usenet provider answers on (defaults to 563).
+    #[arg(long, value_name = "PORT")]
+    pub usenet_port: Option<u16>,
+    /// The Usenet account username.
+    #[arg(long, value_name = "USER")]
+    pub usenet_user: Option<String>,
+    /// The Usenet account password.
+    #[arg(long, value_name = "PASS")]
+    pub usenet_pass: Option<String>,
+    /// Whether the Usenet connection uses TLS (defaults to yes).
+    #[arg(long, value_name = "BOOL")]
+    pub usenet_tls: Option<bool>,
+    /// How to serve the library: `docker`, `native`, or `none`.
+    #[arg(long, value_name = "MODE")]
+    pub library: Option<String>,
+    /// The container user, as `UID:GID`.
+    #[arg(long, value_name = "UID:GID")]
+    pub service_user: Option<String>,
+    /// Whether a VPN carries the torrent traffic. Where torrents are chosen and
+    /// this is absent, the run proceeds unprotected and records that it did.
+    #[arg(long, value_name = "BOOL")]
+    pub vpn: Option<bool>,
+    /// Whether others in the home will use it.
+    #[arg(long, value_name = "BOOL")]
+    pub household: Option<bool>,
+    /// What to be told about: `problems`, `completions`, or `everything`.
+    #[arg(long, value_name = "APPETITE")]
+    pub notifications: Option<String>,
+    /// Whether to start the stack when the machine boots.
+    #[arg(long, value_name = "BOOL")]
+    pub autostart: Option<bool>,
+}
 
 /// Set up and run your media stack.
 #[derive(Debug, Parser)]
 #[command(name = "lemonfiber", version, about)]
-pub(crate) struct Cli {
+pub struct Cli {
     /// Print machine-readable output.
     #[arg(long, global = true)]
-    pub(crate) json: bool,
+    pub json: bool,
 
     /// Say what would happen, and change nothing.
     #[arg(long, global = true)]
-    pub(crate) dry_run: bool,
+    pub dry_run: bool,
 
     /// Take the stack from a run that claimed it and did not give it back.
     #[arg(long, global = true)]
-    pub(crate) force: bool,
+    pub force: bool,
 
     /// Operate a stack directory of your own instead of the built-in one.
     #[arg(long, global = true, value_name = "PATH")]
-    pub(crate) stack_dir: Option<PathBuf>,
+    pub stack_dir: Option<PathBuf>,
 
+    /// What was asked for, or nothing at all — which is the terminal interface.
     #[command(subcommand)]
-    pub(crate) command: Option<Request>,
+    pub command: Option<Request>,
 }
 
 /// What the operator asked for.
 #[derive(Debug, Subcommand)]
-pub(crate) enum Request {
+pub enum Request {
     /// Set up the stack by answering a few questions.
     ///
     /// Interactive by default. Given the flags below, it runs unattended: each
@@ -53,6 +111,7 @@ pub(crate) enum Request {
     /// the confirmation. A non-interactive run missing a flag it needs is told
     /// which, rather than left waiting on input that will not come.
     Setup {
+        /// The answers, as the command line gives them.
         #[command(flatten)]
         flags: RawSetup,
     },
@@ -138,11 +197,13 @@ pub(crate) enum Request {
     },
     /// Read or change one setting.
     Config {
+        /// Which of the three things to do with a setting.
         #[command(subcommand)]
         action: ConfigAction,
     },
     /// Choose how good your media should look, in plain language.
     Quality {
+        /// Which of the four things to do with the quality choice.
         #[command(subcommand)]
         action: QualityCommand,
     },
@@ -158,6 +219,7 @@ pub(crate) enum Request {
         /// leading. Only something this run warns about can be answered.
         #[arg(long, value_name = "CHECK", conflicts_with = "fix")]
         accept: Option<String>,
+        /// How much putting-right this run was given consent for.
         #[command(flatten)]
         mending: Mending,
     },
@@ -269,16 +331,17 @@ pub(crate) enum Request {
 /// other set of flags is — a flag added to one list and not the other is a flag that
 /// silently does nothing.
 #[derive(Debug, Args)]
-pub(crate) struct Mending {
+pub struct Mending {
+    /// Changing things forward, and what was agreed to first.
     #[command(flatten)]
-    pub(crate) fixing: Fixing,
+    pub fixing: Fixing,
     /// Put back what the last repair changed.
     ///
     /// Asked for the same way a repair is, because it is the same errand read
     /// backwards. It reverses that one repair and nothing else: the wiring lemonfiber
     /// seeded and the choices your first run wrote are left where they are.
     #[arg(long, conflicts_with = "fix")]
-    pub(crate) undo: bool,
+    pub undo: bool,
 }
 
 impl Mending {
@@ -286,7 +349,8 @@ impl Mending {
     ///
     /// Asked as one question so the caller deciding between looking and acting does not
     /// have to know which combination of flags amounts to acting.
-    pub(crate) fn acts(&self) -> bool {
+    #[must_use]
+    pub fn acts(&self) -> bool {
         self.fixing.fix || self.undo
     }
 }
@@ -297,23 +361,23 @@ impl Mending {
 /// here describe one run that changes things forward, and each is meaningless without the
 /// first of them.
 #[derive(Debug, Args)]
-pub(crate) struct Fixing {
+pub struct Fixing {
     /// Offer to put right what lemonfiber can, asking about each first.
     ///
     /// A plain run only looks. This one says what each repair would do and what else
     /// changes if it does, and waits to be told.
     #[arg(long)]
-    pub(crate) fix: bool,
+    pub fix: bool,
     /// Carry the repairs out without asking, having decided in advance.
     #[arg(long, requires = "fix")]
-    pub(crate) yes: bool,
+    pub yes: bool,
     /// Include the checks that disturb the running system while repairing.
     ///
     /// Named apart from the field it sits beside: `doctor` already has a `--disruptive`,
     /// and clap keys an argument by the field name unless told otherwise — so two flags
     /// that read differently on the command line would be one argument underneath.
     #[arg(id = "fix-disruptive", long = "fix-disruptive", requires = "fix")]
-    pub(crate) disruptive: bool,
+    pub disruptive: bool,
 }
 
 /// What a support bundle was asked for.
@@ -322,34 +386,34 @@ pub(crate) struct Fixing {
 /// six would otherwise be written out again by whoever passes them on — and a flag added
 /// to one list and not the other is a flag that silently does nothing.
 #[derive(Debug, Args)]
-pub(crate) struct Asked {
+pub struct Asked {
     /// Produce the bundle, having seen what it would hold.
     #[arg(long)]
-    pub(crate) write: bool,
+    pub write: bool,
     /// Where to write it, instead of into this directory.
     #[arg(long, value_name = "PATH")]
-    pub(crate) out: Option<PathBuf>,
+    pub out: Option<PathBuf>,
     /// How many log lines to take from each service.
     #[arg(long, value_name = "LINES", default_value_t = LINES)]
-    pub(crate) logs: u32,
+    pub logs: u32,
     /// Include media filenames, which are replaced by default.
     #[arg(long)]
-    pub(crate) filenames: bool,
+    pub filenames: bool,
     /// Show one setting as it is, named exactly as the bundle names it.
     ///
     /// Repeatable, and refused without `--confirm` on the same run: a flag that
     /// publishes a credential is not one to honour because it turned up on a
     /// command line somebody copied.
     #[arg(long, value_name = "SETTING")]
-    pub(crate) reveal: Vec<String>,
+    pub reveal: Vec<String>,
     /// Confirm showing the settings named by `--reveal`.
     #[arg(long)]
-    pub(crate) confirm: bool,
+    pub confirm: bool,
 }
 
 /// What to do with settings.
 #[derive(Debug, Subcommand)]
-pub(crate) enum QualityCommand {
+pub enum QualityCommand {
     /// Show the quality choice in force, and what each preset means and costs.
     Show,
     /// Choose a preset — for everything, or for one media type.
@@ -381,8 +445,9 @@ pub(crate) enum QualityCommand {
     },
 }
 
+/// What to do with one setting, or with all of them.
 #[derive(Debug, Subcommand)]
-pub(crate) enum ConfigAction {
+pub enum ConfigAction {
     /// Read one setting.
     Get {
         /// The setting to read.
