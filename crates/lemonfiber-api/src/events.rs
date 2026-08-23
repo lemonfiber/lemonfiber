@@ -21,12 +21,12 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{header, HeaderMap, HeaderValue, Response};
+use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::get;
 use axum::Router;
 
 use crate::guard::Token;
-use crate::serve::{admitted, refused};
+use crate::serve::{admitted, carrying, refused, STREAM};
 
 use self::live::{Listening, Live};
 
@@ -83,12 +83,5 @@ pub fn held(listening: Listening) -> Response<Body> {
         let said = listening.next().await?;
         Some((Ok::<String, Infallible>(said), listening))
     });
-    let mut response = Response::new(Body::from_stream(talking));
-    let headers = response.headers_mut();
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("text/event-stream"),
-    );
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
+    carrying(StatusCode::OK, STREAM, Body::from_stream(talking))
 }

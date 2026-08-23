@@ -17,24 +17,25 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
-use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
-use lemonfiber_fixtures::ports::Idle;
+use lemonfiber_fixtures::ports::{Chance, Idle};
 use lemonfiber_fixtures::support::Reporting;
 use tower::ServiceExt as _;
 
-/// Hands back bytes the test chose, so a token is the same one twice.
-struct Given;
-
-impl Random for Given {
-    fn bytes(&self, _: usize) -> Option<Vec<u8>> {
-        Some(vec![0x00, 0x0f, 0xa5, 0xff])
-    }
+/// Bytes the test chose, so a token is the same one twice.
+///
+/// Cycled to whatever width is asked for: a source that answers short mints no
+/// token at all, and every request here would then be refused for that instead of
+/// answered for what it asked.
+fn given() -> Chance {
+    Chance::cycling()
 }
 
-/// The token every request here carries, as it is written.
-const WRITTEN: &str = "000fa5ff";
+/// The token every request here carries, read back from the run that minted it.
+fn written() -> Option<String> {
+    Token::mint(&given()).map(|token| token.as_str().to_owned())
+}
 
 /// Built rather than parsed: an address made of numbers cannot fail to be one.
 fn bound() -> SocketAddr {
@@ -76,17 +77,18 @@ fn running() -> Reporting {
 
 /// The status and body a request to this path is answered with.
 async fn asked(ctx: Ctx, path: &str) -> Option<(StatusCode, String)> {
+    let carried = written()?;
     answered(
         ctx,
         path,
-        &[("host", "127.0.0.1:8471"), (TOKEN_HEADER, WRITTEN)],
+        &[("host", "127.0.0.1:8471"), (TOKEN_HEADER, &carried)],
     )
     .await
 }
 
 /// The same, for a request that says something else about itself.
 async fn answered(ctx: Ctx, path: &str, said: &[(&str, &str)]) -> Option<(StatusCode, String)> {
-    let token = Token::mint(&Given)?;
+    let token = Token::mint(&given())?;
     let router = routes(Serving {
         ctx: Arc::new(ctx),
         token: Arc::new(token),

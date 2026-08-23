@@ -31,10 +31,13 @@ use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 use lemonfiber_fixtures::support::Reporting;
 use tokio::time::Instant;
 
-/// The bytes this run's token is minted from, and the token they spell.
-const MINTED: [u8; 4] = [0x00, 0x0f, 0xa5, 0xff];
-/// What those bytes spell.
-const WRITTEN: &str = "000fa5ff";
+/// Bytes this run's token is minted from.
+///
+/// Cycled to whatever width is asked for: a source that answers short mints no
+/// token at all, and every listener here would be refused rather than answered.
+fn given() -> Chance {
+    Chance::cycling()
+}
 
 /// More than a listener may fall behind by before it is cut loose.
 const FLOOD: usize = 200;
@@ -73,7 +76,7 @@ impl Serving {
     /// A server opening now, with a token a test can carry.
     fn opening() -> Self {
         let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
-        let streaming = Token::mint(&Chance::exactly(Some(MINTED.to_vec()))).map(|token| {
+        let streaming = Token::mint(&given()).map(|token| {
             Arc::new(Streaming {
                 token,
                 bound: ([127, 0, 0, 1], 8471).into(),
@@ -81,6 +84,13 @@ impl Serving {
             })
         });
         Self { streaming, live }
+    }
+
+    /// This run's token, as a caller must send it back.
+    fn token(&self) -> String {
+        self.streaming
+            .as_ref()
+            .map_or_else(String::new, |streaming| streaming.token.as_str().to_owned())
     }
 
     /// What a request saying these headers is answered with.
@@ -105,8 +115,8 @@ fn saying(said: &[(&str, &str)]) -> HeaderMap {
 }
 
 /// What a listener from this machine carrying this run's token says.
-fn welcome() -> Vec<(&'static str, &'static str)> {
-    vec![(TOKEN_HEADER, WRITTEN), ("host", "localhost:8471")]
+fn welcome(token: &str) -> Vec<(&str, &str)> {
+    vec![(TOKEN_HEADER, token), ("host", "localhost:8471")]
 }
 
 /// Say one thing to everyone listening.
@@ -176,7 +186,7 @@ async fn a_request_carrying_no_token_is_refused_here_as_anywhere() {
     );
     assert_eq!(
         typed(answer.as_ref()),
-        Some(&HeaderValue::from_static("application/json")),
+        Some(&HeaderValue::from_static("text/plain; charset=utf-8")),
         "a refusal is answered with, not streamed"
     );
 }
@@ -186,7 +196,10 @@ async fn a_request_naming_another_address_is_refused_here_as_anywhere() {
     let serving = Serving::opening();
 
     let answer = serving
-        .answering(&[(TOKEN_HEADER, WRITTEN), ("host", "example.com:8471")])
+        .answering(&[
+            (TOKEN_HEADER, &serving.token()),
+            ("host", "example.com:8471"),
+        ])
         .await;
 
     assert_eq!(
@@ -199,7 +212,7 @@ async fn a_request_naming_another_address_is_refused_here_as_anywhere() {
 async fn an_admitted_listener_is_answered_with_a_stream_it_can_hold_open() {
     let serving = Serving::opening();
 
-    let answer = serving.answering(&welcome()).await;
+    let answer = serving.answering(&welcome(&serving.token())).await;
 
     assert_eq!(answer.as_ref().map(Response::status), Some(StatusCode::OK));
     assert_eq!(
@@ -217,7 +230,7 @@ async fn an_admitted_listener_is_answered_with_a_stream_it_can_hold_open() {
 #[tokio::test]
 async fn a_listener_hears_what_is_said_after_it_arrives() {
     let serving = Serving::opening();
-    let answer = serving.answering(&welcome()).await;
+    let answer = serving.answering(&welcome(&serving.token())).await;
 
     say(&serving.live, "a service restarted").await;
 
@@ -233,7 +246,8 @@ async fn a_listener_that_comes_back_is_handed_the_record_it_missed_first() {
     let seen = say(&serving.live, "before the gap").await;
     say(&serving.live, "during the gap").await;
 
-    let mut carried = welcome();
+    let token = serving.token();
+    let mut carried = welcome(&token);
     let id = seen.as_ref().map(Event::id).unwrap_or_default();
     carried.push((LAST_EVENT_ID, id));
     let heard = first(serving.answering(&carried).await).await;

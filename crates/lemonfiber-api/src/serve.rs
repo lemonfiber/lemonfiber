@@ -70,35 +70,55 @@ pub fn admitted(headers: &HeaderMap, token: &Token, bound: SocketAddr) -> Result
     Ok(())
 }
 
+/// What an envelope is served as.
+pub(crate) const JSON: &str = "application/json";
+
+/// What a stream a client holds open is served as.
+pub(crate) const STREAM: &str = "text/event-stream";
+
+/// What a sentence this surface says in its own words is served as.
+///
+/// A refusal and a request that could not be read are prose, not payloads. They
+/// are labelled as prose so that a caller parsing what it was told it was given
+/// is not handed a sentence to parse as an envelope.
+pub(crate) const SENTENCE: &str = "text/plain; charset=utf-8";
+
 /// The envelope, as the contract states it.
 ///
 /// The body arrives already rendered, because the rendering that answers the
 /// command line is the rendering that answers here.
 #[must_use]
 pub fn answered(rendered: String) -> Response<Body> {
-    build(StatusCode::OK, rendered)
+    carrying(StatusCode::OK, JSON, Body::from(rendered))
 }
 
 /// A refusal, said plainly rather than as a bare status.
 #[must_use]
 pub fn refused(refusal: Refusal) -> Response<Body> {
-    build(refusal.status(), refusal.said().to_owned())
+    carrying(refusal.status(), SENTENCE, Body::from(refusal.said()))
 }
 
-/// A response carrying a body this surface produced.
+/// Every response this surface produces, wearing the headers all of them carry.
+///
+/// One place rather than one per handler: a header a caller's safety rests on is
+/// carried by a response having been built here, not by whoever built it having
+/// remembered. The bodies differ and the type they are labelled with differs;
+/// nothing else about them does.
 ///
 /// Built rather than assembled through a builder: a builder hands back a result
 /// whose error arm nothing here can reach, and an arm nothing reaches is one no
 /// test can cover.
-fn build(status: StatusCode, body: String) -> Response<Body> {
-    let mut response = Response::new(Body::from(body));
+#[must_use]
+pub(crate) fn carrying(status: StatusCode, sort: &'static str, body: Body) -> Response<Body> {
+    let mut response = Response::new(body);
     *response.status_mut() = status;
     let headers = response.headers_mut();
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-    );
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(sort));
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
     response
 }
 

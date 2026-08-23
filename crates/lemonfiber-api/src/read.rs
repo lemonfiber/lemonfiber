@@ -17,9 +17,10 @@
 //! one command is two names for one answer, which is the opposite of two gathers
 //! that can disagree.
 
+use axum::body::Body;
 use axum::extract::{RawQuery, State};
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, logs, Command, Ctx};
@@ -29,7 +30,7 @@ use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::{LogLine, LogQuery};
 
 use crate::router::Serving;
-use crate::serve::answered;
+use crate::serve::{answered, carrying, SENTENCE};
 
 /// The parameter naming a form to narrow to.
 const FORM: &str = "form";
@@ -209,7 +210,11 @@ fn went_wrong(problem: &Problem) -> Response {
 #[must_use]
 pub fn enveloped(status: StatusCode, rendered: Option<String>) -> Response {
     let Some(body) = rendered else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, UNRENDERABLE).into_response();
+        return carrying(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            SENTENCE,
+            Body::from(UNRENDERABLE),
+        );
     };
     let mut response = answered(body);
     *response.status_mut() = status;
@@ -222,7 +227,7 @@ pub fn enveloped(status: StatusCode, rendered: Option<String>) -> Response {
 /// mistake to correct rather than a request to answer with everything, which is
 /// the judgement the command line makes before the core is reached.
 fn unreadable(said: &'static str) -> Response {
-    (StatusCode::BAD_REQUEST, said).into_response()
+    carrying(StatusCode::BAD_REQUEST, SENTENCE, Body::from(said))
 }
 
 /// The diagnosis a request asked for, or nothing where it named a group of checks
