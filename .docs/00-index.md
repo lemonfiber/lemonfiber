@@ -1,4 +1,4 @@
-# cli/.docs
+# lemonfiber/.docs
 
 Repo-local technical documentation — the Rust-specific *how*. Product decisions
 live in the [spec](https://github.com/lemonfiber/spec); this tree holds only what
@@ -9,8 +9,7 @@ comments — `GOV-R6`). These pages, in turn, cite the spec.
 
 | Area | Holds |
 |------|-------|
-| `architecture/` | How subsystems are built — render loop, Docker split, the VPN port-push mechanism |
-| `adr/` | Repo-local decisions (crate choices, not product ones) |
+| `architecture/` | How subsystems are built — the ports boundary, dispatch, the engine API, the embedded stack, the error model |
 | `conventions/` | Naming, error style; the comment policy is canonical in the spec |
 
 See the three-layer model in

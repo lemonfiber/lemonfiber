@@ -9,7 +9,8 @@ repo.
 
 ## What this repo is
 
-The `lemonfiber` binary — CLI, TUI and web UI over one core. Rust workspace. See
+The `lemonfiber` binary — CLI and TUI over one core, plus the local HTTP API the
+web surface draws. Rust workspace. See
 the spec: [`30-repos/lemonfiber.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/lemonfiber.md),
 [`30-repos/lemonfiber-tui.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/lemonfiber-tui.md),
 [`30-repos/lemonfiber-reference.md`](https://github.com/lemonfiber/spec/blob/main/30-repos/lemonfiber-reference.md).
@@ -43,7 +44,8 @@ the logic and the rendering must stay separate.
 
 ## Before you open a PR
 
-- `just ci` passes (fmt, clippy `-D warnings`, test, cargo-deny).
+- `just ci` passes (fmt, clippy `-D warnings`, test, typos, cargo-deny), and
+  `just coverage` holds the 100% line that CI's sonar job enforces.
 - Your change cites a spec identifier in a commit `Spec:` trailer and the PR body.
 - Behaviour change? The spec PR merged first.
 - The [definition of done](https://github.com/lemonfiber/spec/blob/main/40-quality/definition-of-done.md) is met.

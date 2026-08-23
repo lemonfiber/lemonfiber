@@ -12,7 +12,7 @@ mechanics.
 ```
 crates/
 ├── lemonfiber/           bin — the only crate that knows about a screen
-│   ├── cli/              clap definitions, non-interactive paths
+│   ├── cli.rs            clap definitions, non-interactive paths
 │   ├── render/           what each outcome looks like
 │   └── tests/            the architecture tests, from the top of the graph
 │

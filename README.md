@@ -10,7 +10,7 @@
 <p align="center">
   The <code>lemonfiber</code> binary: one tool that sets up your media stack,
   runs it in slices, and proves it's working.<br>
-  CLI, TUI and a local web UI over one core. Rust.
+  CLI and TUI over one core, and the API the web surface draws. Rust.
 </p>
 
 <p align="center">
@@ -23,12 +23,12 @@
 
 ---
 
-> **Status: early (`0.1.0`).** The core, compose driver, CLI, and the first
-> diagnostics (`doctor`, VPN leak test) are built; the setup wizard, seed, and
-> TUI are not yet, and release artifacts are source-only until M6. See
-> [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for built-vs-roadmap and
-> the [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
-> (this repo is milestones **M2–M6**).
+> **Status: shipping (`0.8.0`).** The core, compose driver, CLI, setup wizard
+> and the trust checks are built and released; the TUI, seed and lifecycle work
+> are under way. See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for
+> built-vs-roadmap and the
+> [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
+> (this repo is milestones **M2–M10**).
 
 ## What it is
 
@@ -37,29 +37,34 @@ Jellyfin, Seerr — and does the parts that are usually manual: guided setup, wi
 services together, and **verifying** things work rather than assuming they do
 (is the VPN actually isolating traffic? are imports hardlinking?).
 
-Run it three ways, one core behind all of them:
+Run it two ways, one core behind both:
 
 ```
 lemonfiber up tv        # scriptable
 lemonfiber              # a terminal dashboard
-lemonfiber ui           # a local web page
 ```
+
+A third surface, the web UI, is its own repository
+([ADR-0011](https://github.com/lemonfiber/spec/blob/main/00-overview/decisions/0011-web-surface-as-a-fifth-repo.md)):
+a single-page app that speaks to a local HTTP API this binary serves.
 
 ## The one load-bearing property
 
 **`lemonfiber-core` cannot render.** It has no UI dependency of any kind — no
 terminal, no HTTP server. A surface (CLI, TUI, web) is a *rendering*, never a
-capability. This is enforced by the crate graph, not by review. See spec
+capability, which is what lets the web surface live in another repository at all. This is enforced by the crate graph, not by review. See spec
 [`ARCH-R11`](https://github.com/lemonfiber/spec/blob/main/20-architecture/component-model.md).
 
 ## Layout
 
 ```
 crates/
-├── lemonfiber/         bin — the only crate that renders (CLI, TUI, web)
-├── lemonfiber-core/    lib — all logic, no UI
-└── lemonfiber-manifest/ lib — parses stack.toml
-.docs/                  repo-local technical docs (Rust-specific HOW)
+├── lemonfiber/          bin — the only crate that renders (CLI, TUI)
+├── lemonfiber-core/     lib — all logic, no UI
+├── lemonfiber-ports/    lib — the boundary and its vocabulary
+├── lemonfiber-manifest/ lib — parses stack.toml
+└── lemonfiber-fixtures/ lib — shared test fixtures
+.docs/                   repo-local technical docs (Rust-specific HOW)
 ```
 
 ## Building

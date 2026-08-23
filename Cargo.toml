@@ -12,7 +12,7 @@ rust-version = "1.82"
 repository = "https://github.com/lemonfiber/lemonfiber"
 authors = ["NightWorks.io"]
 
-# Versions are declared once here so the three crates cannot drift onto
+# Versions are declared once here so the workspace's crates cannot drift onto
 # different minors of the same dependency. See spec 30-repos/lemonfiber.md.
 [workspace.dependencies]
 async-trait = "0.1"
