@@ -64,7 +64,16 @@ jobs:
         # we specify bash to get pipefail; it guards against the `curl` command
         # failing. otherwise `sh` won't catch that `curl` returned non-0
         shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.32.0/cargo-dist-installer.sh | sh"
+        env:
+          DIST_INSTALLER_URL: "https://github.com/axodotdev/cargo-dist/releases/download/v0.32.0/cargo-dist-installer.sh"
+          DIST_INSTALLER_SHA256: "b657cf8c04a8b7bc28f39d220f7e6dd11bbd2bdb072c552262bd9ccf597261b5"
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -LsSf "$DIST_INSTALLER_URL" \
+            -o "$RUNNER_TEMP/dist-installer.sh"
+          echo "$DIST_INSTALLER_SHA256  $RUNNER_TEMP/dist-installer.sh" \
+            | sha256sum --check --strict -
+          sh "$RUNNER_TEMP/dist-installer.sh"
       - name: Cache dist
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

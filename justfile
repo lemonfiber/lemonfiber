@@ -106,6 +106,11 @@ typos:
 #  - cargo-dist always ends the release by publishing (`--draft=false`); OPS-R1
 #    wants a tag to leave a DRAFT a maintainer publishes, and there is no config
 #    for "stay drafted", so we flip that one flag.
+#
+# The generated file is then re-hardened: actions get pinned to commit SHAs, and
+# the dist installer gets fetched and checked against a pinned digest instead of
+# being piped from a mutable release asset straight into `sh`. Each patch has a
+# guard below, because a patch that stopped applying is one nobody would notice.
 # Python (not sed -i) keeps this portable across macOS/Linux.
 release-workflow:
     python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('allow-dirty = [\"ci\"]\n', ''))"
@@ -113,7 +118,9 @@ release-workflow:
     python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('github-attestations = true\n', 'github-attestations = true\nallow-dirty = [\"ci\"]\n', 1))"
     python3 -c "import pathlib; p=pathlib.Path('.github/workflows/release.yml'); p.write_text(p.read_text().replace('gh release create \"', 'gh release create --draft \"'))"
     python3 scripts/pin_release_actions.py
+    python3 scripts/verify_dist_installer.py
     @grep -q 'gh release create --draft' .github/workflows/release.yml || (echo "draft patch failed to apply" && exit 1)
+    @grep -q 'DIST_INSTALLER_SHA256' .github/workflows/release.yml || (echo "installer verification patch failed to apply" && exit 1)
     @grep -q 'allow-dirty = ' Cargo.toml || (echo "allow-dirty not restored" && exit 1)
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.
