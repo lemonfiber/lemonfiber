@@ -1,4 +1,4 @@
-//! Parsing of `stack.toml`, the contract between `lemonfiber` and `media-stack`.
+//! Parsing of `stack.toml`, the contract between `lemonfiber` and `lemonfiber-media-stack`.
 //! See spec `20-architecture/contracts/stack-manifest.md`.
 //!
 //! This crate is deliberately inert: it reads a manifest into types and refuses

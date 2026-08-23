@@ -1,9 +1,9 @@
 # OSI-approved SPDX licence identifiers.
 #
-# Vendored here rather than shared with media-stack's copy: a stack of somebody
-# else's does not ship one, and this validator has to work against any manifest.
-# The two are expected to agree; if they drift, media-stack's is the one a
-# maintainer edits and this one follows.
+# Vendored here rather than shared with lemonfiber-media-stack's copy: a stack of
+# somebody else's does not ship one, and this validator has to work against any
+# manifest. The two are expected to agree; if they drift, the copy in
+# lemonfiber-media-stack is the one a maintainer edits and this one follows.
 #
 # A curated subset of the SPDX licence list, restricted to identifiers OSI has
 # approved. It is vendored rather than fetched so that validation is offline,
