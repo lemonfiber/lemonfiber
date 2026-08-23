@@ -13,6 +13,7 @@ use lemonfiber_core::app::{
     claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started,
     supervise, Command, Ctx, WATCH,
 };
+use lemonfiber_core::model::kind;
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
@@ -51,7 +52,7 @@ pub(crate) async fn stream(
         if json {
             emit!(
                 "{}",
-                Envelope::new("log", &line)
+                Envelope::new(kind::LOG, &line)
                     .to_json()
                     .unwrap_or(UNRENDERABLE.to_owned())
             );

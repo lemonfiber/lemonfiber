@@ -30,7 +30,7 @@
 use serde::Serialize;
 
 /// A word this product uses, and what somebody meeting it needs to know.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Term {
     /// The word as it appears in the interface.
     pub word: &'static str,

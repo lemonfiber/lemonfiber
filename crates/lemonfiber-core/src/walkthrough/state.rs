@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::Step;
 
 /// What has become of a walkthrough.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum State {
     /// Presented at the end of setup, not yet answered.

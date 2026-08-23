@@ -1,0 +1,845 @@
+{
+  "api_version": 1,
+  "kinds": {
+    "error": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Problem"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Code": {
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Codes are declared as constants beside the code\nthat raises them, and are never recycled.",
+          "type": "string"
+        },
+        "Problem": {
+          "description": "Something that went wrong, in the form an operator can act on.",
+          "type": "object",
+          "properties": {
+            "cause": {
+              "description": "The problem that produced this one, where several share a root.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Problem"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "code": {
+              "description": "The stable identifier for this kind of problem.",
+              "$ref": "#/$defs/Code"
+            },
+            "detail": {
+              "description": "The underlying technical detail, available but never leading.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "meaning": {
+              "description": "What it means for the operator.",
+              "type": "string"
+            },
+            "remedies": {
+              "description": "What to do, most likely first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Remedy"
+              }
+            },
+            "severity": {
+              "description": "How much it matters.",
+              "$ref": "#/$defs/Severity"
+            },
+            "state": {
+              "description": "Where it stands with respect to being fixed.",
+              "$ref": "#/$defs/State"
+            },
+            "summary": {
+              "description": "What happened, in one plain sentence.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "severity",
+            "state",
+            "summary",
+            "meaning",
+            "remedies"
+          ]
+        },
+        "Remedy": {
+          "description": "One thing the operator can do about a problem.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "The action, phrased as something to do rather than something to know.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where to look, when that helps.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        "Severity": {
+          "description": "How much a problem matters.\n\nFour levels, deliberately. More would not be applied consistently, and\ninconsistent severity is worse than coarse severity.",
+          "oneOf": [
+            {
+              "description": "Informational; nothing is required.",
+              "type": "string",
+              "const": "advisory"
+            },
+            {
+              "description": "Degraded or risky, still working.",
+              "type": "string",
+              "const": "warning"
+            },
+            {
+              "description": "Something is broken.",
+              "type": "string",
+              "const": "error"
+            },
+            {
+              "description": "Consequences outside the machine, or data at risk.",
+              "type": "string",
+              "const": "critical"
+            }
+          ]
+        },
+        "State": {
+          "description": "Where a problem stands with respect to being fixed.",
+          "oneOf": [
+            {
+              "description": "A remedy is available here.",
+              "type": "string",
+              "const": "actionable"
+            },
+            {
+              "description": "The operator must act, somewhere else.",
+              "type": "string",
+              "const": "guided"
+            },
+            {
+              "description": "lemonfiber can fix this itself.",
+              "type": "string",
+              "const": "remediable"
+            },
+            {
+              "description": "No known remedy; escalation is offered instead.",
+              "type": "string",
+              "const": "unknown"
+            },
+            {
+              "description": "Acknowledged, and not re-shown until it recurs.",
+              "type": "string",
+              "const": "suppressed"
+            }
+          ]
+        }
+      }
+    },
+    "log": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/LogLine"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "LogLine": {
+          "description": "One line of output from one service.\n\nSerialisable because a log stream is part of the machine-readable contract:\n`--json` renders one envelope per line, since a stream has no last element\nto close a document with.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When the container itself says it wrote the line, where it said so.\n\nKept verbatim and unparsed. Containers disagree with the host clock and\nwith each other, and the only defensible ordering is each container's own\naccount of itself — which a reader can only apply if it is carried\nrather than replaced by an arrival time.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "line": {
+              "description": "The line, without its trailing newline.",
+              "type": "string"
+            },
+            "service": {
+              "description": "The Compose service it came from.",
+              "type": "string"
+            },
+            "stream": {
+              "description": "Which stream it arrived on.",
+              "$ref": "#/$defs/Stream"
+            }
+          },
+          "required": [
+            "service",
+            "stream",
+            "line"
+          ]
+        },
+        "Stream": {
+          "description": "Which stream a log line arrived on.",
+          "oneOf": [
+            {
+              "description": "Standard output.",
+              "type": "string",
+              "const": "stdout"
+            },
+            {
+              "description": "Standard error.",
+              "type": "string",
+              "const": "stderr"
+            }
+          ]
+        }
+      }
+    },
+    "setup": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/SetupReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Protocols": {
+          "description": "Which download protocols the operator actually has accounts for.\n\nA form names both, because a form describes what it *does* rather than what\nthis operator has paid for. Narrowing happens afterwards, so a tunnel is\nnever started with credentials that were never supplied.",
+          "type": "object",
+          "properties": {
+            "torrent": {
+              "description": "A VPN and torrent client are configured.",
+              "type": "boolean"
+            },
+            "usenet": {
+              "description": "A Usenet provider is configured.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "usenet",
+            "torrent"
+          ]
+        },
+        "SetupOutcome": {
+          "description": "How a setup run ended.",
+          "oneOf": [
+            {
+              "description": "The reviewed answers were written.",
+              "type": "string",
+              "const": "applied"
+            },
+            {
+              "description": "The plan was seen and not applied; nothing was written.",
+              "type": "string",
+              "const": "abandoned"
+            },
+            {
+              "description": "Nothing was asked, because this machine was already set up.",
+              "type": "string",
+              "const": "already-set-up"
+            }
+          ]
+        },
+        "SetupReport": {
+          "description": "What a setup run came to, and what it settled on.\n\n**Deliberately not the settings themselves.** Setup writes an indexer key and a\nservice password among them, and a report a script can read is a report a script\ncan log — into a file, a CI transcript, somebody's terminal history. So this says\nwhat was *decided* and never what was *entered*, and the fields are chosen one at\na time rather than by serialising a struct that might later gain a secret.\n\nThe indexer's address is left out for that reason rather than because it is\nitself a secret: it is entered beside its key, and the two travel together in\nevery place an operator copies them from.",
+          "type": "object",
+          "properties": {
+            "data_root": {
+              "description": "Where the library was put, where a location was chosen.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcome": {
+              "description": "How the run ended.",
+              "$ref": "#/$defs/SetupOutcome"
+            },
+            "protocols": {
+              "description": "Which ways of downloading the stack was set up for.",
+              "$ref": "#/$defs/Protocols"
+            },
+            "service_user": {
+              "description": "The user the services run as, as `uid:gid`, where one was set.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "outcome",
+            "protocols"
+          ]
+        }
+      }
+    },
+    "walkthrough": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/WalkthroughReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Handover": {
+          "description": "Where a finished walkthrough leaves the operator.",
+          "type": "object",
+          "properties": {
+            "next": {
+              "description": "What to do next, in order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Next"
+              }
+            }
+          },
+          "required": [
+            "next"
+          ]
+        },
+        "Line": {
+          "description": "One narrated line: a step, and what was specifically true of it.",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "description": "What was specifically true — the evidence that makes the line worth reading\nrather than a spinner. Empty where there is nothing particular to say.",
+              "type": "string"
+            },
+            "said": {
+              "description": "What it is doing, in plain language.",
+              "type": "string"
+            },
+            "step": {
+              "description": "The step being narrated.",
+              "$ref": "#/$defs/Step"
+            }
+          },
+          "required": [
+            "step",
+            "said",
+            "detail"
+          ]
+        },
+        "Link": {
+          "description": "What the import did with the finished download — the difference between one copy of a\nfile and two.",
+          "oneOf": [
+            {
+              "description": "The library entry and the download are the same file under two names, which is\nwhat a correctly-shared volume allows and what costs no extra disk.",
+              "type": "string",
+              "const": "hardlinked"
+            },
+            {
+              "description": "The file was copied, so it now exists twice. Works, but every import costs its own\nsize again and seeding a torrent holds the second copy for as long as it seeds.",
+              "type": "string",
+              "const": "copied"
+            }
+          ]
+        },
+        "Next": {
+          "description": "One thing to do next.",
+          "oneOf": [
+            {
+              "description": "Add more content, now that the shape of it is understood.",
+              "type": "string",
+              "const": "more-content"
+            },
+            {
+              "description": "Let the rest of the household ask for things themselves.",
+              "type": "string",
+              "const": "household"
+            },
+            {
+              "description": "Watch it somewhere other than the machine it is running on.",
+              "type": "string",
+              "const": "client-apps"
+            }
+          ]
+        },
+        "Reason": {
+          "description": "Why a walkthrough could not go on.",
+          "oneOf": [
+            {
+              "description": "No indexer is configured, so there is nothing to search. Not a failure of the\nwalk — a reason not to offer it at all.",
+              "type": "string",
+              "const": "no-indexers"
+            },
+            {
+              "description": "The search could not be run: the indexers, or the service holding them, would not\nanswer.",
+              "type": "string",
+              "const": "indexers-failed"
+            },
+            {
+              "description": "The search ran cleanly and matched nothing. An entirely different problem from\nthe one above, and the one operators most often mistake for it.",
+              "type": "string",
+              "const": "nothing-matched"
+            },
+            {
+              "description": "Releases exist, but none meets the chosen quality preset. The stack is working;\nthe preset and what is out there disagree.",
+              "type": "string",
+              "const": "none-met-the-preset"
+            },
+            {
+              "description": "Torrents are in play and the tunnel is not verified up. Nothing is grabbed.",
+              "type": "string",
+              "const": "tunnel-down"
+            },
+            {
+              "description": "The release was never handed to a download client.",
+              "type": "string",
+              "const": "not-grabbed"
+            },
+            {
+              "description": "The download stopped making progress.",
+              "type": "string",
+              "const": "stalled"
+            },
+            {
+              "description": "The download finished and the library manager would not take it.",
+              "type": "string",
+              "const": "import-failed"
+            },
+            {
+              "description": "There is no media server in the running form to make it playable.",
+              "type": "string",
+              "const": "no-media-server"
+            },
+            {
+              "description": "It was imported, the media server was told, and it still cannot be found there.",
+              "type": "string",
+              "const": "not-visible"
+            }
+          ]
+        },
+        "Shape": {
+          "description": "Which walkthrough this stack is offered.",
+          "oneOf": [
+            {
+              "description": "The full walk: search, grab, download, import, and see it in the library.",
+              "type": "string",
+              "const": "pipeline"
+            },
+            {
+              "description": "The walk for a stack that acquires nothing: point at media already on disk and\nconfirm the media server can see it.",
+              "type": "string",
+              "const": "library-only"
+            }
+          ]
+        },
+        "State": {
+          "description": "What has become of a walkthrough.",
+          "oneOf": [
+            {
+              "description": "Presented at the end of setup, not yet answered.",
+              "type": "string",
+              "const": "offered"
+            },
+            {
+              "description": "Declined. Available later, and carrying no penalty — a stack that was set up is\nset up whether or not anyone watched it fetch something.",
+              "type": "string",
+              "const": "skipped"
+            },
+            {
+              "description": "Looking for releases.",
+              "type": "string",
+              "const": "searching"
+            },
+            {
+              "description": "Sending a release to the download client.",
+              "type": "string",
+              "const": "grabbing"
+            },
+            {
+              "description": "The download is running.",
+              "type": "string",
+              "const": "downloading"
+            },
+            {
+              "description": "Moving the finished download into the library.",
+              "type": "string",
+              "const": "importing"
+            },
+            {
+              "description": "It is in the library and playable.",
+              "type": "string",
+              "const": "complete"
+            },
+            {
+              "description": "Stopped at a named step, with a diagnosis.",
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "description": "The operator left part-way. Whatever was in flight stays in flight.",
+              "type": "string",
+              "const": "abandoned"
+            }
+          ]
+        },
+        "Step": {
+          "description": "One step of the walk, ordered from picking something to watching it play.",
+          "oneOf": [
+            {
+              "description": "Picking something to add, and confirming it is not already here.",
+              "type": "string",
+              "const": "choosing"
+            },
+            {
+              "description": "The indexers are being searched for releases.",
+              "type": "string",
+              "const": "searching"
+            },
+            {
+              "description": "A release is being sent to the download client.",
+              "type": "string",
+              "const": "grabbing"
+            },
+            {
+              "description": "The download is running.",
+              "type": "string",
+              "const": "downloading"
+            },
+            {
+              "description": "The \\*arr is moving the finished download into the library.",
+              "type": "string",
+              "const": "importing"
+            },
+            {
+              "description": "The media server is being told to look at what arrived.",
+              "type": "string",
+              "const": "scanning"
+            },
+            {
+              "description": "It is in the library and playable.",
+              "type": "string",
+              "const": "available"
+            }
+          ]
+        },
+        "Stopped": {
+          "description": "A walkthrough that stopped: where, why, what the services were saying, and what to do.",
+          "type": "object",
+          "properties": {
+            "logs": {
+              "description": "What the services involved were saying at the time, shown inline rather than left\nfor the operator to go and find — a fault report they have to research is a fault\nreport they abandon.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "reason": {
+              "description": "Why.",
+              "$ref": "#/$defs/Reason"
+            },
+            "remedy": {
+              "description": "The one thing to try.",
+              "type": "string"
+            },
+            "step": {
+              "description": "The step it stopped at.",
+              "$ref": "#/$defs/Step"
+            }
+          },
+          "required": [
+            "step",
+            "reason",
+            "logs",
+            "remedy"
+          ]
+        },
+        "WalkthroughReport": {
+          "description": "What a first-content walkthrough did — the whole of it, narrated line by line as it\nhappened and gathered here so the ending can be rendered, serialised and exited on.",
+          "type": "object",
+          "properties": {
+            "already_here": {
+              "description": "Whether what was asked for was already here, and so was not acquired again.",
+              "type": "boolean"
+            },
+            "handover": {
+              "description": "Where it leaves the operator, where it worked.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Handover"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "in_background": {
+              "description": "Whether the download was handed to the background rather than waited out.",
+              "type": "boolean"
+            },
+            "item": {
+              "description": "What it walked, where it got as far as choosing something.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "lines": {
+              "description": "Every line it said, in order — the same lines the operator watched arrive, kept so\na machine-readable run is not a silent one.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Line"
+              }
+            },
+            "link": {
+              "description": "What the import did with the file, where it got that far.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Link"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "proves": {
+              "description": "What it set out to prove, said so the operator knows what they watched.",
+              "type": "string"
+            },
+            "shape": {
+              "description": "Which walk this was.",
+              "$ref": "#/$defs/Shape"
+            },
+            "state": {
+              "description": "Where it ended up.",
+              "$ref": "#/$defs/State"
+            },
+            "stopped": {
+              "description": "Where and why it stopped, where it did.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Stopped"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "suggestions": {
+              "description": "What could have been walked instead, where nothing was chosen — the safe first\nattempts, so an operator with an empty library is not left guessing.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "shape",
+            "state",
+            "proves",
+            "lines",
+            "suggestions",
+            "in_background",
+            "already_here"
+          ]
+        }
+      }
+    },
+    "watch": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/SupervisionReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "SupervisionReport": {
+          "description": "What a watch saw, once the data root it was guarding was lost.",
+          "type": "object",
+          "properties": {
+            "forms": {
+              "description": "The forms that were being watched, and are now stopped.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "reason": {
+              "description": "Why the watch ended: the data root vanished, or a different volume took\nits place.",
+              "type": "string"
+            },
+            "stopped": {
+              "description": "Whether stopping the services succeeded.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "forms",
+            "reason",
+            "stopped"
+          ]
+        }
+      }
+    },
+    "word": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Term"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Term": {
+          "description": "A word this product uses, and what somebody meeting it needs to know.",
+          "type": "object",
+          "properties": {
+            "also_called": {
+              "description": "What other services in this stack call the same thing.\n\nSonarr and `SABnzbd` do not agree on words, and an operator moving between\ntheir screens should not have to work out that two of them are one.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "deep": {
+              "description": "More, for somebody who asks — never needed in order to act.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "short": {
+              "description": "One sentence: what it is for and what it costs or gains.\n\nEnough to act on. Somebody who reads only this should not be stuck.",
+              "type": "string"
+            },
+            "word": {
+              "description": "The word as it appears in the interface.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "word",
+            "short",
+            "also_called"
+          ]
+        }
+      }
+    }
+  }
+}

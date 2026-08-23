@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 /// One thing to do next.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Next {
     /// Add more content, now that the shape of it is understood.
@@ -50,7 +50,7 @@ impl Next {
 }
 
 /// Where a finished walkthrough leaves the operator.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Handover {
     /// What to do next, in order.
     pub next: Vec<Next>,

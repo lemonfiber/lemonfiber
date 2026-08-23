@@ -1,0 +1,66 @@
+# Publish the machine-readable contract with the release that produced it.
+#
+# Every SDK generates its types from this artefact rather than transcribing the
+# shapes (ARCH-R58). Reaching it should not mean cloning a Rust repo, so each
+# release carries it as an asset (ARCH-R64) and an SDK vendors the copy from the
+# release it was generated against.
+#
+# Separate from `release.yml`, which dist autogenerates and would overwrite.
+name: release-contract
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # The tag reaches `ref:` below, so its shape is settled before anything
+      # uses it rather than trusted because of who can publish a release.
+      - name: Refuse a tag that is not a version
+        id: tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "::error::refusing to act on a tag that is not vN.N.N: $TAG"
+              exit 1
+              ;;
+          esac
+          printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Take the tag's own copy
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+
+      - name: Attach the contract
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          contract="contract/web-api.contract.json"
+
+          # A release without it leaves every SDK unable to sync that version,
+          # which is better discovered here than by a consumer.
+          if [ ! -s "$contract" ]; then
+            echo "::error::$contract is missing or empty at $TAG"
+            exit 1
+          fi
+
+          python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$contract"
+
+          gh release upload "$TAG" "$contract" --clobber --repo "$REPO"
+          echo "attached $contract to $TAG"

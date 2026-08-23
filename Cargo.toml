@@ -15,6 +15,7 @@ authors = ["NightWorks.io"]
 # Versions are declared once here so the workspace's crates cannot drift onto
 # different minors of the same dependency. See spec 30-repos/lemonfiber.md.
 [workspace.dependencies]
+schemars = "1.2"
 async-trait = "0.1"
 bollard = "0.21"
 clap = { version = "4", features = ["derive"] }

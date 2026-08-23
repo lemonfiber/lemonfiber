@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// Stability is the whole point: an operator who searches for a code should find
 /// the same answer a year later. Codes are declared as constants beside the code
 /// that raises them, and are never recycled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, schemars::JsonSchema)]
 pub struct Code(&'static str);
 
 impl Code {
@@ -39,7 +39,7 @@ impl std::fmt::Display for Code {
 ///
 /// Four levels, deliberately. More would not be applied consistently, and
 /// inconsistent severity is worse than coarse severity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// Informational; nothing is required.
@@ -53,7 +53,7 @@ pub enum Severity {
 }
 
 /// Where a problem stands with respect to being fixed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     /// A remedy is available here.
@@ -69,7 +69,7 @@ pub enum State {
 }
 
 /// One thing the operator can do about a problem.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Remedy {
     /// The action, phrased as something to do rather than something to know.
     pub action: String,
@@ -113,7 +113,7 @@ fn escalation() -> Remedy {
 }
 
 /// Something that went wrong, in the form an operator can act on.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Problem {
     /// The stable identifier for this kind of problem.
     pub code: Code,

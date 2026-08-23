@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::Step;
 
 /// Why a walkthrough could not go on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Reason {
     /// No indexer is configured, so there is nothing to search. Not a failure of the
@@ -135,7 +135,7 @@ impl Reason {
 }
 
 /// A walkthrough that stopped: where, why, what the services were saying, and what to do.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Stopped {
     /// The step it stopped at.
     pub step: Step,

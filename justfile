@@ -117,7 +117,7 @@ release-workflow:
 # on writing assertions that leave no branch a test cannot reach.
 #
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
-skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs)'
+skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs|crates/lemonfiber-core/examples/.*\.rs)'
 
 # A failing gate says which lines it failed on, from the profile already gathered —
 # `report` re-reads it rather than building and running anything a second time. Without

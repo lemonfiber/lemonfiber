@@ -98,7 +98,7 @@ pub enum Disposition {
 }
 
 /// How a setup run ended.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum SetupOutcome {
     /// The reviewed answers were written.
@@ -120,7 +120,7 @@ pub enum SetupOutcome {
 /// The indexer's address is left out for that reason rather than because it is
 /// itself a secret: it is entered beside its key, and the two travel together in
 /// every place an operator copies them from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct SetupReport {
     /// How the run ended.
     pub outcome: SetupOutcome,

@@ -16,7 +16,7 @@ pub struct DoctorReport {
 }
 
 /// What a watch saw, once the data root it was guarding was lost.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct SupervisionReport {
     /// The forms that were being watched, and are now stopped.
     pub forms: Vec<String>,

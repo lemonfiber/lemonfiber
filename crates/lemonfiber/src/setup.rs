@@ -15,6 +15,7 @@ use std::sync::Arc;
 use lemonfiber_core::app::{setup as core_setup, Ctx};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::model::kind;
 use lemonfiber_core::model::{Envelope, SetupOutcome, SetupReport};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::validate::Live;
@@ -83,7 +84,7 @@ fn document(outcome: SetupOutcome, settings: &Settings) -> crate::render::Lines 
     };
     let mut lines = crate::render::Lines::for_a_parser();
     lines.put(
-        Envelope::new("setup", &report)
+        Envelope::new(kind::SETUP, &report)
             .to_json()
             .unwrap_or(crate::render::UNRENDERABLE.to_owned()),
     );

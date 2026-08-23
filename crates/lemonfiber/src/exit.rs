@@ -13,6 +13,7 @@ use lemonfiber_core::app::repair::Report as RepairReport;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::model::kind;
 use lemonfiber_core::model::{Disposition, Envelope, ResetReport, Triggered, UpgradeReport};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
@@ -253,7 +254,7 @@ fn reported(problem: &Problem, parsed: bool) -> Lines {
 fn as_a_document(problem: &Problem) -> Lines {
     let mut lines = Lines::for_a_parser();
     lines.put(
-        Envelope::new("error", problem)
+        Envelope::new(kind::ERROR, problem)
             .to_json()
             // Eagerly, for the reason `machine_readable` states beside it: a
             // lazily-built fallback is a line no test could ever run, since these

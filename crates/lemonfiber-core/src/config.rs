@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// A form names both, because a form describes what it *does* rather than what
 /// this operator has paid for. Narrowing happens afterwards, so a tunnel is
 /// never started with credentials that were never supplied.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Protocols {
     /// A Usenet provider is configured.
     pub usenet: bool,
