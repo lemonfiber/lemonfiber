@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 
+use super::kind::Kind;
 use super::API_VERSION;
 
 /// The wrapper every machine-readable payload arrives in.
@@ -14,7 +15,12 @@ pub struct Envelope<T> {
     /// The output contract's version.
     pub api_version: u32,
     /// Which payload this is, so a consumer can branch before parsing `data`.
-    pub kind: &'static str,
+    // Described as the string it writes rather than as the type that holds it. The
+    // type is a rule about which kinds may exist in this source; a caller reads a
+    // string either way. This comment is not a doc comment because schemars
+    // publishes those into the artefact, and the artefact describes the reply.
+    #[schemars(with = "String")]
+    pub kind: Kind,
     /// The payload.
     pub data: T,
 }
@@ -37,7 +43,7 @@ impl<T: Serialize> Envelope<T> {
 impl<T> Envelope<T> {
     /// Wrap a payload for machine-readable output.
     #[must_use]
-    pub const fn new(kind: &'static str, data: T) -> Self {
+    pub const fn new(kind: Kind, data: T) -> Self {
         Self {
             api_version: API_VERSION,
             kind,

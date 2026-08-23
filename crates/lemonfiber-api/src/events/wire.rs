@@ -6,6 +6,7 @@
 
 use std::time::Duration;
 
+use lemonfiber_core::model::kind::Kind;
 use lemonfiber_core::model::Envelope;
 use serde::Serialize;
 
@@ -37,7 +38,7 @@ pub enum Nature {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rendered {
     /// What the envelope calls itself, which is the name the event carries.
-    kind: &'static str,
+    kind: Kind,
     /// The envelope, as the command line renders it.
     said: String,
     /// Whether a newer one of this kind replaces it.
