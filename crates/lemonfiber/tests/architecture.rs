@@ -771,37 +771,29 @@ fn requirements(cell: &str) -> Vec<String> {
 /// It costs something real. An operator who searches for a code should find the
 /// same answer a year later, and for four releases `VPN-5` was both a port
 /// mismatch and a killswitch leak — so whoever looked one up found the other.
+///
+/// Read through the same reader that writes the committed inventory, so that what
+/// counts as a declaration is decided once. A second reader would answer this
+/// question about a slightly different set of declarations than the one the
+/// artefact is built from, and the two would drift without either being wrong.
 #[test]
 fn no_two_problems_answer_to_the_same_code() {
+    let Ok(declared) = lemonfiber::codes::declared(&workspace_root()) else {
+        unreachable!("the workspace these tests run in is readable");
+    };
+
     let mut seen: BTreeMap<String, PathBuf> = BTreeMap::new();
     let mut collisions: Vec<String> = Vec::new();
-    for (path, text) in sources() {
-        // Tests reuse real codes as fixtures, which is not a second declaration
-        // of one — the production half of each file is what declares.
-        for code in declared(production(&text)) {
-            if let Some(first) = seen.insert(code.clone(), path.clone()) {
-                collisions.push(format!(
-                    "{code} in {} and {}",
-                    first.display(),
-                    path.display()
-                ));
-            }
+    for (path, code) in declared {
+        if let Some(first) = seen.insert(code.clone(), path.clone()) {
+            collisions.push(format!(
+                "{code} in {} and {}",
+                first.display(),
+                path.display()
+            ));
         }
     }
     assert!(collisions.is_empty(), "{collisions:?}");
-}
-
-/// Every code declared in a piece of source.
-fn declared(text: &str) -> Vec<String> {
-    text.match_indices("Code::new(\"")
-        .filter_map(|(at, opening)| {
-            let from = at + opening.len();
-            let rest = text.get(from..)?;
-            rest.find('"')
-                .and_then(|end| rest.get(..end))
-                .map(str::to_owned)
-        })
-        .collect()
 }
 
 /// Output leaves through one place, and this is what keeps it that way.

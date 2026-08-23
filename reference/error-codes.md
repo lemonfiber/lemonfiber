@@ -1,0 +1,91 @@
+# `lemonfiber` — error codes
+
+Generated from the codes the crates declare. Run `just codes` to rewrite it.
+
+Every code lemonfiber can raise, and nothing else. A code is a family and a number,
+it is never recycled, and it is the token to search for. What each one means, and
+what to do about it, is written for operators at
+<https://docs.lemonfiber.app/fixing/every-error-by-code/>.
+
+- `ACK-1`
+- `BACKUP-1`
+- `BACKUP-2`
+- `BACKUP-3`
+- `BUNDLE-1`
+- `BUNDLE-2`
+- `BUNDLE-3`
+- `BUNDLE-4`
+- `BUNDLE-5`
+- `CONFIG-1`
+- `CONFIG-2`
+- `CONFIG-3`
+- `CRED-1`
+- `CRED-2`
+- `CRED-3`
+- `DOCKER-1`
+- `DOCKER-2`
+- `ENV-1`
+- `ENV-2`
+- `ENV-3`
+- `FORM-1`
+- `FORM-2`
+- `FORM-3`
+- `FORM-4`
+- `LIFE-1`
+- `LIFE-2`
+- `LIFE-3`
+- `PROC-1`
+- `PROC-2`
+- `PROVIDER-1`
+- `PROVIDER-2`
+- `PROVIDER-3`
+- `PROVIDER-4`
+- `PROVIDER-5`
+- `PROVIDER-6`
+- `PROVIDER-7`
+- `PROVIDER-8`
+- `PROVIDER-9`
+- `QUAL-1`
+- `QUAL-2`
+- `QUAL-3`
+- `RESTORE-1`
+- `RESTORE-2`
+- `RESTORE-3`
+- `RESTORE-4`
+- `RESTORE-5`
+- `RESTORE-6`
+- `SEED-1`
+- `SEED-2`
+- `SEED-3`
+- `SEED-4`
+- `SETUP-1`
+- `SETUP-2`
+- `SETUP-3`
+- `SETUP-4`
+- `SETUP-5`
+- `SETUP-6`
+- `STACK-1`
+- `STACK-2`
+- `STACK-3`
+- `STACK-4`
+- `STACK-5`
+- `STACK-6`
+- `STORAGE-1`
+- `STORAGE-2`
+- `STORAGE-3`
+- `STORAGE-4`
+- `STORAGE-5`
+- `STORAGE-6`
+- `TUI-1`
+- `VPN-1`
+- `VPN-2`
+- `VPN-3`
+- `VPN-4`
+- `VPN-5`
+- `VPN-6`
+- `VPN-7`
+- `VPN-8`
+- `WATCH-1`
+- `WATCH-2`
+- `WIRING-1`
+- `WORD-1`

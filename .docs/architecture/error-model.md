@@ -169,6 +169,26 @@ stops being read.
 Codes are never recycled. An operator who searches for one should find the same
 answer a year later.
 
+## The inventory is read out of the source
+
+What that decision costs is enumeration: there is no registry, so nothing can list
+the codes at run time. `reference/error-codes.md` is therefore read from the
+declarations themselves, by `lemonfiber::codes` — a lexer over `crates/*/src` that
+tells code from a string from a comment, drops what only the tests compile, and
+sorts what is left by family and number. `just codes` rewrites it; a test compares
+the committed bytes with a fresh read.
+
+The reader refuses to guess. A `Code::new(…)` whose name is not a literal, and a
+file whose braces do not balance by its last line, are both reported by name and
+line rather than left out — a list that is quietly short is the one way the artefact
+could be wrong while still agreeing with itself.
+
+Two things follow from reading it this way. A code is only found where it is written
+as a `const` call, so text that merely looks like a code — a bitrate, an encoding —
+is never mistaken for one. And the architecture test that no two problems share a
+code reads through the same function, so what counts as a declaration is decided
+once rather than twice.
+
 ## Severity is `Ord`
 
 `Critical > Error > Warning > Advisory`, so a health summary can take a maximum

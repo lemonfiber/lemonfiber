@@ -7,4 +7,5 @@
 //! description of them.
 
 pub mod cli;
+pub mod codes;
 pub mod reference;
