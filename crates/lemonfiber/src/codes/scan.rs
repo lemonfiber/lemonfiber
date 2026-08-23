@@ -150,53 +150,97 @@ struct FileScan {
 /// Reads one file's declarations, and which of them the tests alone compile.
 fn scan(text: &str) -> FileScan {
     let mut reader = Reader::default();
+    let mut gate = Gate::default();
     let mut found = FileScan::default();
-    let mut depth: i64 = 0;
-    let mut test_from: Option<i64> = None;
-    let mut armed = false;
 
     for (offset, line) in text.lines().enumerate() {
         let read = reader.read(line);
         let trimmed = read.code.trim();
-        let in_test = test_from.is_some();
-
-        if !in_test && trimmed == "#[cfg(test)]" {
-            armed = true;
+        if gate.arm(trimmed) {
             continue;
         }
 
+        let test_only = gate.test_only();
         for name in read.declarations {
             found.declarations.push(Declaration {
                 name,
                 line: offset + 1,
-                test_only: in_test || armed,
+                test_only,
             });
         }
 
-        if armed && !in_test {
-            if read.code.contains('{') {
-                test_from = Some(depth);
-                armed = false;
-            } else if trimmed.ends_with(';') {
-                found.gated.extend(module_declared(trimmed));
-                armed = false;
-            }
-        }
+        found.gated.extend(gate.open(&read.code, trimmed));
+        gate.follow(&read.code);
+    }
 
-        for letter in read.code.chars() {
+    found.balanced = gate.balanced();
+    found
+}
+
+/// Which half of a file the reader stands in.
+#[derive(Default)]
+struct Gate {
+    /// How deep in braces the reader stands.
+    depth: i64,
+    /// The depth a block compiled only for tests opened at.
+    test_from: Option<i64>,
+    /// A `#[cfg(test)]` has been read and the item it gates has not begun.
+    armed: bool,
+}
+
+impl Gate {
+    /// Whether what stands here is compiled only for tests.
+    fn test_only(&self) -> bool {
+        self.test_from.is_some() || self.armed
+    }
+
+    /// Whether the braces the reader followed have all been closed.
+    fn balanced(&self) -> bool {
+        self.depth == 0
+    }
+
+    /// Takes the attribute that gates whatever follows it, saying whether this line
+    /// was that attribute and nothing else.
+    fn arm(&mut self, trimmed: &str) -> bool {
+        let attribute = self.test_from.is_none() && trimmed == "#[cfg(test)]";
+        self.armed |= attribute;
+        attribute
+    }
+
+    /// Opens the gated item where this line begins it, naming the module it declares.
+    ///
+    /// An item is a block, which runs until its braces close, or a declaration ending
+    /// in a semicolon, which runs to the end of this line. Anything else — an
+    /// attribute of its own, a signature the formatter spread — holds the gate open.
+    fn open(&mut self, code: &str, trimmed: &str) -> Option<String> {
+        if !self.armed || self.test_from.is_some() {
+            return None;
+        }
+        if code.contains('{') {
+            self.test_from = Some(self.depth);
+            self.armed = false;
+            return None;
+        }
+        if !trimmed.ends_with(';') {
+            return None;
+        }
+        self.armed = false;
+        module_declared(trimmed)
+    }
+
+    /// Follows one line's braces, closing a gated block where they end it.
+    fn follow(&mut self, code: &str) {
+        for letter in code.chars() {
             match letter {
-                '{' => depth += 1,
-                '}' => depth -= 1,
+                '{' => self.depth += 1,
+                '}' => self.depth -= 1,
                 _ => {}
             }
         }
-        if test_from.is_some_and(|opened| depth <= opened) {
-            test_from = None;
+        if self.test_from.is_some_and(|opened| self.depth <= opened) {
+            self.test_from = None;
         }
     }
-
-    found.balanced = depth == 0;
-    found
 }
 
 /// The module a line declares, where the line declares one.
@@ -516,6 +560,24 @@ impl Thing {
 
         assert_eq!(shipped_in(source), ["VPN-4"]);
         assert_eq!(tested_in(source), ["TEST-1"]);
+    }
+
+    /// A gate reaches past whatever stands between it and the item it gates.
+    #[test]
+    fn it_holds_the_gate_open_until_the_item_begins() {
+        let source = "\
+#[cfg(test)]
+#[must_use]
+fn only_for_tests() -> Code {
+    Code::new(\"TEST-3\")
+}
+
+pub const REAL: Code = Code::new(\"VPN-13\");
+";
+
+        assert!(scan(source).balanced);
+        assert_eq!(shipped_in(source), ["VPN-13"]);
+        assert_eq!(tested_in(source), ["TEST-3"]);
     }
 
     /// A gate on a one-line item ends with the line.
