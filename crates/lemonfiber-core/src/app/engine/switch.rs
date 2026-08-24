@@ -11,7 +11,7 @@
 
 use lemonfiber_manifest::Manifest;
 
-use super::{compose, settled_into, Composed};
+use super::{compose, lock, settled_into, Composed};
 use crate::app::{Ctx, Outcome};
 use crate::docker::{stopping_order, survey, Service, State};
 use crate::error::{Diagnose, Problem};
@@ -48,6 +48,18 @@ const SWITCH: &str = "switch";
 /// the forms cannot be resolved, the engine cannot be reached, or the services that
 /// were started never became usable.
 pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
+    // Claimed for the same reason `lifecycle` claims: a switch stops services and
+    // starts others, and two of them against one stack interleave a teardown with a
+    // start. Given back whether it worked or not — an early return between the two
+    // would leave the stack claimed by a run that has already finished.
+    let claim = lock::claimed(ctx).await?;
+    let outcome = moving(ctx, forms).await;
+    lock::released(ctx, claim).await;
+    outcome
+}
+
+/// The switch itself, with the stack already claimed for it.
+async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
     let Composed {
         manifest,
         plan,

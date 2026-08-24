@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use lemonfiber_core::app::{claimed, released, Ctx};
+use lemonfiber_core::app::{claimed, dispatch, released, Command, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::filesystem::{
@@ -145,6 +145,33 @@ async fn the_second_run_is_refused_while_the_first_holds_the_stack() {
             .map(|said| said.contains("working on this stack")),
         Some(true),
         "the second run is told what is happening, not just that it cannot: {refused:?}"
+    );
+}
+
+/// A switch stops some services and starts others, so it is a lifecycle operation
+/// and the stack has to be claimed for it. Driven through `dispatch` rather than
+/// through the switch directly, because what is being asserted is that the route a
+/// surface takes claims — both surfaces reach a switch through this one.
+#[tokio::test]
+async fn a_switch_is_refused_while_another_run_holds_the_stack() {
+    let files = Arc::new(Remembering::default());
+    let held = claimed(&ctx(&files)).await;
+    assert!(held.is_ok(), "nothing held it, so the first run took it");
+
+    let refused = dispatch(
+        Command::Switch {
+            forms: vec!["library".to_owned()],
+        },
+        &ctx(&files),
+    )
+    .await;
+
+    let said = refused.err().map(|problem| problem.summary.clone());
+    assert_eq!(
+        said.as_deref()
+            .map(|about| about.contains("working on this stack")),
+        Some(true),
+        "the switch is told the stack is held, rather than going on to move services: {said:?}"
     );
 }
 
