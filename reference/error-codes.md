@@ -22,6 +22,7 @@ what to do about it, is written for operators at
 - `CRED-1`
 - `CRED-2`
 - `CRED-3`
+- `DIAG-1`
 - `DOCKER-1`
 - `DOCKER-2`
 - `ENV-1`

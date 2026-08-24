@@ -24,7 +24,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, logs, Command, Ctx};
-use lemonfiber_core::doctor::Category;
+use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::{LogLine, LogQuery};
@@ -36,7 +36,7 @@ use crate::serve::{answered, carrying, SENTENCE};
 const FORM: &str = "form";
 /// The parameter naming a service to read.
 const SERVICE: &str = "service";
-/// The parameter naming the group of checks to run.
+/// The parameter naming what the checks are narrowed to.
 const ONLY: &str = "only";
 /// The parameter naming the household member to narrow to.
 const MEMBER: &str = "member";
@@ -56,7 +56,7 @@ const BEGIN_WITH: u32 = 50;
 const FAILED: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
 
 /// What is said to a request naming a group of checks that is not one.
-const NO_SUCH_GROUP: &str = "There is no group of checks by that name.";
+const NO_SUCH_GROUP: &str = "There is no group of checks and no check by that name.";
 
 /// What is said to a request whose line count is not a number.
 const NOT_A_COUNT: &str = "How many lines to begin with must be a number.";
@@ -103,7 +103,11 @@ async fn checks(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Re
 
 /// What the checks about the disk found.
 async fn storage(State(serving): State<Serving>) -> Response {
-    carried_out(&serving.ctx, diagnosing(Some(Category::Storage))).await
+    carried_out(
+        &serving.ctx,
+        diagnosing(Narrowing::Category(Category::Storage)),
+    )
+    .await
 }
 
 /// What the household has asked for, and where each request stands.
@@ -137,9 +141,9 @@ async fn log_lines(State(serving): State<Serving>, RawQuery(query): RawQuery) ->
 ///
 /// A read looks and does not touch, so it neither accepts a warning nor opts into
 /// the checks that disturb a running system; both of those change something.
-const fn diagnosing(only: Option<Category>) -> Command {
+const fn diagnosing(narrowing: Narrowing) -> Command {
     Command::Doctor {
-        only,
+        narrowing,
         disruptive: false,
         accept: None,
     }
@@ -234,8 +238,8 @@ fn unreadable(said: &'static str) -> Response {
 /// that is not one lemonfiber knows.
 fn diagnosis(only: Option<&str>) -> Option<Command> {
     match only {
-        None => Some(diagnosing(None)),
-        Some(name) => Category::parse(name).map(|group| diagnosing(Some(group))),
+        None => Some(diagnosing(Narrowing::Suite)),
+        Some(name) => Narrowing::parse(name).map(diagnosing),
     }
 }
 

@@ -655,6 +655,48 @@ fn every_check_is_given_something_to_ask() {
     );
 }
 
+/// A check that disturbs the running system says how long it disturbs it for.
+///
+/// Opting in is a decision an operator makes about a cost, and half the cost is the
+/// length of it: a tunnel down for one probe and a tunnel down for ten minutes are
+/// different answers to "shall I run this now". The killswitch stated what it disturbed
+/// for four releases and never how long, and nothing in the build noticed.
+///
+/// Read structurally, from the gate rather than from the words: a check that refuses to
+/// act unless it was asked for is a check that disturbs something, and it must reach for
+/// the one place a length is put into words. A sentence with the number typed into it
+/// would pass a reading of the prose and still go stale the day the budget changed.
+#[test]
+fn every_disturbing_check_says_how_long_it_disturbs_for() {
+    let mut silent: Vec<String> = Vec::new();
+    let mut seen = 0_usize;
+
+    for (path, text) in sources() {
+        if !path.to_string_lossy().contains("doctor") {
+            continue;
+        }
+        let shipped = production(&text);
+        if !shipped.contains("!self.disruptive") {
+            continue;
+        }
+        seen += 1;
+        if !shipped.contains("disturbing_for") {
+            silent.push(path.display().to_string());
+        }
+    }
+
+    assert!(
+        seen > 1,
+        "the scan found {seen} checks gated on being asked for, which means it is looking \
+         in the wrong place"
+    );
+    assert!(
+        silent.is_empty(),
+        "a check that disturbs the stack must say how long for: {}",
+        silent.join(", ")
+    );
+}
+
 /// No file grows past what one sitting can hold.
 ///
 /// A file that keeps accreting is how a codebase stops being navigable: the third

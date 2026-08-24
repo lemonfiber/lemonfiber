@@ -8,7 +8,7 @@ use std::process::ExitCode;
 
 use lemonfiber_core::app::{diagnose, dispatch, seeding, Command, Ctx, Outcome};
 use lemonfiber_core::docker::Condition;
-use lemonfiber_core::doctor::{Category, Overall};
+use lemonfiber_core::doctor::{Category, Narrowing, Overall};
 
 use crate::engine::pull_showing;
 use crate::exit::{complain, settled, PREFLIGHT};
@@ -36,7 +36,7 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
     // Asked for as a report rather than through the command enum: a dispatched
     // diagnosis comes back as an outcome that has to be destructured, with an arm
     // for every answer it could never be.
-    let report = diagnose(ctx, Some(Category::Environment), false)
+    let report = diagnose(ctx, &Narrowing::Category(Category::Environment), false)
         .await
         .map_err(|problem| complain(&problem))?;
 

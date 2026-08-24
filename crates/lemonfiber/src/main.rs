@@ -10,7 +10,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
-use lemonfiber_core::doctor::Category;
+use lemonfiber_core::doctor::Narrowing;
 
 mod archive;
 mod context;
@@ -167,12 +167,12 @@ async fn main() -> ExitCode {
                 };
                 return repair::run(ctx, paths, mending, &Keyboard, cli.json).await;
             }
-            let only = match narrowed(only.as_deref()) {
-                Ok(only) => only,
+            let narrowing = match narrowed(only.as_deref()) {
+                Ok(narrowing) => narrowing,
                 Err(code) => return code,
             };
             Command::Doctor {
-                only,
+                narrowing,
                 disruptive,
                 accept,
             }
@@ -299,20 +299,21 @@ fn restarting(form: String, services: Vec<String>) -> Command {
     }
 }
 
-/// The category a diagnosis was narrowed to, or the code to exit with for a name
-/// that is not one.
+/// What a diagnosis was narrowed to, or the code to exit with for a name that is
+/// neither a category nor a check inside one.
 ///
-/// A named category lemonfiber does not know is a mistake to correct rather than a
-/// request to run everything — refused here, before the core is reached.
-fn narrowed(only: Option<&str>) -> Result<Option<Category>, ExitCode> {
-    match only.map(Category::parse) {
+/// A name lemonfiber does not know is a mistake to correct rather than a request to
+/// run everything — refused here, before the core is reached. Whether a stack reports
+/// the check named is a question only the run can answer, and it answers it.
+fn narrowed(only: Option<&str>) -> Result<Narrowing, ExitCode> {
+    match only.map(Narrowing::parse) {
         Some(None) => {
             let named = only.unwrap_or_default();
-            complain!("error: no diagnostic category named `{named}`");
+            complain!("error: no diagnostic category or check named `{named}`");
             Err(ExitCode::from(USAGE))
         }
-        Some(Some(category)) => Ok(Some(category)),
-        None => Ok(None),
+        Some(Some(narrowing)) => Ok(narrowing),
+        None => Ok(Narrowing::Suite),
     }
 }
 

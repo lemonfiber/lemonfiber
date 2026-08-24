@@ -92,7 +92,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         UNKNOWN.to_owned()
     };
 
-    match super::engine::diagnose(ctx, None, false).await {
+    match super::engine::diagnose(ctx, &crate::doctor::Narrowing::Suite, false).await {
         Err(problem) => missing.push(format!("the diagnosis could not run — {}", problem.summary)),
         // A finding is a sentence, not a setting: the provider checks quote a download
         // client's own words back, and those arrive with the provider's hostname in them

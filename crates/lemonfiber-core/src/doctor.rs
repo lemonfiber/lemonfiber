@@ -20,6 +20,7 @@ pub mod environment;
 pub mod guides;
 pub mod headroom;
 pub mod indexer;
+pub mod narrowing;
 pub mod providers;
 pub mod releases;
 pub mod storage;
@@ -35,6 +36,8 @@ use serde::Serialize;
 use crate::error::{Problem, Remedy};
 use crate::model::DoctorReport;
 use crate::repair::{Attempt, Repair, Writing};
+
+pub use narrowing::Narrowing;
 
 /// The family a check belongs to, so a run can be narrowed to one of them.
 ///
@@ -239,6 +242,22 @@ const CHECK_BUDGET: Duration = Duration::from_secs(15);
 /// other run.
 pub(crate) const FILESYSTEM_BUDGET: Duration = Duration::from_secs(30);
 
+/// How long a check disturbs what it disturbs, in the words an operator reads before
+/// deciding whether to let it.
+///
+/// Naming what is disturbed is half an answer. An operator weighing a check that stops
+/// their transfers is weighing being without them for a while, and "a while" is the part
+/// they cannot look up — a second is a shrug and ten minutes is a different decision.
+///
+/// Said from the budget the check is bounded by rather than from a number written into a
+/// sentence, so the length promised and the length allowed cannot drift apart.
+pub(crate) fn disturbing_for(budget: Duration) -> String {
+    format!(
+        "for no longer than the {} seconds this check is allowed",
+        budget.as_secs()
+    )
+}
+
 /// A single diagnostic, run in isolation from every other.
 ///
 /// A check reports what it could not determine as an unverified finding and
@@ -318,11 +337,15 @@ pub trait Mend: Send + Sync {
 
 /// Run the checks that match, bound each by its own budget, and sum the result.
 ///
-/// Naming a category runs only that one. Each check is awaited under a timeout,
-/// so a wedged command becomes an unverified finding rather than a hung suite;
-/// because the checks are values in a list, one timing out has no bearing on the
-/// next.
-pub async fn examine(checks: &[Box<dyn Check>], only: Option<Category>) -> DoctorReport {
+/// Naming a family runs only that one, and naming a check reports only that one —
+/// by the same id the finding carries, so what a report names is what can be asked
+/// for again. Each check is awaited under a timeout, so a wedged command becomes an
+/// unverified finding rather than a hung suite; because the checks are values in a
+/// list, one timing out has no bearing on the next.
+///
+/// The overall verdict is summed from what was kept, so a run narrowed to one check
+/// is graded on that check rather than on the family it happened to arrive with.
+pub async fn examine(checks: &[Box<dyn Check>], narrowing: &Narrowing) -> DoctorReport {
     // The checks are independent I/O — process spawns, container execs, HTTP — so
     // they run at once rather than in series: a run's wall-clock then tracks the
     // slowest check, not their sum, which matters most on the struggling stack an
@@ -331,7 +354,7 @@ pub async fn examine(checks: &[Box<dyn Check>], only: Option<Category>) -> Docto
     // bounded by its own budget, so one hanging has no bearing on the rest.
     let selected = checks
         .iter()
-        .filter(|check| only.is_none_or(|wanted| wanted == check.category()));
+        .filter(|check| narrowing.runs(check.category()));
     let findings: Vec<Finding> = futures_util::future::join_all(selected.map(|check| async move {
         match tokio::time::timeout(check.budget(), check.run()).await {
             Ok(produced) => produced,
@@ -341,6 +364,7 @@ pub async fn examine(checks: &[Box<dyn Check>], only: Option<Category>) -> Docto
     .await
     .into_iter()
     .flatten()
+    .filter(|finding| narrowing.keeps(finding))
     .collect();
     DoctorReport {
         overall: overall(&findings),
@@ -449,7 +473,7 @@ fn overall(findings: &[Finding]) -> Overall {
 
 #[cfg(test)]
 mod tests {
-    use super::{attributed, examine, Category, Check, Finding, Overall, Verdict};
+    use super::{attributed, examine, Category, Check, Finding, Narrowing, Overall, Verdict};
     use crate::error::{Code, Problem, Remedy, Severity};
     use async_trait::async_trait;
     use std::time::Duration;
@@ -630,6 +654,11 @@ depends_on = ["gluetun"]
         ))
     }
 
+    /// A finding reporting under the identifier a run can be narrowed to.
+    fn identified(category: Category, check: &str, verdict: Verdict) -> Finding {
+        Finding::in_category(category, check, "What was checked", verdict)
+    }
+
     fn finding(title: &str, verdict: Verdict) -> Finding {
         Finding {
             check: "test".to_owned(),
@@ -662,7 +691,7 @@ depends_on = ["gluetun"]
             Category::Vpn,
             vec![finding("egress", Verdict::Pass { note: None })],
         )];
-        let report = examine(&checks, None).await;
+        let report = examine(&checks, &Narrowing::Suite).await;
         assert_eq!(report.overall, Overall::Healthy);
         assert_eq!(report.findings.len(), 1);
     }
@@ -676,7 +705,10 @@ depends_on = ["gluetun"]
                 finding("port", Verdict::Warn(problem())),
             ],
         )];
-        assert_eq!(examine(&checks, None).await.overall, Overall::Degraded);
+        assert_eq!(
+            examine(&checks, &Narrowing::Suite).await.overall,
+            Overall::Degraded
+        );
     }
 
     #[tokio::test]
@@ -688,7 +720,10 @@ depends_on = ["gluetun"]
                 finding("other", Verdict::Pass { note: None }),
             ],
         )];
-        assert_eq!(examine(&checks, None).await.overall, Overall::Broken);
+        assert_eq!(
+            examine(&checks, &Narrowing::Suite).await.overall,
+            Overall::Broken
+        );
     }
 
     #[tokio::test]
@@ -708,7 +743,10 @@ depends_on = ["gluetun"]
                 ),
             ],
         )];
-        assert_eq!(examine(&checks, None).await.overall, Overall::Unknown);
+        assert_eq!(
+            examine(&checks, &Narrowing::Suite).await.overall,
+            Overall::Unknown
+        );
     }
 
     #[tokio::test]
@@ -722,7 +760,10 @@ depends_on = ["gluetun"]
                 },
             )],
         )];
-        assert_eq!(examine(&checks, None).await.overall, Overall::Unknown);
+        assert_eq!(
+            examine(&checks, &Narrowing::Suite).await.overall,
+            Overall::Unknown
+        );
     }
 
     #[tokio::test]
@@ -737,7 +778,7 @@ depends_on = ["gluetun"]
                 vec![finding("disk", Verdict::Fail(problem()))],
             ),
         ];
-        let report = examine(&checks, Some(Category::Vpn)).await;
+        let report = examine(&checks, &Narrowing::Category(Category::Vpn)).await;
         // The storage failure is not run, so it cannot break the result.
         assert_eq!(report.overall, Overall::Healthy);
         assert_eq!(report.findings.len(), 1);
@@ -747,10 +788,55 @@ depends_on = ["gluetun"]
         );
     }
 
+    /// The suite, a family, or one check: the third of those is named by the id the
+    /// finding itself carries, so a report's own words are what goes back in.
+    #[tokio::test]
+    async fn naming_one_check_reports_only_that_check() {
+        let checks = vec![
+            fixed(
+                Category::Storage,
+                vec![
+                    identified(
+                        Category::Storage,
+                        "storage.space",
+                        Verdict::Pass { note: None },
+                    ),
+                    identified(
+                        Category::Storage,
+                        "storage.hardlinks",
+                        Verdict::Fail(problem()),
+                    ),
+                ],
+            ),
+            fixed(
+                Category::Vpn,
+                vec![identified(
+                    Category::Vpn,
+                    "vpn.tunnel",
+                    Verdict::Fail(problem()),
+                )],
+            ),
+        ];
+
+        let report = examine(&checks, &Narrowing::Check("storage.space".to_owned())).await;
+
+        assert_eq!(
+            report
+                .findings
+                .iter()
+                .map(|found| found.check.as_str())
+                .collect::<Vec<&str>>(),
+            vec!["storage.space"]
+        );
+        // Neither the neighbour in its own family nor the failure in another is
+        // graded here: what was asked for is what the verdict is about.
+        assert_eq!(report.overall, Overall::Healthy);
+    }
+
     #[tokio::test(start_paused = true)]
     async fn a_check_that_will_not_answer_becomes_unverified_rather_than_hanging() {
         let checks: Vec<Box<dyn Check>> = vec![Box::new(Hanging)];
-        let report = examine(&checks, None).await;
+        let report = examine(&checks, &Narrowing::Suite).await;
         assert_eq!(report.overall, Overall::Unknown);
         let verdict = report.findings.first().map(|found| &found.verdict);
         assert!(matches!(verdict, Some(Verdict::Unverified { .. })));

@@ -10,7 +10,7 @@
 //! path, so there is no parallel implementation to fall out of step.
 
 use crate::audio::Format;
-use crate::doctor::Category;
+use crate::doctor::Narrowing;
 use crate::error::{Code, Problem};
 use crate::model::{
     kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
@@ -146,10 +146,11 @@ pub enum Command {
         /// The forms to report on; empty reports on the whole stack.
         forms: Vec<String>,
     },
-    /// Run the diagnostic checks, or one category of them.
+    /// Run the diagnostic checks: the whole suite, one category, or one check.
     Doctor {
-        /// The category to run; empty runs every check there is.
-        only: Option<Category>,
+        /// What the run is narrowed to. A single check is named by the identifier
+        /// its finding carries, so a report can be read and asked for again.
+        narrowing: Narrowing,
         /// Whether the operator opted into the checks that disturb the system.
         disruptive: bool,
         /// A check whose warning the operator is answering: they have weighed the
@@ -359,11 +360,11 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         }
         Command::Ps { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
         Command::Doctor {
-            only,
+            narrowing,
             disruptive,
             accept,
         } => {
-            let report = engine::diagnose(ctx, only, disruptive).await?;
+            let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
             accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
         }
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
@@ -377,10 +378,11 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        dispatch, pull_progress, Category, Command, Ctx, Outcome, QualityAction, VersionReport,
+        dispatch, pull_progress, Command, Ctx, Narrowing, Outcome, QualityAction, VersionReport,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
+    use crate::doctor::Category;
     use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
     use crate::ports::process::{Failure, Output, Progress};
     use crate::quality::Preset;
@@ -795,7 +797,7 @@ mod tests {
         let report = diagnosis(
             dispatch(
                 Command::Doctor {
-                    only: Some(Category::Environment),
+                    narrowing: Narrowing::Category(Category::Environment),
                     disruptive: false,
                     accept: None,
                 },
@@ -898,7 +900,7 @@ mod tests {
             Health::Healthy,
         ));
         let command = Command::Doctor {
-            only: Some(Category::Vpn),
+            narrowing: Narrowing::Category(Category::Vpn),
             disruptive: false,
             accept: None,
         };
@@ -935,7 +937,7 @@ mod tests {
         ));
         let outcome = dispatch(
             Command::Doctor {
-                only: None,
+                narrowing: Narrowing::Suite,
                 disruptive: false,
                 accept: None,
             },
@@ -955,6 +957,69 @@ mod tests {
         assert!(
             names.iter().any(|check| check == "services.quality-guides"),
             "the guide-source check should appear in a full run: {names:?}"
+        );
+    }
+
+    /// One check, named the way the report names it.
+    ///
+    /// The whole point of the identifier being the same on both sides: the guide check
+    /// shares its family with the release search, so a family cannot single it out.
+    #[tokio::test]
+    async fn naming_one_check_runs_that_check_alone() {
+        let ctx = watching(Reporting::holding(
+            &LIBRARY,
+            Lifecycle::Running,
+            Health::Healthy,
+        ));
+        let outcome = dispatch(
+            Command::Doctor {
+                narrowing: Narrowing::Check("services.quality-guides".to_owned()),
+                disruptive: false,
+                accept: None,
+            },
+            &ctx,
+        )
+        .await;
+
+        let names = diagnosis(outcome)
+            .map(|report| {
+                report
+                    .findings
+                    .into_iter()
+                    .map(|finding| finding.check)
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_default();
+        assert_eq!(
+            names,
+            vec!["services.quality-guides".to_owned()],
+            "the run should hold the named check and nothing beside it"
+        );
+    }
+
+    /// A name nothing reports is refused rather than answered with an empty report,
+    /// which reads as a stack with nothing wrong with it.
+    #[tokio::test]
+    async fn a_check_this_stack_does_not_report_is_refused() {
+        let ctx = watching(Reporting::holding(
+            &LIBRARY,
+            Lifecycle::Running,
+            Health::Healthy,
+        ));
+        let outcome = dispatch(
+            Command::Doctor {
+                narrowing: Narrowing::Check("services.nothing-of-the-kind".to_owned()),
+                disruptive: false,
+                accept: None,
+            },
+            &ctx,
+        )
+        .await;
+
+        assert_eq!(
+            outcome.as_ref().err().map(|problem| problem.code),
+            Some(crate::error::Code::new("DIAG-1")),
+            "a name this stack does not report should be refused: {outcome:?}"
         );
     }
 
@@ -996,7 +1061,7 @@ mod tests {
             .build();
         let outcome = dispatch(
             Command::Doctor {
-                only: None,
+                narrowing: Narrowing::Suite,
                 disruptive: false,
                 accept: None,
             },

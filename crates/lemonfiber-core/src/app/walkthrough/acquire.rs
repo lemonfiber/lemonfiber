@@ -12,7 +12,7 @@
 use super::super::engine::diagnose;
 use super::choose::Chosen;
 use super::walk::Walk;
-use crate::doctor::{Category, Finding, Verdict};
+use crate::doctor::{Category, Finding, Narrowing, Verdict};
 use crate::ports::service::{Added, Catalogue, QualityReleases, ReleaseProbe};
 use crate::walkthrough::{Line, Reason, Step};
 
@@ -66,7 +66,7 @@ async fn tunnel_is_up(walk: &mut Walk<'_>) -> Result<(), Reason> {
     if !walk.ctx.settings.protocols.torrent {
         return Ok(());
     }
-    let proved = diagnose(walk.ctx, Some(Category::Vpn), false)
+    let proved = diagnose(walk.ctx, &Narrowing::Category(Category::Vpn), false)
         .await
         .is_ok_and(|report| tunnel_holds(&report.findings));
     if proved {
