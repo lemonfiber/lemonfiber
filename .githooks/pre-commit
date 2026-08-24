@@ -1,0 +1,28 @@
+#!/bin/sh
+# The fast checks CI runs, before the commit rather than after the push.
+#
+# Fast only: the slow gates stay in the repository’s own `ci` recipe, because a
+# hook that takes a minute is a hook people turn off, and one that is off
+# enforces nothing (OPS-R51, Q-R57).
+#
+# Each check is skipped where its tool is absent, so a contributor without it
+# gets CI’s answer rather than a hook that cannot run.
+
+set -eu
+
+if [ -n "$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')" ] \
+	&& command -v cargo >/dev/null 2>&1; then
+	cargo fmt --check || {
+		echo "pre-commit: rustfmt would change a staged file. Run \`cargo fmt\`." >&2
+		exit 1
+	}
+fi
+
+if command -v typos >/dev/null 2>&1; then
+	typos || {
+		echo "pre-commit: typos found something." >&2
+		exit 1
+	}
+fi
+
+exit 0

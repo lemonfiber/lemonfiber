@@ -1,0 +1,62 @@
+#!/bin/sh
+# Say now what CI will say later about this commit message.
+#
+# Three gates read a commit subject or its trailers, and each of them speaks
+# after a push, a run and a red check: `commitlint` wants a conventional
+# subject, `dco` wants a sign-off, `spec-check` wants a `Spec:` citation. None
+# of that needs a network or a build to know, and finding out here costs a
+# second instead of a round trip.
+#
+# It enforces nothing CI does not (Q-R57). The subject pattern is the one
+# `commit_lint.py` applies, the sign-off is the one `dco_check.py` requires, and
+# the trailer is the one `spec_check.py` reads. Where they differ, they are
+# right and this is wrong.
+#
+# The slow gates stay where they are (OPS-R51). A hook that runs a test suite is
+# a hook people turn off.
+
+set -eu
+
+message=$1
+
+# A merge or a revert is written by git and is exempt, as it is in CI.
+subject=$(sed -n '1p' "$message")
+case "$subject" in
+Merge\ * | Revert\ * | fixup!* | squash!*) exit 0 ;;
+esac
+
+# Comment lines are not part of the message.
+body=$(grep -v '^#' "$message" || true)
+
+faults=""
+
+types="feat|fix|docs|refactor|test|chore|ci|perf|build|style|revert"
+if ! printf '%s\n' "$subject" | grep -qE "^($types)(\([a-z0-9.-]+\))?!?: .+"; then
+	faults="${faults}  the subject is not conventional: ${subject}
+      types: $(printf '%s' "$types" | tr '|' ' ')
+      e.g.  feat: health-gate service startup
+"
+fi
+
+if ! printf '%s\n' "$body" | grep -qE '^[ \t]*Signed-off-by:[ \t]*.+<.+>'; then
+	faults="${faults}  no sign-off. Commit with -s, or add:
+      Signed-off-by: Your Name <you@example.com>
+"
+fi
+
+if ! printf '%s\n' "$body" | grep -qiE '^[ \t]*Spec:[ \t]*[^ \t]'; then
+	faults="${faults}  no specification citation. Add a trailer naming what this serves:
+      Spec: GOV-R12
+"
+fi
+
+if [ -n "$faults" ]; then
+	echo "commit-msg: this is what CI would have said." >&2
+	echo "" >&2
+	printf '%s' "$faults" >&2
+	echo "  Nothing is lost — the message is in .git/COMMIT_EDITMSG." >&2
+	echo "  Fix it and commit again, or --no-verify to say it anyway." >&2
+	exit 1
+fi
+
+exit 0
