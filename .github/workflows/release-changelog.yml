@@ -34,10 +34,14 @@ permissions:
 jobs:
   changelog:
     # The generated workflow also runs on every pull request; only a successful
-    # tag push produced a release to write to.
+    # tag push produced a release to write to. And only one from this repository:
+    # a `workflow_run` fires for a fork's run too, and while the checkout below
+    # takes a tag from here rather than from there, refusing the run outright is
+    # the shorter thing to be sure of.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push'
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read

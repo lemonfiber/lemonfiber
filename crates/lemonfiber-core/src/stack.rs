@@ -192,7 +192,7 @@ impl Source {
 /// Whether a path is a file Compose would read.
 fn is_compose(path: &Path) -> bool {
     path.extension()
-        .and_then(|extension| extension.to_str())
+        .and_then(std::ffi::OsStr::to_str)
         .is_some_and(|extension| {
             extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
         })
