@@ -51,6 +51,18 @@ impl Status {
             },
         }
     }
+
+    /// Whether this is a setup to pick up where it was left.
+    ///
+    /// The question every surface asks first, and asks before it asks whether the
+    /// machine is configured: an apply that stopped part-way has written settings
+    /// that the configured-yet check reads as a finished install, so a run that
+    /// asked in the other order would offer reconfiguration for a stack that is
+    /// half written.
+    #[must_use]
+    pub const fn unfinished(self) -> bool {
+        matches!(self, Self::InProgress | Self::Reviewing | Self::FailedApply)
+    }
 }
 
 /// What to do about an interrupted apply, once one is found.

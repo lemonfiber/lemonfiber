@@ -25,6 +25,10 @@ pub static STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media
 /// which is a copy that only ever falls out of step in one direction.
 #[derive(Debug, Default, clap::Args)]
 pub struct RawSetup {
+    /// Report where setup stands and ask nothing. Takes precedence over the
+    /// answers below, so a run that asks where it is never also answers.
+    #[arg(long)]
+    pub status: bool,
     /// Apply without a prompt to confirm — required for an unattended run.
     #[arg(long)]
     pub yes: bool,

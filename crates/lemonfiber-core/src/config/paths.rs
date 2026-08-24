@@ -33,9 +33,21 @@ impl Paths {
     /// regenerated.
     #[must_use]
     pub fn rooted(config: &Path, data: &Path) -> Self {
+        Self::at(&config.join(crate::PRODUCT), &data.join(crate::PRODUCT))
+    }
+
+    /// The layout beneath the two directories themselves, rather than the bases
+    /// they sit in.
+    ///
+    /// What [`Self::rooted`] resolves to, and the way back for a caller that
+    /// already holds the resolved pair — a running command knows where its
+    /// environment file and its stack are, and both name a directory this layout
+    /// is spelled beneath.
+    #[must_use]
+    pub fn at(config: &Path, data: &Path) -> Self {
         Self {
-            config: config.join(crate::PRODUCT),
-            data: data.join(crate::PRODUCT),
+            config: config.to_path_buf(),
+            data: data.to_path_buf(),
         }
     }
 

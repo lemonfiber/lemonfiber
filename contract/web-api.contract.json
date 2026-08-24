@@ -4744,6 +4744,207 @@
         }
       }
     },
+    "wizard": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/WizardReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Phase": {
+          "description": "Where an in-flight or finished setup stands in its lifecycle.\n\nThe persisted marker a later run reads to tell answers still being gathered\nfrom a half-written apply. Only these four are ever written: the two states a\nrun infers instead of storing — no setup at all, and an apply that stopped\nmid-write — are read off the world rather than trusted from a file (see\n[`Status`]).",
+          "oneOf": [
+            {
+              "description": "Still gathering answers. Resumable, and nothing has touched disk.",
+              "type": "string",
+              "const": "in-progress"
+            },
+            {
+              "description": "Every applicable question answered, awaiting the operator's confirmation.",
+              "type": "string",
+              "const": "reviewing"
+            },
+            {
+              "description": "Writing configuration and starting services — the one non-atomic phase,\nand so the only marker whose persistence signals an interrupted run.",
+              "type": "string",
+              "const": "applying"
+            },
+            {
+              "description": "Configuration written and valid.",
+              "type": "string",
+              "const": "applied"
+            }
+          ]
+        },
+        "SettingReport": {
+          "description": "One setting, as it is safe to show.",
+          "type": "object",
+          "properties": {
+            "key": {
+              "description": "The setting's name.",
+              "type": "string"
+            },
+            "secret": {
+              "description": "Whether the value was withheld.",
+              "type": "boolean"
+            },
+            "value": {
+              "description": "Its value, or a note that it is set and withheld.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "value",
+            "secret"
+          ]
+        },
+        "Step": {
+          "description": "A step of setup, in the order the operator meets it.\n\nSome steps only inform (they detect and state, and the operator acknowledges);\nothers ask a question whose answer the wizard records. The apply-and-onward\nsteps — writing config, pulling images, wiring services — are not modelled\nhere yet: they arrive with the features they drive, and this machine covers\nthe read-only phase that precedes them.",
+          "oneOf": [
+            {
+              "description": "States what is about to happen and roughly how long it takes. Informs.",
+              "type": "string",
+              "const": "welcome"
+            },
+            {
+              "description": "Detects the environment: OS, Docker, Compose, daemon reachability. Informs.",
+              "type": "string",
+              "const": "preflight"
+            },
+            {
+              "description": "The account checklist derived from the protocol choice. Informs.",
+              "type": "string",
+              "const": "prerequisites"
+            },
+            {
+              "description": "Usenet, torrents, both, or neither.",
+              "type": "string",
+              "const": "protocols"
+            },
+            {
+              "description": "Whether a VPN carries the torrent traffic. Asked only where torrents were\nchosen, and after the checklist has explained what one is for.",
+              "type": "string",
+              "const": "vpn"
+            },
+            {
+              "description": "Where downloads and the library are kept.",
+              "type": "string",
+              "const": "data-location"
+            },
+            {
+              "description": "The indexer credential, tested against the live service. Asked only where a\ndownload protocol was chosen.",
+              "type": "string",
+              "const": "credentials"
+            },
+            {
+              "description": "The Usenet provider login, tested over NNTP. Asked only where Usenet was\nchosen.",
+              "type": "string",
+              "const": "provider"
+            },
+            {
+              "description": "The user and group the containers run as. Asked only where it is visible.",
+              "type": "string",
+              "const": "service-user"
+            },
+            {
+              "description": "Whether to run Jellyfin, and if so how.",
+              "type": "string",
+              "const": "library"
+            },
+            {
+              "description": "Whether others in the home will use it.",
+              "type": "string",
+              "const": "household"
+            },
+            {
+              "description": "How much the operator wants to be told about — one question, three presets.",
+              "type": "string",
+              "const": "notifications"
+            },
+            {
+              "description": "Whether to start on boot.",
+              "type": "string",
+              "const": "autostart"
+            },
+            {
+              "description": "The complete summary, before anything is written. Informs.",
+              "type": "string",
+              "const": "review"
+            }
+          ]
+        },
+        "WizardReport": {
+          "description": "Where a setup run stands, and what it is still asking for.\n\nThe answer to every step of setup driven from outside this process: a surface\nasks where the walk is, submits one answer, and is told where the walk is now.\nNothing here is a copy of the wizard's own state — it is read off the wizard\neach time, so a surface cannot hold a stale one and act on it.\n\n**The answers themselves are never in it.** Setup gathers an indexer key and a\nprovider password, and this report is one a script can log, so it says what was\n*decided* and never what was *entered* — the same line [`SetupReport`] holds.\nWhat will be written is in `plan`, with every credential withheld exactly as\n`config show` withholds one.",
+          "type": "object",
+          "properties": {
+            "asks": {
+              "description": "Whether that step asks a question, as opposed to only informing.",
+              "type": "boolean"
+            },
+            "at": {
+              "description": "The step the operator is on.",
+              "$ref": "#/$defs/Step"
+            },
+            "offered": {
+              "description": "Whether this machine has setup left to do. False once configuration\nexists and nothing is part-way through, which is when a surface directs\nthe operator to reconfiguration instead of asking the first question again.",
+              "type": "boolean"
+            },
+            "phase": {
+              "description": "Where this run stands in its lifecycle. `applying` read back here means an\napply stopped part-way, because an apply that is still running is one this\nanswer is waiting on.",
+              "$ref": "#/$defs/Phase"
+            },
+            "plan": {
+              "description": "What applying will write, in the order it will be written, with any value\nwhose name reads as a credential withheld.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingReport"
+              }
+            },
+            "ready_for_review": {
+              "description": "Whether every applicable question is answered, so the plan can be applied.",
+              "type": "boolean"
+            },
+            "unanswered": {
+              "description": "Every question that applies on this machine and has no answer yet, in the\norder they are put.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Step"
+              }
+            }
+          },
+          "required": [
+            "offered",
+            "phase",
+            "at",
+            "asks",
+            "unanswered",
+            "ready_for_review",
+            "plan"
+          ]
+        }
+      }
+    },
     "word": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

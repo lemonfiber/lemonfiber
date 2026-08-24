@@ -27,7 +27,8 @@ use crate::model::{
     kind::{self, Kind},
     ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
     MusicReport, QualityReport, ResetReport, SetupReport, Started, StatusReport, StuckReport,
-    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, API_VERSION,
+    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
+    API_VERSION,
 };
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
@@ -120,6 +121,11 @@ impl Contract {
             &mut kinds,
             kind::WATCH,
             schema_for!(Envelope<SupervisionReport>),
+        );
+        describing(
+            &mut kinds,
+            kind::WIZARD,
+            schema_for!(Envelope<WizardReport>),
         );
         describing(&mut kinds, kind::WORD, schema_for!(Envelope<Term>));
 

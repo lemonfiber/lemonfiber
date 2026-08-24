@@ -136,10 +136,7 @@ pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> 
     // an interrupted apply leaves half-written settings that check would read as
     // done. Handing these to the setup path detects and offers the way out.
     let progress = core_setup::progress_at(&paths.setup_progress());
-    if matches!(
-        Status::of(progress.as_ref()),
-        Status::FailedApply | Status::InProgress
-    ) {
+    if Status::of(progress.as_ref()).unfinished() {
         // A bare invocation carries no flags; unfinished setup is picked up
         // interactively, the same conversation a fresh bare run would have.
         return setting_up(ctx, paths, surface, SetupFlags::none()).await;

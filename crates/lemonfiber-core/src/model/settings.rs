@@ -57,6 +57,16 @@ pub struct SettingReport {
     pub secret: bool,
 }
 
+impl From<crate::config::store::Shown> for SettingReport {
+    fn from(shown: crate::config::store::Shown) -> Self {
+        Self {
+            key: shown.key,
+            value: shown.value,
+            secret: shown.secret,
+        }
+    }
+}
+
 /// The answer to a configuration command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct ConfigReport {
@@ -130,4 +140,40 @@ pub struct SetupReport {
     pub data_root: Option<std::path::PathBuf>,
     /// The user the services run as, as `uid:gid`, where one was set.
     pub service_user: Option<String>,
+}
+
+/// Where a setup run stands, and what it is still asking for.
+///
+/// The answer to every step of setup driven from outside this process: a surface
+/// asks where the walk is, submits one answer, and is told where the walk is now.
+/// Nothing here is a copy of the wizard's own state — it is read off the wizard
+/// each time, so a surface cannot hold a stale one and act on it.
+///
+/// **The answers themselves are never in it.** Setup gathers an indexer key and a
+/// provider password, and this report is one a script can log, so it says what was
+/// *decided* and never what was *entered* — the same line [`SetupReport`] holds.
+/// What will be written is in `plan`, with every credential withheld exactly as
+/// `config show` withholds one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct WizardReport {
+    /// Whether this machine has setup left to do. False once configuration
+    /// exists and nothing is part-way through, which is when a surface directs
+    /// the operator to reconfiguration instead of asking the first question again.
+    pub offered: bool,
+    /// Where this run stands in its lifecycle. `applying` read back here means an
+    /// apply stopped part-way, because an apply that is still running is one this
+    /// answer is waiting on.
+    pub phase: crate::wizard::Phase,
+    /// The step the operator is on.
+    pub at: crate::wizard::Step,
+    /// Whether that step asks a question, as opposed to only informing.
+    pub asks: bool,
+    /// Every question that applies on this machine and has no answer yet, in the
+    /// order they are put.
+    pub unanswered: Vec<crate::wizard::Step>,
+    /// Whether every applicable question is answered, so the plan can be applied.
+    pub ready_for_review: bool,
+    /// What applying will write, in the order it will be written, with any value
+    /// whose name reads as a credential withheld.
+    pub plan: Vec<SettingReport>,
 }

@@ -107,7 +107,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Trace(_)
         | Outcome::Household(_)
         | Outcome::Stuck(_)
-        | Outcome::Status(_) => ExitCode::SUCCESS,
+        | Outcome::Status(_)
+        | Outcome::Wizard(_) => ExitCode::SUCCESS,
     }
 }
 

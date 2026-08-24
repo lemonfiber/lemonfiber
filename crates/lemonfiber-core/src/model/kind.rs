@@ -84,6 +84,8 @@ pub const VERSION: Kind = Kind("version");
 pub const WALKTHROUGH: Kind = Kind("walkthrough");
 /// A supervision run's findings.
 pub const WATCH: Kind = Kind("watch");
+/// Where a setup run stands, and what it is still asking for.
+pub const WIZARD: Kind = Kind("wizard");
 /// One glossary term.
 pub const WORD: Kind = Kind("word");
 
@@ -113,6 +115,7 @@ pub const ALL: &[Kind] = &[
     VERSION,
     WALKTHROUGH,
     WATCH,
+    WIZARD,
     WORD,
 ];
 

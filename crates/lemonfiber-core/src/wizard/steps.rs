@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 /// steps — writing config, pulling images, wiring services — are not modelled
 /// here yet: they arrive with the features they drive, and this machine covers
 /// the read-only phase that precedes them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Step {
     /// States what is about to happen and roughly how long it takes. Informs.
@@ -92,6 +94,31 @@ impl Step {
         }
     }
 
+    /// What this step is called, in the words a surface puts to an operator.
+    ///
+    /// Here rather than in a surface because all three must call a step the same
+    /// thing: an operator who reads "Where downloads and the library are kept" in a
+    /// browser and something else in a terminal is being shown two products.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Welcome => "Welcome",
+            Self::Preflight => "What this machine already has",
+            Self::Prerequisites => "The accounts you will need",
+            Self::Protocols => "How to fetch content",
+            Self::Vpn => "Whether a VPN carries the torrents",
+            Self::DataLocation => "Where downloads and the library are kept",
+            Self::Credentials => "Your indexer",
+            Self::Provider => "Your Usenet provider",
+            Self::ServiceUser => "The user the services run as",
+            Self::Library => "How the library is served",
+            Self::Household => "Whether others in the home will use it",
+            Self::Notifications => "How much to be told about",
+            Self::Autostart => "Whether to start on boot",
+            Self::Review => "Review",
+        }
+    }
+
     /// Whether this step asks a question, as opposed to only informing.
     ///
     /// The distinction is what the non-interactive guard reports on: an informing
@@ -140,7 +167,9 @@ pub const fn offer_setup(configuration_present: bool) -> bool {
 /// run infers instead of storing — no setup at all, and an apply that stopped
 /// mid-write — are read off the world rather than trusted from a file (see
 /// [`Status`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Phase {
     /// Still gathering answers. Resumable, and nothing has touched disk.
@@ -173,4 +202,36 @@ pub struct Progress {
     /// gathering phase — the state those files were only ever left in.
     #[serde(default)]
     pub phase: Phase,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{offer_setup, Step};
+
+    #[test]
+    fn every_step_is_called_something() {
+        // A step with no words is one a surface would present as a blank heading,
+        // and the walk has fourteen of them: the one that was forgotten is the one
+        // nobody sees until they reach it.
+        let unnamed: Vec<Step> = Step::ORDER
+            .into_iter()
+            .filter(|step| step.label().is_empty())
+            .collect();
+        assert!(unnamed.is_empty(), "{unnamed:?}");
+    }
+
+    #[test]
+    fn no_two_steps_are_called_the_same_thing() {
+        let mut labels: Vec<&str> = Step::ORDER.into_iter().map(Step::label).collect();
+        labels.sort_unstable();
+        let count = labels.len();
+        labels.dedup();
+        assert_eq!(labels.len(), count);
+    }
+
+    #[test]
+    fn setup_is_offered_exactly_where_there_is_nothing_configured() {
+        assert!(offer_setup(false));
+        assert!(!offer_setup(true));
+    }
 }

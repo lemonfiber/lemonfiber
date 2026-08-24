@@ -7,6 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
+use crate::config::paths::Paths;
 use crate::config::store;
 use crate::stack::Source;
 
@@ -45,6 +46,20 @@ pub(crate) fn config_path(
 pub(crate) fn beside_env(ctx: &Ctx, name: &str) -> Option<PathBuf> {
     let env = ctx.settings.env_file.as_deref()?;
     Some(env.with_file_name(name))
+}
+
+/// The whole install layout, as the two locations a context already carries imply
+/// it: the environment file sits directly in the configuration directory, and the
+/// materialised stack directly in the data directory.
+///
+/// Nothing where either is unconfigured, which a caller turns into "there is
+/// nowhere to keep this" rather than a guess. Resolved here beside the other two,
+/// so a command that needs a whole layout asks for one instead of rebuilding the
+/// convention out of the parts.
+pub(crate) fn layout(ctx: &Ctx) -> Option<Paths> {
+    let config = ctx.settings.env_file.as_deref()?.parent()?;
+    let data = ctx.settings.stack_dir.as_deref()?.parent()?;
+    Some(Paths::at(config, data))
 }
 
 /// The operator's data root on the host, as the environment file records it — the
