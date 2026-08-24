@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::doctor::{Category, Verdict};
+use lemonfiber_core::doctor::{Category, Narrowing, Verdict};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::stack::Source;
@@ -86,7 +86,7 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
     )
     .with_http(http);
 
-    let report = diagnose(&ctx, Some(Category::Providers), false).await;
+    let report = diagnose(&ctx, &Narrowing::Category(Category::Providers), false).await;
     let findings = report.map(|report| report.findings).unwrap_or_default();
 
     assert!(
@@ -134,7 +134,7 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
     )
     .with_http(http);
 
-    let report = diagnose(&ctx, Some(Category::Providers), false).await;
+    let report = diagnose(&ctx, &Narrowing::Category(Category::Providers), false).await;
     let findings = report.map(|report| report.findings).unwrap_or_default();
 
     assert!(
@@ -160,7 +160,7 @@ async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
     )
     .with_http(Fake::silent());
 
-    let report = diagnose(&ctx, Some(Category::Providers), false).await;
+    let report = diagnose(&ctx, &Narrowing::Category(Category::Providers), false).await;
     let findings = report.map(|report| report.findings).unwrap_or_default();
 
     assert!(

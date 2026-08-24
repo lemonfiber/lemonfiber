@@ -278,7 +278,7 @@ async fn looked(
     services: &[lemonfiber_manifest::Service],
     checks: &[Box<dyn Check>],
 ) -> Vec<Finding> {
-    super::engine::examined(ctx, services, checks, None)
+    super::engine::examined(ctx, services, checks, &crate::doctor::Narrowing::Suite)
         .await
         .findings
 }

@@ -185,6 +185,33 @@ async fn an_ordinary_run_skips_the_live_search() {
     ));
 }
 
+/// What it costs to run and for how long, both said before the operator opts in.
+///
+/// A search spent is a search the indexer counts, and an operator weighing that is
+/// weighing how many and for how long — the half a statement of the cost alone leaves out.
+#[tokio::test]
+async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
+    let http = Fake::by_path(Vec::new());
+    let check = ReleasesCheck::new(http, opening_fs(), vec![sonarr()], false);
+    let said = check
+        .run()
+        .await
+        .pop()
+        .and_then(|found| match found.verdict {
+            Verdict::Skipped { reason } => Some(reason),
+            _ => None,
+        })
+        .unwrap_or_default();
+    assert!(
+        said.contains("one real search per service against the indexers"),
+        "it should say what it spends: {said}"
+    );
+    assert!(
+        said.contains("seconds this check is allowed"),
+        "it should say how long for: {said}"
+    );
+}
+
 #[tokio::test]
 async fn a_film_service_is_searched_by_its_own_id() {
     // Radarr searches by movieId rather than episodeId — the same probe, the other

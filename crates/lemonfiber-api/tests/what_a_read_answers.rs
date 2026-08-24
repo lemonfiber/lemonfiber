@@ -202,6 +202,22 @@ async fn a_whole_diagnosis_is_what_a_read_naming_no_group_asks_for() {
     );
 }
 
+/// One check, asked for by the identifier its own finding carries.
+#[tokio::test]
+async fn a_single_check_is_asked_for_the_way_a_finding_names_it() {
+    let seen = asked(
+        world(running(), stack()),
+        "/api/checks?only=environment.engine",
+    )
+    .await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.contains(r#""check":"environment.engine""#)
+            && !body.contains(r#""check":"environment.compose""#)),
+        "a read narrowed to one check answers with that check"
+    );
+}
+
 #[tokio::test]
 async fn a_group_of_checks_that_is_not_one_is_not_run() {
     // A name lemonfiber does not know is a mistake to correct, not a request to
@@ -210,7 +226,7 @@ async fn a_group_of_checks_that_is_not_one_is_not_run() {
         asked(world(running(), stack()), "/api/checks?only=nonsense").await,
         Some((
             StatusCode::BAD_REQUEST,
-            "There is no group of checks by that name.".to_owned()
+            "There is no group of checks and no check by that name.".to_owned()
         ))
     );
 }

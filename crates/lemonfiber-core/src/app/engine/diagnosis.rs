@@ -21,15 +21,18 @@ use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::wiring::WiringCheck;
-use crate::doctor::{examine, Category, Check, Finding, Verdict};
-use crate::error::{Diagnose, Problem};
+use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
+use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
 use crate::model::DoctorReport;
 use crate::ports::service::{Indexers, UsenetAccounts};
 
 use crate::app::targets::{committed_bytes, project_directory, servarr_targets};
 use crate::app::Ctx;
 
-/// Run the diagnostic checks, or the one category asked for.
+/// Raised when a run is narrowed to a check nothing in this stack reports.
+const NO_SUCH_CHECK: Code = Code::new("DIAG-1");
+
+/// Run the diagnostic checks: the whole suite, one category, or one check.
 ///
 /// The checks are assembled here rather than held on the context because each
 /// needs a slice of it — the VPN check needs the engine, the resolved pair and
@@ -43,14 +46,45 @@ use crate::app::Ctx;
 /// # Errors
 ///
 /// Returns a [`Problem`] where the stack cannot be read, which is the one thing
-/// the checks need before any of them can run.
+/// the checks need before any of them can run, and where the run was narrowed to a
+/// check nothing reports.
 pub async fn diagnose(
     ctx: &Ctx,
-    only: Option<Category>,
+    narrowing: &Narrowing,
     disruptive: bool,
 ) -> Result<DoctorReport, Box<Problem>> {
     let (manifest, checks) = assembled(ctx, disruptive).await?;
-    Ok(examined(ctx, &manifest.services, &checks, only).await)
+    let report = examined(ctx, &manifest.services, &checks, narrowing).await;
+    answered(narrowing, report)
+}
+
+/// The report, or a refusal where a named check said nothing at all.
+///
+/// A check that could not run says so, and a check whose prerequisites are absent says
+/// so too, so an empty report from a named check means the name matched none of them.
+/// Reporting that as a healthy silence would settle a question nobody had asked.
+fn answered(narrowing: &Narrowing, report: DoctorReport) -> Result<DoctorReport, Box<Problem>> {
+    match narrowing.check() {
+        Some(named) if report.findings.is_empty() => Err(Box::new(no_such_check(named))),
+        _ => Ok(report),
+    }
+}
+
+/// Why a named check was refused, and where the names that would work are written.
+///
+/// The names are not listed here. What a stack reports depends on what it is running —
+/// one credential check per service it holds — so a list kept in this crate would be
+/// right about somebody else's stack and wrong about the one in front of the operator.
+fn no_such_check(named: &str) -> Problem {
+    Problem::new(
+        NO_SUCH_CHECK,
+        Severity::Error,
+        format!("No check on this stack reports as {named}"),
+        "A check is named by the identifier its finding carries, and this run holds no \
+         finding under that one. A report of nothing found would read as nothing wrong.",
+        Remedy::new("Run the checks and name one this stack actually reports")
+            .with_detail("lemonfiber doctor"),
+    )
 }
 
 /// Run the checks and answer with what they found, acknowledged choices marked as such.
@@ -64,9 +98,9 @@ pub(crate) async fn examined(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     checks: &[Box<dyn Check>],
-    only: Option<Category>,
+    narrowing: &Narrowing,
 ) -> DoctorReport {
-    let mut report = examine(checks, only).await;
+    let mut report = examine(checks, narrowing).await;
     report.findings =
         crate::doctor::acknowledged::suppressing(report.findings, &crate::app::accepted::load(ctx));
     // Attributed after the acknowledged ones are marked, so a choice the operator has

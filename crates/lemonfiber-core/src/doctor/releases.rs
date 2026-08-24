@@ -38,6 +38,20 @@ pub const NONE_AVAILABLE: Code = Code::new("QUAL-3");
 /// The id under which the check reports where there is nothing to run it against.
 const NONE: &str = "services.releases";
 
+/// What this check says when the operator has not asked for the disruptive checks.
+///
+/// It says what running it costs and for how long, which is what an operator has to
+/// weigh before opting in: the searches are real, they are spent against the quota the
+/// indexers hold the operator to, and the check is abandoned at its budget rather than
+/// left to run.
+fn not_asked_for() -> String {
+    format!(
+        "a live release search is only run with --disruptive: it spends one real search \
+         per service against the indexers {}",
+        crate::doctor::disturbing_for(crate::doctor::CHECK_BUDGET)
+    )
+}
+
 /// Searches the resolution services for the operator's wanted content, so a preset that
 /// asks for releases the indexers do not carry is told apart from an indexer failure.
 pub struct ReleasesCheck {
@@ -136,9 +150,7 @@ impl Check for ReleasesCheck {
                 NONE,
                 "Releases for the chosen quality",
                 Verdict::Skipped {
-                    reason: "a live release search is only run with --disruptive, so as not to \
-                             burden the indexer"
-                        .to_owned(),
+                    reason: not_asked_for(),
                 },
             )];
         }

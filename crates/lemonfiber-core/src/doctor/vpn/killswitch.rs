@@ -108,7 +108,7 @@ pub(super) fn not_attempted(disruptive: bool, reason: &str) -> Held {
         reason: if disruptive {
             reason.to_owned()
         } else {
-            NOT_ASKED_FOR.to_owned()
+            not_asked_for()
         },
     }
 }
@@ -138,7 +138,7 @@ pub(super) fn verdict(held: &Held) -> Verdict {
             .in_state(crate::error::State::Guided)
             .with_detail(format!("the world saw {seen} while the tunnel was down")),
         ),
-        Held::NotAttempted { reason } if reason == NOT_ASKED_FOR => Verdict::Unverified {
+        Held::NotAttempted { reason } if *reason == not_asked_for() => Verdict::Unverified {
             reason: reason.clone(),
             remedy: Remedy::new("Run the disruptive check when transfers can be interrupted")
                 .with_detail("lemonfiber doctor --only vpn --disruptive"),
@@ -169,9 +169,17 @@ pub(super) fn verdict(held: &Held) -> Verdict {
 ///
 /// It is never a pass. An untested fail-closed guarantee reported as working would
 /// be exactly the comfortable falsehood this feature exists to eliminate.
-pub(super) const NOT_ASKED_FOR: &str =
-    "the killswitch has not been tested; proving it works means dropping the tunnel and \
-     confirming traffic stops, which interrupts transfers";
+///
+/// It says what running it costs and for how long, which is what an operator has to
+/// weigh before opting in: the tunnel goes down, transfers stop while it is down, and
+/// the check is abandoned at its budget rather than left to run.
+pub(super) fn not_asked_for() -> String {
+    format!(
+        "the killswitch has not been tested; proving it works means dropping the tunnel and \
+         confirming traffic stops, which interrupts transfers {}",
+        crate::doctor::disturbing_for(crate::doctor::CHECK_BUDGET)
+    )
+}
 
 /// Driving the test: taking the tunnel away and putting it back.
 ///
@@ -202,7 +210,7 @@ impl super::VpnCheck {
     ) -> Held {
         if !self.disruptive {
             return Held::NotAttempted {
-                reason: NOT_ASKED_FOR.to_owned(),
+                reason: not_asked_for(),
             };
         }
         let Some(gateway) = running(gateway) else {
@@ -269,7 +277,7 @@ mod tests {
     use super::super::leak::Reach;
     use super::super::Verdict;
     use super::{
-        held_from, not_attempted, read_route, set_link, tunnel_device, verdict, Held, NOT_ASKED_FOR,
+        held_from, not_asked_for, not_attempted, read_route, set_link, tunnel_device, verdict, Held,
     };
 
     #[test]
@@ -361,11 +369,31 @@ mod tests {
         assert!(said.contains("did not come back"), "{said}");
     }
 
+    /// What it disturbs and for how long, both stated before anything is dropped.
+    ///
+    /// The length is read from the budget that enforces it, so a check given longer
+    /// cannot go on promising the shorter answer.
+    #[test]
+    fn what_it_disturbs_is_said_with_how_long_it_disturbs_it_for() {
+        let said = not_asked_for();
+        assert!(
+            said.contains("dropping the tunnel") && said.contains("interrupts transfers"),
+            "it should say what it disturbs: {said}"
+        );
+        assert!(
+            said.contains(&format!(
+                "no longer than the {} seconds",
+                crate::doctor::CHECK_BUDGET.as_secs()
+            )),
+            "it should say how long for, in the seconds it is bounded to: {said}"
+        );
+    }
+
     #[test]
     fn an_untested_killswitch_is_never_reported_as_working() {
         // The comfortable falsehood this feature exists to eliminate.
         let untested = Held::NotAttempted {
-            reason: NOT_ASKED_FOR.to_owned(),
+            reason: not_asked_for(),
         };
         let said = shown(&verdict(&untested));
         assert!(said.starts_with("Unverified"), "{said}");
@@ -391,7 +419,7 @@ mod tests {
         assert_eq!(
             not_attempted(false, "the tunnel container is not running"),
             Held::NotAttempted {
-                reason: NOT_ASKED_FOR.to_owned()
+                reason: not_asked_for()
             }
         );
     }

@@ -209,8 +209,9 @@ pub enum Request {
     },
     /// Run the checks that prove the stack is doing what it should.
     Doctor {
-        /// Run only one category of check, such as `vpn`.
-        #[arg(long, value_name = "CATEGORY", conflicts_with = "fix")]
+        /// Run one category of check, such as `vpn`, or one check by the name a
+        /// finding gives it, such as `vpn.killswitch`.
+        #[arg(long, value_name = "CATEGORY_OR_CHECK", conflicts_with = "fix")]
         only: Option<String>,
         /// Include the checks that disturb the running system.
         #[arg(long)]

@@ -691,8 +691,8 @@ Options:
       --json
           Print machine-readable output
 
-      --only <CATEGORY>
-          Run only one category of check, such as `vpn`
+      --only <CATEGORY_OR_CHECK>
+          Run one category of check, such as `vpn`, or one check by the name a finding gives it, such as `vpn.killswitch`
 
       --disruptive
           Include the checks that disturb the running system

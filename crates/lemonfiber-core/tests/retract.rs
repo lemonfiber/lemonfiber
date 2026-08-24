@@ -19,7 +19,7 @@ use lemonfiber_core::app::repair::retract;
 use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::doctor::Category;
+use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::repair::OPERATION;
@@ -127,7 +127,12 @@ async fn a_stack_with_a_baseline_has_its_wirings_read() {
         r#"{"services":{"Sonarr":{"downloadclient:sabnzbd:8080":{"value":"tv-sonarr","at":"1000","origin":"written"}}}}"#,
     );
 
-    let report = diagnose(&ctx(&root, Fake::silent()), Some(Category::Config), false).await;
+    let report = diagnose(
+        &ctx(&root, Fake::silent()),
+        &Narrowing::Category(Category::Config),
+        false,
+    )
+    .await;
 
     // Nothing answers, so every wiring reads as unverified — but the wirings were read,
     // which is the whole of what a baseline buys.
