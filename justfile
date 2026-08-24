@@ -109,10 +109,11 @@ typos:
 #    for "stay drafted", so we flip that one flag.
 #
 # The generated file is then re-hardened: actions get pinned to commit SHAs, and
-# the dist installer gets fetched and checked against a pinned digest instead of
-# being piped from a mutable release asset straight into `sh`. Each patch has a
-# guard below, because a patch that stopped applying is one nobody would notice.
-# Python (not sed -i) keeps this portable across macOS/Linux.
+# every installer gets fetched and checked against a pinned digest instead of
+# being piped from a mutable URL straight into `sh`. `verify_release_workflow.py`
+# reads the result and says whether each patch is in it; CI runs the same script
+# on every pull request, so a regeneration that skipped this recipe is red rather
+# than unnoticed. Python (not sed -i) keeps this portable across macOS/Linux.
 release-workflow:
     python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('allow-dirty = [\"ci\"]\n', ''))"
     dist generate
@@ -121,10 +122,7 @@ release-workflow:
     python3 scripts/pin_release_actions.py
     python3 scripts/verify_dist_installer.py
     python3 scripts/scope_release_permissions.py
-    @grep -q 'gh release create --draft' .github/workflows/release.yml || (echo "draft patch failed to apply" && exit 1)
-    @grep -q 'DIST_INSTALLER_SHA256' .github/workflows/release.yml || (echo "installer verification patch failed to apply" && exit 1)
-    @grep -q 'permissions:' .github/workflows/release.yml && grep -A1 '^  host:' .github/workflows/release.yml | grep -q 'permissions' || (echo "release permission patch failed to apply" && exit 1)
-    @grep -q 'allow-dirty = ' Cargo.toml || (echo "allow-dirty not restored" && exit 1)
+    python3 scripts/verify_release_workflow.py
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.
 #

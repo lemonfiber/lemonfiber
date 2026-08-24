@@ -72,11 +72,16 @@ jobs:
           DIST_INSTALLER_SHA256: "b657cf8c04a8b7bc28f39d220f7e6dd11bbd2bdb072c552262bd9ccf597261b5"
         run: |
           set -euo pipefail
-          curl --proto '=https' --tlsv1.2 -LsSf "$DIST_INSTALLER_URL" \
-            -o "$RUNNER_TEMP/dist-installer.sh"
-          echo "$DIST_INSTALLER_SHA256  $RUNNER_TEMP/dist-installer.sh" \
-            | sha256sum --check --strict -
-          sh "$RUNNER_TEMP/dist-installer.sh"
+          installer="$RUNNER_TEMP/dist-installer.sh"
+          curl --proto '=https' --tlsv1.2 -LsSf "$DIST_INSTALLER_URL" -o "$installer"
+          if command -v sha256sum > /dev/null 2>&1; then
+            printf '%s  %s\n' "$DIST_INSTALLER_SHA256" "$installer" \
+              | sha256sum --check --strict -
+          else
+            printf '%s  %s\n' "$DIST_INSTALLER_SHA256" "$installer" \
+              | shasum -a 256 --check -
+          fi
+          sh "$installer"
       - name: Cache dist
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -138,13 +143,41 @@ jobs:
           submodules: recursive
       - name: Install Rust non-interactively if not already installed
         if: ${{ matrix.container }}
+        env:
+          RUSTUP_INIT_URL: "https://raw.githubusercontent.com/rust-lang/rustup/28d1352dbcb436d3111c3594b9e1588e94950464/rustup-init.sh"
+          RUSTUP_INIT_SHA256: "6c30b75a75b28a96fd913a037c8581b580080b6ee9b8169a3c0feb1af7fe8caf"
         run: |
+          set -eu
           if ! command -v cargo > /dev/null 2>&1; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+            installer="$RUNNER_TEMP/rustup-init.sh"
+            curl --proto '=https' --tlsv1.2 -LsSf "$RUSTUP_INIT_URL" -o "$installer"
+            if command -v sha256sum > /dev/null 2>&1; then
+              printf '%s  %s\n' "$RUSTUP_INIT_SHA256" "$installer" \
+                | sha256sum --check --strict -
+            else
+              printf '%s  %s\n' "$RUSTUP_INIT_SHA256" "$installer" \
+                | shasum -a 256 --check -
+            fi
+            sh "$installer" -y
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           fi
       - name: Install dist
-        run: ${{ matrix.install_dist.run }}
+        shell: bash
+        env:
+          DIST_INSTALLER_URL: "https://github.com/axodotdev/cargo-dist/releases/download/v0.32.0/cargo-dist-installer.sh"
+          DIST_INSTALLER_SHA256: "b657cf8c04a8b7bc28f39d220f7e6dd11bbd2bdb072c552262bd9ccf597261b5"
+        run: |
+          set -euo pipefail
+          installer="$RUNNER_TEMP/dist-installer.sh"
+          curl --proto '=https' --tlsv1.2 -LsSf "$DIST_INSTALLER_URL" -o "$installer"
+          if command -v sha256sum > /dev/null 2>&1; then
+            printf '%s  %s\n' "$DIST_INSTALLER_SHA256" "$installer" \
+              | sha256sum --check --strict -
+          else
+            printf '%s  %s\n' "$DIST_INSTALLER_SHA256" "$installer" \
+              | shasum -a 256 --check -
+          fi
+          sh "$installer"
       # Get the dist-manifest
       - name: Fetch local artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
