@@ -59,8 +59,9 @@ capability, which is what lets the web surface live in another repository at all
 
 ```
 crates/
-├── lemonfiber/          bin — the only crate that renders (CLI, TUI)
+├── lemonfiber/          bin — the only crate that draws a terminal (CLI, TUI)
 ├── lemonfiber-core/     lib — all logic, no UI
+├── lemonfiber-api/      lib — the HTTP endpoints, and serving the web app
 ├── lemonfiber-ports/    lib — the boundary and its vocabulary
 ├── lemonfiber-manifest/ lib — parses stack.toml
 └── lemonfiber-fixtures/ lib — shared test fixtures

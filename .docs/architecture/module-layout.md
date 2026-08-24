@@ -11,7 +11,7 @@ mechanics.
 
 ```
 crates/
-├── lemonfiber/           bin + lib — the only crate that knows about a screen
+├── lemonfiber/           bin + lib — the only crate that draws a terminal
 │   ├── lib.rs            the command line, and the references generated from it
 │   ├── cli.rs            clap definitions, non-interactive paths
 │   ├── reference.rs      renders the command reference from those definitions
@@ -27,6 +27,10 @@ crates/
 │   ├── adapters/         the only code that talks to Docker, HTTP or processes
 │   ├── platform.rs       the only cfg!(target_os)
 │   └── …                 one directory per subsystem — doctor, seed, config, …
+│
+├── lemonfiber-api/       lib — the JSON endpoints answered on loopback, and the
+│                              serving of the web app beside them. Chooses no
+│                              address: the binary binds the socket.
 │
 ├── lemonfiber-ports/     lib — the traits the outside world is reached through,
 │                              and the vocabulary that crosses them. Depends on

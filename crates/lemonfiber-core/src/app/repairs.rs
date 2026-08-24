@@ -10,11 +10,10 @@
 //! have to be filtered before an undo could read it, and an audit that only recorded the
 //! successful changes would be missing precisely the entries somebody is looking for.
 //!
-//! Written and not yet read by anything in the tree. That is deliberate rather than
-//! forgotten: what the requirement asks for is that every remediation be recorded with its
-//! finding, its action, the time and how it turned out, and this is where a person looks
-//! when the same repair keeps failing to hold a fault down. An accessor invented before
-//! anything needed one would be a method no test could justify.
+//! An entry is appended as each repair finishes, whatever it came to, carrying the finding
+//! it was for, what it did, the time and the outcome. Those four are what a person needs
+//! when the same repair keeps failing to hold a fault down, so a repair that changed
+//! nothing is written as readily as one that worked.
 //!
 //! Best-effort, both ways, for the reason the conditions are: a lost history is a worse
 //! picture for the next run and never a reason to refuse this one.
