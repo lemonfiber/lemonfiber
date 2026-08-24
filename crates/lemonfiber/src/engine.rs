@@ -75,10 +75,21 @@ pub(crate) async fn stream(
 /// the operator is told the wait is coming and then shown Compose's per-image
 /// progress as it arrives.
 pub(crate) async fn pull(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
-    match pull_showing(ctx, forms, json).await {
+    // Claimed here rather than inside `pull_showing`, which setup also calls: a pull
+    // asked for on its own is a lifecycle operation like every other, and the same
+    // request through the dispatcher already claims. Setup's pull is left alone —
+    // it is followed immediately by a start that claims, and a first run has nothing
+    // to race. Given back on both paths out.
+    let claim = match claimed(ctx).await {
+        Ok(claim) => claim,
+        Err(problem) => return complain(&problem),
+    };
+    let code = match pull_showing(ctx, forms, json).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(code) => code,
-    }
+    };
+    released(ctx, claim).await;
+    code
 }
 
 /// Stream a pull to the screen, or report why it could not run.
@@ -314,7 +325,7 @@ mod tests {
     use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
     use lemonfiber_core::stack::Source;
 
-    use super::{emit_line, guard, kind, pull, pull_showing, stream, Ctx};
+    use super::{claimed, emit_line, guard, kind, pull, pull_showing, released, stream, Ctx};
 
     /// A runner that answers every command the same way.
     struct Answering {
@@ -427,6 +438,31 @@ mod tests {
     }
 
     /// A clean exit, as it reads.
+
+    #[tokio::test]
+    async fn a_pull_is_refused_while_another_run_holds_the_stack() {
+        let mut ctx = ctx(0, "pulled");
+        let dir = std::env::temp_dir().join(format!("lemonfiber-pull-lock-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        ctx.settings.env_file = Some(dir.join(".env"));
+
+        let held = claimed(&ctx).await;
+        assert!(held.is_ok(), "nothing held it, so the first run took it");
+
+        let code = pull(&ctx, &["tv".to_owned()], false).await;
+
+        assert_ne!(
+            format!("{code:?}"),
+            success(),
+            "a pull asked for on its own is a lifecycle operation, so a stack \
+             somebody else is working on is one it is told about"
+        );
+
+        if let Ok(claim) = held {
+            released(&ctx, claim).await;
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[tokio::test]
     async fn a_pull_that_the_engine_refuses_is_not_a_success() {
