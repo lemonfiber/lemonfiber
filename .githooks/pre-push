@@ -20,10 +20,16 @@ set -eu
 trunk=refs/remotes/origin/main
 empty=0000000000000000000000000000000000000000
 
-# Nothing to compare against on a fresh clone that has not fetched. Silence is
-# better than a guard that fires on the wrong evidence.
-if ! git rev-parse --verify --quiet "$trunk" >/dev/null; then
-	exit 0
+# Whether the trunk is here to compare against. A clone of one branch that is not
+# the trunk has no `origin/main`, and neither does one that has never fetched.
+# That silences the comparison below — but only that. Refusing a push to the
+# trunk needs nothing but the name it is being pushed to, and a guard that goes
+# quiet in the case it was never told about is how this one came to pass a push
+# it exists to stop.
+if git rev-parse --verify --quiet "$trunk" >/dev/null; then
+	comparable=yes
+else
+	comparable=no
 fi
 
 while read -r _ pushing onto _; do
@@ -41,6 +47,10 @@ while read -r _ pushing onto _; do
 		exit 1
 		;;
 	esac
+
+	if [ "$comparable" = "no" ]; then
+		continue
+	fi
 
 	if git merge-base --is-ancestor "$pushing" "$trunk"; then
 		echo "pre-push: ${branch} would carry no commit that origin/main does not." >&2
