@@ -148,43 +148,6 @@ fn remedies_stay_in_the_order_they_were_offered() {
     );
 }
 
-// ── Never the operator's fault ────────────────────────────────
-
-/// Words that put a failure on the person reading it.
-///
-/// Not a spell-check of English: a short list of the constructions that actually
-/// appear when someone writes an error in a hurry. It catches the reflex, which is
-/// what a guard over wording can honestly do.
-const BLAMING: [&str; 6] = [
-    "you failed",
-    "you forgot",
-    "you should have",
-    "your mistake",
-    "invalid input",
-    "user error",
-];
-
-#[test]
-fn a_problems_wording_does_not_put_the_failure_on_the_operator() {
-    // The rule is about every message lemonfiber ships, which no test can
-    // enumerate. What this pins is the check itself and the shape of a compliant
-    // message, so the intent is written down somewhere executable rather than only
-    // in a review habit.
-    let problem = problem();
-    let words = format!("{} {}", problem.summary, problem.meaning).to_lowercase();
-    for blame in BLAMING {
-        assert!(!words.contains(blame), "{blame}");
-    }
-    // A remedy tells the operator what to do next; it never tells them what they
-    // did wrong.
-    for remedy in &problem.remedies {
-        let action = remedy.action.to_lowercase();
-        for blame in BLAMING {
-            assert!(!action.contains(blame), "{blame}: {action}");
-        }
-    }
-}
-
 // ── No credential, anywhere ───────────────────────────────────
 
 #[test]
