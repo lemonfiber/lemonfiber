@@ -46,8 +46,9 @@ release-tag VERSION:
     git push origin "v{{VERSION}}"
     @echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
 
-# Everything CI runs.
-ci: fmt-check lint test typos deny
+# Everything CI runs, and the hooks turned on if they are not already — this is
+# the command run before a push, which is when the pre-push hook matters.
+ci: hooks fmt-check lint test typos deny
 
 build:
     cargo build --workspace

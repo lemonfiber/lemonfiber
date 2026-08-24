@@ -75,6 +75,12 @@ cargo build --workspace     # or: just build
 just ci                     # everything CI runs
 ```
 
+`just ci` also turns on this repository's pre-push hook, which refuses a push
+that would leave a branch carrying no commit `origin/main` does not — what
+pushing the trunk over a feature branch looks like. It is `git config
+core.hooksPath .githooks`, per clone, and `just hooks` does only that. A clone
+where neither has run has no hook: git cannot read `.githooks/` on its own.
+
 ## Contributing
 
 This project's spec is **canonical**: every change cites a spec identifier that
