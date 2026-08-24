@@ -119,8 +119,10 @@ release-workflow:
     python3 -c "import pathlib; p=pathlib.Path('.github/workflows/release.yml'); p.write_text(p.read_text().replace('gh release create \"', 'gh release create --draft \"'))"
     python3 scripts/pin_release_actions.py
     python3 scripts/verify_dist_installer.py
+    python3 scripts/scope_release_permissions.py
     @grep -q 'gh release create --draft' .github/workflows/release.yml || (echo "draft patch failed to apply" && exit 1)
     @grep -q 'DIST_INSTALLER_SHA256' .github/workflows/release.yml || (echo "installer verification patch failed to apply" && exit 1)
+    @grep -q 'permissions:' .github/workflows/release.yml && grep -A1 '^  host:' .github/workflows/release.yml | grep -q 'permissions' || (echo "release permission patch failed to apply" && exit 1)
     @grep -q 'allow-dirty = ' Cargo.toml || (echo "allow-dirty not restored" && exit 1)
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.
