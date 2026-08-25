@@ -352,17 +352,60 @@ impl Viewer {
         None
     }
 
-    /// What the screen is showing, and what is waiting off the top of it.
-    pub(crate) fn heading(&self) -> String {
-        let sources = match &self.service {
-            Some(service) => service.clone(),
-            None if self.seen.is_empty() => "waiting for lines".to_owned(),
-            None => self.seen.join(", "),
+    /// What the screen is showing, and what is waiting off the top of it, in the
+    /// room a title has.
+    ///
+    /// A title cannot be given a second row, so what it says is built to fit the one
+    /// it has. The count of unseen lines is kept whatever else goes; it sits at the
+    /// end, which is where a cut would take it first.
+    pub(crate) fn heading(&self, across: usize) -> String {
+        let unseen = match self.held.unseen() {
+            0 => String::new(),
+            unseen => format!(" — {unseen} unseen"),
         };
-        match self.held.unseen() {
-            0 => sources,
-            unseen => format!("{sources} — {unseen} unseen"),
+        let room = across.saturating_sub(unseen.chars().count());
+        format!("{}{unseen}", self.sources(room))
+    }
+
+    /// Which services are being shown, named while there is room to name them.
+    ///
+    /// As many as fit whole, and the rest counted. A name cut in half says which
+    /// service no better than an absent one, and a list showing three of ten with no
+    /// count reads as there being three.
+    fn sources(&self, room: usize) -> String {
+        match &self.service {
+            Some(service) => return service.clone(),
+            None if self.seen.is_empty() => return "waiting for lines".to_owned(),
+            None => (),
         }
+        let all = self.seen.join(", ");
+        if all.chars().count() <= room {
+            return all;
+        }
+        // Measured against the whole count rather than the number left out, which is
+        // never larger — so what is built is never wider than what was measured.
+        let budget = room.saturating_sub(format!(", +{} more", self.seen.len()).chars().count());
+        let mut named = String::new();
+        let mut counted = 0;
+        for name in &self.seen {
+            let next = if named.is_empty() {
+                name.clone()
+            } else {
+                format!("{named}, {name}")
+            };
+            if next.chars().count() > budget {
+                break;
+            }
+            named = next;
+            counted += 1;
+        }
+        let left = self.seen.len() - counted;
+        // Where not one name fits, the count stands on its own rather than as
+        // "more" than a list that is not there.
+        if named.is_empty() {
+            return format!("{left} service{}", s(left));
+        }
+        format!("{named}, +{left} more")
     }
 
     /// What is in force, and what the screen has had to give up.
@@ -408,6 +451,9 @@ pub(crate) fn colours(no_color: Option<&str>) -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// A title with more room than anything here is testing the edge of.
+    const WIDE: usize = 200;
+
     use super::{colours, sampled, Asked, Press, Shown, Viewer, BATCH};
     use lemonfiber_core::bundle::Marks;
     use lemonfiber_core::logs::Level;
@@ -530,13 +576,58 @@ mod tests {
 
         assert!(viewer.open());
         assert_eq!(viewer.typing(), None);
-        assert_eq!(viewer.heading(), "waiting for lines");
+        assert_eq!(viewer.heading(WIDE), "waiting for lines");
         assert_eq!(viewer.footing(), "following");
     }
 
     #[test]
     fn each_service_is_named_once_however_many_lines_it_writes() {
-        assert_eq!(a_viewer().heading(), "sonarr, radarr");
+        assert_eq!(a_viewer().heading(WIDE), "sonarr, radarr");
+    }
+
+    /// A title is one row and cannot be given a second, so it names as many services
+    /// as fit whole and counts the rest. A name cut in half says which service no
+    /// better than an absent one, and it costs the same room to say so.
+    #[test]
+    fn a_title_narrower_than_the_names_counts_the_ones_it_leaves_out() {
+        let mut viewer = Viewer::opened();
+        for service in [
+            "sonarr",
+            "radarr",
+            "calibre-web-automated",
+            "audiobookshelf",
+        ] {
+            viewer.take(line(service, "up"));
+        }
+
+        assert_eq!(
+            viewer.heading(WIDE),
+            "sonarr, radarr, calibre-web-automated, audiobookshelf",
+            "with room for all of them it names all of them"
+        );
+        assert_eq!(viewer.heading(38), "sonarr, radarr, +2 more");
+        assert_eq!(
+            viewer.heading(12),
+            "4 services",
+            "where not one name fits, the count stands on its own"
+        );
+    }
+
+    /// How far behind the screen is survives however narrow the title gets: it is
+    /// the half that changes, it sits at the end where a cut takes it first, and a
+    /// tail that stopped saying it has stopped being one.
+    #[test]
+    fn a_narrow_title_gives_up_names_before_it_gives_up_the_count() {
+        let mut viewer = Viewer::opened();
+        for service in ["sonarr", "radarr", "calibre-web-automated"] {
+            viewer.take(line(service, "up"));
+        }
+        viewer.pressed(Press::Back);
+        viewer.take(line("sonarr", "and another"));
+
+        let heading = viewer.heading(30);
+        assert!(heading.contains("1 unseen"), "{heading}");
+        assert!(heading.chars().count() <= 30, "{heading}");
     }
 
     /// What the screen shows about one line: who said it, how bad they said it was,
@@ -675,14 +766,14 @@ mod tests {
         let mut viewer = a_viewer();
 
         viewer.pressed(Press::Typed('s'));
-        assert_eq!(viewer.heading(), "sonarr");
+        assert_eq!(viewer.heading(WIDE), "sonarr");
         assert_eq!(shown(&viewer, 10).len(), 2);
 
         viewer.pressed(Press::Typed('s'));
-        assert_eq!(viewer.heading(), "radarr");
+        assert_eq!(viewer.heading(WIDE), "radarr");
 
         viewer.pressed(Press::Typed('s'));
-        assert_eq!(viewer.heading(), "sonarr, radarr");
+        assert_eq!(viewer.heading(WIDE), "sonarr, radarr");
     }
 
     #[test]
@@ -690,7 +781,7 @@ mod tests {
         let mut viewer = Viewer::opened();
         viewer.pressed(Press::Typed('s'));
 
-        assert_eq!(viewer.heading(), "waiting for lines");
+        assert_eq!(viewer.heading(WIDE), "waiting for lines");
     }
 
     #[test]
@@ -702,7 +793,7 @@ mod tests {
         viewer.pressed(Press::Typed('c'));
 
         assert_eq!(viewer.footing(), "following");
-        assert_eq!(viewer.heading(), "sonarr, radarr");
+        assert_eq!(viewer.heading(WIDE), "sonarr, radarr");
         assert_eq!(shown(&viewer, 10).len(), 3);
     }
 
@@ -760,7 +851,7 @@ mod tests {
         viewer.take(line("sonarr", "epsilon timed"));
         assert_eq!(shown(&viewer, 1), ["beta timed"]);
 
-        let heading = viewer.heading();
+        let heading = viewer.heading(WIDE);
         assert!(heading.contains("2 unseen"), "{heading}");
     }
 
@@ -890,7 +981,7 @@ mod tests {
 
         viewer.pressed(Press::Typed('s'));
 
-        assert_eq!(viewer.heading(), "sonarr");
+        assert_eq!(viewer.heading(WIDE), "sonarr");
         assert!(
             shown(&viewer, 10)
                 .iter()
@@ -1027,7 +1118,7 @@ mod tests {
             4,
             "it joined the lines rather than replacing them"
         );
-        assert_eq!(viewer.heading(), "sonarr, radarr, lemonfiber");
+        assert_eq!(viewer.heading(WIDE), "sonarr, radarr, lemonfiber");
     }
 
     /// The convention is the variable's presence, not its value — so `NO_COLOR=0`
