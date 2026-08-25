@@ -12,5 +12,8 @@ lcov.info
 # bytecode from the release-workflow scripts, which import one another
 __pycache__/
 
+# the canonical spec, checked out beside this tree by the gates that read both
+.spec-canonical/
+
 # agent tooling scratch — session state and throwaway worktrees, never the repo's
 .claude/
