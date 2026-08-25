@@ -17,8 +17,8 @@
 //!
 //! **What comes back never repeats what was entered.** Setup gathers an indexer
 //! key and a provider password, and a machine-readable answer is one a caller can
-//! log; the report says what was decided and withholds every value whose name
-//! reads as a credential, exactly as `config show` does.
+//! log; the report says what was decided and withholds every value nobody has
+//! written down a reason for showing, exactly as `config show` does.
 
 use axum::body::Body;
 use axum::extract::rejection::JsonRejection;

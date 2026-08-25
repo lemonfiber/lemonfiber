@@ -1,15 +1,17 @@
-//! Which of the settings the stack this binary carries are displayed in full.
+//! Which settings are displayed in full, over every namespace that reaches the file.
 //!
-//! Read from the embedded copy — the same `STACK` the binary writes to an
-//! operator's disk — rather than from the checked-out submodule, for the same
-//! reason the published ports are: those are the bytes a machine ends up running,
-//! and the directory beside them belongs to another repository that a clone need
-//! not have populated at all.
+//! Two corpora, because there are two writers. The stack declares its settings in
+//! the embedded `.env.example` — read from the embedded copy rather than from the
+//! checked-out submodule, for the same reason the published ports are: those are
+//! the bytes a machine ends up running, and the directory beside them belongs to
+//! another repository that a clone need not have populated at all.
 //!
-//! Withholding decides by name, so a setting whose name carries a credential and
-//! none of the words the withholding recognises is displayed with its value. That
-//! answer now reaches a browser rather than only a terminal, and a heuristic
-//! nothing reads back is a heuristic that is right until the day it is not.
+//! lemonfiber declares its own in [`lemonfiber_core::config::SETTINGS`], and until
+//! that list existed this guard could not see them. That was the whole namespace
+//! setup collects an indexer key and a Usenet password into — so the guard's claim,
+//! that a new credential is red until somebody argues for it, was false for exactly
+//! the settings it most needed to be true for. Three of those keys happened to
+//! carry a marker word, which is luck and not a check.
 //!
 //! What runs here is the display path itself rather than the name test under it:
 //! the claim is that an operator's value does not come back out, which is a
@@ -23,107 +25,15 @@
 use std::collections::BTreeSet;
 
 use lemonfiber::cli::STACK;
+use lemonfiber_core::config::display::SHOWN;
 use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_core::config::store::showing;
+use lemonfiber_core::config::SETTINGS;
 
 mod source_tree;
 
 /// The file the stack declares its settings in.
-const SETTINGS: &str = ".env.example";
-
-/// The settings displayed with their values, and why each one is.
-///
-/// Everything else the stack declares is withheld. These are the ones whose value
-/// is the answer an operator came for — a path, an address, a schedule — and
-/// which tell whoever reads them nothing they could sign in with.
-///
-/// A setting that arrives displayed and is not written down here fails, and the
-/// second half of the entry is where somebody has to say what makes displaying it
-/// safe. The list is the decision; this is where it is reviewable.
-const SHOWN: &[(&str, &str)] = &[
-    (
-        "DATA_ROOT",
-        "the one path an operator has to get right, and the one they check first",
-    ),
-    (
-        "PUID",
-        "the user id everything under the data root is owned by",
-    ),
-    (
-        "PGID",
-        "the group id everything under the data root is owned by",
-    ),
-    ("TZ", "schedules and log timestamps are read in this zone"),
-    (
-        "LAN_BIND",
-        "the address the household tier is published on, which an operator narrows by hand",
-    ),
-    (
-        "VPN_PROVIDER",
-        "which provider's servers the tunnel dials, and not the account on them",
-    ),
-    (
-        "VPN_COUNTRIES",
-        "where the tunnel comes out, which is changed often and checked after",
-    ),
-    (
-        "VPN_PORT_FORWARDING",
-        "whether a forwarded port is asked for at all",
-    ),
-    (
-        "QBITTORRENT_USERNAME",
-        "an account name says who signs in; the password beside it is what signs in",
-    ),
-    (
-        "UMASK",
-        "the file mode extracted downloads land on disk with",
-    ),
-    (
-        "FLARESOLVERR_LOG_LEVEL",
-        "how much the challenge solver writes to its own log",
-    ),
-    (
-        "SEERR_LOG_LEVEL",
-        "how much the request service writes to its own log",
-    ),
-    (
-        "RECYCLARR_CRON",
-        "when the quality sync runs, which explains a profile that has not moved",
-    ),
-    (
-        "HOMEPAGE_ALLOWED_HOSTS",
-        "the addresses the dashboard answers for, and a wrong one is why it refuses",
-    ),
-    (
-        "HOMEPAGE_VAR_LAN_HOST",
-        "the address the dashboard's household links point at",
-    ),
-    (
-        "HOMEPAGE_VAR_QBITTORRENT_USER",
-        "the account name the dashboard widget signs in as, beside a withheld password",
-    ),
-    (
-        "UN_SONARR_0_URL",
-        "where the extractor reaches the television service",
-    ),
-    (
-        "UN_RADARR_0_URL",
-        "where the extractor reaches the film service",
-    ),
-    (
-        "UN_LIDARR_0_URL",
-        "where the extractor reaches the music service",
-    ),
-    (
-        "DOMAIN",
-        "the hostname real certificates are obtained for, which is public in the certificate",
-    ),
-    ("NAS_HOST", "the machine the network mount is exported from"),
-    (
-        "NAS_EXPORT",
-        "the share on that machine the data root lives on",
-    ),
-];
+const SETTINGS_FILE: &str = ".env.example";
 
 /// The settings the embedded stack declares.
 ///
@@ -134,16 +44,29 @@ const SHOWN: &[(&str, &str)] = &[
 /// wrong.
 fn declared() -> EnvFile {
     let text = STACK
-        .get_file(SETTINGS)
+        .get_file(SETTINGS_FILE)
         .and_then(include_dir::File::contents_utf8)
         .unwrap_or_default();
     let settings = EnvFile::parse(text);
     assert!(
         !settings.keys().is_empty(),
-        "the embedded stack declares no settings in {SETTINGS}, which means this is reading \
-         the wrong thing"
+        "the embedded stack declares no settings in {SETTINGS_FILE}, which means this is \
+         reading the wrong thing"
     );
     settings
+}
+
+/// Every setting that reaches an operator's file, from either writer.
+fn every_setting() -> BTreeSet<String> {
+    let stack = declared();
+    let mut names: BTreeSet<String> = stack.keys().into_iter().map(str::to_owned).collect();
+    names.extend(SETTINGS.iter().map(|name| (*name).to_owned()));
+    assert!(
+        names.len() > stack.keys().len(),
+        "lemonfiber's own settings are all in the stack's file, which means SETTINGS is \
+         not being read"
+    );
+    names
 }
 
 /// A stand-in for whatever an operator has actually put in a setting.
@@ -156,12 +79,12 @@ fn a_value() -> String {
 }
 
 /// The settings whose value comes back out of the display path as it was written.
-fn displayed_in_full(settings: &EnvFile) -> Vec<&str> {
+fn displayed_in_full(names: &BTreeSet<String>) -> Vec<&str> {
     let supplied = a_value();
-    settings
-        .keys()
-        .into_iter()
-        .filter(|key| showing(key, &supplied).value == supplied)
+    names
+        .iter()
+        .map(String::as_str)
+        .filter(|name| showing(name, &supplied).value == supplied)
         .collect()
 }
 
@@ -170,44 +93,95 @@ fn displayed_in_full(settings: &EnvFile) -> Vec<&str> {
 /// The default is the safe one and the exception is the thing that costs somebody
 /// a sentence, which is the only arrangement that survives a setting being added
 /// by whoever is in a hurry. A new setting holding a credential does not need to
-/// be noticed in review: it is red until it is either named so the withholding
-/// catches it, or argued for.
+/// be noticed in review: it is red until somebody argues for it.
+///
+/// Structural now rather than emergent, which is the point of the list: the display
+/// path consults it, so this can only fail if something learns to display a value
+/// without asking. That is worth a test — it is the bypass nobody would notice.
 #[test]
-fn no_setting_the_stack_declares_is_displayed_without_a_declared_reason() {
-    let listed: BTreeSet<&str> = SHOWN.iter().map(|(key, _)| *key).collect();
-    let settings = declared();
-    let undecided: Vec<&str> = displayed_in_full(&settings)
+fn no_setting_is_displayed_without_a_declared_reason() {
+    let listed: BTreeSet<&str> = SHOWN.iter().map(|(name, _)| *name).collect();
+    let known = every_setting();
+    let undecided: Vec<&str> = displayed_in_full(&known)
         .into_iter()
-        .filter(|key| !listed.contains(key))
+        .filter(|name| !listed.contains(name))
         .collect();
     assert!(
         undecided.is_empty(),
         "these are served with their values to anything that reads the configuration, a \
-         browser included, and nothing says why — give each a name the withholding \
-         recognises, or add it to SHOWN with what makes displaying it safe: {undecided:?}"
+         browser included, and nothing says why: {undecided:?}"
     );
 }
 
-/// Nothing stays on the list after the stack stops displaying it.
+/// A setting nobody has decided about keeps its value to itself.
 ///
-/// The other direction of the same rule, and it is not the same test: the one
-/// above starts from what the stack declares, so an entry for a setting that has
-/// been dropped or has since been withheld would pass it in silence. An exception
-/// that no longer excepts anything reads as a decision somebody made about the
-/// stack as it is, and it is a decision about a stack that is gone.
+/// The claim the allow-list is bought for, and the one a marker list cannot make.
+/// None of these carries a word `is_secret` recognises, every one of them is a
+/// credential in some stack, and the last is the case that matters most: the
+/// setting that leaks is the one nobody had thought of when the rule was written.
 #[test]
-fn nothing_stays_on_the_shown_list_after_the_stack_stops_displaying_it() {
-    let settings = declared();
-    let displayed: BTreeSet<&str> = displayed_in_full(&settings).into_iter().collect();
+fn a_setting_nobody_has_argued_for_is_withheld() {
+    let supplied = a_value();
+    let served: Vec<&str> = [
+        "OPENVPN_USER",
+        "PLEX_CLAIM",
+        "DISCORD_WEBHOOK",
+        "DB_PWD",
+        "SESSION_SALT",
+        "DATABASE_URL",
+        "SOME_SERVICE_ADDED_NEXT_YEAR",
+    ]
+    .into_iter()
+    .filter(|name| showing(name, &supplied).value == supplied)
+    .collect();
+    assert!(
+        served.is_empty(),
+        "these reach a browser with their values and no rule recognises their names: \
+         {served:?}"
+    );
+}
+
+/// Every credential lemonfiber's own setup collects stays out of the display path.
+///
+/// Named one at a time rather than derived, because deriving them from the same
+/// list the display path reads would be the check agreeing with itself. These are
+/// the four values an operator hands over or lemonfiber mints, and the outcome for
+/// each of them is asserted directly.
+#[test]
+fn no_credential_lemonfiber_writes_is_ever_displayed() {
+    let supplied = a_value();
+    for name in [
+        "INDEXER_APIKEY",
+        "USENET_PASS",
+        "USENET_USER",
+        "QBITTORRENT_PASSWORD",
+        "JELLYFIN_ADMIN_PASSWORD",
+    ] {
+        let seen = showing(name, &supplied);
+        assert!(seen.secret, "{name} is not marked withheld");
+        assert!(!seen.value.contains(&supplied), "{name} -> {}", seen.value);
+    }
+}
+
+/// Nothing stays on the list after no writer produces it any more.
+///
+/// The other direction of the same rule, and it is not the same test: the one above
+/// starts from what is declared, so an entry for a setting that has been dropped
+/// would pass it in silence. An exception that no longer excepts anything reads as a
+/// decision somebody made about the stack as it is, and it is a decision about a
+/// stack that is gone.
+#[test]
+fn nothing_stays_on_the_list_after_no_writer_produces_it() {
+    let known = every_setting();
     let stale: Vec<&str> = SHOWN
         .iter()
-        .map(|(key, _)| *key)
-        .filter(|key| !displayed.contains(key))
+        .map(|(name, _)| *name)
+        .filter(|name| !known.contains(*name))
         .collect();
     assert!(
         stale.is_empty(),
-        "these are written down as deliberately displayed and the stack displays neither \
-         them nor their values — a setting it dropped, or one now withheld: {stale:?}"
+        "these are written down as deliberately displayed and no writer produces them — a \
+         setting the stack dropped, or one lemonfiber stopped naming: {stale:?}"
     );
 }
 
@@ -221,7 +195,7 @@ fn every_displayed_setting_says_why_it_is_one() {
     let silent: Vec<&str> = SHOWN
         .iter()
         .filter(|(_, reason)| reason.split_whitespace().count() < 4)
-        .map(|(key, _)| *key)
+        .map(|(name, _)| *name)
         .collect();
     assert!(
         silent.is_empty(),

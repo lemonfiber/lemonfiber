@@ -460,6 +460,26 @@ mod tests {
         assert!(!shown("SOME_SERVICE_TOKEN_ADDED_NEXT_YEAR"));
     }
 
+    /// Two allow-lists, and one of them is strictly the narrower.
+    ///
+    /// A bundle is attached to a public thread and the configuration surface is read by
+    /// the operator whose machine it is, so the bundle shows less — but "less" is a
+    /// relationship somebody has to keep, and nothing enforces it by construction. A
+    /// setting safe to publish to strangers and withheld from its own owner is one of
+    /// the two lists being wrong, and this says which pair to look at.
+    #[test]
+    fn nothing_a_bundle_publishes_is_hidden_from_the_operator_who_owns_it() {
+        let undisplayable: Vec<&str> = super::allowed::SHOWN
+            .into_iter()
+            .filter(|name| !crate::config::display::in_full(name))
+            .collect();
+        assert!(
+            undisplayable.is_empty(),
+            "a bundle shows these to anybody it is sent to and `config show` withholds \
+             them from the operator: {undisplayable:?}"
+        );
+    }
+
     #[test]
     fn a_shown_setting_keeps_its_value_and_a_hidden_one_keeps_only_its_name() {
         let secret = key_shaped();

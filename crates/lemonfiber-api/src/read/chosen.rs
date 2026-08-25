@@ -26,9 +26,9 @@ pub(super) fn routes() -> Router<Serving> {
 
 /// Every setting, or one of them by name, with credentials withheld.
 ///
-/// The withholding happens in the core, where the settings are read: a value whose
-/// name reads as a credential is replaced before any report carries it, so this
-/// endpoint and `lemonfiber config show` withhold the same values.
+/// The withholding happens in the core, where the settings are read: a value nobody
+/// has written down a reason for showing is replaced before any report carries it, so
+/// this endpoint and `lemonfiber config show` withhold the same values.
 ///
 /// Naming none shows them all and naming one reads that one, which is the fork
 /// `config show` and `config get` take on the command line.

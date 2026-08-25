@@ -17,7 +17,7 @@ use lemonfiber_core::storage::COPY_CONSEQUENCE;
 use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Library, Plan};
 
-use lemonfiber_core::config::store::is_secret;
+use lemonfiber_core::config::display::in_full;
 
 use super::flags::parse_ids;
 use super::Answers;
@@ -372,10 +372,12 @@ impl Prompt for Terminal {
     fn confirm(&self, plan: &Plan) -> bool {
         say!("\nThis is what setup will write:");
         for (key, value) in plan.settings() {
-            // A secret is shown as present, not in the clear: the review reaches
-            // the screen, scrollback and any session recording, and an API key or
-            // password has no business in any of them.
-            let shown = if is_secret(key) { "********" } else { value };
+            // A value is shown only where somebody has written down what makes
+            // showing it safe: the review reaches the screen, scrollback and any
+            // session recording, and an API key or password has no business in any
+            // of them. Decided by the same allow-list `config show` displays by, so
+            // the two surfaces cannot disagree about one setting.
+            let shown = if in_full(key) { value } else { "********" };
             say!("  {key} = {shown}");
         }
         self.yes_no("\nApply it?", true)

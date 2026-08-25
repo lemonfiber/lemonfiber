@@ -5581,7 +5581,7 @@
               "$ref": "#/$defs/Phase"
             },
             "plan": {
-              "description": "What applying will write, in the order it will be written, with any value\nwhose name reads as a credential withheld.",
+              "description": "What applying will write, in the order it will be written, with any value\nnobody has argued for showing withheld.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/SettingReport"

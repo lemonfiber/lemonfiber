@@ -305,11 +305,10 @@ fn too_many(configured: u64, words: &str) -> Problem {
 /// operator will find in their client's log, and a report that paraphrases it leaves
 /// them matching two different accounts of the same failure.
 ///
-/// Every detail is scanned for credentials on its way to a person, and that scan reads
-/// what stands before the first colon as the name of what follows. So the words this side
-/// of it are chosen to name nothing that reads like a credential — otherwise the quote
-/// after the colon would be withheld as though it were one, and the operator would be
-/// shown a redaction where the provider's own sentence should be.
+/// Every detail is scanned for credentials on its way to a person. That scan reads what
+/// stands before a separator as a name only where it is one — a single word, no spaces —
+/// so a clause introducing a quotation is left alone whatever words it is built from, and
+/// the provider's own sentence reaches the operator rather than a redaction of it.
 fn beside(detail: String, said: Option<&str>) -> String {
     match said {
         None => detail,
