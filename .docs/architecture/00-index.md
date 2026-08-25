@@ -14,6 +14,7 @@ are about Rust rather than about the product.
 | [error-model.md](error-model.md) | Typed errors, one operator-facing value, and how the coverage gate proves it |
 | [embedded-stack.md](embedded-stack.md) | How the stack gets into the binary, and why a bad pairing cannot compile |
 | [form-closure.md](form-closure.md) | Forms to profiles to a Compose invocation, and the golden files |
+| [surface-parity.md](surface-parity.md) | What each surface reaches, the one intrinsic exception, and the guard that reads the table |
 
 Planned as their subsystems land: `render-loop.md`, `vpn-port-forwarding.md`,
 `seed-clients.md`, `compose-construction.md`.

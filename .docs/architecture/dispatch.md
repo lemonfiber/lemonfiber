@@ -119,3 +119,4 @@ something is broken, so it must answer when the engine is down.
 
 - [module-layout.md](module-layout.md) · [ports-and-adapters.md](ports-and-adapters.md)
 - [error-model.md](error-model.md)
+- [surface-parity.md](surface-parity.md) — which surfaces reach which of those commands, and what is missing
