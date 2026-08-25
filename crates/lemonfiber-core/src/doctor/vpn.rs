@@ -201,6 +201,22 @@ impl Check for VpnCheck {
         Category::Vpn
     }
 
+    /// A run that may drop the tunnel is allowed the ordinary budget and the
+    /// disturbance on top of it, rather than one budget covering both.
+    ///
+    /// The reads before the killswitch are the reads every other check makes and want
+    /// the same time for them; the tunnel coming back is not something to compete with
+    /// them for. Sharing one budget would mean a stack slow enough to spend it is a
+    /// stack whose killswitch is never proven — and the check refusing to disturb
+    /// anything is the only safe thing it could do at that point.
+    fn budget(&self) -> std::time::Duration {
+        if self.disruptive {
+            crate::doctor::CHECK_BUDGET + killswitch::DISTURBANCE
+        } else {
+            crate::doctor::CHECK_BUDGET
+        }
+    }
+
     fn mender(&self) -> Option<&dyn crate::doctor::Mend> {
         self.mender
             .as_ref()
@@ -208,6 +224,9 @@ impl Check for VpnCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
+        // Read now rather than where the killswitch needs it: what it has to know is
+        // how much of the run is already spent, and only the start of the run can say.
+        let deadline = tokio::time::Instant::now() + self.budget();
         let pair = match &self.target {
             Target::Skip(reason) => return vec![skipped(reason.clone())],
             Target::Unprotected => return vec![unprotected()],
@@ -290,7 +309,7 @@ impl Check for VpnCheck {
         };
 
         let held = self
-            .killswitch_held(gateway_container, client_container, echo, &client)
+            .killswitch_held(gateway_container, client_container, echo, &client, deadline)
             .await;
         let mut findings = assemble(pair, &gateway, &client, note, killswitch_findings(&held));
         // A disagreement is reported rather than resolved: there is no basis to
