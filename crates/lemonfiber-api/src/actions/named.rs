@@ -16,7 +16,7 @@ use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, QualityAction};
+use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::quality::Preset;
@@ -84,7 +84,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     // Two arguments, two requests. A teardown that waits and a stop of named
     // services are different things to ask for, and a run given both would have to
     // drop one of them.
-    if action == "down" && given.wait && !given.services.is_empty() {
+    if action == "down" && given.wait == Waiting::ForTheDownloads && !given.services.is_empty() {
         return Err(Refused::Together {
             action: action.to_owned(),
             argument: "wait".to_owned(),

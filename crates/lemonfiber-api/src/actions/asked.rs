@@ -19,6 +19,7 @@
 //! the answer can be read, counted and held against the flags the command line
 //! declares.
 
+use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
 use serde::Deserialize;
 
@@ -33,7 +34,7 @@ pub struct Arguments {
     /// The services to act on, leaving the rest of the form alone.
     pub services: Vec<String>,
     /// Whether anything still downloading is let finish before the stop.
-    pub wait: bool,
+    pub wait: Waiting,
     /// The one service to act on instead of the whole stack.
     pub service: Option<String>,
     /// The setting to change.
@@ -281,7 +282,11 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
     let carried: [(&str, bool, &[&str]); 20] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
-        ("wait", given.wait, TAKES_WAITING),
+        (
+            "wait",
+            matches!(given.wait, Waiting::ForTheDownloads),
+            TAKES_WAITING,
+        ),
         ("service", given.service.is_some(), TAKES_SERVICE),
         ("key", given.key.is_some(), TAKES_SETTING),
         ("value", given.value.is_some(), TAKES_SETTING),

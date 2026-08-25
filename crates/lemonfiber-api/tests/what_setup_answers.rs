@@ -297,11 +297,119 @@ async fn what_was_entered_never_comes_back() {
         .map(|(_, body)| body)
         .unwrap_or_default();
     assert!(!later.contains(&key), "{later}");
-    // A caller cannot assert a credential was proven by saying it was.
+    // A caller cannot assert a credential was proven by saying it was: what is
+    // recorded is what the live test established, and nothing answered here.
     assert!(
         later.contains(r#"{"key":"INDEXER_VALIDATED","value":"off""#),
         "{later}"
     );
+    // And the browser is told why rather than left to guess, in the terms the
+    // remedy differs by: nothing answered, so nothing can be concluded.
+    assert!(
+        body.contains(r#""proof":{"outcome":"unreachable""#),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn an_answer_about_this_machine_has_no_service_to_prove_it_against() {
+    let paths = scratch("nothing-to-prove");
+    let body = answer(&paths, r#"{"protocols":{"usenet":true,"torrent":true}}"#)
+        .await
+        .map(|(_, body)| body)
+        .unwrap_or_default();
+
+    assert!(body.contains(r#""proof":null"#), "{body}");
+}
+
+/// What an interrupted apply leaves in a scratch layout: half-written settings,
+/// the marker saying the writing had begun, and the record of what it wrote.
+fn interrupted(paths: &Paths) {
+    let _ = std::fs::create_dir_all(paths.config_dir());
+    assert!(std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n").is_ok());
+    assert!(std::fs::write(
+        paths.setup_progress(),
+        r#"{"at":"review","answers":{},"phase":"applying"}"#
+    )
+    .is_ok());
+    assert!(std::fs::write(
+        paths.journal(),
+        r#"{"at":"1","operation":"setup","target":".env","kind":{"action":"set","key":"DATA_ROOT","previous":null,"current":"/srv"}}"#
+    )
+    .is_ok());
+}
+
+#[tokio::test]
+async fn an_apply_that_stopped_part_way_names_what_it_wrote_before_a_way_out_is_chosen() {
+    let paths = scratch("half-written");
+    interrupted(&paths);
+
+    let body = standing(&paths)
+        .await
+        .map(|(_, body)| body)
+        .unwrap_or_default();
+
+    assert!(body.contains(r#""phase":"applying""#), "{body}");
+    assert!(
+        body.contains(r#""written":["the setting DATA_ROOT"]"#),
+        "a choice made without seeing this is a choice made blind: {body}"
+    );
+}
+
+#[tokio::test]
+async fn a_way_out_of_an_interrupted_apply_is_taken_and_leaves_nothing_of_it() {
+    let paths = scratch("started-over");
+    interrupted(&paths);
+
+    let said = asked(
+        &paths,
+        "POST",
+        "/api/setup/recover",
+        r#"{"choice":"start-over"}"#,
+    )
+    .await;
+
+    assert_eq!(said.as_ref().map(|(status, _)| *status), Some(200));
+    let body = said.map(|(_, body)| body).unwrap_or_default();
+    assert!(body.contains(r#""at":"welcome""#), "{body}");
+    assert!(!paths.setup_progress().exists(), "the answers are gone");
+    assert!(
+        !paths.journal().exists(),
+        "and so is the record of the apply"
+    );
+}
+
+#[tokio::test]
+async fn a_way_out_of_an_apply_that_never_stopped_is_refused_in_the_same_envelope() {
+    let paths = scratch("nothing-to-recover");
+    let said = asked(
+        &paths,
+        "POST",
+        "/api/setup/recover",
+        r#"{"choice":"roll-back"}"#,
+    )
+    .await;
+
+    assert_eq!(said.as_ref().map(|(status, _)| *status), Some(400));
+    let body = said.map(|(_, body)| body).unwrap_or_default();
+    assert!(body.contains(r#""code":"SETUP-8""#), "{body}");
+}
+
+#[tokio::test]
+async fn a_body_that_is_not_a_way_out_is_said_plainly() {
+    let paths = scratch("not-a-way-out");
+    let said = asked(
+        &paths,
+        "POST",
+        "/api/setup/recover",
+        r#"{"choice":"reticulate"}"#,
+    )
+    .await;
+
+    assert_eq!(said.as_ref().map(|(status, _)| *status), Some(400));
+    let body = said.map(|(_, body)| body).unwrap_or_default();
+    assert!(body.contains("interrupted apply"), "{body}");
+    assert!(!body.contains("reticulate"), "{body}");
 }
 
 #[tokio::test]
@@ -340,6 +448,7 @@ async fn every_endpoint_setup_offers_reaches_the_core() {
         ("POST", "/api/setup/next", ""),
         ("POST", "/api/setup/back", ""),
         ("POST", "/api/setup/apply", ""),
+        ("POST", "/api/setup/recover", r#"{"choice":"resume"}"#),
     ];
     for (method, path, body) in endpoints {
         let said = asked(&paths, method, path, body).await;
@@ -374,6 +483,7 @@ async fn no_setup_endpoint_is_reachable_without_this_run_s_token() {
         ("POST", "/api/setup/next"),
         ("POST", "/api/setup/back"),
         ("POST", "/api/setup/apply"),
+        ("POST", "/api/setup/recover"),
     ] {
         let request = Request::builder()
             .method(method)

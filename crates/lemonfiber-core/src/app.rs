@@ -68,7 +68,7 @@ pub use setup::SetupAction;
 // engine module's functions re-exported for the binary and the log commands to reach.
 pub use engine::{
     claimed, diagnose, in_flight, logs, pull_progress, released, start_progress, started, Claim,
-    Interrupted,
+    Interrupted, Waiting,
 };
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
@@ -119,7 +119,7 @@ pub enum Command {
         /// that cannot sit in a loop asks for it by saying so. Whether to offer the
         /// choice at all is the surface's — a terminal asks, a machine-readable run
         /// is not asked — but the waiting itself is one implementation.
-        wait: bool,
+        wait: Waiting,
     },
     /// Stop named services, leaving the rest of what is running alone.
     ///
@@ -571,7 +571,7 @@ mod tests {
 
     use super::{
         dispatch, pull_progress, Command, Ctx, Narrowing, Outcome, QualityAction, SetupAction,
-        VersionReport,
+        VersionReport, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -1186,7 +1186,7 @@ mod tests {
             },
             Command::Down {
                 forms: vec!["library".to_owned()],
-                wait: false,
+                wait: Waiting::Never,
             },
             Command::Switch {
                 forms: vec!["library".to_owned()],
@@ -1560,13 +1560,76 @@ mod tests {
             .build();
         let command = Command::Down {
             forms: vec!["library".to_owned()],
-            wait: false,
+            wait: Waiting::Never,
         };
         let produced = report(dispatch(command, &ctx).await);
 
         assert_eq!(
             produced.map(|report| (report.action, report.rehearsed, report.status)),
             Some(("down".to_owned(), false, Some(0)))
+        );
+    }
+
+    #[tokio::test]
+    async fn starting_named_services_is_the_start_compose_spells_that_way() {
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::holding(
+                &["sabnzbd", "gluetun", "qbittorrent"],
+                Lifecycle::Running,
+                Health::Healthy,
+            )))
+            .settings(settings)
+            .build()
+            .waiting(std::time::Duration::ZERO);
+        let command = Command::Start {
+            forms: vec!["dl".to_owned()],
+            services: vec!["qbittorrent".to_owned()],
+        };
+        let produced = report(dispatch(command, &ctx).await);
+
+        assert_eq!(
+            produced
+                .as_ref()
+                .map(|report| report.action.clone())
+                .as_deref(),
+            Some("up"),
+            "it is a start, and reports as one"
+        );
+        assert!(
+            produced.is_some_and(|report| report.command.contains(&"qbittorrent".to_owned())),
+            "and the command it ran names the service rather than the form"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_teardown_asked_to_wait_where_nothing_is_downloading_stops_at_once() {
+        // A form holding no download client asks the network nothing, so the wait
+        // it was asked for is over before the teardown that follows it begins.
+        let settings = Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        };
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::holding(
+                &[],
+                Lifecycle::Exited,
+                Health::None,
+            )))
+            .settings(settings)
+            .build();
+        let command = Command::Down {
+            forms: vec!["search".to_owned()],
+            wait: Waiting::ForTheDownloads,
+        };
+        let produced = report(dispatch(command, &ctx).await);
+
+        assert_eq!(
+            produced.map(|report| (report.action, report.status)),
+            Some(("down".to_owned(), Some(0)))
         );
     }
 
@@ -2603,7 +2666,7 @@ mod tests {
         let refused = dispatch(
             Command::Down {
                 forms: vec!["tv".to_owned()],
-                wait: false,
+                wait: Waiting::Never,
             },
             &watching(running),
         )
@@ -2631,7 +2694,7 @@ mod tests {
         let refusal = dispatch(
             Command::Down {
                 forms: vec!["library".to_owned()],
-                wait: false,
+                wait: Waiting::Never,
             },
             &rehearsing(crate::config::Protocols::both()),
         )
@@ -2660,7 +2723,7 @@ mod tests {
             dispatch(
                 Command::Down {
                     forms: vec!["library".to_owned()],
-                    wait: false,
+                    wait: Waiting::Never,
                 },
                 &watching(running),
             )
@@ -2680,7 +2743,7 @@ mod tests {
         let ctx = watching(engine).waiting(Duration::ZERO);
         let command = Command::Down {
             forms: vec!["library".to_owned()],
-            wait: false,
+            wait: Waiting::Never,
         };
 
         let produced = report(dispatch(command, &ctx).await);

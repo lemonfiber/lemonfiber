@@ -25,17 +25,51 @@
 //! **A finished download is not something stopping can interrupt.** Clients keep
 //! completed items in the same list they report active ones from, and naming those
 //! would be warning about work that is already done.
+//!
+//! The teardown itself is here too, because letting the downloads finish is the one
+//! thing that happens before it: what the operator asked about is inside the command
+//! rather than in front of it, so a surface that cannot sit in a loop for an hour
+//! reaches the same wait a shell does.
 
 use std::time::Duration;
 
 use lemonfiber_manifest::Service;
 
 use crate::app::targets::{download_targets, project_directory, protocol_of, read_transfers};
-use crate::app::Ctx;
+use crate::app::{Ctx, Outcome};
 use crate::dashboard::Protocol;
+use crate::error::Problem;
 use crate::plural::s;
 use crate::ports::service::Download;
 use crate::stack::closure::resolve;
+use crate::stack::compose::Action;
+
+/// Whether a teardown lets what is still coming down finish before it stops.
+///
+/// Read from the bare flag a surface carries rather than from a name of its own,
+/// because that is what all of them have: `--wait` on a command line and a `wait`
+/// in a request body are one word that is there or is not. Named rather than left a
+/// bare boolean because the field it lands on decides how long a teardown takes,
+/// and a `true` at a call site says nothing about which way round that reads.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(from = "bool")]
+pub enum Waiting {
+    /// Stop now, interrupting whatever is still coming down.
+    #[default]
+    Never,
+    /// Let anything still coming down finish first.
+    ForTheDownloads,
+}
+
+impl From<bool> for Waiting {
+    fn from(waits: bool) -> Self {
+        if waits {
+            Self::ForTheDownloads
+        } else {
+            Self::Never
+        }
+    }
+}
 
 /// One download a teardown would interrupt.
 ///
@@ -113,6 +147,22 @@ fn underway(download: &Download) -> bool {
 /// the wait noticed.
 const AGAIN: Duration = Duration::from_secs(10);
 
+/// Let anything still downloading finish where that was asked for, then stop.
+///
+/// The wait runs before the stack is claimed for the teardown, because it can last
+/// an hour and a claim held for an hour is a stack nothing else can touch while
+/// nothing is happening to it.
+pub(in crate::app) async fn teardown(
+    ctx: &Ctx,
+    forms: &[String],
+    wait: Waiting,
+) -> Result<Outcome, Box<Problem>> {
+    if wait == Waiting::ForTheDownloads {
+        drained(ctx, forms).await;
+    }
+    super::lifecycle(ctx, forms, &Action::Down).await
+}
+
 /// Hold on until nothing inside these forms is coming down any more.
 ///
 /// The waiting itself rather than the decision to wait: whoever asked has already
@@ -123,7 +173,7 @@ const AGAIN: Duration = Duration::from_secs(10);
 /// Said again only when the count changes, because a line repeated every ten seconds
 /// is one whoever is reading scrolls past — and the one moment it has news is the
 /// moment another download finishes.
-pub(super) async fn drained(ctx: &Ctx, forms: &[String]) {
+async fn drained(ctx: &Ctx, forms: &[String]) {
     let mut counted = usize::MAX;
     loop {
         let active = in_flight(ctx, forms).await;

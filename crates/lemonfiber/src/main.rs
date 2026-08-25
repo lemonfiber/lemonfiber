@@ -10,7 +10,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::Kept;
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 use lemonfiber_core::doctor::Narrowing;
 
 mod acting;
@@ -439,7 +439,7 @@ async fn halting(
     };
     Command::Down {
         forms,
-        wait: waiting,
+        wait: Waiting::from(waiting),
     }
 }
 

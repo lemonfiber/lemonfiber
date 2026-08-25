@@ -108,6 +108,7 @@ pub(super) fn ask_recovery_choice(surface: &dyn Surface) -> Choice {
 mod tests {
     use crate::exit::{shown, success};
     use lemonfiber_core::alert::Appetite;
+    use lemonfiber_core::app::Ctx;
     use lemonfiber_core::config::paths::Paths;
     use lemonfiber_core::config::Protocols;
     use lemonfiber_core::journal::{Change, Kind};
@@ -123,6 +124,17 @@ mod tests {
             std::env::temp_dir().join(format!("lemonfiber-recover-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         Paths::rooted(&root.join("config"), &root.join("data"))
+    }
+
+    /// The same context, keeping lemonfiber's files where this test put them.
+    ///
+    /// A real run's settings already point at the configuration home the paths come
+    /// from — both are read off the same place — so this says here what the machine
+    /// says there, and the command reaches the files the operator is being shown.
+    fn keeping(mut context: Ctx, paths: &Paths) -> Ctx {
+        context.settings.env_file = Some(paths.env_file());
+        context.settings.stack_dir = Some(paths.stack());
+        context
     }
 
     #[test]
@@ -154,18 +166,15 @@ mod tests {
         // The undo and the apply behind a roll back are one step, so there is no
         // moment between them to report from — what an operator watching a pause
         // reads has to be what is about to happen.
-        let said: Vec<&str> = [Choice::Resume, Choice::RollBack, Choice::StartOver]
-            .into_iter()
-            .map(about_to)
-            .collect();
-        assert!(said[0].contains("Resuming"), "{said:?}");
-        assert!(said[1].contains("Rolling back"), "{said:?}");
-        assert!(said[2].contains("forgetting the answers"), "{said:?}");
-        assert_eq!(
-            said.iter().collect::<std::collections::BTreeSet<_>>().len(),
-            said.len(),
-            "and each way out says something of its own"
-        );
+        assert!(about_to(Choice::Resume).contains("Resuming"));
+        assert!(about_to(Choice::RollBack).contains("Rolling back"));
+        assert!(about_to(Choice::StartOver).contains("forgetting the answers"));
+        let said: std::collections::BTreeSet<&str> =
+            [Choice::Resume, Choice::RollBack, Choice::StartOver]
+                .into_iter()
+                .map(about_to)
+                .collect();
+        assert_eq!(said.len(), 3, "and each way out says something of its own");
     }
 
     /// An install whose previous setup stopped part-way through applying.
@@ -228,7 +237,7 @@ mod tests {
         // the state stays as it is, still recoverable, rather than acted on unasked.
         let paths = interrupted("piped");
         let code = recover_setup(
-            ctx(),
+            keeping(ctx(), &paths),
             &paths,
             &Scripted::saying(false, &[]),
             progress_at(&paths),
@@ -239,10 +248,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_apply_that_wrote_nothing_says_so_rather_than_showing_an_empty_list() {
+        // "It had written:" followed by nothing reads as a list that failed to
+        // render. The two states are different and are said differently.
+        let paths = interrupted("wrote-nothing");
+        let _ = std::fs::remove_file(paths.journal());
+
+        let code = recover_setup(
+            keeping(ctx(), &paths),
+            &paths,
+            &Scripted::saying(false, &[]),
+            progress_at(&paths),
+        )
+        .await;
+
+        assert_ne!(shown(code), success(), "and nobody was there to choose");
+    }
+
+    #[tokio::test]
     async fn resuming_finishes_applying_from_where_it_stopped() {
         let paths = interrupted("resume");
         let code = recover_setup(
-            working_ctx(),
+            keeping(working_ctx(), &paths),
             &paths,
             &Scripted::saying(true, &["1"]),
             progress_at(&paths),
@@ -255,7 +282,7 @@ mod tests {
     async fn rolling_back_undoes_what_was_written_and_applies_again() {
         let paths = interrupted("rollback");
         let code = recover_setup(
-            working_ctx(),
+            keeping(working_ctx(), &paths),
             &paths,
             &Scripted::saying(true, &["2"]),
             progress_at(&paths),
@@ -268,7 +295,7 @@ mod tests {
     async fn starting_over_undoes_it_and_forgets_the_answers() {
         let paths = interrupted("startover");
         let code = recover_setup(
-            ctx(),
+            keeping(ctx(), &paths),
             &paths,
             &Scripted::saying(true, &["3"]),
             progress_at(&paths),
@@ -290,7 +317,7 @@ mod tests {
             r#"{"at":"review","answers":{},"phase":"applying"}"#,
         );
         let code = recover_setup(
-            working_ctx(),
+            keeping(working_ctx(), &paths),
             &paths,
             &Scripted::saying(true, &["1"]),
             progress_at(&paths),
@@ -304,7 +331,13 @@ mod tests {
         // A stopped apply always leaves its answers; if they are somehow gone there
         // is nothing to resume from, so a fresh run is the honest fallback.
         let paths = scratch("no-answers");
-        let code = recover_setup(ctx(), &paths, &Scripted::saying(false, &[]), None).await;
+        let code = recover_setup(
+            keeping(ctx(), &paths),
+            &paths,
+            &Scripted::saying(false, &[]),
+            None,
+        )
+        .await;
         let _ = code;
     }
 
@@ -324,7 +357,7 @@ mod tests {
             let _ = std::fs::remove_file(paths.env_file());
             let _ = std::fs::create_dir_all(paths.env_file());
             let code = recover_setup(
-                ctx(),
+                keeping(ctx(), &paths),
                 &paths,
                 &Scripted::saying(true, &[answer]),
                 progress_at(&paths),

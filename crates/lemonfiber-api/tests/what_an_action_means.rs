@@ -28,7 +28,7 @@ use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::Kept;
-use lemonfiber_core::app::{Command, Ctx, QualityAction};
+use lemonfiber_core::app::{Command, Ctx, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
@@ -254,7 +254,7 @@ fn starting_and_stopping_take_the_forms_they_are_given() {
         command("down", naming("tv")),
         Some(Command::Down {
             forms: vec!["tv".to_owned()],
-            wait: false
+            wait: Waiting::Never
         })
     );
 }
@@ -289,14 +289,14 @@ fn starting_named_services_is_a_different_request_from_bringing_a_form_up() {
 fn a_teardown_can_be_asked_to_let_the_downloads_finish_first() {
     let waiting = Arguments {
         forms: vec!["tv".to_owned()],
-        wait: true,
+        wait: Waiting::ForTheDownloads,
         ..Arguments::default()
     };
     assert_eq!(
         command("down", waiting),
         Some(Command::Down {
             forms: vec!["tv".to_owned()],
-            wait: true
+            wait: Waiting::ForTheDownloads
         })
     );
 }
@@ -310,7 +310,7 @@ fn waiting_and_naming_services_are_refused_together_rather_than_one_being_droppe
     let both = Arguments {
         forms: vec!["tv".to_owned()],
         services: vec!["sonarr".to_owned()],
-        wait: true,
+        wait: Waiting::ForTheDownloads,
         ..Arguments::default()
     };
     assert_eq!(
@@ -490,7 +490,7 @@ fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
-        wait: takes(TAKES_WAITING),
+        wait: takes(TAKES_WAITING).into(),
         service: takes(TAKES_SERVICE).then(|| "sonarr".to_owned()),
         key: takes(TAKES_SETTING).then(|| "DATA_ROOT".to_owned()),
         value: takes(TAKES_SETTING).then(|| "/srv".to_owned()),
@@ -555,7 +555,13 @@ fn carries_forms(command: &Command) -> bool {
 /// Whether the command has the services it was given in it.
 /// Whether the command has the wait it was asked for in it.
 fn carries_wait(command: &Command) -> bool {
-    matches!(command, Command::Down { wait: true, .. })
+    matches!(
+        command,
+        Command::Down {
+            wait: Waiting::ForTheDownloads,
+            ..
+        }
+    )
 }
 
 fn carries_services(command: &Command) -> bool {
@@ -719,7 +725,7 @@ fn give_services(given: &mut Arguments) {
 }
 
 fn give_wait(given: &mut Arguments) {
-    given.wait = true;
+    given.wait = Waiting::ForTheDownloads;
 }
 
 fn give_key(given: &mut Arguments) {
@@ -854,11 +860,14 @@ fn swept(argument: &str, give: fn(&mut Arguments), carries: fn(&Command) -> bool
                 argument: named, ..
             }) if named == argument => {}
             // Refused by name for the other reason there is: it and something the
-            // action already holds name two different requests. Still refused
-            // rather than dropped, which is the whole of what this sweeps for.
+            // action already holds name two different requests. That refusal names
+            // both of them, and either half is this argument being refused rather
+            // than dropped, which is the whole of what this sweeps for.
             Err(Refused::Together {
-                argument: named, ..
-            }) if named == argument => {}
+                argument: named,
+                alongside,
+                ..
+            }) if named == argument || alongside == argument => {}
             Err(refused) => {
                 wrong.push(format!(
                     "{action} was refused for something else: {refused:?}"
@@ -917,7 +926,7 @@ fn stopping_a_whole_stack_is_not_gated_the_way_a_reset_is() {
         command("down", naming("tv")),
         Some(Command::Down {
             forms: vec!["tv".to_owned()],
-            wait: false
+            wait: Waiting::Never
         })
     );
     let agreed = Arguments {

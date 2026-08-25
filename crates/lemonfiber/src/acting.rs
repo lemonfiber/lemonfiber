@@ -536,7 +536,7 @@ mod tests {
     use super::offer::tests::{a_listing, nothing_declared};
     use super::{meaning, question, Acting, Line, Press, Wanted};
     use crate::render::fixtures::{a_lifecycle, a_plan};
-    use lemonfiber_core::app::{Command, Outcome};
+    use lemonfiber_core::app::{Command, Outcome, Waiting};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
     use lemonfiber_core::model::{FormsReport, VersionReport};
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -700,7 +700,7 @@ mod tests {
             carried,
             Wanted::Carry(Command::Down {
                 forms: Vec::new(),
-                wait: false
+                wait: Waiting::Never
             })
         );
     }

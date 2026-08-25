@@ -23,7 +23,8 @@ mod waiting;
 
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
-pub use inflight::{in_flight, Interrupted};
+pub(super) use inflight::teardown;
+pub use inflight::{in_flight, Interrupted, Waiting};
 pub use lock::{claimed, released, Claim};
 pub use streaming::{logs, pull_progress, start_progress, started};
 // Reached only by the tests that drive the decision directly rather than through a
@@ -402,23 +403,6 @@ pub(super) async fn lifecycle(
     let outcome = worked(ctx, forms, action).await;
     lock::released(ctx, claim).await;
     outcome
-}
-
-/// Let anything still downloading finish where that was asked for, then stop.
-///
-/// The wait is here rather than in front of the command, so every surface reaches
-/// the same one. It runs before the stack is claimed for the teardown, because a
-/// wait can last an hour and a claim held for an hour is a stack nothing else can
-/// touch while nothing is happening to it.
-pub(super) async fn teardown(
-    ctx: &Ctx,
-    forms: &[String],
-    wait: bool,
-) -> Result<Outcome, Box<Problem>> {
-    if wait {
-        inflight::drained(ctx, forms).await;
-    }
-    lifecycle(ctx, forms, &Action::Down).await
 }
 
 /// The operation itself, with the stack already claimed for it.
