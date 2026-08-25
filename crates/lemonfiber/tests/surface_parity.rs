@@ -156,6 +156,85 @@ fn api() -> String {
 /// Both directions, because they fail differently: a request with no row is a
 /// surface decision nobody made, and a row with no request is a claim about
 /// something that no longer exists.
+/// The numbers the page states about itself, held to the rows it states them about.
+///
+/// The summary said ten and five where the rows said eleven and four. Nothing read
+/// it, so a page whose whole purpose is to be counted had stopped being countable.
+#[test]
+fn the_count_the_page_states_is_the_count_of_its_rows() {
+    let counted = rows();
+    assert!(!counted.is_empty(), "the table was read");
+
+    let full = counted
+        .iter()
+        .filter(|row| !tokens(&row.web).iter().any(|word| WEB_WORDS.contains(word)))
+        .count();
+    let partial = counted
+        .iter()
+        .filter(|row| tokens(&row.web).contains(&QUALIFIER))
+        .count();
+    let none = counted.iter().filter(|row| row.web == "none").count();
+    let intrinsic = counted
+        .iter()
+        .filter(|row| tokens(&row.web).contains(&"intrinsic"))
+        .count();
+
+    // Line breaks fall between a number and the noun it counts, so the page is read
+    // as one run of words rather than as lines.
+    let page = fs::read_to_string(TABLE).unwrap_or_default().to_lowercase();
+    let page: String = page.split_whitespace().collect::<Vec<_>>().join(" ");
+    for (number, what) in [
+        (counted.len(), "requests"),
+        (full, "reach the web in full"),
+        (partial, "reach it in part"),
+        (none, "do not reach it at all"),
+        (partial + none, "gaps"),
+    ] {
+        let said = spelled(number);
+        assert!(
+            page.contains(&format!("{said} ")),
+            "the page says `{said}` for the {what} its rows carry ({number})"
+        );
+    }
+    assert_eq!(intrinsic, 1, "one exception, which the page names as `ui`");
+}
+
+/// A number as the page writes it, since it writes them as words.
+fn spelled(number: usize) -> String {
+    const WORDS: [&str; 27] = [
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen",
+        "twenty",
+        "twenty-one",
+        "twenty-two",
+        "twenty-three",
+        "twenty-four",
+        "twenty-five",
+        "twenty-six",
+    ];
+    WORDS
+        .get(number)
+        .map_or_else(|| number.to_string(), |&word| word.to_owned())
+}
+
 #[test]
 fn every_request_the_command_line_accepts_has_a_row() {
     let rows = rows();
