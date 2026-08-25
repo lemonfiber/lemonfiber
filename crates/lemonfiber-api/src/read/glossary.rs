@@ -13,18 +13,18 @@ use axum::extract::{RawQuery, State};
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use lemonfiber_core::app::Command;
 
+use crate::reads::{Wanted, EXPLAIN};
 use crate::router::Serving;
 
-use super::{carried_out, Asked};
+use super::{reading, Asked};
 
 /// The parameter naming the word to explain.
 const WORD: &str = "word";
 
 /// The read about this product's own words.
 pub(super) fn routes() -> Router<Serving> {
-    Router::new().route("/api/explain", get(explain))
+    Router::new().route(EXPLAIN, get(explain))
 }
 
 /// What one word means, or every word there is to ask about.
@@ -39,11 +39,13 @@ pub(super) fn routes() -> Router<Serving> {
 /// refused for that rather than read as having named none.
 async fn explain(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
     let asked = Asked::read(query.as_deref());
-    let command = match asked.one(WORD) {
-        Some(word) => Command::Explain {
-            word: word.to_owned(),
+    reading(
+        &serving.ctx,
+        EXPLAIN,
+        Wanted {
+            word: asked.one(WORD).map(str::to_owned),
+            ..Wanted::default()
         },
-        None => Command::Glossary,
-    };
-    carried_out(&serving.ctx, command).await
+    )
+    .await
 }

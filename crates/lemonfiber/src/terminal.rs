@@ -267,6 +267,7 @@ const fn meaning(key: KeyEvent) -> Option<crate::acting::Press> {
     }
     match key.code {
         KeyCode::Char(character) => Some(Key::Typed(character)),
+        KeyCode::Backspace => Some(Key::Rubout),
         KeyCode::Esc => Some(Key::Abandon),
         KeyCode::Enter => Some(Key::Accept),
         KeyCode::Up => Some(Key::Back),

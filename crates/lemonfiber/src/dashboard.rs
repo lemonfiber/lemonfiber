@@ -372,8 +372,43 @@ pub(crate) mod tests {
     fn the_footer_names_the_actions_this_screen_offers() {
         let text = drawn(&a_snapshot(), 200, 40);
 
-        for hint in ["q quit", "r refresh", "? words", "start", "stop", "restart"] {
+        for hint in [
+            "q quit",
+            "r refresh",
+            "? words",
+            "ask",
+            "start",
+            "stop",
+            "restart",
+        ] {
             assert!(text.contains(hint), "{hint} is missing:\n{text}");
+        }
+    }
+
+    /// The list of what this stack can be asked is drawn over the panels too, and
+    /// the panels are still behind it — one box, in one place, whichever key opened
+    /// it.
+    #[test]
+    fn the_questions_are_drawn_over_the_panels_the_way_an_action_is() {
+        let snapshot = a_snapshot();
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(crate::acting::ASK));
+
+        let text = with(&snapshot, 120, 40, &acting);
+
+        assert!(text.contains("versions"), "{text}");
+        assert!(text.contains("Transfers"), "a panel is still there: {text}");
+    }
+
+    /// A terminal too small for the box still draws, with something open on it.
+    #[test]
+    fn a_terminal_too_small_for_the_box_still_draws_what_is_open_on_it() {
+        let snapshot = a_snapshot();
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(crate::acting::ASK));
+
+        for (across, down) in [(8_u16, 4_u16), (24, 10), (40, 12)] {
+            assert!(!with(&snapshot, across, down, &acting).is_empty());
         }
     }
 

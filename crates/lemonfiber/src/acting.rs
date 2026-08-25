@@ -1,17 +1,25 @@
 //! What a keypress on the dashboard asks for, and what becomes of it.
 //!
-//! The dashboard read and offered nothing to do about what it read. This is the
-//! deciding half of doing something: which key reaches which action, what an action
-//! may be given, the question put before it, and what is said about what it came
-//! to. None of it is in [`crate::terminal`], which is a real terminal in raw mode
-//! and the one file this workspace deliberately does not test — a decision behind
-//! that filename is a decision nothing checks.
+//! The dashboard read six panels and offered nothing else — no way to act on what
+//! it read, and no way to ask anything the panels do not already show. This is the
+//! deciding half of both: which key reaches which action, what an action may be
+//! given, the question put before it, what this stack can be asked, and what is
+//! said about every answer. None of it is in [`crate::terminal`], which is a real
+//! terminal in raw mode and the one file this workspace deliberately does not test
+//! — a decision behind that filename is a decision nothing checks.
 //!
-//! **An action reaches the command every other surface reaches.** The name is put
-//! through the web surface's own translation rather than assembled here, so this
-//! screen cannot grow an action a browser has no form of. That is the whole point
-//! of the arrangement: a terminal action that did something no other surface could
-//! do would defeat the requirement it was built for.
+//! **An action reaches the command every other surface reaches, and so does a
+//! question.** Both are named rather than assembled: an action goes through the
+//! web surface's table of actions and a question through its table of reads, so
+//! this screen cannot grow either a write or a read a browser has no form of. That
+//! is the whole point of the arrangement: a terminal that did something no other
+//! surface could do would defeat the requirement it was built for.
+//!
+//! **A read is asked for the same way an action is.** One key opens the list, the
+//! entry taken names what to ask, and a question that has to be given a word gets a
+//! line to type it on. The answer comes back in the words the command line gives
+//! for the same request, in a box that moves through them — an answer cut to what
+//! fits is an answer whose end nobody can reach.
 //!
 //! **Nothing happens on one keypress.** A key opens the list of what the action can
 //! be given; taking one puts the question; only an explicit yes goes ahead. On a
@@ -32,6 +40,8 @@
 
 mod chooser;
 mod offer;
+mod question;
+mod reading;
 mod words;
 
 use lemonfiber_core::app::{Command, Outcome};
@@ -40,7 +50,15 @@ use ratatui::text::Line;
 
 use chooser::Chooser;
 use offer::{Choice, Offer};
+use question::Question;
+use reading::Reading;
 
+/// The key that opens the list of what this stack can be asked.
+///
+/// Re-exported for the screen these boxes are drawn over, whose own tests press it
+/// rather than writing the letter down a second time.
+#[cfg(test)]
+pub(crate) use question::KEY as ASK;
 pub(crate) use words::Pane;
 
 /// What is said where an answer is not the shape the question had.
@@ -50,6 +68,8 @@ const NOT_THE_ANSWER: &str = "This stack answered something other than what was 
 pub(crate) enum Press {
     /// A character.
     Typed(char),
+    /// Take back the last character typed.
+    Rubout,
     /// The entry above the one selected.
     Back,
     /// The entry below it.
@@ -88,7 +108,7 @@ enum Stage {
         /// The action being chosen for.
         offer: &'static Offer,
         /// What it can be given, one of them selected.
-        chooser: Chooser,
+        chooser: Chooser<Choice>,
     },
     /// Holding the question before anything is done.
     Confirming {
@@ -105,7 +125,27 @@ enum Stage {
         chosen: Choice,
     },
     /// What it came to, until it is put away.
-    Came(Vec<String>),
+    Came(Reading),
+    /// Choosing what to ask this stack.
+    Wondering(Chooser<&'static Question>),
+    /// Typing the word a question has to be given.
+    Typing {
+        /// The question waiting on it.
+        question: &'static Question,
+        /// What is asked for, above the line being typed.
+        asks: &'static str,
+        /// What has been typed of it.
+        typed: String,
+    },
+    /// The question is with the core.
+    Waiting(&'static Question),
+    /// What it answered, until it is put away.
+    Answered {
+        /// The question that was asked.
+        question: &'static Question,
+        /// The answer, and where in it the box is.
+        reading: Reading,
+    },
 }
 
 /// What this screen has open, and what it is waiting for.
@@ -159,8 +199,30 @@ impl Acting {
             Stage::Choosing { offer, chooser } => self.choosing(offer, chooser, press),
             Stage::Confirming { offer, chosen } => self.confirming(offer, chosen, press),
             Stage::Running { offer, chosen } => self.while_running(offer, chosen, press),
-            // A report is put away by any key, the way the words are.
-            Stage::Came(_) => Wanted::Nothing,
+            Stage::Wondering(chooser) => self.wondering(chooser, press),
+            Stage::Typing {
+                question,
+                asks,
+                typed,
+            } => self.typing(question, asks, typed, press),
+            Stage::Waiting(question) => self.while_waiting(question, press),
+            // A reading moves, and any key that is not a move puts it away — the
+            // way the pane of words is put away.
+            Stage::Came(mut reading) => {
+                if moved(&mut reading, press) {
+                    self.stage = Stage::Came(reading);
+                }
+                Wanted::Nothing
+            }
+            Stage::Answered {
+                question,
+                mut reading,
+            } => {
+                if moved(&mut reading, press) {
+                    self.stage = Stage::Answered { question, reading };
+                }
+                Wanted::Nothing
+            }
         }
     }
 
@@ -173,8 +235,13 @@ impl Acting {
                 self.words = true;
                 Wanted::Words
             }
+            Press::Typed(question::KEY) => {
+                let (first, rest) = question::all();
+                self.stage = Stage::Wondering(Chooser::over(first, rest));
+                Wanted::Nothing
+            }
             Press::Typed(key) => self.begin(key),
-            Press::Back | Press::Forward | Press::Accept => Wanted::Nothing,
+            Press::Rubout | Press::Back | Press::Forward | Press::Accept => Wanted::Nothing,
         }
     }
 
@@ -201,7 +268,12 @@ impl Acting {
     }
 
     /// Over the list: move, take one, or leave it.
-    fn choosing(&mut self, offer: &'static Offer, mut chooser: Chooser, press: &Press) -> Wanted {
+    fn choosing(
+        &mut self,
+        offer: &'static Offer,
+        mut chooser: Chooser<Choice>,
+        press: &Press,
+    ) -> Wanted {
         match *press {
             Press::Abandon => return Wanted::Nothing,
             Press::Accept => {
@@ -213,7 +285,7 @@ impl Acting {
             }
             Press::Back => chooser.back(),
             Press::Forward => chooser.forward(),
-            Press::Typed(_) => (),
+            Press::Typed(_) | Press::Rubout => (),
         }
         self.stage = Stage::Choosing { offer, chooser };
         Wanted::Nothing
@@ -242,6 +314,89 @@ impl Acting {
         Wanted::Nothing
     }
 
+    /// Over the questions: move, take one, or leave it.
+    fn wondering(&mut self, mut chooser: Chooser<&'static Question>, press: &Press) -> Wanted {
+        match *press {
+            Press::Abandon => return Wanted::Nothing,
+            Press::Accept => return self.take(chooser.taken()),
+            Press::Back => chooser.back(),
+            Press::Forward => chooser.forward(),
+            Press::Typed(_) | Press::Rubout => (),
+        }
+        self.stage = Stage::Wondering(chooser);
+        Wanted::Nothing
+    }
+
+    /// Ask the question that was taken, or open the line it has to be given first.
+    fn take(&mut self, question: &'static Question) -> Wanted {
+        match question.needs.asks() {
+            Some(asks) => {
+                self.stage = Stage::Typing {
+                    question,
+                    asks,
+                    typed: String::new(),
+                };
+                Wanted::Nothing
+            }
+            None => self.put(question, ""),
+        }
+    }
+
+    /// Over the line being typed: type, take back, ask, or leave it.
+    fn typing(
+        &mut self,
+        question: &'static Question,
+        asks: &'static str,
+        mut typed: String,
+        press: &Press,
+    ) -> Wanted {
+        match *press {
+            Press::Abandon => return Wanted::Nothing,
+            Press::Accept => return self.put(question, &typed),
+            Press::Rubout => {
+                typed.pop();
+            }
+            Press::Typed(character) => typed.push(character),
+            Press::Back | Press::Forward => (),
+        }
+        self.stage = Stage::Typing {
+            question,
+            asks,
+            typed,
+        };
+        Wanted::Nothing
+    }
+
+    /// Put the question to the core, or say why it cannot be put.
+    ///
+    /// Carried rather than awaited, because a question about what the household
+    /// asked for reaches the services over the network and a screen that waited on
+    /// it would stop answering keys while it did.
+    fn put(&mut self, question: &'static Question, typed: &str) -> Wanted {
+        match question.command(typed) {
+            Ok(command) => {
+                self.stage = Stage::Waiting(question);
+                Wanted::Carry(command)
+            }
+            Err(said) => {
+                self.stage = Stage::Answered {
+                    question,
+                    reading: Reading::of(vec![said.to_owned()]),
+                };
+                Wanted::Nothing
+            }
+        }
+    }
+
+    /// While the question is with the core: back out, or wait for it.
+    fn while_waiting(&mut self, question: &'static Question, press: &Press) -> Wanted {
+        if matches!(*press, Press::Abandon) {
+            return Wanted::Nothing;
+        }
+        self.stage = Stage::Waiting(question);
+        Wanted::Nothing
+    }
+
     /// What the stack answered when it was asked what there is to act on.
     pub(crate) fn told(&mut self, answer: Result<Outcome, Box<Problem>>) {
         let offer = match &self.stage {
@@ -254,20 +409,40 @@ impl Acting {
                     offer,
                     chooser: Chooser::over(selected, rest),
                 },
-                Err(refused) => Stage::Came(vec![refused]),
+                Err(refused) => Stage::Came(Reading::of(vec![refused])),
             },
-            Ok(_) => Stage::Came(unexpected()),
-            Err(problem) => Stage::Came(complaint(&problem)),
+            Ok(_) => Stage::Came(Reading::of(unexpected())),
+            Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
         };
     }
 
-    /// What the action came to.
+    /// What the action came to, or what the question was answered with.
+    ///
+    /// Which of the two is read off what the screen is waiting for. An answer
+    /// nobody is waiting for any more — a question backed out of while it was with
+    /// the core — leaves the screen as it stands rather than opening a box over
+    /// whatever the operator went on to do.
     pub(crate) fn came_to(&mut self, answer: Result<Outcome, Box<Problem>>) {
-        self.stage = Stage::Came(match answer {
-            Ok(Outcome::Lifecycle(report)) => lines_of(&crate::render::stack::lifecycle(&report)),
-            Ok(_) => unexpected(),
-            Err(problem) => complaint(&problem),
-        });
+        self.stage = match std::mem::replace(&mut self.stage, Stage::Idle) {
+            Stage::Running { .. } => Stage::Came(Reading::of(match answer {
+                Ok(Outcome::Lifecycle(report)) => {
+                    lines_of(&crate::render::stack::lifecycle(&report))
+                }
+                Ok(_) => unexpected(),
+                Err(problem) => complaint(&problem),
+            })),
+            // Rendered by the same renderer the command line reaches for the same
+            // answer, so the two surfaces cannot come to say different things about
+            // one stack.
+            Stage::Waiting(question) => Stage::Answered {
+                question,
+                reading: Reading::of(match answer {
+                    Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
+                    Err(problem) => complaint(&problem),
+                }),
+            },
+            waiting_for_nothing => waiting_for_nothing,
+        };
     }
 
     /// The box over the screen, or nothing where the action has none open.
@@ -279,6 +454,19 @@ impl Acting {
     pub(crate) fn footer(&self, across: usize) -> Line<'static> {
         words::footer(&self.stage, across)
     }
+}
+
+/// Move through a reading, saying whether the press was a move at all.
+///
+/// A press that is not a move puts the reading away, which is how the pane of words
+/// is put away too: one shape of dismissal on a screen where several boxes open.
+fn moved(reading: &mut Reading, press: &Press) -> bool {
+    match *press {
+        Press::Back => reading.back(),
+        Press::Forward => reading.forward(),
+        _ => return false,
+    }
+    true
 }
 
 /// An answer that is not the shape the question had.
@@ -303,7 +491,7 @@ fn lines_of(lines: &crate::render::Lines) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::offer::tests::{a_listing, nothing_declared};
-    use super::{Acting, Line, Press, Wanted};
+    use super::{question, Acting, Line, Press, Wanted};
     use crate::render::fixtures::{a_lifecycle, a_plan};
     use lemonfiber_core::app::{Command, Outcome};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
@@ -340,14 +528,26 @@ mod tests {
         text(&acting.footer(200))
     }
 
-    /// An answer of a shape this screen never asks for.
+    /// A version report, which is both an answer this screen asks for and an answer
+    /// of a shape an action never has.
     fn a_version() -> VersionReport {
         VersionReport {
-            binary: String::new(),
-            supported_schema: Vec::new(),
-            stack: String::new(),
+            binary: "0.8.0".to_owned(),
+            supported_schema: vec![1],
+            stack: "1.2.3".to_owned(),
             compose: None,
         }
+    }
+
+    /// The screen, having got as far as the line where what to follow is typed.
+    fn asking_where() -> Acting {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(question::KEY));
+        while !showing(&acting).contains("> where one thing is") {
+            acting.pressed(&Press::Forward);
+        }
+        acting.pressed(&Press::Accept);
+        acting
     }
 
     /// A failure to render, for the paths that report one.
@@ -647,7 +847,9 @@ mod tests {
         asked.pressed(&Press::Typed('u'));
         asked.told(Ok(Outcome::Version(a_version())));
 
-        let mut acted = Acting::opened();
+        let (mut acted, _) = choosing('t', a_listing());
+        acted.pressed(&Press::Accept);
+        acted.pressed(&Press::Typed('y'));
         acted.came_to(Ok(Outcome::Version(a_version())));
 
         let (asked, acted) = (showing(&asked), showing(&acted));
@@ -678,5 +880,187 @@ mod tests {
             assert_eq!(wanted, Wanted::Ask(Command::Forms), "{key}");
             assert!(showing(&acting).contains("asking this stack"), "{key}");
         }
+    }
+
+    /// The whole flow of a read, which is the claim the other half of this screen
+    /// exists to make: one key, a question taken off a list, and a command that is
+    /// one of the core's own rather than one assembled here.
+    #[test]
+    fn a_question_takes_a_key_and_a_choice_before_it_reaches_a_command() {
+        let mut acting = Acting::opened();
+
+        assert_eq!(
+            acting.pressed(&Press::Typed(question::KEY)),
+            Wanted::Nothing
+        );
+        let said = showing(&acting);
+        assert!(said.contains("> versions"), "{said}");
+        assert!(said.contains("the container engine"), "{said}");
+
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Version)
+        );
+        assert!(showing(&acting).contains("waiting for this stack to answer"));
+    }
+
+    /// An answer is shown in the words the command line gives for the same request,
+    /// rather than in a second account of it — which is the whole reason a question
+    /// names a read instead of this screen writing its own report.
+    #[test]
+    fn an_answer_is_shown_in_the_words_the_command_line_gives() {
+        let outcome = Outcome::Version(a_version());
+        let printed = crate::render::shaped(&outcome).text();
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(question::KEY));
+        acting.pressed(&Press::Accept);
+
+        acting.came_to(Ok(outcome));
+
+        let said = showing(&acting);
+        assert!(said.contains("versions"), "the box is named for it: {said}");
+        for line in printed.lines().filter(|line| !line.is_empty()) {
+            assert!(said.contains(line), "{line:?} is missing from {said}");
+        }
+    }
+
+    /// A read that could not be carried out says why, in the words the command line
+    /// gives for the same failure.
+    #[test]
+    fn a_question_the_stack_will_not_answer_says_why() {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(question::KEY));
+        acting.pressed(&Press::Accept);
+
+        acting.came_to(Err(Box::new(a_failure())));
+
+        let said = showing(&acting);
+        assert!(
+            said.contains("the container engine could not be reached"),
+            "{said}"
+        );
+    }
+
+    /// A question that has to be given a word gets a line to type it on, takes
+    /// characters back one at a time, and only then reaches a command.
+    #[test]
+    fn a_question_that_takes_a_word_is_typed_before_it_is_asked() {
+        let mut acting = asking_where();
+
+        for character in "Expansee".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Rubout);
+        let said = showing(&acting);
+        assert!(said.contains("What to follow"), "{said}");
+        assert!(said.contains("> Expanse"), "{said}");
+
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Trace {
+                term: "Expanse".to_owned(),
+                season: None,
+            })
+        );
+    }
+
+    /// Asking it with nothing typed says what is missing, in the sentence the web
+    /// surface gives the same request — the refusal is that surface's, not one this
+    /// screen wrote.
+    #[test]
+    fn a_question_asked_with_no_word_says_what_is_missing() {
+        let mut acting = asking_where();
+
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+
+        let said = showing(&acting);
+        assert!(said.contains(lemonfiber_api::reads::NO_TERM), "{said}");
+    }
+
+    /// Moving over the line being typed changes neither it nor the screen, and
+    /// backing out of it leaves the screen clear.
+    #[test]
+    fn the_line_being_typed_ignores_a_move_and_is_left_on_a_way_out() {
+        let mut acting = asking_where();
+        acting.pressed(&Press::Typed('x'));
+
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+        assert!(showing(&acting).contains("> x"));
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// Moving over the questions and typing at them take nothing, the way the list
+    /// of what an action can be given does.
+    #[test]
+    fn moving_over_the_questions_and_typing_at_them_take_nothing() {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(question::KEY));
+
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Back);
+        assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
+        assert_eq!(acting.pressed(&Press::Rubout), Wanted::Nothing);
+        assert!(showing(&acting).contains("> versions"));
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// A question with the core waits for it, and can be left the way the listing
+    /// of an action's subjects can — after which its answer changes nothing, so a
+    /// reply nobody is waiting for cannot open a box over what came next.
+    #[test]
+    fn a_question_left_before_it_lands_takes_the_answer_nowhere() {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(question::KEY));
+        acting.pressed(&Press::Accept);
+
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+        assert!(showing(&acting).contains("waiting for this stack to answer"));
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        acting.came_to(Ok(Outcome::Version(a_version())));
+
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// An answer longer than the box moves through it, and any key that is not a
+    /// move puts it away — the same dismissal the pane of words has.
+    #[test]
+    fn an_answer_moves_under_the_arrows_and_closes_under_anything_else() {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(question::KEY));
+        acting.pressed(&Press::Accept);
+        acting.came_to(Ok(Outcome::Version(a_version())));
+        let opened = showing(&acting);
+
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+        let moved = showing(&acting);
+        assert!(moved.contains("1 more line above"), "{moved}");
+        assert_ne!(moved, opened);
+
+        acting.pressed(&Press::Back);
+        assert_eq!(showing(&acting), opened);
+
+        assert_eq!(acting.pressed(&Press::Typed('n')), Wanted::Nothing);
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// What an action came to moves the same way, so two boxes an operator meets a
+    /// keypress apart do not answer the arrows differently.
+    #[test]
+    fn what_an_action_came_to_moves_the_same_way() {
+        let (mut acting, _) = choosing('t', a_listing());
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Typed('y'));
+        acting.came_to(Err(Box::new(a_failure())));
+        let opened = showing(&acting);
+
+        acting.pressed(&Press::Forward);
+
+        assert_ne!(showing(&acting), opened);
+        assert!(showing(&acting).contains("1 more line above"));
     }
 }

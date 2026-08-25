@@ -8,11 +8,11 @@ use axum::extract::{RawQuery, State};
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use lemonfiber_core::app::{Command, QualityAction};
 
+use crate::reads::{Wanted, CONFIG, QUALITY};
 use crate::router::Serving;
 
-use super::{carried_out, Asked};
+use super::{reading, Asked};
 
 /// The parameter naming one setting to read, instead of all of them.
 const KEY: &str = "key";
@@ -20,8 +20,8 @@ const KEY: &str = "key";
 /// The reads about what has been chosen.
 pub(super) fn routes() -> Router<Serving> {
     Router::new()
-        .route("/api/config", get(config))
-        .route("/api/quality", get(quality))
+        .route(CONFIG, get(config))
+        .route(QUALITY, get(quality))
 }
 
 /// Every setting, or one of them by name, with credentials withheld.
@@ -34,16 +34,18 @@ pub(super) fn routes() -> Router<Serving> {
 /// `config show` and `config get` take on the command line.
 async fn config(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
     let asked = Asked::read(query.as_deref());
-    let command = match asked.one(KEY) {
-        Some(key) => Command::ConfigGet {
-            key: key.to_owned(),
+    reading(
+        &serving.ctx,
+        CONFIG,
+        Wanted {
+            key: asked.one(KEY).map(str::to_owned),
+            ..Wanted::default()
         },
-        None => Command::ConfigShow,
-    };
-    carried_out(&serving.ctx, command).await
+    )
+    .await
 }
 
 /// The quality choice in force, what each preset means, and what it costs.
 async fn quality(State(serving): State<Serving>) -> Response {
-    carried_out(&serving.ctx, Command::Quality(QualityAction::Show)).await
+    reading(&serving.ctx, QUALITY, Wanted::default()).await
 }
