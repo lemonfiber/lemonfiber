@@ -1,0 +1,61 @@
+# Dependency updates (spec ADR-0016).
+#
+# One file per repo. Dependabot cannot extend a shared preset the way Renovate
+# could, so this is copied rather than inherited and kept alike by review.
+#
+# The pull requests it opens cite nothing — Dependabot composes its own commit
+# message and offers no way to add a `Spec:` trailer. `spec_check.py` supplies
+# `GOV-R12` for a pull request GitHub says `dependabot[bot]` opened (Q-R55).
+#
+# Not configured here, deliberately:
+#   - the `assets/media-stack` submodule. That revision is embedded in the
+#     binary at build time and moved on purpose, not on release.
+#   - `python-version:` written inline in a workflow. Dependabot has no regex
+#     manager and nothing else watches it — see the spec's 40-quality/tooling.md,
+#     "What Dependabot does not watch".
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: daily
+      time: "05:00"
+      timezone: Europe/Amsterdam
+    labels: ["dependencies"]
+    commit-message:
+      prefix: chore
+      include: scope
+    # A release waits three days before it is offered. The shared gates are
+    # excluded from that wait: a repo running a stale gate is the failure this
+    # grouping exists to prevent, and the delay is the whole cost of it.
+    # Security updates are never subject to cooldown.
+    cooldown:
+      default-days: 3
+      exclude: ["lemonfiber/spec*"]
+    groups:
+      # First match wins, so the shared gates are claimed before the wildcard.
+      shared-workflows:
+        patterns: ["lemonfiber/spec*"]
+      actions:
+        patterns: ["*"]
+        exclude-patterns: ["lemonfiber/spec*"]
+        # Majors are left out, so each arrives on its own carrying `major`.
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Amsterdam
+    labels: ["dependencies"]
+    commit-message:
+      prefix: chore
+      include: scope
+    cooldown:
+      default-days: 3
+    groups:
+      cargo:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
