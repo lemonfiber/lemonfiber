@@ -36,6 +36,8 @@ impl std::fmt::Display for Kind {
     }
 }
 
+/// The backup archives this machine has kept.
+pub const ARCHIVES: Kind = Kind("archives");
 /// Where a backup archive was written, and what it covers.
 pub const BACKUP: Kind = Kind("backup");
 /// What a support bundle would hold, or where one went.
@@ -106,6 +108,7 @@ pub const WORD: Kind = Kind("word");
 
 /// Every kind, so the contract cannot describe one that is never emitted.
 pub const ALL: &[Kind] = &[
+    ARCHIVES,
     BACKUP,
     BUNDLE,
     CONFIG,

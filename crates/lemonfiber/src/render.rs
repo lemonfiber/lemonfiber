@@ -216,6 +216,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Wizard(report) => standing(report),
         Outcome::Backup(report) => archive::backup(report),
         Outcome::Support(report) => archive::bundle(report),
+        Outcome::Archives(listing) => archive::kept(listing),
         Outcome::Restore(report) => archive::restoration(report),
         Outcome::Watch(report) => stack::watch(report),
         Outcome::Walkthrough(report) => walkthrough::ending(report),
@@ -357,6 +358,7 @@ mod tests {
     use super::{
         answer, forms, logged, machine_readable, render, settings, standing, versions, Lines,
     };
+    use lemonfiber_core::app::archives::Listing;
     use lemonfiber_core::app::backup::Report as Capture;
     use lemonfiber_core::app::repair::{Report as Mending, Reversal};
     use lemonfiber_core::app::restore::{Preview, Restoration};
@@ -692,6 +694,9 @@ mod tests {
             // answers, which is also the pair with no list in either.
             Outcome::Repair(Mending::default()),
             Outcome::Undo(Reversal::default()),
+            Outcome::Archives(Listing {
+                archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
+            }),
         ];
         // Every arm of the dispatch renders something, and every one of them also
         // renders as an envelope a script can parse.

@@ -1,6 +1,51 @@
 {
   "api_version": 1,
   "kinds": {
+    "archives": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Listing"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Listing": {
+          "description": "The archives this machine has kept.",
+          "type": "object",
+          "properties": {
+            "archives": {
+              "description": "Each one by the name it was written under, newest first.\n\nThe name is the whole of what another surface needs: it is what a restore\nasks for, and it carries the moment the archive was taken and what it\ncovers, because that is how a capture names one.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "archives"
+          ]
+        }
+      }
+    },
     "backup": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

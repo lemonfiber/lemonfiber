@@ -13,12 +13,16 @@ what to do about it, is written for operators at
 - `BACKUP-3`
 - `BACKUP-4`
 - `BACKUP-5`
+- `BACKUP-6`
+- `BACKUP-7`
 - `BUNDLE-1`
 - `BUNDLE-2`
 - `BUNDLE-3`
 - `BUNDLE-4`
 - `BUNDLE-5`
 - `BUNDLE-6`
+- `BUNDLE-7`
+- `BUNDLE-8`
 - `CONFIG-1`
 - `CONFIG-2`
 - `CONFIG-3`

@@ -22,6 +22,7 @@ use crate::stack::compose::Action;
 pub mod accepted;
 pub mod appetite;
 pub mod apply;
+pub mod archives;
 pub mod backup;
 pub mod bundle;
 mod command;
@@ -123,6 +124,8 @@ pub enum Outcome {
     Backup(backup::Report),
     /// What a support bundle would hold, or where one went.
     Support(support::Bundle),
+    /// The backup archives this machine has kept.
+    Archives(archives::Listing),
     /// What a restore would overwrite, or what it put back.
     Restore(restore::Restoration),
     /// How a guard ended, and whether it got the services stopped.
@@ -158,6 +161,7 @@ impl Outcome {
             Self::Wizard(_) => kind::WIZARD,
             Self::Backup(_) => kind::BACKUP,
             Self::Support(_) => kind::BUNDLE,
+            Self::Archives(_) => kind::ARCHIVES,
             Self::Restore(_) => kind::RESTORE,
             Self::Watch(_) => kind::WATCH,
             Self::Walkthrough(_) => kind::WALKTHROUGH,
@@ -191,6 +195,7 @@ impl serde::Serialize for Outcome {
             Self::Wizard(report) => report.serialize(serializer),
             Self::Backup(report) => report.serialize(serializer),
             Self::Support(report) => report.serialize(serializer),
+            Self::Archives(listing) => listing.serialize(serializer),
             Self::Restore(report) => report.serialize(serializer),
             Self::Watch(report) => report.serialize(serializer),
             Self::Walkthrough(report) => report.serialize(serializer),
@@ -293,6 +298,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         } => support::run(ctx, &wanted, write, &dest)
             .await
             .map(Outcome::Support),
+        Command::Archives => archives::run(ctx).await.map(Outcome::Archives),
         Command::Restore {
             archive,
             repoint,
@@ -383,6 +389,27 @@ mod tests {
         assert!(
             json.contains(r#""done":null"#),
             "nothing was put back: {json}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_listing_serialises_under_its_own_kind() {
+        // In-crate as well as from `tests/`, because this file carries tests of its
+        // own and so is mapped twice: an arm reached only from outside the crate is
+        // an arm the mapping this file's own tests build never runs.
+        let vault = Arc::new(crate::app::fixtures::FakeArchive::keeping_backups(&[(
+            "lemonfiber-full-1.tar.gz",
+            "00000000000000000001",
+        )]));
+        let json = dispatch(Command::Archives, &keeping_archives(&vault))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(json.contains(r#""kind":"archives""#), "{json}");
+        assert!(
+            json.contains("lemonfiber-full-1.tar.gz"),
+            "it names what is kept: {json}"
         );
     }
 
@@ -857,6 +884,7 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
+                | Outcome::Archives(_)
                 | Outcome::Restore(_)
                 | Outcome::Watch(_)
                 | Outcome::Walkthrough(_),
@@ -892,6 +920,7 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
+                | Outcome::Archives(_)
                 | Outcome::Restore(_)
                 | Outcome::Watch(_)
                 | Outcome::Walkthrough(_),
@@ -1609,6 +1638,7 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
+                | Outcome::Archives(_)
                 | Outcome::Restore(_)
                 | Outcome::Watch(_)
                 | Outcome::Walkthrough(_),
@@ -2598,6 +2628,7 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
+                | Outcome::Archives(_)
                 | Outcome::Restore(_)
                 | Outcome::Watch(_)
                 | Outcome::Walkthrough(_),

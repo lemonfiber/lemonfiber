@@ -74,6 +74,29 @@ impl FakeArchive {
         }
     }
 
+    /// The same archive, keeping the backups named — each with the moment it was
+    /// taken, written the way the adapter writes one.
+    pub(crate) fn keeping_backups(kept: &[(&str, &str)]) -> Self {
+        Self {
+            existing: Ok(kept
+                .iter()
+                .map(|(name, taken)| Existing {
+                    name: (*name).to_owned(),
+                    created_at: (*taken).to_owned(),
+                })
+                .collect()),
+            ..Self::roomy()
+        }
+    }
+
+    /// The same archive, whose directory will not be read at all.
+    pub(crate) fn unlistable() -> Self {
+        Self {
+            existing: Err(Fault::new("permission denied")),
+            ..Self::roomy()
+        }
+    }
+
     /// What it was asked to unpack, in the order it was asked.
     pub(crate) fn extractions(&self) -> Vec<PathBuf> {
         self.extracted.lock().map(|e| e.clone()).unwrap_or_default()

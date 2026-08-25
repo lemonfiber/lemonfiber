@@ -1,4 +1,5 @@
-//! The thirteen reads: one endpoint per question a command already answers.
+//! The fifteen reads: one endpoint per question a command already answers, plus the
+//! two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
 //! into the command a person would type, hands that to the dispatcher the
@@ -17,8 +18,10 @@
 //! command, so one place refuses a parameter no read takes — including on the
 //! reads that take nothing at all. What is left here is the carrying out. The
 //! endpoints themselves are grouped beside it by what they are about: the stack,
-//! the diagnosis, one item, the choices in force, and the words.
+//! the diagnosis, one item, the choices in force, the words, and the files
+//! lemonfiber keeps of its own.
 
+mod archives;
 mod chosen;
 mod diagnosis;
 mod glossary;
@@ -54,6 +57,7 @@ pub fn routes() -> Router<Serving> {
         .merge(items::routes())
         .merge(chosen::routes())
         .merge(glossary::routes())
+        .merge(archives::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.

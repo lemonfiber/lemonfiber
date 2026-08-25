@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 use schemars::{schema_for, Schema};
 use serde::Serialize;
 
+use crate::app::archives::Listing;
 use crate::app::backup::Report as BackupReport;
 use crate::app::repair::{Report as RepairReport, Reversal};
 use crate::app::restore::Restoration;
@@ -81,6 +82,7 @@ impl Contract {
 
 /// The shapes a command's own answer takes, one per [`Outcome`] variant.
 fn answered(kinds: &mut BTreeMap<String, Schema>) {
+    describing(kinds, kind::ARCHIVES, schema_for!(Envelope<Listing>));
     describing(kinds, kind::BACKUP, schema_for!(Envelope<BackupReport>));
     describing(kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
     describing(kinds, kind::CONFIG, schema_for!(Envelope<ConfigReport>));

@@ -22,8 +22,8 @@
 use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
 
 use super::{
-    Wanted, CHECKS, CONFIG, EXPLAIN, FORMS, LOGS, QUALITY, REQUESTS, SERVICES, STATUS, STORAGE,
-    STUCK, TRACE, VERSION,
+    Wanted, BACKUPS, BUNDLE, CHECKS, CONFIG, EXPLAIN, FORMS, LOGS, QUALITY, REQUESTS, SERVICES,
+    STATUS, STORAGE, STUCK, TRACE, VERSION,
 };
 
 /// Raised where a read was given a parameter its answer has nowhere to put.
@@ -70,10 +70,12 @@ const WORD: &str = "word";
 /// purpose, so a read added without one refuses everything rather than accepting
 /// everything.
 ///
-/// `/api/logs` has a row here and none among the commands. It reaches no command —
-/// it opens a stream and renders a document per line — but it is asked with flags
-/// like every other read, and a read exempt from this table would be the one place
-/// the refusal did not reach.
+/// `/api/logs` and `/api/bundle/{name}` have rows here and none among the commands.
+/// Neither reaches one — the first opens a stream and renders a document per line,
+/// the second answers with a file — but both are asked at this door like every other
+/// read, and a read exempt from this table would be the one place the refusal did
+/// not reach. What the bundle is named by is a path segment rather than a parameter,
+/// so what its empty row refuses is a query string it has no use for at all.
 const TAKEN: &[(&str, &[&str])] = &[
     (VERSION, &[]),
     (FORMS, &[FORM]),
@@ -88,6 +90,8 @@ const TAKEN: &[(&str, &[&str])] = &[
     (CONFIG, &[KEY]),
     (QUALITY, &[]),
     (EXPLAIN, &[WORD]),
+    (BACKUPS, &[]),
+    (BUNDLE, &[]),
 ];
 
 /// The parameters that name one of several rather than one thing.
