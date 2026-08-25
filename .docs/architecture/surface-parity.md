@@ -21,7 +21,7 @@ of what that requirement asks for.
 | Surface | Declared in | Read as |
 |---------|-------------|---------|
 | Command line | [`cli.rs`](../../crates/lemonfiber/src/cli.rs) | the `Request` enum, which clap renders |
-| Web, writes | [`actions.rs`](../../crates/lemonfiber-api/src/actions.rs) | `OFFERED`, one name per action |
+| Web, writes | [`named.rs`](../../crates/lemonfiber-api/src/actions/named.rs) | `OFFERED`, one name per action |
 | Web, reads | [`read.rs`](../../crates/lemonfiber-api/src/read.rs) · [`setup.rs`](../../crates/lemonfiber-api/src/setup.rs) · [`jobs.rs`](../../crates/lemonfiber-api/src/jobs.rs) | the routes each declares |
 | Terminal, writes | [`acting/offer.rs`](../../crates/lemonfiber/src/acting/offer.rs) | `OFFERED`, one key per action |
 | Terminal, reads | [`terminal.rs`](../../crates/lemonfiber/src/terminal.rs) | the screens the loop opens |
@@ -74,15 +74,15 @@ and the rest is named in **Standing**.
 | `seed` | `seed` | none | Offered on the web. No terminal form, like every other write. |
 | `adopt` | `adopt` | none | As above. |
 | `reset` | `reset` | none | As above. It is the one write in this group that destroys work, which makes the terminal's silence about it the least costly silence in the table. |
-| `backup` | none | none | Unbuilt on both. Not an exception: the server runs on the host as the operator, so a path typed into a form is a path it can write. What a browser cannot do is browse to one. |
-| `support` | none | none | Unbuilt on both, and the same argument as `backup`. The bundle is written where it is produced and sent nowhere, so the only web-specific question is which path, not whether. |
+| `backup` | `backup` | none | Reachable in full. It takes the one thing the command line takes — the single service to capture instead of the whole stack — and takes no path at all, because a capture goes into the backups directory lemonfiber chose, whoever asked for it. Refusing a stack that cannot be proven stopped is the command's own rule now rather than the command line's, so a browser cannot ask for the live-database capture a shell was never allowed either. No terminal form, like every other write. |
+| `support` | `support`, partial | none | Everything that decides what the bundle holds is offered: whether to produce one at all, how much of each service's log to take, whether media filenames survive, which settings are shown as they are, and the agreement that showing one takes. Where it goes is the one thing that is not — `--out` names a path on the host and a browser has none to name — so a bundle asked for here is written with lemonfiber's own files, under a name carrying the moment it was taken. Nothing leaves the machine on either surface. |
 | `ui` | intrinsic | none | **The one honest exception in this table.** A surface cannot start itself: the request either reaches a server that is already serving, where it means nothing, or it means starting a second server, which is a different request — and it would make a running server hand out the per-run token for a new one. Unbuilt rather than excepted on the terminal, where a key that starts the web surface and prints its address is meaningful. |
-| `restore` | none | none | Unbuilt on both, and the same argument as `backup`, sharpened: choosing the wrong archive cannot be taken back, so the missing part is not the write but the confirmation of what is about to be overwritten. |
+| `restore` | `restore`, partial | none | Offered, and the confirmation is inside the command rather than in a screen: unconfirmed it verifies the archive and answers with what it holds, having touched nothing, and only a second request carrying the agreement overwrites — so a surface that skipped the listing would be asking for something else, not rendering the same thing differently. Accepting a re-point is offered. Restoring an archive from anywhere on the host is not: a browser names one of the backups this machine took and the name is resolved beneath the backups directory, so a name carrying a path, or climbing out of that directory, is refused by name rather than followed. |
 
 ## What the table adds up to
 
-Of the twenty-six requests, fifteen reach the web in full, five reach it in
-part, five do not reach it at all, and one — `ui` — is an honest exception. Ten
+Of the twenty-six requests, sixteen reach the web in full, seven reach it in
+part, two do not reach it at all, and one — `ui` — is an honest exception. Nine
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
 
@@ -102,7 +102,11 @@ are not made again:
 **Backup, restore and support are not web exceptions.** The appeal is that a
 browser cannot choose a path on the host. It cannot, but the operation does not
 need it to — the server is on the host and runs as the operator. The picker is
-poorer on the web; the action is not unsuited to it.
+poorer on the web; the action is not unsuited to it. All three are offered now,
+and what building them took from that argument is the other half of it: a path
+the server can write is a path a browser must not supply. A capture takes none, a
+bundle goes where lemonfiber keeps its own files, and a restore reads one of the
+archives in the backups directory by the name it was written under.
 
 **A long or streaming action is not a different action.** `logs --follow` and
 `watch` run for minutes and produce lines rather than a value, and the web already

@@ -21,6 +21,9 @@ use std::collections::BTreeMap;
 use schemars::{schema_for, Schema};
 use serde::Serialize;
 
+use crate::app::backup::Report as BackupReport;
+use crate::app::restore::Restoration;
+use crate::app::support::Bundle;
 use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
@@ -54,6 +57,12 @@ impl Contract {
     #[must_use]
     pub fn describe() -> Self {
         let mut kinds = BTreeMap::new();
+        describing(
+            &mut kinds,
+            kind::BACKUP,
+            schema_for!(Envelope<BackupReport>),
+        );
+        describing(&mut kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
         describing(
             &mut kinds,
             kind::CONFIG,
@@ -93,6 +102,11 @@ impl Contract {
             schema_for!(Envelope<QualityReport>),
         );
         describing(&mut kinds, kind::RESET, schema_for!(Envelope<ResetReport>));
+        describing(
+            &mut kinds,
+            kind::RESTORE,
+            schema_for!(Envelope<Restoration>),
+        );
         describing(
             &mut kinds,
             kind::SEED,
@@ -177,7 +191,7 @@ mod tests {
     use crate::stack::closure::Plan;
 
     /// Arms in `Outcome::envelope`, so a variant added without a sample here fails.
-    const OUTCOMES: usize = 17;
+    const OUTCOMES: usize = 20;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -233,6 +247,25 @@ mod tests {
             Outcome::Seed(crate::seed::Report::default()),
             Outcome::Reset(ResetReport::default()),
             Outcome::Word(a_word()),
+            Outcome::Backup(crate::app::backup::Report {
+                path: std::path::PathBuf::new(),
+                scope: crate::backup::Scope::WholeStack,
+                sensitive: true,
+                pruned: Vec::new(),
+            }),
+            Outcome::Support(crate::app::support::Bundle {
+                contents: crate::bundle::Contents::default(),
+                bytes: 0,
+                path: None,
+            }),
+            Outcome::Restore(crate::app::restore::Restoration {
+                would: crate::app::restore::Preview {
+                    manifest: manifest(),
+                    downgrade: false,
+                    relocation: None,
+                },
+                done: None,
+            }),
             Outcome::Glossary(Vocabulary {
                 words: vec![a_word()],
             }),
@@ -247,6 +280,20 @@ mod tests {
             short: "Search engines that find what you are looking for.",
             deep: Some("An indexer keeps track of what has been posted and where."),
             also_called: &["search provider"],
+        }
+    }
+
+    /// An archive's own account of itself, holding nothing, which is all the shape
+    /// comparison needs of one.
+    fn manifest() -> crate::backup::Manifest {
+        crate::backup::Manifest {
+            schema: crate::backup::SCHEMA,
+            product_version: "0.1.0".to_owned(),
+            created_at: "0".to_owned(),
+            data_root: String::new(),
+            scope: crate::backup::Scope::WholeStack,
+            sensitive: true,
+            members: Vec::new(),
         }
     }
 

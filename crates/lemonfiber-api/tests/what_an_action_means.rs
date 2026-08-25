@@ -17,12 +17,16 @@ use axum::http::{header, StatusCode};
 use lemonfiber_api::actions;
 use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Refused, OFFERED, TAKES_AGREEMENT,
-    TAKES_FORMS, TAKES_PRESET, TAKES_SERVICES, TAKES_SETTING,
+    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_FORMS, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES,
+    TAKES_SETTING,
 };
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
+use lemonfiber_core::app::bundle::Wanted;
+use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::{Command, Ctx, QualityAction};
+use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::quality::Preset;
@@ -349,9 +353,9 @@ fn a_preset_that_names_nothing_is_refused_with_what_it_could_have_said() {
 
 #[test]
 fn an_argument_no_action_takes_is_refused_rather_than_ignored() {
-    // A caller who spelled `service` where `services` was meant has been told,
-    // instead of watching a whole form stop.
-    let mistyped = serde_json::from_str::<Arguments>(r#"{"service":["sonarr"]}"#);
+    // A caller who spelled `form` where `forms` was meant has been told, instead
+    // of watching a whole form stop.
+    let mistyped = serde_json::from_str::<Arguments>(r#"{"form":"tv"}"#);
     assert!(mistyped.is_err());
     assert!(serde_json::from_str::<Arguments>("{}").is_ok());
 }
@@ -378,13 +382,31 @@ fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
+        service: takes(TAKES_SERVICE).then(|| "sonarr".to_owned()),
         key: takes(TAKES_SETTING).then(|| "DATA_ROOT".to_owned()),
         value: takes(TAKES_SETTING).then(|| "/srv".to_owned()),
         preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
         media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),
+        archive: takes(TAKES_ARCHIVE).then(|| ARCHIVE.to_owned()),
+        repoint: takes(TAKES_ARCHIVE),
+        write: takes(TAKES_BUNDLING),
+        logs: takes(TAKES_BUNDLING).then_some(LOGS),
+        filenames: takes(TAKES_BUNDLING).into(),
+        reveal: if takes(TAKES_BUNDLING) {
+            vec!["INDEXER_KEY".to_owned()]
+        } else {
+            Vec::new()
+        },
         confirm: takes(TAKES_AGREEMENT),
     }
 }
+
+/// A backup name, as one is written under.
+const ARCHIVE: &str = "lemonfiber-full-1700000000.tar.gz";
+
+/// A log window that is not the one a bundle takes when nothing is asked for, so a
+/// command carrying the default cannot pass for one carrying what was given.
+const LOGS: u32 = 12;
 
 /// Whether the command has the forms it was given in it.
 fn carries_forms(command: &Command) -> bool {
@@ -432,13 +454,69 @@ fn carries_media_type(command: &Command) -> bool {
 }
 
 /// Whether the command has the operator's agreement in it.
+///
+/// A bundle carries it inside what was asked for rather than beside it, because the
+/// setting to be shown and the agreement to show it are one decision.
 fn carries_agreement(command: &Command) -> bool {
     matches!(
         command,
         Command::Quality(QualityAction::Set { confirm: true, .. })
             | Command::QualityUpgrade { confirm: true }
             | Command::Reset { confirm: true }
+            | Command::Restore { confirm: true, .. }
+            | Command::Support {
+                wanted: Wanted {
+                    confirmed: true,
+                    ..
+                },
+                ..
+            }
     )
+}
+
+/// Whether the command has the one service it was given in it.
+fn carries_service(command: &Command) -> bool {
+    matches!(command, Command::Backup { service: Some(_) })
+}
+
+/// Whether the command has the archive it was named in it, as a name rather than a
+/// path — which is the whole of what a browser may ask to be read.
+fn carries_archive(command: &Command) -> bool {
+    matches!(command, Command::Restore { archive: Kept::Named(name), .. } if name == ARCHIVE)
+}
+
+/// Whether the command has the accepted re-point in it.
+fn carries_repoint(command: &Command) -> bool {
+    matches!(command, Command::Restore { repoint: true, .. })
+}
+
+/// Whether the command was told to produce the file rather than describe one.
+fn carries_write(command: &Command) -> bool {
+    matches!(command, Command::Support { write: true, .. })
+}
+
+/// Whether the command has the log window it was given in it.
+fn carries_logs(command: &Command) -> bool {
+    matches!(command, Command::Support { wanted, .. } if wanted.lines == LOGS)
+}
+
+/// Whether the command was told to leave media filenames as they are.
+fn carries_filenames(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Support {
+            wanted: Wanted {
+                filenames: Filenames::Shown,
+                ..
+            },
+            ..
+        }
+    )
+}
+
+/// Whether the command has the settings it was told to show as they are.
+fn carries_reveal(command: &Command) -> bool {
+    matches!(command, Command::Support { wanted, .. } if !wanted.reveal.is_empty())
 }
 
 fn give_forms(given: &mut Arguments) {
@@ -469,6 +547,34 @@ fn give_agreement(given: &mut Arguments) {
     given.confirm = true;
 }
 
+fn give_service(given: &mut Arguments) {
+    given.service = Some("sonarr".to_owned());
+}
+
+fn give_archive(given: &mut Arguments) {
+    given.archive = Some(ARCHIVE.to_owned());
+}
+
+fn give_repoint(given: &mut Arguments) {
+    given.repoint = true;
+}
+
+fn give_write(given: &mut Arguments) {
+    given.write = true;
+}
+
+fn give_logs(given: &mut Arguments) {
+    given.logs = Some(LOGS);
+}
+
+fn give_filenames(given: &mut Arguments) {
+    given.filenames = Filenames::Shown;
+}
+
+fn give_reveal(given: &mut Arguments) {
+    given.reveal = vec!["INDEXER_KEY".to_owned()];
+}
+
 /// One argument the carrier holds: its name, how to give it, and what it looks like
 /// to have arrived on the command the action reached.
 type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
@@ -479,13 +585,20 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 7] = [
+const SWEEPS: [Sweep; 14] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
+    ("service", give_service, carries_service),
     ("key", give_key, carries_setting),
     ("value", give_value, carries_setting),
     ("preset", give_preset, carries_preset),
     ("media_type", give_media_type, carries_media_type),
+    ("archive", give_archive, carries_archive),
+    ("repoint", give_repoint, carries_repoint),
+    ("write", give_write, carries_write),
+    ("logs", give_logs, carries_logs),
+    ("filenames", give_filenames, carries_filenames),
+    ("reveal", give_reveal, carries_reveal),
     ("confirm", give_agreement, carries_agreement),
 ];
 
@@ -537,10 +650,17 @@ fn every_argument_the_carrier_holds_is_swept() {
     let held = [
         "forms",
         "services",
+        "service",
         "key",
         "value",
         "preset",
         "media_type",
+        "archive",
+        "repoint",
+        "write",
+        "logs",
+        "filenames",
+        "reveal",
         "confirm",
     ];
     let swept: Vec<&str> = SWEEPS.iter().map(|(argument, _, _)| *argument).collect();

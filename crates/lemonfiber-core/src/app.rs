@@ -43,6 +43,7 @@ mod notify;
 mod outbox;
 mod quality;
 pub mod queue;
+mod quiesced;
 mod record;
 pub mod recover;
 pub mod repair;
@@ -53,6 +54,7 @@ mod screen;
 mod seed;
 pub mod seeding;
 pub mod setup;
+pub mod support;
 mod targets;
 mod trace;
 mod upgrade;
@@ -223,6 +225,33 @@ pub enum Command {
         /// shown and nothing is written.
         confirm: bool,
     },
+    /// Capture the configuration to a backup archive, so it stops being precious.
+    Backup {
+        /// The one service to capture instead of the whole stack, or every one of
+        /// them where absent.
+        service: Option<String>,
+    },
+    /// Gather everything somebody helping would ask for, with every value not named
+    /// safe replaced by a stand-in.
+    Support {
+        /// Whether to produce the file, rather than say what one would hold.
+        write: bool,
+        /// What goes in it, and what was agreed to going in it.
+        wanted: bundle::Wanted,
+        /// Where it is written, for a run that produces one.
+        dest: support::Destination,
+    },
+    /// Put a configuration back from a backup archive.
+    Restore {
+        /// The archive to restore from, named the way the surface can name one.
+        archive: restore::Kept,
+        /// Whether re-pointing to this machine's data root was accepted.
+        repoint: bool,
+        /// Whether what the archive would overwrite has been seen and agreed to.
+        /// Without it the archive is verified and its contents listed, and nothing
+        /// is touched.
+        confirm: bool,
+    },
     /// Walk first-run setup: read where it stands, answer one question, move
     /// between them, or apply what has been answered.
     ///
@@ -292,6 +321,12 @@ pub enum Outcome {
     Reset(ResetReport),
     /// Where setup stands, and what it is still asking for.
     Wizard(WizardReport),
+    /// Where a backup archive was written, and what it covers.
+    Backup(backup::Report),
+    /// What a support bundle would hold, or where one went.
+    Support(support::Bundle),
+    /// What a restore would overwrite, or what it put back.
+    Restore(restore::Restoration),
 }
 
 impl Outcome {
@@ -317,6 +352,9 @@ impl Outcome {
             Self::Seed(_) => kind::SEED,
             Self::Reset(_) => kind::RESET,
             Self::Wizard(_) => kind::WIZARD,
+            Self::Backup(_) => kind::BACKUP,
+            Self::Support(_) => kind::BUNDLE,
+            Self::Restore(_) => kind::RESTORE,
         };
         Envelope::new(kind, self)
     }
@@ -343,6 +381,9 @@ impl serde::Serialize for Outcome {
             Self::Seed(report) => report.serialize(serializer),
             Self::Reset(report) => report.serialize(serializer),
             Self::Wizard(report) => report.serialize(serializer),
+            Self::Backup(report) => report.serialize(serializer),
+            Self::Support(report) => report.serialize(serializer),
+            Self::Restore(report) => report.serialize(serializer),
         }
     }
 }
@@ -411,6 +452,21 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
         Command::Setup(action) => setup::setting_up(ctx, action).map(Outcome::Wizard),
+        Command::Backup { service } => backup::run(ctx, service).await.map(Outcome::Backup),
+        Command::Support {
+            write,
+            wanted,
+            dest,
+        } => support::run(ctx, &wanted, write, &dest)
+            .await
+            .map(Outcome::Support),
+        Command::Restore {
+            archive,
+            repoint,
+            confirm,
+        } => restore::run(ctx, &archive, repoint, confirm)
+            .await
+            .map(Outcome::Restore),
     }
 }
 
@@ -438,6 +494,61 @@ mod tests {
             .runner(Arc::new(Scripted(scripted)))
             .engine(Arc::new(Reporting::default()))
             .build()
+    }
+
+    /// A run that keeps archives, whose engine answers and reports nothing running.
+    fn keeping_archives(vault: &Arc<crate::app::fixtures::FakeArchive>) -> Ctx {
+        let stopped = a_context()
+            .engine(Arc::new(lemonfiber_fixtures::support::Reporting::holding(
+                &["sonarr"],
+                crate::ports::docker::Lifecycle::Exited,
+                crate::ports::docker::Health::None,
+            )))
+            .settings(Settings {
+                data_root: Some(std::path::PathBuf::from("/srv/media")),
+                ..Settings::default()
+            })
+            .build();
+        crate::app::fixtures::keeping(stopped, vault)
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_backup_serialises_under_its_own_kind() {
+        let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
+        let json = dispatch(Command::Backup { service: None }, &keeping_archives(&vault))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(json.contains(r#""kind":"backup""#), "{json}");
+        assert!(json.contains("backups"), "it says where it went: {json}");
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_restore_serialises_under_its_own_kind() {
+        // Unconfirmed, so it lists what it would overwrite and touches nothing —
+        // which is still the whole of the dispatch, envelope and serialise arms.
+        let vault = Arc::new(crate::app::fixtures::FakeArchive::holding(
+            crate::app::fixtures::CURRENT,
+            crate::backup::SCHEMA,
+        ));
+        let json = dispatch(
+            Command::Restore {
+                archive: crate::app::restore::Kept::Named("lemonfiber-full-1.tar.gz".to_owned()),
+                repoint: false,
+                confirm: false,
+            },
+            &keeping_archives(&vault),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(json.contains(r#""kind":"restore""#), "{json}");
+        assert!(
+            json.contains(r#""done":null"#),
+            "nothing was put back: {json}"
+        );
     }
 
     #[tokio::test]
@@ -825,7 +936,10 @@ mod tests {
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
-                | Outcome::Wizard(_),
+                | Outcome::Wizard(_)
+                | Outcome::Backup(_)
+                | Outcome::Support(_)
+                | Outcome::Restore(_),
             )
             | Err(_) => None,
         }
@@ -853,7 +967,10 @@ mod tests {
                 | Outcome::Status(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
-                | Outcome::Wizard(_),
+                | Outcome::Wizard(_)
+                | Outcome::Backup(_)
+                | Outcome::Support(_)
+                | Outcome::Restore(_),
             )
             | Err(_) => None,
         }
@@ -1498,7 +1615,10 @@ mod tests {
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
-                | Outcome::Wizard(_),
+                | Outcome::Wizard(_)
+                | Outcome::Backup(_)
+                | Outcome::Support(_)
+                | Outcome::Restore(_),
             )
             | Err(_) => None,
         }
@@ -2476,7 +2596,10 @@ mod tests {
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
-                | Outcome::Wizard(_),
+                | Outcome::Wizard(_)
+                | Outcome::Backup(_)
+                | Outcome::Support(_)
+                | Outcome::Restore(_),
             )
             | Err(_) => None,
         }

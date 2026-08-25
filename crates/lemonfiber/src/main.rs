@@ -9,6 +9,9 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
+use lemonfiber_core::app::bundle::Wanted;
+use lemonfiber_core::app::restore::Kept;
+use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
 use lemonfiber_core::doctor::Narrowing;
 
@@ -20,7 +23,6 @@ mod engine;
 mod exit;
 mod keyboard;
 mod logs;
-mod maintain;
 mod pane;
 mod prompt;
 mod render;
@@ -28,7 +30,6 @@ mod repair;
 mod say;
 mod setup;
 mod stopping;
-mod support;
 mod terminal;
 mod translate;
 mod ui;
@@ -63,6 +64,40 @@ async fn read_logs(
         terminal::watching(ctx, forms, services, tail).await
     } else {
         stream(ctx, forms, services, follow, tail, json).await
+    }
+}
+
+/// A restore, which is the same command asked twice.
+///
+/// The first asks what the archive holds and overwrites nothing; the second
+/// overwrites. An operator at a shell is present for both, so this makes both and
+/// prints the listing between them — which is the same pair of answers a browser
+/// gets as two requests, with the operator's decision in the gap.
+///
+/// A first answer that refuses ends the run: there is nothing to be shown, and
+/// asking again would only produce the same refusal after the operator had been
+/// told once.
+async fn restoring(ctx: &Ctx, archive: Kept, repoint: bool, json: bool) -> ExitCode {
+    let looking = Command::Restore {
+        archive: archive.clone(),
+        repoint,
+        confirm: false,
+    };
+    match dispatch(looking, ctx).await {
+        Ok(outcome) => render(&outcome, json),
+        Err(problem) => return complain(&problem),
+    }
+    let doing = Command::Restore {
+        archive,
+        repoint,
+        confirm: true,
+    };
+    match dispatch(doing, ctx).await {
+        Ok(outcome) => {
+            render(&outcome, json);
+            settled(&outcome)
+        }
+        Err(problem) => complain(&problem),
     }
 }
 
@@ -198,28 +233,31 @@ async fn main() -> ExitCode {
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },
-        // Backup and restore drive their own executors over the tar adapter and
-        // render their own reports, like setup — they are not one value from
-        // dispatch. They take the context by value for the settings they read.
-        Request::Backup { service } => {
-            let Some(paths) = here() else {
-                return no_config_home();
-            };
-            return maintain::run_backup(ctx, paths, service, cli.json).await;
-        }
-        // A bundle drives its own executor over the same tar adapter, and renders both
-        // of the answers it can give — what one would hold, and where one went.
-        Request::Support(asked) => return support::run(ctx, asked, cli.json).await,
+        Request::Backup { service } => Command::Backup { service },
+        Request::Support(asked) => Command::Support {
+            write: asked.write,
+            wanted: Wanted::asked(
+                asked.logs,
+                asked.filenames.into(),
+                asked.reveal,
+                asked.confirm,
+            ),
+            // A shell has a filesystem in front of it, so a bundle asked for
+            // without a path goes beside the operator rather than into a directory
+            // they would have to be told about.
+            dest: asked.out.map_or(Destination::Beside, Destination::At),
+        },
         // The web surface holds the process until it is stopped, and answers many
         // requests rather than producing one value, so like the dashboard and the
         // log viewer it runs its own way instead of through dispatch. It takes the
         // context by value because every request it answers reaches through it.
         Request::Ui(asked) => return serving(ctx, asked).await,
+        // A restore is the one request that is the same command twice: what it
+        // would overwrite, and then the overwrite. Both are dispatched, so what
+        // an operator is shown before it happens is the command's own answer
+        // rather than this surface's rendering of one.
         Request::Restore { archive, repoint } => {
-            let Some(paths) = here() else {
-                return no_config_home();
-            };
-            return maintain::run_restore(ctx, paths, archive, repoint, cli.json).await;
+            return restoring(&ctx, Kept::At(archive), repoint, cli.json).await
         }
     };
 

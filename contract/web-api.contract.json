@@ -1,6 +1,263 @@
 {
   "api_version": 1,
   "kinds": {
+    "backup": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Report"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Report": {
+          "description": "What a capture produced.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "Where the archive was written.",
+              "type": "string"
+            },
+            "pruned": {
+              "description": "The older backups retention pruned, oldest first.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "scope": {
+              "description": "What the backup covers.",
+              "$ref": "#/$defs/Scope"
+            },
+            "sensitive": {
+              "description": "Whether it carries credentials, and so must be handled as sensitive.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "path",
+            "scope",
+            "sensitive",
+            "pruned"
+          ]
+        },
+        "Scope": {
+          "description": "How much of the stack a backup covers.\n\nWhole-stack is the common case, but restoring one service is often what is\nactually wanted — one \\*arr's configuration mangled while the rest is fine —\nso the scope is recorded in the archive and honoured on the way back.",
+          "oneOf": [
+            {
+              "description": "Every service's configuration, plus lemonfiber's own and the stack.",
+              "type": "object",
+              "properties": {
+                "scope": {
+                  "type": "string",
+                  "const": "whole_stack"
+                }
+              },
+              "required": [
+                "scope"
+              ]
+            },
+            {
+              "description": "One named service's configuration alone.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "description": "The service whose configuration this covers.",
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string",
+                  "const": "service"
+                }
+              },
+              "required": [
+                "scope",
+                "name"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "bundle": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Bundle"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Bundle": {
+          "description": "What a support request said: what a bundle holds, and where it is if it exists.\n\nOne record with an absent path rather than two shapes, because the two answers\nare the same answer at two moments: both list what goes in the file and say how\nlarge it is, and only one of them has a file to point at. A caller reads whether\nthere is a path to know which it has.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "How large the file is, or would be.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "contents": {
+              "description": "Everything it holds, gathered, redacted and read back.",
+              "$ref": "#/$defs/Contents"
+            },
+            "path": {
+              "description": "Where it was written, or nothing where a run that writes nothing described it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "contents",
+            "bytes"
+          ]
+        },
+        "Contents": {
+          "description": "Everything gathered for a bundle, and everything that could not be.",
+          "type": "object",
+          "properties": {
+            "missing": {
+              "description": "What could not be collected, named.\n\nNamed rather than passed over: a bundle from a machine whose diagnostics will not\nrun is exactly the bundle worth having, and a gap nobody mentions reads as an\nabsence of trouble rather than as an absence of information.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "pieces": {
+              "description": "The files, in the order a reader would want them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Piece"
+              }
+            },
+            "taken": {
+              "description": "Where and when it came from.",
+              "$ref": "#/$defs/Taken"
+            },
+            "terms": {
+              "description": "How it was made, and what its operator chose.",
+              "$ref": "#/$defs/Terms"
+            }
+          },
+          "required": [
+            "pieces",
+            "missing",
+            "taken",
+            "terms"
+          ]
+        },
+        "Filenames": {
+          "description": "Whether media filenames are shown as they are.\n\nReplaced unless asked otherwise. A library's contents are not a credential, but they\nare the one thing in a bundle that says something about the person rather than about\nthe machine, and replacing them costs a diagnostic a reader can still follow — the\nmarks keep two mentions of one file recognisable as one file.\n\nRead from the bare flag a surface carries rather than from a name of its own,\nbecause that is what both surfaces have: `--filenames` on a command line and a\n`filenames` in a request body are one word that is there or is not. Which way\nround it reads is decided here, once — a surface that read it the other way\nround would put a library's contents in a file people post in public.",
+          "type": "boolean"
+        },
+        "Piece": {
+          "description": "One file inside a bundle: the name it will carry, and what it holds.\n\nHeld in memory rather than written as it is gathered, because everything is read back\nbefore anything is written. A bundle that had already put one file on disk when it\nfound a credential in the next would have to be unwritten, and unwriting is the kind of\nthing that half-works.",
+          "type": "object",
+          "properties": {
+            "body": {
+              "description": "What it holds, already redacted.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called inside the bundle.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "body"
+          ]
+        },
+        "Taken": {
+          "description": "What a reader needs to know before reading a word of the bundle.\n\nAn operator pasting last week's bundle into this week's thread is the commonest way one\nof those threads goes wrong, and nothing in the contents tells either of them.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When, as a service writes a moment.",
+              "type": "string"
+            },
+            "lemonfiber": {
+              "description": "The lemonfiber that wrote it.",
+              "type": "string"
+            },
+            "stack": {
+              "description": "The stack it was written from.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "lemonfiber",
+            "stack",
+            "at"
+          ]
+        },
+        "Terms": {
+          "description": "How a bundle was made: what was bounded, what was replaced, and what its operator asked\nto have shown as it is.\n\nCarried in the bundle rather than known only to the command that wrote it, because the\nperson who reads one is usually not the person who chose any of this.",
+          "type": "object",
+          "properties": {
+            "filenames": {
+              "description": "Whether media filenames were shown.",
+              "$ref": "#/$defs/Filenames"
+            },
+            "revealed": {
+              "description": "The settings the operator asked to have shown as they are.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "window": {
+              "description": "How much of the logs was taken, said as it would be said aloud.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "window",
+            "filenames",
+            "revealed"
+          ]
+        }
+      }
+    },
     "config": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -3176,6 +3433,237 @@
           "required": [
             "path",
             "diff"
+          ]
+        }
+      }
+    },
+    "restore": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Restoration"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Manifest": {
+          "description": "The record written inside an archive, and read back to decide a restore.\n\nEverything a restore needs to know before it overwrites anything: what made\nthe archive, when, what data root it was taken against, what it covers, whether\nit is sensitive, and the contents to list. Round-trips through JSON so the same\nvalue the capture wrote is the value the restore reads.",
+          "type": "object",
+          "properties": {
+            "created_at": {
+              "description": "When it was taken. Opaque here; the surface stamps it from the clock.",
+              "type": "string"
+            },
+            "data_root": {
+              "description": "The data root it was taken against, to notice a restore to a different one.",
+              "type": "string"
+            },
+            "members": {
+              "description": "What is inside, for a listing shown before anything is overwritten.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Member"
+              }
+            },
+            "product_version": {
+              "description": "The lemonfiber version that wrote it, checked against the one restoring.",
+              "type": "string"
+            },
+            "schema": {
+              "description": "The archive format, checked before anything inside is trusted.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "scope": {
+              "description": "What it covers.",
+              "$ref": "#/$defs/Scope"
+            },
+            "sensitive": {
+              "description": "Whether it carries credentials, and so must be handled as sensitive.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "schema",
+            "product_version",
+            "created_at",
+            "data_root",
+            "scope",
+            "sensitive",
+            "members"
+          ]
+        },
+        "Member": {
+          "description": "One entry in an archive's contents listing.",
+          "type": "object",
+          "properties": {
+            "archive_path": {
+              "description": "Where it sits inside the archive.",
+              "type": "string"
+            },
+            "label": {
+              "description": "What it is, in the operator's terms.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "archive_path",
+            "label"
+          ]
+        },
+        "Preview": {
+          "description": "What a restore would do, shown before anything is overwritten.",
+          "type": "object",
+          "properties": {
+            "downgrade": {
+              "description": "Whether the archive is old enough that a compatibility warning applies.",
+              "type": "boolean"
+            },
+            "manifest": {
+              "description": "The archive's own account of itself — its scope, version and contents.",
+              "$ref": "#/$defs/Manifest"
+            },
+            "relocation": {
+              "description": "The data-root difference, where the archive was taken against another one.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Relocation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "manifest",
+            "downgrade"
+          ]
+        },
+        "Relocation": {
+          "description": "A restore whose archive was taken against a different data root than the one\nconfigured now, so its stored paths would land where nothing exists.",
+          "type": "object",
+          "properties": {
+            "now": {
+              "description": "The data root configured now.",
+              "type": "string"
+            },
+            "was": {
+              "description": "The data root the archive was taken against.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "was",
+            "now"
+          ]
+        },
+        "Report": {
+          "description": "What a restore did.",
+          "type": "object",
+          "properties": {
+            "from_version": {
+              "description": "The lemonfiber version the archive was written by.",
+              "type": "string"
+            },
+            "relocated": {
+              "description": "The data root that was re-pointed, where the restore accepted one.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Relocation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "scope": {
+              "description": "What was restored.",
+              "$ref": "#/$defs/Scope"
+            }
+          },
+          "required": [
+            "scope",
+            "from_version"
+          ]
+        },
+        "Restoration": {
+          "description": "What a restore said: what it would overwrite, and whether it did.\n\nThe listing is present either way, and that is the point of the shape. It is not\na separate request a surface may or may not make — it is the half of a restore\nthat happens before anything is overwritten, so every answer carries it and an\nanswer that overwrote nothing is one whose `done` is absent.",
+          "type": "object",
+          "properties": {
+            "done": {
+              "description": "What was put back, or nothing where nothing was.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Report"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "would": {
+              "description": "What the archive holds and what restoring it would come to, read before\nanything was touched.",
+              "$ref": "#/$defs/Preview"
+            }
+          },
+          "required": [
+            "would"
+          ]
+        },
+        "Scope": {
+          "description": "How much of the stack a backup covers.\n\nWhole-stack is the common case, but restoring one service is often what is\nactually wanted — one \\*arr's configuration mangled while the rest is fine —\nso the scope is recorded in the archive and honoured on the way back.",
+          "oneOf": [
+            {
+              "description": "Every service's configuration, plus lemonfiber's own and the stack.",
+              "type": "object",
+              "properties": {
+                "scope": {
+                  "type": "string",
+                  "const": "whole_stack"
+                }
+              },
+              "required": [
+                "scope"
+              ]
+            },
+            {
+              "description": "One named service's configuration alone.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "description": "The service whose configuration this covers.",
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string",
+                  "const": "service"
+                }
+              },
+              "required": [
+                "scope",
+                "name"
+              ]
+            }
           ]
         }
       }

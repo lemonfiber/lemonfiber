@@ -19,12 +19,15 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lemonfiber_core::app::bundle::{
-    collect, write, Wanted, BUNDLE_LEAK, BUNDLE_NO_ROOM, BUNDLE_UNWRITTEN,
+    collect, write, Wanted, BUNDLE_LEAK, BUNDLE_NO_MARKS, BUNDLE_NO_ROOM, BUNDLE_UNCONFIRMED,
+    BUNDLE_UNWRITTEN,
 };
+use lemonfiber_core::app::support::{run, Destination, NOWHERE_TO_KEEP};
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::archive::{Archive, Fault as ArchiveFault, Space};
+use lemonfiber_core::archive::{Archive, Archiving, Fault as ArchiveFault, Reader, Space, Vault};
 use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
-use lemonfiber_core::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
+use lemonfiber_core::bundle::{Contents, Filenames, Piece, Taken, Terms, MANIFEST};
+use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -286,6 +289,25 @@ impl Archive for Recorder {
     }
 }
 
+/// The other half of the port, so one fake is the one adapter a run holds.
+///
+/// A bundle never reads an archive back. Both halves are here because a run is given
+/// one thing that does both, and a second fake for the half a bundle does not use
+/// would be a second stand-in that could answer differently from this one.
+#[async_trait]
+impl Reader for Recorder {
+    async fn read_manifest(&self, _src: &Path) -> Result<BackupManifest, ArchiveFault> {
+        Err(ArchiveFault::new("a bundle never reads an archive back"))
+    }
+    async fn extract(
+        &self,
+        _src: &Path,
+        _targets: &[(String, PathBuf)],
+    ) -> Result<(), ArchiveFault> {
+        Err(ArchiveFault::new("a bundle never reads an archive back"))
+    }
+}
+
 /// Contents holding exactly what they are given.
 fn holding(name: &str, body: String) -> Contents {
     Contents {
@@ -382,4 +404,141 @@ async fn a_bundle_is_still_written_where_the_room_cannot_be_read() {
 
     assert!(write(&archive, &contents, &dest()).await.is_ok());
     assert_eq!(archive.wrote(), 1);
+}
+
+// ── What a support request comes to ───────────────────────────────────────────
+
+/// Where a run that keeps its own files keeps them.
+const KEPT_UNDER: &str = "/tmp/lemonfiber-support-test";
+
+/// A machine with nothing working, which is when a bundle is wanted, keeping its own
+/// files where a test can name them.
+fn asking(vault: &Arc<Recorder>) -> Ctx {
+    ctx(Source::External(project()), false, None).keeping(Archiving {
+        paths: Paths::at(Path::new(KEPT_UNDER), Path::new(KEPT_UNDER)),
+        vault: Arc::clone(vault) as Arc<dyn Vault>,
+    })
+}
+
+/// What a caller who asked for nothing in particular gets.
+fn plainly() -> Wanted {
+    Wanted::default()
+}
+
+#[tokio::test]
+async fn a_bare_run_says_what_a_bundle_would_hold_and_writes_nothing() {
+    // The decision to make a file worth attaching to a public thread is taken after
+    // seeing what goes in it, so a run that has not been told to write does not.
+    let vault = Arc::new(Recorder::new(1 << 30, false));
+    let said = run(&asking(&vault), &plainly(), false, &Destination::Kept).await;
+    let holds = said.map(|bundle| (bundle.path, bundle.bytes > 0, bundle.contents.pieces.len()));
+    assert!(
+        matches!(&holds, Ok((None, true, pieces)) if *pieces > 0),
+        "{holds:?}"
+    );
+    assert_eq!(vault.wrote(), 0, "nothing was written");
+}
+
+#[tokio::test]
+async fn a_bundle_asked_for_without_a_path_goes_where_lemonfiber_keeps_its_own_files() {
+    // The one web-specific question a bundle has, answered by the server rather than
+    // by whoever asked: a browser has no path on this host it could name.
+    let vault = Arc::new(Recorder::new(1 << 30, false));
+    let said = run(&asking(&vault), &plainly(), true, &Destination::Kept).await;
+    let at = said.ok().and_then(|bundle| bundle.path).unwrap_or_default();
+    assert!(at.starts_with(format!("{KEPT_UNDER}/support")), "{at:?}");
+    assert!(
+        at.to_string_lossy().ends_with(".tar.gz"),
+        "named for the moment it was taken: {at:?}"
+    );
+    assert_eq!(vault.wrote(), 1);
+}
+
+#[tokio::test]
+async fn a_bundle_asked_for_at_a_path_goes_to_that_path() {
+    let vault = Arc::new(Recorder::new(1 << 30, false));
+    let named = PathBuf::from("/tmp/lemonfiber-support-test/asked-for.tar.gz");
+    let said = run(
+        &asking(&vault),
+        &plainly(),
+        true,
+        &Destination::At(named.clone()),
+    )
+    .await;
+    assert_eq!(said.ok().and_then(|bundle| bundle.path), Some(named));
+}
+
+#[tokio::test]
+async fn a_bundle_asked_for_beside_the_operator_is_named_for_the_moment_it_was_taken() {
+    let vault = Arc::new(Recorder::new(1 << 30, false));
+    let said = run(&asking(&vault), &plainly(), true, &Destination::Beside).await;
+    let at = said.ok().and_then(|bundle| bundle.path).unwrap_or_default();
+    let name = at.to_string_lossy().into_owned();
+    assert_eq!(at.parent(), Some(Path::new("")), "beside them: {at:?}");
+    assert!(name.starts_with("lemonfiber-support-"), "{name}");
+}
+
+#[tokio::test]
+async fn a_run_that_cannot_write_an_archive_at_all_refuses_before_it_gathers_a_file() {
+    let ctx = ctx(Source::External(project()), false, None);
+    let refusal = run(&ctx, &plainly(), true, &Destination::Beside)
+        .await
+        .err()
+        .map(|problem| problem.code);
+    assert_eq!(refusal, Some(NOWHERE_TO_KEEP));
+}
+
+#[tokio::test]
+async fn a_setting_named_to_be_shown_as_it_is_takes_saying_twice() {
+    // A flag that publishes a credential is not one to honour because it turned up
+    // in a request somebody copied.
+    let vault = Arc::new(Recorder::new(1 << 30, false));
+    let asked = Wanted::asked(
+        10,
+        Filenames::Replaced,
+        vec!["INDEXER_KEY".to_owned()],
+        false,
+    );
+    let refusal = run(&asking(&vault), &asked, true, &Destination::Kept)
+        .await
+        .err()
+        .map(|problem| problem.code);
+    assert_eq!(refusal, Some(BUNDLE_UNCONFIRMED));
+    assert_eq!(vault.wrote(), 0, "nothing was written");
+}
+
+#[tokio::test]
+async fn a_machine_that_will_not_supply_randomness_gets_no_bundle_at_all() {
+    // Every replaced value carries a stand-in derived from randomness, and one
+    // anybody can reproduce is a way back to the value it stands for.
+    let vault = Arc::new(Recorder::new(1 << 30, false));
+    let ctx =
+        asking(&vault).with_random(Arc::new(lemonfiber_fixtures::ports::Chance::exactly(None)));
+    let refusal = run(&ctx, &plainly(), false, &Destination::Kept)
+        .await
+        .err()
+        .map(|problem| problem.code);
+    assert_eq!(refusal, Some(BUNDLE_NO_MARKS));
+}
+
+#[tokio::test]
+async fn a_dispatched_support_request_serialises_under_its_own_kind() {
+    let vault = Arc::new(Recorder::new(1 << 30, false));
+    let json = lemonfiber_core::app::dispatch(
+        lemonfiber_core::app::Command::Support {
+            write: false,
+            wanted: plainly(),
+            dest: Destination::Kept,
+        },
+        &asking(&vault),
+    )
+    .await
+    .ok()
+    .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+    .unwrap_or_default();
+    assert!(json.contains(r#""kind":"bundle""#), "{json}");
+    assert!(
+        json.contains(r#""path":null"#),
+        "nothing was written: {json}"
+    );
 }

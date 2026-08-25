@@ -6,10 +6,12 @@
 //! nouns carry logic belongs beside them.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
 use crate::backup::{Existing, Item, Manifest};
+use crate::config::paths::Paths;
 
 /// The room a capture would take, against what is free where it would be written.
 ///
@@ -172,6 +174,35 @@ pub trait Reader: Send + Sync {
     /// escape its target, an area is unrecognised, or a member could not be
     /// written.
     async fn extract(&self, src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault>;
+}
+
+/// Both halves of one adapter: what writes archives and what reads them back.
+///
+/// [`Archive`] and [`Reader`] stay apart because each side is driven by a fake
+/// that answers only the question it is asked. A run holds one thing that does
+/// both, though, and two fields that must name the same adapter are two fields
+/// that eventually do not — so the pair is named once here rather than at every
+/// caller that holds it.
+pub trait Vault: Archive + Reader {}
+
+impl<T: Archive + Reader> Vault for T {}
+
+/// How a run reaches the archives it keeps: where they are, and what writes them.
+///
+/// Held together because neither half means anything alone. An adapter with no
+/// layout has nowhere to put an archive, and a layout with no adapter is a
+/// directory nothing can write into — so a run either has both or has neither,
+/// and the commands that need them say so once rather than twice.
+///
+/// Absent where this machine would not say where its own files go. That is not a
+/// hypothetical: resolving the configuration home is the surface's job and it can
+/// fail, and a run that could not resolve it has no backups directory to name.
+#[derive(Clone)]
+pub struct Archiving {
+    /// The layout archives are written into, and restored back over.
+    pub paths: Paths,
+    /// What turns the chosen trees into an archive, and reads one back.
+    pub vault: Arc<dyn Vault>,
 }
 
 #[cfg(test)]

@@ -36,6 +36,10 @@ impl std::fmt::Display for Kind {
     }
 }
 
+/// Where a backup archive was written, and what it covers.
+pub const BACKUP: Kind = Kind("backup");
+/// What a support bundle would hold, or where one went.
+pub const BUNDLE: Kind = Kind("bundle");
 /// The settings asked about, and what a change did to them.
 pub const CONFIG: Kind = Kind("config");
 /// One moment of what the stack is doing, as the dashboard assembles it.
@@ -66,6 +70,8 @@ pub const PULL: Kind = Kind("pull");
 pub const QUALITY: Kind = Kind("quality");
 /// What a full reset did, or would do.
 pub const RESET: Kind = Kind("reset");
+/// What a restore would overwrite, or what it put back.
+pub const RESTORE: Kind = Kind("restore");
 /// What seeding wired, and what it left for a re-run.
 pub const SEED: Kind = Kind("seed");
 /// What setup settled on.
@@ -94,6 +100,8 @@ pub const WORD: Kind = Kind("word");
 
 /// Every kind, so the contract cannot describe one that is never emitted.
 pub const ALL: &[Kind] = &[
+    BACKUP,
+    BUNDLE,
     CONFIG,
     DASHBOARD,
     DOCTOR,
@@ -109,6 +117,7 @@ pub const ALL: &[Kind] = &[
     PULL,
     QUALITY,
     RESET,
+    RESTORE,
     SEED,
     SETUP,
     START,

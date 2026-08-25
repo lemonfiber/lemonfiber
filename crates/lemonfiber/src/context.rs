@@ -11,6 +11,7 @@ use std::sync::Arc;
 use lemonfiber_core::acknowledged::{self, Acknowledged};
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::Ctx;
+use lemonfiber_core::archive::Archiving;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, indexer_from_env, ip_echo_from_env, port_forward_from_env, reads_as_off,
@@ -60,6 +61,19 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     // browser holds open, which is the only reason this is a value rather than a
     // call from inside the wait.
     .narrating(Arc::new(crate::engine::Narrating));
+
+    // Where archives are kept, and what packs them. The packing lives in this
+    // crate because the crate that reasons about backups keeps no dependency on
+    // how a `.tar.gz` is written, so this is the one place the two meet. Absent
+    // where this machine would not say where its own files go, which is the same
+    // absence every other reader of `here` handles.
+    let ctx = match here() {
+        None => ctx,
+        Some(paths) => ctx.keeping(Archiving {
+            paths,
+            vault: Arc::new(crate::archive::Tar),
+        }),
+    };
 
     // A rehearsal takes nothing, so the two never both apply — but a rehearsal that
     // was also asked to force is a rehearsal, because the harmless reading of an

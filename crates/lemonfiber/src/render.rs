@@ -14,6 +14,7 @@
 #[cfg(test)]
 pub(crate) mod fixtures;
 
+mod archive;
 mod doctor;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
@@ -21,7 +22,6 @@ mod quality;
 pub(crate) mod repair;
 mod seed;
 pub(crate) mod stack;
-pub(crate) mod support;
 mod trace;
 pub(crate) mod walkthrough;
 
@@ -209,6 +209,9 @@ fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Seed(report) => seed::seeding(report),
         Outcome::Reset(report) => stack::reset(report),
         Outcome::Wizard(report) => standing(report),
+        Outcome::Backup(report) => archive::backup(report),
+        Outcome::Support(report) => archive::bundle(report),
+        Outcome::Restore(report) => archive::restoration(report),
     }
 }
 

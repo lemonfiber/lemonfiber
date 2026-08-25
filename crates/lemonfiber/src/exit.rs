@@ -97,6 +97,16 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // are pending reverts, so either one left unconfirmed is a non-zero result.
         // Confirmed, or with nothing to revert, it succeeded.
         Outcome::Reset(report) => reset_exit(report),
+        // A restore that overwrote nothing listed what it would overwrite and
+        // stopped — like an unconfirmed reset, it is waiting on the operator's
+        // say-so, so a script sees a non-zero result rather than a false success.
+        Outcome::Restore(report) => {
+            if report.done.is_some() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(VALIDATION)
+            }
+        }
         // A trace, a stuck-item listing or the household's requests is a query — it
         // answers where things are; asking is never a failure, whatever the answer.
         Outcome::Version(_)
@@ -110,7 +120,12 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Status(_)
         | Outcome::Word(_)
         | Outcome::Glossary(_)
-        | Outcome::Wizard(_) => ExitCode::SUCCESS,
+        | Outcome::Wizard(_)
+        // A capture that was written and a bundle that was described are each an
+        // answer that arrived, and a run that could not produce one comes back as
+        // a problem rather than as an outcome with a code on it.
+        | Outcome::Backup(_)
+        | Outcome::Support(_) => ExitCode::SUCCESS,
     }
 }
 
@@ -312,8 +327,8 @@ mod tests {
     };
 
     use super::{
-        complain, exit_code, no_config_home, settled, success, FAILURE, NEVER_SETTLED, USAGE,
-        VALIDATION,
+        complain, exit_code, no_config_home, settled, shown, success, FAILURE, NEVER_SETTLED,
+        USAGE, VALIDATION,
     };
 
     /// A problem of the given severity and state.
@@ -620,6 +635,72 @@ mod tests {
         assert_ne!(format!("{:?}", complain(&carrying)), success());
         assert_ne!(format!("{:?}", no_config_home()), success());
         let _ = USAGE;
+    }
+
+    #[test]
+    fn a_restore_that_overwrote_nothing_is_not_reported_as_a_restore() {
+        // The listing is what a run that has not been confirmed produces, and a
+        // script told it succeeded would believe the archive had been put back.
+        use lemonfiber_core::app::restore::{Preview, Report as Restored, Restoration};
+        use lemonfiber_core::backup::{Manifest, Scope, SCHEMA};
+
+        let would = Preview {
+            manifest: Manifest {
+                schema: SCHEMA,
+                product_version: "0.7.0".to_owned(),
+                created_at: "2026-07-30".to_owned(),
+                data_root: "/srv/media".to_owned(),
+                scope: Scope::WholeStack,
+                sensitive: true,
+                members: Vec::new(),
+            },
+            downgrade: false,
+            relocation: None,
+        };
+        assert_eq!(
+            shown(settled(&Outcome::Restore(Restoration {
+                would: would.clone(),
+                done: None,
+            }))),
+            shown(std::process::ExitCode::from(VALIDATION))
+        );
+        assert_eq!(
+            shown(settled(&Outcome::Restore(Restoration {
+                would,
+                done: Some(Restored {
+                    scope: Scope::WholeStack,
+                    from_version: "0.7.0".to_owned(),
+                    relocated: None,
+                }),
+            }))),
+            success()
+        );
+    }
+
+    #[test]
+    fn a_capture_and_a_bundle_succeed_by_having_arrived() {
+        use lemonfiber_core::app::backup::Report as Capture;
+        use lemonfiber_core::app::support::Bundle;
+        use lemonfiber_core::backup::Scope;
+        use lemonfiber_core::bundle::Contents;
+
+        assert_eq!(
+            shown(settled(&Outcome::Backup(Capture {
+                path: std::path::PathBuf::from("/data/lemonfiber/backups/full.tar.gz"),
+                scope: Scope::WholeStack,
+                sensitive: true,
+                pruned: Vec::new(),
+            }))),
+            success()
+        );
+        assert_eq!(
+            shown(settled(&Outcome::Support(Bundle {
+                contents: Contents::default(),
+                bytes: 0,
+                path: None,
+            }))),
+            success()
+        );
     }
 }
 

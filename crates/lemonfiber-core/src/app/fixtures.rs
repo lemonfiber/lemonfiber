@@ -5,32 +5,49 @@
 //! its own stand-in rather than about the code under it.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use crate::archive::{Archive, Fault, Space};
-use crate::backup::{Existing, Item, Manifest};
+use crate::archive::{Archive, Archiving, Fault, Reader, Space};
+use crate::backup::{self, Existing, Item, Manifest, Scope, SCHEMA};
+use crate::config::paths::Paths;
 use crate::test_support::a_context;
 
 /// More room than any writer asks to keep free, so a test that is not about room does not
 /// have to know what the writer it drives keeps in reserve.
 const ROOMY: u64 = 512 * 1024 * 1024;
 
+/// The layout every test about an archive is written against.
+///
+/// One layout rather than one per module: what a capture writes and what a restore
+/// puts back are the same directories, and two spellings of them would let a test
+/// pass while proving something about a tree the other half never touches.
+pub(crate) fn paths() -> Paths {
+    Paths::rooted(Path::new("/cfg"), Path::new("/data"))
+}
+
 /// An archive that answers each operation from what the test scripted, and records what it
-/// was asked to write and remove.
+/// was asked to write, remove and unpack.
+///
+/// Both halves of the port, because a run holds one adapter that does both: a capture
+/// writes archives and a restore reads them, and a fake per half would be two stand-ins
+/// that could answer the same question differently.
 pub(crate) struct FakeArchive {
     pub(crate) space: Result<Space, Fault>,
     pub(crate) write: Result<(), Fault>,
     pub(crate) existing: Result<Vec<Existing>, Fault>,
     pub(crate) remove: Result<(), Fault>,
+    pub(crate) manifest: Result<Manifest, Fault>,
+    pub(crate) extract: Result<(), Fault>,
     pub(crate) written: Mutex<Vec<PathBuf>>,
     pub(crate) removed: Mutex<Vec<String>>,
+    pub(crate) extracted: Mutex<Vec<PathBuf>>,
 }
 
 impl FakeArchive {
     /// An archive with ample room where every operation succeeds and no older backups
-    /// exist to prune.
+    /// exist to prune, holding a whole-stack manifest this build can restore.
     pub(crate) fn roomy() -> Self {
         Self {
             space: Ok(Space {
@@ -40,9 +57,26 @@ impl FakeArchive {
             write: Ok(()),
             existing: Ok(Vec::new()),
             remove: Ok(()),
+            manifest: Ok(manifest_of(CURRENT, SCHEMA)),
+            extract: Ok(()),
             written: Mutex::new(Vec::new()),
             removed: Mutex::new(Vec::new()),
+            extracted: Mutex::new(Vec::new()),
         }
+    }
+
+    /// The same archive, holding a whole-stack manifest written by `version` in
+    /// format `schema` — the two things a restore decides on before it overwrites.
+    pub(crate) fn holding(version: &str, schema: u32) -> Self {
+        Self {
+            manifest: Ok(manifest_of(version, schema)),
+            ..Self::roomy()
+        }
+    }
+
+    /// What it was asked to unpack, in the order it was asked.
+    pub(crate) fn extractions(&self) -> Vec<PathBuf> {
+        self.extracted.lock().map(|e| e.clone()).unwrap_or_default()
     }
 
     /// Where it was asked to write, in the order it was asked.
@@ -65,6 +99,17 @@ impl FakeArchive {
     }
 }
 
+/// The version a test restores against unless it is about a version gap.
+pub(crate) const CURRENT: &str = "0.3.0";
+
+/// A whole-stack manifest taken against `/srv/media`, as an archive carries one.
+fn manifest_of(version: &str, schema: u32) -> Manifest {
+    let plan = backup::plan(&paths(), &Scope::WholeStack);
+    let mut manifest = Manifest::describe(&plan, version, "t", "/srv/media");
+    manifest.schema = schema;
+    manifest
+}
+
 #[async_trait]
 impl Archive for FakeArchive {
     async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, Fault> {
@@ -85,6 +130,31 @@ impl Archive for FakeArchive {
         }
         self.remove.clone()
     }
+}
+
+#[async_trait]
+impl Reader for FakeArchive {
+    async fn read_manifest(&self, _src: &Path) -> Result<Manifest, Fault> {
+        self.manifest.clone()
+    }
+    async fn extract(&self, src: &Path, _targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+        if let Ok(mut extracted) = self.extracted.lock() {
+            extracted.push(src.to_path_buf());
+        }
+        self.extract.clone()
+    }
+}
+
+/// A context that keeps its archives in the shared layout, through `vault`.
+///
+/// The pair a capture and a restore both need, handed over the way a surface hands
+/// it over — so what a test drives is the run holding an adapter, not a function
+/// taking one.
+pub(crate) fn keeping(ctx: crate::app::Ctx, vault: &Arc<FakeArchive>) -> crate::app::Ctx {
+    ctx.keeping(Archiving {
+        paths: paths(),
+        vault: Arc::clone(vault) as Arc<dyn crate::archive::Vault>,
+    })
 }
 
 /// A scratch directory unique to one test, emptied first.

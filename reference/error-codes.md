@@ -11,11 +11,14 @@ what to do about it, is written for operators at
 - `BACKUP-1`
 - `BACKUP-2`
 - `BACKUP-3`
+- `BACKUP-4`
+- `BACKUP-5`
 - `BUNDLE-1`
 - `BUNDLE-2`
 - `BUNDLE-3`
 - `BUNDLE-4`
 - `BUNDLE-5`
+- `BUNDLE-6`
 - `CONFIG-1`
 - `CONFIG-2`
 - `CONFIG-3`
@@ -55,6 +58,10 @@ what to do about it, is written for operators at
 - `RESTORE-4`
 - `RESTORE-5`
 - `RESTORE-6`
+- `RESTORE-7`
+- `RESTORE-8`
+- `RESTORE-9`
+- `RESTORE-10`
 - `SEED-1`
 - `SEED-2`
 - `SEED-3`
