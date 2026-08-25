@@ -456,7 +456,9 @@ mod tests {
     use lemonfiber_core::app::{backup, Command, Outcome, Waiting};
     use lemonfiber_core::backup::Scope;
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
-    use lemonfiber_core::model::{FormsReport, ResetReport, StackEdit, VersionReport};
+    use lemonfiber_core::model::{
+        FormsReport, ResetReport, StackEdit, SupervisionReport, VersionReport,
+    };
     use lemonfiber_core::walkthrough::Step as WalkStep;
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::path::PathBuf;
@@ -1658,6 +1660,9 @@ mod tests {
         let mut acting = Acting::opened();
         acting.pressed(&Press::Typed(lasting::KEY));
         assert!(showing(&acting).contains("keeps going"));
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Back);
+        assert!(showing(&acting).contains("> a walk through"));
 
         assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
 
@@ -1732,16 +1737,37 @@ mod tests {
 
     /// What a guard came to is the whole of its box, because it had said nothing
     /// until then — and it is rendered by the renderer the command line reaches for
-    /// the same answer.
+    /// the same answer, whether it ended or failed.
     #[test]
     fn what_a_guard_came_to_is_the_whole_of_its_box() {
-        let mut acting = guarding();
-
-        acting.came_to(Err(Box::new(a_failure())));
-
-        let said = showing(&acting);
+        let mut failed = guarding();
+        failed.came_to(Err(Box::new(a_failure())));
+        let said = showing(&failed);
         assert!(said.contains("could not be reached"), "{said}");
         assert!(said.contains("what it came to"), "{said}");
+
+        let mut ended = guarding();
+        ended.came_to(Ok(Outcome::Watch(SupervisionReport {
+            forms: vec!["full".to_owned()],
+            reason: "the data location is no longer present".to_owned(),
+            stopped: true,
+        })));
+        let ending = showing(&ended);
+        assert!(ending.contains("no longer present"), "{ending}");
+    }
+
+    /// The question before the terminal is handed over names what it costs, since
+    /// what it costs is the screen somebody was reading.
+    #[test]
+    fn the_key_that_hands_the_terminal_over_says_so_before_it_does() {
+        let mut acting = Acting::opened();
+
+        acting.pressed(&Press::Typed(surface::KEY));
+
+        let said = showing(&acting);
+        assert!(said.contains("web interface"), "{said}");
+        assert!(said.contains("Close this screen"), "{said}");
+        assert!(said.contains("any other key changes nothing"), "{said}");
     }
 
     /// The footer names every key the screen answers, including the two this slice
