@@ -757,7 +757,9 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn a_non_interactive_run_missing_a_flag_is_told_which() {
-        // Rather than left waiting on input that never comes.
+        // Rather than left waiting on input that never comes — and told **which**,
+        // since a run that failed without naming a flag leaves the operator to guess
+        // at the very thing the refusal exists to supply.
         let paths = scratch("missing-flags");
         let code = setting_up(
             ctx(),
@@ -767,6 +769,27 @@ pub(crate) mod tests {
         )
         .await;
         assert_ne!(shown(code), success());
+
+        // The words themselves, where they are decided. Asserting the exit code alone
+        // would go on passing if the flags stopped being named.
+        let wizard = crate::setup::Wizard::new(Environment::MacOs);
+        let named = SetupFlags::none().missing(&wizard);
+        assert!(
+            named.iter().any(|flag| flag.starts_with("--protocols")),
+            "the refusal names the protocols flag: {named:?}"
+        );
+        assert!(
+            named.iter().any(|flag| flag.starts_with("--data-location")),
+            "and where the data goes: {named:?}"
+        );
+        assert!(
+            named.contains(&"--yes"),
+            "and the one that says nobody will be asked: {named:?}"
+        );
+        assert!(
+            named.iter().all(|flag| flag.starts_with("--")),
+            "each is a flag as it would be typed, not a step's name: {named:?}"
+        );
     }
 
     #[tokio::test]
