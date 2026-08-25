@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use lemonfiber_core::doctor::credentials::Target;
 use lemonfiber_core::doctor::releases::{ReleasesCheck, NONE_AVAILABLE, PRESET_UNMET};
-use lemonfiber_core::doctor::{Category, Check, Verdict};
+use lemonfiber_core::doctor::{Category, Check, Narrowing, Verdict};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
@@ -172,17 +172,69 @@ async fn no_resolution_service_is_skipped() {
     assert!(matches!(verdict, Some(Verdict::Skipped { .. })));
 }
 
+/// A search nobody asked for is not spent, and the run says so honestly.
+///
+/// Unverified rather than skipped, and the difference is the whole point: skipped means
+/// the check did not apply, and a run full of skips can still be healthy. This check
+/// applied — there is a service, there is wanted content — and nothing about releases
+/// was established, so a report calling the stack healthy on the strength of it would be
+/// claiming an answer no search was made for.
 #[tokio::test]
-async fn an_ordinary_run_skips_the_live_search() {
-    // Not disruptive: the check reports skipped rather than querying the indexer.
+async fn an_ordinary_run_leaves_the_live_search_unverified_rather_than_skipped() {
     let http = Fake::by_path(Vec::new());
     let check = ReleasesCheck::new(http, opening_fs(), vec![sonarr()], false);
     let findings = check.run().await;
     assert_eq!(findings.len(), 1);
-    assert!(matches!(
-        findings.first().map(|found| &found.verdict),
-        Some(Verdict::Skipped { .. })
-    ));
+    let said = findings.first().map(|found| &found.verdict);
+    assert!(matches!(said, Some(Verdict::Unverified { .. })), "{said:?}");
+    let told = match said {
+        Some(Verdict::Unverified { remedy, .. }) => remedy.detail.clone(),
+        _ => None,
+    };
+    assert_eq!(
+        told.as_deref(),
+        Some("lemonfiber doctor --only services.releases --disruptive"),
+        "it should say how to get a real answer"
+    );
+}
+
+/// The command the remedy names runs this check, rather than merely reading as though
+/// it would.
+///
+/// A remedy is a sentence until something establishes that it resolves. What is in this
+/// one is the id the finding reports under, and a run narrowed to that id runs this
+/// check — so a rename that left the sentence behind is a failure here rather than an
+/// instruction that quietly stopped working.
+#[tokio::test]
+async fn the_remedy_names_a_check_a_run_can_be_narrowed_to() {
+    let http = Fake::by_path(Vec::new());
+    let check = ReleasesCheck::new(http, opening_fs(), vec![sonarr()], false);
+    let found = check.run().await.pop();
+
+    let named = found
+        .as_ref()
+        .and_then(|finding| match &finding.verdict {
+            Verdict::Unverified { remedy, .. } => remedy.detail.clone(),
+            _ => None,
+        })
+        .and_then(|detail| {
+            detail
+                .split_whitespace()
+                .skip_while(|word| *word != "--only")
+                .nth(1)
+                .map(str::to_owned)
+        });
+
+    assert_eq!(
+        named.as_deref(),
+        found.as_ref().map(|finding| finding.check.as_str()),
+        "the command should name the id this check reports under"
+    );
+    assert_eq!(
+        named.as_deref().and_then(Narrowing::parse),
+        Some(Narrowing::Check("services.releases".to_owned())),
+        "and that id should be one a run can be narrowed to"
+    );
 }
 
 /// What it costs to run and for how long, both said before the operator opts in.
@@ -198,7 +250,7 @@ async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
         .await
         .pop()
         .and_then(|found| match found.verdict {
-            Verdict::Skipped { reason } => Some(reason),
+            Verdict::Unverified { reason, .. } => Some(reason),
             _ => None,
         })
         .unwrap_or_default();
@@ -207,7 +259,11 @@ async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
         "it should say what it spends: {said}"
     );
     assert!(
-        said.contains("seconds this check is allowed"),
+        said.contains("daily cap"),
+        "it should say whose cap it spends against: {said}"
+    );
+    assert!(
+        said.contains("seconds it is bounded to"),
         "it should say how long for: {said}"
     );
 }

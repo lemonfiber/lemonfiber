@@ -249,12 +249,14 @@ pub(crate) const FILESYSTEM_BUDGET: Duration = Duration::from_secs(30);
 /// their transfers is weighing being without them for a while, and "a while" is the part
 /// they cannot look up — a second is a shrug and ten minutes is a different decision.
 ///
-/// Said from the budget the check is bounded by rather than from a number written into a
-/// sentence, so the length promised and the length allowed cannot drift apart.
-pub(crate) fn disturbing_for(budget: Duration) -> String {
+/// Said from the bound that enforces it rather than from a number written into a
+/// sentence, so the length promised and the length allowed cannot drift apart. Which
+/// bound that is differs: a check whose whole run is the burden says its budget, and one
+/// that takes something away for part of its run says how long it is away for.
+pub(crate) fn disturbing_for(bound: Duration) -> String {
     format!(
-        "for no longer than the {} seconds this check is allowed",
-        budget.as_secs()
+        "for no longer than the {} seconds it is bounded to",
+        bound.as_secs()
     )
 }
 

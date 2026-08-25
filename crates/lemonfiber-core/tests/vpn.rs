@@ -8,11 +8,13 @@
 
 mod common;
 
+use std::sync::Arc;
+
 use common::tunnel::*;
 
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::doctor::vpn::{VpnCheck, CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
-use lemonfiber_core::doctor::{Category, Check, Verdict};
+use lemonfiber_core::doctor::{examine, Category, Check, Narrowing, Verdict};
 use lemonfiber_core::error::Severity;
 
 #[tokio::test]
@@ -123,7 +125,7 @@ async fn a_tunnel_the_test_could_not_put_back_is_reported_twice_over() {
     let findings = checking(Fake::linked(
         contained(),
         Link {
-            restores: false,
+            restore: Restore::Fails,
             ..Link::holding()
         },
     ))
@@ -236,6 +238,91 @@ async fn without_the_flag_nothing_is_touched_and_the_operator_is_told_how_to_ask
     let findings = subject.run().await;
     assert!(unverified_reason(&findings, "vpn.killswitch")
         .is_some_and(|reason| reason.contains("interrupts transfers")));
+}
+
+/// The suite as it is actually run, over an engine the test keeps hold of, so what
+/// state the check left the tunnel in can be asked afterwards.
+async fn suite_over(engine: &Arc<Fake>) -> lemonfiber_core::model::DoctorReport {
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(
+        asking_engine(Arc::clone(engine)).disruptive().check(),
+    )];
+    examine(&checks, &Narrowing::Suite).await
+}
+
+/// A probe that outlasts the budget still leaves the tunnel up.
+///
+/// The suite abandons a check at its budget by dropping the future it is awaiting, and
+/// a dropped future runs no further code. Nothing between taking the tunnel away and
+/// putting it back may therefore be allowed to reach that moment: a client cut off with
+/// the tunnel is exactly the thing likeliest to stop answering, and the restore behind
+/// it is the one part of this check that must always happen.
+#[tokio::test(start_paused = true)]
+async fn a_probe_that_outlasts_the_budget_leaves_the_tunnel_up_all_the_same() {
+    let engine = Arc::new(Fake::linked(
+        contained(),
+        Link {
+            probe_hangs: true,
+            ..Link::holding()
+        },
+    ));
+
+    let report = suite_over(&engine).await;
+
+    assert!(
+        !engine.is_dropped(),
+        "the tunnel was taken away and never put back: {report:?}"
+    );
+    assert!(
+        unverified_reason(&report.findings, "vpn.killswitch")
+            .is_some_and(|reason| reason.contains("could not be asked")),
+        "a client that never answered proves nothing: {report:?}"
+    );
+}
+
+/// Putting it back is bounded too, so a restore that never answers is reported as the
+/// emergency it is rather than holding the run open until the suite gives up on it.
+#[tokio::test(start_paused = true)]
+async fn a_restore_that_never_answers_is_reported_rather_than_waited_on() {
+    let engine = Arc::new(Fake::linked(
+        contained(),
+        Link {
+            restore: Restore::Silent,
+            ..Link::holding()
+        },
+    ));
+
+    let report = suite_over(&engine).await;
+
+    let restored = failure(&report.findings, "vpn.tunnel-restored");
+    assert!(
+        restored.is_some_and(|problem| problem.summary.contains("did not come back")),
+        "the operator is told the tunnel is gone rather than left waiting: {report:?}"
+    );
+}
+
+/// A budget already spent by the reads before it is not enough to drop the tunnel and
+/// be sure of putting it back, so the tunnel is not dropped at all.
+#[tokio::test(start_paused = true)]
+async fn a_budget_already_spent_never_takes_the_tunnel_away() {
+    let engine = Arc::new(Fake::linked(
+        contained(),
+        Link {
+            route_takes: 20,
+            ..Link::holding()
+        },
+    ));
+
+    let report = suite_over(&engine).await;
+
+    assert!(
+        !engine.is_dropped(),
+        "nothing should have been disturbed: {report:?}"
+    );
+    assert!(
+        unverified_reason(&report.findings, "vpn.killswitch")
+            .is_some_and(|reason| reason.contains("too little of this check's time")),
+        "{report:?}"
+    );
 }
 
 #[tokio::test]

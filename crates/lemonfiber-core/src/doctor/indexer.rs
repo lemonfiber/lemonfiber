@@ -8,6 +8,18 @@
 //!
 //! The credential itself never leaves this module — not into a finding, a log, or
 //! a bundle. What is reported is the outcome, never the input.
+//!
+//! This one is not gated behind the operator asking for it, and the check beside it
+//! that searches for releases is. The difference is not which of them touches the
+//! network. Nothing here is taken away from the running stack: the search is one
+//! request, sent to be answered, and it costs a single hit against the cap the indexer
+//! holds the operator to — a share small enough that the check cannot itself be what
+//! exhausts the cap. Reading the key out of configuration instead would establish only
+//! that a key is written down, which is the inference this whole subsystem exists to
+//! refuse, and a key that rotted overnight would go on reading as healthy until
+//! something failed to download. The releases check spends one search per service every
+//! time it runs and searches for content rather than for an answer, which is a large
+//! enough share of the same cap to be worth asking about first.
 
 use std::sync::Arc;
 

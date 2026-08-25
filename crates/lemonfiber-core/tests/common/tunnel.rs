@@ -58,6 +58,17 @@ impl Behavior {
     }
 }
 
+/// How the tunnel container answers being asked to put the device back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Restore {
+    /// The device comes back.
+    Works,
+    /// The command is refused.
+    Fails,
+    /// The command never answers at all.
+    Silent,
+}
+
 /// How the tunnel container answers the killswitch test, and what the client
 /// sees while the tunnel is down.
 #[derive(Debug, Clone, Copy)]
@@ -66,11 +77,19 @@ pub struct Link {
     pub device: Option<&'static str>,
     /// Whether `ip link set` succeeds.
     pub movable: bool,
-    /// Whether putting the device back up succeeds.
-    pub restores: bool,
+    /// How putting the device back up is answered.
+    pub restore: Restore,
     /// What the client's address probe answers while the tunnel is down. `None`
     /// is traffic that stopped, which is the killswitch holding.
     pub leaks_as: Option<&'static str>,
+    /// Whether the client's probe never answers at all while the tunnel is down.
+    ///
+    /// A container whose network went away with the tunnel can leave an exec waiting
+    /// with nothing to answer it, which is the shape of hang that outlasts a budget.
+    pub probe_hangs: bool,
+    /// How many seconds the route read takes, so a test can spend the budget before
+    /// the tunnel is touched.
+    pub route_takes: u64,
 }
 
 impl Link {
@@ -80,8 +99,10 @@ impl Link {
         Self {
             device: Some("tun0"),
             movable: true,
-            restores: true,
+            restore: Restore::Works,
             leaks_as: None,
+            probe_hangs: false,
+            route_takes: 0,
         }
     }
 }
@@ -123,6 +144,18 @@ impl Fake {
         self.dropped.load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// How long this `ip` command takes to answer, where the test slowed it down or
+    /// stopped it answering at all.
+    pub async fn dawdle(&self, argv: &[String]) {
+        let Some(link) = self.link else { return };
+        if argv.get(1).is_some_and(|arg| arg == "route") && link.route_takes > 0 {
+            tokio::time::sleep(std::time::Duration::from_secs(link.route_takes)).await;
+        }
+        if argv.last().is_some_and(|arg| arg == "up") && link.restore == Restore::Silent {
+            std::future::pending::<()>().await;
+        }
+    }
+
     /// The tunnel container's answer to an `ip` command.
     pub fn answer_ip(&self, argv: &[String]) -> ExecOutput {
         let Some(link) = self.link else {
@@ -144,7 +177,7 @@ impl Fake {
             };
         }
         let up = argv.last().is_some_and(|arg| arg == "up");
-        if !link.movable || (up && !link.restores) {
+        if !link.movable || (up && link.restore != Restore::Works) {
             return ExecOutput {
                 status: Some(2),
                 stdout: String::new(),
@@ -202,6 +235,7 @@ impl Engine for Fake {
         // port answers it; one without makes `cat` exit non-zero with no output,
         // exactly as a missing file does.
         if argv.first().is_some_and(|arg| arg == "ip") {
+            self.dawdle(argv).await;
             return Ok(self.answer_ip(argv));
         }
         if argv.first().is_some_and(|arg| arg == "cat") {
@@ -228,6 +262,14 @@ impl Engine for Fake {
         let asked_second = argv
             .last()
             .is_some_and(|arg| arg.contains("second.example"));
+        // A client cut off with the tunnel can leave the exec waiting rather than
+        // answering, where the test asks for that.
+        if self.is_dropped()
+            && behavior.service != "gluetun"
+            && self.link.is_some_and(|link| link.probe_hangs)
+        {
+            std::future::pending::<()>().await;
+        }
         // While the tunnel is down the client answers with whatever the test says
         // still gets out — nothing at all, where the killswitch holds.
         let address = if self.is_dropped() && behavior.service != "gluetun" {
@@ -289,13 +331,19 @@ pub fn stack() -> Manifest {
 /// axes anyone had needed, and every test needing a fourth wrote the whole `Asked` out
 /// again — fourteen of them did, which is fourteen places a new field would land.
 pub struct Asking {
-    engine: Fake,
+    engine: Arc<Fake>,
     manifest: Manifest,
     asked: Asked,
 }
 
 /// A check over this engine, to vary by name from there.
 pub fn asking(engine: Fake) -> Asking {
+    asking_engine(Arc::new(engine))
+}
+
+/// The same, over an engine the test keeps a handle on — so it can ask afterwards
+/// what state the check left the tunnel in.
+pub fn asking_engine(engine: Arc<Fake>) -> Asking {
     Asking {
         engine,
         manifest: stack(),
@@ -371,7 +419,7 @@ impl Asking {
     #[must_use]
     pub fn check(self) -> VpnCheck {
         VpnCheck::new(
-            Arc::new(self.engine),
+            self.engine,
             "lemonfiber".to_owned(),
             &self.manifest,
             self.asked,
