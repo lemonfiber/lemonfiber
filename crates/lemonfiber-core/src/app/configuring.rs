@@ -61,11 +61,7 @@ pub(super) fn configuration(
     let settings = store::shown(&file)
         .into_iter()
         .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
-        .map(|setting| SettingReport {
-            key: setting.key,
-            value: setting.value,
-            secret: setting.secret,
-        })
+        .map(SettingReport::from)
         .collect();
 
     Ok(Outcome::Config(ConfigReport {

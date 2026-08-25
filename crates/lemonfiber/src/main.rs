@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
 use lemonfiber_core::doctor::Narrowing;
 
 mod archive;
@@ -116,9 +116,12 @@ async fn main() -> ExitCode {
         // A watch is long-running and produces one report at its end, not a value
         // that arrives once, so like streaming it does not go through dispatch.
         Request::Watch { forms } => return guard(&ctx, &forms, cli.json).await,
-        // Setup is a conversation and then a stack coming up, not a value that
-        // arrives once, so like streaming and watching it runs its own way. It
-        // takes the context by value because it rewrites the settings mid-run.
+        // Asking where setup stands is a value that arrives once, so unlike the
+        // conversation below it goes through dispatch like every other question.
+        Request::Setup { flags } if flags.status => Command::Setup(SetupAction::Where),
+        // Setup itself is a conversation and then a stack coming up, not a value
+        // that arrives once, so like streaming and watching it runs its own way.
+        // It takes the context by value because it rewrites the settings mid-run.
         Request::Setup { flags } => return setup_from(ctx, flags).await,
         Request::Version => Command::Version,
         // Naming nothing asks what forms there are; naming one asks what it would

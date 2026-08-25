@@ -15,7 +15,7 @@ use crate::error::{Code, Problem};
 use crate::model::{
     kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
     MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
-    VersionReport,
+    VersionReport, WizardReport,
 };
 use crate::quality::Preset;
 use crate::stack::closure::Plan;
@@ -59,6 +59,7 @@ mod walkthrough;
 pub mod watch;
 
 pub use ctx::Ctx;
+pub use setup::SetupAction;
 
 // The log-following reads a surface streams from live outside dispatch, so they are the
 // engine module's functions re-exported for the binary and the log commands to reach.
@@ -207,6 +208,14 @@ pub enum Command {
         /// shown and nothing is written.
         confirm: bool,
     },
+    /// Walk first-run setup: read where it stands, answer one question, move
+    /// between them, or apply what has been answered.
+    ///
+    /// One step per command rather than the whole conversation, because a surface
+    /// that cannot hold a conversation must still be able to have one — and the
+    /// answers gathered so far live in the resumable progress file between them,
+    /// which is where a terminal run keeps them too.
+    Setup(SetupAction),
 }
 
 /// What a quality command asks for.
@@ -262,6 +271,8 @@ pub enum Outcome {
     Seed(crate::seed::Report),
     /// What a full reset did, or would do — the operator edits reverted to lemonfiber's.
     Reset(ResetReport),
+    /// Where setup stands, and what it is still asking for.
+    Wizard(WizardReport),
 }
 
 impl Outcome {
@@ -284,6 +295,7 @@ impl Outcome {
             Self::Doctor(_) => kind::DOCTOR,
             Self::Seed(_) => kind::SEED,
             Self::Reset(_) => kind::RESET,
+            Self::Wizard(_) => kind::WIZARD,
         };
         Envelope::new(kind, self)
     }
@@ -307,6 +319,7 @@ impl serde::Serialize for Outcome {
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
             Self::Reset(report) => report.serialize(serializer),
+            Self::Wizard(report) => report.serialize(serializer),
         }
     }
 }
@@ -370,6 +383,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
+        Command::Setup(action) => setup::setting_up(ctx, action).map(Outcome::Wizard),
     }
 }
 
@@ -378,7 +392,8 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        dispatch, pull_progress, Command, Ctx, Narrowing, Outcome, QualityAction, VersionReport,
+        dispatch, pull_progress, Command, Ctx, Narrowing, Outcome, QualityAction, SetupAction,
+        VersionReport,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -483,6 +498,31 @@ mod tests {
             json.contains("\"kind\":\"stuck\""),
             "envelope names the kind"
         );
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_setup_serialises_under_its_own_kind() {
+        // Reading where the walk stands asks nothing and writes nothing, so it runs
+        // through dispatch, envelope and serialise on a machine with no setup at all.
+        let env_file = config_scratch("setup-kind");
+        let settings = Settings {
+            stack_dir: env_file.parent().map(|dir| dir.join("stack")),
+            env_file: Some(env_file),
+            ..Settings::default()
+        };
+        let json = dispatch(
+            Command::Setup(SetupAction::Where),
+            &a_context().settings(settings).build(),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"wizard\""),
+            "envelope names the kind: {json}"
+        );
+        assert!(json.contains("\"at\":\"welcome\""), "{json}");
     }
 
     #[tokio::test]
@@ -710,7 +750,8 @@ mod tests {
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
-                | Outcome::Reset(_),
+                | Outcome::Reset(_)
+                | Outcome::Wizard(_),
             )
             | Err(_) => None,
         }
@@ -735,7 +776,8 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_)
-                | Outcome::Reset(_),
+                | Outcome::Reset(_)
+                | Outcome::Wizard(_),
             )
             | Err(_) => None,
         }
@@ -1377,7 +1419,8 @@ mod tests {
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
-                | Outcome::Reset(_),
+                | Outcome::Reset(_)
+                | Outcome::Wizard(_),
             )
             | Err(_) => None,
         }
@@ -2352,7 +2395,8 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
-                | Outcome::Reset(_),
+                | Outcome::Reset(_)
+                | Outcome::Wizard(_),
             )
             | Err(_) => None,
         }

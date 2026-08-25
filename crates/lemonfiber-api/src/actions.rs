@@ -141,7 +141,7 @@ pub enum Answering {
 #[must_use]
 pub const fn answering(command: &Command) -> Answering {
     match command {
-        Command::ConfigSet { .. } | Command::Quality(_) => Answering::Now,
+        Command::ConfigSet { .. } | Command::Quality(_) | Command::Setup(_) => Answering::Now,
         _ => Answering::Later,
     }
 }

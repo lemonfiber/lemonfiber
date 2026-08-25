@@ -54,6 +54,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
     let endpoints = Router::new()
         .merge(crate::read::routes())
         .merge(crate::actions::routes())
+        .merge(crate::setup::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming));
     endpoints.layer(middleware::from_fn_with_state(serving, guarded))

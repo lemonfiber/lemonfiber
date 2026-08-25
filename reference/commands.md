@@ -71,11 +71,17 @@ Options:
       --json
           Print machine-readable output
 
-      --yes
-          Apply without a prompt to confirm — required for an unattended run
+      --status
+          Report where setup stands and ask nothing. Takes precedence over the answers below, so a run that asks where it is never also answers
 
       --dry-run
           Say what would happen, and change nothing
+
+      --yes
+          Apply without a prompt to confirm — required for an unattended run
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
 
       --protocols <PROTOCOLS>
           How to fetch content: `both`, `usenet`, `torrent`, or `none`
@@ -83,14 +89,11 @@ Options:
       --data-location <PATH>
           Where the library and downloads live
 
-      --force
-          Take the stack from a run that claimed it and did not give it back
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
 
       --indexer-url <URL>
           An indexer's API base URL
-
-      --stack-dir <PATH>
-          Operate a stack directory of your own instead of the built-in one
 
       --indexer-key <KEY>
           The indexer's API key

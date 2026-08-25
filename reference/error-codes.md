@@ -67,6 +67,7 @@ what to do about it, is written for operators at
 - `SETUP-4`
 - `SETUP-5`
 - `SETUP-6`
+- `SETUP-7`
 - `STACK-1`
 - `STACK-2`
 - `STACK-3`

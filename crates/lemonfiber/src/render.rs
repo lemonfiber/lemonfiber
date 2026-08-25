@@ -26,7 +26,10 @@ mod trace;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{ConfigReport, FormsReport, SupervisionReport, VersionReport};
+use lemonfiber_core::model::{
+    ConfigReport, FormsReport, SupervisionReport, VersionReport, WizardReport,
+};
+use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
 /// What stands in for an answer that could not be turned into JSON.
@@ -197,7 +200,39 @@ fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Doctor(report) => doctor::diagnosis(report),
         Outcome::Seed(report) => seed::seeding(report),
         Outcome::Reset(report) => stack::reset(report),
+        Outcome::Wizard(report) => standing(report),
     }
+}
+
+/// Where setup stands, for somebody who asked rather than answered.
+///
+/// The plan is shown only once every question has an answer, because until then
+/// it is a partial list of settings that reads as the whole of what will be
+/// written. Its values arrive withheld where they are credentials, and are put
+/// through unexamined here — deciding again which of them to hide would be a
+/// second rule to keep in step with the one that already did it.
+fn standing(report: &WizardReport) -> Lines {
+    let mut lines = Lines::default();
+    if !report.offered {
+        lines.put(format!("{PRODUCT} is already set up on this machine."));
+        return lines;
+    }
+    if report.phase == Phase::Applying {
+        lines.put("An earlier apply stopped part-way and has not been recovered.".to_owned());
+    }
+    lines.put(format!("Setup is at: {}", report.at.label()));
+    for step in &report.unanswered {
+        lines.put(format!("  · still to answer: {}", step.label()));
+    }
+    if report.ready_for_review {
+        lines.put("Every question is answered.".to_owned());
+        lines.put(String::new());
+        lines.put("What applying will write:".to_owned());
+        for setting in &report.plan {
+            lines.put(format!("  {}={}", setting.key, setting.value));
+        }
+    }
+    lines
 }
 
 /// The same answer, for something that will parse it.
@@ -304,7 +339,8 @@ mod tests {
         some_forms,
     };
     use super::{
-        answer, forms, logged, machine_readable, render, settings, versions, watched, Lines,
+        answer, forms, logged, machine_readable, render, settings, standing, versions, watched,
+        Lines,
     };
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::docker::Condition;
@@ -312,8 +348,22 @@ mod tests {
     use lemonfiber_core::model::{
         ConfigReport, Disposition, DoctorReport, FormsReport, HouseholdReport, MusicReport,
         QualityReport, ResetReport, SettingReport, StatusReport, StuckReport, UpgradeReport,
-        VersionReport,
+        VersionReport, WizardReport,
     };
+    use lemonfiber_core::wizard::{Phase, Step};
+
+    /// A setup part-way through, which is what most of these vary from.
+    fn part_way() -> WizardReport {
+        WizardReport {
+            offered: true,
+            phase: Phase::InProgress,
+            at: Step::DataLocation,
+            asks: true,
+            unanswered: vec![Step::DataLocation, Step::Library],
+            ready_for_review: false,
+            plan: Vec::new(),
+        }
+    }
 
     /// The case this exists for. The container writes the line, the terminal reads
     /// the escape, and the screen stops saying what this product said.
@@ -581,5 +631,64 @@ mod tests {
         lines.spaced("and\rthis");
         lines.block("a\u{7f}b");
         assert_eq!(lines.text(), "Some[2JRelease\n\nandthis\nab");
+    }
+
+    #[test]
+    fn a_setup_part_way_through_names_where_it_is_and_what_is_left() {
+        // Through the dispatcher's own renderer, so the arm that reaches these
+        // words is the one a run takes rather than one only a test does.
+        let said = answer(&Outcome::Wizard(part_way()), false).text();
+        assert!(
+            said.contains("Where downloads and the library are kept"),
+            "{said}"
+        );
+        assert!(said.contains("How the library is served"), "{said}");
+        assert!(
+            !said.contains("What applying will write"),
+            "a partial plan read as the whole of it: {said}"
+        );
+    }
+
+    #[test]
+    fn a_finished_machine_is_pointed_elsewhere_rather_than_asked_again() {
+        let said = standing(&WizardReport {
+            offered: false,
+            ..part_way()
+        })
+        .text();
+        assert!(said.contains("already set up"), "{said}");
+        assert!(!said.contains("still to answer"), "{said}");
+    }
+
+    #[test]
+    fn an_apply_that_stopped_part_way_is_said_before_anything_else() {
+        let said = standing(&WizardReport {
+            phase: Phase::Applying,
+            ..part_way()
+        })
+        .text();
+        assert!(
+            said.starts_with("An earlier apply stopped part-way"),
+            "{said}"
+        );
+    }
+
+    #[test]
+    fn a_complete_set_of_answers_shows_what_applying_would_write() {
+        let said = standing(&WizardReport {
+            at: Step::Review,
+            asks: false,
+            unanswered: Vec::new(),
+            ready_for_review: true,
+            plan: vec![SettingReport {
+                key: "INDEXER_APIKEY".to_owned(),
+                value: "(set, not shown)".to_owned(),
+                secret: true,
+            }],
+            ..part_way()
+        })
+        .text();
+        assert!(said.contains("Every question is answered."), "{said}");
+        assert!(said.contains("INDEXER_APIKEY=(set, not shown)"), "{said}");
     }
 }

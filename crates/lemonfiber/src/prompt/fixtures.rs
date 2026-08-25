@@ -58,6 +58,7 @@ pub(crate) fn wizard() -> Wizard {
 /// Raw flags with nothing set, for a test to fill only what it means to.
 pub(crate) fn raw() -> RawSetup {
     RawSetup {
+        status: false,
         yes: false,
         protocols: None,
         data_location: None,

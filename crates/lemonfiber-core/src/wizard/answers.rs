@@ -59,6 +59,10 @@ pub struct Indexer {
     /// The API key it authenticates with.
     pub key: String,
     /// Whether a live test proved the key before it was kept.
+    ///
+    /// Defaulted when it is absent, so a surface submitting an answer states only
+    /// what was entered; what a test decided is not a caller's to assert.
+    #[serde(default)]
     pub validated: bool,
 }
 
@@ -116,6 +120,9 @@ pub struct Provider {
     /// Whether to connect over TLS, as it must be to carry the password.
     pub tls: bool,
     /// Whether a live login proved the account before it was kept.
+    ///
+    /// Defaulted when it is absent, for the same reason the indexer's is.
+    #[serde(default)]
     pub validated: bool,
 }
 
@@ -179,7 +186,12 @@ pub struct Answers {
 }
 
 /// One answer, tagged by the step it belongs to.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Read back as well as built, because a surface that is not in this process
+/// submits one: the tag is the step, so an answer names the question it belongs
+/// to rather than arriving as a field a reader has to guess the meaning of.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Answer {
     /// The protocol choice.
     Protocols(Protocols),

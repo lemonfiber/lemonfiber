@@ -182,20 +182,28 @@ fn unwritable(path: &Path, err: &std::io::Error) -> Failure {
 pub fn shown(file: &EnvFile) -> Vec<Shown> {
     file.keys()
         .into_iter()
-        .map(|key| {
-            let secret = is_secret(key);
-            let value = file.get(key).unwrap_or_default();
-            Shown {
-                key: key.to_owned(),
-                value: if secret && !value.is_empty() {
-                    REDACTED.to_owned()
-                } else {
-                    value.to_owned()
-                },
-                secret,
-            }
-        })
+        .map(|key| showing(key, file.get(key).unwrap_or_default()))
         .collect()
+}
+
+/// One setting as it is safe to display: a name that reads as a credential keeps
+/// its name and loses its value.
+///
+/// A pair rather than a whole file, because the settings a run is about to write
+/// are shown before there is a file holding them — and a review that redacted by
+/// its own rule would be a second rule to keep in step with this one.
+#[must_use]
+pub fn showing(key: &str, value: &str) -> Shown {
+    let secret = is_secret(key);
+    Shown {
+        key: key.to_owned(),
+        value: if secret && !value.is_empty() {
+            REDACTED.to_owned()
+        } else {
+            value.to_owned()
+        },
+        secret,
+    }
 }
 
 /// Configuration could not be read or changed.

@@ -9,8 +9,10 @@
 //! Starting the stack and recovering an interrupted apply join this once there is
 //! a surface to show their progress.
 
+mod answering;
 mod proving;
 
+pub use answering::{setting_up, SetupAction, ALREADY_SET_UP};
 use proving::{resolve_credentials, resolve_location, resolve_provider, resolve_vpn};
 
 use std::path::{Path, PathBuf};
@@ -203,13 +205,18 @@ pub fn progress_at(path: &Path) -> Option<Progress> {
     serde_json::from_str(&text).ok()
 }
 
-/// Re-apply a setup whose apply was interrupted, from the answers it recorded.
+/// Take a gathered setup through review and apply it, from the answers it holds.
+///
+/// The one way answers become configuration, whether they were gathered in this
+/// process or over a sequence of requests, and however far a previous attempt got:
+/// review is entered only from a complete set of answers, so an incomplete one is
+/// refused here rather than judged by each caller.
 ///
 /// A failed apply leaves the wizard restored to `applying` with every answer
 /// intact — apply persists them before it writes. Rolling that one step back to
 /// review is the wizard's single backward edge, and from review apply carries it
-/// forward again. Apply is idempotent, so this either finishes what the
-/// interrupted run started or leaves the same recoverable marker to try again.
+/// forward again. Apply is idempotent, so this either finishes what an interrupted
+/// run started or leaves the same recoverable marker to try again.
 ///
 /// # Errors
 ///
@@ -359,7 +366,7 @@ fn does_not_apply(rejected: Rejected) -> Problem {
         DOES_NOT_APPLY,
         Severity::Error,
         "An answer does not apply on this platform",
-        "Setup only asks what applies where it runs, so this should not be reachable through its own prompts. Nothing has been applied.",
+        "Setup only offers what applies where it runs, so the answer was not recorded. Nothing has been applied.",
         Remedy::new("Answer with a choice this platform offers"),
     )
     .with_detail(format!("{rejected:?}"))
