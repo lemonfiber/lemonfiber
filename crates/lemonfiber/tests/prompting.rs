@@ -39,6 +39,9 @@ const ASKED: &str = "crates/lemonfiber/src/prompt";
 /// The one question that is not the wizard's: whether to let downloads finish.
 const STOPPING: &str = "crates/lemonfiber/src/stopping.rs";
 
+/// The other one: whether to carry out each repair a check offered.
+const REPAIRING: &str = "crates/lemonfiber/src/repair.rs";
+
 /// The workspace root, from where this test's crate sits.
 fn workspace() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -51,7 +54,7 @@ fn workspace() -> &'static Path {
 fn along_the_path() -> Vec<(String, String)> {
     let root = workspace();
     let mut read: Vec<(String, String)> = Vec::new();
-    for named in [KEYBOARD, ASKING, STOPPING] {
+    for named in [KEYBOARD, ASKING, STOPPING, REPAIRING] {
         if let Ok(text) = std::fs::read_to_string(root.join(named)) {
             read.push((named.to_owned(), text));
         }

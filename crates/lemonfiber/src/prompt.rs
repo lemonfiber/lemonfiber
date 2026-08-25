@@ -39,6 +39,15 @@ pub(crate) fn yes_no(answers: &dyn Answers, question: &str, default: bool) -> bo
 }
 
 pub trait Answers {
+    /// Whether anyone is present to answer.
+    ///
+    /// True unless something says otherwise, because everything that answers in a
+    /// test has an answer ready — the one implementation that can find nobody there
+    /// is the one reading a real terminal.
+    fn present(&self) -> bool {
+        true
+    }
+
     /// Show a question and read the trimmed answer, empty at end of input.
     fn ask(&self, question: &str) -> String;
 
