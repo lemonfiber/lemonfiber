@@ -15,6 +15,13 @@
 //! * A **stale** value is worth showing, and worth marking. The last known speed
 //!   tells more than a blank, as long as nobody reads it as current.
 //! * An **absent** panel says why. An empty region reads as "nothing wrong".
+//!
+//! A panel is a box of a fixed height, so a row that will not fit is shortened
+//! rather than wrapped: wrapping would push the last entries out of a box that
+//! cannot grow, which trades a loss that is marked for one that is silent. What is
+//! shortened is only what came from somewhere else — every value here reaches the
+//! screen through [`plain`], and it is shortened in the middle, so the ends that
+//! tell two of them apart both survive.
 
 use crate::render::downloads::protocol;
 use lemonfiber_core::alert::Alert;
@@ -24,7 +31,7 @@ use lemonfiber_core::dashboard::{
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;
 use lemonfiber_core::queue::Stuck;
-use lemonfiber_core::text::plain;
+use lemonfiber_core::text::{fitted, plain};
 use lemonfiber_core::walkthrough::{size, spell_out};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -34,6 +41,15 @@ use ratatui::text::{Line, Span};
 /// A long list is not more information — past a handful it is a wall an operator
 /// stops reading, and the thing that needed attention is somewhere in it.
 const SHOWN: usize = 6;
+
+/// How wide the service column is in the queues panel, where there is room for it.
+///
+/// A column narrower than the room left is what makes a list scannable down its
+/// edge; where the room is narrower than the column, the room decides.
+const NAMED: usize = 12;
+
+/// The same, in the services panel, whose names sit beside a longer word.
+const LISTED: usize = 14;
 
 /// The dimmed style everything uncertain is drawn in.
 fn quiet() -> Style {
@@ -46,13 +62,24 @@ fn quiet() -> Style {
 /// Two different questions, deliberately side by side. A healthy stack can be
 /// shown through half-failing telemetry, and a perfectly refreshing screen can be
 /// reporting a stack that is on fire.
-pub(super) fn header(telemetry: Telemetry, health: &Summary) -> Line<'static> {
+pub(super) fn header(telemetry: Telemetry, health: &Summary, across: usize) -> Line<'static> {
+    let state = screen(telemetry);
+    let led = "lemonfiber  ".len() + state.chars().count() + "   ".len();
     Line::from(vec![
         Span::raw("lemonfiber  "),
-        Span::styled(screen(telemetry).to_owned(), quiet()),
+        Span::styled(state.to_owned(), quiet()),
         Span::raw("   "),
-        Span::raw(plain(&health.said())),
+        Span::raw(shortened(&health.said(), across.saturating_sub(led))),
     ])
+}
+
+/// Text from somewhere else, made safe for a terminal and then made to fit the row
+/// it has.
+///
+/// One place, so no panel can put a value on the screen by a route that skips
+/// either half of it.
+fn shortened(value: &str, room: usize) -> String {
+    fitted(&plain(value), room)
 }
 
 /// How the screen itself is doing, in a word.
@@ -68,7 +95,7 @@ const fn screen(telemetry: Telemetry) -> &'static str {
 
 /// The VPN panel: where traffic leaves from, and whether it is genuinely leaving
 /// through the tunnel.
-pub(super) fn vpn(panel: Option<&Panel<Vpn>>) -> Vec<Line<'static>> {
+pub(super) fn vpn(panel: Option<&Panel<Vpn>>, room: usize) -> Vec<Line<'static>> {
     let Some(panel) = panel else {
         // No VPN configured. Said rather than shown as a permanently red panel,
         // which is what an omitted one would read as after a while.
@@ -76,18 +103,18 @@ pub(super) fn vpn(panel: Option<&Panel<Vpn>>) -> Vec<Line<'static>> {
     };
     let vpn = match panel {
         Panel::Ready(vpn) => vpn,
-        Panel::Unavailable { reason } => return unavailable(reason),
+        Panel::Unavailable { reason } => return unavailable(reason, room),
     };
     let port = vpn.forwarded_port.map_or_else(
         || Span::styled("no forwarded port", quiet()),
         |port| Span::raw(format!("port {port}")),
     );
+    // The address takes the room it needs and the country takes what is left: two
+    // values on one row, and the first of them is the one being checked.
+    let exit = shortened(&vpn.exit_ip, room);
+    let country = shortened(&vpn.country, room.saturating_sub(exit.chars().count() + 2));
     vec![
-        Line::from(vec![
-            Span::raw(plain(&vpn.exit_ip)),
-            Span::raw("  "),
-            Span::raw(plain(&vpn.country)),
-        ]),
+        Line::from(vec![Span::raw(exit), Span::raw("  "), Span::raw(country)]),
         Line::from(vec![
             // The one line that matters: a tunnel being up says nothing about
             // whether the client's traffic is inside it.
@@ -102,10 +129,10 @@ pub(super) fn vpn(panel: Option<&Panel<Vpn>>) -> Vec<Line<'static>> {
 }
 
 /// The transfers panel: what is arriving, how fast, and when it lands.
-pub(super) fn transfers(panel: &Panel<Vec<Transfer>>) -> Vec<Line<'static>> {
+pub(super) fn transfers(panel: &Panel<Vec<Transfer>>, room: usize) -> Vec<Line<'static>> {
     let transfers = match panel {
         Panel::Ready(transfers) => transfers,
-        Panel::Unavailable { reason } => return unavailable(reason),
+        Panel::Unavailable { reason } => return unavailable(reason, room),
     };
     if transfers.is_empty() {
         return vec![Line::styled("nothing is downloading", quiet())];
@@ -114,7 +141,7 @@ pub(super) fn transfers(panel: &Panel<Vec<Transfer>>) -> Vec<Line<'static>> {
         .iter()
         .take(SHOWN)
         .map(|transfer| {
-            Line::from(vec![
+            let led = vec![
                 Span::raw(format!("{:>3}%  ", transfer.progress)),
                 Span::raw(format!("{:<7}", protocol(transfer.protocol))),
                 speed(&transfer.speed),
@@ -124,10 +151,16 @@ pub(super) fn transfers(panel: &Panel<Vec<Transfer>>) -> Vec<Line<'static>> {
                     |left| Span::raw(format!("~{}", spell_out(left))),
                 ),
                 Span::raw("  "),
-                // From an indexer by way of a download client: a terminal reads a
-                // control character in the middle of it as an instruction.
-                Span::raw(plain(&transfer.name)),
-            ])
+            ];
+            let mut line = Line::from(led);
+            // From an indexer by way of a download client: a terminal reads a
+            // control character in the middle of it as an instruction, and the
+            // name is what tells this download from the next one.
+            line.push_span(Span::raw(shortened(
+                &transfer.name,
+                room.saturating_sub(width(&line)),
+            )));
+            line
         })
         .collect();
     lines.extend(rest(transfers.len(), "transfer"));
@@ -151,16 +184,18 @@ fn speed(reading: &Reading<u64>) -> Span<'static> {
 /// — so an alert reaches here whether or not anything else was set up. What is
 /// owed and what has been said read alike, because to somebody looking at the
 /// screen there is no difference: both are things that happened.
-pub(super) fn alerts(alerts: &[Alert]) -> Vec<Line<'static>> {
+pub(super) fn alerts(alerts: &[Alert], room: usize) -> Vec<Line<'static>> {
     if alerts.is_empty() {
         return vec![Line::styled("nothing has needed saying", quiet())];
     }
     alerts
         .iter()
         .map(|alert| {
+            let moment = format!("{:<9}", alert.moment.said());
+            let left = room.saturating_sub(moment.chars().count());
             Line::from(vec![
-                Span::raw(format!("{:<9}", alert.moment.said())),
-                Span::raw(plain(&alert.summary)),
+                Span::raw(moment),
+                Span::raw(shortened(&alert.summary, left)),
             ])
         })
         .collect()
@@ -172,24 +207,24 @@ pub(super) fn alerts(alerts: &[Alert]) -> Vec<Line<'static>> {
 /// that matters most is invisible inside either: an item that downloaded and was
 /// never imported is a finished download to the client and nothing at all to the
 /// \*arr.
-pub(super) fn stuck(stuck: &[Stuck]) -> Vec<Line<'static>> {
+pub(super) fn stuck(stuck: &[Stuck], room: usize) -> Vec<Line<'static>> {
     if stuck.is_empty() {
         return vec![Line::styled("nothing is stuck", quiet())];
     }
     let mut lines: Vec<Line<'static>> = stuck
         .iter()
         .take(SHOWN)
-        .map(|stuck| Line::from(vec![Span::raw(plain(&stuck.said()))]))
+        .map(|stuck| Line::from(vec![Span::raw(shortened(&stuck.said(), room))]))
         .collect();
     lines.extend(rest(stuck.len(), "item"));
     lines
 }
 
 /// The queue panel: how deep each service's queue is, and how much of it is stuck.
-pub(super) fn queues(panel: &Panel<Vec<Queue>>) -> Vec<Line<'static>> {
+pub(super) fn queues(panel: &Panel<Vec<Queue>>, room: usize) -> Vec<Line<'static>> {
     let queues = match panel {
         Panel::Ready(queues) => queues,
-        Panel::Unavailable { reason } => return unavailable(reason),
+        Panel::Unavailable { reason } => return unavailable(reason, room),
     };
     if queues.is_empty() {
         return vec![Line::styled("no service reported a queue", quiet())];
@@ -203,9 +238,17 @@ pub(super) fn queues(panel: &Panel<Vec<Queue>>) -> Vec<Line<'static>> {
             } else {
                 Span::raw(format!("{} stuck", queue.stuck))
             };
+            let depth = format!("{:>4} queued  ", queue.depth);
+            let led = depth.chars().count() + stuck.content.chars().count();
+            // The column is what a short name is padded to, not what a long one is
+            // held to: a name takes the whole of the room left before it is
+            // shortened, and the column only lines the short ones up.
+            let allowed = room.saturating_sub(led);
+            let column = NAMED.min(allowed);
+            let named = shortened(&queue.service, allowed);
             Line::from(vec![
-                Span::raw(format!("{:<12}", plain(&queue.service))),
-                Span::raw(format!("{:>4} queued  ", queue.depth)),
+                Span::raw(format!("{named:<column$}")),
+                Span::raw(depth),
                 stuck,
             ])
         })
@@ -215,10 +258,10 @@ pub(super) fn queues(panel: &Panel<Vec<Queue>>) -> Vec<Line<'static>> {
 }
 
 /// The storage panel: what is left, whether imports are free, and when it fills.
-pub(super) fn storage(panel: &Panel<Storage>) -> Vec<Line<'static>> {
+pub(super) fn storage(panel: &Panel<Storage>, room: usize) -> Vec<Line<'static>> {
     let storage = match panel {
         Panel::Ready(storage) => storage,
-        Panel::Unavailable { reason } => return unavailable(reason),
+        Panel::Unavailable { reason } => return unavailable(reason, room),
     };
     let free = match &storage.free {
         Reading::Known(bytes) => Span::raw(format!("{} free", size(*bytes))),
@@ -244,10 +287,10 @@ pub(super) fn storage(panel: &Panel<Storage>) -> Vec<Line<'static>> {
 }
 
 /// The services panel: what each one is doing.
-pub(super) fn services(panel: &Panel<Vec<Service>>) -> Vec<Line<'static>> {
+pub(super) fn services(panel: &Panel<Vec<Service>>, room: usize) -> Vec<Line<'static>> {
     let services = match panel {
         Panel::Ready(services) => services,
-        Panel::Unavailable { reason } => return unavailable(reason),
+        Panel::Unavailable { reason } => return unavailable(reason, room),
     };
     if services.is_empty() {
         return vec![Line::styled("no services are running", quiet())];
@@ -256,9 +299,13 @@ pub(super) fn services(panel: &Panel<Vec<Service>>) -> Vec<Line<'static>> {
         .iter()
         .take(SHOWN)
         .map(|service| {
+            let state = format!("{:?}", service.state).to_lowercase();
+            let allowed = room.saturating_sub(state.chars().count());
+            let column = LISTED.min(allowed);
+            let named = shortened(&service.id, allowed);
             Line::from(vec![
-                Span::raw(format!("{:<14}", plain(&service.id))),
-                Span::raw(format!("{:?}", service.state).to_lowercase()),
+                Span::raw(format!("{named:<column$}")),
+                Span::raw(state),
             ])
         })
         .collect();
@@ -289,13 +336,25 @@ fn rest(total: usize, noun: &str) -> Option<Line<'static>> {
 ///
 /// One panel, one source. A panel that could not be filled marks itself and
 /// leaves the rest of the screen live.
-fn unavailable(reason: &str) -> Vec<Line<'static>> {
+fn unavailable(reason: &str, room: usize) -> Vec<Line<'static>> {
     // The reason commonly quotes what a service said, which is text from
     // somewhere else on its way to a terminal.
+    const LED: &str = "unavailable — ";
     vec![Line::styled(
-        format!("unavailable — {}", plain(reason)),
+        format!(
+            "{LED}{}",
+            shortened(reason, room.saturating_sub(LED.chars().count()))
+        ),
         quiet(),
     )]
+}
+
+/// How many columns a line has taken so far.
+fn width(line: &Line<'static>) -> usize {
+    line.spans
+        .iter()
+        .map(|span| span.content.chars().count())
+        .sum()
 }
 
 /// Whether any panel in this snapshot could not be filled.
@@ -321,6 +380,9 @@ mod tests {
     };
     use lemonfiber_core::health::{Reach, Summary};
     use lemonfiber_core::queue::Stuck;
+
+    /// A panel with more room than anything here is testing the edge of.
+    const WIDE: usize = 200;
 
     /// The words of a panel, one string per line.
     fn said(lines: &[ratatui::text::Line<'static>]) -> Vec<String> {
@@ -351,14 +413,14 @@ mod tests {
         // The distinction the whole panel exists for: nought bytes a second is a
         // stalled download; no answer is a client that went quiet, and an operator
         // who cannot tell them apart learns to trust neither.
-        let stalled = said(&transfers(&Panel::Ready(vec![transfer(
-            "Some.Release",
-            Reading::Known(0),
-        )])));
-        let quiet = said(&transfers(&Panel::Ready(vec![transfer(
-            "Some.Release",
-            Reading::Unknown,
-        )])));
+        let stalled = said(&transfers(
+            &Panel::Ready(vec![transfer("Some.Release", Reading::Known(0))]),
+            WIDE,
+        ));
+        let quiet = said(&transfers(
+            &Panel::Ready(vec![transfer("Some.Release", Reading::Unknown)]),
+            WIDE,
+        ));
         assert_ne!(stalled, quiet);
         assert!(stalled.first().is_some_and(|line| line.contains("0 MB/s")));
         assert!(quiet.first().is_some_and(|line| line.contains("not read")));
@@ -368,10 +430,10 @@ mod tests {
     fn a_stale_speed_is_shown_and_marked_rather_than_dropped() {
         // The last known speed says more than a blank, as long as nobody reads it
         // as current.
-        let stale = said(&transfers(&Panel::Ready(vec![transfer(
-            "Some.Release",
-            Reading::Stale(5_000_000),
-        )])));
+        let stale = said(&transfers(
+            &Panel::Ready(vec![transfer("Some.Release", Reading::Stale(5_000_000))]),
+            WIDE,
+        ));
         assert!(stale.first().is_some_and(|line| line.contains("5 MB/s ·")));
     }
 
@@ -380,15 +442,15 @@ mod tests {
         // A blank region reads as "nothing wrong", which is the one thing an empty
         // panel must never say on its own.
         assert_eq!(
-            said(&transfers(&Panel::Ready(Vec::new()))),
+            said(&transfers(&Panel::Ready(Vec::new()), WIDE)),
             vec!["nothing is downloading".to_owned()]
         );
         assert_eq!(
-            said(&queues(&Panel::Ready(Vec::new()))),
+            said(&queues(&Panel::Ready(Vec::new()), WIDE)),
             vec!["no service reported a queue".to_owned()]
         );
         assert_eq!(
-            said(&services(&Panel::Ready(Vec::new()))),
+            said(&services(&Panel::Ready(Vec::new()), WIDE)),
             vec!["no services are running".to_owned()]
         );
     }
@@ -397,7 +459,7 @@ mod tests {
     fn an_unavailable_panel_says_why_and_leaves_the_rest_alone() {
         let down: Panel<Vec<Transfer>> = Panel::unavailable("the client did not answer");
         assert_eq!(
-            said(&transfers(&down)),
+            said(&transfers(&down, WIDE)),
             vec!["unavailable — the client did not answer".to_owned()]
         );
     }
@@ -409,7 +471,7 @@ mod tests {
         let many: Vec<Transfer> = (0..SHOWN + 3)
             .map(|n| transfer(&format!("Release.{n}"), Reading::Known(1_000_000)))
             .collect();
-        let lines = said(&transfers(&Panel::Ready(many)));
+        let lines = said(&transfers(&Panel::Ready(many), WIDE));
         assert_eq!(lines.len(), SHOWN + 1);
         assert!(lines
             .last()
@@ -421,12 +483,15 @@ mod tests {
         let few: Vec<Transfer> = (0..2)
             .map(|n| transfer(&format!("Release.{n}"), Reading::Known(1_000_000)))
             .collect();
-        assert_eq!(said(&transfers(&Panel::Ready(few))).len(), 2);
+        assert_eq!(said(&transfers(&Panel::Ready(few), WIDE)).len(), 2);
     }
 
     #[test]
     fn no_vpn_configured_is_stated_rather_than_shown_as_a_red_panel() {
-        assert_eq!(said(&vpn(None)), vec!["no VPN is configured".to_owned()]);
+        assert_eq!(
+            said(&vpn(None, WIDE)),
+            vec!["no VPN is configured".to_owned()]
+        );
     }
 
     #[test]
@@ -439,7 +504,7 @@ mod tests {
             forwarded_port: None,
             egress_matches: false,
         });
-        let lines = said(&vpn(Some(&leaking)));
+        let lines = said(&vpn(Some(&leaking), WIDE));
         assert!(lines.iter().any(|line| line.contains("NOT going through")));
         assert!(lines.iter().any(|line| line.contains("no forwarded port")));
 
@@ -449,7 +514,7 @@ mod tests {
             forwarded_port: Some(51413),
             egress_matches: true,
         });
-        let lines = said(&vpn(Some(&behind)));
+        let lines = said(&vpn(Some(&behind), WIDE));
         assert!(lines.iter().any(|line| line.contains("leaves through")));
         assert!(lines.iter().any(|line| line.contains("port 51413")));
     }
@@ -458,7 +523,7 @@ mod tests {
     fn an_unavailable_vpn_panel_says_why() {
         let down: Panel<Vpn> = Panel::unavailable("the gateway did not answer");
         assert_eq!(
-            said(&vpn(Some(&down))),
+            said(&vpn(Some(&down), WIDE)),
             vec!["unavailable — the gateway did not answer".to_owned()]
         );
     }
@@ -467,20 +532,26 @@ mod tests {
     fn a_volume_that_could_not_be_read_never_reads_as_a_full_one() {
         // Opposite things to an operator: one is a fault in the reading, the other
         // is a fault they have to act on tonight.
-        let unread = said(&storage(&Panel::Ready(Storage {
-            free: Reading::Unknown,
-            exhaustion: None,
-            hardlink: Hardlink::Unknown,
-        })));
+        let unread = said(&storage(
+            &Panel::Ready(Storage {
+                free: Reading::Unknown,
+                exhaustion: None,
+                hardlink: Hardlink::Unknown,
+            }),
+            WIDE,
+        ));
         assert!(unread
             .first()
             .is_some_and(|line| line.contains("could not be read")));
 
-        let empty = said(&storage(&Panel::Ready(Storage {
-            free: Reading::Known(0),
-            exhaustion: None,
-            hardlink: Hardlink::Linking,
-        })));
+        let empty = said(&storage(
+            &Panel::Ready(Storage {
+                free: Reading::Known(0),
+                exhaustion: None,
+                hardlink: Hardlink::Linking,
+            }),
+            WIDE,
+        ));
         assert!(empty.first().is_some_and(|line| line.contains("0 MB free")));
     }
 
@@ -488,22 +559,28 @@ mod tests {
     fn copying_imports_are_stated_as_what_they_cost() {
         // The consequence rather than the property: "no hardlinks" is a filesystem
         // fact, and "twice the disk" is what the operator has to weigh.
-        let copying = said(&storage(&Panel::Ready(Storage {
-            free: Reading::Known(1_000_000_000),
-            exhaustion: Some(std::time::Duration::from_secs(7200)),
-            hardlink: Hardlink::Copying,
-        })));
+        let copying = said(&storage(
+            &Panel::Ready(Storage {
+                free: Reading::Known(1_000_000_000),
+                exhaustion: Some(std::time::Duration::from_secs(7200)),
+                hardlink: Hardlink::Copying,
+            }),
+            WIDE,
+        ));
         assert!(copying.iter().any(|line| line.contains("twice the disk")));
         assert!(copying.iter().any(|line| line.contains("full in ~2h")));
     }
 
     #[test]
     fn a_queue_with_nothing_stuck_says_so_quietly() {
-        let lines = said(&queues(&Panel::Ready(vec![Queue {
-            service: "sonarr".to_owned(),
-            depth: 4,
-            stuck: 0,
-        }])));
+        let lines = said(&queues(
+            &Panel::Ready(vec![Queue {
+                service: "sonarr".to_owned(),
+                depth: 4,
+                stuck: 0,
+            }]),
+            WIDE,
+        ));
         assert!(lines
             .first()
             .is_some_and(|line| line.contains("4 queued") && line.contains("none stuck")));
@@ -511,11 +588,14 @@ mod tests {
 
     #[test]
     fn a_queue_with_something_stuck_says_how_many() {
-        let lines = said(&queues(&Panel::Ready(vec![Queue {
-            service: "sonarr".to_owned(),
-            depth: 4,
-            stuck: 2,
-        }])));
+        let lines = said(&queues(
+            &Panel::Ready(vec![Queue {
+                service: "sonarr".to_owned(),
+                depth: 4,
+                stuck: 2,
+            }]),
+            WIDE,
+        ));
         assert!(lines.first().is_some_and(|line| line.contains("2 stuck")));
     }
 
@@ -525,13 +605,13 @@ mod tests {
         let store: Panel<Storage> = Panel::unavailable("no data location is configured");
         let running: Panel<Vec<lemonfiber_core::docker::Service>> =
             Panel::unavailable("the engine did not answer");
-        assert!(said(&queues(&queue))
+        assert!(said(&queues(&queue, WIDE))
             .first()
             .is_some_and(|line| line.starts_with("unavailable —")));
-        assert!(said(&storage(&store))
+        assert!(said(&storage(&store, WIDE))
             .first()
             .is_some_and(|line| line.starts_with("unavailable —")));
-        assert!(said(&services(&running))
+        assert!(said(&services(&running, WIDE))
             .first()
             .is_some_and(|line| line.starts_with("unavailable —")));
     }
@@ -541,7 +621,7 @@ mod tests {
         // Two different questions: a healthy stack can be shown through half-failing
         // telemetry, and a perfect screen can be reporting a stack that is on fire.
         let summary = Summary::of(Reach::Running, &[], "1000");
-        let line = header(Telemetry::Degraded, &summary);
+        let line = header(Telemetry::Degraded, &summary, WIDE);
         let text: String = line
             .spans
             .iter()
@@ -563,7 +643,7 @@ mod tests {
         ]
         .into_iter()
         .map(|telemetry| {
-            header(telemetry, &summary)
+            header(telemetry, &summary, WIDE)
                 .spans
                 .iter()
                 .map(|span| span.content.to_string())
@@ -601,7 +681,7 @@ mod tests {
             eta: None,
             ..transfer("Some.Release", Reading::Known(0))
         };
-        let lines = said(&transfers(&Panel::Ready(vec![stalled])));
+        let lines = said(&transfers(&Panel::Ready(vec![stalled]), WIDE));
         assert!(lines
             .first()
             .is_some_and(|line| line.contains("no estimate")));
@@ -609,11 +689,14 @@ mod tests {
 
     #[test]
     fn a_free_space_reading_that_went_stale_is_shown_and_marked() {
-        let stale = said(&storage(&Panel::Ready(Storage {
-            free: Reading::Stale(2_000_000_000),
-            exhaustion: None,
-            hardlink: Hardlink::Unknown,
-        })));
+        let stale = said(&storage(
+            &Panel::Ready(Storage {
+                free: Reading::Stale(2_000_000_000),
+                exhaustion: None,
+                hardlink: Hardlink::Unknown,
+            }),
+            WIDE,
+        ));
         assert!(stale
             .first()
             .is_some_and(|line| line.contains("2.0 GB free ·")));
@@ -630,7 +713,7 @@ mod tests {
             depends_on: Vec::new(),
             exit: None,
         };
-        let lines = said(&services(&Panel::Ready(vec![running])));
+        let lines = said(&services(&Panel::Ready(vec![running]), WIDE));
         assert!(lines
             .first()
             .is_some_and(|line| line.contains("sonarr") && line.contains("running")));
@@ -642,7 +725,7 @@ mod tests {
         // control character in the middle of one as an instruction, and the result
         // is a screen that no longer says what this product said.
         let named = transfer("Some\u{1b}[2JRelease", Reading::Known(1_000_000));
-        let lines = said(&transfers(&Panel::Ready(vec![named])));
+        let lines = said(&transfers(&Panel::Ready(vec![named]), WIDE));
         assert!(
             lines.first().is_some_and(|line| !line.contains('\u{1b}')),
             "{lines:?}"
@@ -672,16 +755,19 @@ mod tests {
     fn an_alert_says_which_way_it_went_as_well_as_what_happened() {
         // "Sonarr is down" and "Sonarr came back" are opposite news, and a list
         // that renders them alike is one an operator has to read twice.
-        let lines = said(&alerts(&[
-            an_alert(
-                "Sonarr is not running",
-                lemonfiber_core::alert::Moment::Onset,
-            ),
-            an_alert(
-                "Sonarr is running again",
-                lemonfiber_core::alert::Moment::Resolved,
-            ),
-        ]));
+        let lines = said(&alerts(
+            &[
+                an_alert(
+                    "Sonarr is not running",
+                    lemonfiber_core::alert::Moment::Onset,
+                ),
+                an_alert(
+                    "Sonarr is running again",
+                    lemonfiber_core::alert::Moment::Resolved,
+                ),
+            ],
+            WIDE,
+        ));
         assert!(lines
             .first()
             .is_some_and(|line| line.starts_with("started")));
@@ -695,7 +781,7 @@ mod tests {
         // Not a blank region: an empty alerts panel is good news, and it should
         // read as good news rather than as a panel that failed to fill.
         assert_eq!(
-            said(&alerts(&[])),
+            said(&alerts(&[], WIDE)),
             vec!["nothing has needed saying".to_owned()]
         );
     }
@@ -704,7 +790,7 @@ mod tests {
     fn an_alert_from_a_service_cannot_take_over_the_screen() {
         // The summary quotes what a service said, which came from somewhere else.
         let evil = an_alert("gone\u{1b}[2Jaway", lemonfiber_core::alert::Moment::Onset);
-        assert!(said(&alerts(&[evil]))
+        assert!(said(&alerts(&[evil], WIDE))
             .first()
             .is_some_and(|line| !line.contains('\u{1b}')));
     }
@@ -718,7 +804,7 @@ mod tests {
             blocking: None,
             items: 1,
         };
-        let lines = said(&stuck(std::slice::from_ref(&held)));
+        let lines = said(&stuck(std::slice::from_ref(&held), WIDE));
         assert!(lines
             .first()
             .is_some_and(|line| line.contains("Some.Release") && line.contains("7 hours")));
@@ -726,6 +812,6 @@ mod tests {
 
     #[test]
     fn a_pipeline_with_nothing_stuck_says_so() {
-        assert_eq!(said(&stuck(&[])), vec!["nothing is stuck".to_owned()]);
+        assert_eq!(said(&stuck(&[], WIDE)), vec!["nothing is stuck".to_owned()]);
     }
 }

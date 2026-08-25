@@ -796,4 +796,30 @@ mod tests {
             );
         }
     }
+    /// The pane the `?` key opens is this screen's as much as the dashboard's, and
+    /// an explanation is prose: at no width does it stop mid-sentence.
+    #[test]
+    fn the_words_this_screen_explains_are_explained_whole() {
+        let mut viewer = Viewer::opened().without_colour();
+        viewer.take(line("qbittorrent", "INFO the hardlink failed"));
+        viewer.pressed(Press::Typed('?'));
+
+        let explained: Vec<&str> = lemonfiber_core::glossary::TERMS
+            .iter()
+            .filter(|term| term.word == "hardlink")
+            .flat_map(|term| term.short.split_whitespace())
+            .collect();
+
+        for across in [60u16, 80, 120, 200] {
+            let screen = drawn(&viewer, across, 24).replace('\n', " ");
+            let cut: Vec<&&str> = explained
+                .iter()
+                .filter(|word| !screen.contains(**word))
+                .collect();
+            assert!(
+                cut.is_empty(),
+                "at {across} columns, cut off {cut:?}: {screen}"
+            );
+        }
+    }
 }

@@ -422,7 +422,8 @@ const fn wanted(key: KeyEvent) -> Option<Press> {
 /// which is the one failure this whole record exists to avoid.
 fn learned(showing: &str, screen: Rect, rehearsing: bool) {
     let known = crate::render::glossary::known();
-    let words: Vec<&str> = crate::pane::explained_in(showing, crate::pane::room_on(screen), known)
+    let (rows, across) = crate::pane::room_on(screen);
+    let words: Vec<&str> = crate::pane::explained_in(showing, rows, across, known)
         .into_iter()
         .map(|term| term.word)
         .collect();
