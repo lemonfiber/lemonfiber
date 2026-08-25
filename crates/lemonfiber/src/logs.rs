@@ -32,7 +32,7 @@ pub(crate) mod draw;
 mod keys;
 mod notices;
 
-pub(crate) use keys::{Asked, Press};
+pub(crate) use keys::{wanted, Asked, Press};
 
 /// How many lines the screen holds before the oldest give way.
 ///
@@ -454,10 +454,42 @@ mod tests {
     /// A title with more room than anything here is testing the edge of.
     const WIDE: usize = 200;
 
-    use super::{colours, sampled, Asked, Press, Shown, Viewer, BATCH};
+    use super::{colours, sampled, wanted, Asked, Press, Shown, Viewer, BATCH};
     use lemonfiber_core::bundle::Marks;
     use lemonfiber_core::logs::Level;
     use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    /// One keypress as this view reads it.
+    fn read(code: KeyCode, modifiers: KeyModifiers) -> Option<Press> {
+        wanted(KeyEvent::new(code, modifiers))
+    }
+
+    /// Every key this view answers arrives as something it can act on, and one it
+    /// has no use for arrives as nothing. Ctrl-C backs out rather than typing a
+    /// character, because raw mode no longer turns it into a signal.
+    #[test]
+    fn the_keyboard_reaches_this_view_as_the_presses_it_answers() {
+        for (code, press) in [
+            (KeyCode::Char('f'), Press::Typed('f')),
+            (KeyCode::Backspace, Press::Rubout),
+            (KeyCode::Enter, Press::Accept),
+            (KeyCode::Esc, Press::Abandon),
+            (KeyCode::Up, Press::Back),
+            (KeyCode::Down, Press::Forward),
+            (KeyCode::End, Press::Tail),
+        ] {
+            assert_eq!(read(code, KeyModifiers::NONE), Some(press), "{code:?}");
+        }
+        assert_eq!(
+            read(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            Some(Press::Abandon)
+        );
+        assert_eq!(read(KeyCode::Home, KeyModifiers::NONE), None);
+        // A character held with control is not that character: ctrl-e is not a
+        // filter somebody began typing.
+        assert_eq!(read(KeyCode::Char('e'), KeyModifiers::CONTROL), None);
+    }
 
     /// One line as the engine hands it over.
     fn line(service: &str, said: &str) -> LogLine {

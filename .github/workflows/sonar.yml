@@ -15,7 +15,7 @@ jobs:
       # The outermost edge only, where a test cannot follow — see the justfile's `coverage`
       # recipe for what each exclusion is and why. Named once here so the gate and the step
       # that explains the gate cannot disagree about what is being measured.
-      SKIPPED: '(crates/lemonfiber/src/(main|keyboard|context|engine|terminal)\.rs|crates/lemonfiber-core/src/adapters/nntp\.rs|crates/.*/examples/.*\.rs)'
+      SKIPPED: '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber/src/terminal(\.rs|/.*\.rs)|crates/lemonfiber-core/src/adapters/nntp\.rs|crates/.*/examples/.*\.rs)'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

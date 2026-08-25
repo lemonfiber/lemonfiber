@@ -371,17 +371,33 @@ impl Prompt for Terminal {
 
     fn confirm(&self, plan: &Plan) -> bool {
         say!("\nThis is what setup will write:");
-        for (key, value) in plan.settings() {
-            // A value is shown only where somebody has written down what makes
-            // showing it safe: the review reaches the screen, scrollback and any
-            // session recording, and an API key or password has no business in any
-            // of them. Decided by the same allow-list `config show` displays by, so
-            // the two surfaces cannot disagree about one setting.
-            let shown = if in_full(key) { value } else { "********" };
-            say!("  {key} = {shown}");
+        for line in reviewed(plan) {
+            say!("{line}");
         }
         self.yes_no("\nApply it?", true)
     }
+}
+
+/// What is shown in place of a secret: that there is one, and nothing more.
+const MASKED: &str = "********";
+
+/// The review of what setup will write, as the lines it puts on the screen.
+///
+/// A value is shown only where somebody has written down what makes showing it safe:
+/// the review reaches the screen, scrollback and any session recording, and an API
+/// key or password has no business in any of them. Decided by the same allow-list
+/// `config show` displays by, so the two surfaces cannot disagree about one setting.
+///
+/// Built rather than printed straight out, so that what it says can be read back — a
+/// mask nothing reads is a mask that can stop masking silently.
+fn reviewed(plan: &Plan) -> Vec<String> {
+    plan.settings()
+        .iter()
+        .map(|(key, value)| {
+            let shown = if in_full(key) { value.as_str() } else { MASKED };
+            format!("  {key} = {shown}")
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -393,9 +409,9 @@ mod tests {
     use lemonfiber_core::platform::Environment;
     use lemonfiber_core::prerequisites::prerequisites;
     use lemonfiber_core::validate::Validation;
-    use lemonfiber_core::wizard::{Answer, Indexer, Library, Wizard};
+    use lemonfiber_core::wizard::{Answer, Indexer, Library, Plan, Provider, Wizard};
 
-    use super::Terminal;
+    use super::{reviewed, Terminal, MASKED};
     use crate::prompt::fixtures::{answered, wizard, Script};
 
     /// Worth reading the first time and noise every time after — the rule the
@@ -426,23 +442,76 @@ mod tests {
         assert!(terminal.met.borrow().is_empty(), "nothing was introduced");
     }
 
-    #[test]
-    fn the_review_shows_each_setting_with_a_secret_marked_present_only() {
-        // A review reaches the screen, scrollback and any session recording, so a
-        // key has no business appearing in it — it is shown as present instead.
+    /// The indexer credential the reviewable plan carries.
+    ///
+    /// Named here, and asked about by name, rather than asked of `in_full`: that is
+    /// the decision under test, and a review checked against it would agree with it
+    /// however it answered — including when it answered that everything is safe.
+    const THE_KEY: &str = "the-key";
+
+    /// The provider credential it carries, named for the same reason.
+    const THE_LOGIN: &str = "the-login";
+
+    /// The settings of this plan whose values must not reach the review, by name.
+    ///
+    /// `USENET_USER` is one of them and carries no word that reads as a credential:
+    /// a provider issues it, several issue an account number, and it is half of a
+    /// paid login. That is what the allow-list is for, and what a rule reading names
+    /// would miss.
+    const WITHHELD: [&str; 3] = ["INDEXER_APIKEY", "USENET_USER", "USENET_PASS"];
+
+    /// A plan carrying both kinds of credential this setup can hold — an indexer key
+    /// and a provider login — beside settings that are not credentials at all.
+    fn a_reviewable_plan() -> Plan {
         let mut wizard = wizard();
         let _ = wizard.answer(Answer::Protocols(Protocols::both()));
         let _ = wizard.answer(Answer::DataLocation(PathBuf::from("/srv/media")));
         let _ = wizard.answer(Answer::Credentials(Some(Indexer {
             url: "http://indexer.test".to_owned(),
-            key: "the-key".to_owned(),
+            key: THE_KEY.to_owned(),
             validated: true,
         })));
-        let plan = wizard.plan();
+        let _ = wizard.answer(Answer::Provider(Some(Provider {
+            host: "news.test".to_owned(),
+            port: 563,
+            user: "me".to_owned(),
+            pass: THE_LOGIN.to_owned(),
+            tls: true,
+            validated: true,
+        })));
+        wizard.plan()
+    }
+
+    #[test]
+    fn the_review_shows_each_setting_with_a_secret_marked_present_only() {
+        // A review reaches the screen, scrollback and any session recording, so a
+        // key has no business appearing in it — it is shown as present instead.
+        let plan = a_reviewable_plan();
         assert!(
             !plan.settings().is_empty(),
             "the plan carries what was answered"
         );
+
+        let review = reviewed(&plan).join("\n");
+
+        assert!(review.contains("INDEXER_APIKEY = ********"), "{review}");
+        assert!(review.contains("USENET_PASS = ********"), "{review}");
+        assert!(review.contains("USENET_USER = ********"), "{review}");
+        assert!(
+            !review.contains(THE_KEY),
+            "the key is in the clear: {review}"
+        );
+        assert!(
+            !review.contains(THE_LOGIN),
+            "the login is in the clear: {review}"
+        );
+        // And the settings somebody vouched for are shown as they will be written,
+        // or a review that masked everything would say nothing at all.
+        assert!(
+            review.contains("INDEXER_URL = http://indexer.test"),
+            "{review}"
+        );
+        assert!(review.contains("DATA_ROOT = /srv/media"), "{review}");
         assert!(answered(&[""]).confirm(&plan));
     }
 
@@ -642,9 +711,35 @@ mod tests {
 
     #[test]
     fn the_review_shows_every_setting_and_never_a_secret_in_the_clear() {
-        let plan = Wizard::new(Environment::MacOs).plan();
+        let plan = a_reviewable_plan();
+
+        let review = reviewed(&plan);
+
+        // Every setting the plan carries is on the review, shown as it will be
+        // written — except the two that carry a credential, which are shown as
+        // present and nothing more. One left off would be written without ever
+        // having been shown.
+        assert_eq!(review.len(), plan.settings().len());
+        for (key, value) in plan.settings() {
+            let shown = if WITHHELD.contains(&key.as_str()) {
+                MASKED
+            } else {
+                value.as_str()
+            };
+            assert!(
+                review.contains(&format!("  {key} = {shown}")),
+                "{key} is shown the wrong way: {review:?}"
+            );
+        }
+        // And neither credential reaches the review by any other route.
+        let said = review.join("\n");
+        for credential in [THE_KEY, THE_LOGIN] {
+            assert!(!said.contains(credential), "{credential} is in {said}");
+        }
+
         // Confirmed by default: a bare enter applies.
-        assert!(answered(&[""]).confirm(&plan));
-        assert!(!answered(&["n"]).confirm(&plan));
+        let empty = Wizard::new(Environment::MacOs).plan();
+        assert!(answered(&[""]).confirm(&empty));
+        assert!(!answered(&["n"]).confirm(&empty));
     }
 }

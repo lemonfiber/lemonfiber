@@ -183,8 +183,9 @@ pub(super) fn alerts(alerts: &[Alert], room: usize) -> Vec<Line<'static>> {
     if alerts.is_empty() {
         return vec![Line::styled("nothing has needed saying", quiet())];
     }
-    alerts
+    let mut lines: Vec<Line<'static>> = alerts
         .iter()
+        .take(SHOWN)
         .map(|alert| {
             let moment = format!("{:<9}", alert.moment.said());
             let left = room.saturating_sub(moment.chars().count());
@@ -193,7 +194,9 @@ pub(super) fn alerts(alerts: &[Alert], room: usize) -> Vec<Line<'static>> {
                 Span::raw(shortened(&alert.summary, left)),
             ])
         })
-        .collect()
+        .collect();
+    lines.extend(rest(alerts.len(), "alert"));
+    lines
 }
 
 /// The stuck panel: what in the pipeline has stopped, and for how long.
@@ -771,6 +774,31 @@ mod tests {
         assert!(lines
             .get(1)
             .is_some_and(|line| line.starts_with("resolved")));
+    }
+
+    /// The alerts panel is cut like every other list panel, and says so — a panel
+    /// that showed six of eight in silence would be read as the whole of what
+    /// happened.
+    #[test]
+    fn a_long_run_of_alerts_is_cut_and_says_it_was() {
+        let many: Vec<Alert> = (0..SHOWN + 2)
+            .map(|n| {
+                an_alert(
+                    &format!("Sonarr said {n}"),
+                    lemonfiber_core::alert::Moment::Onset,
+                )
+            })
+            .collect();
+
+        let lines = said(&alerts(&many, WIDE));
+
+        assert_eq!(lines.len(), SHOWN + 1);
+        assert!(
+            lines
+                .last()
+                .is_some_and(|line| line == "and 2 more alerts — 8 in all"),
+            "{lines:?}"
+        );
     }
 
     #[test]

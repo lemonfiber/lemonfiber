@@ -204,10 +204,12 @@ fn places(body: Rect) -> Vec<Rect> {
 pub(crate) mod tests {
     use super::{draw, places, sections, showing, Acting, TWO_COLUMNS};
     use crate::acting::Press;
+    use lemonfiber_core::app::Outcome;
     use lemonfiber_core::dashboard::{
         Hardlink, Panel, Protocol, Reading, Snapshot, Storage, Telemetry, Transfer,
     };
     use lemonfiber_core::health::{Reach, Summary};
+    use lemonfiber_core::model::{FormReport, FormsReport};
     use ratatui::backend::TestBackend;
     use ratatui::layout::Rect;
     use ratatui::Terminal;
@@ -347,18 +349,25 @@ pub(crate) mod tests {
         assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS - 1, 40)).len(), wanted);
     }
 
-    /// A key that begins an action puts what it is asking over the panels, and the
-    /// panels are still behind it — the box is a share of the screen rather than
-    /// the screen.
+    /// What an action can be given is put over the panels, and the panels are still
+    /// behind it — the box is a share of the screen rather than the screen.
     #[test]
-    fn what_an_action_is_asking_is_drawn_over_the_panels() {
+    fn what_an_action_can_be_given_is_drawn_over_the_panels() {
         let snapshot = a_snapshot();
         let mut acting = Acting::opened();
         acting.pressed(&Press::Typed('d'));
+        acting.told(Ok(Outcome::Forms(FormsReport {
+            forms: vec![FormReport {
+                id: "full".to_owned(),
+                name: "Full stack".to_owned(),
+                description: "everything, behind the tunnel".to_owned(),
+                composable: false,
+            }],
+        })));
 
         let text = with(&snapshot, 120, 40, &acting);
 
-        assert!(text.contains("asking this stack"), "{text}");
+        assert!(text.contains("Full stack"), "{text}");
         assert!(
             text.contains("lemonfiber"),
             "the header is still there: {text}"

@@ -34,9 +34,14 @@
 //! report. The panels go on gathering every second while the work runs, so a
 //! restart shows as the services going down and coming back, in the panel that
 //! lists them. Nothing is drawn over that — only the footer says what is running.
-//! Leaving stops this screen waiting; what the container engine was already asked
-//! to do is between the operator and the engine, exactly as a closed browser tab
-//! takes nothing with it.
+//!
+//! **Leaving closes the screen, not the run.** A closed browser tab leaves a server
+//! carrying the job on; a closed dashboard has no server to leave it to. The process
+//! drawing this screen is the one that claimed the stack and issued the command, and
+//! it is the only one that can give the stack back — so leaving gives the screen back
+//! at once and the run stays until the action it started has finished. Saying
+//! otherwise would leave an operator to find out from the next command, refused in
+//! the name of a process that no longer exists.
 
 mod chooser;
 mod offer;
@@ -46,6 +51,7 @@ mod words;
 
 use lemonfiber_core::app::{Command, Outcome};
 use lemonfiber_core::error::Problem;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::Line;
 
 use chooser::Chooser;
@@ -80,6 +86,33 @@ pub(crate) enum Press {
     Abandon,
 }
 
+/// What a keypress on this screen is, or nothing for one it has no use for.
+///
+/// Beside the vocabulary it produces rather than in [`crate::terminal`], for the
+/// reason everything else here is: which key reaches which action, and what backing
+/// out of a half-answered question does, are decisions — and a decision behind that
+/// filename is a decision nothing checks.
+///
+/// Ctrl-C, because a terminal in raw mode no longer turns it into a signal and an
+/// operator who cannot back out with it is trapped.
+pub(crate) const fn meaning(key: KeyEvent) -> Option<Press> {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return match key.code {
+            KeyCode::Char('c') => Some(Press::Abandon),
+            _ => None,
+        };
+    }
+    match key.code {
+        KeyCode::Char(character) => Some(Press::Typed(character)),
+        KeyCode::Backspace => Some(Press::Rubout),
+        KeyCode::Esc => Some(Press::Abandon),
+        KeyCode::Enter => Some(Press::Accept),
+        KeyCode::Up => Some(Press::Back),
+        KeyCode::Down => Some(Press::Forward),
+        _ => None,
+    }
+}
+
 /// What the loop has to go and do about a press.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Wanted {
@@ -98,11 +131,14 @@ pub(crate) enum Wanted {
 }
 
 /// Where an action stands.
+///
+/// Every one of these is a state a frame can be drawn in. Being asked what a stack
+/// can be acted on is not one: [`Wanted::Ask`] and [`Acting::told`] are one statement
+/// in the loop, over a read that does not await, so no frame is drawn between them —
+/// which is why the offer waiting for that answer is a field rather than a stage.
 enum Stage {
     /// Nothing is open.
     Idle,
-    /// Waiting to be told what this stack can be asked to act on.
-    Asking(&'static Offer),
     /// Choosing what to act on.
     Choosing {
         /// The action being chosen for.
@@ -152,6 +188,11 @@ enum Stage {
 pub(crate) struct Acting {
     /// Where the action stands.
     stage: Stage,
+    /// The action an outstanding [`Wanted::Ask`] was begun for.
+    ///
+    /// Taken by [`Acting::told`], so an answer to a question that was never asked —
+    /// or was asked for something else — changes nothing.
+    asked: Option<&'static Offer>,
     /// Whether the pane explaining this screen's words is open.
     words: bool,
     /// Whether this run explains its words at all.
@@ -166,6 +207,7 @@ impl Acting {
     pub(crate) const fn opened() -> Self {
         Self {
             stage: Stage::Idle,
+            asked: None,
             words: false,
             explanations: true,
         }
@@ -195,7 +237,6 @@ impl Acting {
         }
         match std::mem::replace(&mut self.stage, Stage::Idle) {
             Stage::Idle => self.idle(press),
-            Stage::Asking(offer) => self.waiting(offer, press),
             Stage::Choosing { offer, chooser } => self.choosing(offer, chooser, press),
             Stage::Confirming { offer, chosen } => self.confirming(offer, chosen, press),
             Stage::Running { offer, chosen } => self.while_running(offer, chosen, press),
@@ -254,17 +295,8 @@ impl Acting {
         let Some(offer) = offer::for_key(key) else {
             return Wanted::Nothing;
         };
-        self.stage = Stage::Asking(offer);
+        self.asked = Some(offer);
         Wanted::Ask(Command::Forms)
-    }
-
-    /// While the stack is being asked: back out, or wait for it.
-    fn waiting(&mut self, offer: &'static Offer, press: &Press) -> Wanted {
-        if matches!(*press, Press::Abandon) {
-            return Wanted::Nothing;
-        }
-        self.stage = Stage::Asking(offer);
-        Wanted::Nothing
     }
 
     /// Over the list: move, take one, or leave it.
@@ -306,11 +338,15 @@ impl Acting {
     }
 
     /// While the action is with the core: leaving is the only thing left to ask.
+    ///
+    /// The stage is put back either way. Leaving does not stop the action — the run
+    /// waits for it once the screen is given back — so it is still where it was, and
+    /// [`Acting::staying_for`] is what says so on the way out.
     fn while_running(&mut self, offer: &'static Offer, chosen: Choice, press: &Press) -> Wanted {
+        self.stage = Stage::Running { offer, chosen };
         if matches!(*press, Press::Typed('q') | Press::Abandon) {
             return Wanted::Leave;
         }
-        self.stage = Stage::Running { offer, chosen };
         Wanted::Nothing
     }
 
@@ -399,9 +435,8 @@ impl Acting {
 
     /// What the stack answered when it was asked what there is to act on.
     pub(crate) fn told(&mut self, answer: Result<Outcome, Box<Problem>>) {
-        let offer = match &self.stage {
-            Stage::Asking(offer) => *offer,
-            _ => return,
+        let Some(offer) = self.asked.take() else {
+            return;
         };
         self.stage = match answer {
             Ok(Outcome::Forms(report)) => match offer.given(&report) {
@@ -454,6 +489,14 @@ impl Acting {
     pub(crate) fn footer(&self, across: usize) -> Line<'static> {
         words::footer(&self.stage, across)
     }
+
+    /// What a run leaving this screen now would stay for, or nothing where it may go.
+    ///
+    /// Asked for on the way out, where the loop knows the screen is being given back
+    /// and this knows what is still with the core.
+    pub(crate) fn staying_for(&self) -> Option<String> {
+        words::staying_for(&self.stage)
+    }
 }
 
 /// Move through a reading, saying whether the press was a move at all.
@@ -491,11 +534,12 @@ fn lines_of(lines: &crate::render::Lines) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::offer::tests::{a_listing, nothing_declared};
-    use super::{question, Acting, Line, Press, Wanted};
+    use super::{meaning, question, Acting, Line, Press, Wanted};
     use crate::render::fixtures::{a_lifecycle, a_plan};
     use lemonfiber_core::app::{Command, Outcome};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
     use lemonfiber_core::model::{FormsReport, VersionReport};
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     /// The screen, having got as far as the list for one action.
     fn choosing(key: char, report: FormsReport) -> (Acting, Wanted) {
@@ -715,19 +759,18 @@ mod tests {
         assert_eq!(acting.pressed(&Press::Typed('q')), Wanted::Leave);
     }
 
-    /// Backing out while the stack is being asked does the same, and anything else
-    /// pressed there leaves the question standing.
+    /// An answer is taken once, by the ask that is outstanding. A second one for the
+    /// same question changes nothing, so a reply that arrives twice cannot open a
+    /// list over whatever the operator has moved on to.
     #[test]
-    fn a_screen_waiting_on_the_stack_can_be_left_and_otherwise_waits() {
-        let mut acting = Acting::opened();
-        acting.pressed(&Press::Typed('u'));
-        assert!(showing(&acting).contains("asking this stack"));
+    fn an_answer_is_taken_once_by_the_ask_that_is_outstanding() {
+        let (mut acting, _) = choosing('p', a_listing());
+        assert!(showing(&acting).contains("Full stack"));
+        acting.pressed(&Press::Abandon);
 
-        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
-        assert!(showing(&acting).contains("asking this stack"));
+        acting.told(Ok(Outcome::Forms(a_listing())));
 
-        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
-        assert!(showing(&acting).is_empty());
+        assert!(showing(&acting).is_empty(), "the ask was already answered");
     }
 
     /// The keys the screen already answered go on answering, and a key on nothing
@@ -786,10 +829,12 @@ mod tests {
         assert!(footer.contains("still running"), "{footer}");
     }
 
-    /// Leaving while an action runs is allowed and stops nothing but the watching.
-    /// Anything else pressed leaves it running.
+    /// Leaving while an action runs is allowed, and the action is still where it
+    /// was: what is being waited on is asked for on the way out, because the run
+    /// holding the screen is the run carrying the work out. Anything else pressed
+    /// leaves it running and says nothing.
     #[test]
-    fn leaving_while_an_action_runs_stops_the_watching_and_not_the_work() {
+    fn leaving_while_an_action_runs_says_what_is_still_being_waited_on() {
         let (mut acting, _) = choosing('t', a_listing());
         acting.pressed(&Press::Accept);
         acting.pressed(&Press::Typed('y'));
@@ -798,6 +843,20 @@ mod tests {
         assert!(footing(&acting).contains("still running"));
 
         assert_eq!(acting.pressed(&Press::Typed('q')), Wanted::Leave);
+        let said = acting.staying_for().unwrap_or_default();
+        assert!(said.contains("restart Full stack"), "{said}");
+        assert!(said.contains("leave the stack claimed"), "{said}");
+    }
+
+    /// Leaving with nothing running has nothing to wait for, so an operator who
+    /// pressed q on an idle screen gets their shell rather than a sentence.
+    #[test]
+    fn leaving_with_nothing_running_waits_for_nothing() {
+        let mut acting = Acting::opened();
+
+        assert_eq!(acting.pressed(&Press::Typed('q')), Wanted::Leave);
+
+        assert!(acting.staying_for().is_none());
     }
 
     /// What an action came to is put on the screen in the words the command line
@@ -868,17 +927,71 @@ mod tests {
         assert!(showing(&acting).is_empty());
     }
 
+    /// One keypress as this screen reads it.
+    fn read(code: KeyCode, modifiers: KeyModifiers) -> Option<Press> {
+        meaning(KeyEvent::new(code, modifiers))
+    }
+
+    /// Every key this screen answers arrives as something it can act on, and a key
+    /// it has no use for arrives as nothing rather than as a character it never
+    /// typed. Ctrl-C is read as backing out: raw mode no longer turns it into a
+    /// signal, so an operator who reaches for it is asking to leave.
+    #[test]
+    fn the_keyboard_reaches_this_screen_as_the_presses_it_answers() {
+        assert!(matches!(
+            read(KeyCode::Char('q'), KeyModifiers::NONE),
+            Some(Press::Typed('q'))
+        ));
+        assert!(matches!(
+            read(KeyCode::Backspace, KeyModifiers::NONE),
+            Some(Press::Rubout)
+        ));
+        assert!(matches!(
+            read(KeyCode::Esc, KeyModifiers::NONE),
+            Some(Press::Abandon)
+        ));
+        assert!(matches!(
+            read(KeyCode::Enter, KeyModifiers::NONE),
+            Some(Press::Accept)
+        ));
+        assert!(matches!(
+            read(KeyCode::Up, KeyModifiers::NONE),
+            Some(Press::Back)
+        ));
+        assert!(matches!(
+            read(KeyCode::Down, KeyModifiers::NONE),
+            Some(Press::Forward)
+        ));
+        assert!(matches!(
+            read(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            Some(Press::Abandon)
+        ));
+        assert!(read(KeyCode::Home, KeyModifiers::NONE).is_none());
+        // A character held with control is not that character: an operator typing
+        // ctrl-d on this screen has not asked to stop the stack.
+        assert!(read(KeyCode::Char('d'), KeyModifiers::CONTROL).is_none());
+    }
+
     /// Every key an action is on begins that action, and every one of them reaches
-    /// the same list of what it can be given.
+    /// the same list of what it can be given — under that action's own name, which
+    /// is what proves the answer landed on the offer the key began.
     #[test]
     fn every_key_an_action_is_on_begins_that_action() {
-        for key in ['u', 'd', 's', 't', 'p'] {
+        for (key, named) in [
+            ('u', "start"),
+            ('d', "stop"),
+            ('s', "switch"),
+            ('t', "restart"),
+            ('p', "fetch"),
+        ] {
             let mut acting = Acting::opened();
 
             let wanted = acting.pressed(&Press::Typed(key));
+            acting.told(Ok(Outcome::Forms(a_listing())));
 
             assert_eq!(wanted, Wanted::Ask(Command::Forms), "{key}");
-            assert!(showing(&acting).contains("asking this stack"), "{key}");
+            let said = showing(&acting);
+            assert!(said.contains(named), "{key}: {said}");
         }
     }
 

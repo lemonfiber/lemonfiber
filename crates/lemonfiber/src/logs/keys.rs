@@ -9,6 +9,7 @@
 //! two `Press` and `Asked` vocabularies live beside the code that reads them.
 
 use lemonfiber_core::logs::Level;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{Viewer, Words};
 
@@ -44,6 +45,34 @@ pub(crate) enum Press {
     Forward,
     /// All the way to the newest line.
     Tail,
+}
+
+/// What a keypress asks this view for, or nothing for one it has no use for.
+///
+/// Beside the vocabulary it produces rather than in [`crate::terminal`], because
+/// this view wants most characters as text where the dashboard wants two commands —
+/// the difference is this module's to make, not the terminal's to make for it.
+///
+/// Ctrl-C is read as giving up rather than as the character it is: raw mode no
+/// longer turns it into a signal, so an operator who reaches for it is asking to
+/// back out — of a filter they were typing, or of the screen where they were not.
+pub(crate) const fn wanted(key: KeyEvent) -> Option<Press> {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return match key.code {
+            KeyCode::Char('c') => Some(Press::Abandon),
+            _ => None,
+        };
+    }
+    match key.code {
+        KeyCode::Char(character) => Some(Press::Typed(character)),
+        KeyCode::Backspace => Some(Press::Rubout),
+        KeyCode::Enter => Some(Press::Accept),
+        KeyCode::Esc => Some(Press::Abandon),
+        KeyCode::Up => Some(Press::Back),
+        KeyCode::Down => Some(Press::Forward),
+        KeyCode::End => Some(Press::Tail),
+        _ => None,
+    }
 }
 
 /// What a keypress asked for that the screen cannot do by itself.
