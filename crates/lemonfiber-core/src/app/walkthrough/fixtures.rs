@@ -197,9 +197,21 @@ pub(super) fn ctx_with(fake: &Fake) -> Ctx {
 }
 
 /// The same, reachable media server and all — the admin password recorded under a scratch
-/// environment file, tagged so each test keeps its own rather than racing on a shared one.
-pub(super) fn ctx_watching(fake: &Fake, tag: &str) -> Ctx {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-walk-{tag}-{}", std::process::id()));
+/// environment file this context alone holds.
+///
+/// Counted rather than named by the test that asked, because a name is an agreement the
+/// next test has to keep and cannot be made to. Two contexts under one name share one
+/// file, and recording the password rewrites that file in place: the write truncates
+/// before it writes, so a walk reading the credential in that gap finds none, opens no
+/// media server, and stops at [`crate::walkthrough::Reason::NoMediaServer`] on a stack
+/// that has one. Counting leaves nothing to agree about.
+pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
+    static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!(
+        "lemonfiber-walkthrough-{}-{nth}",
+        std::process::id()
+    ));
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = ctx_with(fake);
     ctx.settings.env_file = Some(dir.join(".env"));
@@ -303,8 +315,8 @@ pub(super) fn ctx_through_a_tunnel(fake: &Fake) -> Ctx {
 }
 
 /// A stack that acquires nothing, with a media server to ask about what it already has.
-pub(super) fn ctx_library_only(fake: &Fake, tag: &str) -> Ctx {
-    let mut ctx = ctx_watching(fake, tag);
+pub(super) fn ctx_library_only(fake: &Fake) -> Ctx {
+    let mut ctx = ctx_watching(fake);
     ctx.settings.protocols = acquires_nothing().protocols;
     ctx
 }
