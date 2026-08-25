@@ -24,10 +24,11 @@ use std::sync::Arc;
 use axum::Router;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
+use lemonfiber_api::events::stepping::Stepping;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::frontend as serving;
 use lemonfiber_api::guard::Token;
-use lemonfiber_api::jobs::Jobs;
+use lemonfiber_api::jobs::{Jobs, LEASE};
 use lemonfiber_api::router::{self, Serving};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity, State as Standing};
@@ -252,18 +253,31 @@ pub(crate) async fn run(
     // a browser is told the name of the work and nothing else, and everything it
     // learns after that arrives here.
     let live = Arc::new(Live::opening(ctx.clock.as_ref()));
-    let ctx = ctx.narrating(Arc::new(Saying::onto(Arc::clone(&live))));
+    // A walk's steps go down the same stream, whole rather than rendered: the words
+    // are the core's, and a second rendering of them here would be a second copy of
+    // the walk's own prose beside the one the terminal draws.
+    let (steps, carrying) = Stepping::onto(Arc::clone(&live));
+    let ctx = ctx
+        .narrating(Arc::new(Saying::onto(Arc::clone(&live))))
+        .narrating_steps(Arc::new(steps));
     let (ctx, token) = (Arc::new(ctx), Arc::new(token));
+    tokio::spawn(carrying.carrying());
     // Started before anything can ask to hear it, so a client that connects at
     // once is not waiting on a first pass that has not been asked for.
     tokio::spawn(Arc::clone(&live).gathering(Arc::new(
         lemonfiber_api::events::dashboard::Dashboard::against(Arc::clone(&ctx)),
     )));
+    let jobs = Jobs::default();
+    // Work with no ending of its own is held only while somebody is still asking
+    // about it, so a guard whose browser went away is let go rather than left
+    // polling a drive until this process stops.
+    tokio::spawn(jobs.clone().sweeping(LEASE));
     let serving = Serving {
         ctx: Arc::clone(&ctx),
         token: Arc::clone(&token),
         bound,
-        jobs: Jobs::default(),
+        jobs,
+        live: Arc::clone(&live),
     };
     let streaming = Arc::new(Streaming { token, bound, live });
     let surface = surface(serving, streaming, app(embedded, asked.assets));
@@ -833,6 +847,7 @@ mod tests {
             token: Arc::clone(&token),
             bound: bound(),
             jobs: Jobs::default(),
+            live: Arc::clone(&live),
         };
         let streaming = Arc::new(Streaming {
             token,

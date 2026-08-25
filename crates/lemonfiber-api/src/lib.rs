@@ -11,6 +11,7 @@
 
 pub mod actions;
 pub mod events;
+mod following;
 pub mod frontend;
 pub mod guard;
 pub mod jobs;

@@ -4,14 +4,13 @@
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
 use lemonfiber_core::docker::{Condition, Service, State};
-use lemonfiber_core::model::kind;
 use lemonfiber_core::model::{
-    Envelope, LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
+    LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
 };
 use lemonfiber_core::plural::s;
 use lemonfiber_core::stack::closure::{Plan, Protocol};
 
-use super::{Lines, UNRENDERABLE};
+use super::Lines;
 
 /// What a full reset did, or — until confirmed — would do: the edits it reverts to
 /// lemonfiber's own state, named with what is lost, so nothing is discarded unseen.
@@ -246,16 +245,11 @@ pub(super) fn show(services: &[Service]) -> Lines {
 }
 
 /// The lines a finished watch renders to.
-pub(super) fn watch_lines(report: &SupervisionReport, json: bool) -> Lines {
-    if json {
-        let mut lines = Lines::for_a_parser();
-        lines.put(
-            Envelope::new(kind::WATCH, report.clone())
-                .to_json()
-                .unwrap_or(UNRENDERABLE.to_owned()),
-        );
-        return lines;
-    }
+///
+/// For a person only. A machine-readable run renders the envelope the outcome
+/// carries, the way every other answer does, so there is no second rendering here
+/// that could describe the same ending differently.
+pub(super) fn watch(report: &SupervisionReport) -> Lines {
     let mut lines = Lines::default();
 
     lines.put(format!("the watch ended: {}", report.reason));
@@ -574,18 +568,22 @@ mod tests {
 
     #[test]
     fn a_watch_reports_whether_it_stopped_what_it_guarded() {
-        assert!(watch_lines(&a_watch(), false)
-            .text()
-            .contains("stopped: media"));
+        assert!(watch(&a_watch()).text().contains("stopped: media"));
         let stranded = SupervisionReport {
             stopped: false,
             ..a_watch()
         };
-        assert!(watch_lines(&stranded, false)
-            .text()
-            .contains("could not stop media"));
-        // As JSON it is one envelope, not prose.
-        let json = watch_lines(&a_watch(), true).text();
-        assert!(json.contains(r#""kind":"watch""#));
+        assert!(watch(&stranded).text().contains("could not stop media"));
+    }
+
+    #[test]
+    fn a_watch_read_by_a_script_is_the_envelope_every_other_answer_arrives_in() {
+        // Through the outcome rather than through a rendering of its own, so a
+        // guard cannot come to describe its ending differently from the rest.
+        let json =
+            crate::render::machine_readable(&lemonfiber_core::app::Outcome::Watch(a_watch()))
+                .text();
+        assert!(json.contains(r#""kind":"watch""#), "{json}");
+        assert!(json.contains(r#""stopped":true"#), "{json}");
     }
 }

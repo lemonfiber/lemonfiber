@@ -28,7 +28,7 @@ mod suggestion;
 
 pub use diagnosis::{Reason, Stopped};
 pub use handover::{Handover, Next};
-pub use narration::{size, spell_out, Line, Narrator, Speed};
+pub use narration::{size, spell_out, Line, Narrator, Speed, Unheard};
 pub use shape::{Shape, Why};
 pub use state::State;
 pub use step::{Link, Step};

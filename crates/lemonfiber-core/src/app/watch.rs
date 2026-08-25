@@ -289,6 +289,49 @@ mod tests {
         assert_eq!(report.map(|report| report.stopped), Some(true));
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn a_watch_asked_for_as_a_command_guards_the_volume_the_context_names() {
+        // The whole of what a surface has to supply: which drive to ask about is
+        // the context's, and how often to ask is this command's own — a surface
+        // that could choose the interval could choose one that misses the moment
+        // the watch exists for.
+        let ctx =
+            watching(Ok(spoke("")), Some("/data")).with_volume(Arc::new(Drive::playing(vec![
+                Presence::On(9),
+                Presence::Gone,
+            ])));
+        let outcome = crate::app::dispatch(
+            crate::app::Command::Watch {
+                forms: vec!["library".to_owned()],
+            },
+            &ctx,
+        )
+        .await;
+
+        // The same report `supervise` comes to when it is asked directly, so
+        // dispatching changes only which drive it asks and how often.
+        let directly = watch(
+            &watching(Ok(spoke("")), Some("/data")),
+            Drive::playing(vec![Presence::On(9), Presence::Gone]),
+        )
+        .await;
+        assert_eq!(outcome.ok(), directly.ok().map(crate::app::Outcome::Watch));
+    }
+
+    #[tokio::test]
+    async fn a_watch_asked_for_with_nothing_to_guard_is_refused_as_a_command_too() {
+        let ctx = watching(Ok(spoke("")), None);
+        let refused = crate::app::dispatch(
+            crate::app::Command::Watch {
+                forms: vec!["library".to_owned()],
+            },
+            &ctx,
+        )
+        .await
+        .err();
+        assert_eq!(refused.map(|problem| problem.code), Some(NOTHING_TO_WATCH));
+    }
+
     #[tokio::test]
     async fn a_reading_that_cannot_be_taken_is_held_not_acted_on() {
         // A transient error mid-watch — the drive is still there. The watch holds

@@ -36,6 +36,7 @@ use crate::model::{
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
 use crate::stack::closure::Plan;
+use crate::walkthrough::Line;
 
 /// Where the generated artefact is kept, relative to the workspace root.
 pub const CONTRACT_PATH: &str = "contract/web-api.contract.json";
@@ -119,6 +120,7 @@ impl Contract {
             kind::STATUS,
             schema_for!(Envelope<StatusReport>),
         );
+        describing(&mut kinds, kind::STEP, schema_for!(Envelope<Line>));
         describing(&mut kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
         describing(&mut kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
         describing(

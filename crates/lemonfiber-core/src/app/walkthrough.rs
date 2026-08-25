@@ -550,6 +550,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_walk_asked_for_as_a_command_says_its_steps_where_the_context_says() {
+        // The whole of what a surface has to supply: a walk dispatched like every
+        // other command narrates to whoever the context is listening with, so a
+        // browser hears the steps a terminal would have printed.
+        let heard = std::sync::Arc::new(Recording::default());
+        let ctx = ctx_watching(&Fake::default(), "complete")
+            .narrating_steps(heard.clone() as std::sync::Arc<dyn crate::walkthrough::Narrator>);
+        let outcome = crate::app::dispatch(
+            crate::app::Command::Walkthrough {
+                item: Some("Sintel".to_owned()),
+            },
+            &ctx,
+        )
+        .await;
+
+        // The same report the walk comes to when it is called directly, so
+        // dispatching changes only where the steps are said.
+        let (expected, _) =
+            walked(&ctx_watching(&Fake::default(), "complete"), Some("Sintel")).await;
+        assert_eq!(
+            outcome.ok(),
+            Some(crate::app::Outcome::Walkthrough(expected))
+        );
+        // The steps reached the narrator the context carries. Said without a
+        // message: an argument built only for a failure is a line no passing run
+        // ever reaches, and every run here passes.
+        let steps: Vec<Step> = heard.lines().iter().map(|line| line.step).collect();
+        assert!(steps.contains(&Step::Searching));
+    }
+
+    #[tokio::test]
+    async fn a_walk_nobody_is_watching_is_the_same_walk_as_one_somebody_is() {
+        // The default narrator says nothing, and saying nothing changes nothing:
+        // whether anyone is listening is the surface's business and never the
+        // walk's, so the two runs come to the same report.
+        let watched = walked(&ctx_watching(&Fake::default(), "complete"), Some("Sintel"))
+            .await
+            .0;
+        let alone = crate::app::dispatch(
+            crate::app::Command::Walkthrough {
+                item: Some("Sintel".to_owned()),
+            },
+            &ctx_watching(&Fake::default(), "complete"),
+        )
+        .await;
+
+        assert_eq!(
+            alone.ok(),
+            Some(crate::app::Outcome::Walkthrough(watched)),
+            "the report is the same whether or not anybody heard it"
+        );
+    }
+
+    #[tokio::test]
     async fn a_stack_that_cannot_be_read_at_all_is_a_problem_rather_than_a_report() {
         // Everything else is a walk that stopped; only the stack itself failing to read
         // is an error, because there is nothing to narrate at all.

@@ -6,12 +6,10 @@
 //! action — a fault report they have to research is a fault report they abandon. And one
 //! still running owes them the truth that walking away costs nothing.
 
-use lemonfiber_core::model::kind;
-use lemonfiber_core::model::Envelope;
 use lemonfiber_core::model::WalkthroughReport;
 use lemonfiber_core::walkthrough::{Handover, Stopped};
 
-use super::super::{Lines, UNRENDERABLE};
+use super::super::Lines;
 
 /// The whole ending, for a person.
 pub(crate) fn ending(report: &WalkthroughReport) -> Lines {
@@ -101,20 +99,11 @@ fn still_going(report: &WalkthroughReport) -> Lines {
     lines
 }
 
-/// The whole report as one document, for a script.
-pub(crate) fn machine_readable(report: &WalkthroughReport) -> Lines {
-    let mut lines = Lines::for_a_parser();
-    lines.put(
-        Envelope::new(kind::WALKTHROUGH, report)
-            .to_json()
-            .unwrap_or(UNRENDERABLE.to_owned()),
-    );
-    lines
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{ending, machine_readable};
+    use super::super::super::machine_readable;
+    use super::ending;
+    use lemonfiber_core::app::Outcome;
     use lemonfiber_core::model::WalkthroughReport;
     use lemonfiber_core::walkthrough::{Handover, Line, Link, Reason, Shape, State, Step, Stopped};
 
@@ -276,7 +265,10 @@ mod tests {
 
     #[test]
     fn a_script_gets_one_document_carrying_the_whole_run() {
-        let said = machine_readable(&report(State::Complete)).text();
+        // Through the outcome rather than through a rendering of its own: what a
+        // script reads is the envelope every other answer arrives in, so a walk
+        // cannot come to describe itself differently from the rest.
+        let said = machine_readable(&Outcome::Walkthrough(report(State::Complete))).text();
         let parsed: Option<serde_json::Value> = serde_json::from_str(&said).ok();
         let kind = parsed
             .as_ref()

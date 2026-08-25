@@ -23,6 +23,7 @@ use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
 use lemonfiber_api::actions;
 use lemonfiber_api::actions::{answering, named, Answering, Arguments, Refused};
+use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
@@ -32,7 +33,7 @@ use lemonfiber_core::app::{bundle, Command, Ctx};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
-use lemonfiber_fixtures::ports::{Chance, Idle};
+use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 
 /// The name one of this machine's backups is written under.
 const KEPT: &str = "lemonfiber-full-1700000000.tar.gz";
@@ -206,6 +207,7 @@ fn routed() -> axum::Router {
         token: Arc::new(token),
         bound: ([127, 0, 0, 1], 8471).into(),
         jobs: Jobs::default(),
+        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     })
 }
 

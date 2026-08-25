@@ -107,8 +107,23 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::from(VALIDATION)
             }
         }
+        // Only a walk that stopped is a failure. One that finished worked; one still
+        // downloading is working, and reporting that as a failure would contradict
+        // the sentence that just told the operator nothing was cancelled; and one
+        // that found the content already here answered the question it was asked.
+        Outcome::Walkthrough(report) => {
+            if report.state.is_a_problem() {
+                ExitCode::from(FAILURE)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
         // A trace, a stuck-item listing or the household's requests is a query — it
         // answers where things are; asking is never a failure, whatever the answer.
+        //
+        // A guard that ended is one too. It ended because the data location went,
+        // which is the thing it was watching for, and it reports whether it got the
+        // services stopped — so the report is the answer rather than the failure.
         Outcome::Version(_)
         | Outcome::Forms(_)
         | Outcome::Preview(_)
@@ -125,6 +140,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // answer that arrived, and a run that could not produce one comes back as
         // a problem rather than as an outcome with a code on it.
         | Outcome::Backup(_)
+        | Outcome::Watch(_)
         | Outcome::Support(_) => ExitCode::SUCCESS,
     }
 }
@@ -317,6 +333,7 @@ mod tests {
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity, State};
+    use lemonfiber_core::model::WalkthroughReport;
     use lemonfiber_core::model::{
         Disposition, DoctorReport, LifecycleReport, MusicChoice, MusicReport, QualityReport,
         ResetReport, StackEdit, StatusReport, Triggered, UpgradeMedia, UpgradeReport,
@@ -325,11 +342,29 @@ mod tests {
     use lemonfiber_core::seed::{
         Assessment, Report as SeedReport, Severity as SeedSeverity, State as SeedState, Wiring,
     };
+    use lemonfiber_core::walkthrough::{Shape, State as WalkState};
 
     use super::{
         complain, exit_code, no_config_home, settled, shown, success, FAILURE, NEVER_SETTLED,
         USAGE, VALIDATION,
     };
+
+    /// A walk that ended in one state, with nothing else to say about it.
+    fn walked(state: WalkState) -> Outcome {
+        Outcome::Walkthrough(WalkthroughReport {
+            shape: Shape::Pipeline,
+            state,
+            proves: String::new(),
+            item: None,
+            lines: Vec::new(),
+            stopped: None,
+            link: None,
+            handover: None,
+            suggestions: Vec::new(),
+            in_background: false,
+            already_here: false,
+        })
+    }
 
     /// A problem of the given severity and state.
     fn problem(severity: Severity, state: State) -> Problem {
@@ -701,6 +736,30 @@ mod tests {
             }))),
             success()
         );
+    }
+
+    #[test]
+    fn only_a_walk_that_stopped_is_a_failure() {
+        // One that finished worked; one still downloading is working, and calling
+        // that a failure would contradict the sentence that has just told the
+        // operator nothing was cancelled; and one that found the content already
+        // here answered the question it was asked.
+        assert_eq!(shown(settled(&walked(WalkState::Complete))), success());
+        assert_eq!(shown(settled(&walked(WalkState::Downloading))), success());
+        assert_eq!(shown(settled(&walked(WalkState::Skipped))), success());
+        assert_ne!(shown(settled(&walked(WalkState::Failed))), success());
+    }
+
+    #[test]
+    fn a_guard_that_ended_is_a_report_rather_than_a_failure() {
+        // It ended because the data location went, which is what it was watching
+        // for, and it says whether it got the services stopped.
+        let stranded = Outcome::Watch(lemonfiber_core::model::SupervisionReport {
+            forms: vec!["library".to_owned()],
+            reason: "the data location is no longer present".to_owned(),
+            stopped: false,
+        });
+        assert_eq!(shown(settled(&stranded)), success());
     }
 }
 

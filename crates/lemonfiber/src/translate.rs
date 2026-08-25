@@ -5,6 +5,8 @@
 //! so that what a request *means* can be read, and proven, without going through
 //! everything that happens to it afterwards.
 
+use lemonfiber_core::app::bundle::Wanted;
+use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{Command, QualityAction};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::quality::Preset;
@@ -12,7 +14,26 @@ use lemonfiber_core::recyclarr::Kind;
 
 use crate::exit::USAGE;
 use crate::say::complain;
-use lemonfiber::cli::{ConfigAction, QualityCommand};
+use lemonfiber::cli::{Asked, ConfigAction, QualityCommand};
+
+/// What a support bundle was asked to hold, and where it goes.
+///
+/// A shell has a filesystem in front of it, so a bundle asked for without a path
+/// goes beside the operator rather than into a directory they would have to be
+/// told about — which is the one thing this decides that a browser's request
+/// cannot, and the reason the translation is not the same on both surfaces.
+pub(crate) fn bundling(asked: Asked) -> Command {
+    Command::Support {
+        write: asked.write,
+        wanted: Wanted::asked(
+            asked.logs,
+            asked.filenames.into(),
+            asked.reveal,
+            asked.confirm,
+        ),
+        dest: asked.out.map_or(Destination::Beside, Destination::At),
+    }
+}
 
 /// Which setting the operator is reading or changing.
 pub(crate) fn configuration(action: ConfigAction) -> Command {
@@ -79,9 +100,10 @@ mod tests {
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
-    use super::{configuration, quality};
+    use super::{bundling, configuration, quality, Destination, Wanted};
     use crate::exit::USAGE;
-    use lemonfiber::cli::{ConfigAction, QualityCommand};
+    use lemonfiber::cli::{Asked, ConfigAction, QualityCommand};
+    use lemonfiber_core::bundle::Filenames;
 
     #[test]
     fn each_configuration_action_becomes_its_own_command() {
@@ -191,5 +213,47 @@ mod tests {
                 Err(USAGE)
             );
         }
+    }
+
+    #[test]
+    fn a_bundle_asked_for_at_a_shell_goes_where_the_shell_is() {
+        // The one thing this decides that a browser's request cannot: a shell has a
+        // filesystem in front of it, so a bundle with no path named goes beside the
+        // operator rather than into a directory they would have to be told about.
+        let asked = Asked {
+            write: true,
+            logs: 12,
+            filenames: true,
+            reveal: vec!["INDEXER_KEY".to_owned()],
+            confirm: true,
+            out: None,
+        };
+        assert_eq!(
+            bundling(asked),
+            Command::Support {
+                write: true,
+                wanted: Wanted::asked(12, Filenames::Shown, vec!["INDEXER_KEY".to_owned()], true),
+                dest: Destination::Beside,
+            }
+        );
+    }
+
+    #[test]
+    fn a_bundle_told_where_to_go_goes_there() {
+        let asked = Asked {
+            write: true,
+            logs: 50,
+            filenames: false,
+            reveal: Vec::new(),
+            confirm: false,
+            out: Some(std::path::PathBuf::from("/tmp/bundle.tar.gz")),
+        };
+        assert!(matches!(
+            bundling(asked),
+            Command::Support {
+                dest: Destination::At(path),
+                ..
+            } if path == std::path::Path::new("/tmp/bundle.tar.gz")
+        ));
     }
 }

@@ -9,9 +9,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
-use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::restore::Kept;
-use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
 use lemonfiber_core::doctor::Narrowing;
 
@@ -33,19 +31,18 @@ mod stopping;
 mod terminal;
 mod translate;
 mod ui;
-mod walkthrough;
 
 use crate::say::{complain, say};
 use context::{context, here};
-use engine::{guard, pull, settle, start, stream};
+use engine::{pull, settle, start, stream};
 use exit::{complain, no_config_home, settled, USAGE};
 use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
 use render::render;
 use render::stack::Doing;
+use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
-use translate::{configuration, quality};
-use walkthrough::walk;
+use translate::{bundling, configuration, quality};
 
 /// Logs as a screen, or logs as a stream.
 ///
@@ -64,6 +61,31 @@ async fn read_logs(
         terminal::watching(ctx, forms, services, tail).await
     } else {
         stream(ctx, forms, services, follow, tail, json).await
+    }
+}
+
+/// The one thing a walk was asked for, or nothing at all.
+///
+/// Taken as words so it can be typed unquoted, and joined back into the title as
+/// said. Nothing named is a request in its own right rather than an omission: a
+/// walk asked for nothing in particular suggests something likely to work, which
+/// is what an operator with an empty library needs.
+fn named(words: &[String]) -> Option<String> {
+    let said = words.join(" ");
+    (!said.trim().is_empty()).then_some(said)
+}
+
+/// Where a walk's steps go while it runs.
+///
+/// A run whose whole answer is a JSON document must not have prose interleaved into
+/// it: a consumer parsing that stream would be handed something that is not a
+/// document. So a machine-readable walk is narrated to nobody, and the report at
+/// its end is the whole of what it says.
+fn walking(json: bool) -> std::sync::Arc<dyn lemonfiber_core::walkthrough::Narrator> {
+    if json {
+        std::sync::Arc::new(Quiet)
+    } else {
+        std::sync::Arc::new(WalkNarrating)
     }
 }
 
@@ -136,7 +158,7 @@ async fn main() -> ExitCode {
         return greeting(ctx, &paths, &Console).await;
     };
 
-    let ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
+    let mut ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
 
     let command = match request {
         // Streaming is not a value that arrives once, so it does not become a
@@ -149,16 +171,22 @@ async fn main() -> ExitCode {
             watch,
             tail,
         } => return read_logs(&ctx, &form, &services, follow, watch, tail, cli.json).await,
-        // A watch is long-running and produces one report at its end, not a value
-        // that arrives once, so like streaming it does not go through dispatch.
-        Request::Watch { forms } => return guard(&ctx, &forms, cli.json).await,
+        // Long-running, and still a value that arrives once: what a guard produces
+        // is one report, at the end. So it goes through dispatch like everything
+        // that answers, and the waiting is the command's rather than this file's.
+        Request::Watch { forms } => Command::Watch { forms },
         // Asking where setup stands is a value that arrives once, so unlike the
         // conversation below it goes through dispatch like every other question.
         Request::Setup { flags } if flags.status => Command::Setup(SetupAction::Where),
         // Setup itself is a conversation and then a stack coming up, not a value
         // that arrives once, so like streaming and watching it runs its own way.
         // It takes the context by value because it rewrites the settings mid-run.
-        Request::Setup { flags } => return setup_from(ctx, flags).await,
+        //
+        // Narrated because setup ends by offering the walk: the offer is put at a
+        // terminal, so what the walk says has a terminal to say it to.
+        Request::Setup { flags } => {
+            return setup_from(ctx.narrating_steps(walking(cli.json)), flags).await
+        }
         Request::Version => Command::Version,
         // Naming nothing asks what forms there are; naming one asks what it would
         // come to. Two questions about the same subject, so one word answers both.
@@ -222,9 +250,18 @@ async fn main() -> ExitCode {
             term: term.join(" "),
             season,
         },
-        // A walkthrough narrates for minutes and produces one report at its end, not a
-        // value that arrives once, so like streaming and watching it runs its own way.
-        Request::Walkthrough { item } => return walk(&ctx, &item.join(" "), cli.json).await,
+        // Narrated for minutes and then one report, so the report goes through
+        // dispatch and the narration goes wherever the surface is listening. A run
+        // whose whole answer is a JSON document must not have prose interleaved
+        // into it, so a machine-readable run listens with nobody.
+        //
+        // The term is taken as words so it can be typed unquoted; joined back into
+        // the title as said, and nothing named at all asks to be suggested
+        // something.
+        Request::Walkthrough { item } => {
+            ctx = ctx.narrating_steps(walking(cli.json));
+            Command::Walkthrough { item: named(&item) }
+        }
         // Naming a word says what it means and naming none lists them, and both are
         // answered from a table compiled into the binary rather than from a stack.
         Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
@@ -234,19 +271,7 @@ async fn main() -> ExitCode {
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },
         Request::Backup { service } => Command::Backup { service },
-        Request::Support(asked) => Command::Support {
-            write: asked.write,
-            wanted: Wanted::asked(
-                asked.logs,
-                asked.filenames.into(),
-                asked.reveal,
-                asked.confirm,
-            ),
-            // A shell has a filesystem in front of it, so a bundle asked for
-            // without a path goes beside the operator rather than into a directory
-            // they would have to be told about.
-            dest: asked.out.map_or(Destination::Beside, Destination::At),
-        },
+        Request::Support(asked) => bundling(asked),
         // The web surface holds the process until it is stopped, and answers many
         // requests rather than producing one value, so like the dashboard and the
         // log viewer it runs its own way instead of through dispatch. It takes the

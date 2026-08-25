@@ -9,18 +9,23 @@
 //! Driven from outside the crate, because what a caller can reach is the thing
 //! worth holding still.
 
+use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
+use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
-use lemonfiber_api::jobs::{accepted, routes, Job, Jobs, Standing};
+use lemonfiber_api::jobs::{accepted, leased, routes, Job, Jobs, Lease, Standing};
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
-use lemonfiber_fixtures::ports::{Chance, Idle};
+use lemonfiber_core::ports::filesystem::{Presence, Volume};
+use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 
 /// A context that needs neither a stack on disk nor a daemon to answer.
 fn ctx() -> Ctx {
@@ -54,12 +59,84 @@ fn routed(jobs: Jobs) -> axum::Router {
         token: Arc::new(token),
         bound: ([127, 0, 0, 1], 8471).into(),
         jobs,
+        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     })
+}
+
+/// How often a guard looks again, and how many looks a test moves past.
+///
+/// The interval is the command's own; a test that wrote down its own number would
+/// pass on an interval this product does not use.
+const WATCH: Duration = lemonfiber_core::app::WATCH;
+
+/// Looks a test moves the clock past, enough that a guard still guarding has
+/// plainly looked more than once.
+const LOOKS: usize = 4;
+
+/// How often a swept register is looked at, for the test that drives the beat.
+const BEAT: Duration = Duration::from_millis(5);
+
+/// A world guarding a directory that is really there, so a guard holds rather
+/// than ending before a test can do anything to it.
+fn guarding(volume: Arc<dyn Volume>) -> Ctx {
+    let dir = std::env::temp_dir().join(format!("lemonfiber-job-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    Ctx::new(
+        Arc::new(Idle),
+        Arc::new(lemonfiber_core::adapters::Daemon::local()),
+        Arc::new(lemonfiber_core::adapters::System),
+        Arc::new(lemonfiber_core::adapters::Disk),
+        lemonfiber_core::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
+        Settings {
+            data_root: Some(dir),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_random(Arc::new(Chance::cycling()))
+    .with_volume(volume)
+}
+
+/// A volume that is always there, and counts how often it was asked.
+struct Counting(Arc<AtomicUsize>);
+
+#[async_trait]
+impl Volume for Counting {
+    async fn presence(&self, _path: &Path) -> Presence {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Presence::On(9)
+    }
+}
+
+/// A guard started under a name, over a location that will not go away.
+async fn watching(jobs: &Jobs, volume: Arc<dyn Volume>) -> Job {
+    let job = minted();
+    jobs.start(
+        &job,
+        "watch",
+        Command::Watch {
+            forms: vec!["library".to_owned()],
+        },
+        Arc::new(guarding(volume)),
+    )
+    .await;
+    job
 }
 
 /// What asking about one name answered, as its status and what it said.
 async fn asked(jobs: Jobs, job: &str) -> (u16, String) {
+    over("GET", jobs, job).await
+}
+
+/// The same, for a request that releases the name instead of asking about it.
+async fn released(jobs: Jobs, job: &str) -> (u16, String) {
+    over("DELETE", jobs, job).await
+}
+
+/// What one request to the job route answered, as its status and what it said.
+async fn over(method: &str, jobs: Jobs, job: &str) -> (u16, String) {
     let request = axum::http::Request::builder()
+        .method(method)
         .uri(format!("/api/jobs/{job}"))
         .body(axum::body::Body::empty());
     let Ok(request) = request else {
@@ -283,4 +360,187 @@ async fn a_name_that_was_handed_out_is_not_repeated_back_to_a_caller_that_guesse
     // run minted, and a message repeating one carries it wherever the message goes.
     let (_, body) = asked(Jobs::default(), "deadbeef").await;
     assert!(!body.contains("deadbeef"), "{body}");
+}
+
+// ── Ending work by the name it was answered with ─────────────────────────────
+
+#[tokio::test(start_paused = true)]
+async fn releasing_a_name_stops_the_work_rather_than_only_the_record_of_it() {
+    // The claim is that the polling stops, not that a register was written in.
+    // Time is moved rather than waited on: a guard looks again every few seconds,
+    // and a test that sat through two of them is a test somebody deletes.
+    let jobs = Jobs::default();
+    let looked = Arc::new(AtomicUsize::new(0));
+    let job = watching(&jobs, Arc::new(Counting(Arc::clone(&looked)))).await;
+
+    // Long enough that a guard still running would have looked several times over.
+    // Advanced a look at a time, because the next one is only scheduled once the
+    // last has woken — one long jump would fire one timer, not all of them.
+    let looks_ahead = || async {
+        for _ in 0..LOOKS {
+            tokio::time::advance(WATCH).await;
+        }
+    };
+    looks_ahead().await;
+    let by_now = looked.load(Ordering::SeqCst);
+    assert!(by_now > 1, "the guard was guarding: {by_now}");
+
+    let released = jobs.stop(job.as_str()).await;
+    assert_eq!(released.map(|work| work.standing), Some(Standing::Ended));
+
+    looks_ahead().await;
+    assert_eq!(
+        looked.load(Ordering::SeqCst),
+        by_now,
+        "it stopped looking, which is what a browser has no interrupt to say"
+    );
+}
+
+#[tokio::test]
+async fn releasing_a_name_this_run_never_handed_out_stands_for_nothing() {
+    assert_eq!(Jobs::default().stop("0badc0de").await, None);
+}
+
+#[tokio::test]
+async fn releasing_work_that_already_finished_answers_with_what_it_came_to() {
+    // Releasing a name twice, or releasing one whose work landed in the moment
+    // before, must not overwrite an outcome with an ending.
+    let jobs = Jobs::default();
+    let job = minted();
+    jobs.start(
+        &job,
+        "quality-reapply",
+        Command::Quality(QualityAction::Show),
+        Arc::new(ctx()),
+    )
+    .await;
+    let standing = settled(&jobs, job.as_str()).await;
+    assert!(matches!(standing, Some(Standing::Done(_))), "{standing:?}");
+
+    assert_eq!(
+        jobs.stop(job.as_str()).await.map(|work| work.standing),
+        standing
+    );
+}
+
+#[tokio::test]
+async fn work_that_was_ended_is_answered_with_the_name_rather_than_an_outcome() {
+    // Under the status finished work answers with, and the kind the start answered
+    // with: the work is over, and there is no outcome because it did not reach one.
+    let jobs = Jobs::default();
+    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let released = jobs.stop(job.as_str()).await;
+    assert_eq!(released.map(|work| work.standing), Some(Standing::Ended));
+
+    let (status, body) = asked(jobs, job.as_str()).await;
+    assert_eq!(status, StatusCode::OK.as_u16(), "{body}");
+    assert!(body.contains(r#""kind":"job""#), "{body}");
+    assert!(body.contains(r#""action":"watch""#), "{body}");
+}
+
+#[tokio::test]
+async fn releasing_a_name_over_the_route_says_where_the_work_now_stands() {
+    // Releasing and asking are two questions with one answer, so a caller that
+    // released a name need not ask again to find out what it released.
+    let jobs = Jobs::default();
+    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let (status, body) = released(jobs.clone(), job.as_str()).await;
+    assert_eq!(status, StatusCode::OK.as_u16(), "{body}");
+    assert!(body.contains(r#""kind":"job""#), "{body}");
+    assert_eq!(
+        jobs.about(job.as_str()).await.map(|work| work.standing),
+        Some(Standing::Ended)
+    );
+}
+
+#[tokio::test]
+async fn releasing_a_name_the_route_never_handed_out_is_absent_there_too() {
+    let (status, body) = released(Jobs::default(), "0badc0de").await;
+    assert_eq!(status, StatusCode::NOT_FOUND.as_u16(), "{body}");
+    assert_eq!(body, "No work in this run goes by that name.");
+}
+
+// ── The lease on work with no ending of its own ──────────────────────────────
+
+#[test]
+fn a_guard_is_the_one_command_held_only_while_somebody_asks() {
+    // Everything else finishes — a fetch takes an hour at worst — and letting one
+    // go because nobody happened to ask about it would end work that was going to
+    // succeed.
+    assert_eq!(
+        leased(&Command::Watch {
+            forms: vec!["library".to_owned()]
+        }),
+        Lease::WhileAsked
+    );
+    for command in [
+        Command::Up { forms: Vec::new() },
+        Command::Pull {
+            forms: vec!["library".to_owned()],
+        },
+        Command::Walkthrough { item: None },
+        Command::Seed,
+    ] {
+        assert_eq!(leased(&command), Lease::Held, "{command:?}");
+    }
+}
+
+#[tokio::test]
+async fn a_guard_nobody_asks_about_is_let_go_on_the_second_look() {
+    // One sweep that finds it untouched is not enough: a name is handed out
+    // between sweeps, and ending it on the first look would be a race with the
+    // sweep's timing rather than a bound on how long nobody was interested.
+    let jobs = Jobs::default();
+    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+
+    assert_eq!(jobs.sweep().await, 0, "it survives the first look");
+    assert_eq!(
+        jobs.about(job.as_str()).await.map(|work| work.standing),
+        Some(Standing::Running)
+    );
+    // Asking is what renews it, so the ask above buys it another look.
+    assert_eq!(jobs.sweep().await, 0, "and the ask renewed it");
+    assert_eq!(jobs.sweep().await, 1, "then nothing was asking");
+    assert_eq!(
+        jobs.about(job.as_str()).await.map(|work| work.standing),
+        Some(Standing::Ended)
+    );
+}
+
+#[tokio::test]
+async fn work_that_has_already_finished_is_not_let_go_by_a_sweep() {
+    let jobs = Jobs::default();
+    let job = minted();
+    jobs.start(&job, "up", Command::Forms, Arc::new(ctx()))
+        .await;
+    let standing = settled(&jobs, job.as_str()).await;
+    assert!(
+        matches!(standing, Some(Standing::Failed(_))),
+        "{standing:?}"
+    );
+
+    assert_eq!(jobs.sweep().await, 0);
+    assert_eq!(jobs.sweep().await, 0);
+    assert_eq!(
+        jobs.about(job.as_str()).await.map(|work| work.standing),
+        standing,
+        "what it came to is what it stands for"
+    );
+}
+
+#[tokio::test]
+async fn sweeping_on_the_beat_lets_go_of_what_a_sweep_asked_for_would() {
+    // Waited out rather than polled: asking what became of it is what renews the
+    // lease, so a test that watched for the ending by asking would renew the very
+    // thing it was waiting to see let go.
+    let jobs = Jobs::default();
+    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let beating = tokio::spawn(jobs.clone().sweeping(BEAT));
+
+    tokio::time::sleep(BEAT * 20).await;
+    beating.abort();
+    assert_eq!(
+        jobs.about(job.as_str()).await.map(|work| work.standing),
+        Some(Standing::Ended)
+    );
 }

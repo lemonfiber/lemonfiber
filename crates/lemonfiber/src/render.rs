@@ -26,9 +26,7 @@ mod trace;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{
-    ConfigReport, FormsReport, SupervisionReport, VersionReport, WizardReport,
-};
+use lemonfiber_core::model::{ConfigReport, FormsReport, VersionReport, WizardReport};
 use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
@@ -217,6 +215,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Backup(report) => archive::backup(report),
         Outcome::Support(report) => archive::bundle(report),
         Outcome::Restore(report) => archive::restoration(report),
+        Outcome::Watch(report) => stack::watch(report),
+        Outcome::Walkthrough(report) => walkthrough::ending(report),
     }
 }
 
@@ -324,11 +324,6 @@ fn settings(report: &ConfigReport) -> Lines {
     lines
 }
 
-/// What a watch did once its location was lost.
-pub(crate) fn watched(report: &SupervisionReport, json: bool) {
-    stack::watch_lines(report, json).print();
-}
-
 /// One log line, as it should reach a terminal.
 ///
 /// A log line is the least trustworthy text this product shows: it is written by
@@ -355,8 +350,7 @@ mod tests {
         some_forms,
     };
     use super::{
-        answer, forms, logged, machine_readable, render, settings, standing, versions, watched,
-        Lines,
+        answer, forms, logged, machine_readable, render, settings, standing, versions, Lines,
     };
     use lemonfiber_core::app::backup::Report as Capture;
     use lemonfiber_core::app::restore::{Preview, Restoration};
@@ -488,7 +482,7 @@ mod tests {
         lines.put("printed");
         lines.print();
         render(&Outcome::Version(a_version()), false);
-        watched(&a_watch(), false);
+        render(&Outcome::Watch(a_watch()), false);
     }
 
     /// The id first, because that is what gets typed. A form that cannot be combined

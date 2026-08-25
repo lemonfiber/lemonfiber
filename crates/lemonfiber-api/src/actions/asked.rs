@@ -53,15 +53,22 @@ pub struct Arguments {
     pub reveal: Vec<String>,
     /// Whether a cost the action would incur was agreed to in advance.
     pub confirm: bool,
+    /// The one thing to add end to end, as it would be said.
+    pub item: Option<String>,
 }
 
 /// The actions whose command carries the forms it was given.
 ///
-/// The lifecycle five, and nothing else. Seeding, adopting, resetting, changing a
+/// The lifecycle five, and the guard. Seeding, adopting, resetting, changing a
 /// setting and choosing a quality are whole-stack requests on every surface: no
 /// command has a field to narrow them by and the command line declares no argument
 /// for one, so a form named to any of them is a narrowing that was never available.
-pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull"];
+///
+/// A guard's forms are not a narrowing at all. They are what it stops when the data
+/// location goes, which is why the command line makes them the one thing it will
+/// not run without — a watch over nothing would notice a drive vanish and have
+/// nothing to do about it.
+pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "watch"];
 
 /// The actions whose command carries the operator's agreement.
 ///
@@ -153,13 +160,22 @@ pub const TAKES_ARCHIVE: &[&str] = &["restore"];
 /// file whose contents a caller chooses.
 pub const TAKES_BUNDLING: &[&str] = &["support"];
 
+/// The action whose command carries the one thing it was told to add.
+///
+/// A walkthrough and nothing else. It is the only request that is about a single
+/// piece of content rather than about the stack — and naming none is a request in
+/// its own right rather than an omission, because a walk asked for nothing in
+/// particular suggests something likely to work, which is what an operator with an
+/// empty library needs.
+pub const TAKES_ITEM: &[&str] = &["walkthrough"];
+
 /// The argument this action's command has nowhere to put, where one was given.
 ///
 /// Only for a name this surface offers — a name it does not offer is absent before
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 14] = [
+    let carried: [(&str, bool, &[&str]); 15] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         ("service", given.service.is_some(), TAKES_SERVICE),
@@ -178,6 +194,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ),
         ("reveal", !given.reveal.is_empty(), TAKES_BUNDLING),
         ("confirm", given.confirm, TAKES_AGREEMENT),
+        ("item", given.item.is_some(), TAKES_ITEM),
     ];
     if !offered.contains(&action) {
         return None;

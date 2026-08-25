@@ -71,6 +71,7 @@ fn serving(paths: &Paths) -> Option<Serving> {
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
         jobs: Jobs::default(),
+        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     })
 }
 
@@ -93,6 +94,7 @@ fn homeless() -> Option<axum::Router> {
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
         jobs: Jobs::default(),
+        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     };
     Some(lemonfiber_api::setup::routes().with_state(serving))
 }

@@ -4297,6 +4297,98 @@
         }
       }
     },
+    "step": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Line"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Line": {
+          "description": "One narrated line: a step, and what was specifically true of it.",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "description": "What was specifically true — the evidence that makes the line worth reading\nrather than a spinner. Empty where there is nothing particular to say.",
+              "type": "string"
+            },
+            "said": {
+              "description": "What it is doing, in plain language.",
+              "type": "string"
+            },
+            "step": {
+              "description": "The step being narrated.",
+              "$ref": "#/$defs/Step"
+            }
+          },
+          "required": [
+            "step",
+            "said",
+            "detail"
+          ]
+        },
+        "Step": {
+          "description": "One step of the walk, ordered from picking something to watching it play.",
+          "oneOf": [
+            {
+              "description": "Picking something to add, and confirming it is not already here.",
+              "type": "string",
+              "const": "choosing"
+            },
+            {
+              "description": "The indexers are being searched for releases.",
+              "type": "string",
+              "const": "searching"
+            },
+            {
+              "description": "A release is being sent to the download client.",
+              "type": "string",
+              "const": "grabbing"
+            },
+            {
+              "description": "The download is running.",
+              "type": "string",
+              "const": "downloading"
+            },
+            {
+              "description": "The \\*arr is moving the finished download into the library.",
+              "type": "string",
+              "const": "importing"
+            },
+            {
+              "description": "The media server is being told to look at what arrived.",
+              "type": "string",
+              "const": "scanning"
+            },
+            {
+              "description": "It is in the library and playable.",
+              "type": "string",
+              "const": "available"
+            }
+          ]
+        }
+      }
+    },
     "stuck": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

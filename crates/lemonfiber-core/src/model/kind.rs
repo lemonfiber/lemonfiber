@@ -81,6 +81,8 @@ pub const SETUP: Kind = Kind("setup");
 pub const START: Kind = Kind("start");
 /// What each service is doing.
 pub const STATUS: Kind = Kind("status");
+/// One step of a walkthrough, said the moment it is true.
+pub const STEP: Kind = Kind("step");
 /// The items whose downloads are stuck.
 pub const STUCK: Kind = Kind("stuck");
 /// Where one item is in the pipeline.
@@ -122,6 +124,7 @@ pub const ALL: &[Kind] = &[
     SETUP,
     START,
     STATUS,
+    STEP,
     STUCK,
     TRACE,
     UPGRADE,

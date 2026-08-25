@@ -8,10 +8,9 @@
 use std::process::ExitCode;
 use std::time::Duration;
 
-use lemonfiber_core::adapters::Disk;
 use lemonfiber_core::app::{
-    claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started,
-    supervise, Command, Ctx, WATCH,
+    claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started, Command,
+    Ctx,
 };
 use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::Envelope;
@@ -23,7 +22,7 @@ use crate::exit::{complain, settled, FAILURE};
 use crate::keyboard::{Console, Keyboard};
 use crate::prompt::Answers as _;
 use crate::render::downloads::interrupting;
-use crate::render::{logged, render, watched, UNRENDERABLE};
+use crate::render::{logged, render, UNRENDERABLE};
 use crate::say::{complain, emit, say};
 use crate::setup::Surface as _;
 use crate::stopping::{answered, asking, Asking, Choice, ASK_TO_WAIT};
@@ -196,22 +195,6 @@ impl Narrator for Narrating {
     }
 }
 
-/// Watch the data location until it is lost, then report what was stopped.
-///
-/// This blocks for as long as the location holds — the operator ends it with the
-/// same interrupt they end any foreground command. It returns only once the
-/// location is lost and the services have been stopped, which is the one thing
-/// it exists to do.
-pub(crate) async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
-    match supervise(ctx, &Disk, forms, WATCH).await {
-        Ok(report) => {
-            watched(&report, json);
-            ExitCode::SUCCESS
-        }
-        Err(problem) => complain(&problem),
-    }
-}
-
 /// How often a wait looks again.
 ///
 /// Ten seconds: long enough that two clients are not being polled at, short enough
@@ -347,7 +330,7 @@ mod tests {
     use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
     use lemonfiber_core::stack::Source;
 
-    use super::{claimed, emit_line, guard, kind, pull, pull_showing, released, stream, Ctx};
+    use super::{claimed, emit_line, kind, pull, pull_showing, released, stream, Ctx};
 
     /// A runner that answers every command the same way.
     struct Answering {
@@ -606,24 +589,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_watch_over_a_location_that_holds_ends_cleanly() {
-        // Nothing running and nothing lost: the watch has nothing to stop.
-        let code = guard(&answering(), &["tv".to_owned()], false).await;
-        let _ = code;
-    }
-
-    #[tokio::test]
-    async fn a_watch_that_ends_reports_how_it_ended() {
-        // Nothing to guard, so the watch has nothing to wait on and says so.
-        let mut ctx = answering();
-        ctx.settings.data_root = Some(std::env::temp_dir().join("lemonfiber-watch-nowhere"));
-        let code = guard(&ctx, &["tv".to_owned()], false).await;
-        let _ = code;
-        let json = guard(&ctx, &["tv".to_owned()], true).await;
-        let _ = json;
-    }
-
-    #[tokio::test]
     async fn a_rehearsed_pull_that_cannot_be_described_is_reported() {
         // No stack to describe the command against, so there is nothing to show.
         let mut rehearsing = ctx(0, "");
@@ -649,12 +614,6 @@ mod tests {
     #[tokio::test]
     async fn streaming_logs_from_a_stack_that_is_not_there_is_not_a_success() {
         let code = stream(&ctx(1, ""), &[], &[], false, 10, false).await;
-        assert_ne!(shown(code), success());
-    }
-
-    #[tokio::test]
-    async fn guarding_a_location_that_cannot_be_watched_reports_rather_than_waits() {
-        let code = guard(&ctx(1, ""), &["tv".to_owned()], false).await;
         assert_ne!(shown(code), success());
     }
 }

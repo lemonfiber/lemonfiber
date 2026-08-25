@@ -9,4 +9,4 @@ mod live;
 mod report;
 
 pub(crate) use live::{Narrating, Quiet};
-pub(crate) use report::{ending, machine_readable};
+pub(crate) use report::ending;
