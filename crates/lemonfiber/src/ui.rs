@@ -24,6 +24,7 @@ use std::sync::Arc;
 use axum::Router;
 use lemonfiber_api::actions::Jobs;
 use lemonfiber_api::events::live::Live;
+use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::frontend as serving;
 use lemonfiber_api::guard::Token;
@@ -246,11 +247,15 @@ pub(crate) async fn run(
         say!("{line}");
     }
 
-    let (ctx, token) = (Arc::new(ctx), Arc::new(token));
-    // The one gather every listener hears, started before anything can ask to
-    // hear it, so a client that connects at once is not waiting on a first pass
-    // that has not been asked for.
+    // The one gather every listener hears, made before the context so that the
+    // waits a command runs into have somewhere to say what they are waiting for:
+    // a browser is told the name of the work and nothing else, and everything it
+    // learns after that arrives here.
     let live = Arc::new(Live::opening(ctx.clock.as_ref()));
+    let ctx = ctx.narrating(Arc::new(Saying::onto(Arc::clone(&live))));
+    let (ctx, token) = (Arc::new(ctx), Arc::new(token));
+    // Started before anything can ask to hear it, so a client that connects at
+    // once is not waiting on a first pass that has not been asked for.
     tokio::spawn(Arc::clone(&live).gathering(Arc::new(
         lemonfiber_api::events::dashboard::Dashboard::against(Arc::clone(&ctx)),
     )));

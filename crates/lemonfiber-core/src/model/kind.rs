@@ -68,7 +68,8 @@ pub const RESET: Kind = Kind("reset");
 pub const SEED: Kind = Kind("seed");
 /// What setup settled on.
 pub const SETUP: Kind = Kind("setup");
-/// One line the container engine wrote while starting services.
+/// One line said while services are starting: what the container engine wrote, or
+/// what the wait after it is still waiting for.
 pub const START: Kind = Kind("start");
 /// What each service is doing.
 pub const STATUS: Kind = Kind("status");

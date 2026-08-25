@@ -17,6 +17,7 @@ use axum::http::{header, HeaderMap, HeaderName, HeaderValue, Response, StatusCod
 use futures_util::StreamExt;
 use lemonfiber_api::events::dashboard::Dashboard;
 use lemonfiber_api::events::live::{Gathers, Live, TICK};
+use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::wire::{Event, Nature, Rendered, BEAT, BEAT_SAID};
 use lemonfiber_api::events::{routes, stream, Streaming, LAST_EVENT_ID, PATH};
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
@@ -24,6 +25,7 @@ use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::platform::Environment;
+use lemonfiber_core::ports::Narrator as _;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::Fake;
@@ -382,4 +384,56 @@ async fn the_stream_is_fed_by_the_gather_that_answers_the_dashboard() {
     assert!(heard.contains(r#""telemetry":"#), "{heard}");
     assert!(heard.contains(r#""health":"#), "{heard}");
     assert!(listening.next().await.is_some(), "and the one after it");
+}
+
+/// A wait says what it is waiting for, and a browser hears it.
+///
+/// A browser that asked for a form to be started is answered with a name for the
+/// work and then told nothing until the work is over — minutes, on a first start.
+/// This is the other end of the seam the command line prints under the command: the
+/// core's own words, in the envelope every other event arrives in, under the kind a
+/// start's narration already carries.
+#[tokio::test]
+async fn a_wait_says_what_it_is_waiting_for_to_whoever_is_listening() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let mut listening = live.listening(None).await;
+    let waiting = Saying::onto(Arc::clone(&live));
+
+    waiting
+        .say("Still starting: jellyfin, seerr — 45 seconds so far, of 180.")
+        .await;
+
+    let heard = listening.next().await.unwrap_or_default();
+    assert!(heard.contains("\nevent: start\n"), "{heard}");
+    assert!(
+        heard.contains("Still starting: jellyfin, seerr"),
+        "the words are the core's, unchanged: {heard}"
+    );
+    assert!(
+        heard.contains("45 seconds so far, of 180."),
+        "including how far into the budget it is: {heard}"
+    );
+}
+
+/// A wait from before a gap is never handed to a client that comes back.
+///
+/// Only the newest line describes what a wait is waiting for now, so the lines are
+/// carried as state rather than as a record — a client returning is caught up by the
+/// next line the wait says, not replayed every second of the one it missed. The
+/// record it did miss is a different question, answered above.
+#[tokio::test(start_paused = true)]
+async fn a_wait_from_before_a_gap_is_never_handed_to_a_client_that_comes_back() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let seen = say(&live, "one line it did read").await;
+    Saying::onto(Arc::clone(&live))
+        .say("Still starting: jellyfin — 5 seconds so far, of 180.")
+        .await;
+
+    let mut arriving = live.listening(seen.as_ref().map(Event::id)).await;
+
+    assert_eq!(
+        arriving.next().await.as_deref(),
+        Some(BEAT_SAID),
+        "a wait it missed is over, and saying so would be saying it is not"
+    );
 }

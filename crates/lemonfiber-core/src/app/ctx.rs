@@ -14,8 +14,9 @@ use crate::config::Settings;
 use crate::platform::Environment;
 use crate::ports::docker::Engine;
 use crate::ports::http::Http;
+use crate::ports::narration::Silent;
 use crate::ports::random::Random;
-use crate::ports::{Clock, FileSystem, Runner};
+use crate::ports::{Clock, FileSystem, Narrator, Runner};
 use crate::stack::Source;
 
 /// Everything a command needs that is not part of the command itself.
@@ -38,6 +39,13 @@ pub struct Ctx {
     /// Where unpredictable bytes come from, for the one credential seeding mints
     /// itself.
     pub random: Arc<dyn Random>,
+    /// Where a wait says what it is waiting for, for the surface to render.
+    ///
+    /// A port for the same reason printing is not done here: the core has no
+    /// terminal, and a wait that reached for one would be a wait only the command
+    /// line could have. A run whose surface is not listening holds a narrator that
+    /// says nothing, so there is no second code path for the case where nobody is.
+    pub narrator: Arc<dyn Narrator>,
     /// How long starting waits for services to settle before giving up.
     ///
     /// A knob rather than a constant because it is a policy: an operator on a
@@ -86,6 +94,10 @@ impl Ctx {
                 crate::adapters::Web::new(),
             )),
             random: Arc::new(crate::adapters::Os),
+            // Nobody, until a surface says otherwise. A context is built before the
+            // thing that would listen exists in both surfaces, and a default that
+            // said something would have to guess where.
+            narrator: Arc::new(Silent),
             patience: PATIENCE,
             stack,
             settings,
@@ -120,6 +132,17 @@ impl Ctx {
     #[must_use]
     pub fn with_filesystem(mut self, filesystem: Arc<dyn FileSystem>) -> Self {
         self.filesystem = filesystem;
+        self
+    }
+
+    /// The same context, saying what it waits for through the given narrator.
+    ///
+    /// How a surface hears a wait: the command line puts the words under the command
+    /// it is running, and the web surface says them on the stream a browser already
+    /// holds open. Neither reaches into the wait, and the wait knows about neither.
+    #[must_use]
+    pub fn narrating(mut self, narrator: Arc<dyn Narrator>) -> Self {
+        self.narrator = narrator;
         self
     }
 

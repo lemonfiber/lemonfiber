@@ -42,6 +42,7 @@ Held as `Arc<dyn …>` and faked in every test that does not want the real thing
 | `ports::filesystem` | `FileSystem` | The data root — resolving it, and proving it can hardlink |
 | `ports::filesystem` | `Volume` | Whether the data root is still present, and still the same volume |
 | `ports::http` | `Http` | Any HTTP request, which every service client is built on |
+| `ports::narration` | `Narrator` | Where a long wait says what it is waiting for, for a surface to render |
 | `ports::nntp` | `Nntp` | A Usenet provider, dialled directly to prove the credential works |
 | `ports::process` | `Runner` | Spawned programs, which is how Compose is driven |
 | `ports::random` | `Random` | The entropy a minted credential is drawn from |
@@ -49,6 +50,14 @@ Held as `Arc<dyn …>` and faked in every test that does not want the real thing
 
 Each is `Send + Sync`, because a background poller owns one and the render loop
 must never wait on it.
+
+`ports::narration` is the only one that carries words *out* rather than reaching
+something in. It is a port for the same reason the others are: the wait it serves
+is minutes long and lives in the core, which has no terminal — so it says what it
+is waiting for, and the command line prints those words under the command while
+the web surface says them on the stream a browser holds open. A run whose surface
+is not listening holds `Silent`, so there is no second code path for the case
+where nobody is.
 
 `ports::service` is the exception to the one-trait-per-module shape: a service is
 not one capability but several, and which it has depends on what it is. `Client`
