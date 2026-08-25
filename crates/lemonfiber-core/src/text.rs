@@ -16,9 +16,10 @@
 //! person could have meant — accents, scripts, punctuation, emoji — survives
 //! untouched, because a release name in Japanese is a release name.
 //!
-//! Beside it lives the other thing that happens to text on its way to being read:
-//! breaking it so it fits the room there is. The two surfaces that need it want
-//! different things at the edge, and [`Overrun`] is how each says which.
+//! Beside it live the two other things that happen to text on its way to being
+//! read: breaking it so it fits the room there is, and — where the room is one row
+//! and cannot be given a second — shortening it to that row. The two surfaces that
+//! wrap want different things at the edge, and [`Overrun`] is how each says which.
 
 /// The same text with anything a terminal would obey removed.
 ///
@@ -113,9 +114,46 @@ fn broken_at(marks: &[char], at: usize, width: usize, overrun: Overrun) -> usize
     }
 }
 
+/// What stands in a value where the middle of it was left out.
+///
+/// Three full stops rather than an ellipsis, so a terminal that cannot render the
+/// character is never handed one.
+const MARKER: &str = "...";
+
+/// The text shortened to this width, keeping both of its ends.
+///
+/// Elided in the middle rather than cut at the end, because the end of a value is
+/// where the things that tell two of them apart live — for a release name, the
+/// resolution, the encoding and the group. Cut at the tail, `...1080p` and
+/// `...2160p` read identically, and a list that cannot tell two of its entries
+/// apart fails at the one question it exists to answer.
+///
+/// For a row that cannot be given a second row this is what wrapping is instead:
+/// a panel of a fixed height that wrapped would push its last entries out of the
+/// box, which trades a loss that is marked for one that is silent.
+///
+/// Where there is not room for the marker and something of both ends, the marker
+/// stands alone: a half of a name is read as a name, and a marker is not.
+#[must_use]
+pub fn fitted(text: &str, width: usize) -> String {
+    let counted = text.chars().count();
+    if counted <= width {
+        return text.to_owned();
+    }
+    if width < MARKER.len() {
+        return MARKER.chars().take(width).collect();
+    }
+    let keep = width - MARKER.len();
+    let tail = keep / 2;
+    let head = keep - tail;
+    let front: String = text.chars().take(head).collect();
+    let back: String = text.chars().skip(counted - tail).collect();
+    format!("{front}{MARKER}{back}")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{plain, wrapped, Overrun};
+    use super::{fitted, plain, wrapped, Overrun};
 
     #[test]
     fn a_release_name_that_would_clear_the_screen_no_longer_can() {
@@ -247,5 +285,61 @@ mod tests {
             wrapped("Amélie Amélie Amélie", 13, Overrun::Broken),
             ["Amélie Amélie", "Amélie"]
         );
+    }
+    /// A name that fits is left exactly as it is — shortening one that needs no
+    /// shortening would be inventing a change to it.
+    #[test]
+    fn text_that_already_fits_the_row_is_left_alone() {
+        assert_eq!(fitted("Short.Name", 40), "Short.Name");
+        assert_eq!(fitted(&"x".repeat(40), 40), "x".repeat(40));
+    }
+
+    /// The defect this exists for: cut at the tail, two releases that differ only in
+    /// resolution read identically, and a list of what is downloading that cannot
+    /// tell them apart fails at the one question it exists to answer.
+    #[test]
+    fn two_values_differing_only_at_the_end_stay_apart() {
+        let hd = "A.Very.Long.Release.Name.From.Some.Group.2024.1080p.WEB-DL";
+        let uhd = "A.Very.Long.Release.Name.From.Some.Group.2024.2160p.WEB-DL";
+
+        let lesser = fitted(hd, 40);
+        let better = fitted(uhd, 40);
+        assert_ne!(lesser, better, "both were shortened to the same thing");
+        assert!(better.ends_with("WEB-DL"), "{better}");
+        assert!(better.starts_with("A.Very.Long"), "{better}");
+    }
+
+    /// Never wider than asked for, however it was shortened.
+    #[test]
+    fn a_shortened_value_still_fits_the_row() {
+        for width in [4, 7, 20, 41] {
+            let shortened = fitted(&"z".repeat(120), width);
+            assert_eq!(shortened.chars().count(), width, "{shortened}");
+        }
+    }
+
+    /// The marker is full stops rather than an ellipsis, so a terminal that cannot
+    /// render the character is never handed one.
+    #[test]
+    fn shortening_uses_no_character_a_terminal_might_not_have() {
+        let text = fitted(&"y".repeat(80), 40);
+
+        assert!(text.contains("..."), "{text}");
+        assert!(text.is_ascii(), "{text}");
+    }
+
+    /// A row too narrow for both ends and a marker says only that something is
+    /// there: a half of a name is read as a name, and a marker is not.
+    #[test]
+    fn a_row_with_no_room_for_both_ends_keeps_neither() {
+        assert_eq!(fitted("Some.Release.2160p", 3), "...");
+        assert_eq!(fitted("Some.Release.2160p", 2), "..");
+        assert_eq!(fitted("Some.Release.2160p", 0), "");
+    }
+
+    /// Width is counted in characters rather than in bytes, on both ends of it.
+    #[test]
+    fn a_shortened_value_is_measured_in_what_a_terminal_draws() {
+        assert_eq!(fitted("Amélie.Amélie.Amélie", 11), "Amél...élie");
     }
 }

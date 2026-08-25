@@ -7,6 +7,10 @@
 //! Laid out by what is available rather than by a fixed grid: a narrow terminal
 //! drops to one column rather than squeezing two into a width neither fits, so it
 //! degrades by carrying less at a time and never by overlapping.
+//!
+//! The panels reflow and so do the lines inside them: each panel is built for the
+//! room its own place has, so nothing on the screen is decided by a width the
+//! screen does not have.
 
 mod panels;
 
@@ -23,6 +27,13 @@ use ratatui::Frame;
 /// one column, which is less at a time and still correct — the alternative is a
 /// layout that overlaps, and a corrupted screen is worse than a tall one.
 const TWO_COLUMNS: u16 = 96;
+
+/// The room a panel is built for where no screen is being drawn.
+///
+/// [`showing`] is asked what a snapshot says rather than what one terminal is
+/// showing it at, and a word left out because a panel was narrow is not a word
+/// this product declined to say.
+const UNBOUNDED: usize = usize::MAX;
 
 /// Draw the whole screen.
 pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
@@ -44,7 +55,11 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
         snapshot.telemetry
     };
     frame.render_widget(
-        Paragraph::new(panels::header(telemetry, &snapshot.health)),
+        Paragraph::new(panels::header(
+            telemetry,
+            &snapshot.health,
+            usize::from(top.width),
+        )),
         top,
     );
     frame.render_widget(
@@ -55,12 +70,13 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
         bottom,
     );
 
-    let panels = sections(snapshot);
+    let places = places(body);
+    let panels = sections(snapshot, &rooms(&places));
     // Gathered before the panels are consumed by drawing, and only when it was
     // asked for.
     let showing = glossary.then(|| words_of(&panels));
 
-    for (area, (title, lines)) in places(body).into_iter().zip(panels) {
+    for (area, (title, lines)) in places.into_iter().zip(panels) {
         frame.render_widget(
             Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title(title)),
             area,
@@ -89,20 +105,39 @@ fn words_of(panels: &[(&'static str, Vec<Line<'static>>)]) -> String {
 /// frame — the loop recording what an operator opened, which the drawing cannot do
 /// because it happens every frame and this must happen once.
 pub(crate) fn showing(snapshot: &Snapshot) -> String {
-    words_of(&sections(snapshot))
+    words_of(&sections(snapshot, &[]))
+}
+
+/// The room each panel's own lines have, inside its border.
+fn rooms(places: &[Rect]) -> Vec<usize> {
+    places
+        .iter()
+        .map(|place| usize::from(place.width.saturating_sub(2)))
+        .collect()
 }
 
 /// Each panel, in the order they are read: what is wrong first, then what is
 /// happening, then what it is running on.
-fn sections(snapshot: &Snapshot) -> Vec<(&'static str, Vec<Line<'static>>)> {
+fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line<'static>>)> {
+    // Taken in the order the panels are built below, which is the order their
+    // places were laid out in — so no panel is ever built for another's width.
+    let mut given = rooms.iter().copied().chain(std::iter::repeat(UNBOUNDED));
+    let mut room = || given.next().unwrap_or(UNBOUNDED);
+    let vpn = panels::vpn(snapshot.vpn.as_ref(), room());
+    let transfers = panels::transfers(&snapshot.transfers, room());
+    let queues = panels::queues(&snapshot.queue, room());
+    let storage = panels::storage(&snapshot.storage, room());
+    let services = panels::services(&snapshot.services, room());
+    let stuck = panels::stuck(&snapshot.stuck, room());
+    let alerts = panels::alerts(&snapshot.alerts, room());
     vec![
-        ("VPN", panels::vpn(snapshot.vpn.as_ref())),
-        ("Transfers", panels::transfers(&snapshot.transfers)),
-        ("Queues", panels::queues(&snapshot.queue)),
-        ("Storage", panels::storage(&snapshot.storage)),
-        ("Services", panels::services(&snapshot.services)),
-        ("Stuck", panels::stuck(&snapshot.stuck)),
-        ("Alerts", panels::alerts(&snapshot.alerts)),
+        ("VPN", vpn),
+        ("Transfers", transfers),
+        ("Queues", queues),
+        ("Storage", storage),
+        ("Services", services),
+        ("Stuck", stuck),
+        ("Alerts", alerts),
     ]
 }
 
@@ -151,19 +186,24 @@ pub(crate) mod tests {
     use ratatui::layout::Rect;
     use ratatui::Terminal;
 
+    /// The transfer a filled snapshot carries, for a test that wants another.
+    pub(crate) fn a_transfer() -> Transfer {
+        Transfer {
+            name: "Some.Release".to_owned(),
+            protocol: Protocol::Torrent,
+            progress: 42,
+            speed: Reading::Known(5_000_000),
+            eta: Some(std::time::Duration::from_secs(600)),
+        }
+    }
+
     /// A snapshot with every panel filled, for the tests that need one.
     pub(crate) fn a_snapshot() -> Snapshot {
         Snapshot {
             telemetry: Telemetry::Live,
             health: Summary::of(Reach::Running, &[], "1000"),
             vpn: None,
-            transfers: Panel::Ready(vec![Transfer {
-                name: "Some.Release".to_owned(),
-                protocol: Protocol::Torrent,
-                progress: 42,
-                speed: Reading::Known(5_000_000),
-                eta: Some(std::time::Duration::from_secs(600)),
-            }]),
+            transfers: Panel::Ready(vec![a_transfer()]),
             queue: Panel::Ready(Vec::new()),
             stuck: Vec::new(),
             alerts: Vec::new(),
@@ -234,7 +274,7 @@ pub(crate) mod tests {
     #[test]
     fn the_screen_carries_every_panel_and_the_state_of_the_screen_itself() {
         let text = drawn(&a_snapshot(), 120, 40);
-        for (panel, _) in sections(&a_snapshot()) {
+        for (panel, _) in sections(&a_snapshot(), &[]) {
             assert!(text.contains(panel), "{panel} is missing:\n{text}");
         }
         assert!(text.contains("lemonfiber"), "{text}");
@@ -246,7 +286,7 @@ pub(crate) mod tests {
         // Degrading by carrying less at a time, never by overlapping: a corrupted
         // screen is worse than a tall one.
         let text = drawn(&a_snapshot(), 60, 90);
-        for (panel, _) in sections(&a_snapshot()) {
+        for (panel, _) in sections(&a_snapshot(), &[]) {
             assert!(text.contains(panel), "{panel} is missing:\n{text}");
         }
     }
@@ -267,7 +307,7 @@ pub(crate) mod tests {
         // place would leave an operator looking for something that is simply not
         // on the screen — so this counts against the sections themselves rather
         // than a number written twice.
-        let wanted = sections(&a_snapshot()).len();
+        let wanted = sections(&a_snapshot(), &[]).len();
         assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS, 40)).len(), wanted);
         assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS - 1, 40)).len(), wanted);
     }
@@ -278,5 +318,151 @@ pub(crate) mod tests {
         // rather than fail.
         let text = drawn(&a_snapshot(), 8, 4);
         assert!(!text.is_empty());
+    }
+    /// A value long enough to need shortening at every width this is drawn at,
+    /// with an end that says which value it was.
+    fn a_long(mark: u8) -> String {
+        format!("<<{mark}.The.Long.Way.to.a.Small.Angry.Planet.2024.2160p.WEB-DL.{mark}>>")
+    }
+
+    /// The values a wordy snapshot puts on the screen: which panel each one is in,
+    /// and the mark its two ends are told apart by.
+    const MARKED: [(&str, u8); 4] = [
+        ("the transfer", 1),
+        ("the queue", 2),
+        ("the service", 3),
+        ("the alert", 4),
+    ];
+
+    /// A snapshot whose every panel carries a value from somewhere else, each long
+    /// enough that the screen has to do something about it.
+    fn a_wordy_snapshot() -> Snapshot {
+        let mut snapshot = a_snapshot();
+        snapshot.transfers = Panel::Ready(vec![Transfer {
+            name: a_long(1),
+            ..a_transfer()
+        }]);
+        snapshot.queue = Panel::Ready(vec![lemonfiber_core::dashboard::Queue {
+            service: a_long(2),
+            depth: 4,
+            stuck: 1,
+        }]);
+        snapshot.services = Panel::Ready(vec![lemonfiber_core::docker::Service {
+            id: a_long(3),
+            name: "Sonarr".to_owned(),
+            profile: "tv".to_owned(),
+            state: lemonfiber_core::docker::State::Running,
+            criticality: lemonfiber_core::docker::Criticality::Core,
+            depends_on: Vec::new(),
+            exit: None,
+        }]);
+        snapshot.alerts = vec![lemonfiber_core::alert::Alert {
+            check: "service.sonarr".to_owned(),
+            kind: "service.down".to_owned(),
+            moment: lemonfiber_core::alert::Moment::Onset,
+            severity: lemonfiber_core::error::Severity::Warning,
+            summary: a_long(4),
+            remedies: vec!["start it".to_owned()],
+            affected: vec!["service.sonarr".to_owned()],
+        }];
+        snapshot
+    }
+
+    /// Both ends of a value, which is what tells one from the next.
+    fn ends(value: &str) -> (String, String) {
+        let counted = value.chars().count();
+        (
+            value.chars().take(5).collect(),
+            value.chars().skip(counted.saturating_sub(5)).collect(),
+        )
+    }
+
+    /// The requirement, at the widths it failed at. A value cut at its end is a
+    /// value two of which read alike: the resolution, the encoding and the group
+    /// all live at the end of a release name, and a panel listing what is
+    /// downloading that cannot tell two downloads apart fails at the one question
+    /// it exists to answer.
+    #[test]
+    fn no_width_cuts_a_value_at_its_end() {
+        let snapshot = a_wordy_snapshot();
+
+        for width in [60u16, 96, 120, 160, 200] {
+            let screen = drawn(&snapshot, width, 44);
+            for (panel, mark) in MARKED {
+                let (head, tail) = ends(&a_long(mark));
+                assert!(
+                    screen.contains(&head),
+                    "{panel} lost its head at {width}:\n{screen}"
+                );
+                assert!(
+                    screen.contains(&tail),
+                    "{panel} lost its tail at {width}:\n{screen}"
+                );
+            }
+        }
+    }
+
+    /// What was left out is marked, so nobody reads a shortened value as a whole
+    /// one — and the marker is full stops rather than a character a terminal may
+    /// not have.
+    #[test]
+    fn a_shortened_value_says_it_was_shortened() {
+        let screen = drawn(&a_wordy_snapshot(), 120, 44);
+
+        assert!(screen.contains("..."), "{screen}");
+        assert!(!screen.contains('…'), "{screen}");
+    }
+
+    /// A value that fits is left exactly as it is: shortening one that needed no
+    /// shortening would be inventing a change to it.
+    #[test]
+    fn a_value_that_fits_is_drawn_whole_and_unmarked() {
+        let screen = drawn(&a_snapshot(), 160, 44);
+
+        assert!(screen.contains("Some.Release"), "{screen}");
+        assert!(!screen.contains("..."), "{screen}");
+    }
+
+    /// A reason a panel could not be filled is another service's words, and the
+    /// end of it is commonly the part that says what to do.
+    #[test]
+    fn the_reason_a_panel_is_down_keeps_both_of_its_ends() {
+        let mut snapshot = a_snapshot();
+        let reason = a_long(5);
+        snapshot.storage = Panel::unavailable(&reason);
+
+        let screen = drawn(&snapshot, 120, 44);
+
+        let (head, tail) = ends(&reason);
+        assert!(screen.contains("unavailable"), "{screen}");
+        assert!(screen.contains(&head) && screen.contains(&tail), "{screen}");
+    }
+
+    /// The pane is the log viewer's as well as this screen's, so an explanation
+    /// broken onto another row here is one broken there too.
+    ///
+    /// A hundred and twenty columns is the width it failed at: the pane is seven
+    /// tenths of the screen, which left eighty-two for a definition longer than
+    /// that, and every one of them stopped mid-word.
+    #[test]
+    fn no_width_leaves_an_explanation_on_this_screen_unfinished() {
+        let snapshot = a_snapshot();
+        let explained: Vec<&str> = lemonfiber_core::glossary::TERMS
+            .iter()
+            .filter(|term| term.word == "hardlink")
+            .flat_map(|term| term.short.split_whitespace())
+            .collect();
+
+        for width in [60u16, 96, 120, 200] {
+            let screen = shown(&snapshot, width, 44, true).replace('\n', " ");
+            let missing: Vec<&&str> = explained
+                .iter()
+                .filter(|word| !screen.contains(**word))
+                .collect();
+            assert!(
+                missing.is_empty(),
+                "at {width} columns the pane lost {missing:?}:\n{screen}"
+            );
+        }
     }
 }

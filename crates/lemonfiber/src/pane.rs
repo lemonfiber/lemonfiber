@@ -13,9 +13,15 @@
 //! What it explains is **what is on the screen now** rather than everything this
 //! product knows. A glossary of two dozen words is a document; the four words in
 //! front of somebody is an answer.
+//!
+//! An explanation is prose, and the pane counts its own rows — so an explanation
+//! wider than the pane is wrapped onto another row rather than shortened. An
+//! explanation cut mid-sentence has stopped being one, and a pane whose whole
+//! purpose is to say what a word means cannot afford to say most of it.
 
 use lemonfiber_core::acknowledged::Acknowledged;
 use lemonfiber_core::glossary::{mentioned, Term};
+use lemonfiber_core::text::{wrapped, Overrun};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Frame, Line, Span, Style};
 use ratatui::style::Modifier;
@@ -23,6 +29,19 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 /// How wide the pane is, as a share of the screen.
 const WIDTH: u16 = 70;
+
+/// What the pane calls itself where there is room to say it, longest first.
+///
+/// The width decides which of them is used, and every one of them is whole: a
+/// title is the one row that cannot be given a second.
+const TITLES: [&str; 2] = [
+    " the words on this screen — any key closes ",
+    " the words on this screen ",
+];
+
+/// What it is called where there is room for none of those. A pane has to be
+/// called something, and half a name is not a name.
+const SHORTEST: &str = " words ";
 
 /// How tall, as a share, so it never covers everything behind it.
 const HEIGHT: u16 = 60;
@@ -43,52 +62,117 @@ pub(crate) fn showing<'a>(lines: impl IntoIterator<Item = &'a Line<'a>>) -> Stri
 /// Draw the words on this screen over whatever is already drawn.
 pub(crate) fn over(frame: &mut Frame, showing: &str) {
     let area = middle(frame.area());
-    let room = usize::from(area.height.saturating_sub(2));
+    let (rows, across) = inside(area);
     frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(explaining(showing, room)).block(
+        Paragraph::new(explaining(showing, rows, across)).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" the words on this screen — any key closes "),
+                .title(titled(area.width)),
         ),
         area,
     );
 }
 
-/// One line per word on the screen, and a word about what was left out.
+/// The longest of the pane's names that fits the width it has.
+///
+/// The shortest is used where not even that fits, since a pane has to be called
+/// something and half a name is not a name.
+fn titled(across: u16) -> &'static str {
+    let room = usize::from(across);
+    TITLES
+        .into_iter()
+        .find(|title| title.chars().count() <= room)
+        .unwrap_or(SHORTEST)
+}
+
+/// Every word on the screen it has room to explain, and a count of the rest.
 ///
 /// Cut to what fits rather than scrolled: this is an aside, and an aside somebody
-/// has to navigate has stopped being one. What is left out is counted, because a
-/// pane that quietly showed four of nine would be read as there being four.
-fn explaining(showing: &str, room: usize) -> Vec<Line<'static>> {
+/// has to navigate has stopped being one. What goes is whole words rather than the
+/// ends of their explanations, and what is left out is counted, because a pane that
+/// quietly showed four of nine would be read as there being four.
+fn explaining(showing: &str, rows: usize, across: usize) -> Vec<Line<'static>> {
     let used = mentioned(showing);
     if used.is_empty() {
-        return vec![Line::raw("Nothing on this screen needs a word explaining.")];
+        return broken("Nothing on this screen needs a word explaining.", across)
+            .map(Line::raw)
+            .collect();
     }
 
-    let explained = explained_in(showing, room, crate::render::glossary::known());
-    let shown = explained.len();
+    let explained = explained_in(showing, rows, across, crate::render::glossary::known());
     let mut lines: Vec<Line<'static>> = explained
         .iter()
-        .map(|term| {
-            Line::from(vec![
-                Span::styled(
-                    format!("{}  ", term.word),
-                    Style::default().add_modifier(Modifier::BOLD),
-                ),
-                Span::raw(term.short.to_owned()),
-            ])
-        })
+        .flat_map(|term| taught(term, across))
         .collect();
 
-    let left = used.len().saturating_sub(shown);
+    let left = used.len().saturating_sub(explained.len());
     if left > 0 {
-        lines.push(Line::styled(
-            format!("and {left} more, which `lemonfiber explain` will say"),
-            Style::default().add_modifier(Modifier::DIM),
-        ));
+        lines.extend(
+            counted(left, across, rows.saturating_sub(lines.len()))
+                .into_iter()
+                .map(|row| Line::styled(row, Style::default().add_modifier(Modifier::DIM))),
+        );
     }
     lines
+}
+
+/// What the pane says about the words it had no room to explain, longest first.
+///
+/// The count is the half that has to survive: a pane that quietly showed two of six
+/// would be read as there being two, so what goes as the room runs out is the
+/// sentence around the number rather than the number.
+fn more(left: usize) -> [String; 3] {
+    [
+        format!("and {left} more, which `lemonfiber explain` will say"),
+        format!("and {left} more"),
+        format!("+{left}"),
+    ]
+}
+
+/// The longest of those that fits the rows there are for saying it.
+///
+/// Nothing at all where there is not a row for even the shortest: the pane has
+/// already given every row it has to explaining words, which is what it is for.
+fn counted(left: usize, across: usize, rows: usize) -> Vec<String> {
+    more(left)
+        .into_iter()
+        .map(|said| broken(&said, across).collect::<Vec<String>>())
+        .find(|said| said.len() <= rows)
+        .unwrap_or_default()
+}
+
+/// Text over as many rows of the pane as it takes.
+///
+/// A screen is a grid of cells and past the edge is not re-wrapped, it is not
+/// drawn — so a run with nothing to break on is broken at the edge here, where a
+/// report would let it overrun and be re-wrapped by whatever is reading it.
+fn broken(text: &str, across: usize) -> impl Iterator<Item = String> {
+    wrapped(text, across.max(1), Overrun::Broken).into_iter()
+}
+
+/// One word and what it means, over as many rows as the explanation takes.
+///
+/// The word leads and its explanation is wrapped beside it, every row continuing
+/// one indented to where it began so it cannot be read as another word's. The
+/// column is capped at half the pane, so a long word never leaves its explanation
+/// a strip too narrow to carry anything.
+fn taught(term: &Term, across: usize) -> Vec<Line<'static>> {
+    let column = (term.word.chars().count() + 2).min(across / 2);
+    broken(term.short, across.saturating_sub(column))
+        .enumerate()
+        .map(|(at, part)| {
+            let head = if at == 0 {
+                Span::styled(
+                    format!("{:<column$}", term.word),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )
+            } else {
+                Span::raw(" ".repeat(column))
+            };
+            Line::from(vec![head, Span::raw(part)])
+        })
+        .collect()
 }
 
 /// The words this pane explains in full, given the room it has.
@@ -97,22 +181,59 @@ fn explaining(showing: &str, room: usize) -> Vec<Line<'static>> {
 /// record **exactly** what was explained to them. The ones the pane only names are
 /// not explained — naming a word is how it stays findable, not how it gets taught —
 /// and recording those would stop a later report explaining a word nobody ever read.
-pub(crate) fn explained_in(showing: &str, room: usize, known: &Acknowledged) -> Vec<&'static Term> {
-    let fits = room.saturating_sub(1).max(1);
-    mentioned(showing)
-        .into_iter()
-        // A word already gone and found out about is named rather than taught
-        // again, exactly as a report does it — so the room this pane has goes to
-        // what is new. One rule, both surfaces: a screen and a report disagreeing
-        // about which words somebody knows would be the same feature twice.
+pub(crate) fn explained_in(
+    showing: &str,
+    rows: usize,
+    across: usize,
+    known: &Acknowledged,
+) -> Vec<&'static Term> {
+    let used = mentioned(showing);
+    // A word already gone and found out about is named rather than taught again,
+    // exactly as a report does it — so the room this pane has goes to what is new.
+    // One rule, both surfaces: a screen and a report disagreeing about which words
+    // somebody knows would be the same feature twice.
+    let new: Vec<&'static Term> = used
+        .iter()
+        .copied()
         .filter(|term| !known.holds(term.word))
-        .take(fits)
-        .collect()
+        .collect();
+    if new.len() == used.len() && tall(&new, across) <= rows {
+        return new;
+    }
+    // Measured against every word on the screen rather than against the ones left
+    // out, which is never the larger number — so the row it is given is never
+    // narrower than the row it takes.
+    let budget = rows.saturating_sub(counted(used.len(), across, rows).len());
+    let mut taken: Vec<&'static Term> = Vec::new();
+    let mut height = 0;
+    for term in new {
+        let needs = taught(term, across).len();
+        if height + needs > budget {
+            break;
+        }
+        height += needs;
+        taken.push(term);
+    }
+    taken
 }
 
-/// How much room the pane has for words, on a screen of this size.
-pub(crate) fn room_on(screen: Rect) -> usize {
-    usize::from(middle(screen).height.saturating_sub(2))
+/// How many rows explaining all of these takes.
+fn tall(terms: &[&'static Term], across: usize) -> usize {
+    terms.iter().map(|term| taught(term, across).len()).sum()
+}
+
+/// How much room the pane has for words, on a screen of this size: rows and
+/// columns both, since how many words fit depends on how wide each one runs.
+pub(crate) fn room_on(screen: Rect) -> (usize, usize) {
+    inside(middle(screen))
+}
+
+/// The rows and columns inside a pane of this size, its own border taken off.
+fn inside(area: Rect) -> (usize, usize) {
+    (
+        usize::from(area.height.saturating_sub(2)),
+        usize::from(area.width.saturating_sub(2)),
+    )
 }
 
 /// A box in the middle of the screen, leaving what is behind it visible around.
@@ -138,10 +259,16 @@ fn middle(screen: Rect) -> Rect {
 
 #[cfg(test)]
 mod tests {
-    use super::{explained_in, explaining, middle, room_on, showing};
+    use super::{
+        explained_in, explaining, middle, room_on, showing, taught, titled, SHORTEST, TITLES,
+    };
     use lemonfiber_core::acknowledged::Acknowledged;
+    use lemonfiber_core::glossary::{mentioned, TERMS};
     use ratatui::layout::Rect;
     use ratatui::prelude::{Line, Span};
+
+    /// A pane with more room than anything here is testing the edge of.
+    const WIDE: usize = 200;
 
     /// The text of one line, for an assertion to read it back.
     fn text(line: &Line<'_>) -> String {
@@ -162,7 +289,7 @@ mod tests {
         ];
 
         let said = showing(drawn.iter());
-        let explained = explaining(&said, 10);
+        let explained = explaining(&said, 10, WIDE);
 
         assert_eq!(explained.len(), 1, "one word was on the screen");
         let first = explained.first().map(text).unwrap_or_default();
@@ -175,7 +302,7 @@ mod tests {
     fn a_screen_with_no_words_to_explain_says_so() {
         let drawn = [Line::from(vec![Span::raw("everything is running")])];
 
-        let explained = explaining(&showing(drawn.iter()), 10);
+        let explained = explaining(&showing(drawn.iter()), 10, WIDE);
 
         assert_eq!(explained.len(), 1);
         let said = explained.first().map(text).unwrap_or_default();
@@ -189,7 +316,7 @@ mod tests {
             "the indexer, the hardlink, the VPN, the ratio and the seed",
         )])];
 
-        let explained = explaining(&showing(drawn.iter()), 4);
+        let explained = explaining(&showing(drawn.iter()), 4, WIDE);
 
         let last = explained.last().map(text).unwrap_or_default();
         assert!(last.starts_with("and 2 more"), "{last}");
@@ -202,8 +329,8 @@ mod tests {
         let said = "the indexer, the hardlink, the VPN, the ratio and the seed";
 
         let nothing = Acknowledged::default();
-        let roomy = explained_in(said, 10, &nothing);
-        let cramped = explained_in(said, 3, &nothing);
+        let roomy = explained_in(said, 10, WIDE, &nothing);
+        let cramped = explained_in(said, 3, WIDE, &nothing);
 
         let (roomy_count, cramped_count) = (roomy.len(), cramped.len());
         assert!(
@@ -222,23 +349,29 @@ mod tests {
         let mut known = Acknowledged::default();
         known.take("indexer");
 
-        let explained = explained_in("no indexer answered, the hardlink failed", 10, &known);
+        let explained = explained_in("no indexer answered, the hardlink failed", 10, WIDE, &known);
 
         let words: Vec<&str> = explained.iter().map(|term| term.word).collect();
         assert_eq!(words, ["hardlink"], "the room goes to what is new");
     }
 
     /// The room is the pane's, not the screen's — what is behind it was not read.
+    /// Both of its dimensions, since how many words fit depends on how wide each
+    /// one runs as well as on how many rows there are.
     #[test]
     fn the_room_is_the_panes_rather_than_the_screens() {
         let screen = Rect::new(0, 0, 100, 40);
 
-        let room = room_on(screen);
+        let (rows, across) = room_on(screen);
 
-        assert!(room > 0, "there is room for something");
+        assert!(rows > 0 && across > 0, "there is room for something");
         assert!(
-            room < usize::from(screen.height),
-            "but less than the screen: {room}"
+            rows < usize::from(screen.height),
+            "but fewer rows than the screen: {rows}"
+        );
+        assert!(
+            across < usize::from(screen.width),
+            "and narrower than it: {across}"
         );
     }
 
@@ -256,5 +389,114 @@ mod tests {
             area.x > 0 && area.y > 0,
             "and it is not in a corner: {area:?}"
         );
+    }
+    /// The words of one line, for a check that reads what a row actually carries.
+    fn text_of(lines: &[Line<'static>]) -> Vec<String> {
+        lines.iter().map(text).collect()
+    }
+
+    /// The defect this exists for. An explanation is prose and the pane counts its
+    /// own rows, so an explanation wider than the pane goes onto another row — at
+    /// no width does the pane stop mid-sentence, which is the one thing a pane for
+    /// explaining words cannot do.
+    #[test]
+    fn no_width_leaves_an_explanation_unfinished() {
+        let said = "the hardlink, the indexer and the VPN";
+
+        for across in [26, 40, 54, 82, 120, 200] {
+            // Read as a terminal reads it: a grid of cells, where whatever a row
+            // holds past its last column is not re-wrapped, it is not drawn.
+            let screen = text_of(&explaining(said, 40, across))
+                .iter()
+                .map(|row| row.chars().take(across).collect::<String>())
+                .collect::<Vec<String>>()
+                .join(" ");
+            for term in mentioned(said) {
+                let missing: Vec<&str> = term
+                    .short
+                    .split_whitespace()
+                    .filter(|word| !screen.contains(word))
+                    .collect();
+                assert!(
+                    missing.is_empty(),
+                    "at {across} columns `{}` lost {missing:?}: {screen}",
+                    term.word
+                );
+            }
+        }
+    }
+
+    /// Nothing the pane writes runs past its own edge either: a row past the last
+    /// column of a grid of cells is not re-wrapped, it is not drawn.
+    #[test]
+    fn no_row_the_pane_writes_runs_past_its_edge() {
+        for across in [26, 40, 54, 82] {
+            for rows in text_of(&explaining(
+                "the hardlink and the quality profile",
+                40,
+                across,
+            )) {
+                let counted = rows.chars().count();
+                assert!(counted <= across, "{counted} of {across}: {rows}");
+            }
+        }
+    }
+
+    /// A pane that overflowed its own rows would lose the line at the bottom, which
+    /// is the one saying how many words it had no room for.
+    #[test]
+    fn what_the_pane_draws_never_outruns_the_rows_it_was_given() {
+        let said = "the hardlink, the indexer, the VPN, the ratio, the seed and the torrent";
+
+        for rows in [0usize, 1, 2, 3, 5, 8, 13] {
+            let drawn = explaining(said, rows, 40);
+            assert!(drawn.len() <= rows, "{} rows of {rows}", drawn.len());
+        }
+    }
+
+    /// Whatever it had no room for is still counted, however narrow the pane — a
+    /// pane that quietly showed two of six would be read as there being two.
+    #[test]
+    fn a_narrow_pane_still_says_how_many_it_left_out() {
+        let said = "the hardlink, the indexer, the VPN, the ratio, the seed and the torrent";
+
+        let drawn = text_of(&explaining(said, 6, 40)).join(" ");
+
+        assert!(drawn.contains("more, which"), "{drawn}");
+    }
+
+    /// A row continuing an explanation is indented to where the explanation began,
+    /// so it cannot be read as another word's.
+    #[test]
+    fn a_row_continuing_an_explanation_starts_under_the_explanation() {
+        let rows: Vec<String> = TERMS
+            .iter()
+            .filter(|term| term.word == "hardlink")
+            .flat_map(|term| text_of(&taught(term, 40)))
+            .collect();
+
+        assert!(rows.len() > 1, "it took more than one row: {rows:?}");
+        let continuing: Vec<&String> = rows.iter().skip(1).collect();
+        assert!(
+            continuing
+                .iter()
+                .all(|row| row.starts_with(&" ".repeat("hardlink".len() + 2))),
+            "{continuing:?}"
+        );
+    }
+
+    /// The title is the one row of the pane that cannot be given a second, so the
+    /// width decides which of its names is used — and every one of them is whole.
+    #[test]
+    fn the_pane_is_never_called_by_half_a_name() {
+        for across in 1u16..=120 {
+            let title = titled(across);
+            assert!(TITLES.contains(&title) || title == SHORTEST, "`{title}`");
+            let fits = title.chars().count() <= usize::from(across);
+            assert!(fits || title == SHORTEST, "`{title}` does not fit {across}");
+        }
+        assert!(titled(120).contains("any key closes"), "{}", titled(120));
+        assert!(titled(30).ends_with("this screen "), "{}", titled(30));
+        assert_eq!(titled(10), " words ");
     }
 }
