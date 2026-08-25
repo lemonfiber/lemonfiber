@@ -191,9 +191,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     // a different request from the one that was asked and says nothing about having
     // done so. Only for a name this surface offers — a name it does not offer is
     // absent before it is anything else.
-    let carried: [(&str, bool, &[&str]); 2] = [
-        ("confirm", confirm, TAKES_AGREEMENT),
+    let carried: [(&str, bool, &[&str]); 7] = [
+        ("forms", !forms.is_empty(), TAKES_FORMS),
         ("services", !services.is_empty(), TAKES_SERVICES),
+        ("key", key.is_some(), TAKES_SETTING),
+        ("value", value.is_some(), TAKES_SETTING),
+        ("preset", preset.is_some(), TAKES_PRESET),
+        ("media_type", media_type.is_some(), TAKES_PRESET),
+        ("confirm", confirm, TAKES_AGREEMENT),
     ];
     for (argument, given, takers) in carried {
         if given && OFFERED.contains(&action) && !takers.contains(&action) {
@@ -236,6 +241,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
 /// The actions that must be told what to act on.
 const NAMES_ITS_FORMS: [&str; 3] = ["switch", "restart", "pull"];
 
+/// The actions whose command carries the forms it was given.
+///
+/// The lifecycle five, and nothing else. Seeding, adopting, resetting, changing a
+/// setting and choosing a quality are whole-stack requests on every surface: no
+/// command has a field to narrow them by and the command line declares no argument
+/// for one, so a form named to any of them is a narrowing that was never available.
+pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull"];
+
 /// The actions whose command carries the operator's agreement.
 ///
 /// The three the command line declares `--confirm` on, and no others. Each names
@@ -254,7 +267,7 @@ const NAMES_ITS_FORMS: [&str; 3] = ["switch", "restart", "pull"];
 /// Choosing for music is inside `quality-set` and drops the agreement, because
 /// picking an audio format is not a choice this host has to transcode for. The
 /// command line drops it there too.
-const TAKES_AGREEMENT: &[&str] = &["quality-set", "quality-upgrade", "reset"];
+pub const TAKES_AGREEMENT: &[&str] = &["quality-set", "quality-upgrade", "reset"];
 
 /// The actions whose command carries the services it was given.
 ///
@@ -268,7 +281,26 @@ const TAKES_AGREEMENT: &[&str] = &["quality-set", "quality-upgrade", "reset"];
 /// the form holds, which is the answer to a request nobody made. Whether starting
 /// named services is its own request, the way `Halt` is its own request, is a
 /// question for the core rather than for this table.
-const TAKES_SERVICES: &[&str] = &["down", "restart"];
+pub const TAKES_SERVICES: &[&str] = &["down", "restart"];
+
+/// The action whose command carries the setting it was given.
+///
+/// One setting is read or written by name, and no other action is about a setting
+/// at all.
+pub const TAKES_SETTING: &[&str] = &["config-set"];
+
+/// The action whose command carries the quality it was given.
+///
+/// Choosing is the only one of the three quality actions that takes a preset or a
+/// media type. Re-asserting the recorded choice re-asserts what is recorded, and
+/// upgrading re-fetches at what is recorded — neither takes a new choice, and the
+/// command line declares neither argument on them.
+///
+/// `quality-upgrade` is where dropping one costs the most. A caller that named a
+/// preset and a media type asked to upgrade one kind of media to one quality; the
+/// command re-fetches the whole library at the quality already recorded, which is
+/// a far larger download than the one the agreement beside it was given for.
+pub const TAKES_PRESET: &[&str] = &["quality-set"];
 
 /// Every action this surface offers, in the order they are worth reading.
 ///
