@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use reqwest::header::HeaderValue;
 use reqwest::Url;
 
-use crate::config::store::is_secret;
+use crate::config::display::without_query;
+use crate::config::store::REDACTED;
 use crate::ports::http::{Http, Method, Request, Response, Unreachable};
 
 /// How long to wait for a service to accept a connection before treating it as
@@ -85,15 +86,15 @@ impl Http for Web {
             builder = builder.body(body.clone());
         }
 
-        // A transport error's own words can quote the URL it failed on, and a URL
-        // can carry a secret in its query — an indexer authenticates by an `apikey`
-        // parameter, not a header. Mask those values wherever they would otherwise
-        // reach an operator: in the URL kept on the failure and in the reason read
-        // from the error.
-        let secrets = query_secrets(&request.url);
+        // A transport error's own words can quote the URL it failed on, and a URL can
+        // carry a credential in its query — an indexer authenticates by a query
+        // parameter, not a header. Which parameter holds it is not a question this code
+        // can answer, so it does not ask: the query goes wholesale, out of the URL kept
+        // on the failure and out of the reason read from the error.
+        let query = query_of(&request.url);
         let unreachable = |error: &reqwest::Error| Unreachable {
-            url: mask(&request.url, &secrets),
-            reason: mask(&error.to_string(), &secrets),
+            url: without_query(&request.url),
+            reason: withheld_query(&error.to_string(), query),
             attempts: 1,
         };
 
@@ -108,31 +109,26 @@ impl Http for Web {
     }
 }
 
-/// The values of any query parameters whose names mark them secret — an indexer's
-/// `apikey` above all. Read from the request URL so a transport error quoting that
-/// URL can have them masked before it is surfaced. The same name-based rule the
-/// configuration store redacts by decides what counts (`apikey` holds `KEY`), so
-/// there is one answer to "is this a secret" rather than two.
-fn query_secrets(url: &str) -> Vec<&str> {
-    let Some((_, query)) = url.split_once('?') else {
-        return Vec::new();
-    };
-    query
-        .split('&')
-        .filter_map(|pair| pair.split_once('='))
-        .filter(|(name, value)| is_secret(name) && !value.is_empty())
-        .map(|(_, value)| value)
-        .collect()
+/// The whole of a URL's query, where it carries one.
+///
+/// The whole of it, and not the parameters within it that read as credentials, because
+/// a parameter's name belongs to whoever wrote the service rather than to lemonfiber. A
+/// name rule caught `apikey` by the accident of its holding `KEY`, and caught neither
+/// the `r=` a Newznab-family indexer authenticates by nor a `sid=` session — guessing at
+/// somebody else's vocabulary, and wrong wherever they chose a word nobody here listed.
+///
+/// So the answer is the one [`without_query`] already gives on the same value on the
+/// settings surface: a query nobody reads is a smaller loss than a key everybody can.
+fn query_of(url: &str) -> Option<&str> {
+    url.split_once('?')
+        .map(|(_, query)| query)
+        .filter(|query| !query.is_empty())
 }
 
-/// `text` with every one of `secrets` blotted out — what makes a URL or an error
-/// message safe to show once its secret query values are known.
-fn mask(text: &str, secrets: &[&str]) -> String {
-    let mut safe = text.to_owned();
-    for secret in secrets {
-        safe = safe.replace(secret, "***");
-    }
-    safe
+/// `text` with `query` blotted out wherever it appears — what makes a transport error's
+/// own sentence safe to show, since that sentence quotes the URL it failed on.
+fn withheld_query(text: &str, query: Option<&str>) -> String {
+    query.map_or_else(|| text.to_owned(), |query| text.replace(query, REDACTED))
 }
 
 /// Cookies kept apart by the exact origin that set them.
