@@ -1,8 +1,9 @@
 //! What this stack is, what it declares, and what it is doing.
 //!
 //! The versions in play, the forms the stack offers, the state of every service,
-//! and what those services are saying. One reading of one running stack, cut four
-//! ways because the command line cuts it four ways.
+//! and what those services are saying. Five reads of one running stack, cut four
+//! ways because the command line cuts it four ways — what is running and what each
+//! service is are one question asked at two scales, and each scale is a command.
 
 use axum::extract::{RawQuery, State};
 use axum::http::StatusCode;
