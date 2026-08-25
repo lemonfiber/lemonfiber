@@ -1,0 +1,77 @@
+# Tell the SDKs when the contract they vendor has moved.
+#
+# Each SDK keeps a copy of `contract/web-api.contract.json` and generates its
+# types from that copy. A copy goes stale in silence, so both repos carry a
+# `contract-drift` check that compares what they hold against what this repo
+# serves. That check runs weekly, which means a contract change is unnoticed for
+# up to seven days — and the SDK that is wrong for those seven days is the one a
+# consumer is installing.
+#
+# The gap is cadence, not correctness: driven by hand against a real change, both
+# drift checks refused it and named the reason. So this fires them on the change
+# instead of on the calendar.
+#
+# Only the artefact matters here. A commit that touches nothing else in this
+# repo still moves what every SDK is generated from; a commit that touches
+# everything else does not.
+name: contract-moved
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - contract/web-api.contract.json
+  # Kept so the notifier can be driven against a real change rather than trusted.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tell:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Mint a token that can reach the SDKs
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            sdk-ts
+            sdk-php
+
+      - name: Ask each SDK to compare what it holds against what we serve
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          # Every repo that vendors the artefact. Adding an SDK is a deliberate
+          # act, so this list is written out rather than discovered.
+          sdks=(sdk-ts sdk-php)
+
+          unreachable=""
+          for sdk in "${sdks[@]}"; do
+            if gh api --method POST \
+              "repos/${OWNER}/${sdk}/actions/workflows/contract-drift.yml/dispatches" \
+              -f ref=main
+            then
+              echo "asked ${sdk} to check what it holds."
+            else
+              echo "::error::could not ask ${sdk} to check its vendored contract"
+              unreachable="${unreachable} ${sdk}"
+            fi
+          done
+
+          # A notifier that cannot notify has to say so. Reporting success here
+          # would leave the weekly run as the only thing looking, which is the
+          # state this workflow exists to end.
+          if [ -n "${unreachable}" ]; then
+            echo "::error::the contract moved and these were not told:${unreachable}"
+            exit 1
+          fi
