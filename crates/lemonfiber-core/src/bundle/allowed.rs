@@ -31,7 +31,7 @@ pub const SALT_BYTES: usize = 16;
 /// rather not say. An indexer's address is here for the same reason, and is the case that
 /// makes the query-string rule below necessary rather than tidy: the address is worth
 /// sharing and the key riding in its query is not, and they arrive as one string.
-const SHOWN: [&str; 15] = [
+pub(super) const SHOWN: [&str; 15] = [
     "DATA_ROOT",
     "PUID",
     "PGID",

@@ -174,6 +174,6 @@ pub struct WizardReport {
     /// Whether every applicable question is answered, so the plan can be applied.
     pub ready_for_review: bool,
     /// What applying will write, in the order it will be written, with any value
-    /// whose name reads as a credential withheld.
+    /// nobody has argued for showing withheld.
     pub plan: Vec<SettingReport>,
 }

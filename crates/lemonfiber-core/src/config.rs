@@ -10,6 +10,7 @@
 //! shape the compose driver reads: enough to decide what runs, and nothing about
 //! how it is stored.
 
+pub mod display;
 pub mod env;
 pub mod paths;
 pub mod store;
@@ -159,6 +160,43 @@ pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 /// creates it, the Seerr identity wiring signs in with it, and a trace's library read
 /// authenticates as it, all under the same name.
 pub const JELLYFIN_ADMIN_USER: &str = "admin";
+
+/// Every setting lemonfiber names.
+///
+/// Declared rather than discovered. The guard that checks nothing is displayed with its
+/// value without a reason written down needs to know which settings exist, and until this
+/// list it knew only the ones the embedded stack declares — which is every namespace
+/// except lemonfiber's own, the one where setup collects a Usenet password and an indexer
+/// key. A guard that cannot see the settings that matter most is a guard that reports on
+/// somebody else's file.
+///
+/// Reading them back out of this module's source would answer the same question and go
+/// stale the first time somebody writes a name inline, so the list is the declaration and
+/// a test holds the writer to it: what [`crate::wizard::Wizard::plan`] produces, and what
+/// seeding records, may only be named here.
+pub const SETTINGS: &[&str] = &[
+    USENET_KEY,
+    TORRENT_KEY,
+    IP_ECHO_KEY,
+    EXPLANATIONS_KEY,
+    DATA_ROOT_KEY,
+    PUID_KEY,
+    PGID_KEY,
+    VPN_PROVIDER_KEY,
+    VPN_PORT_FORWARDING_KEY,
+    JELLYFIN_MODE_KEY,
+    INDEXER_URL_KEY,
+    INDEXER_APIKEY_KEY,
+    INDEXER_VALIDATED_KEY,
+    PROVIDER_HOST_KEY,
+    PROVIDER_PORT_KEY,
+    PROVIDER_USER_KEY,
+    PROVIDER_PASS_KEY,
+    PROVIDER_TLS_KEY,
+    PROVIDER_VALIDATED_KEY,
+    QBITTORRENT_PASSWORD_KEY,
+    JELLYFIN_ADMIN_PASSWORD_KEY,
+];
 
 /// A recorded value with the whitespace and surrounding quotes a person might
 /// add stripped, its case left alone — so a hand-edited `"https://IP.example"`

@@ -727,6 +727,49 @@ mod tests {
     }
 
     #[test]
+    fn every_setting_a_plan_writes_is_one_lemonfiber_declares() {
+        // What holds the writer to `config::SETTINGS`. That list is what the guard on
+        // withholding reads to know which settings exist at all, and a key written here
+        // and absent there is a setting served to a browser that no guard has looked at.
+        let mut wizard = on_native_linux();
+        answer_all(&mut wizard);
+        wizard
+            .answer(Answer::Credentials(Some(super::Indexer {
+                url: "http://indexer.test/api".to_owned(),
+                key: "the-key".to_owned(),
+                validated: true,
+            })))
+            .unwrap_or(());
+        wizard
+            .answer(Answer::Provider(Some(super::Provider {
+                host: "news.provider.test".to_owned(),
+                port: 563,
+                user: "person".to_owned(),
+                pass: "the-login".to_owned(),
+                tls: true,
+                validated: true,
+            })))
+            .unwrap_or(());
+
+        let plan = wizard.plan();
+        let undeclared: Vec<&str> = plan
+            .settings()
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .filter(|name| !crate::config::SETTINGS.contains(name))
+            .collect();
+        assert!(
+            undeclared.is_empty(),
+            "setup writes these and config::SETTINGS does not name them, so nothing \
+             checks whether they are displayed: {undeclared:?}"
+        );
+        assert!(
+            plan.settings().len() > 10,
+            "a plan this small is not exercising the writer"
+        );
+    }
+
+    #[test]
     fn a_given_indexer_is_planned_but_a_stale_one_is_dropped_when_it_no_longer_applies() {
         let indexer = Answer::Credentials(Some(super::Indexer {
             url: "http://indexer.test/api".to_owned(),

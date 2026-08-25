@@ -11,11 +11,12 @@ use thiserror::Error;
 use super::env::EnvFile;
 use lemonfiber_ports::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
-/// Parts of a setting's name that mean its value must never be shown.
+/// Withholding a credential from text that has no field names to read.
 ///
-/// Matched on the name rather than the value, because a credential is not
-/// recognisable by looking at it — and a rule that tried would be wrong in the
-/// direction that publishes one.
+/// The rule for prose — an error's detail, a diff of a file, a line quoted back.
+/// Which settings are *displayed*, where there are names to read, is decided by the
+/// allow-list in [`super::display`] instead: a keyword rule cannot answer about a
+/// name nobody has thought of yet, and that is the name that leaks.
 pub use lemonfiber_ports::withheld::{is_secret, withheld, withheld_text, REDACTED};
 
 /// One setting, as it is safe to display.
@@ -25,7 +26,7 @@ pub struct Shown {
     pub key: String,
     /// Its value, or a note that it is set but withheld.
     pub value: String,
-    /// Whether the value was withheld.
+    /// Whether the value is withheld rather than displayed.
     pub secret: bool,
 }
 
@@ -186,23 +187,32 @@ pub fn shown(file: &EnvFile) -> Vec<Shown> {
         .collect()
 }
 
-/// One setting as it is safe to display: a name that reads as a credential keeps
-/// its name and loses its value.
+/// One setting as it is safe to display: a name nobody has vouched for keeps its
+/// name and loses its value.
+///
+/// Decided by [`super::display::in_full`] rather than by reading the name for words
+/// that sound like a credential. A keyword rule answers about the names somebody
+/// thought of; this surface serves whatever is in the operator's file, and the
+/// setting that leaks is the one nobody thought of. So the default is to withhold and
+/// the exception costs somebody a sentence on the list.
 ///
 /// A pair rather than a whole file, because the settings a run is about to write
 /// are shown before there is a file holding them — and a review that redacted by
 /// its own rule would be a second rule to keep in step with this one.
 #[must_use]
 pub fn showing(key: &str, value: &str) -> Shown {
-    let secret = is_secret(key);
+    let displayed = super::display::in_full(key);
     Shown {
         key: key.to_owned(),
-        value: if secret && !value.is_empty() {
-            REDACTED.to_owned()
-        } else {
-            value.to_owned()
+        // An empty setting reads as empty either way. A credential that is not set and
+        // one that is are different faults, and saying "(set, not shown)" about a blank
+        // would report the wrong one.
+        value: match (displayed, value.is_empty()) {
+            (_, true) => String::new(),
+            (true, false) => super::display::without_query(value),
+            (false, false) => REDACTED.to_owned(),
         },
-        secret,
+        secret: !displayed,
     }
 }
 
