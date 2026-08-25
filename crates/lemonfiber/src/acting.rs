@@ -1667,6 +1667,73 @@ mod tests {
         assert_eq!(showing(&guarding), String::new());
     }
 
+    /// A key that means nothing where it was pressed changes nothing there — on the
+    /// list, at the question, and while something is running. A screen that acted on
+    /// a stray letter would be a screen nobody could lean on.
+    #[test]
+    fn a_key_that_means_nothing_where_it_was_pressed_changes_nothing() {
+        let mut listing = Acting::opened();
+        listing.pressed(&Press::Typed(lasting::KEY));
+        assert_eq!(listing.pressed(&Press::Typed('z')), Wanted::Nothing);
+        assert!(showing(&listing).contains("keeps going"));
+
+        let mut asking = starting("walkthrough");
+        asking.pressed(&Press::Accept);
+        assert_eq!(asking.pressed(&Press::Typed('n')), Wanted::Nothing);
+        assert_eq!(showing(&asking), String::new());
+
+        let mut running = guarding();
+        assert_eq!(running.pressed(&Press::Typed('z')), Wanted::Nothing);
+        let footing = footing(&running);
+        assert!(footing.contains("esc lets it go"), "{footing}");
+    }
+
+    /// What a walk is told to look for is typed, taken back and moved over the way
+    /// every other line on this screen is.
+    #[test]
+    fn the_line_a_walk_is_typed_on_takes_back_what_was_typed() {
+        let mut acting = starting("walkthrough");
+
+        for character in "Sintelx".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Rubout);
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Back);
+        acting.pressed(&Press::Accept);
+
+        assert!(showing(&acting).contains("Walk through Sintel?"));
+    }
+
+    /// And the forms a guard could be given are moved over the way every other list
+    /// on this screen is.
+    #[test]
+    fn the_forms_a_guard_could_be_given_are_moved_over_like_any_list() {
+        let mut acting = starting("watch");
+        acting.told(Ok(Outcome::Forms(a_listing())));
+
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Typed('z'));
+        acting.pressed(&Press::Back);
+        acting.pressed(&Press::Accept);
+
+        assert!(showing(&acting).contains("Guard the data location while running Full stack?"));
+    }
+
+    /// What a guard came to is the whole of its box, because it had said nothing
+    /// until then — and it is rendered by the renderer the command line reaches for
+    /// the same answer.
+    #[test]
+    fn what_a_guard_came_to_is_the_whole_of_its_box() {
+        let mut acting = guarding();
+
+        acting.came_to(Err(Box::new(a_failure())));
+
+        let said = showing(&acting);
+        assert!(said.contains("could not be reached"), "{said}");
+        assert!(said.contains("what it came to"), "{said}");
+    }
+
     /// The footer names every key the screen answers, including the two this slice
     /// added, since a key nobody is told about is a key nobody presses.
     #[test]

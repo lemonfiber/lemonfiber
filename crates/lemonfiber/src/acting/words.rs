@@ -227,9 +227,11 @@ pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
 
 /// What a run leaving this screen now would stay for, or nothing where it may go.
 ///
-/// Only an action. A read is with the core the same way and claims nothing, so a
-/// screen left with one outstanding has nothing to stay for — which is why this asks
-/// about [`Stage::Running`] and not about [`Stage::Waiting`].
+/// Only what changes something. A read is with the core the same way and claims
+/// nothing, so a screen left with one outstanding has nothing to stay for — which is
+/// why this asks about [`Stage::Running`] and not about [`Stage::Waiting`]. A guard
+/// that has already been let go has nothing to stay for either: it is no longer this
+/// stage by then.
 ///
 /// Said on the ordinary terminal once the screen is given back, where there is room
 /// for the whole of it and no width to fit — so this is the one line here that goes
