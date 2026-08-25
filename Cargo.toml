@@ -27,7 +27,7 @@ color-eyre = "0.6"
 etcetera = "0.10"
 # The operating system's CSPRNG, for the one secret lemonfiber generates itself:
 # qBittorrent's WebUI password. 0.2 is already in the tree via rustls.
-getrandom = "0.2"
+getrandom = "0.4"
 include_dir = "0.7"
 # rustls, not the platform's TLS: it keeps the musl static release target free of
 # an OpenSSL build dependency. json for decoding service API responses.
