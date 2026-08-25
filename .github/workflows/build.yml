@@ -10,6 +10,22 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+      # The contract page lives in the spec and this repo does not vendor it, so
+      # the one check that reads both trees needs both trees. Same repository,
+      # same ref and same path the governance gate uses, for one answer to where
+      # the canonical spec is.
+      - name: Check out the canonical spec
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lemonfiber/spec
+          ref: main
+          path: .spec-canonical
+          persist-credentials: false
+      # Before the toolchain, because it needs none and costs a second: a page
+      # that no longer describes this surface is worth saying in the first
+      # minute rather than after a build.
+      - name: The contract page names the reads we serve
+        run: python3 scripts/reads_match_the_contract.py --spec .spec-canonical
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           components: rustfmt, clippy
