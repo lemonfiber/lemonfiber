@@ -355,6 +355,86 @@ mod tests {
         assert_eq!(seen.len(), OUTCOMES, "{seen:?}");
     }
 
+    /// Keywords that say something about a schema without constraining what it
+    /// matches, so they are safe company for a reference.
+    const ANNOTATIONS: [&str; 4] = ["description", "title", "default", "examples"];
+
+    /// Every reference in a schema that has a constraint sitting beside it.
+    ///
+    /// Draft-07 readers discard whatever accompanies a `$ref`; 2020-12 readers
+    /// apply both. A schema that puts a constraint there therefore means two
+    /// different things to two readers, and the generators that read this artefact
+    /// are split across that line — so the artefact must never contain the shape.
+    fn references_beside_constraints(node: &Value, path: &str, found: &mut Vec<String>) {
+        match node {
+            Value::Object(fields) => {
+                let beside: Vec<&str> = fields
+                    .keys()
+                    .map(String::as_str)
+                    .filter(|key| *key != "$ref" && !ANNOTATIONS.contains(key))
+                    .collect();
+                if fields.contains_key("$ref") && !beside.is_empty() {
+                    found.push(format!("{path} has {beside:?} beside its $ref"));
+                }
+                for (key, value) in fields {
+                    references_beside_constraints(value, &format!("{path}/{key}"), found);
+                }
+            }
+            Value::Array(items) => {
+                for (at, item) in items.iter().enumerate() {
+                    references_beside_constraints(item, &format!("{path}/{at}"), found);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The sweep reports the shape it exists to find.
+    ///
+    /// Without this the sweep below could pass by looking at nothing, which is how
+    /// the shape it looks for reached two SDKs in the first place.
+    #[test]
+    fn a_reference_beside_a_constraint_is_reported() {
+        let node = serde_json::json!({
+            "oneOf": [{
+                "type": "object",
+                "$ref": "#/$defs/Problem",
+                "properties": { "outcome": { "const": "warn" } }
+            }]
+        });
+        let mut found = Vec::new();
+        references_beside_constraints(&node, "", &mut found);
+
+        assert_eq!(found.len(), 1, "{found:?}");
+    }
+
+    /// An annotation is not a constraint, so a described reference is not the shape.
+    #[test]
+    fn a_reference_with_only_a_description_is_not_reported() {
+        let node = serde_json::json!({
+            "description": "The stable identifier for this kind of problem.",
+            "$ref": "#/$defs/Code"
+        });
+        let mut found = Vec::new();
+        references_beside_constraints(&node, "", &mut found);
+
+        assert!(found.is_empty(), "{found:?}");
+    }
+
+    /// No kind may describe anything as a reference with a constraint beside it.
+    ///
+    /// The two readings of that shape cost the same field twice over: one generator
+    /// keeps the constraint and drops the reference, the other keeps the reference
+    /// and drops the constraint, and each loses what the other kept.
+    #[test]
+    fn no_kind_puts_a_constraint_beside_a_reference() {
+        let contract = serde_json::to_value(Contract::describe()).unwrap_or_default();
+        let mut found = Vec::new();
+        references_beside_constraints(&contract, "", &mut found);
+
+        assert!(found.is_empty(), "{}", found.join(", "));
+    }
+
     #[test]
     fn it_describes_the_wire_version_it_belongs_to() {
         assert_eq!(Contract::describe().api_version, crate::model::API_VERSION);

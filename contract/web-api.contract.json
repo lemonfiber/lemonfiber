@@ -1453,28 +1453,128 @@
               "description": "Working, but degraded or risky.",
               "type": "object",
               "properties": {
+                "cause": {
+                  "description": "The problem that produced this one, where several share a root.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Problem"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "code": {
+                  "description": "The stable identifier for this kind of problem.",
+                  "$ref": "#/$defs/Code"
+                },
+                "detail": {
+                  "description": "The underlying technical detail, available but never leading.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "meaning": {
+                  "description": "What it means for the operator.",
+                  "type": "string"
+                },
                 "outcome": {
                   "type": "string",
                   "const": "warn"
+                },
+                "remedies": {
+                  "description": "What to do, most likely first.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Remedy"
+                  }
+                },
+                "severity": {
+                  "description": "How much it matters.",
+                  "$ref": "#/$defs/Severity"
+                },
+                "state": {
+                  "description": "Where it stands with respect to being fixed.",
+                  "$ref": "#/$defs/State"
+                },
+                "summary": {
+                  "description": "What happened, in one plain sentence.",
+                  "type": "string"
                 }
               },
-              "$ref": "#/$defs/Problem",
               "required": [
-                "outcome"
+                "outcome",
+                "code",
+                "severity",
+                "state",
+                "summary",
+                "meaning",
+                "remedies"
               ]
             },
             {
               "description": "Not working.",
               "type": "object",
               "properties": {
+                "cause": {
+                  "description": "The problem that produced this one, where several share a root.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Problem"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "code": {
+                  "description": "The stable identifier for this kind of problem.",
+                  "$ref": "#/$defs/Code"
+                },
+                "detail": {
+                  "description": "The underlying technical detail, available but never leading.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "meaning": {
+                  "description": "What it means for the operator.",
+                  "type": "string"
+                },
                 "outcome": {
                   "type": "string",
                   "const": "fail"
+                },
+                "remedies": {
+                  "description": "What to do, most likely first.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Remedy"
+                  }
+                },
+                "severity": {
+                  "description": "How much it matters.",
+                  "$ref": "#/$defs/Severity"
+                },
+                "state": {
+                  "description": "Where it stands with respect to being fixed.",
+                  "$ref": "#/$defs/State"
+                },
+                "summary": {
+                  "description": "What happened, in one plain sentence.",
+                  "type": "string"
                 }
               },
-              "$ref": "#/$defs/Problem",
               "required": [
-                "outcome"
+                "outcome",
+                "code",
+                "severity",
+                "state",
+                "summary",
+                "meaning",
+                "remedies"
               ]
             },
             {

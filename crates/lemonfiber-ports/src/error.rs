@@ -214,6 +214,19 @@ impl Problem {
     }
 }
 
+/// A problem's schema, written out rather than referred to.
+///
+/// A tagged variant that carries a problem writes the problem's fields beside
+/// its tag, so the schema for that variant has to describe them in the same
+/// object. Referring to `Problem` there leaves `$ref` as a sibling of
+/// `properties`, and readers disagree about that shape: draft-07 discards the
+/// siblings, 2020-12 composes them, and the generators reading this contract
+/// split the same way — one keeps the tag and loses the diagnosis, the other
+/// loses the tag. Written out, there is only one object to read.
+pub fn problem_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    <Problem as schemars::JsonSchema>::json_schema(generator)
+}
+
 /// Turns a typed error into the problem an operator sees.
 ///
 /// Every error type in this crate implements it, which is what keeps the error
