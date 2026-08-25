@@ -46,7 +46,7 @@ and the rest is named in **Standing**.
 | Request | Web | Terminal | Standing |
 |---------|-----|----------|----------|
 | `setup` | `/api/setup`, `/api/setup/answer`, `/api/setup/next`, `/api/setup/back`, `/api/setup/apply`, partial | wizard | Completable from a browser and from a terminal. Two affordances are terminal-only — proving a credential against the provider while the answer is being given, and choosing how to recover an interrupted apply — and neither blocks finishing setup. |
-| `version` | none | none | Unbuilt, and the cheapest gap on this page: one read, no arguments, an answer the core already renders. |
+| `version` | `/api/version` | none | Served on the web, and the cheapest read on this page: no arguments, and an answer the core already renders. The terminal has no key for it. |
 | `forms` | `/api/forms` | none | Served on the web, and through one endpoint because the command line spells it as one request: naming no form lists what the stack declares, naming some says what starting those would come to. The profile carried on `/api/services` is a Compose profile and not a form, and neither list contains the other, so this needed an endpoint of its own rather than a reading of that one. The terminal has no way to ask what a stack declares. |
 | `up` | `up`, partial | none | Starting a form is offered. Starting only some of its services is not reachable at all: `--service` never reaches a `Command` — the command line runs its own streamed start around it — so there is nothing to hand them to, and services named to this action are refused rather than dropped for a start of the whole form. Whether that is its own request, the way `Halt` is not `Down`, is a question for the core. The terminal shows a service is down and offers nothing to do about it. |
 | `down` | `down`, partial | none | The teardown is offered, and so is stopping named services, which is `Command::Halt` rather than an argument to this one. Letting anything still downloading finish first is not: `--wait` is a loop the command line runs around a queue reading before it asks for the stop, not something `Command::Down` carries, so a browser can only stop now. Its companion `--yes` answers a prompt no machine-readable run is put, and needs no web form. |
@@ -55,15 +55,15 @@ and the rest is named in **Standing**.
 | `pull` | `pull` | none | As `switch`: it refuses an empty `forms`, which `/api/forms` serves. |
 | `ps` | `/api/status`, `/api/services` | dashboard | Reachable from all three. The dashboard and the endpoints are fed by the same gather. |
 | `logs` | `/api/logs`, partial | viewer | The scrollback is a read and is served. Following is not: the event stream carries the dashboard gather and the narration a wait produces, never a service's own lines, so a browser cannot watch them arrive. `--watch` is the terminal's own rendering of the same lines, not a separate request. |
-| `config` | `config-set`, partial | none | Changing a setting is offered; reading one is not. There is no endpoint behind `config get` or `config show`, so a browser can write a value it cannot read back. |
-| `quality` | `quality-set`, `quality-reapply`, `quality-upgrade`, partial | none | Every write is offered and the read is not: `quality show` — the preset in force, what each one means, and what it costs — has no endpoint, and it is the screen a browser is best at. |
+| `config` | `config-set`, `/api/config` | none | Reachable in full. Writing arrived before reading, so a browser could set a value it had no way to read back; `/api/config` answers both halves of the read the way the command line spells them — naming no setting shows every one, naming one reads that one. Credentials are withheld where the settings are read rather than where they are printed, so the endpoint serves what `config show` prints. |
+| `quality` | `quality-set`, `quality-reapply`, `quality-upgrade`, `/api/quality` | none | Reachable in full. `/api/quality` serves the read the three writes were being made without: the preset in force, what each one means, and what it costs, which is the screen a browser is best at. |
 | `doctor` | `/api/checks`, `/api/storage`, partial | dashboard, partial | The diagnosis is served. Repair is not: `--fix`, `--yes`, `--fix-disruptive`, `--undo` and `--accept` have no web form, and an offer-and-consent flow is something HTML does better than a terminal prompt. The dashboard shows storage and VPN facts the diagnosis also reads, without being the diagnosis. |
 | `watch` | none | none | Unbuilt. It is long-running work that ends in one report, which is exactly the shape the web already answers with a job name — and a guard started from a browser and left running is the useful case, not the awkward one. What it needs that a command does not is a way to stop it, since there is no terminal to interrupt. |
-| `trace` | none | none | Unbuilt. A read, and the half of a screen that already half-exists: `/api/requests` reports what the household asked for, and following one item is what a reader does next. |
+| `trace` | `/api/trace` | none | Served on the web, and it completes a screen that half-existed: `/api/requests` reports what the household asked for, and this follows one of them. What to follow is one query parameter — the command line takes it as words so it can be typed unquoted, and a query string carries the title whole. The terminal has no view of one item. |
 | `household` | `/api/requests` | none | Served on the web. The terminal has no view of what the household asked for. |
 | `walkthrough` | none | none | Unbuilt, and the surface it is least built for is the one it was designed for: it narrates for minutes, which is a job plus the event stream, and its audience is a first-time operator who is likelier to be in a browser than in a shell. |
 | `explain` | none | glossary | Answered from a table compiled into the binary, so it needs neither a stack nor a daemon. The terminal offers it on `?`. The browser has no route to it, and shipping a second copy of the glossary into the web app would be a surface implementing behaviour of its own. |
-| `stuck` | none | dashboard, partial | Unbuilt on the web, which is where the dashboard's own "N stuck" figure most wants somewhere to land. The terminal's panel lists them and offers no way to follow one. |
+| `stuck` | `/api/stuck` | dashboard, partial | Served on the web, which is where the dashboard's own "N stuck" figure lands: each entry is named the way `/api/trace` is asked, so the count leads somewhere. The terminal's panel lists them and offers no way to follow one. |
 | `seed` | `seed` | none | Offered on the web. No terminal form, like every other write. |
 | `adopt` | `adopt` | none | As above. |
 | `reset` | `reset` | none | As above. It is the one write in this group that destroys work, which makes the terminal's silence about it the least costly silence in the table. |
@@ -74,8 +74,8 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, nine reach the web in full, seven reach it in part,
-nine do not reach it at all, and one — `ui` — is an honest exception. Sixteen
+Of the twenty-six requests, fourteen reach the web in full, five reach it in
+part, six do not reach it at all, and one — `ui` — is an honest exception. Eleven
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
 
@@ -106,10 +106,12 @@ not.
 **A read is not exempt from a requirement about actions.** Reading is most of what
 an operator asks for, and a surface that could not say what is running would be
 crippled in exactly the way parity exists to prevent. So `version`, `forms`,
-`stuck`, `trace` and `explain` were counted alongside the writes, and `forms` is
-served. Being reads makes them cheap to build, not optional to build — and cheap is
-the argument for doing them first: four of the nine requests absent from the web
-are one endpoint each over a command the core already carries out.
+`stuck`, `trace` and `explain` were counted alongside the writes. Being reads makes
+them cheap to build, not optional to build — and cheap was the argument for doing
+them first: each of the four now served was one endpoint over a command the core
+already carried out. `explain` is the one left, and it is the one that never had a
+command to reach: it is answered from a table compiled into the binary, so an
+endpoint for it is a read of that table rather than a dispatch.
 
 ## The terminal offers no action at all
 

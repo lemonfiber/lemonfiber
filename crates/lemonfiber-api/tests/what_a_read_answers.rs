@@ -16,7 +16,8 @@ use lemonfiber_api::guard::{Token, TOKEN_HEADER};
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::read::enveloped;
 use lemonfiber_api::router::{routes, Serving};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
+use lemonfiber_core::config::store::REDACTED;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -61,16 +62,49 @@ fn nowhere() -> Source {
 /// The world a command runs against: nothing is spawned and nothing is fetched,
 /// so what an endpoint answers is decided by what the engine reports.
 fn world(engine: Reporting, stack: Source) -> Ctx {
+    holding(engine, stack, Settings::default())
+}
+
+/// The same world, told where the settings it reads are kept.
+fn holding(engine: Reporting, stack: Source, settings: Settings) -> Ctx {
     Ctx::new(
         Arc::new(Idle),
         Arc::new(engine),
         Arc::new(lemonfiber_core::adapters::System),
         Arc::new(lemonfiber_core::adapters::Disk),
         stack,
-        Settings::default(),
+        settings,
         Environment::MacOs,
     )
     .with_http(Fake::silent())
+}
+
+/// A value built rather than written, so nothing scanning this tree for a
+/// committed credential finds a string that reads as one.
+fn a_value() -> String {
+    ('a'..='j').collect()
+}
+
+/// Two settings: one ordinary, and one whose name reads as a credential.
+fn kept() -> String {
+    format!("LEMONFIBER_USENET=on\nSONARR_API_KEY={}\n", a_value())
+}
+
+/// A world whose settings are these, written to a scratch file this test owns.
+fn configured(named: &str, contents: &str) -> Ctx {
+    let dir = std::env::temp_dir().join(format!("lemonfiber-read-{}-{named}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join(".env");
+    let _ = std::fs::write(&path, contents);
+    holding(
+        running(),
+        stack(),
+        Settings {
+            env_file: Some(path),
+            ..Settings::default()
+        },
+    )
 }
 
 /// An engine reporting one healthy service.
@@ -380,6 +414,203 @@ async fn a_line_count_that_is_not_a_number_is_refused() {
             StatusCode::BAD_REQUEST,
             "How many lines to begin with must be a number.".to_owned()
         ))
+    );
+}
+
+#[tokio::test]
+async fn the_versions_in_play_are_the_envelope_the_command_renders() {
+    // The cheapest read there is: no arguments, and an answer the core already
+    // renders for the command line.
+    let expected = as_the_command_renders_it(&world(running(), stack()), Command::Version).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), "/api/version").await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn the_versions_in_play_are_carried_in_their_own_envelope() {
+    // Written out rather than derived, so a second serialisation could not pass
+    // this by agreeing with itself.
+    let seen = asked(world(running(), stack()), "/api/version").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"version","data":{"binary":"#)),
+        "the versions in play, under the version kind"
+    );
+}
+
+#[tokio::test]
+async fn following_one_item_is_the_envelope_the_command_renders() {
+    let expected = as_the_command_renders_it(
+        &world(running(), stack()),
+        Command::Trace {
+            term: "the expanse".to_owned(),
+            season: None,
+        },
+    )
+    .await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), "/api/trace?term=the+expanse").await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn the_term_a_trace_followed_is_the_term_that_was_asked_for() {
+    // The whole request is its argument, so a read that dropped it would answer
+    // about something else and look like it had answered.
+    let seen = asked(world(running(), stack()), "/api/trace?term=the+expanse").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"trace","data":{"#)
+            && body.contains(r#""item":"the expanse""#)),
+        "the item followed is the one named"
+    );
+}
+
+#[tokio::test]
+async fn a_season_narrows_a_trace_the_way_it_narrows_the_command() {
+    let expected = as_the_command_renders_it(
+        &world(running(), stack()),
+        Command::Trace {
+            term: "the expanse".to_owned(),
+            season: Some(2),
+        },
+    )
+    .await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(
+            world(running(), stack()),
+            "/api/trace?term=the+expanse&season=2"
+        )
+        .await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn a_trace_that_named_nothing_to_follow_is_refused() {
+    // The command line requires the term too. A trace of everything is not a
+    // smaller request than a trace of one thing; it is a different one.
+    assert_eq!(
+        asked(world(running(), stack()), "/api/trace").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "What to follow must be named.".to_owned()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_term_given_and_left_empty_named_nothing_to_follow() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/trace?term=").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "What to follow must be named.".to_owned()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_season_that_is_not_a_number_is_refused() {
+    assert_eq!(
+        asked(
+            world(running(), stack()),
+            "/api/trace?term=the+expanse&season=latest"
+        )
+        .await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "Which season to narrow to must be a number.".to_owned()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn what_has_stopped_is_answered_under_its_own_kind() {
+    // The landing point for the dashboard's own count of what is stuck, which
+    // until this endpoint existed had nowhere on the web to go.
+    let seen = asked(world(running(), stack()), "/api/stuck").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"stuck","data":{"items":"#)),
+        "the stuck items are answered in the stuck envelope"
+    );
+}
+
+#[tokio::test]
+async fn every_setting_is_the_envelope_the_command_renders() {
+    let contents = kept();
+    let expected =
+        as_the_command_renders_it(&configured("shown-command", &contents), Command::ConfigShow)
+            .await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(configured("shown-endpoint", &contents), "/api/config").await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn a_setting_whose_name_reads_as_a_credential_is_withheld() {
+    // The withholding is the core's, so it is in force wherever the settings are
+    // read from. This is the endpoint that would have published them.
+    let seen = asked(configured("withheld", &kept()), "/api/config").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && !body.contains(&a_value())
+            && body.contains(&format!(r#""value":"{REDACTED}","secret":true"#))
+            && body.contains(r#""key":"LEMONFIBER_USENET","value":"on","secret":false"#)),
+        "the credential is withheld and the setting beside it is not"
+    );
+}
+
+#[tokio::test]
+async fn naming_a_setting_reads_that_one_rather_than_all_of_them() {
+    let seen = asked(
+        configured("one-setting", &kept()),
+        "/api/config?key=LEMONFIBER_USENET",
+    )
+    .await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.contains(r#""key":"LEMONFIBER_USENET""#)
+            && !body.contains("SONARR_API_KEY")),
+        "a named setting is the setting reported on"
+    );
+}
+
+#[tokio::test]
+async fn the_quality_in_force_is_the_envelope_the_command_renders() {
+    let expected = as_the_command_renders_it(
+        &world(running(), stack()),
+        Command::Quality(QualityAction::Show),
+    )
+    .await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), "/api/quality").await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn the_quality_in_force_is_carried_in_its_own_envelope() {
+    let seen = asked(world(running(), stack()), "/api/quality").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"quality","data":{"#)),
+        "the choice in force is answered in the quality envelope"
     );
 }
 
