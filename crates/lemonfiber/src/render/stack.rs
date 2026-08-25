@@ -154,7 +154,7 @@ fn moved(switched: &Switched) -> Lines {
 }
 
 /// What a lifecycle command did, or would have done.
-pub(super) fn lifecycle(report: &LifecycleReport) -> Lines {
+pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     let mut lines = Lines::default();
     if report.rehearsed {
         lines.put("would run:");

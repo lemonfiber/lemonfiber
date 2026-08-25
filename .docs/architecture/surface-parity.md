@@ -23,7 +23,8 @@ of what that requirement asks for.
 | Command line | [`cli.rs`](../../crates/lemonfiber/src/cli.rs) | the `Request` enum, which clap renders |
 | Web, writes | [`actions.rs`](../../crates/lemonfiber-api/src/actions.rs) | `OFFERED`, one name per action |
 | Web, reads | [`read.rs`](../../crates/lemonfiber-api/src/read.rs) · [`setup.rs`](../../crates/lemonfiber-api/src/setup.rs) · [`jobs.rs`](../../crates/lemonfiber-api/src/jobs.rs) | the routes each declares |
-| Terminal | [`terminal.rs`](../../crates/lemonfiber/src/terminal.rs) | the keys the loop reads |
+| Terminal, writes | [`acting/offer.rs`](../../crates/lemonfiber/src/acting/offer.rs) | `OFFERED`, one key per action |
+| Terminal, reads | [`terminal.rs`](../../crates/lemonfiber/src/terminal.rs) | the screens the loop opens |
 
 The table below is checked against the first three by
 [`surface_parity.rs`](../../crates/lemonfiber/tests/surface_parity.rs): a request
@@ -32,9 +33,15 @@ and an action or a route the web offers that no row accounts for fails. A route
 that answers no command-line request at all — the stream, the path actions are
 asked for through, and the one a job's name is redeemed at — is declared there
 by name, so adding a route is a decision somebody makes rather than one that
-happens. The terminal column is prose — its keys live in the one file this
-workspace deliberately does not test — so it is the one column a reader has to
-check by eye.
+happens.
+
+The terminal column is still the one a reader has to check by eye, but for a
+smaller reason than before. Its actions are declared in a list now rather than
+being knowable only by reading a match arm at a time, and a test beside that list
+holds every one of them to something the web already offers — so an action this
+screen alone could take fails there. What nothing joins is the list to this column:
+`acting/` lives in the binary rather than in the library this test reads, so a row
+claiming `dashboard` is a claim about a file rather than a claim read out of one.
 
 ## The table
 
@@ -48,11 +55,11 @@ and the rest is named in **Standing**.
 | `setup` | `/api/setup`, `/api/setup/answer`, `/api/setup/next`, `/api/setup/back`, `/api/setup/apply`, partial | wizard | Completable from a browser and from a terminal. Two affordances are terminal-only — proving a credential against the provider while the answer is being given, and choosing how to recover an interrupted apply — and neither blocks finishing setup. |
 | `version` | `/api/version` | none | Served on the web, and the cheapest read on this page: no arguments, and an answer the core already renders. The terminal has no key for it. |
 | `forms` | `/api/forms` | none | Served on the web, and through one endpoint because the command line spells it as one request: naming no form lists what the stack declares, naming some says what starting those would come to. The profile carried on `/api/services` is a Compose profile and not a form, and neither list contains the other, so this needed an endpoint of its own rather than a reading of that one. The terminal has no way to ask what a stack declares. |
-| `up` | `up`, partial | none | Starting a form is offered. Starting only some of its services is not reachable at all: `--service` never reaches a `Command` — the command line runs its own streamed start around it — so there is nothing to hand them to, and services named to this action are refused rather than dropped for a start of the whole form. Whether that is its own request, the way `Halt` is not `Down`, is a question for the core. The terminal shows a service is down and offers nothing to do about it. |
-| `down` | `down`, partial | none | The teardown is offered, and so is stopping named services, which is `Command::Halt` rather than an argument to this one. Letting anything still downloading finish first is not: `--wait` is a loop the command line runs around a queue reading before it asks for the stop, not something `Command::Down` carries, so a browser can only stop now. Its companion `--yes` answers a prompt no machine-readable run is put, and needs no web form. |
-| `switch` | `switch` | none | Reachable in full. It refuses an empty `forms`, and `/api/forms` serves the names — which is what it was waiting on. No terminal form, like every other write. |
-| `restart` | `restart` | none | As `switch`: it refuses an empty `forms`, which `/api/forms` serves. |
-| `pull` | `pull` | none | As `switch`: it refuses an empty `forms`, which `/api/forms` serves. |
+| `up` | `up`, partial | dashboard, partial | Starting a form is offered on both, and on the terminal the whole stack is a choice too, because the command carries an empty list. Starting only some of a form's services is not reachable at all: `--service` never reaches a `Command` — the command line runs its own streamed start around it — so there is nothing to hand them to, and services named to this action are refused rather than dropped for a start of the whole form. Whether that is its own request, the way `Halt` is not `Down`, is a question for the core. Naming several forms at once is reachable from a browser, which sends the list whole, and not from the dashboard, whose list takes one. |
+| `down` | `down`, partial | dashboard, partial | The teardown is offered on both, and so is stopping named services on the web, which is `Command::Halt` rather than an argument to this one — the terminal offers neither that nor several forms at once. Letting anything still downloading finish first is on no other surface: `--wait` is a loop the command line runs around a queue reading before it asks for the stop, not something `Command::Down` carries. Its companion `--yes` answers a prompt no machine-readable run is put; the terminal asks its own question instead, on a screen where one key reaches a teardown. |
+| `switch` | `switch` | dashboard, partial | Reachable in full from a browser. It refuses an empty `forms`, and `/api/forms` serves the names — which is what it was waiting on; the dashboard asks the same list of the core and offers the names it comes back with, so a stack declaring none is refused there in the same words. What the terminal leaves is naming several forms at once, its list taking one. |
+| `restart` | `restart` | dashboard, partial | As `switch` on both counts. The terminal leaves the same two things: several forms at once, and the named services `--service` restarts, which its list has no way to name. |
+| `pull` | `pull` | dashboard, partial | As `switch`: it refuses an empty `forms`, which `/api/forms` and the dashboard's own list both serve. The terminal leaves naming several forms at once. It is the one of the five that stops nothing, and it is asked about before it runs anyway, because it can spend an hour of somebody's connection. |
 | `ps` | `/api/status`, `/api/services` | dashboard | Reachable from all three. The dashboard and the endpoints are fed by the same gather. |
 | `logs` | `/api/logs`, partial | viewer | The scrollback is a read and is served. Following is not: the event stream carries the dashboard gather and the narration a wait produces, never a service's own lines, so a browser cannot watch them arrive. `--watch` is the terminal's own rendering of the same lines, not a separate request. |
 | `config` | `config-set`, `/api/config` | none | Reachable in full. Writing arrived before reading, so a browser could set a value it had no way to read back; `/api/config` answers both halves of the read the way the command line spells them — naming no setting shows every one, naming one reads that one. Credentials are withheld where the settings are read rather than where they are printed, so the endpoint serves what `config show` prints. |
@@ -113,20 +120,49 @@ already carried out. `explain` is the one left, and it is the one that never had
 command to reach: it is answered from a table compiled into the binary, so an
 endpoint for it is a read of that table rather than a dispatch.
 
-## The terminal offers no action at all
+## The terminal acts on five of them
 
-This is the largest single gap and it is not an exception. The dashboard reads and
-the log viewer reads; the wizard is the only screen that changes anything, and it
-only runs on a machine that has not been set up yet. Twenty of the twenty-six
-requests have a terminal form of `none`. Of the six that do not, five are reads
-and the sixth is the wizard.
+It acted on none. The dashboard read and the log viewer read; the wizard was the
+only screen that changed anything, and it only runs on a machine that has not been
+set up yet. The argument for leaving it that way was that the shell is right there —
+an operator reading `sonarr: unhealthy` can type the restart. It is true and it
+proves too much: by the same reasoning the web needs no actions either, since the
+operator could open a terminal. The operator this surface exists for is the one on
+the far end of a remote session, who is the least able of the three to reach
+another surface to act on what this one has just told them.
 
-The argument for leaving it that way is that the shell is right there — an operator
-reading `sonarr: unhealthy` can type the restart. It is true and it proves too
-much: by the same reasoning the web needs no actions either, since the operator
-could open a terminal. The operator the terminal surface exists for is the one on
-the far end of an SSH session, who is the least able of the three to reach another
-surface to act on what this one has just told them.
+The dashboard now offers the five the screen already showed state for — starting,
+stopping, switching, restarting and fetching. Fifteen of the twenty-six requests
+still have a terminal form of `none`, which is what the rest of this gap looks
+like now.
+
+**The action is the web's action.** A key names one of the actions
+[`actions.rs`](../../crates/lemonfiber-api/src/actions.rs) offers and that name is
+put through the same translation a browser's request goes through, so the terminal
+reaches the command a browser reaches and cannot grow one a browser has no form of.
+Which of them refuse an empty list of forms is asked of that table rather than
+written down again, so the two surfaces cannot come to disagree about it. What the
+screen decides — which key, which subject, and the question in front of it — is in
+[`acting/`](../../crates/lemonfiber/src/acting.rs), not in the terminal file, which
+is the one this workspace deliberately does not test.
+
+**Nothing happens on one keypress.** A key opens the list of what the action can be
+given; taking one puts the question, which names what is about to happen and to
+what; only an explicit yes goes ahead, the way the teardown's own question is read.
+On a screen where one finger reaches a teardown that is the difference between an
+action and an accident, and it is also where the operator is told what the action
+reaches before it reaches it.
+
+**A long action reports through the screen it interrupted, and is left rather than
+stopped.** The web answers an action that reaches the container engine with a job's
+name, because a request cannot be held open for minutes. A terminal needs no such
+indirection: the dashboard is already the report. The panels go on gathering every
+second while the work runs, so a restart shows as the services going down and coming
+back in the panel that lists them, and nothing is drawn over that — only the footer
+says what is running. Leaving stops this screen waiting; what the container engine
+was already asked to do is between the operator and the engine, exactly as a closed
+browser tab takes nothing with it. What the action came to is shown when it lands,
+in the words the command line gives for the same run.
 
 ## What is missing beside the table
 

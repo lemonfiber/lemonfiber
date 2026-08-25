@@ -753,7 +753,7 @@ fn a_failure_is_reported_on_stderr_and_never_on_stdout() {
     // The lines themselves are built next door now, so the per-line checks below
     // have to follow them there. A guard that kept reading only the two-line caller
     // would pass on anything.
-    let built = body_of(&exit, "\nfn reported");
+    let built = body_of(&exit, "\npub(crate) fn reported");
     let reporter = format!("{complain}\n{built}");
 
     assert!(!complain.is_empty(), "the reporter was found");
