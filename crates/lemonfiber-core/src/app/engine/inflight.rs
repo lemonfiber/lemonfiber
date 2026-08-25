@@ -26,11 +26,14 @@
 //! completed items in the same list they report active ones from, and naming those
 //! would be warning about work that is already done.
 
+use std::time::Duration;
+
 use lemonfiber_manifest::Service;
 
 use crate::app::targets::{download_targets, project_directory, protocol_of, read_transfers};
 use crate::app::Ctx;
 use crate::dashboard::Protocol;
+use crate::plural::s;
 use crate::ports::service::Download;
 use crate::stack::closure::resolve;
 
@@ -101,6 +104,44 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
 /// Whether a download is still coming down.
 fn underway(download: &Download) -> bool {
     download.progress < 100
+}
+
+/// How often a wait looks again.
+///
+/// Ten seconds: long enough that two clients are not being polled at, short enough
+/// that whoever is watching the last download finish is not left wondering whether
+/// the wait noticed.
+const AGAIN: Duration = Duration::from_secs(10);
+
+/// Hold on until nothing inside these forms is coming down any more.
+///
+/// The waiting itself rather than the decision to wait: whoever asked has already
+/// settled that, and a surface that put the question is not the one that has to sit
+/// through the answer. That is what lets a browser ask for it — a request cannot be
+/// held open for an hour, and the wait is inside the teardown rather than around it.
+///
+/// Said again only when the count changes, because a line repeated every ten seconds
+/// is one whoever is reading scrolls past — and the one moment it has news is the
+/// moment another download finishes.
+pub(super) async fn drained(ctx: &Ctx, forms: &[String]) {
+    let mut counted = usize::MAX;
+    loop {
+        let active = in_flight(ctx, forms).await;
+        if active.is_empty() {
+            ctx.narrator.say("downloads finished — stopping now").await;
+            return;
+        }
+        if active.len() != counted {
+            counted = active.len();
+            ctx.narrator
+                .say(&format!(
+                    "waiting for {counted} download{} to finish",
+                    s(counted)
+                ))
+                .await;
+        }
+        tokio::time::sleep(AGAIN).await;
+    }
 }
 
 #[cfg(test)]

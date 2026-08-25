@@ -2,9 +2,16 @@
 //!
 //! A terminal holds the whole conversation on its stack; a browser cannot, so the
 //! walk is taken a request at a time. Each one names a step of it — where am I,
-//! here is one answer, back one, apply — and each becomes one of the core's own
-//! commands, so what a browser can do to a fresh machine is what the command line
-//! can do to it and nothing more.
+//! here is one answer, back one, apply, and the way out of an apply that stopped
+//! part-way — and each becomes one of the core's own commands, so what a browser
+//! can do to a fresh machine is what the command line can do to it and nothing
+//! more.
+//!
+//! **A credential is proven where it is entered.** An indexer key and a Usenet
+//! login are tested against their live services as the answer is given, and what
+//! the service said comes back on the report — so a browser shows the test happen
+//! rather than a silent pass, exactly as a terminal run does. What is recorded is
+//! what the test established, never what the caller asserted.
 //!
 //! Nothing is held between requests here. The answers gathered so far live in the
 //! resumable progress file setup already writes, which is what a terminal run
@@ -29,16 +36,19 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use lemonfiber_core::app::{dispatch, Command, SetupAction};
 use lemonfiber_core::model::{kind, Envelope};
-use lemonfiber_core::wizard::Answer;
+use lemonfiber_core::wizard::{Answer, Choice};
+use serde::Deserialize;
 
 use crate::read::{enveloped, refusing};
 use crate::router::Serving;
 use crate::serve::{carrying, SENTENCE};
 
-/// What is said to a request whose body is not an answer.
-const NOT_AN_ANSWER: &str = "The body of this request is not one of setup's answers.";
+/// What is said to a request whose body is not one setup takes.
+const NOT_AN_ANSWER: &str =
+    "The body of this request is not one of setup's answers, nor a way out of an \
+     interrupted apply.";
 
-/// The five requests setup is walked with.
+/// The six requests setup is walked with.
 pub fn routes() -> Router<Serving> {
     Router::new()
         .route("/api/setup", get(standing))
@@ -46,6 +56,7 @@ pub fn routes() -> Router<Serving> {
         .route("/api/setup/next", post(onward))
         .route("/api/setup/back", post(backward))
         .route("/api/setup/apply", post(applied))
+        .route("/api/setup/recover", post(recovered))
 }
 
 /// Where setup stands, and what it is still asking for.
@@ -81,6 +92,37 @@ async fn backward(State(serving): State<Serving>) -> Response {
 /// engine nor a service — it has finished by the time a reply could be written.
 async fn applied(State(serving): State<Serving>) -> Response {
     walked(&serving, SetupAction::Apply).await
+}
+
+/// One way out of an apply that stopped part-way.
+///
+/// The choice is the whole body, because it is the whole of what a caller decides:
+/// what was already written is on the report they read before choosing, and naming
+/// it back would be asking them to repeat what they were just told.
+///
+/// Answered with its outcome rather than with a name to follow, for the reason
+/// applying is: a recovery reverses settings and directories and re-applies the
+/// answers, all of which are lemonfiber's own files.
+async fn recovered(
+    State(serving): State<Serving>,
+    given: Result<Json<Chosen>, JsonRejection>,
+) -> Response {
+    let Ok(Json(chosen)) = given else {
+        return unreadable();
+    };
+    walked(&serving, SetupAction::Recover(chosen.choice)).await
+}
+
+/// The way out of an interrupted apply a caller picked.
+///
+/// A named field rather than a bare word, so the body is an object like every other
+/// this surface takes and a second thing to decide can be added without the shape
+/// changing under a caller.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Chosen {
+    /// Which of the three ways out.
+    choice: Choice,
 }
 
 /// One step of the walk, carried out and answered with where it left setup.

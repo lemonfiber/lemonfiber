@@ -63,7 +63,13 @@ pub enum Credential {
 
 /// What proving a credential against its live service established — never the
 /// input, only the outcome.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Read back as well as built. A surface that is not in this process asks setup to
+/// prove a credential and is told what came of it, so the four outcomes are tagged
+/// by name rather than distinguished by which field is present — the same reason an
+/// answer carries the step it belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(tag = "outcome", rename_all = "kebab-case")]
 pub enum Validation {
     /// Proven working, carrying the capability observed while proving it.
     Valid {

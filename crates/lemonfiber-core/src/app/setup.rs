@@ -26,7 +26,10 @@ use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::stack::Source;
 use crate::validate::{Validation, Validator};
-use crate::wizard::{Answer, Library, Phase, Plan, Progress, Rejected, Step, Wizard};
+use crate::wizard::{
+    described, Answer, Choice, Library, Phase, Plan, Progress, Recovery, Rejected, Resolution,
+    Step, Wizard,
+};
 
 /// How the operator is asked the questions the wizard cannot answer itself.
 ///
@@ -232,6 +235,65 @@ pub fn resume(
     apply::apply(wizard, paths, source, stamp)?;
     clear_progress(paths);
     Ok(())
+}
+
+/// Take an interrupted apply the way it was chosen out of, and leave nothing of it
+/// stranded.
+///
+/// The whole of the recovery rather than the deciding half of it: the reversal is
+/// computed by [`Recovery`], carried out here, and followed by whatever the choice
+/// asked for next — so a surface offers three words and does none of the work, and
+/// three surfaces cannot come to disagree about what one of them means.
+///
+/// Starting over removes the journal as well as the answers, because a reversal
+/// already carried out and still recorded is one a later recovery would try again.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render where a recorded change could
+/// not be reversed, or where the apply that follows a resume or a roll back fails —
+/// which leaves the marker at `applying` for another attempt, exactly as an apply
+/// asked for directly does.
+pub(super) fn recovered(
+    wizard: &mut Wizard,
+    paths: &Paths,
+    source: Source,
+    stamp: &str,
+    choice: Choice,
+) -> Result<(), Box<Problem>> {
+    let journal = crate::app::recover::journal_at(&paths.journal());
+    let env = paths.env_file();
+    match Recovery::of(&journal).resolve(choice) {
+        Resolution::Resume => resume(wizard, paths, source, stamp),
+        Resolution::RollBack(undos) => {
+            crate::app::recover::undo(&undos, &env, Vec::new())?;
+            resume(wizard, paths, source, stamp)
+        }
+        Resolution::StartOver(undos) => {
+            crate::app::recover::undo(&undos, &env, Vec::new())?;
+            clear_progress(paths);
+            let _ = std::fs::remove_file(paths.journal());
+            Ok(())
+        }
+    }
+}
+
+/// What an apply that stopped part-way had already written, each said plainly.
+///
+/// The partial state a recovery is chosen about. Read from the change journal the
+/// apply wrote as it went, so the choice is offered against what really happened
+/// rather than against a guess — and said in the journal's own words, so the list
+/// reads the same wherever the choice is put.
+///
+/// Empty where the apply stopped before it wrote anything, which is worth being
+/// able to tell apart from having written something.
+#[must_use]
+pub fn written_so_far(paths: &Paths) -> Vec<String> {
+    crate::app::recover::journal_at(&paths.journal())
+        .changes()
+        .iter()
+        .map(described)
+        .collect()
 }
 
 /// Ask each question the wizard presents here and has no answer for yet, in order.

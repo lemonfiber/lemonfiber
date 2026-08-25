@@ -18,7 +18,6 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::kind;
 use lemonfiber_core::model::{Envelope, SetupOutcome, SetupReport};
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::validate::Live;
 use lemonfiber_core::wizard::{offer_setup, Progress, Status, Wizard};
 use lemonfiber_core::PRODUCT;
 
@@ -287,11 +286,9 @@ async fn drive(
 
     // Credentials are proven against their live services as they are entered — the
     // indexer and any existing service over HTTP, a Usenet provider over a real,
-    // TLS-wrapped NNTP connection.
-    let validator = Live::with_nntp(
-        ctx.http.clone(),
-        Arc::new(lemonfiber_core::adapters::Dialer::new()),
-    );
+    // TLS-wrapped NNTP connection. The context carries the one that does it, so a
+    // run driven a question at a time from a browser proves them the same way.
+    let validator = Arc::clone(&ctx.validator);
 
     // A terminal answers the questions; without one the flags do, and where a flag
     // a question needs is missing the run is told which rather than left waiting on
@@ -315,7 +312,7 @@ async fn drive(
         &mut wizard,
         prompt.as_ref(),
         ctx.filesystem.as_ref(),
-        &validator,
+        validator.as_ref(),
         paths,
         ctx.stack,
         &stamp(),

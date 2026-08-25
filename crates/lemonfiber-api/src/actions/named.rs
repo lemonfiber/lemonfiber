@@ -81,9 +81,20 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     if let Some(refused) = unwanted(action, &given, OFFERED) {
         return Err(refused);
     }
+    // Two arguments, two requests. A teardown that waits and a stop of named
+    // services are different things to ask for, and a run given both would have to
+    // drop one of them.
+    if action == "down" && given.wait && !given.services.is_empty() {
+        return Err(Refused::Together {
+            action: action.to_owned(),
+            argument: "wait".to_owned(),
+            alongside: "services".to_owned(),
+        });
+    }
     let Arguments {
         forms,
         services,
+        wait,
         service,
         key,
         value,
@@ -103,11 +114,12 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         item,
     } = given;
     match action {
-        "up" => Ok(Command::Up { forms }),
-        // Stopping named services and tearing a form down are different requests
-        // rather than one request with an argument, exactly as the command line
-        // reads them, and Compose spells them differently too.
-        "down" if services.is_empty() => Ok(Command::Down { forms }),
+        // Starting named services and bringing a form up are different requests
+        // rather than one request with an argument, exactly as stopping them and
+        // tearing a form down are, and Compose spells both pairs differently.
+        "up" if services.is_empty() => Ok(Command::Up { forms }),
+        "up" => Ok(Command::Start { forms, services }),
+        "down" if services.is_empty() => Ok(Command::Down { forms, wait }),
         "down" => Ok(Command::Halt { forms, services }),
         "switch" => Ok(Command::Switch { forms }),
         "restart" => Ok(Command::Restart { forms, services }),

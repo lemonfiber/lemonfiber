@@ -176,4 +176,16 @@ pub struct WizardReport {
     /// What applying will write, in the order it will be written, with any value
     /// nobody has argued for showing withheld.
     pub plan: Vec<SettingReport>,
+    /// What an apply that stopped part-way had already written, each said plainly.
+    ///
+    /// The partial state a recovery is chosen about, so whoever chooses has seen it.
+    /// Empty for every other phase, and empty too for an apply that stopped before
+    /// it wrote anything.
+    pub written: Vec<String>,
+    /// What proving the credential just given came to, where one was given.
+    ///
+    /// Setup tests an indexer key and a Usenet login against their live services as
+    /// they are entered, and this is what the service answered — never what was
+    /// entered. Absent for every other answer, and for a step that gave none.
+    pub proof: Option<crate::validate::Validation>,
 }

@@ -98,10 +98,28 @@ pub enum Command {
         /// The forms to start, resolved to the union of their closures.
         forms: Vec<String>,
     },
+    /// Start named services, leaving the rest of the form where it is.
+    ///
+    /// Apart from [`Command::Up`] for the reason [`Command::Halt`] is apart from
+    /// [`Command::Down`]: bringing a form up creates everything its closure holds,
+    /// and this starts the ones named. Compose spells them differently too.
+    Start {
+        /// The forms the services belong to; none means the whole stack.
+        forms: Vec<String>,
+        /// The services to start.
+        services: Vec<String>,
+    },
     /// Stop and remove what a form started.
     Down {
         /// The forms to stop.
         forms: Vec<String>,
+        /// Whether anything still downloading is let finish before the stop.
+        ///
+        /// The wait is inside the command rather than in front of it, so a surface
+        /// that cannot sit in a loop asks for it by saying so. Whether to offer the
+        /// choice at all is the surface's — a terminal asks, a machine-readable run
+        /// is not asked — but the waiting itself is one implementation.
+        wait: bool,
     },
     /// Stop named services, leaving the rest of what is running alone.
     ///
@@ -463,7 +481,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
-        Command::Down { forms } => engine::lifecycle(ctx, &forms, &Action::Down).await,
+        Command::Start { forms, services } => {
+            engine::lifecycle(ctx, &forms, &Action::Start(services)).await
+        }
+        Command::Down { forms, wait } => engine::teardown(ctx, &forms, wait).await,
         Command::Halt { forms, services } => {
             engine::lifecycle(ctx, &forms, &Action::Stop(services)).await
         }
@@ -525,7 +546,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
-        Command::Setup(action) => setup::setting_up(ctx, action).map(Outcome::Wizard),
+        Command::Setup(action) => setup::setting_up(ctx, action).await.map(Outcome::Wizard),
         Command::Backup { service } => backup::run(ctx, service).await.map(Outcome::Backup),
         Command::Support {
             write,
@@ -1165,6 +1186,7 @@ mod tests {
             },
             Command::Down {
                 forms: vec!["library".to_owned()],
+                wait: false,
             },
             Command::Switch {
                 forms: vec!["library".to_owned()],
@@ -1538,6 +1560,7 @@ mod tests {
             .build();
         let command = Command::Down {
             forms: vec!["library".to_owned()],
+            wait: false,
         };
         let produced = report(dispatch(command, &ctx).await);
 
@@ -2580,6 +2603,7 @@ mod tests {
         let refused = dispatch(
             Command::Down {
                 forms: vec!["tv".to_owned()],
+                wait: false,
             },
             &watching(running),
         )
@@ -2607,6 +2631,7 @@ mod tests {
         let refusal = dispatch(
             Command::Down {
                 forms: vec!["library".to_owned()],
+                wait: false,
             },
             &rehearsing(crate::config::Protocols::both()),
         )
@@ -2635,6 +2660,7 @@ mod tests {
             dispatch(
                 Command::Down {
                     forms: vec!["library".to_owned()],
+                    wait: false,
                 },
                 &watching(running),
             )
@@ -2654,6 +2680,7 @@ mod tests {
         let ctx = watching(engine).waiting(Duration::ZERO);
         let command = Command::Down {
             forms: vec!["library".to_owned()],
+            wait: false,
         };
 
         let produced = report(dispatch(command, &ctx).await);

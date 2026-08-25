@@ -237,6 +237,9 @@ fn standing(report: &WizardReport) -> Lines {
     }
     if report.phase == Phase::Applying {
         lines.put("An earlier apply stopped part-way and has not been recovered.".to_owned());
+        for change in &report.written {
+            lines.put(format!("  · it had written: {change}"));
+        }
     }
     lines.put(format!("Setup is at: {}", report.at.label()));
     for step in &report.unanswered {
@@ -394,6 +397,8 @@ mod tests {
             unanswered: vec![Step::DataLocation, Step::Library],
             ready_for_review: false,
             plan: Vec::new(),
+            written: Vec::new(),
+            proof: None,
         }
     }
 

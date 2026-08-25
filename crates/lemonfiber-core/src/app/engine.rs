@@ -404,6 +404,23 @@ pub(super) async fn lifecycle(
     outcome
 }
 
+/// Let anything still downloading finish where that was asked for, then stop.
+///
+/// The wait is here rather than in front of the command, so every surface reaches
+/// the same one. It runs before the stack is claimed for the teardown, because a
+/// wait can last an hour and a claim held for an hour is a stack nothing else can
+/// touch while nothing is happening to it.
+pub(super) async fn teardown(
+    ctx: &Ctx,
+    forms: &[String],
+    wait: bool,
+) -> Result<Outcome, Box<Problem>> {
+    if wait {
+        inflight::drained(ctx, forms).await;
+    }
+    lifecycle(ctx, forms, &Action::Down).await
+}
+
 /// The operation itself, with the stack already claimed for it.
 async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome, Box<Problem>> {
     let (manifest, command, mut report) = readied(ctx, forms, action).await?;

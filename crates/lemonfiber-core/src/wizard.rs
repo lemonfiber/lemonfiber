@@ -33,7 +33,7 @@ pub use answers::{
     Answer, Answers, Credentials, Indexer, Library, Provider, Rejected, Usenet, Vpn,
 };
 pub use plan::{on_off, Plan, APPLY, ENV_FILE};
-pub use recovery::{Choice, Recovery, Resolution, Status};
+pub use recovery::{described, Choice, Recovery, Resolution, Status};
 pub use steps::{offer_setup, Direction, Phase, Progress, Step};
 
 /// The setup wizard: where the operator is, what they have answered, and the

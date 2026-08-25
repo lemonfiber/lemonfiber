@@ -3,17 +3,21 @@
 //! An interrupted apply is the one state setup must never guess about: it wrote
 //! something, and what it wrote is the operator's to keep, undo, or forget. Kept
 //! apart from the gathering so the three ways out read as the whole of the choice.
+//!
+//! What is here is the offering and nothing else. Which changes were written comes
+//! back from the same read a browser makes, and each way out is one of the core's
+//! own commands — so the choice an operator is put is the choice a browser is put,
+//! and the work behind it is one implementation rather than two.
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{recover, setup as core_setup, Ctx};
+use lemonfiber_core::app::{dispatch, setup as core_setup, Command, Ctx, SetupAction};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::journal::{Change, Kind};
-use lemonfiber_core::wizard::{Choice, Progress, Recovery, Resolution, Wizard};
+use lemonfiber_core::wizard::{Choice, Progress};
 use lemonfiber_core::PRODUCT;
 
 use super::boot::start;
-use super::{fresh_setup, stamp, Surface};
+use super::{fresh_setup, Surface};
 use crate::context::read_settings;
 use crate::exit::{complain, USAGE};
 use crate::prompt::SetupFlags;
@@ -26,7 +30,7 @@ use crate::say::{complain, say};
 /// Deciding is not done for a piped run that cannot answer — the state is left as
 /// it is, still recoverable, rather than acted on unasked.
 pub(super) async fn recover_setup(
-    ctx: Ctx,
+    mut ctx: Ctx,
     paths: &Paths,
     surface: &dyn Surface,
     progress: Option<Progress>,
@@ -34,21 +38,20 @@ pub(super) async fn recover_setup(
     // A stopped apply always leaves its answers; if they are somehow gone there is
     // nothing to resume from, so a fresh run is the honest fallback — interactive,
     // since recovery carries no flags.
-    let Some(progress) = progress else {
+    if progress.is_none() {
         return fresh_setup(ctx, paths, surface, SetupFlags::none()).await;
-    };
-
-    let journal = recover::journal_at(&paths.journal());
-    let recovery = Recovery::of(&journal);
+    }
 
     say!("A previous setup was interrupted part-way through applying.");
-    let written = recovery.written();
+    // The same list a browser is shown before it is offered the same three ways
+    // out, in the same words, because both read it from the one place.
+    let written = core_setup::written_so_far(paths);
     if written.is_empty() {
         say!("It had not written anything yet.");
     } else {
         say!("It had written:");
-        for change in written {
-            say!("  · {}", describe(change));
+        for change in &written {
+            say!("  · {change}");
         }
     }
 
@@ -58,46 +61,33 @@ pub(super) async fn recover_setup(
         return ExitCode::from(USAGE);
     }
 
-    let env = paths.env_file();
-    match recovery.resolve(ask_recovery_choice(surface)) {
-        Resolution::Resume => {
-            say!("\nResuming.");
-            resume_and_start(ctx, paths, surface, progress).await
-        }
-        Resolution::RollBack(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env, Vec::new()) {
-                return complain(&problem);
-            }
-            say!("\nRolled back. Applying again.");
-            resume_and_start(ctx, paths, surface, progress).await
-        }
-        Resolution::StartOver(undos) => {
-            if let Err(problem) = recover::undo(&undos, &env, Vec::new()) {
-                return complain(&problem);
-            }
-            discard(paths);
-            say!("\nStarted over — nothing of the interrupted setup remains.");
-            say!("Run `{PRODUCT} setup` to begin again.");
-            ExitCode::SUCCESS
-        }
+    let choice = ask_recovery_choice(surface);
+    // Said before rather than after: the undo and the apply behind a roll back are
+    // one step now, so there is no moment between them to report from — and what is
+    // about to happen is what an operator watching a pause wants to read.
+    say!("\n{}", about_to(choice));
+    if let Err(problem) = dispatch(Command::Setup(SetupAction::Recover(choice)), &ctx).await {
+        return complain(&problem);
     }
+
+    if choice == Choice::StartOver {
+        say!("Nothing of the interrupted setup remains.");
+        say!("Run `{PRODUCT} setup` to begin again.");
+        return ExitCode::SUCCESS;
+    }
+    // The settings read at startup predate the file the recovery just wrote, so
+    // they are refreshed before the stack is brought up against them.
+    ctx.settings = read_settings();
+    say!("\nSetup is done — bringing your stack up.");
+    start(&ctx, surface).await
 }
 
-/// Re-apply the answers a stopped setup recorded, then bring the stack up.
-pub(super) async fn resume_and_start(
-    mut ctx: Ctx,
-    paths: &Paths,
-    surface: &dyn Surface,
-    progress: Progress,
-) -> ExitCode {
-    let mut wizard = Wizard::resume(ctx.environment, progress);
-    match core_setup::resume(&mut wizard, paths, ctx.stack, &stamp()) {
-        Ok(()) => {
-            ctx.settings = read_settings();
-            say!("\nSetup is done — bringing your stack up.");
-            start(&ctx, surface).await
-        }
-        Err(problem) => complain(&problem),
+/// What each way out is about to do, said before it happens.
+fn about_to(choice: Choice) -> &'static str {
+    match choice {
+        Choice::Resume => "Resuming — finishing the apply from where it stopped.",
+        Choice::RollBack => "Rolling back what was written, then applying again.",
+        Choice::StartOver => "Undoing what was written and forgetting the answers.",
     }
 }
 
@@ -114,27 +104,6 @@ pub(super) fn ask_recovery_choice(surface: &dyn Surface) -> Choice {
     }
 }
 
-/// A written change, said plainly enough for the operator to recognise.
-pub(super) fn describe(change: &Change) -> String {
-    match &change.kind {
-        Kind::Set { key, .. } => format!("the setting {key}"),
-        Kind::Made { path } => format!("the directory {path}"),
-        Kind::Created { resource, .. } => format!("a {resource}"),
-        // Not something a first run writes — a repair does — but the journal is shared, so
-        // an interrupted setup could find one that a repair left. Named the same way, so
-        // an operator reading what would be undone recognises it either way.
-        Kind::Configured {
-            resource, field, ..
-        } => format!("a {resource}'s {field}"),
-    }
-}
-
-/// Remove what an interrupted setup left, so starting over leaves nothing behind.
-pub(super) fn discard(paths: &Paths) {
-    let _ = std::fs::remove_file(paths.setup_progress());
-    let _ = std::fs::remove_file(paths.journal());
-}
-
 #[cfg(test)]
 mod tests {
     use crate::exit::{shown, success};
@@ -145,7 +114,7 @@ mod tests {
     use lemonfiber_core::platform::Environment;
     use lemonfiber_core::wizard::{Answer, Choice, Library, Phase, Vpn, Wizard};
 
-    use super::{ask_recovery_choice, describe, discard, recover_setup};
+    use super::{about_to, ask_recovery_choice, recover_setup};
     use crate::setup::tests::{ctx, working_ctx, Scripted};
 
     /// A scratch install unique to this test.
@@ -181,64 +150,22 @@ mod tests {
     }
 
     #[test]
-    fn a_written_change_is_said_plainly_enough_to_recognise() {
-        // What an operator is shown of an interrupted run: the point is that they
-        // recognise it, not that it round-trips.
-        let change = |kind| Change {
-            at: String::new(),
-            operation: "setup".to_owned(),
-            target: "the environment file".to_owned(),
-            kind,
-        };
+    fn each_way_out_says_what_it_is_about_to_do_before_it_does_it() {
+        // The undo and the apply behind a roll back are one step, so there is no
+        // moment between them to report from — what an operator watching a pause
+        // reads has to be what is about to happen.
+        let said: Vec<&str> = [Choice::Resume, Choice::RollBack, Choice::StartOver]
+            .into_iter()
+            .map(about_to)
+            .collect();
+        assert!(said[0].contains("Resuming"), "{said:?}");
+        assert!(said[1].contains("Rolling back"), "{said:?}");
+        assert!(said[2].contains("forgetting the answers"), "{said:?}");
         assert_eq!(
-            describe(&change(Kind::Set {
-                key: "DATA_ROOT".to_owned(),
-                previous: None,
-                current: "/srv".to_owned(),
-            })),
-            "the setting DATA_ROOT"
+            said.iter().collect::<std::collections::BTreeSet<_>>().len(),
+            said.len(),
+            "and each way out says something of its own"
         );
-        assert_eq!(
-            describe(&change(Kind::Made {
-                path: "/srv/media".to_owned()
-            })),
-            "the directory /srv/media"
-        );
-        assert_eq!(
-            describe(&change(Kind::Created {
-                resource: "root folder".to_owned(),
-                id: "1".to_owned(),
-            })),
-            "a root folder"
-        );
-        // A repair's own record. Not something a first run writes, but the journal is
-        // shared, so an interrupted setup can find one — and an operator deciding whether
-        // to roll back is owed a name for it rather than silence.
-        assert_eq!(
-            describe(&change(Kind::Configured {
-                resource: "downloadclient".to_owned(),
-                id: "7".to_owned(),
-                field: "tvCategory".to_owned(),
-                previous: None,
-                current: "tv-sonarr".to_owned(),
-            })),
-            "a downloadclient's tvCategory"
-        );
-    }
-
-    #[test]
-    fn starting_over_leaves_nothing_of_the_interrupted_run() {
-        let paths = scratch("discard");
-        for path in [paths.setup_progress(), paths.journal()] {
-            let _ = path.parent().map(std::fs::create_dir_all);
-            let _ = std::fs::write(&path, "something");
-            assert!(path.exists());
-        }
-        discard(&paths);
-        assert!(!paths.setup_progress().exists());
-        assert!(!paths.journal().exists());
-        // Discarding what is already gone is not a failure.
-        discard(&paths);
     }
 
     /// An install whose previous setup stopped part-way through applying.

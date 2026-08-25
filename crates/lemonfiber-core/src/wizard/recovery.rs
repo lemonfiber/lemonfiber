@@ -3,7 +3,7 @@
 //! An interrupted apply wrote something, and what it wrote is the operator's to keep,
 //! undo, or forget — so the ways out are modelled rather than decided for them.
 
-use super::{Change, Journal, Phase, Progress, Undo};
+use super::{Change, Journal, Kind, Phase, Progress, Undo};
 
 /// What a later run makes of the setup it finds — the whole lifecycle, read from
 /// the world rather than trusted from a file.
@@ -70,7 +70,12 @@ impl Status {
 /// The three exits the setup wizard promises for its one dangerous state: keep
 /// going, walk it back, or drop it entirely. A surface offers these; [`Recovery`]
 /// turns the chosen one into the work it means.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Read back as well as built, because the surface offering them may not be in this
+/// process: a browser sends the one the operator picked by the name it is written
+/// under here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Choice {
     /// Carry on from where apply stopped, keeping what was already written.
     Resume,
@@ -120,6 +125,27 @@ impl<'a> Recovery<'a> {
             Choice::RollBack => Resolution::RollBack(self.written.rewind()),
             Choice::StartOver => Resolution::StartOver(self.written.rewind()),
         }
+    }
+}
+
+/// A change an interrupted apply wrote, said plainly enough to recognise.
+///
+/// What an operator is shown before they choose. Written from the journal's own
+/// vocabulary rather than from the file it landed in, because the choice is about
+/// what was done and not about where it went — and the same sentence has to read
+/// on a terminal and in a browser.
+#[must_use]
+pub fn described(change: &Change) -> String {
+    match &change.kind {
+        Kind::Set { key, .. } => format!("the setting {key}"),
+        Kind::Made { path } => format!("the directory {path}"),
+        Kind::Created { resource, .. } => format!("a {resource}"),
+        // Not something a first run writes — a repair does — but the journal is
+        // shared, so an interrupted setup could find one a repair left. Named the
+        // same way, so what would be undone reads alike either way.
+        Kind::Configured {
+            resource, field, ..
+        } => format!("a {resource}'s {field}"),
     }
 }
 

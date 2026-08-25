@@ -696,7 +696,13 @@ mod tests {
         acting.pressed(&Press::Accept);
         let carried = acting.pressed(&Press::Typed('y'));
 
-        assert_eq!(carried, Wanted::Carry(Command::Down { forms: Vec::new() }));
+        assert_eq!(
+            carried,
+            Wanted::Carry(Command::Down {
+                forms: Vec::new(),
+                wait: false
+            })
+        );
     }
 
     /// Anything but an explicit yes changes nothing, and leaves the screen where an
