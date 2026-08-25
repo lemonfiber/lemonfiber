@@ -45,6 +45,14 @@ pub(crate) trait Surface {
     /// Whether anyone is present to answer.
     fn interactive(&self) -> bool;
 
+    /// Whether there is a screen to draw on.
+    ///
+    /// A separate question from whether anyone can answer, because the two streams
+    /// are separately redirected: `lemonfiber > out.txt` leaves a keyboard attached
+    /// and no screen. Asked of every surface rather than defaulted to the other, so
+    /// a surface that has not thought about it does not quietly answer for both.
+    fn drawable(&self) -> bool;
+
     /// Show a prompt and read the trimmed line typed in reply.
     fn line(&self, prompt: &str) -> String;
 
@@ -101,7 +109,6 @@ pub(crate) fn already_set_up() -> Vec<String> {
         format!("{PRODUCT} is already set up on this machine."),
         format!("  · change a setting with `{PRODUCT} config set <key> <value>`"),
         format!("  · start the stack with `{PRODUCT} up`"),
-        format!("  · see everything with `{PRODUCT} --help`"),
     ]
 }
 
@@ -145,7 +152,7 @@ pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> 
     if !offer_setup(paths.env_file().exists()) {
         // Already set up: setup would walk a done machine back to its first
         // question, so a bare run does the other thing it could mean.
-        return crate::terminal::configured(ctx, bare_run(surface.interactive())).await;
+        return crate::terminal::configured(ctx, bare_run(surface.drawable())).await;
     }
 
     say!("No configuration found.");
@@ -386,6 +393,11 @@ pub(crate) mod tests {
     /// A surface that answers from a script and says whether anyone is there.
     pub(crate) struct Scripted {
         interactive: bool,
+        /// Whether there is a screen, which a redirected run has without a keyboard
+        /// and a piped one has the other way round.
+        drawable: bool,
+        /// Whether the screen was the question asked, rather than the keyboard.
+        asked_screen: std::cell::Cell<bool>,
         lines: std::cell::RefCell<Vec<String>>,
         /// Whether the plan is accepted at the review. A walk that declines it is
         /// the one that must write nothing at all.
@@ -396,10 +408,20 @@ pub(crate) mod tests {
         pub(crate) fn saying(interactive: bool, lines: &[&str]) -> Self {
             Self {
                 interactive,
+                drawable: interactive,
+                asked_screen: std::cell::Cell::new(false),
                 lines: std::cell::RefCell::new(
                     lines.iter().rev().map(|line| (*line).to_owned()).collect(),
                 ),
                 applies: true,
+            }
+        }
+
+        /// Somebody at a keyboard whose output goes to a file.
+        pub(crate) fn piped() -> Self {
+            Self {
+                drawable: false,
+                ..Self::saying(true, &[])
             }
         }
 
@@ -415,6 +437,11 @@ pub(crate) mod tests {
     impl Surface for Scripted {
         fn interactive(&self) -> bool {
             self.interactive
+        }
+
+        fn drawable(&self) -> bool {
+            self.asked_screen.set(true);
+            self.drawable
         }
 
         fn line(&self, _prompt: &str) -> String {
@@ -632,16 +659,55 @@ pub(crate) mod tests {
         assert_eq!(shown(code), success());
     }
 
+    #[tokio::test]
+    async fn a_bare_run_asks_the_screen_rather_than_the_keyboard() {
+        // `lemonfiber > out.txt` leaves a keyboard attached and no screen. The
+        // dashboard would draw escape sequences into the file and hold the run open
+        // waiting for a keypress nobody would see the prompt for, so what decides is
+        // the stream it would draw to.
+        let piped = Scripted::piped();
+        let paths = scratch("piped");
+        let _ = paths.env_file().parent().map(std::fs::create_dir_all);
+        let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
+
+        let code = greeting(ctx(), &paths, &piped).await;
+
+        assert_eq!(shown(code), success());
+        assert!(
+            piped.asked_screen.get(),
+            "the screen was the question, not the keyboard"
+        );
+        assert!(
+            piped.interactive(),
+            "and a keyboard was attached the whole time, which is what makes it the wrong question"
+        );
+    }
+
+    #[test]
+    fn what_a_run_with_no_screen_is_told_is_the_whole_of_it() {
+        // A pipe, a cron line or a CI step cannot go and ask a second time, so the
+        // commands are listed rather than pointed at.
+        let help = lemonfiber::cli::help();
+        for named in ["setup", "doctor", "up", "config"] {
+            assert!(help.contains(named), "the help names `{named}`: {help}");
+        }
+        assert!(
+            !already_set_up().iter().any(|line| line.contains("--help")),
+            "and nothing points at what is already printed"
+        );
+    }
+
     #[test]
     fn a_run_nobody_is_watching_is_told_where_to_go_next() {
-        // Three ways on rather than a refusal: this is guidance, not a misuse.
+        // Two ways on rather than a refusal: this is guidance, not a misuse. The
+        // third used to be a line saying where the help is, and the help itself is
+        // printed under these now.
         let said = already_set_up();
         assert!(said
             .first()
             .is_some_and(|line| line.contains("already set up")));
         assert!(said.iter().any(|line| line.contains("config set")));
         assert!(said.iter().any(|line| line.contains(" up`")));
-        assert!(said.iter().any(|line| line.contains("--help")));
     }
 
     #[test]

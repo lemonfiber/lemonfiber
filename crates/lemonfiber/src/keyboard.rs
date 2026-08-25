@@ -58,6 +58,10 @@ impl Surface for Console {
         std::io::stdin().is_terminal()
     }
 
+    fn drawable(&self) -> bool {
+        std::io::stdout().is_terminal()
+    }
+
     fn line(&self, prompt: &str) -> String {
         Keyboard.ask(prompt)
     }

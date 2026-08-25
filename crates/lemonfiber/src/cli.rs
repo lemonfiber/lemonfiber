@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 use lemonfiber_core::app::bundle::LINES;
 
@@ -103,6 +103,15 @@ pub struct Cli {
     /// What was asked for, or nothing at all — which is the terminal interface.
     #[command(subcommand)]
     pub command: Option<Request>,
+}
+
+/// What this binary can do, as clap renders it.
+///
+/// Here rather than at the edge because it is a property of the parser, and the
+/// one place that prints it should not also be the place that knows how.
+#[must_use]
+pub fn help() -> String {
+    Cli::command().render_long_help().to_string()
 }
 
 /// What the operator asked for.
