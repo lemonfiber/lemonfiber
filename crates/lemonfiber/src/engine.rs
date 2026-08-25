@@ -194,22 +194,6 @@ impl Narrator for Narrating {
     }
 }
 
-/// Watch the data location until it is lost, then report what was stopped.
-///
-/// This blocks for as long as the location holds — the operator ends it with the
-/// same interrupt they end any foreground command. It returns only once the
-/// location is lost and the services have been stopped, which is the one thing
-/// it exists to do.
-pub(crate) async fn guard(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
-    match supervise(ctx, &Disk, forms, WATCH).await {
-        Ok(report) => {
-            watched(&report, json);
-            ExitCode::SUCCESS
-        }
-        Err(problem) => complain(&problem),
-    }
-}
-
 /// Report what stopping would interrupt, and say what the operator decided about it.
 ///
 /// Silent where nothing is coming down, which is the ordinary case — a teardown that
