@@ -21,8 +21,9 @@ crates/
 │   │                     guard outside the binary can hold the parity table to it
 │   ├── render/           what each outcome looks like
 │   ├── acting/           what a dashboard keypress asks for and what becomes
-│   │                     of it — which action, which question, and every other
-│   │                     decision the terminal file must not hold
+│   │                     of it — a file per flow, each holding the list it
+│   │                     decides over, and every other decision the terminal
+│   │                     file must not hold
 │   ├── examples/         emitters: a `print!` around one generated artefact
 │   └── tests/            the architecture tests, from the top of the graph
 │
