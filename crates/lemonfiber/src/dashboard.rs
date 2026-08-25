@@ -11,15 +11,20 @@
 //! The panels reflow and so do the lines inside them: each panel is built for the
 //! room its own place has, so nothing on the screen is decided by a width the
 //! screen does not have.
+//!
+//! What an action has open is drawn over the panels rather than beside them, and
+//! what it says is [`crate::acting`]'s. A running action opens nothing: the panels
+//! are its report, and covering them would take away the one thing worth watching.
 
 mod panels;
 
 use lemonfiber_core::dashboard::{Snapshot, Telemetry};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
+
+use crate::acting::{Acting, Pane};
 
 /// The width below which two columns stop fitting.
 ///
@@ -36,7 +41,7 @@ const TWO_COLUMNS: u16 = 96;
 const UNBOUNDED: usize = usize::MAX;
 
 /// Draw the whole screen.
-pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
+pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, acting: &Acting) {
     let area = frame.area();
     let [top, body, bottom] = Layout::default()
         .direction(Direction::Vertical)
@@ -63,10 +68,7 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
         top,
     );
     frame.render_widget(
-        Paragraph::new(Line::styled(
-            "q quit   r refresh   ? words",
-            Style::default().add_modifier(Modifier::DIM),
-        )),
+        Paragraph::new(acting.footer(usize::from(bottom.width))),
         bottom,
     );
 
@@ -74,7 +76,7 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
     let panels = sections(snapshot, &rooms(&places));
     // Gathered before the panels are consumed by drawing, and only when it was
     // asked for.
-    let showing = glossary.then(|| words_of(&panels));
+    let showing = acting.showing_words().then(|| words_of(&panels));
 
     for (area, (title, lines)) in places.into_iter().zip(panels) {
         frame.render_widget(
@@ -83,12 +85,35 @@ pub(crate) fn draw(frame: &mut Frame, snapshot: &Snapshot, glossary: bool) {
         );
     }
 
+    // Over the panels: what the action has open, where it has anything open.
+    let (rows, across) = crate::pane::room_on(area);
+    if let Some(open) = acting.pane(rows, across) {
+        acted(frame, &open);
+    }
+
     // Last, so it is over everything: the words on this screen, when asked for.
     // Read back from the panels' own lines rather than from the snapshot, so what
     // is explained is what is being shown.
     if let Some(showing) = showing {
         crate::pane::over(frame, &showing);
     }
+}
+
+/// Draw what an action has open over whatever is already drawn.
+///
+/// The same box the words are explained in, in the same place: two panes an
+/// operator meets a keypress apart should not be two different shapes.
+fn acted(frame: &mut Frame, open: &Pane) {
+    let area = crate::pane::middle(frame.area());
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(open.lines.clone()).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(open.title.clone()),
+        ),
+        area,
+    );
 }
 
 /// The words this screen is showing.
@@ -177,7 +202,8 @@ fn places(body: Rect) -> Vec<Rect> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{draw, places, sections, showing, TWO_COLUMNS};
+    use super::{draw, places, sections, showing, Acting, TWO_COLUMNS};
+    use crate::acting::Press;
     use lemonfiber_core::dashboard::{
         Hardlink, Panel, Protocol, Reading, Snapshot, Storage, Telemetry, Transfer,
     };
@@ -252,10 +278,19 @@ pub(crate) mod tests {
 
     /// The same, with the words on the screen asked for.
     fn shown(snapshot: &Snapshot, width: u16, height: u16, glossary: bool) -> String {
+        let mut acting = Acting::opened();
+        if glossary {
+            acting.pressed(&Press::Typed('?'));
+        }
+        with(snapshot, width, height, &acting)
+    }
+
+    /// The whole screen as text, with the action in whatever state it is in.
+    fn with(snapshot: &Snapshot, width: u16, height: u16, acting: &Acting) -> String {
         Terminal::new(TestBackend::new(width, height))
             .ok()
             .map(|mut terminal| {
-                let _ = terminal.draw(|frame| draw(frame, snapshot, glossary));
+                let _ = terminal.draw(|frame| draw(frame, snapshot, acting));
                 terminal
                     .backend()
                     .buffer()
@@ -310,6 +345,36 @@ pub(crate) mod tests {
         let wanted = sections(&a_snapshot(), &[]).len();
         assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS, 40)).len(), wanted);
         assert_eq!(places(Rect::new(0, 0, TWO_COLUMNS - 1, 40)).len(), wanted);
+    }
+
+    /// A key that begins an action puts what it is asking over the panels, and the
+    /// panels are still behind it — the box is a share of the screen rather than
+    /// the screen.
+    #[test]
+    fn what_an_action_is_asking_is_drawn_over_the_panels() {
+        let snapshot = a_snapshot();
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed('d'));
+
+        let text = with(&snapshot, 120, 40, &acting);
+
+        assert!(text.contains("asking this stack"), "{text}");
+        assert!(
+            text.contains("lemonfiber"),
+            "the header is still there: {text}"
+        );
+        assert!(text.contains("Transfers"), "a panel is still there: {text}");
+    }
+
+    /// The keys an operator can press are on the screen, or the only account of
+    /// what this screen does is its source.
+    #[test]
+    fn the_footer_names_the_actions_this_screen_offers() {
+        let text = drawn(&a_snapshot(), 200, 40);
+
+        for hint in ["q quit", "r refresh", "? words", "start", "stop", "restart"] {
+            assert!(text.contains(hint), "{hint} is missing:\n{text}");
+        }
     }
 
     #[test]

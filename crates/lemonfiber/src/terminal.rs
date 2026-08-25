@@ -4,7 +4,10 @@
 //! because it is the part no test can stand in for: a real terminal in raw mode,
 //! a real keyboard, and a loop that runs until somebody stops it. Everything
 //! about *what* a screen says lives elsewhere — [`crate::dashboard`] and
-//! [`crate::logs`] — where it is drawn into a buffer and read back.
+//! [`crate::logs`] — where it is drawn into a buffer and read back, and so does
+//! everything about what a key *means*: which action a letter reaches, what an
+//! action may be given, and the question asked before it are [`crate::acting`]'s,
+//! where every one of them can be put to a test. What is here is the wire.
 //!
 //! Both full-screen views are here rather than one each, because what they share is
 //! all of the hard part: taking the terminal, giving it back, and reading a keyboard
@@ -34,9 +37,10 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{dashboard::gather, logs, Ctx};
+use lemonfiber_core::app::{dashboard::gather, dispatch, logs, Command, Ctx, Outcome};
 use lemonfiber_core::bundle::Marks;
 use lemonfiber_core::dashboard::Snapshot;
+use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::docker::{Lifecycle, LogLine, LogQuery};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::terminal::{
@@ -48,6 +52,7 @@ use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 use tokio::sync::mpsc::Receiver;
 
+use crate::acting::{Acting, Wanted};
 use crate::exit::complain;
 use crate::logs::{colours, sampled, Asked, Press, Viewer};
 use crate::say::{complain, say};
@@ -110,18 +115,33 @@ async fn dashboard(ctx: Ctx) -> ExitCode {
 }
 
 /// The loop itself, with the terminal already in hand.
+///
+/// What a key *means* is [`crate::acting`]'s and so is every decision that follows
+/// from it; what is here is the doing of it — reading the keyboard, handing a
+/// command to the dispatcher, and putting the answer back. An action runs as a task
+/// of its own beside the gather, so a teardown that takes a minute never holds up
+/// either the screen or the next keypress.
 async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
     let ctx = Arc::new(ctx);
     let (keys, mut typed) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&keys, meaning));
 
     let mut snapshot: Option<Snapshot> = None;
-    // Closed until asked for, which is what keeps it an aside.
-    let mut glossary = false;
+    // Read here rather than deeper in, because this is the edge: what a run explains
+    // is decided where a test can reach it, and only this knows where the answer
+    // came from. The same division the log viewer makes over the same question.
+    let mut acting = Acting::opened();
+    if !crate::render::glossary::wanted() {
+        acting = acting.without_explanations();
+    }
     let mut refreshing = tokio::spawn(refresh(Arc::clone(&ctx), None));
+    // Where a running action puts what it came to. One at a time is the screen's
+    // own rule rather than this channel's — nothing else can be begun while an
+    // action is with the core.
+    let (answers, mut answered) = tokio::sync::mpsc::channel::<Answer>(1);
     loop {
         if let Some(snapshot) = snapshot.as_ref() {
-            if let Err(err) = screen.draw(snapshot, glossary) {
+            if let Err(err) = screen.draw(snapshot, &acting) {
                 return complain(&drawing("dashboard", &err.to_string()));
             }
         }
@@ -130,20 +150,26 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
             // which is the difference between a screen that feels alive and one
             // that ignores you for three seconds at a time.
             key = typed.recv() => match key {
-                Some(Key::Quit) | None => break,
-                Some(Key::Refresh) => {
-                    refreshing.abort();
-                    refreshing = tokio::spawn(refresh(Arc::clone(&ctx), None));
-                }
-                Some(Key::Glossary) => {
-                    glossary = crate::render::glossary::wanted() && !glossary;
+                None => break,
+                Some(press) => match acting.pressed(&press) {
+                    Wanted::Leave => break,
+                    Wanted::Nothing => {}
+                    Wanted::Gather => {
+                        refreshing.abort();
+                        refreshing = tokio::spawn(refresh(Arc::clone(&ctx), None));
+                    }
                     // Opening them is the asking, so what was opened is recorded.
-                    if glossary {
+                    Wanted::Words => {
                         if let Some(snapshot) = snapshot.as_ref() {
                             let area = screen.area();
                             learned(&crate::dashboard::showing(snapshot), area, ctx.dry_run);
                         }
                     }
+                    // Awaited here rather than on a task of its own: this reads the
+                    // stack's own declaration of itself off disk, where an action
+                    // reaches the container engine and the services.
+                    Wanted::Ask(command) => acting.told(dispatch(command, &ctx).await),
+                    Wanted::Carry(command) => carry(command, Arc::clone(&ctx), answers.clone()),
                 }
             },
             gathered = &mut refreshing => {
@@ -157,6 +183,11 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
                     refresh(next, previous).await
                 });
             }
+            done = answered.recv() => {
+                if let Some(done) = done {
+                    acting.came_to(done);
+                }
+            }
         }
     }
     refreshing.abort();
@@ -165,19 +196,25 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// What carrying out an action came to.
+type Answer = Result<Outcome, Box<Problem>>;
+
+/// Hand one action to the dispatcher, on a task of its own.
+///
+/// A task rather than an await, because a start or a teardown takes minutes and the
+/// screen has to go on gathering and answering keys throughout — the gather beside
+/// it is a task for the same reason. It outlives the screen: an operator who leaves
+/// mid-teardown has stopped watching, and the container engine goes on doing what
+/// it was asked.
+fn carry(command: Command, ctx: Arc<Ctx>, answers: tokio::sync::mpsc::Sender<Answer>) {
+    tokio::spawn(async move {
+        let _ = answers.send(dispatch(command, &ctx).await).await;
+    });
+}
+
 /// One gather, with the last one to carry a stale reading forward from.
 async fn refresh(ctx: Arc<Ctx>, previous: Option<Snapshot>) -> Snapshot {
     gather(&ctx, previous.as_ref()).await
-}
-
-/// What the operator asked for.
-enum Key {
-    /// Leave.
-    Quit,
-    /// Gather again now rather than at the next tick.
-    Refresh,
-    /// Show what the words on this screen mean, or stop showing them.
-    Glossary,
 }
 
 /// Read the keyboard until the channel closes, on a thread of its own.
@@ -212,15 +249,28 @@ fn read_keyboard<T>(keys: &tokio::sync::mpsc::Sender<T>, meaning: fn(KeyEvent) -
     }
 }
 
-/// What a keypress means, or nothing for one this screen has no use for.
-const fn meaning(key: KeyEvent) -> Option<Key> {
+/// What a keypress is, or nothing for one this screen has no use for.
+///
+/// The keys themselves and nothing about what they mean: which action a letter
+/// reaches, and what backing out of a half-answered question does, are decided in
+/// [`crate::acting`] where a test can put every one of them.
+const fn meaning(key: KeyEvent) -> Option<crate::acting::Press> {
+    use crate::acting::Press as Key;
+
+    // Ctrl-C, because a terminal in raw mode no longer turns it into a signal and
+    // an operator who cannot back out with it is trapped.
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return match key.code {
+            KeyCode::Char('c') => Some(Key::Abandon),
+            _ => None,
+        };
+    }
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => Some(Key::Quit),
-        // Ctrl-C, because a terminal in raw mode no longer turns it into a signal
-        // and an operator who cannot leave with it is trapped.
-        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Key::Quit),
-        KeyCode::Char('r') => Some(Key::Refresh),
-        KeyCode::Char('?') => Some(Key::Glossary),
+        KeyCode::Char(character) => Some(Key::Typed(character)),
+        KeyCode::Esc => Some(Key::Abandon),
+        KeyCode::Enter => Some(Key::Accept),
+        KeyCode::Up => Some(Key::Back),
+        KeyCode::Down => Some(Key::Forward),
         _ => None,
     }
 }
@@ -416,18 +466,9 @@ const fn wanted(key: KeyEvent) -> Option<Press> {
 
 /// Record what the pane explained, since opening it is the asking.
 ///
-/// **What it explained**, not what was on the screen. The pane names the words it
-/// had no room for rather than dropping them, and a named word has not been taught —
-/// recording those would stop a later report explaining a word nobody ever read,
-/// which is the one failure this whole record exists to avoid.
+/// Which words those are is [`crate::pane`]'s, where a test can read them back.
 fn learned(showing: &str, screen: Rect, rehearsing: bool) {
-    let known = crate::render::glossary::known();
-    let (rows, across) = crate::pane::room_on(screen);
-    let words: Vec<&str> = crate::pane::explained_in(showing, rows, across, known)
-        .into_iter()
-        .map(|term| term.word)
-        .collect();
-    crate::context::remember(&words, rehearsing);
+    crate::context::remember(&crate::pane::taught_on(showing, screen), rehearsing);
 }
 
 /// The terminal, in the state a full-screen view needs it, for as long as it is held.
@@ -455,9 +496,9 @@ impl Screen {
     }
 
     /// Draw one frame.
-    fn draw(&mut self, snapshot: &Snapshot, glossary: bool) -> std::io::Result<()> {
+    fn draw(&mut self, snapshot: &Snapshot, acting: &Acting) -> std::io::Result<()> {
         self.terminal
-            .draw(|frame| crate::dashboard::draw(frame, snapshot, glossary))?;
+            .draw(|frame| crate::dashboard::draw(frame, snapshot, acting))?;
         Ok(())
     }
 

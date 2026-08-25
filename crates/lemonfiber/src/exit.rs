@@ -209,7 +209,7 @@ pub(crate) fn complain(problem: &Problem) -> ExitCode {
 ///
 /// **And a failure explains its own words**, like every other answer, which matters
 /// most here: an error is where somebody is least able to go and look one up.
-fn reported(problem: &Problem, parsed: bool) -> Lines {
+pub(crate) fn reported(problem: &Problem, parsed: bool) -> Lines {
     if parsed {
         return as_a_document(problem);
     }

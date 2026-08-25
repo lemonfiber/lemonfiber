@@ -18,6 +18,8 @@ crates/
 │   ├── codes.rs          renders the error-code reference from the crates' own
 │   │                     declarations, read out of their source
 │   ├── render/           what each outcome looks like
+│   ├── acting/           what a dashboard keypress asks for and what becomes
+│   │                     of it — every decision the terminal file must not hold
 │   ├── examples/         emitters: a `print!` around one generated artefact
 │   └── tests/            the architecture tests, from the top of the graph
 │

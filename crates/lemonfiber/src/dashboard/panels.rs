@@ -23,6 +23,7 @@
 //! screen through [`plain`], and it is shortened in the middle, so the ends that
 //! tell two of them apart both survive.
 
+use crate::pane::quiet;
 use crate::render::downloads::protocol;
 use lemonfiber_core::alert::Alert;
 use lemonfiber_core::dashboard::{
@@ -33,7 +34,6 @@ use lemonfiber_core::health::Summary;
 use lemonfiber_core::queue::Stuck;
 use lemonfiber_core::text::{fitted, plain};
 use lemonfiber_core::walkthrough::{size, spell_out};
-use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
 /// How many rows of a list are shown before the rest becomes a count.
@@ -50,11 +50,6 @@ const NAMED: usize = 12;
 
 /// The same, in the services panel, whose names sit beside a longer word.
 const LISTED: usize = 14;
-
-/// The dimmed style everything uncertain is drawn in.
-fn quiet() -> Style {
-    Style::default().add_modifier(Modifier::DIM)
-}
 
 /// The one-line header: whether the screen can be trusted, and what the stack
 /// amounts to.

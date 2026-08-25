@@ -12,6 +12,7 @@ use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
 use lemonfiber_core::doctor::Narrowing;
 
+mod acting;
 mod archive;
 mod context;
 mod dashboard;

@@ -46,6 +46,15 @@ const SHORTEST: &str = " words ";
 /// How tall, as a share, so it never covers everything behind it.
 const HEIGHT: u16 = 60;
 
+/// The dimmed style everything uncertain and everything secondary is drawn in.
+///
+/// An attribute rather than a colour, and shared by every full-screen view: a
+/// terminal told to use no colour still dims, and two screens that each decided
+/// this for themselves would eventually decide it differently.
+pub(crate) fn quiet() -> Style {
+    Style::default().add_modifier(Modifier::DIM)
+}
+
 /// The text a screen is showing, gathered so the words in it can be found.
 ///
 /// Read back from the lines that were built rather than from the values they came
@@ -111,7 +120,7 @@ fn explaining(showing: &str, rows: usize, across: usize) -> Vec<Line<'static>> {
         lines.extend(
             counted(left, across, rows.saturating_sub(lines.len()))
                 .into_iter()
-                .map(|row| Line::styled(row, Style::default().add_modifier(Modifier::DIM))),
+                .map(|row| Line::styled(row, quiet())),
         );
     }
     lines
@@ -228,6 +237,23 @@ pub(crate) fn room_on(screen: Rect) -> (usize, usize) {
     inside(middle(screen))
 }
 
+/// The words a pane opened over this screen would actually have taught.
+///
+/// **What it explained**, not what was on the screen. The pane names the words it
+/// had no room for rather than dropping them, and a named word has not been taught —
+/// so recording those would stop a later report explaining a word nobody ever read,
+/// which is the one failure the whole record exists to avoid.
+///
+/// Here rather than at the loop that records it, because which words those are is a
+/// decision and the loop is a terminal.
+pub(crate) fn taught_on(showing: &str, screen: Rect) -> Vec<&'static str> {
+    let (rows, across) = room_on(screen);
+    explained_in(showing, rows, across, crate::render::glossary::known())
+        .into_iter()
+        .map(|term| term.word)
+        .collect()
+}
+
 /// The rows and columns inside a pane of this size, its own border taken off.
 fn inside(area: Rect) -> (usize, usize) {
     (
@@ -237,7 +263,7 @@ fn inside(area: Rect) -> (usize, usize) {
 }
 
 /// A box in the middle of the screen, leaving what is behind it visible around.
-fn middle(screen: Rect) -> Rect {
+pub(crate) fn middle(screen: Rect) -> Rect {
     let [_, row, _] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -260,7 +286,8 @@ fn middle(screen: Rect) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::{
-        explained_in, explaining, middle, room_on, showing, taught, titled, SHORTEST, TITLES,
+        explained_in, explaining, middle, room_on, showing, taught, taught_on, titled, SHORTEST,
+        TITLES,
     };
     use lemonfiber_core::acknowledged::Acknowledged;
     use lemonfiber_core::glossary::{mentioned, TERMS};
@@ -353,6 +380,24 @@ mod tests {
 
         let words: Vec<&str> = explained.iter().map(|term| term.word).collect();
         assert_eq!(words, ["hardlink"], "the room goes to what is new");
+    }
+
+    /// What is recorded is what the pane taught, and it is measured against the
+    /// pane's own room rather than the screen's — a word left out for want of a row
+    /// is one nobody read.
+    #[test]
+    fn the_words_recorded_are_the_ones_the_pane_had_room_to_teach() {
+        let said = "the indexer, the hardlink, the VPN, the ratio and the seed";
+
+        let roomy = taught_on(said, Rect::new(0, 0, 200, 60));
+        let cramped = taught_on(said, Rect::new(0, 0, 200, 8));
+
+        let (roomy_count, cramped_count) = (roomy.len(), cramped.len());
+        assert!(roomy.contains(&"indexer"), "{roomy:?}");
+        assert!(
+            roomy_count > cramped_count,
+            "room decides how many: {roomy_count} against {cramped_count}"
+        );
     }
 
     /// The room is the pane's, not the screen's — what is behind it was not read.
