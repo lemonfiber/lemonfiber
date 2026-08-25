@@ -14,27 +14,10 @@ use lemonfiber_core::app::{logs, Ctx};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::{LogLine, LogQuery};
 
-use crate::reads::{Wanted, FORMS, SERVICES, STATUS, VERSION};
+use crate::reads::{Asked, FOLLOW, FORM, FORMS, LOGS, SERVICE, SERVICES, STATUS, TAIL, VERSION};
 use crate::router::Serving;
 
-use super::{enveloped, reading, unreadable, went_wrong, Asked};
-
-/// Where the services' own lines are read.
-///
-/// The one read with no row in [`crate::reads`], because it reaches no command: it
-/// opens a stream and answers with a document per line — or, where it was asked to
-/// keep reading, with a name for work that will not end and lines that arrive
-/// somewhere else.
-const LOGS: &str = "/api/logs";
-
-/// The parameter naming a form to narrow to.
-const FORM: &str = "form";
-/// The parameter naming a service to read.
-const SERVICE: &str = "service";
-/// The parameter saying how many existing log lines to begin with.
-const TAIL: &str = "tail";
-/// The parameter asking to keep reading as new lines arrive.
-const FOLLOW: &str = "follow";
+use super::{enveloped, reading, unreadable, went_wrong};
 
 /// How many existing lines a log read begins with when it is not told.
 ///
@@ -42,8 +25,22 @@ const FOLLOW: &str = "follow";
 /// says nothing about it with the same lines.
 const BEGIN_WITH: u32 = 50;
 
-/// What is said to a request whose line count is not a number.
-const NOT_A_COUNT: &str = "How many lines to begin with must be a number.";
+/// The most existing lines this read will begin with.
+///
+/// The command line hands each line on as it arrives and keeps none of them. This
+/// read has no last element to close a document with, so it gathers the whole
+/// scrollback before it answers any of it — which makes the number a caller writes
+/// here the number of lines this machine holds in memory at once. A ceiling is on
+/// the reading of it rather than on the gathering, because the honest answer to a
+/// request for four billion lines is that it will not be answered, and quietly
+/// gathering fewer would answer a different request.
+const AT_MOST: u32 = 10_000;
+
+/// What is said to a request whose line count is not a number, or is past the
+/// ceiling. One sentence, because both are the same mistake about the same word.
+fn not_a_count() -> String {
+    format!("How many lines to begin with must be a number, and no more than {AT_MOST}.")
+}
 
 /// What is said to a request whose follow is neither yes nor no.
 const NOT_A_CHOICE: &str = "Whether to keep reading must be true or false.";
@@ -59,8 +56,8 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
-async fn version(State(serving): State<Serving>) -> Response {
-    reading(&serving.ctx, VERSION, Wanted::default()).await
+async fn version(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
+    reading(&serving.ctx, VERSION, query.as_deref()).await
 }
 
 /// Every form the stack declares, or what naming some of them would come to.
@@ -69,35 +66,17 @@ async fn version(State(serving): State<Serving>) -> Response {
 /// something a caller can hold in advance. Naming none lists them and naming some
 /// resolves them, which is the fork `lemonfiber forms` takes on the same word.
 async fn forms(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
-    reading(
-        &serving.ctx,
-        FORMS,
-        Wanted {
-            forms: asked.every(FORM),
-            ..Wanted::default()
-        },
-    )
-    .await
+    reading(&serving.ctx, FORMS, query.as_deref()).await
 }
 
 /// What the whole stack is doing.
-async fn status(State(serving): State<Serving>) -> Response {
-    reading(&serving.ctx, STATUS, Wanted::default()).await
+async fn status(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
+    reading(&serving.ctx, STATUS, query.as_deref()).await
 }
 
 /// What each service is doing, narrowed to the forms that were named.
 async fn services(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
-    reading(
-        &serving.ctx,
-        SERVICES,
-        Wanted {
-            forms: asked.every(FORM),
-            ..Wanted::default()
-        },
-    )
-    .await
+    reading(&serving.ctx, SERVICES, query.as_deref()).await
 }
 
 /// What the services are saying, and — where it is asked for — what they say next.
@@ -109,9 +88,12 @@ async fn services(State(serving): State<Serving>, RawQuery(query): RawQuery) -> 
 /// the work instead — the same answer every request that outlives its own
 /// connection gets here — and the lines arrive on the stream.
 async fn log_lines(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
+    let asked = match Asked::read(LOGS, query.as_deref()) {
+        Ok(asked) => asked,
+        Err(problem) => return went_wrong(&problem),
+    };
     let Some(tail) = counted(asked.one(TAIL)) else {
-        return unreadable(NOT_A_COUNT);
+        return unreadable(&not_a_count());
     };
     let Some(follow) = told(asked.one(FOLLOW)) else {
         return unreadable(NOT_A_CHOICE);
@@ -176,7 +158,9 @@ fn one_per_line(said: &[LogLine]) -> Option<String> {
 }
 
 /// How many existing lines to begin with, or nothing where what was asked for is
-/// not a number.
+/// not a number or is more than this read will gather.
 fn counted(said: Option<&str>) -> Option<u32> {
-    said.map_or(Some(BEGIN_WITH), |said| said.parse().ok())
+    said.map_or(Some(BEGIN_WITH), |said| {
+        said.parse().ok().filter(|count| *count <= AT_MOST)
+    })
 }

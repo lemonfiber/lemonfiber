@@ -9,13 +9,10 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
-use crate::reads::{Wanted, CONFIG, QUALITY};
+use crate::reads::{CONFIG, QUALITY};
 use crate::router::Serving;
 
-use super::{reading, Asked};
-
-/// The parameter naming one setting to read, instead of all of them.
-const KEY: &str = "key";
+use super::reading;
 
 /// The reads about what has been chosen.
 pub(super) fn routes() -> Router<Serving> {
@@ -33,19 +30,10 @@ pub(super) fn routes() -> Router<Serving> {
 /// Naming none shows them all and naming one reads that one, which is the fork
 /// `config show` and `config get` take on the command line.
 async fn config(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
-    reading(
-        &serving.ctx,
-        CONFIG,
-        Wanted {
-            key: asked.one(KEY).map(str::to_owned),
-            ..Wanted::default()
-        },
-    )
-    .await
+    reading(&serving.ctx, CONFIG, query.as_deref()).await
 }
 
 /// The quality choice in force, what each preset means, and what it costs.
-async fn quality(State(serving): State<Serving>) -> Response {
-    reading(&serving.ctx, QUALITY, Wanted::default()).await
+async fn quality(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
+    reading(&serving.ctx, QUALITY, query.as_deref()).await
 }

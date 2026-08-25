@@ -13,10 +13,11 @@
 //!
 //! Which command a read reaches is [`crate::reads`]'s, named by the path it is
 //! served at, so another surface can ask for the same read by the same name and
-//! reach the same command. What is left here is the reading of a query string and
-//! the carrying out. The endpoints themselves are grouped beside it by what they
-//! are about: the stack, the diagnosis, one item, the choices in force, and the
-//! words.
+//! reach the same command. What a read takes is named there too, beside the
+//! command, so one place refuses a parameter no read takes — including on the
+//! reads that take nothing at all. What is left here is the carrying out. The
+//! endpoints themselves are grouped beside it by what they are about: the stack,
+//! the diagnosis, one item, the choices in force, and the words.
 
 mod chosen;
 mod diagnosis;
@@ -32,7 +33,7 @@ use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::error::{Amiss, Problem};
 use lemonfiber_core::model::{kind, Envelope};
 
-use crate::reads::{named, Wanted};
+use crate::reads::{named, wanted};
 use crate::router::Serving;
 use crate::serve::{answered, carrying, SENTENCE};
 
@@ -55,12 +56,17 @@ pub fn routes() -> Router<Serving> {
         .merge(glossary::routes())
 }
 
-/// Carry out the read a name reaches, or say why it reaches none.
+/// Carry out the read a name reaches, or say why it cannot be.
 ///
-/// Every endpoint below arrives here, so the name a path is served under and the
-/// command it comes to are one decision made in one place rather than one made
-/// per handler.
-pub(crate) async fn reading(ctx: &Ctx, read: &str, given: Wanted) -> Response {
+/// Every endpoint below arrives here with its own name and the query string as it
+/// arrived, so the name a path is served under, what may be said alongside it and
+/// the command it comes to are one decision made in one place rather than
+/// thirteen made per handler.
+pub(crate) async fn reading(ctx: &Ctx, read: &str, query: Option<&str>) -> Response {
+    let given = match wanted(read, query) {
+        Ok(given) => given,
+        Err(problem) => return went_wrong(&problem),
+    };
     match named(read, given) {
         Ok(command) => carried_out(ctx, command).await,
         Err(said) => unreadable(said),
@@ -142,42 +148,10 @@ pub fn enveloped(status: StatusCode, rendered: Option<String>) -> Response {
 /// What was asked for is not repeated back. A name lemonfiber does not know is a
 /// mistake to correct rather than a request to answer with everything, which is
 /// the judgement the command line makes before the core is reached.
-pub(crate) fn unreadable(said: &'static str) -> Response {
-    carrying(StatusCode::BAD_REQUEST, SENTENCE, Body::from(said))
-}
-
-/// What a request asked for, read from its query string.
-///
-/// Read here rather than through an extractor, because the router carries no
-/// query parser: what this surface takes are the flags the commands take, and a
-/// flag a command accepts more than once is a name given more than once.
-pub(crate) struct Asked(Vec<(String, String)>);
-
-impl Asked {
-    /// The pairs a query string holds, decoded.
-    pub(crate) fn read(query: Option<&str>) -> Self {
-        let given = query.unwrap_or_default();
-        Self(
-            form_urlencoded::parse(given.as_bytes())
-                .map(|(name, value)| (name.into_owned(), value.into_owned()))
-                .collect(),
-        )
-    }
-
-    /// The first value given for a name, or nothing where it was not given.
-    pub(crate) fn one(&self, name: &str) -> Option<&str> {
-        self.0
-            .iter()
-            .find(|(given, _)| given == name)
-            .map(|(_, value)| value.as_str())
-    }
-
-    /// Every value given for a name, in the order they were given.
-    pub(crate) fn every(&self, name: &str) -> Vec<String> {
-        self.0
-            .iter()
-            .filter(|(given, _)| given == name)
-            .map(|(_, value)| value.clone())
-            .collect()
-    }
+pub(crate) fn unreadable(said: &str) -> Response {
+    carrying(
+        StatusCode::BAD_REQUEST,
+        SENTENCE,
+        Body::from(said.to_owned()),
+    )
 }

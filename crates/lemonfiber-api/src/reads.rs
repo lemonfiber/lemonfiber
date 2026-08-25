@@ -17,12 +17,19 @@
 //! the checks that disturb a running system and accepting a warning both change
 //! something and belong where changes are asked for.
 //!
-//! `/api/logs` is the one read with no row here, because it reaches no command: it
-//! opens a stream and renders a document per line, which is a different shape of
-//! answer rather than a different answer.
+//! `/api/logs` is the one read with no command below, because it reaches none: it
+//! opens a stream and renders a document per line, or hands back a name for a follow
+//! that will not end — a different shape of answer rather than a different answer. It
+//! is named here all the same, because it is asked with parameters like every other
+//! read and [`asked`] holds every read to the parameters it takes.
+
+mod asked;
 
 use lemonfiber_core::app::{Command, QualityAction};
 use lemonfiber_core::doctor::{Category, Narrowing};
+use lemonfiber_core::error::Problem;
+
+pub(crate) use asked::{Asked, FOLLOW, FORM, SERVICE, TAIL};
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
 pub const VERSION: &str = "/api/version";
@@ -59,6 +66,10 @@ pub const QUALITY: &str = "/api/quality";
 
 /// What one of this product's words means, or every word there is to ask about.
 pub const EXPLAIN: &str = "/api/explain";
+
+/// What the services are saying, one document a line — or, where it was asked to
+/// keep reading, a name for work that will not end and lines that arrive elsewhere.
+pub const LOGS: &str = "/api/logs";
 
 /// The reads a name reaches, in the order the endpoints declare them.
 ///
@@ -104,6 +115,20 @@ pub struct Wanted {
     pub only: Option<String>,
     /// The word to explain, instead of every word there is to ask about.
     pub word: Option<String>,
+}
+
+/// What a read was given, or why the request cannot be read as it stands.
+///
+/// The one door a query string goes through. Which parameters a read takes is
+/// [`asked`]'s, named by the path the read is served at, so a read that takes none
+/// refuses a parameter by the same rule as one that takes three.
+///
+/// # Errors
+///
+/// Returns the refusal a caller is answered with: a parameter this read does not
+/// take, or one it takes once and was given twice.
+pub fn wanted(read: &str, query: Option<&str>) -> Result<Wanted, Box<Problem>> {
+    Asked::read(read, query).map(|asked| asked.wanted())
 }
 
 /// The command a read names, or what to say to a request that reaches none.
