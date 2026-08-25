@@ -133,6 +133,17 @@ pub trait Narrator: Send + Sync {
     fn said(&self, line: &Line);
 }
 
+/// The narrator for a walk nobody is watching.
+///
+/// A value rather than an absence, so a walk says each line exactly once in the
+/// source — the alternative is every call site asking whether anyone is there,
+/// which is the branch that gets forgotten on the path that matters.
+pub struct Unheard;
+
+impl Narrator for Unheard {
+    fn said(&self, _line: &Line) {}
+}
+
 /// A size in the decimal gigabytes the rest of the product quotes — the same units the
 /// quality presets and the free-space checks use, so two numbers an operator sees on one
 /// screen mean the same thing.

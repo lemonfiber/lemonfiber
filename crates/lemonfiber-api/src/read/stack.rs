@@ -22,7 +22,9 @@ use super::{enveloped, reading, unreadable, went_wrong, Asked};
 /// Where the services' own lines are read.
 ///
 /// The one read with no row in [`crate::reads`], because it reaches no command: it
-/// opens a stream and answers with a document per line.
+/// opens a stream and answers with a document per line — or, where it was asked to
+/// keep reading, with a name for work that will not end and lines that arrive
+/// somewhere else.
 const LOGS: &str = "/api/logs";
 
 /// The parameter naming a form to narrow to.
@@ -31,6 +33,8 @@ const FORM: &str = "form";
 const SERVICE: &str = "service";
 /// The parameter saying how many existing log lines to begin with.
 const TAIL: &str = "tail";
+/// The parameter asking to keep reading as new lines arrive.
+const FOLLOW: &str = "follow";
 
 /// How many existing lines a log read begins with when it is not told.
 ///
@@ -40,6 +44,9 @@ const BEGIN_WITH: u32 = 50;
 
 /// What is said to a request whose line count is not a number.
 const NOT_A_COUNT: &str = "How many lines to begin with must be a number.";
+
+/// What is said to a request whose follow is neither yes nor no.
+const NOT_A_CHOICE: &str = "Whether to keep reading must be true or false.";
 
 /// The reads about the stack itself.
 pub(super) fn routes() -> Router<Serving> {
@@ -93,19 +100,43 @@ async fn services(State(serving): State<Serving>, RawQuery(query): RawQuery) -> 
     .await
 }
 
-/// What the services are saying.
+/// What the services are saying, and — where it is asked for — what they say next.
+///
+/// One endpoint over one request, because the command line spells it as one:
+/// following is a flag on `logs` rather than a request of its own, and the lines
+/// it reads are the lines the scrollback reads. What differs is that it does not
+/// end, so it cannot be answered with what it read. It is answered with a name for
+/// the work instead — the same answer every request that outlives its own
+/// connection gets here — and the lines arrive on the stream.
 async fn log_lines(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
     let asked = Asked::read(query.as_deref());
     let Some(tail) = counted(asked.one(TAIL)) else {
         return unreadable(NOT_A_COUNT);
     };
-    read_logs(
-        &serving.ctx,
-        &asked.every(FORM),
-        &asked.every(SERVICE),
-        tail,
-    )
-    .await
+    let Some(follow) = told(asked.one(FOLLOW)) else {
+        return unreadable(NOT_A_CHOICE);
+    };
+    let (forms, services) = (asked.every(FORM), asked.every(SERVICE));
+    if follow {
+        return crate::following::followed(&serving, forms, services, tail).await;
+    }
+    read_logs(&serving.ctx, &forms, &services, tail).await
+}
+
+/// Whether a request asked to keep reading, or nothing where it said something
+/// that is neither.
+///
+/// Not given is not asked for. A word that is neither is a mistake to correct
+/// rather than a request to answer with the scrollback, because the two answers
+/// are different shapes — lines, or a name — and a caller that meant to follow
+/// would otherwise parse an answer it never asked for.
+fn told(said: Option<&str>) -> Option<bool> {
+    match said {
+        // Not given is not asked for, which is the same answer as having said so.
+        None | Some("false") => Some(false),
+        Some("true") => Some(true),
+        Some(_) => None,
+    }
 }
 
 /// The scrollback, one envelope per line.

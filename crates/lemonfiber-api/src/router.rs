@@ -17,6 +17,7 @@ use axum::response::Response;
 use axum::Router;
 use lemonfiber_core::app::Ctx;
 
+use crate::events::live::Live;
 use crate::events::Streaming;
 use crate::guard::Token;
 use crate::jobs::Jobs;
@@ -38,6 +39,13 @@ pub struct Serving {
     /// The work this run started, which the actions that take minutes are named
     /// and left to run under.
     pub jobs: Jobs,
+    /// The one stream, for the work whose output arrives while it runs.
+    ///
+    /// The same stream the events route serves from its own state, shared rather
+    /// than gathered again: what an endpoint needs here is the ability to *say*,
+    /// which is what a follow's lines and a wait's words both need, and two
+    /// streams would be two orders for one run of events.
+    pub live: Arc<Live>,
 }
 
 /// Every endpoint this surface answers, behind the guard they share.

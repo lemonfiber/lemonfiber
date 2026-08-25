@@ -134,6 +134,7 @@ async fn answered(ctx: Ctx, path: &str, said: &[(&str, &str)]) -> Option<(Status
             token: Arc::clone(&token),
             bound: bound(),
             jobs: Jobs::default(),
+            live: Arc::clone(&live),
         },
         Arc::new(Streaming {
             token,

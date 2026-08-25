@@ -15,8 +15,8 @@ use crate::error::{Code, Problem};
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
-    MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
-    VersionReport, WizardReport,
+    MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, SupervisionReport,
+    TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
 };
 use crate::quality::Preset;
 use crate::stack::closure::Plan;
@@ -211,6 +211,24 @@ pub enum Command {
     /// resolving them: a surface that has to name a word cannot know the names in
     /// advance, and asking is what keeps it from carrying its own copy of the table.
     Glossary,
+    /// Guard the data location while the given forms run, stopping them the moment
+    /// it disappears.
+    ///
+    /// The one command with no ending of its own: everything else here answers and
+    /// is done, and this holds until the location is lost or whoever asked for it
+    /// stops asking. A surface that cannot be interrupted has to be able to say so.
+    Watch {
+        /// The forms to stop if the data location is lost.
+        forms: Vec<String>,
+    },
+    /// Add one thing end to end, saying each step as it happens.
+    ///
+    /// Naming nothing asks for something safe to be suggested, because a first
+    /// attempt that fails on an obscure choice teaches the wrong lesson entirely.
+    Walkthrough {
+        /// What to add, as it would be said, or nothing to be suggested something.
+        item: Option<String>,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they
@@ -327,6 +345,10 @@ pub enum Outcome {
     Support(support::Bundle),
     /// What a restore would overwrite, or what it put back.
     Restore(restore::Restoration),
+    /// How a guard ended, and whether it got the services stopped.
+    Watch(SupervisionReport),
+    /// How far a walk got, and what it proved.
+    Walkthrough(WalkthroughReport),
 }
 
 impl Outcome {
@@ -355,6 +377,8 @@ impl Outcome {
             Self::Backup(_) => kind::BACKUP,
             Self::Support(_) => kind::BUNDLE,
             Self::Restore(_) => kind::RESTORE,
+            Self::Watch(_) => kind::WATCH,
+            Self::Walkthrough(_) => kind::WALKTHROUGH,
         };
         Envelope::new(kind, self)
     }
@@ -384,6 +408,8 @@ impl serde::Serialize for Outcome {
             Self::Backup(report) => report.serialize(serializer),
             Self::Support(report) => report.serialize(serializer),
             Self::Restore(report) => report.serialize(serializer),
+            Self::Watch(report) => report.serialize(serializer),
+            Self::Walkthrough(report) => report.serialize(serializer),
         }
     }
 }
@@ -447,6 +473,19 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         } => {
             let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
             accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
+        }
+        // Held open until the location is lost, which is what a guard is. The
+        // interval is this command's own rather than the caller's: a surface that
+        // could choose it could choose one that misses the moment it exists for.
+        Command::Watch { forms } => watch::supervise(ctx, ctx.volume.as_ref(), &forms, WATCH)
+            .await
+            .map(Outcome::Watch),
+        // Said onto whatever the surface is listening with, which is how a walk is
+        // watched rather than read afterwards.
+        Command::Walkthrough { item } => {
+            walkthrough::walkthrough(ctx, item.as_deref(), ctx.steps.as_ref())
+                .await
+                .map(Outcome::Walkthrough)
         }
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
@@ -967,7 +1006,9 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
-                | Outcome::Restore(_),
+                | Outcome::Restore(_)
+                | Outcome::Watch(_)
+                | Outcome::Walkthrough(_),
             )
             | Err(_) => None,
         }
@@ -998,7 +1039,9 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
-                | Outcome::Restore(_),
+                | Outcome::Restore(_)
+                | Outcome::Watch(_)
+                | Outcome::Walkthrough(_),
             )
             | Err(_) => None,
         }
@@ -1646,7 +1689,9 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
-                | Outcome::Restore(_),
+                | Outcome::Restore(_)
+                | Outcome::Watch(_)
+                | Outcome::Walkthrough(_),
             )
             | Err(_) => None,
         }
@@ -2627,7 +2672,9 @@ mod tests {
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
-                | Outcome::Restore(_),
+                | Outcome::Restore(_)
+                | Outcome::Watch(_)
+                | Outcome::Walkthrough(_),
             )
             | Err(_) => None,
         }

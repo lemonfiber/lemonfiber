@@ -14,11 +14,13 @@ use crate::archive::Archiving;
 use crate::config::Settings;
 use crate::platform::Environment;
 use crate::ports::docker::Engine;
+use crate::ports::filesystem::Volume;
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
 use crate::ports::random::Random;
 use crate::ports::{Clock, FileSystem, Narrator, Runner};
 use crate::stack::Source;
+use crate::walkthrough::{Narrator as Stepwise, Unheard};
 
 /// Everything a command needs that is not part of the command itself.
 pub struct Ctx {
@@ -34,6 +36,11 @@ pub struct Ctx {
     pub clock: Arc<dyn Clock>,
     /// How the filesystem is reached, for the checks that prove what it can do.
     pub filesystem: Arc<dyn FileSystem>,
+    /// How a path is asked whether it is still there, and still the same volume.
+    ///
+    /// Apart from the filesystem because the question is apart: a guard asks this
+    /// and nothing else, and every other check asks the rest and never this.
+    pub volume: Arc<dyn Volume>,
     /// How services are reached over HTTP, for the checks and seeding that ask
     /// one what it is or wire it to another.
     pub http: Arc<dyn Http>,
@@ -47,6 +54,14 @@ pub struct Ctx {
     /// line could have. A run whose surface is not listening holds a narrator that
     /// says nothing, so there is no second code path for the case where nobody is.
     pub narrator: Arc<dyn Narrator>,
+    /// Where a walk says what it has just done, for the surface to render.
+    ///
+    /// Beside the narrator rather than the same port, because the two carry
+    /// different things: a wait says one sentence, and a walk says a step, a
+    /// phrase and the evidence for it. Rendering the step into a sentence here
+    /// would put the walk's words in the core and the terminal's copy of them in
+    /// the binary, which is two accounts of one run.
+    pub steps: Arc<dyn Stepwise>,
     /// How long starting waits for services to settle before giving up.
     ///
     /// A knob rather than a constant because it is a policy: an operator on a
@@ -91,6 +106,10 @@ impl Ctx {
             engine,
             clock,
             filesystem,
+            // The real volume for the same reason the transport below is real:
+            // the one command that asks is asking about this machine's drives,
+            // and a test that means something else says so by name.
+            volume: Arc::new(crate::adapters::Disk),
             // The real transport is the only sensible default; the one code path
             // that needs to answer for a fake service overrides it with
             // `with_http`, so no test reaches the network to build a context.
@@ -106,6 +125,8 @@ impl Ctx {
             // thing that would listen exists in both surfaces, and a default that
             // said something would have to guess where.
             narrator: Arc::new(Silent),
+            // Nobody either, and for the same reason.
+            steps: Arc::new(Unheard),
             patience: PATIENCE,
             stack,
             settings,
@@ -168,6 +189,28 @@ impl Ctx {
     #[must_use]
     pub fn narrating(mut self, narrator: Arc<dyn Narrator>) -> Self {
         self.narrator = narrator;
+        self
+    }
+
+    /// The same context, asking the given seam whether a path is still there.
+    ///
+    /// Lets a guard be driven against a drive a test scripted, so what a watch
+    /// does when a volume is swapped out under it is exercised with nothing
+    /// unplugged.
+    #[must_use]
+    pub fn with_volume(mut self, volume: Arc<dyn Volume>) -> Self {
+        self.volume = volume;
+        self
+    }
+
+    /// The same context, saying what a walk has done through the given narrator.
+    ///
+    /// How a surface watches a walk: the command line puts each step under the
+    /// command it is running, and the web surface says it on the stream a browser
+    /// already holds open.
+    #[must_use]
+    pub fn narrating_steps(mut self, steps: Arc<dyn Stepwise>) -> Self {
+        self.steps = steps;
         self
     }
 

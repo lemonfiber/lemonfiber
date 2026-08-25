@@ -18,6 +18,7 @@ use futures_util::StreamExt;
 use lemonfiber_api::events::dashboard::Dashboard;
 use lemonfiber_api::events::live::{Gathers, Live, TICK};
 use lemonfiber_api::events::saying::Saying;
+use lemonfiber_api::events::stepping::Stepping;
 use lemonfiber_api::events::wire::{Event, Nature, Rendered, BEAT, BEAT_SAID};
 use lemonfiber_api::events::{routes, stream, Streaming, LAST_EVENT_ID, PATH};
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
@@ -27,6 +28,7 @@ use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::Narrator as _;
 use lemonfiber_core::stack::Source;
+use lemonfiber_core::walkthrough::{Line, Narrator as _};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
@@ -412,6 +414,90 @@ async fn a_wait_says_what_it_is_waiting_for_to_whoever_is_listening() {
     assert!(
         heard.contains("45 seconds so far, of 180."),
         "including how far into the budget it is: {heard}"
+    );
+}
+
+/// A walk's steps reach whoever is listening, whole rather than written out.
+///
+/// The words are the core's — what the step is called, and the evidence that makes
+/// the line worth reading — and rendering them into a sentence for a browser would
+/// be a second copy of the walk's own prose beside the one the terminal draws.
+#[tokio::test]
+async fn a_walk_says_each_step_to_whoever_is_listening() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let mut listening = live.listening(None).await;
+    let (walking, carrying) = Stepping::onto(Arc::clone(&live));
+    let saying = tokio::spawn(carrying.carrying());
+
+    walking.said(&Line::searched(5, 47));
+
+    let heard = listening.next().await.unwrap_or_default();
+    saying.abort();
+    assert!(heard.contains("\nevent: step\n"), "{heard}");
+    assert!(
+        heard.contains(r#""step":"searching""#),
+        "the step itself, for a browser to draw: {heard}"
+    );
+    assert!(
+        heard.contains(r#""detail":"5 indexers, 47 releases""#),
+        "and the evidence, in the core's own words: {heard}"
+    );
+}
+
+/// A step said with nobody to carry it goes nowhere, rather than failing the walk.
+///
+/// A run whose surface has gone away is a run that goes on running; a walk made to
+/// fail because nobody was listening would be a walk made worse by the reporting
+/// added to it.
+#[tokio::test]
+async fn a_step_said_after_the_surface_has_gone_is_not_a_walk_that_failed() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let (walking, carrying) = Stepping::onto(Arc::clone(&live));
+    drop(carrying);
+
+    walking.said(&Line::searched(1, 1));
+
+    let mut listening = live.listening(None).await;
+    assert_eq!(
+        listening.next().await.as_deref(),
+        Some(BEAT_SAID),
+        "nothing was said, and the stream is still there to say so"
+    );
+}
+
+/// Carrying ends when the last narrator is let go, which is when the run ends.
+///
+/// Started once with the surface rather than once per walk, so a walk that finished
+/// must leave it open for the next one — and only the surface going away closes it.
+#[tokio::test]
+async fn carrying_the_steps_ends_when_there_is_nothing_left_to_say_them() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let (walking, carrying) = Stepping::onto(Arc::clone(&live));
+
+    walking.said(&Line::searched(2, 9));
+    drop(walking);
+    carrying.carrying().await;
+
+    let mut listening = live.listening(Some("0-0")).await;
+    let heard = listening.next().await.unwrap_or_default();
+    assert!(heard.contains("\nevent: step\n"), "{heard}");
+    assert!(
+        heard.contains(r#""detail":"2 indexers, 9 releases""#),
+        "{heard}"
+    );
+}
+
+/// An envelope that will not render is not said, rather than said as something else.
+#[tokio::test]
+async fn nothing_rendered_is_nothing_said() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    live.say_if_rendered(None).await;
+
+    let mut listening = live.listening(None).await;
+    assert_eq!(
+        listening.next().await.as_deref(),
+        Some(BEAT_SAID),
+        "the stream is still there, and has said nothing"
     );
 }
 

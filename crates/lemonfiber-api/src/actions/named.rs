@@ -7,7 +7,10 @@
 //!
 //! Only the actions that *change* something are here. Asking what the stack is
 //! doing is a read and has an endpoint of its own; a write that also happens to
-//! report is still a write.
+//! report is still a write — and so is one that mostly waits. A guard exists to
+//! stop the services when the drive under them goes, and a walk searches, grabs
+//! and imports; that both spend most of their time watching does not make either
+//! of them a question.
 
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
@@ -41,10 +44,17 @@ pub const OFFERED: &[&str] = &[
     "backup",
     "support",
     "restore",
+    "watch",
+    "walkthrough",
 ];
 
 /// The actions that must be told what to act on.
-const NAMES_ITS_FORMS: [&str; 3] = ["switch", "restart", "pull"];
+///
+/// A guard is one of them for a reason the other three do not share: it is not
+/// that the request has lost its subject, but that a watch with nothing to stop
+/// would see the drive vanish and have nothing to do about it. The command line
+/// refuses all four the same way.
+const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 
 /// The command an action names, or why it names none.
 ///
@@ -57,9 +67,9 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         argument: argument.to_owned(),
     };
     // Naming nothing means everything for the actions that can mean it, and is a
-    // mistake for the three that cannot: switching to nothing, restarting nothing
-    // and fetching nothing are each a request that has lost its subject, and the
-    // command line refuses all three the same way.
+    // mistake for the four that cannot: switching to nothing, restarting nothing,
+    // fetching nothing and guarding nothing are each a request with nothing to act
+    // on, and the command line refuses all four the same way.
     if NAMES_ITS_FORMS.contains(&action) && given.forms.is_empty() {
         return Err(needs("forms"));
     }
@@ -81,6 +91,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         filenames,
         reveal,
         confirm,
+        item,
     } = given;
     match action {
         "up" => Ok(Command::Up { forms }),
@@ -127,6 +138,15 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
             }),
             None => Err(needs("archive")),
         },
+        "watch" => Ok(Command::Watch { forms }),
+        // Naming nothing is a request rather than an omission: a walk asked for
+        // nothing in particular suggests something likely to work, which is what an
+        // operator with an empty library needs. Blank is nothing named, not an
+        // empty title, so a browser that sent the field and left it alone asks the
+        // same thing as one that left it out.
+        "walkthrough" => Ok(Command::Walkthrough {
+            item: item.filter(|named| !named.trim().is_empty()),
+        }),
         _ => Err(Refused::Unknown {
             name: action.to_owned(),
         }),

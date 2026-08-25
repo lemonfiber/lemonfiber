@@ -62,14 +62,14 @@ and the rest is named in **Standing**.
 | `restart` | `restart` | dashboard, partial | As `switch` on both counts. The terminal leaves the same two things: several forms at once, and the named services `--service` restarts, which its list has no way to name. |
 | `pull` | `pull` | dashboard, partial | As `switch`: it refuses an empty `forms`, which `/api/forms` and the dashboard's own list both serve. The terminal leaves naming several forms at once. It is the one of the five that stops nothing, and it is asked about before it runs anyway, because it can spend an hour of somebody's connection. |
 | `ps` | `/api/status`, `/api/services` | dashboard | Reachable from all three. The dashboard and the endpoints are fed by the same gather. |
-| `logs` | `/api/logs`, partial | viewer | The scrollback is a read and is served. Following is not: the event stream carries the dashboard gather and the narration a wait produces, never a service's own lines, so a browser cannot watch them arrive. `--watch` is the terminal's own rendering of the same lines, not a separate request. |
+| `logs` | `/api/logs` | viewer | Reachable in full. The scrollback is a read that ends, and is answered with what it read; following does not end, so it is answered with a name for the work and the lines arrive on the stream the browser already holds — one endpoint for both, because the command line spells following as a flag on this request rather than as a request of its own. The stream carries a service's own lines now, which it did not: they go down as `log`, the event name every other envelope's kind becomes, so a browser that is not following never registers for one. Nothing is dropped at the source and a browser that reads more slowly than a service speaks is let go past the window the stream carries, which is the rule already in force for every other event. `--watch` is the terminal's own rendering of the same lines, not a separate request. |
 | `config` | `config-set`, `/api/config` | dashboard, partial | Reachable in full from a browser. Writing arrived before reading, so a browser could set a value it had no way to read back; `/api/config` answers both halves of the read the way the command line spells them — naming no setting shows every one, naming one reads that one. Credentials are withheld where the settings are read rather than where they are printed, so both the endpoint and the dashboard show what `config show` prints, and a guard refuses a screen that reads the file for itself. The terminal asks for the whole listing and not for one setting by name: the answer is a box that moves through the settings, so reading one of them is scrolling to it rather than typing it exactly. Changing one is offered nowhere but the browser, like every other write. |
 | `quality` | `quality-set`, `quality-reapply`, `quality-upgrade`, `/api/quality` | dashboard, partial | Reachable in full from a browser. `/api/quality` serves the read the three writes were being made without: the preset in force, what each one means, and what it costs, which is the screen a browser is best at. The dashboard asks the same read and offers none of the three writes. |
 | `doctor` | `/api/checks`, `/api/storage`, partial | dashboard, partial | The diagnosis is served. Repair is not: `--fix`, `--yes`, `--fix-disruptive`, `--undo` and `--accept` have no web form, and an offer-and-consent flow is something HTML does better than a terminal prompt. The dashboard shows storage and VPN facts the diagnosis also reads, without being the diagnosis. |
-| `watch` | none | none | Unbuilt. It is long-running work that ends in one report, which is exactly the shape the web already answers with a job name — and a guard started from a browser and left running is the useful case, not the awkward one. What it needs that a command does not is a way to stop it, since there is no terminal to interrupt. |
+| `watch` | `watch` | none | Reachable in full, and it is the command with no ending of its own: it holds until the data location is lost, which on a machine where the drive stays put is never. So it is answered with a job's name like every other long action, and the name is also how it is stopped — a browser has no interruption to send, so releasing the name is its Ctrl-C, and what the container engine was already asked to do goes on exactly as it does when a terminal is closed. A tab closing stops nothing, which is the useful case. What bounds an abandoned one is that asking what became of it renews it: a guard nobody has asked about across two sweeps of half an hour is let go and says so, so one started on a Friday does not outlive the day. Nothing else is leased, because everything else ends by itself. The terminal has no form of it. |
 | `trace` | `/api/trace` | dashboard, partial | Served on the web, and it completes a screen that half-existed: `/api/requests` reports what the household asked for, and this follows one of them. What to follow is one query parameter — the command line takes it as words so it can be typed unquoted, and a query string carries the title whole. It is the one question the dashboard has to be given something before it can ask, so taking it opens a line to type the title on, and an empty one is refused in the sentence a browser is refused with. Narrowing to one season is not offered there: it is a second thing to type for an answer that already reads season by season. |
 | `household` | `/api/requests` | dashboard, partial | Served on the web, and asked off the dashboard's own list of questions. Narrowing to one member is not offered there: the answer is grouped by whoever asked, so a household of four is four headings rather than a list to search, and naming one would be a second thing to type for a smaller version of what is already on the screen. |
-| `walkthrough` | none | none | Unbuilt, and the surface it is least built for is the one it was designed for: it narrates for minutes, which is a job plus the event stream, and its audience is a first-time operator who is likelier to be in a browser than in a shell. |
+| `walkthrough` | `walkthrough` | none | Reachable in full, on the surface it was designed for: a first-time operator is likelier to be in a browser than in a shell. It is a job plus the stream — the report at the end is what the name is redeemed for, and each step goes down the stream the moment it is true, because a walk read back afterwards is a report and the operator would have learned what happened rather than watched it happen. The step goes down whole rather than as a sentence: the words are the core's own, and rendering them into a line for the browser would be a second copy of the walk's prose beside the one the terminal draws. Naming nothing is a request rather than an omission, and is offered as one. The terminal has no form of it. |
 | `explain` | `/api/explain` | glossary | Reachable in full, and the one read that needs neither a stack nor a daemon: the words are a table compiled into the binary, so a browser meeting one in a failure can ask what it means while the thing that failed is still down. One endpoint over two commands, the way `forms` is: naming a word explains that one, naming none lists what there is to ask about — which a caller that has never met this vocabulary needs before it can name anything. Served rather than shipped; a second copy of the table in the web app would be a surface explaining a word its own way. The terminal offers it on `?`, over the words on the screen. |
 | `stuck` | `/api/stuck` | dashboard, partial | Served on the web, which is where the dashboard's own "N stuck" figure lands: each entry is named the way `/api/trace` is asked, so the count leads somewhere. The terminal's panel lists them and offers no way to follow one. |
 | `seed` | `seed` | none | Offered on the web. No terminal form, like every other write. |
@@ -82,10 +82,13 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, sixteen reach the web in full, seven reach it in
-part, two do not reach it at all, and one — `ui` — is an honest exception. Nine
+Of the twenty-six requests, nineteen reach the web in full, six reach it in
+part, zero do not reach it at all, and one — `ui` — is an honest exception. Six
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
+
+Nothing is now wholly out of a browser's reach. What is left is the six requests
+reachable in part, each of which loses an argument rather than the request.
 
 These four numbers are read back from the table above by the guard, because a
 version of this paragraph said ten and five where the rows said eleven and four,
@@ -109,11 +112,17 @@ the server can write is a path a browser must not supply. A capture takes none, 
 bundle goes where lemonfiber keeps its own files, and a restore reads one of the
 archives in the backups directory by the name it was written under.
 
-**A long or streaming action is not a different action.** `logs --follow` and
-`watch` run for minutes and produce lines rather than a value, and the web already
-has both halves of the answer: a job name for work that outlives a request, and an
-event stream for what it says while it runs. Delivery differs; the request does
-not.
+**A long or streaming action is not a different action.** `logs --follow`,
+`watch` and `walkthrough` run for minutes and produce lines rather than a value,
+and the web already had both halves of the answer: a job name for work that
+outlives a request, and an event stream for what it says while it runs. Delivery
+differs; the request does not. All three are offered now, and what building them
+took from that argument is the half it did not state: a job name is only the whole
+answer if it can be given back. A terminal ends what it is running by interrupting
+it and a browser has nothing to interrupt with, so the name it was answered with is
+the handle — released, and the work ends where a shell's own interruption would
+have left it. That is a property of the name rather than of any one of the three,
+which is why it is one verb on the job rather than three actions.
 
 **A read is not exempt from a requirement about actions.** Reading is most of what
 an operator asks for, and a surface that could not say what is running would be
@@ -206,10 +215,13 @@ One thing still weakens "reachable from the web" for every long-running action, 
 it is not a row here because it is not a request:
 
 - **Narration carries no job's name.** `events::saying::Saying` puts a wait's own
-  words on the stream, and the context it says them through belongs to the run
-  rather than to a job, so two actions running at once are narrated into one
-  undifferentiated line of talk. What each one *came to* is asked for by name at
-  `/api/jobs/<name>`; what it is saying on the way there is anonymous.
+  words on the stream and `events::stepping::Stepping` puts a walk's steps there,
+  and the context both say them through belongs to the run rather than to a job, so
+  two actions running at once are narrated into one undifferentiated line of talk.
+  A followed service's lines are the one narration that says whose they are, and
+  they say the service rather than the job. What each piece of work *came to* is
+  asked for by name at `/api/jobs/<name>`; what it is saying on the way there is
+  anonymous.
 
 ## Related
 

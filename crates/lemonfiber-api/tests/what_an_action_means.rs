@@ -17,9 +17,10 @@ use axum::http::{header, StatusCode};
 use lemonfiber_api::actions;
 use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Refused, OFFERED, TAKES_AGREEMENT,
-    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_FORMS, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES,
-    TAKES_SETTING,
+    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_FORMS, TAKES_ITEM, TAKES_PRESET, TAKES_SERVICE,
+    TAKES_SERVICES, TAKES_SETTING,
 };
+use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
@@ -30,7 +31,7 @@ use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::quality::Preset;
-use lemonfiber_fixtures::ports::{Chance, Idle};
+use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 
 /// Nothing named, which is what most actions are asked with.
 fn nothing() -> Arguments {
@@ -90,10 +91,64 @@ fn a_name_this_surface_does_not_offer_is_refused_rather_than_invented() {
 fn a_read_is_not_an_action() {
     // Asking what the stack is doing is a read with an endpoint of its own, and
     // a write surface that also answered it would be two ways to ask one thing.
-    for read in ["status", "ps", "trace", "household", "stuck", "config-get"] {
+    // `logs` is here too, and it is the one worth stating: following runs for
+    // minutes and is answered with a name like an action, but it is still the read
+    // it always was, so it is asked for at the endpoint that already answers it.
+    for read in [
+        "status",
+        "ps",
+        "trace",
+        "household",
+        "stuck",
+        "config-get",
+        "logs",
+    ] {
         assert!(
             matches!(refusal(read, nothing()), Some(Refused::Unknown { .. })),
             "{read} is a read"
+        );
+    }
+}
+
+#[test]
+fn a_guard_reaches_the_command_and_the_forms_it_will_stop() {
+    assert_eq!(
+        command("watch", naming("tv")),
+        Some(Command::Watch {
+            forms: vec!["tv".to_owned()]
+        })
+    );
+}
+
+#[test]
+fn a_walk_reaches_the_command_and_the_one_thing_it_was_told_to_add() {
+    let given = Arguments {
+        item: Some("Sintel".to_owned()),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        command("walkthrough", given),
+        Some(Command::Walkthrough {
+            item: Some("Sintel".to_owned())
+        })
+    );
+}
+
+#[test]
+fn a_walk_told_nothing_in_particular_asks_to_be_suggested_something() {
+    // Naming nothing is a request rather than an omission, and a field sent blank
+    // asks the same thing as one left out — so a browser that renders an empty box
+    // cannot turn a request into a walk for a title that is one space.
+    for given in [
+        nothing(),
+        Arguments {
+            item: Some("  ".to_owned()),
+            ..Arguments::default()
+        },
+    ] {
+        assert_eq!(
+            command("walkthrough", given),
+            Some(Command::Walkthrough { item: None })
         );
     }
 }
@@ -240,8 +295,11 @@ fn stopping_named_services_is_a_different_request_from_tearing_a_form_down() {
 }
 
 #[test]
-fn the_three_actions_that_must_be_told_what_to_act_on_say_so() {
-    for action in ["switch", "restart", "pull"] {
+fn the_four_actions_that_must_be_told_what_to_act_on_say_so() {
+    // A guard is one of them for a different reason from the other three: not that
+    // the request has lost its subject, but that a watch with nothing to stop would
+    // see the drive vanish and have nothing to do about it.
+    for action in ["switch", "restart", "pull", "watch"] {
         assert_eq!(
             refusal(action, nothing()),
             Some(Refused::Missing {
@@ -398,6 +456,7 @@ fn exactly_what(action: &str) -> Arguments {
             Vec::new()
         },
         confirm: takes(TAKES_AGREEMENT),
+        item: takes(TAKES_ITEM).then(|| ITEM.to_owned()),
     }
 }
 
@@ -408,6 +467,9 @@ const ARCHIVE: &str = "lemonfiber-full-1700000000.tar.gz";
 /// command carrying the default cannot pass for one carrying what was given.
 const LOGS: u32 = 12;
 
+/// One thing to walk end to end, named the way somebody would say it.
+const ITEM: &str = "Sintel";
+
 /// Whether the command has the forms it was given in it.
 fn carries_forms(command: &Command) -> bool {
     match command {
@@ -415,6 +477,7 @@ fn carries_forms(command: &Command) -> bool {
         | Command::Down { forms }
         | Command::Switch { forms }
         | Command::Pull { forms }
+        | Command::Watch { forms }
         | Command::Halt { forms, .. }
         | Command::Restart { forms, .. } => !forms.is_empty(),
         _ => false,
@@ -575,6 +638,15 @@ fn give_reveal(given: &mut Arguments) {
     given.reveal = vec!["INDEXER_KEY".to_owned()];
 }
 
+/// Whether the command has the one thing it was told to add in it.
+fn carries_item(command: &Command) -> bool {
+    matches!(command, Command::Walkthrough { item: Some(named) } if named == ITEM)
+}
+
+fn give_item(given: &mut Arguments) {
+    given.item = Some(ITEM.to_owned());
+}
+
 /// One argument the carrier holds: its name, how to give it, and what it looks like
 /// to have arrived on the command the action reached.
 type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
@@ -585,7 +657,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 14] = [
+const SWEEPS: [Sweep; 15] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("service", give_service, carries_service),
@@ -600,6 +672,7 @@ const SWEEPS: [Sweep; 14] = [
     ("filenames", give_filenames, carries_filenames),
     ("reveal", give_reveal, carries_reveal),
     ("confirm", give_agreement, carries_agreement),
+    ("item", give_item, carries_item),
 ];
 
 /// Every offered action given one argument on top of what it takes, gathering what
@@ -662,6 +735,7 @@ fn every_argument_the_carrier_holds_is_swept() {
         "filenames",
         "reveal",
         "confirm",
+        "item",
     ];
     let swept: Vec<&str> = SWEEPS.iter().map(|(argument, _, _)| *argument).collect();
     assert_eq!(swept, held);
@@ -731,7 +805,17 @@ fn choosing_for_music_takes_the_agreement_and_drops_it_as_the_command_line_does(
 
 #[test]
 fn an_action_reaching_the_engine_is_answered_with_a_name_for_the_work() {
-    for action in ["up", "down", "switch", "restart", "pull", "seed", "adopt"] {
+    for action in [
+        "up",
+        "down",
+        "switch",
+        "restart",
+        "pull",
+        "seed",
+        "adopt",
+        "watch",
+        "walkthrough",
+    ] {
         // Given what each takes: seeding and adopting are whole-stack requests and
         // refuse a form, so naming one would be refused rather than answered.
         let Some(command) = command(action, exactly_what(action)) else {
@@ -800,6 +884,7 @@ fn routed(random: Chance) -> axum::Router {
         token: Arc::new(token),
         bound: ([127, 0, 0, 1], 8471).into(),
         jobs: Jobs::default(),
+        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     })
 }
 

@@ -11,14 +11,15 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{worth_offering, Ctx};
+use lemonfiber_core::app::{dispatch, worth_offering, Command, Ctx};
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::walkthrough::{Shape, Why};
 use lemonfiber_core::PRODUCT;
 
 use super::Surface;
+use crate::exit::{complain, settled as ended};
+use crate::render::render;
 use crate::say::say;
-use crate::walkthrough::walk;
 
 /// Offer the first-content walk, once the stack is up.
 ///
@@ -64,7 +65,23 @@ async fn ask(ctx: &Ctx, surface: &dyn Surface, shape: Shape, settled: ExitCode) 
         say!("Nothing lost — run `{PRODUCT} walkthrough` whenever you like.");
         return settled;
     }
-    walk(ctx, "", false).await
+    walked(ctx).await
+}
+
+/// Walk something, and report how it ended.
+///
+/// Nothing named: an operator who has just finished setup has an empty library, so
+/// the walk suggests something likely to work rather than being told what to try.
+/// Where each step is said is settled on the context this run was built with, which
+/// for setup is the terminal the offer was put on.
+async fn walked(ctx: &Ctx) -> ExitCode {
+    match dispatch(Command::Walkthrough { item: None }, ctx).await {
+        Ok(outcome) => {
+            render(&outcome, false);
+            ended(&outcome)
+        }
+        Err(problem) => complain(&problem),
+    }
 }
 
 /// Whether the operator wants the walk. Silence means yes: they are at the end of a setup
@@ -85,7 +102,7 @@ mod tests {
 
     use lemonfiber_core::docker::Condition;
 
-    use super::{offer, yes};
+    use super::{offer, walked, yes};
     use crate::setup::tests::{working_ctx, Scripted};
 
     /// The code setup would have exited with, had there been no offer.
@@ -191,5 +208,15 @@ mod tests {
         for answer in ["n", "no", "NO", "No"] {
             assert!(!yes(&Scripted::saying(true, &[answer])), "{answer}");
         }
+    }
+
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_is_complained_about_rather_than_reported() {
+        // Everything a walk meets is a walk that stopped, which is a report; only
+        // the stack itself failing to read is a problem, and a problem is said in
+        // the words every other failure is said in.
+        let mut ctx = working_ctx();
+        ctx.stack = lemonfiber_core::stack::Source::External(std::path::Path::new("/not-a-stack"));
+        assert_ne!(shown(walked(&ctx).await), shown(already_settled()));
     }
 }

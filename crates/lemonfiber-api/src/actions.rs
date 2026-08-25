@@ -10,9 +10,11 @@
 //! and a request that waited for it would tie the work to a connection. So those
 //! are answered with a name for the work instead, and the work runs somewhere the
 //! connection cannot reach — a browser tab closed mid-repair takes nothing with
-//! it. What that name is redeemed for lives in [`crate::jobs`]. An action that
-//! only reads and writes lemonfiber's own files is answered with its outcome,
-//! because it has already finished by the time a reply could be.
+//! it. What that name is redeemed for lives in [`crate::jobs`], and so does the
+//! other thing a name is for: a browser has no interruption to send, so releasing
+//! the name is how an action that would otherwise run all afternoon is stopped. An
+//! action that only reads and writes lemonfiber's own files is answered with its
+//! outcome, because it has already finished by the time a reply could be.
 //!
 //! No payload is serialised here. An envelope renders itself, and the same
 //! rendering answers the command line.
@@ -37,8 +39,8 @@ use crate::router::Serving;
 use crate::serve::{carrying, SENTENCE};
 
 pub use asked::{
-    Arguments, TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_FORMS, TAKES_PRESET,
-    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
+    Arguments, TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_FORMS, TAKES_ITEM,
+    TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
 };
 pub use named::{named, OFFERED};
 pub use refused::Refused;
@@ -121,8 +123,9 @@ async fn taken(
 /// Work that could not be named, and therefore was not begun.
 ///
 /// A job with no name is work nothing could ever be told about, so there is
-/// nothing here to fall back to.
-fn unnameable() -> Response {
+/// nothing here to fall back to. Shared with the one long-running request that is
+/// asked for as a read, because a name it cannot mint stops it in the same way.
+pub(crate) fn unnameable() -> Response {
     carrying(
         StatusCode::INTERNAL_SERVER_ERROR,
         SENTENCE,

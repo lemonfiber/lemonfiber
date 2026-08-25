@@ -77,6 +77,19 @@ impl Live {
         event
     }
 
+    /// Say one thing, where there was one to say.
+    ///
+    /// Rendering answers with an absence for a payload that will not serialise, and
+    /// what to do about it is one decision rather than one per narrator: an
+    /// envelope that cannot be rendered is not sent, rather than sent as something
+    /// else. Taken here so a caller hands over what rendering gave it and nothing
+    /// more.
+    pub async fn say_if_rendered(&self, said: Option<Rendered>) {
+        if let Some(said) = said {
+            self.say(said).await;
+        }
+    }
+
     /// Listen, having last seen `seen`.
     pub async fn listening(&self, seen: Option<&str>) -> Listening {
         let backlog = self.backlog.lock().await;
