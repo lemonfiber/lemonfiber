@@ -117,7 +117,7 @@ impl Change {
 }
 
 /// A single reversal, for the surface to carry out.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Undo {
     /// The service or file to reverse it against.
     pub target: String,
@@ -126,7 +126,11 @@ pub struct Undo {
 }
 
 /// What an undo does.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Tagged by what it does rather than by the field it sits in, so a reader parsing
+/// one branches on a word rather than on which keys are present.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(tag = "does", rename_all = "snake_case")]
 pub enum Action {
     /// Remove the resource that was created.
     Remove {
@@ -496,5 +500,60 @@ mod tests {
             let read = serde_json::from_str::<Change>(&line).ok();
             assert_eq!(read.as_ref(), Some(&change), "{line}");
         }
+    }
+
+    /// A reversal is read by a surface that never touches this machine, so its wire
+    /// shape is pinned here rather than left to whatever a derive happens to write.
+    ///
+    /// All four, because each carries different keys and a reader branches on the
+    /// word rather than on which of them are present.
+    #[test]
+    fn every_reversal_writes_itself_as_what_it_does() {
+        let written = |action: Action| {
+            serde_json::to_string(&Undo {
+                target: "qbittorrent".to_owned(),
+                action,
+            })
+            .unwrap_or_default()
+        };
+
+        assert_eq!(
+            written(Action::Restore {
+                key: "PORT".to_owned(),
+                value: Some("8080".to_owned()),
+            }),
+            r#"{"target":"qbittorrent","action":{"does":"restore","key":"PORT","value":"8080"}}"#
+        );
+        // Nothing there before, so putting it back means taking it away again — said
+        // as an absent value rather than as a missing key.
+        assert_eq!(
+            written(Action::Restore {
+                key: "PORT".to_owned(),
+                value: None,
+            }),
+            r#"{"target":"qbittorrent","action":{"does":"restore","key":"PORT","value":null}}"#
+        );
+        assert_eq!(
+            written(Action::Remove {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+            }),
+            r#"{"target":"qbittorrent","action":{"does":"remove","resource":"downloadclient","id":"7"}}"#
+        );
+        assert_eq!(
+            written(Action::Delete {
+                path: "/srv/media".to_owned(),
+            }),
+            r#"{"target":"qbittorrent","action":{"does":"delete","path":"/srv/media"}}"#
+        );
+        assert_eq!(
+            written(Action::Reconfigure {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+                field: "port".to_owned(),
+                value: Some("8080".to_owned()),
+            }),
+            r#"{"target":"qbittorrent","action":{"does":"reconfigure","resource":"downloadclient","id":"7","field":"port","value":"8080"}}"#
+        );
     }
 }

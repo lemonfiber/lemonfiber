@@ -62,7 +62,7 @@ impl Stance {
 }
 
 /// One repair lemonfiber could carry out.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Repair {
     /// The check whose finding this answers, as the finding names it.
     pub check: String,
@@ -80,6 +80,48 @@ pub struct Repair {
     /// is not undoable and is usually right — but the operator confirming one deserves to
     /// know which kind they are agreeing to.
     pub reversible: bool,
+}
+
+/// What an offer was, in a form the consent given for it can name it by.
+///
+/// A checksum over every word an operator reads before agreeing — what each repair
+/// would do, what else changes if it does, whether it can be taken back, and the
+/// order they were offered in. Anything that would make the offer read differently
+/// makes this read differently, so consent given for one offer cannot be spent on
+/// another.
+///
+/// A surface whose consent crosses a request boundary sends this back with it, and
+/// the run that acts recomputes it from a fresh look. That is what a terminal gets
+/// for nothing by holding the question open in one process.
+///
+/// Not a secret and not a signature. It says which offer, not who agreed: this
+/// surface's admission is decided above it, once, for every request.
+#[must_use]
+pub fn agreement(offered: &[Repair]) -> String {
+    let mut hasher = crc32fast::Hasher::new();
+    for repair in offered {
+        for word in [
+            repair.check.as_str(),
+            repair.does.as_str(),
+            if repair.reversible {
+                "reversible"
+            } else {
+                "irreversible"
+            },
+        ] {
+            said(&mut hasher, word);
+        }
+        for effect in &repair.effects {
+            said(&mut hasher, effect);
+        }
+    }
+    format!("{:08x}", hasher.finalize())
+}
+
+/// One word of an offer, ended so that two words cannot run together into a third.
+fn said(hasher: &mut crc32fast::Hasher, word: &str) {
+    hasher.update(word.as_bytes());
+    hasher.update(&[0]);
 }
 
 /// What carrying out a repair did, as the mender that carried it out saw it.
@@ -141,7 +183,7 @@ impl Attempt {
 ///
 /// Deliberately not a boolean. "It ran" and "it worked" are different claims, and a model
 /// that cannot tell them apart will eventually report the first as the second.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "outcome")]
 pub enum Outcome {
     /// It ran, and the check now passes.
@@ -386,7 +428,8 @@ pub fn offered(repairs: &[Repair], conditions: &[&Condition]) -> Vec<Repair> {
 #[cfg(test)]
 mod tests {
     use super::{
-        escalation, exhausted, mendable, offerable, offered, Outcome, Repair, Stance, ATTEMPTS,
+        agreement, escalation, exhausted, mendable, offerable, offered, Outcome, Repair, Stance,
+        ATTEMPTS,
     };
     use crate::condition::{Condition, Fault};
     use crate::error::{Severity, State};
@@ -707,5 +750,88 @@ mod tests {
         );
         assert!(serde_json::to_string(&repair("vpn.up"))
             .is_ok_and(|json| json.contains(r#""check":"vpn.up""#)));
+    }
+
+    /// An offer names itself by every word an operator reads before agreeing, so a
+    /// change to any of them is a different offer.
+    ///
+    /// Each part on its own, because an agreement that ignored one of them would
+    /// let consent be spent on a repair whose statement had quietly changed — and
+    /// the one that matters most is what *else* changes if it goes ahead.
+    #[test]
+    fn an_offer_is_named_by_everything_that_was_read_before_agreeing() {
+        let one = Repair {
+            check: "vpn.port-forward-client".to_owned(),
+            does: "move the download client onto the forwarded port".to_owned(),
+            effects: vec!["transfers in flight pause briefly".to_owned()],
+            reversible: true,
+        };
+        let name = agreement(std::slice::from_ref(&one));
+
+        // The same offer, read twice, is the same offer.
+        assert_eq!(name, agreement(std::slice::from_ref(&one)));
+
+        let differing = [
+            Repair {
+                check: "vpn.killswitch".to_owned(),
+                ..one.clone()
+            },
+            Repair {
+                does: "restart the download client".to_owned(),
+                ..one.clone()
+            },
+            Repair {
+                effects: vec!["transfers in flight are cancelled".to_owned()],
+                ..one.clone()
+            },
+            Repair {
+                effects: Vec::new(),
+                ..one.clone()
+            },
+            Repair {
+                reversible: false,
+                ..one.clone()
+            },
+        ];
+        for other in differing {
+            assert_ne!(name, agreement(std::slice::from_ref(&other)), "{other:?}");
+        }
+
+        // Order is part of it: the same repairs read in another order were read in
+        // another order, and an offer is what was in front of somebody.
+        let second = Repair {
+            check: "vpn.killswitch".to_owned(),
+            ..one.clone()
+        };
+        assert_ne!(
+            agreement(&[one.clone(), second.clone()]),
+            agreement(&[second, one])
+        );
+    }
+
+    /// Two repairs whose words run together must not name the same offer as one
+    /// repair holding the joined text, which is what a checksum without ends does.
+    #[test]
+    fn two_words_do_not_run_together_into_a_third() {
+        let split = Repair {
+            check: "vpn".to_owned(),
+            does: "port".to_owned(),
+            effects: Vec::new(),
+            reversible: true,
+        };
+        let joined = Repair {
+            check: "vpnport".to_owned(),
+            does: String::new(),
+            effects: Vec::new(),
+            reversible: true,
+        };
+        assert_ne!(agreement(&[split]), agreement(&[joined]));
+    }
+
+    /// An offer of nothing still names itself, because agreeing to nothing out of
+    /// it is a thing somebody can do.
+    #[test]
+    fn an_offer_of_nothing_still_names_itself() {
+        assert!(!agreement(&[]).is_empty());
     }
 }

@@ -13,10 +13,12 @@
 //! of them a question.
 
 use lemonfiber_core::app::bundle::{Wanted, LINES};
+use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{Command, QualityAction};
 use lemonfiber_core::audio::Format;
+use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
@@ -46,6 +48,9 @@ pub const OFFERED: &[&str] = &[
     "restore",
     "watch",
     "walkthrough",
+    "repair",
+    "undo",
+    "accept",
 ];
 
 /// The actions that must be told what to act on.
@@ -90,6 +95,10 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         logs,
         filenames,
         reveal,
+        check,
+        disruptive,
+        offer,
+        agreed,
         confirm,
         item,
     } = given;
@@ -118,6 +127,28 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "adopt" => Ok(Command::Adopt),
         "reset" => Ok(Command::Reset { confirm }),
         "backup" => Ok(Command::Backup { service }),
+        // The offer and the yes are one action because they are one request read
+        // twice: unconfirmed it says what each repair would do and what else
+        // changes if it does, and confirmed it carries out what was agreed to.
+        "repair" => consent(confirm, offer, agreed).map(|consent| Command::Repair {
+            consent,
+            disruptive: disruptive.included(),
+        }),
+        // No subject at all. Which repair was last, what reversing it takes and
+        // which of those need a service to reach are the core's to decide, so
+        // there is nothing here for a caller to name.
+        "undo" => Ok(Command::Undo),
+        // Over the whole suite. Only something a run warns about can be answered,
+        // and a narrowed run is a run that may not have raised it — so what a
+        // browser narrows is the diagnosis it reads, not the warning it answers.
+        "accept" => match check {
+            Some(check) => Ok(Command::Doctor {
+                narrowing: Narrowing::Suite,
+                disruptive: disruptive.included(),
+                accept: Some(check),
+            }),
+            None => Err(needs("check")),
+        },
         // The bundle goes where lemonfiber keeps its own files. A browser has no
         // filesystem in front of it and no path it could name that would mean
         // anything here, so the destination is settled rather than asked for —
@@ -150,6 +181,37 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         _ => Err(Refused::Unknown {
             name: action.to_owned(),
         }),
+    }
+}
+
+/// What a repairing run was given consent for, or why it names none.
+///
+/// Three shapes, and the yes is what tells them apart. Without it the request is
+/// the offer itself, which changes nothing and is what an operator reads before
+/// deciding. With it and nothing else it is standing consent — the decision taken
+/// in advance the command line spells `--yes`, which is a thing somebody does
+/// deliberately rather than a default anybody falls into. With it and the offer it
+/// was read in, it is consent given to that offer, for the repairs it names.
+///
+/// The rest are refused rather than read charitably. An agreement that does not say
+/// which offer it answered cannot be checked against the offer that stands, and an
+/// offer nobody agreed to any of is consent that has lost its subject — and both,
+/// let through, would carry out a request nobody made.
+fn consent(confirm: bool, offer: Option<String>, agreed: Vec<String>) -> Result<Consent, Refused> {
+    let needs = |argument: &str| Refused::Missing {
+        action: "repair".to_owned(),
+        argument: argument.to_owned(),
+    };
+    match (confirm, offer, agreed.is_empty()) {
+        (false, None, true) => Ok(Consent::Offer),
+        (true, None, true) => Ok(Consent::Standing),
+        (true, Some(offer), false) => Ok(Consent::Given {
+            offer,
+            repairs: agreed,
+        }),
+        (true, Some(_), true) => Err(needs("agreed")),
+        (true, None, false) => Err(needs("offer")),
+        (false, _, _) => Err(needs("confirm")),
     }
 }
 

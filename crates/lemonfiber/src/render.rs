@@ -209,6 +209,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Lifecycle(report) => stack::lifecycle(report),
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),
+        Outcome::Repair(report) => repair::mended(report),
+        Outcome::Undo(report) => repair::reversed(&report.reversed),
         Outcome::Seed(report) => seed::seeding(report),
         Outcome::Reset(report) => stack::reset(report),
         Outcome::Wizard(report) => standing(report),
@@ -353,6 +355,7 @@ mod tests {
         answer, forms, logged, machine_readable, render, settings, standing, versions, Lines,
     };
     use lemonfiber_core::app::backup::Report as Capture;
+    use lemonfiber_core::app::repair::{Report as Mending, Reversal};
     use lemonfiber_core::app::restore::{Preview, Restoration};
     use lemonfiber_core::app::support::Bundle;
     use lemonfiber_core::app::Outcome;
@@ -680,6 +683,10 @@ mod tests {
                 },
                 done: None,
             }),
+            // Nothing offered and nothing put back: what a machine with nothing wrong
+            // answers, which is also the pair with no list in either.
+            Outcome::Repair(Mending::default()),
+            Outcome::Undo(Reversal::default()),
         ];
         // Every arm of the dispatch renders something, and every one of them also
         // renders as an envelope a script can parse.

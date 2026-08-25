@@ -7,15 +7,14 @@ use lemonfiber_core::app::repair::Report;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::repair::{Outcome, ASK_FOR_REPAIRS};
 
-use super::{Lines, UNRENDERABLE};
+use super::Lines;
 
 /// What was offered and what was done about it.
-pub(crate) fn mended(report: &Report, json: bool) -> Lines {
+///
+/// For a person only. What a parser reads is the envelope every other answer is
+/// rendered into, which is the one both surfaces put on the wire.
+pub(crate) fn mended(report: &Report) -> Lines {
     let mut lines = Lines::default();
-    if json {
-        lines.put(serde_json::to_string(report).unwrap_or(UNRENDERABLE.to_owned()));
-        return lines;
-    }
     // Said first, because it is the one thing here the operator has to act on themselves.
     for beyond in &report.beyond {
         lines.put(format!(
@@ -48,12 +47,8 @@ pub(crate) fn mended(report: &Report, json: bool) -> Lines {
 }
 
 /// What was put back, or that there was nothing to put back.
-pub(crate) fn reversed(undos: &[Undo], json: bool) -> Lines {
+pub(crate) fn reversed(undos: &[Undo]) -> Lines {
     let mut lines = Lines::default();
-    if json {
-        lines.put(format!(r#"{{"reversed":{}}}"#, undos.len()));
-        return lines;
-    }
     if undos.is_empty() {
         lines.put("There is no repair to put back.");
         return lines;
@@ -110,7 +105,7 @@ fn said(outcome: &Outcome) -> String {
 mod tests {
     use lemonfiber_core::app::repair::{Beyond, Mended, Report};
     use lemonfiber_core::error::Remedy;
-    use lemonfiber_core::repair::{Outcome, Repair};
+    use lemonfiber_core::repair::{agreement, Outcome, Repair};
 
     use super::{mended, reversed};
     use lemonfiber_core::journal::{Action, Undo};
@@ -136,6 +131,7 @@ mod tests {
     fn report(acted: bool, outcomes: Vec<Outcome>) -> Report {
         Report {
             offered: vec![repair()],
+            agreement: agreement(&[repair()]),
             beyond: Vec::new(),
             mended: outcomes
                 .into_iter()
@@ -152,7 +148,7 @@ mod tests {
     /// list that reads as a command that did not work.
     #[test]
     fn nothing_to_mend_is_said_rather_than_shown_as_nothing() {
-        let text = mended(&Report::default(), false).text();
+        let text = mended(&Report::default()).text();
         assert!(
             text.contains("nothing here lemonfiber can put right"),
             "{text}"
@@ -162,7 +158,7 @@ mod tests {
     /// A run that only looked says what could be done and that it did none of it.
     #[test]
     fn a_run_that_only_looked_says_so() {
-        let text = mended(&report(false, Vec::new()), false).text();
+        let text = mended(&report(false, Vec::new())).text();
         assert!(text.contains("could be put right"), "{text}");
         assert!(text.contains("Nothing has been changed"), "{text}");
         assert!(text.contains("--fix"), "{text}");
@@ -172,21 +168,18 @@ mod tests {
     /// point of asking the check again, so the report never blurs the two.
     #[test]
     fn every_outcome_reads_as_what_it_was() {
-        let text = mended(
-            &report(
-                true,
-                vec![
-                    Outcome::Fixed,
-                    Outcome::FixFailed,
-                    Outcome::Declined,
-                    Outcome::WouldOverwrite,
-                    Outcome::Stopped {
-                        leaving: "the client on its old port".to_owned(),
-                    },
-                ],
-            ),
-            false,
-        )
+        let text = mended(&report(
+            true,
+            vec![
+                Outcome::Fixed,
+                Outcome::FixFailed,
+                Outcome::Declined,
+                Outcome::WouldOverwrite,
+                Outcome::Stopped {
+                    leaving: "the client on its old port".to_owned(),
+                },
+            ],
+        ))
         .text();
 
         assert!(text.contains("fixed —"), "{text}");
@@ -208,11 +201,12 @@ mod tests {
     fn a_fault_past_repairing_is_named_with_somewhere_to_go() {
         let past = Report {
             offered: Vec::new(),
+            agreement: agreement(&[]),
             mended: Vec::new(),
             beyond: vec![beyond()],
             acted: false,
         };
-        let text = mended(&past, false).text();
+        let text = mended(&past).text();
 
         assert!(text.contains("has outlasted every repair"), "{text}");
         assert!(text.contains("support bundle"), "{text}");
@@ -223,13 +217,6 @@ mod tests {
             !text.contains("nothing here lemonfiber can put right"),
             "{text}"
         );
-    }
-
-    /// A script reads the whole report, outcomes and all.
-    #[test]
-    fn the_machine_readable_form_carries_the_outcomes() {
-        let json = mended(&report(true, vec![Outcome::Fixed]), true).text();
-        assert!(json.contains(r#""outcome":"fixed""#), "{json}");
     }
 
     /// Every kind of reversal reads in the words of the thing it acted on, because "undone"
@@ -284,7 +271,7 @@ mod tests {
             },
         ];
 
-        let said = reversed(&undos, false).text();
+        let said = reversed(&undos).text();
 
         assert!(said.contains("PORT back to 8080"), "{said}");
         assert!(said.contains("PROXY removed, as it was"), "{said}");
@@ -300,10 +287,10 @@ mod tests {
         );
     }
 
-    /// A run with nothing to put back says so, and says it in whichever form was asked for.
+    /// A run with nothing to put back says so, rather than showing an empty list that
+    /// reads as a command that did not work.
     #[test]
-    fn nothing_to_put_back_is_said_plainly_and_counted_for_a_script() {
-        assert!(reversed(&[], false).text().contains("no repair"));
-        assert!(reversed(&[], true).text().contains(r#""reversed":0"#));
+    fn nothing_to_put_back_is_said_plainly() {
+        assert!(reversed(&[]).text().contains("no repair"));
     }
 }

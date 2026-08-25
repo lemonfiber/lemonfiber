@@ -17,8 +17,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::repair::{mend, mending, Confirm, Report};
-use lemonfiber_core::app::Ctx;
+use lemonfiber_core::app::repair::{mend, mending, Confirm, Consent, Report};
+use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Check, Finding, Mend, Verdict};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
@@ -356,4 +356,34 @@ async fn a_stack_with_nothing_mendable_offers_nothing() {
     // Asked to act rather than only look, and still with nothing to act on.
     let acting = mend(&context, Stance::Unattended, false, &Always(true)).await;
     assert!(acting.is_ok_and(|report| report.mended.is_empty() && report.acted));
+}
+
+/// The offer, asked for the way every surface asks for it.
+///
+/// Through the dispatcher rather than through [`mend`] directly, because that is the
+/// one entry a browser and a command line both go in through — and from here as well
+/// as in-crate, for the reason at the top of this file.
+///
+/// Nothing is wrong on the machine running this that lemonfiber could put right, so
+/// what is being held is the shape of the answer: its own kind, and a run that acted
+/// on none of what it found.
+#[tokio::test]
+async fn a_dispatched_offer_answers_under_its_own_kind_and_acts_on_none_of_it() {
+    let json = dispatch(
+        Command::Repair {
+            consent: Consent::Offer,
+            disruptive: false,
+        },
+        &ctx("dispatched-offer").with_http(lemonfiber_fixtures::http::Fake::silent()),
+    )
+    .await
+    .ok()
+    .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+    .unwrap_or_default();
+
+    assert!(json.contains(r#""kind":"repair""#), "{json}");
+    assert!(json.contains(r#""acted":false"#), "{json}");
+    // The offer names itself on the way out, which is the whole of what consent
+    // crossing a request boundary has to be able to point at.
+    assert!(json.contains(r#""agreement":"#), "{json}");
 }

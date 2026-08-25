@@ -68,6 +68,8 @@ pub const PREVIEW: Kind = Kind("preview");
 pub const PULL: Kind = Kind("pull");
 /// The quality choice, what it means, and what a command did with it.
 pub const QUALITY: Kind = Kind("quality");
+/// What could be put right, and what became of the ones agreed to.
+pub const REPAIR: Kind = Kind("repair");
 /// What a full reset did, or would do.
 pub const RESET: Kind = Kind("reset");
 /// What a restore would overwrite, or what it put back.
@@ -87,6 +89,8 @@ pub const STEP: Kind = Kind("step");
 pub const STUCK: Kind = Kind("stuck");
 /// Where one item is in the pipeline.
 pub const TRACE: Kind = Kind("trace");
+/// What putting back the last repair came to.
+pub const UNDO: Kind = Kind("undo");
 /// What upgrading existing content did, or would do.
 pub const UPGRADE: Kind = Kind("upgrade");
 /// The versions in play: the binary, and the stack it operates.
@@ -118,6 +122,7 @@ pub const ALL: &[Kind] = &[
     PREVIEW,
     PULL,
     QUALITY,
+    REPAIR,
     RESET,
     RESTORE,
     SEED,
@@ -127,6 +132,7 @@ pub const ALL: &[Kind] = &[
     STEP,
     STUCK,
     TRACE,
+    UNDO,
     UPGRADE,
     VERSION,
     WALKTHROUGH,

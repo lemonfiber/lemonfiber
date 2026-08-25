@@ -3361,6 +3361,239 @@
         }
       }
     },
+    "repair": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Report"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Beyond": {
+          "description": "A repair that has run out of chances, and where to go instead.",
+          "type": "object",
+          "properties": {
+            "check": {
+              "description": "The check whose fault has outlasted every attempt at it.",
+              "type": "string"
+            },
+            "remedy": {
+              "description": "What to do about it now that lemonfiber has stopped offering to.",
+              "$ref": "#/$defs/Remedy"
+            }
+          },
+          "required": [
+            "check",
+            "remedy"
+          ]
+        },
+        "Mended": {
+          "description": "One repair, and what became of it.",
+          "type": "object",
+          "properties": {
+            "outcome": {
+              "description": "How it turned out, once the check was asked again.",
+              "$ref": "#/$defs/Outcome"
+            },
+            "repair": {
+              "description": "What was proposed.",
+              "$ref": "#/$defs/Repair"
+            }
+          },
+          "required": [
+            "repair",
+            "outcome"
+          ]
+        },
+        "Outcome": {
+          "description": "How a repair turned out, once the check that raised the finding has been asked again.\n\nDeliberately not a boolean. \"It ran\" and \"it worked\" are different claims, and a model\nthat cannot tell them apart will eventually report the first as the second.",
+          "oneOf": [
+            {
+              "description": "It ran, and the check now passes.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "fixed"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "It ran, and the check still fails.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "fix_failed"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "It stopped partway, leaving this.\n\nNamed precisely rather than as \"failed\": a half-applied change is a different\nstate to be in from an unchanged one, and the operator has to know which they are\nlooking at before they try anything else.",
+              "type": "object",
+              "properties": {
+                "leaving": {
+                  "description": "What the machine is now in, said plainly.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "stopped"
+                }
+              },
+              "required": [
+                "outcome",
+                "leaving"
+              ]
+            },
+            {
+              "description": "Not carried out, because the operator said no.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "declined"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "Refused, because it would have written over something changed by hand.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "would_overwrite"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            }
+          ]
+        },
+        "Remedy": {
+          "description": "One thing the operator can do about a problem.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "The action, phrased as something to do rather than something to know.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where to look, when that helps.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        "Repair": {
+          "description": "One repair lemonfiber could carry out.",
+          "type": "object",
+          "properties": {
+            "check": {
+              "description": "The check whose finding this answers, as the finding names it.",
+              "type": "string"
+            },
+            "does": {
+              "description": "What it would do, in the words the operator will read before confirming.",
+              "type": "string"
+            },
+            "effects": {
+              "description": "What else changes if it does.\n\nStated before it is confirmed and never afterwards, because an effect an operator\nlearns about after the fact is not something they agreed to. Empty where a repair\ntouches nothing but the thing it names.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "reversible": {
+              "description": "Whether carrying it out is recorded well enough to be undone.\n\nA repair that cannot be reversed is still worth offering — restarting a container\nis not undoable and is usually right — but the operator confirming one deserves to\nknow which kind they are agreeing to.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "check",
+            "does",
+            "effects",
+            "reversible"
+          ]
+        },
+        "Report": {
+          "description": "What a repairing run offered, and what it did.",
+          "type": "object",
+          "properties": {
+            "acted": {
+              "description": "Whether this run was allowed to act at all.",
+              "type": "boolean"
+            },
+            "agreement": {
+              "description": "What this offer is, so consent given for it can name which offer it read.\n\nCarried on every report rather than only on the ones that offer something: a\nsurface that has to look for it is a surface that can fail to find it, and an\noffer of nothing is still an offer somebody may agree to nothing of.",
+              "type": "string"
+            },
+            "beyond": {
+              "description": "What has been tried too often to keep offering.\n\nSaid rather than passed over. A repair that quietly stopped being offered leaves\nthe operator watching a fault nobody mentions any more, which is worse than being\ntold plainly that this is past what lemonfiber can work out.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Beyond"
+              }
+            },
+            "mended": {
+              "description": "What was carried out, in the order it was.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Mended"
+              }
+            },
+            "offered": {
+              "description": "What could be put right, whether or not it was.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Repair"
+              }
+            }
+          },
+          "required": [
+            "offered",
+            "agreement",
+            "mended",
+            "beyond",
+            "acted"
+          ]
+        }
+      }
+    },
     "reset": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -4863,6 +5096,175 @@
           "required": [
             "stage",
             "service"
+          ]
+        }
+      }
+    },
+    "undo": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Reversal"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Action": {
+          "description": "What an undo does.\n\nTagged by what it does rather than by the field it sits in, so a reader parsing\none branches on a word rather than on which keys are present.",
+          "oneOf": [
+            {
+              "description": "Remove the resource that was created.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "remove"
+                },
+                "id": {
+                  "description": "The identifier to remove.",
+                  "type": "string"
+                },
+                "resource": {
+                  "description": "The kind of resource.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "resource",
+                "id"
+              ]
+            },
+            {
+              "description": "Restore a value, or remove it where there was none before (`None`).",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "restore"
+                },
+                "key": {
+                  "description": "The setting to restore.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "What to restore it to, or `None` to remove it.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "does",
+                "key"
+              ]
+            },
+            {
+              "description": "Remove a path that was created.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "delete"
+                },
+                "path": {
+                  "description": "The path to remove.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "path"
+              ]
+            },
+            {
+              "description": "Put one field of a service's own resource back to what it held.\n\nThe only reversal that needs the service itself: the value lives inside it,\nand nothing on the host can write it. A reversal that cannot reach the\nservice says so rather than reporting the field restored.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "reconfigure"
+                },
+                "field": {
+                  "description": "The field to put back.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The identifier to change.",
+                  "type": "string"
+                },
+                "resource": {
+                  "description": "The kind of resource.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "What to put back, or `None` where it held nothing.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "does",
+                "resource",
+                "id",
+                "field"
+              ]
+            }
+          ]
+        },
+        "Reversal": {
+          "description": "What putting back the last repair came to.\n\nA report rather than a bare list, because it is what an envelope carries and an\nenvelope carries a document. The list is the whole of it: what went back, and\nagainst what.",
+          "type": "object",
+          "properties": {
+            "reversed": {
+              "description": "What was put back, in the order it was.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Undo"
+              }
+            }
+          },
+          "required": [
+            "reversed"
+          ]
+        },
+        "Undo": {
+          "description": "A single reversal, for the surface to carry out.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "What reversing it does.",
+              "$ref": "#/$defs/Action"
+            },
+            "target": {
+              "description": "The service or file to reverse it against.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "action"
           ]
         }
       }
