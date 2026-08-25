@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 use crate::alert::{Appetite, Wants};
 use crate::config::paths::Paths;
 use crate::config::store;
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Change, Journal, Kind};
 use crate::stack::{self, Source};
 use crate::wizard::{Phase, Wizard};
@@ -257,6 +257,7 @@ fn not_reviewed() -> Problem {
         "Applying writes the answers to disk, so it runs only once they are all gathered and confirmed. Nothing has been written.",
         Remedy::new("Answer every question, then confirm the review before applying"),
     )
+    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

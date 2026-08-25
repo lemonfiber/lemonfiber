@@ -21,7 +21,7 @@ use crate::alert::Appetite;
 use crate::app::apply;
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Amiss, Code, Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::stack::Source;
@@ -369,6 +369,7 @@ fn does_not_apply(rejected: Rejected) -> Problem {
         "Setup only offers what applies where it runs, so the answer was not recorded. Nothing has been applied.",
         Remedy::new("Answer with a choice this platform offers"),
     )
+    .lies_in(Amiss::Asking)
     .with_detail(format!("{rejected:?}"))
 }
 

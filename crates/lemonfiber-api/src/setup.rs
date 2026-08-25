@@ -27,30 +27,16 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lemonfiber_core::app::{apply, dispatch, setup, Command, SetupAction};
-use lemonfiber_core::error::{Code, Problem};
+use lemonfiber_core::app::{dispatch, Command, SetupAction};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::wizard::Answer;
 
-use crate::read::enveloped;
+use crate::read::{enveloped, refusing};
 use crate::router::Serving;
 use crate::serve::{carrying, SENTENCE};
 
 /// What is said to a request whose body is not an answer.
 const NOT_AN_ANSWER: &str = "The body of this request is not one of setup's answers.";
-
-/// The problems a caller caused rather than this machine.
-///
-/// An answer this platform does not offer, a plan applied before every question
-/// had one, and a machine that is already set up are each a request that could
-/// never have worked, so a browser is told to change what it asked rather than to
-/// try again. Everything else setup can raise is this machine failing to write,
-/// which trying again may well fix.
-const ASKED_WRONGLY: [Code; 3] = [
-    setup::ALREADY_SET_UP,
-    setup::DOES_NOT_APPLY,
-    apply::NOT_REVIEWED,
-];
 
 /// The five requests setup is walked with.
 pub fn routes() -> Router<Serving> {
@@ -102,23 +88,9 @@ async fn walked(serving: &Serving, action: SetupAction) -> Response {
     match dispatch(Command::Setup(action), &serving.ctx).await {
         Ok(outcome) => enveloped(StatusCode::OK, outcome.envelope().to_json()),
         Err(problem) => enveloped(
-            refused(&problem),
+            refusing(&problem),
             Envelope::new(kind::ERROR, &*problem).to_json(),
         ),
-    }
-}
-
-/// The status a refusal is answered with.
-///
-/// The body is the envelope either way — a caller that asked for something it
-/// could parse asked about the refusals most of all — so only the status tells
-/// the two apart, and the two are worth telling apart: a browser answered 500 for
-/// an answer this platform does not offer would retry what cannot succeed.
-fn refused(problem: &Problem) -> StatusCode {
-    if ASKED_WRONGLY.contains(&problem.code) {
-        StatusCode::BAD_REQUEST
-    } else {
-        StatusCode::INTERNAL_SERVER_ERROR
     }
 }
 

@@ -29,14 +29,14 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
-use lemonfiber_core::error::Problem;
+use lemonfiber_core::error::{Amiss, Problem};
 use lemonfiber_core::model::{kind, Envelope};
 
 use crate::reads::{named, Wanted};
 use crate::router::Serving;
 use crate::serve::{answered, carrying, SENTENCE};
 
-/// The status a command that could not be carried out is answered with.
+/// The status a read that this machine could not answer is refused with.
 ///
 /// The body is still the envelope, because a caller that asked for something it
 /// could parse asked about the failures most of all.
@@ -79,9 +79,39 @@ pub async fn carried_out(ctx: &Ctx, command: Command) -> Response {
 }
 
 /// The failure a command reported, in the envelope machine-readable output gives
-/// it.
+/// it, at the status the refusal warrants.
 pub(crate) fn went_wrong(problem: &Problem) -> Response {
-    enveloped(FAILED, Envelope::new(kind::ERROR, problem).to_json())
+    enveloped(
+        refusing(problem),
+        Envelope::new(kind::ERROR, problem).to_json(),
+    )
+}
+
+/// The status a refusal warrants.
+///
+/// The body is the envelope whichever it is — a caller that asked for something it
+/// could parse asked about the refusals most of all — so the status is the only
+/// thing that tells them apart, and they are worth telling apart: a browser
+/// answered 500 for a word this product does not explain would go on retrying
+/// what cannot succeed, and would have to word its message so as to be true of a
+/// broken stack as well.
+///
+/// Read from the problem rather than decided here. Which of these a code means is
+/// known where the code is raised and nowhere else; a list of codes kept on this
+/// side would be a second place to remember, and a code added later would answer
+/// wrongly until somebody thought to come back.
+///
+/// The two a caller can act on are told apart the way the write surface tells its
+/// own apart: what a request *named* and this product does not have is absent,
+/// and how a request *asked* is bad. Every surface that answers with a problem
+/// reads this one, so a single refusal cannot carry two statuses depending on
+/// which door it arrived through.
+pub(crate) const fn refusing(problem: &Problem) -> StatusCode {
+    match problem.amiss {
+        Amiss::Naming => StatusCode::NOT_FOUND,
+        Amiss::Asking => StatusCode::BAD_REQUEST,
+        Amiss::Answering => FAILED,
+    }
 }
 
 /// A rendered envelope as a response, at the status the answer warrants.

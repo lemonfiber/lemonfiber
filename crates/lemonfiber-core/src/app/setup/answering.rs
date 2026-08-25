@@ -23,7 +23,7 @@ use crate::app::targets::layout;
 use crate::app::Ctx;
 use crate::config::paths::Paths;
 use crate::config::store;
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{SettingReport, WizardReport};
 use crate::wizard::{offer_setup, Answer, Indexer, Progress, Provider, Status, Wizard};
 
@@ -166,6 +166,7 @@ fn already_set_up() -> Problem {
             .with_detail("lemonfiber config set <key> <value>"),
     )
     .in_state(State::Guided)
+    .lies_in(Amiss::Asking)
 }
 
 /// Raised when setup is answered on a machine that is already set up.

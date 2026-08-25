@@ -54,6 +54,30 @@ pub enum Severity {
     Critical,
 }
 
+/// Where a problem lies: in what a request named, in how it asked, or in the
+/// answering of it.
+///
+/// Nothing else here carries this. Severity is how much a problem matters and
+/// state is whether there is a remedy, and a word this product does not explain
+/// and a container engine that is not running can agree on both — so a surface
+/// holding only those two cannot tell a caller which of them it met. This is
+/// what tells them apart, and a surface that answers requests needs it: one of
+/// them is worth asking again, and the other never will be.
+///
+/// Not blame. Asking about a word with no entry is a reasonable thing to have
+/// done and the wording says so; where the answer would have to come from is a
+/// separate question from whose mistake it was.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Amiss {
+    /// The answering. Nothing about the request was wrong.
+    #[default]
+    Answering,
+    /// What the request named, which is not one of the things there are.
+    Naming,
+    /// How the request asked, which cannot be answered as it stands.
+    Asking,
+}
+
 /// Where a problem stands with respect to being fixed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -133,6 +157,15 @@ pub struct Problem {
     pub detail: Option<String>,
     /// The problem that produced this one, where several share a root.
     pub cause: Option<Box<Problem>>,
+    /// Where the problem lies.
+    ///
+    /// Not carried in the document. What a surface does with this is say it in
+    /// its own terms — a status, an exit code — and writing it into the body as
+    /// well would be the same fact stated twice, which is two things to keep
+    /// agreeing.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub amiss: Amiss,
 }
 
 impl Problem {
@@ -158,6 +191,7 @@ impl Problem {
             remedies: vec![remedy],
             detail: None,
             cause: None,
+            amiss: Amiss::Answering,
         }
     }
 
@@ -189,6 +223,18 @@ impl Problem {
     #[must_use]
     pub const fn in_state(mut self, state: State) -> Self {
         self.state = state;
+        self
+    }
+
+    /// Record where the problem lies, when it is not in the answering.
+    ///
+    /// Said at the point the problem is raised, because that is the only place
+    /// that knows. A surface reading the code afterwards would be keeping a
+    /// second list of which codes mean what, and a list kept away from the thing
+    /// it describes is a list that goes stale without anybody noticing.
+    #[must_use]
+    pub const fn lies_in(mut self, amiss: Amiss) -> Self {
+        self.amiss = amiss;
         self
     }
 
@@ -295,7 +341,7 @@ pub fn folded(problems: Vec<Problem>) -> Vec<Repeated> {
 
 #[cfg(test)]
 mod tests {
-    use super::{folded, Code, Diagnose, Problem, Remedy, Repeated, Severity, State};
+    use super::{folded, Amiss, Code, Diagnose, Problem, Remedy, Repeated, Severity, State};
 
     const TEST: Code = Code::new("TEST-1");
 
@@ -364,6 +410,39 @@ mod tests {
         assert_eq!(
             problem.cause.as_ref().map(|root| root.code.as_str()),
             Some("TEST-2")
+        );
+    }
+
+    #[test]
+    fn a_problem_lies_in_the_answering_until_it_says_otherwise() {
+        // The safe default: a surface told nothing reports that it could not
+        // answer, which is what it did.
+        assert_eq!(a_problem().amiss, Amiss::Answering);
+        assert_eq!(
+            Problem::unknown(TEST, Severity::Error, "Something broke", "Unclear").amiss,
+            Amiss::Answering
+        );
+    }
+
+    #[test]
+    fn where_a_problem_lies_is_recorded_beside_what_it_says() {
+        // Both halves matter: a problem that recorded the naming and lost its
+        // words would be a status with nothing to read behind it.
+        let named = a_problem().lies_in(Amiss::Naming);
+        assert_eq!(named.amiss, Amiss::Naming);
+        assert_eq!(named.summary, "Something broke");
+
+        assert_eq!(a_problem().lies_in(Amiss::Asking).amiss, Amiss::Asking);
+    }
+
+    #[test]
+    fn where_a_problem_lies_is_not_written_into_the_document() {
+        // A surface says this in its own terms — a status, an exit code — and the
+        // same fact in the body as well would be two things to keep agreeing.
+        let rendered = serde_json::to_string(&a_problem().lies_in(Amiss::Naming));
+        assert!(
+            rendered.is_ok_and(|json| !json.contains("amiss") && json.contains("Something broke")),
+            "the document is what it always was"
         );
     }
 
