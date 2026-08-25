@@ -20,7 +20,7 @@ pub use lemonfiber_manifest::Protocol;
 use thiserror::Error;
 
 use crate::config::Protocols;
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// What will be run, and what was left out.
 ///
@@ -301,7 +301,8 @@ impl Diagnose for Failure {
                 "A form says which part of the stack to run. Without one there is nothing to start.",
                 Remedy::new("Name a form, or list the ones this stack has")
                     .with_detail("lemonfiber forms"),
-            ),
+            )
+            .lies_in(Amiss::Asking),
             // The suggestion leads and the full list follows, because a typo is
             // the common case and reading eleven names to find the one you
             // already meant is work the tool can do.
@@ -326,14 +327,16 @@ impl Diagnose for Failure {
                     },
                 ))
                 .with_detail("lemonfiber forms"),
-            ),
+            )
+            .lies_in(Amiss::Naming),
             Self::NotComposable { form } => Problem::new(
                 FORMS_CONFLICT,
                 Severity::Error,
                 format!("{form} has to run on its own"),
                 "Most forms layer together. This one does not, because what it starts would conflict with the others rather than add to them.",
                 Remedy::new(format!("Run {form} by itself")),
-            ),
+            )
+            .lies_in(Amiss::Asking),
             // Not a failure of the stack or of the request: the operator asked
             // for something reasonable and has not finished setting up yet.
             Self::NothingLeft { forms } => Problem::new(

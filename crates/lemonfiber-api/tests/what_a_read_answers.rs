@@ -701,10 +701,28 @@ async fn a_word_this_product_does_not_explain_is_refused_rather_than_listed() {
     // there are, which is the same one the command line reports.
     let seen = asked(world(running(), stack()), "/api/explain?word=kubernetes").await;
     assert!(
-        seen.is_some_and(|(status, body)| status == StatusCode::INTERNAL_SERVER_ERROR
+        seen.is_some_and(|(status, body)| status == StatusCode::NOT_FOUND
             && body.starts_with(r#"{"api_version":1,"kind":"error","data":{"code":"WORD-1""#)
             && body.contains("indexer")),
         "a word with no entry is refused, with what there is instead"
+    );
+}
+
+#[tokio::test]
+async fn a_word_with_no_entry_is_not_said_the_way_a_stack_that_cannot_answer_is() {
+    // What this endpoint could not say before: a glossary reading `WORD-1` and an
+    // engine that is not there were one status, and a caller holding both had to
+    // write a sentence true of either.
+    let missing = asked(world(running(), stack()), "/api/explain?word=kubernetes").await;
+    let unanswered = asked(world(Reporting::absent(), stack()), "/api/logs").await;
+
+    assert_eq!(
+        missing.map(|(status, _)| status),
+        Some(StatusCode::NOT_FOUND)
+    );
+    assert_eq!(
+        unanswered.map(|(status, _)| status),
+        Some(StatusCode::INTERNAL_SERVER_ERROR)
     );
 }
 
@@ -715,9 +733,36 @@ async fn a_word_given_and_left_empty_named_a_word_rather_than_none() {
     // gets, and the reason the empty one is not read as having named nothing.
     let seen = asked(world(running(), stack()), "/api/explain?word=").await;
     assert!(
-        seen.is_some_and(|(status, body)| status == StatusCode::INTERNAL_SERVER_ERROR
-            && body.contains(r#""code":"WORD-1""#)),
+        seen.is_some_and(
+            |(status, body)| status == StatusCode::NOT_FOUND && body.contains(r#""code":"WORD-1""#)
+        ),
         "an empty word is refused rather than listed"
+    );
+}
+
+#[tokio::test]
+async fn a_form_this_stack_does_not_declare_is_refused_as_missing() {
+    // The same reading arrived at from a stack rather than from a compiled-in
+    // table: the form named is the whole of what was asked for, and there is no
+    // such form.
+    let seen = asked(world(running(), stack()), "/api/forms?form=nonsense").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::NOT_FOUND
+            && body.starts_with(r#"{"api_version":1,"kind":"error","data":{"code":"FORM-2""#)),
+        "a form the stack does not declare is missing, not a failure of this machine"
+    );
+}
+
+#[tokio::test]
+async fn narrowing_the_services_to_a_form_that_is_not_one_is_refused_as_missing() {
+    // Two reads take the same parameter, and a name that names nothing names
+    // nothing in both of them.
+    let seen = asked(world(running(), stack()), "/api/services?form=nonsense").await;
+    assert!(
+        seen.is_some_and(
+            |(status, body)| status == StatusCode::NOT_FOUND && body.contains(r#""code":"FORM-2""#)
+        ),
+        "the reading does not turn on which endpoint asked"
     );
 }
 
@@ -725,6 +770,9 @@ async fn a_word_given_and_left_empty_named_a_word_rather_than_none() {
 async fn a_command_that_could_not_be_carried_out_answers_with_the_failure() {
     // The envelope a failure gets under `--json`, because a caller that asked for
     // something it could parse asked about the failures most of all.
+    //
+    // Nothing about the request was wrong here, so it keeps the status that says
+    // so: a stack this machine cannot read is this machine's to fix.
     let seen = asked(world(running(), nowhere()), "/api/status").await;
     assert!(
         seen.is_some_and(|(status, body)| status == StatusCode::INTERNAL_SERVER_ERROR

@@ -29,7 +29,7 @@
 
 use serde::Serialize;
 
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Amiss, Code, Problem, Remedy, Severity};
 
 /// A word this product uses, and what somebody meeting it needs to know.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -282,6 +282,10 @@ pub fn vocabulary() -> Vocabulary {
 /// Through the error model rather than a bare line, so it carries a code and a way
 /// forward like every other refusal — and the way forward is the list itself, which
 /// is short enough to be the answer rather than a pointer at one.
+///
+/// It lies in the naming: the word is the whole of what was asked for, and there is
+/// no entry for it. A surface that reported this as its own failure would be telling
+/// a caller to try again at something that will never work.
 #[must_use]
 pub fn unrecognised(word: &str) -> Problem {
     let words: Vec<&str> = TERMS.iter().map(|term| term.word).collect();
@@ -294,6 +298,7 @@ pub fn unrecognised(word: &str) -> Problem {
          meaning nothing, and nothing is wrong with your stack.",
         Remedy::new("Ask about one of the words its reports use"),
     )
+    .lies_in(Amiss::Naming)
     .with_detail(format!("It explains these — {}.", words.join(", ")))
 }
 
