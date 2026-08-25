@@ -34,9 +34,6 @@ const CAME: &str = " what it came to ";
 /// What the box holding the questions calls itself.
 const ASK: &str = " ask ";
 
-/// What the box says while the stack is being asked what there is to act on.
-const ASKING: &str = "asking this stack what there is to act on";
-
 /// What the box says while a question is with the stack.
 const ANSWERING: &str = "waiting for this stack to answer";
 
@@ -58,7 +55,12 @@ const CHOOSING: &str = "up and down choose   enter goes on   esc leaves it";
 const AGREEING: &str = "y goes ahead   any other key changes nothing";
 
 /// What is said beside a running action, and what leaving does about it.
-const WAITING: &str = "still running   q stops watching, and the work goes on";
+///
+/// There is no daemon behind this screen. The process drawing it is the one that
+/// claimed the stack and issued the command, so leaving is not a tab being closed
+/// on a server that carries on: the screen goes at once, and the run stays until
+/// the action it started has finished and given the stack back.
+const WAITING: &str = "still running   q closes the screen and waits for it";
 
 /// A box over the screen: what it is called, and what it says.
 pub(crate) struct Pane {
@@ -77,10 +79,6 @@ pub(crate) struct Pane {
 pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
     match stage {
         Stage::Idle | Stage::Running { .. } => None,
-        Stage::Asking(offer) => Some(Pane {
-            title: titled(offer),
-            lines: vec![dimmed(ASKING, across)],
-        }),
         Stage::Choosing { offer, chooser } => Some(Pane {
             title: titled(offer),
             lines: choosing(chooser, rows, across),
@@ -126,6 +124,25 @@ pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
         _ => keys(),
     };
     dimmed(&said, across)
+}
+
+/// What a run leaving this screen now would stay for, or nothing where it may go.
+///
+/// Only an action. A read is with the core the same way and claims nothing, so a
+/// screen left with one outstanding has nothing to stay for — which is why this asks
+/// about [`Stage::Running`] and not about [`Stage::Waiting`].
+///
+/// Said on the ordinary terminal once the screen is given back, where there is room
+/// for the whole of it and no width to fit — so this is the one line here that goes
+/// through [`plain`] alone rather than through [`shortened`].
+pub(super) fn staying_for(stage: &Stage) -> Option<String> {
+    let Stage::Running { offer, chosen } = stage else {
+        return None;
+    };
+    Some(plain(&format!(
+        "waiting for {} {} to finish — leaving it now would leave the stack claimed",
+        offer.hint, chosen.name
+    )))
 }
 
 /// Every key this screen answers, in the order they are worth reading.
@@ -274,7 +291,7 @@ fn shortened(value: &str, room: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{elsewhere, footer, keys, pane, read, Offer, Stage};
+    use super::{elsewhere, footer, keys, pane, read, staying_for, Offer, Stage};
     use crate::acting::chooser::Chooser;
     use crate::acting::offer::{Choice, OFFERED};
     use crate::acting::question::{Needed, Question, HINT, KEY};
@@ -360,7 +377,9 @@ mod tests {
     }
 
     /// While something is running the footer says so, and says what leaving does —
-    /// which is the one thing an operator watching a teardown needs to know.
+    /// which is the one thing an operator watching a teardown needs to know. What it
+    /// must not say is that the work outlives the screen: the process drawing it is
+    /// the one carrying the work out.
     #[test]
     fn a_running_action_says_what_leaving_the_screen_does_about_it() {
         let stage = Stage::Running {
@@ -372,7 +391,42 @@ mod tests {
 
         assert!(said.contains("Full stack"), "{said}");
         assert!(said.contains("still running"), "{said}");
-        assert!(said.contains("the work goes on"), "{said}");
+        assert!(said.contains("closes the screen and waits"), "{said}");
+        assert!(!said.contains("the work goes on"), "{said}");
+    }
+
+    /// Leaving mid-action says which action is being waited on and why, because an
+    /// operator who pressed q and got a wait instead of a shell is owed both.
+    #[test]
+    fn leaving_mid_action_says_what_is_being_waited_on_and_why() {
+        let stage = Stage::Running {
+            offer: &A_START,
+            chosen: a_choice("Full stack", "everything"),
+        };
+
+        let said = staying_for(&stage).unwrap_or_default();
+
+        assert!(said.contains("start Full stack"), "{said}");
+        assert!(said.contains("leave the stack claimed"), "{said}");
+        assert!(
+            staying_for(&Stage::Idle).is_none(),
+            "nothing runs, nothing said"
+        );
+    }
+
+    /// A form's own name reaches an ordinary terminal here rather than a drawn row,
+    /// and a control character is an instruction to both.
+    #[test]
+    fn a_name_from_somewhere_else_is_made_safe_before_it_is_said() {
+        let stage = Stage::Running {
+            offer: &A_START,
+            chosen: a_choice("Full\u{1b}[2Jstack", "everything"),
+        };
+
+        let said = staying_for(&stage).unwrap_or_default();
+
+        assert!(!said.contains('\u{1b}'), "{said:?}");
+        assert!(said.contains("Full[2Jstack"), "{said}");
     }
 
     /// A running action draws no box, because the panels behind it are the report.
@@ -435,17 +489,6 @@ mod tests {
         assert!(said.contains("Start Full stack?"), "{said}");
         assert!(said.contains("everything, behind the tunnel"), "{said}");
         assert!(said.contains("any other key changes nothing"), "{said}");
-    }
-
-    #[test]
-    fn asking_the_stack_says_what_it_is_waiting_for() {
-        let said = said(&Stage::Asking(&A_START), 20, 80);
-
-        assert!(
-            said.contains("start"),
-            "the box is named for the action: {said}"
-        );
-        assert!(said.contains("asking this stack"), "{said}");
     }
 
     /// An answer says how to move through it, and counts what is off each end —
