@@ -22,12 +22,12 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use axum::Router;
-use lemonfiber_api::actions::Jobs;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::frontend as serving;
 use lemonfiber_api::guard::Token;
+use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::{self, Serving};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity, State as Standing};
@@ -327,10 +327,10 @@ mod tests {
     use axum::extract::Request;
     use axum::http::{HeaderValue, StatusCode};
     use axum::Router;
-    use lemonfiber_api::actions::Jobs;
     use lemonfiber_api::events::live::Live;
     use lemonfiber_api::events::Streaming;
     use lemonfiber_api::guard::Token;
+    use lemonfiber_api::jobs::Jobs;
     use lemonfiber_api::router::Serving;
     use lemonfiber_core::app::Ctx;
     use lemonfiber_core::config::Settings;

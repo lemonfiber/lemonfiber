@@ -10,10 +10,10 @@ use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
-use lemonfiber_api::actions::Jobs;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
+use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::read::enveloped;
 use lemonfiber_api::router::{routes, Serving};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
@@ -128,6 +128,63 @@ async fn as_the_command_renders_it(ctx: &Ctx, command: Command) -> Option<String
         .ok()
         .map(Outcome::envelope)
         .and_then(|envelope| envelope.to_json())
+}
+
+#[tokio::test]
+async fn what_the_stack_declares_is_the_envelope_the_command_renders() {
+    // The gap this read closed: the surface offers to start, stop and switch forms,
+    // and until this endpoint existed a caller had to already know their names.
+    let expected = as_the_command_renders_it(&world(running(), stack()), Command::Forms).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), "/api/forms").await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn the_forms_a_stack_declares_are_carried_in_their_own_envelope() {
+    // Written out rather than derived, so a second serialisation could not pass
+    // this by agreeing with itself.
+    let seen = asked(world(running(), stack()), "/api/forms").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"forms","data":{"forms":[{"#)
+            && body.contains(r#""id":"library""#)),
+        "every form the stack declares, under the forms kind"
+    );
+}
+
+#[tokio::test]
+async fn naming_a_form_says_what_starting_it_would_come_to() {
+    // One endpoint over two commands, because the command line spells the two with
+    // one word: naming none lists them, naming some resolves them.
+    let expected = as_the_command_renders_it(
+        &world(running(), stack()),
+        Command::Preview {
+            forms: vec!["library".to_owned()],
+        },
+    )
+    .await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), "/api/forms?form=library").await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn a_form_that_is_named_is_not_answered_with_the_whole_list() {
+    // The mistake the two commands exist to keep apart: a request that named a
+    // form and was handed the catalogue would look like it had been answered.
+    let seen = asked(world(running(), stack()), "/api/forms?form=library").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"preview""#)),
+        "a named form is resolved rather than listed"
+    );
 }
 
 #[tokio::test]

@@ -17,9 +17,9 @@ use axum::response::Response;
 use axum::Router;
 use lemonfiber_core::app::Ctx;
 
-use crate::actions::Jobs;
 use crate::events::Streaming;
 use crate::guard::Token;
+use crate::jobs::Jobs;
 use crate::serve::{admitted, refused};
 
 /// What every handler is given.
@@ -54,6 +54,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
     let endpoints = Router::new()
         .merge(crate::read::routes())
         .merge(crate::actions::routes())
+        .merge(crate::jobs::routes())
         .merge(crate::setup::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming));

@@ -9,16 +9,15 @@
 //! Driven from outside the crate, because what a caller can reach is the thing
 //! worth holding still.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::time::Duration;
 
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
 use lemonfiber_api::actions;
-use lemonfiber_api::actions::{
-    accepted, answering, declined, named, Answering, Arguments, Job, Jobs, Refused, OFFERED,
-};
+use lemonfiber_api::actions::{answering, declined, named, Answering, Arguments, Refused, OFFERED};
 use lemonfiber_api::guard::Token;
+use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::{Command, Ctx, QualityAction};
 use lemonfiber_core::config::Settings;
@@ -101,7 +100,7 @@ fn a_read_is_not_an_action() {
 }
 
 #[test]
-fn a_refusal_says_which_of_the_three_it_was() {
+fn a_refusal_says_which_of_the_four_it_was() {
     let said = [
         Refused::Unknown {
             name: "reticulate".to_owned(),
@@ -114,13 +113,37 @@ fn a_refusal_says_which_of_the_three_it_was() {
             argument: "preset".to_owned(),
             offered: "try balanced".to_owned(),
         },
+        Refused::Unwanted {
+            action: "down".to_owned(),
+            argument: "confirm".to_owned(),
+        },
     ];
+    let spoken: BTreeSet<String> = said.iter().map(Refused::said).collect();
     for refusal in &said {
         assert!(!refusal.said().is_empty(), "{refusal:?}");
     }
-    assert_eq!(said.len(), 3, "and each says something different");
-    assert_ne!(said[0].said(), said[1].said());
-    assert_ne!(said[1].said(), said[2].said());
+    assert_eq!(
+        spoken.len(),
+        said.len(),
+        "and each says something different"
+    );
+}
+
+#[test]
+fn a_name_this_surface_does_not_offer_is_absent_before_its_arguments_are_judged() {
+    // A name nothing answers to is the first thing wrong with such a request, and
+    // saying what its arguments should have been would be answering about an
+    // action that does not exist.
+    let given = Arguments {
+        confirm: true,
+        ..Arguments::default()
+    };
+    assert_eq!(
+        refusal("reticulate", given),
+        Some(Refused::Unknown {
+            name: "reticulate".to_owned()
+        })
+    );
 }
 
 #[test]
@@ -138,6 +161,14 @@ fn a_name_that_is_not_an_action_is_absent_and_a_bad_argument_is_a_mistake() {
         Refused::Missing {
             action: "pull".to_owned(),
             argument: "forms".to_owned()
+        }
+        .status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        Refused::Unwanted {
+            action: "down".to_owned(),
+            argument: "confirm".to_owned()
         }
         .status(),
         StatusCode::BAD_REQUEST
@@ -161,6 +192,33 @@ fn starting_and_stopping_take_the_forms_they_are_given() {
     assert_eq!(
         command("down", naming("tv")),
         Some(Command::Down {
+            forms: vec!["tv".to_owned()]
+        })
+    );
+}
+
+#[test]
+fn starting_named_services_is_refused_rather_than_answered_with_the_whole_form() {
+    // `--service` on a start never reaches a `Command`: the command line runs its
+    // own streamed start around it, so there is nothing here to hand them to.
+    // Dropped, they would start every service the form holds — the answer to a
+    // request nobody made — so they are refused instead, and the caller is told.
+    let given = Arguments {
+        forms: vec!["tv".to_owned()],
+        services: vec!["sonarr".to_owned()],
+        ..Arguments::default()
+    };
+    assert_eq!(
+        refusal("up", given),
+        Some(Refused::Unwanted {
+            action: "up".to_owned(),
+            argument: "services".to_owned()
+        })
+    );
+    // Naming none, it is the start it says it is.
+    assert_eq!(
+        command("up", naming("tv")),
+        Some(Command::Up {
             forms: vec!["tv".to_owned()]
         })
     );
@@ -303,6 +361,146 @@ fn an_argument_no_action_takes_is_refused_rather_than_ignored() {
     assert!(serde_json::from_str::<Arguments>("{}").is_ok());
 }
 
+// ── An argument reaches the commands that carry it, and no others ─────────────
+
+/// Whether the command has the operator's agreement in it.
+fn carries_agreement(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Quality(QualityAction::Set { confirm: true, .. })
+            | Command::QualityUpgrade { confirm: true }
+            | Command::Reset { confirm: true }
+    )
+}
+
+/// Whether the command has the services it was given in it.
+fn carries_services(command: &Command) -> bool {
+    match command {
+        Command::Halt { services, .. } | Command::Restart { services, .. } => !services.is_empty(),
+        _ => false,
+    }
+}
+
+/// Everything an action wants, so a refusal is about the argument under test
+/// rather than about a missing one.
+fn wanting() -> Arguments {
+    Arguments {
+        forms: vec!["tv".to_owned()],
+        key: Some("DATA_ROOT".to_owned()),
+        value: Some("/srv".to_owned()),
+        preset: Some("balanced".to_owned()),
+        ..Arguments::default()
+    }
+}
+
+/// Every offered action swept for one argument, gathering what is wrong.
+///
+/// The property rather than a second copy of the table: an action may accept an
+/// argument only if the command it reaches has somewhere to put it, and must refuse
+/// it by that name otherwise. An action that takes one and drops it is what this
+/// exists to catch, and dropping it is invisible from outside — the request is
+/// carried out, as something else.
+fn swept(argument: &str, given: &Arguments, carries: fn(&Command) -> bool) -> Vec<String> {
+    let mut wrong: Vec<String> = Vec::new();
+    for action in OFFERED {
+        match named(action, given.clone()) {
+            Ok(command) if carries(&command) => {}
+            Ok(command) => wrong.push(format!(
+                "{action} took `{argument}` and dropped it: {command:?}"
+            )),
+            Err(Refused::Unwanted {
+                argument: named, ..
+            }) if named == argument => {}
+            Err(refused) => wrong.push(format!(
+                "{action} was refused for something else: {refused:?}"
+            )),
+        }
+    }
+    wrong
+}
+
+#[test]
+fn agreement_is_taken_exactly_where_a_command_carries_it() {
+    let agreeing = Arguments {
+        confirm: true,
+        ..wanting()
+    };
+    let wrong = swept("confirm", &agreeing, carries_agreement);
+    assert!(wrong.is_empty(), "{wrong:?}");
+}
+
+#[test]
+fn named_services_are_taken_exactly_where_a_command_carries_them() {
+    // The sweep that would have caught `up`: it accepted the services it was given
+    // and started the whole form, and nothing said so.
+    let naming_services = Arguments {
+        services: vec!["sonarr".to_owned()],
+        ..wanting()
+    };
+    let wrong = swept("services", &naming_services, carries_services);
+    assert!(wrong.is_empty(), "{wrong:?}");
+}
+
+#[test]
+fn stopping_a_whole_stack_is_not_gated_the_way_a_reset_is() {
+    // A teardown removes what a form started and `up` puts it back, so there is no
+    // cost to agree to in advance, and the command line declares no such flag on
+    // it. The command it reaches carries no agreement at all.
+    assert_eq!(
+        command("down", naming("tv")),
+        Some(Command::Down {
+            forms: vec!["tv".to_owned()]
+        })
+    );
+    let agreed = Arguments {
+        forms: vec!["tv".to_owned()],
+        confirm: true,
+        ..Arguments::default()
+    };
+    assert_eq!(
+        refusal("down", agreed),
+        Some(Refused::Unwanted {
+            action: "down".to_owned(),
+            argument: "confirm".to_owned()
+        })
+    );
+}
+
+#[test]
+fn stopping_named_services_takes_no_agreement_either() {
+    let agreed = Arguments {
+        forms: vec!["tv".to_owned()],
+        services: vec!["sonarr".to_owned()],
+        confirm: true,
+        ..Arguments::default()
+    };
+    assert_eq!(
+        refusal("down", agreed),
+        Some(Refused::Unwanted {
+            action: "down".to_owned(),
+            argument: "confirm".to_owned()
+        })
+    );
+}
+
+#[test]
+fn choosing_for_music_takes_the_agreement_and_drops_it_as_the_command_line_does() {
+    // Picking an audio format is not a choice this host has to transcode for, so
+    // the agreement has nowhere to go — and `quality set --for music --confirm`
+    // drops it too. Refusing it here would make this surface the stricter of the
+    // two, which is the same divergence as offering something the other cannot.
+    let given = Arguments {
+        preset: Some("lossless".to_owned()),
+        media_type: Some("music".to_owned()),
+        confirm: true,
+        ..Arguments::default()
+    };
+    assert!(matches!(
+        command("quality-set", given),
+        Some(Command::QualityMusic { .. })
+    ));
+}
+
 // ── Which answers wait, and which are named and left to run ───────────────────
 
 #[test]
@@ -332,50 +530,6 @@ fn an_action_confined_to_our_own_files_is_answered_with_its_outcome() {
     assert_eq!(answering(&reapply), Answering::Now);
 }
 
-// ── A name for work that outlives the request ─────────────────────────────────
-
-#[test]
-fn a_job_is_the_bytes_the_machine_gave_written_as_one_word() {
-    let job = Job::mint(&Chance::exactly(Some(vec![0x00, 0x0f, 0xa5, 0xff])));
-    assert_eq!(
-        job.map(|job| job.as_str().to_owned()),
-        Some("000fa5ff".to_owned())
-    );
-}
-
-#[test]
-fn there_is_no_job_when_the_machine_will_not_say() {
-    assert!(Job::mint(&Chance::exactly(None)).is_none());
-}
-
-#[tokio::test]
-async fn an_accepted_job_is_named_so_the_stream_can_be_followed_for_it() {
-    let Some(job) = Job::mint(&Chance::cycling()) else {
-        unreachable!("cycling letters always supply bytes");
-    };
-    let response = accepted(&job, "up");
-
-    assert_eq!(response.status(), StatusCode::ACCEPTED);
-    assert_eq!(
-        response
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .map(AsRef::as_ref),
-        Some(b"application/json".as_slice())
-    );
-
-    let body = to_bytes(response.into_body(), usize::MAX).await;
-    let said = String::from_utf8(body.map(|bytes| bytes.to_vec()).unwrap_or_default());
-    let said = said.unwrap_or_default();
-    assert!(said.contains(r#""kind":"job""#), "{said}");
-    assert!(
-        said.contains(r#""api_version":1"#),
-        "the same envelope: {said}"
-    );
-    assert!(said.contains(job.as_str()), "the name to follow: {said}");
-    assert!(said.contains(r#""action":"up""#), "and what it was: {said}");
-}
-
 #[tokio::test]
 async fn a_declined_action_says_why_rather_than_answering_with_a_status_alone() {
     let refusal = Refused::Unknown {
@@ -388,7 +542,7 @@ async fn a_declined_action_says_why_rather_than_answering_with_a_status_alone() 
     assert_eq!(body.ok().as_deref(), Some(refusal.said().as_bytes()));
 }
 
-// ── Work that a closing connection cannot reach ───────────────────────────────
+// ── The route itself, driven without a socket ─────────────────────────────────
 
 /// A context that needs neither a stack on disk nor a daemon to answer.
 fn ctx() -> Ctx {
@@ -403,62 +557,6 @@ fn ctx() -> Ctx {
     )
     .with_random(Arc::new(Chance::cycling()))
 }
-
-/// Where a job got to, once it has had the chance to get anywhere.
-async fn settled(jobs: &Jobs, job: &str) -> Option<lemonfiber_api::actions::Standing> {
-    for _ in 0..200 {
-        match jobs.standing(job).await {
-            Some(lemonfiber_api::actions::Standing::Running) | None => {
-                tokio::time::sleep(Duration::from_millis(5)).await;
-            }
-            settled => return settled,
-        }
-    }
-    jobs.standing(job).await
-}
-
-#[tokio::test]
-async fn work_started_under_a_name_finishes_without_anything_holding_it() {
-    // Nothing awaits the work, and nothing is holding the request that asked for
-    // it — which is the point. A browser tab closed here takes nothing with it.
-    let jobs = Jobs::default();
-    let Some(job) = Job::mint(&Chance::cycling()) else {
-        unreachable!("cycling letters always supply bytes");
-    };
-    jobs.start(&job, Command::Quality(QualityAction::Show), Arc::new(ctx()))
-        .await;
-
-    let standing = settled(&jobs, job.as_str()).await;
-    assert!(
-        matches!(standing, Some(lemonfiber_api::actions::Standing::Done(_))),
-        "it ran to its end on its own: {standing:?}"
-    );
-}
-
-#[tokio::test]
-async fn work_that_could_not_be_done_says_so_under_its_own_name() {
-    let jobs = Jobs::default();
-    let Some(job) = Job::mint(&Chance::cycling()) else {
-        unreachable!("cycling letters always supply bytes");
-    };
-    // A stack that is not there: the command fails, and the failure is recorded
-    // against the job rather than lost with the request that started it.
-    jobs.start(&job, Command::Forms, Arc::new(ctx())).await;
-
-    let standing = settled(&jobs, job.as_str()).await;
-    assert!(
-        matches!(&standing, Some(lemonfiber_api::actions::Standing::Failed(said))
-            if said.contains(r#""kind":"error""#)),
-        "{standing:?}"
-    );
-}
-
-#[tokio::test]
-async fn a_name_this_run_never_handed_out_stands_for_nothing() {
-    assert_eq!(Jobs::default().standing("0badc0de").await, None);
-}
-
-// ── The route itself, driven without a socket ─────────────────────────────────
 
 /// The action routes as a run builds them, over a context a test chose.
 ///
@@ -539,6 +637,14 @@ async fn an_action_missing_an_argument_is_refused_by_the_route_too() {
     let (status, body) = said(Chance::cycling(), "pull", "{}").await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
     assert!(body.contains("needs `forms`"), "{body}");
+}
+
+#[tokio::test]
+async fn agreement_an_action_does_not_take_is_refused_by_the_route_too() {
+    let asked = r#"{"forms":["tv"],"confirm":true}"#;
+    let (status, body) = said(Chance::cycling(), "down", asked).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
+    assert!(body.contains("takes no `confirm`"), "{body}");
 }
 
 #[tokio::test]

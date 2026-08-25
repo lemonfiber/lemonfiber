@@ -1948,7 +1948,7 @@
               "type": "string"
             },
             "job": {
-              "description": "The name to follow this work by on the event stream.",
+              "description": "The name to ask what became of this work by.",
               "type": "string"
             }
           },

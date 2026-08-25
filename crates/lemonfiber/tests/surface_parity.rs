@@ -17,9 +17,13 @@
 //! actually translates, and a row naming a route names one something actually
 //! serves. Otherwise the honest cell and the aspirational one read alike.
 //!
-//! **The web offers nothing unaccounted for.** Every action the web translates
-//! appears in some row, so an action added there without a command behind it fails
-//! here as well as being refused by the contract.
+//! **The web offers nothing unaccounted for.** Every action the web translates and
+//! every route it serves appears in some row, so an action added there without a
+//! command behind it fails here as well as being refused by the contract — and a
+//! route added there without a decision about what request it answers fails too.
+//! A route that answers no command-line request is declared by name below, which
+//! is what turns "it does not belong in the table" into something somebody wrote
+//! down rather than something nobody noticed.
 //!
 //! The terminal column is not checked. Its keys live in the one file this workspace
 //! deliberately leaves untested — a real terminal in raw mode — so the words are
@@ -63,6 +67,18 @@ const QUALIFIER: &str = "partial";
 
 /// A verdict that admits no company: nothing is reachable, or nothing ever will be.
 const ALONE: [&str; 2] = ["none", "intrinsic"];
+
+/// The routes that answer no request the command line accepts.
+///
+/// Each is the web's own half of something that has no command-line form. The
+/// stream is one of the three exceptions running the other way — a live gather
+/// nothing prints. The action path is how every action is asked for, and the rows
+/// name the actions rather than the path they arrive on. The job path is the other
+/// end of the name a long-running action is answered with, and being answered with
+/// a name is itself the web's own arrangement.
+///
+/// Anything else this surface routes belongs in a row.
+const UNREQUESTED: [&str; 3] = ["/api/events", "/api/actions/{action}", "/api/jobs/{job}"];
 
 /// One row of the parity table.
 struct Row {
@@ -262,7 +278,7 @@ fn every_request_the_command_line_accepts_has_a_row() {
 /// A row claiming the web reaches a request names something that exists.
 #[test]
 fn a_row_claiming_the_web_names_an_action_or_a_route_that_exists() {
-    let served = api();
+    let served = served();
     let mut invented: Vec<String> = Vec::new();
     for row in rows() {
         for token in tokens(&row.web) {
@@ -270,7 +286,7 @@ fn a_row_claiming_the_web_names_an_action_or_a_route_that_exists() {
                 continue;
             };
             let exists = if named.starts_with('/') {
-                served.contains(&format!(".route(\"{named}\""))
+                served.contains(named)
             } else {
                 OFFERED.contains(&named)
             };
@@ -305,6 +321,75 @@ fn every_action_the_web_offers_is_claimed_by_a_row() {
         unclaimed.is_empty(),
         "the web offers these and no row says which request they answer: {unclaimed:?}"
     );
+}
+
+/// Every route the web serves is claimed by a row, or declared as answering none.
+///
+/// The converse of the check above, and the read half of the pair: a route added to
+/// the surface without deciding which request it answers fails here, which is the
+/// failure that is invisible in review because a diff adding a route looks complete.
+#[test]
+fn every_route_the_web_serves_is_claimed_by_a_row_or_declared_as_answering_none() {
+    let claimed: BTreeSet<String> = rows()
+        .iter()
+        .flat_map(|row| tokens(&row.web))
+        .map(|token| token.trim_matches('`').to_owned())
+        .collect();
+    let unclaimed: Vec<String> = served()
+        .into_iter()
+        .filter(|route| !claimed.contains(route) && !UNREQUESTED.contains(&route.as_str()))
+        .collect();
+    assert!(
+        unclaimed.is_empty(),
+        "the web serves these and no row says which request they answer — add a row \
+         in .docs/architecture/surface-parity.md, or declare it in UNREQUESTED: \
+         {unclaimed:?}"
+    );
+}
+
+/// Every route declared as answering no request is one this surface still serves.
+///
+/// Without this the declaration outlives the route: a path renamed or removed leaves
+/// a name here that excuses nothing, and the next route added under the old name is
+/// excused by it.
+#[test]
+fn every_route_declared_as_answering_none_is_one_the_web_still_serves() {
+    let served = served();
+    let gone: Vec<&&str> = UNREQUESTED
+        .iter()
+        .filter(|route| !served.contains(**route))
+        .collect();
+    assert!(
+        gone.is_empty(),
+        "these are declared as answering no request and nothing serves them: {gone:?}"
+    );
+}
+
+/// Every path the web surface routes, read from the calls that declare them.
+///
+/// A route is declared either with its path written out or with the constant that
+/// holds it, so both are read. Only the literals matter in the end — a constant is
+/// resolved against the same text, which is the only place a path can be written.
+fn served() -> BTreeSet<String> {
+    let source = api();
+    source
+        .split(".route(")
+        .skip(1)
+        .filter_map(|rest| rest.split_once(','))
+        .filter_map(|(argument, _)| path_of(argument.trim(), &source))
+        .collect()
+}
+
+/// The path one route call names, written out or held in a constant.
+fn path_of(argument: &str, source: &str) -> Option<String> {
+    if let Some(quoted) = argument.strip_prefix('"') {
+        return quoted.split_once('"').map(|(path, _)| path.to_owned());
+    }
+    let declared = format!("const {argument}: &str = \"");
+    source
+        .split_once(&declared)
+        .and_then(|(_, rest)| rest.split_once('"'))
+        .map(|(path, _)| path.to_owned())
 }
 
 /// Every cell says one of the things a cell may say, and says why where it must.

@@ -13,6 +13,7 @@ pub mod actions;
 pub mod events;
 pub mod frontend;
 pub mod guard;
+pub mod jobs;
 pub mod read;
 pub mod router;
 pub mod serve;
