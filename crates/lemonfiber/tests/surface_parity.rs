@@ -45,6 +45,9 @@ const API: &str = "../lemonfiber-api/src";
 /// The heading the parity table sits under.
 const HEADING: &str = "## The table";
 
+/// Where the page states what its rows add up to.
+const SUMMARY: &str = "## What the table adds up to";
+
 /// What the web column may say that is not an action or a route.
 const WEB_WORDS: [&str; 3] = ["none", "intrinsic", "partial"];
 
@@ -195,10 +198,30 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         .filter(|row| tokens(&row.web).contains(&"intrinsic"))
         .count();
 
-    // Line breaks fall between a number and the noun it counts, so the page is read
-    // as one run of words rather than as lines.
+    // Line breaks fall between a number and the noun it counts, so the section is
+    // read as one run of words rather than as lines.
+    //
+    // The summary alone, and not the page. Written against the whole page, each
+    // number was looked for on its own and found anywhere — `six` inside
+    // `twenty-six`, `ten` inside `written`, `one` inside `none` — and the paragraph
+    // below this one, which records the last time these numbers drifted, was itself
+    // supplying `eleven` and `ten` to the search. The sentence that documented the
+    // bug was what hid the next one.
     let page = fs::read_to_string(TABLE).unwrap_or_default().to_lowercase();
-    let page: String = page.split_whitespace().collect::<Vec<_>>().join(" ");
+    let summary = page
+        .split_once(&SUMMARY.to_lowercase())
+        .map_or_else(String::new, |(_, rest)| {
+            rest.split_once("\n## ")
+                .map_or_else(|| rest.to_owned(), |(section, _)| section.to_owned())
+        });
+    let summary: String = summary.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        summary.len() > 200,
+        "read {} characters under `{SUMMARY}`, which is not a paragraph — the heading \
+         has moved and this is no longer reading the summary",
+        summary.len()
+    );
+
     for (number, what) in [
         (counted.len(), "requests"),
         (full, "reach the web in full"),
@@ -208,8 +231,8 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
     ] {
         let said = spelled(number);
         assert!(
-            page.contains(&format!("{said} ")),
-            "the page says `{said}` for the {what} its rows carry ({number})"
+            summary.contains(&format!("{said} {what}")),
+            "the summary says `{said} {what}` for what its rows carry ({number})"
         );
     }
     assert_eq!(intrinsic, 1, "one exception, which the page names as `ui`");
