@@ -46,13 +46,13 @@ and the rest is named in **Standing**.
 | `forms` | none | none | Unbuilt, and the sharpest gap in the table: the web can start, stop and switch forms it has no way to enumerate. Every caller has to already know the names. |
 | `up` | `up` | none | The terminal shows a service is down and offers nothing to do about it. |
 | `down` | `down` | none | As above. |
-| `switch` | `switch` | none | As above. |
-| `restart` | `restart` | none | As above. |
-| `pull` | `pull` | none | As above. |
+| `switch` | `switch`, partial | none | Reachable only by a caller that already knows a form's name. `switch` refuses an empty `forms`, and nothing serves `forms` — see that row. The profile carried on `/api/services` is a Compose profile and not a form; neither list contains the other. |
+| `restart` | `restart`, partial | none | As `switch`: refuses an empty `forms`, which nothing serves. |
+| `pull` | `pull`, partial | none | As `switch`: refuses an empty `forms`, which nothing serves. |
 | `ps` | `/api/status`, `/api/services` | dashboard | Reachable from all three. The dashboard and the endpoints are fed by the same gather. |
 | `logs` | `/api/logs`, partial | viewer | The scrollback is a read and is served. Following is not: the event stream carries the dashboard gather and nothing else, so a browser cannot watch lines arrive. `--watch` is the terminal's own rendering of the same lines, not a separate request. |
 | `config` | `config-set`, partial | none | Changing a setting is offered; reading one is not. There is no endpoint behind `config get` or `config show`, so a browser can write a value it cannot read back. |
-| `quality` | `quality-set`, `quality-reapply`, `quality-upgrade` | none | Every write is offered and the read is not: `quality show` — the preset in force, what each one means, and what it costs — has no endpoint, and it is the screen a browser is best at. |
+| `quality` | `quality-set`, `quality-reapply`, `quality-upgrade`, partial | none | Every write is offered and the read is not: `quality show` — the preset in force, what each one means, and what it costs — has no endpoint, and it is the screen a browser is best at. |
 | `doctor` | `/api/checks`, `/api/storage`, partial | dashboard, partial | The diagnosis is served. Repair is not: `--fix`, `--yes`, `--fix-disruptive`, `--undo` and `--accept` have no web form, and an offer-and-consent flow is something HTML does better than a terminal prompt. The dashboard shows storage and VPN facts the diagnosis also reads, without being the diagnosis. |
 | `watch` | none | none | Unbuilt. It is long-running work that ends in one report, which is exactly the shape the web already answers with a job name — and a guard started from a browser and left running is the useful case, not the awkward one. What it needs that a command does not is a way to stop it, since there is no terminal to interrupt. |
 | `trace` | none | none | Unbuilt. A read, and the half of a screen that already half-exists: `/api/requests` reports what the household asked for, and following one item is what a reader does next. |
@@ -70,10 +70,15 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, ten reach the web in full, five reach it in part, ten
-do not reach it at all, and one — `ui` — is an honest exception. Fifteen gaps and
-one exception is the split `G1-R1` asks for, and it is deliberately lopsided: an
-exception has to survive being argued, and almost nothing does.
+Of the twenty-six requests, seven reach the web in full, eight reach it in part,
+ten do not reach it at all, and one — `ui` — is an honest exception. Eighteen
+gaps and one exception is the split `G1-R1` asks for, and it is deliberately
+lopsided: an exception has to survive being argued, and almost nothing does.
+
+These four numbers are read back from the table below by the guard, because the
+first version of this paragraph said ten and five where the rows said eleven and
+four, and a summary nobody checks is how a page that exists to be counted stops
+being countable.
 
 The other three exceptions the spec names run the other way — a live-refreshing
 dashboard and an open event stream have no command-line form, and `--json` has no
