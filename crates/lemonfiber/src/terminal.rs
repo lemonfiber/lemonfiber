@@ -84,6 +84,10 @@ pub(crate) async fn configured(ctx: Ctx, bare: Bare) -> ExitCode {
             for line in crate::setup::already_set_up() {
                 say!("{line}");
             }
+            // The whole of it, rather than a line saying where to find it. A run
+            // with nowhere to draw is a pipe, a cron line or a CI step, and none of
+            // them can go and ask a second time.
+            say!("\n{}", lemonfiber::cli::help());
             ExitCode::SUCCESS
         }
     }
