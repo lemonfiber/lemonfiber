@@ -384,6 +384,56 @@ mod tests {
         announcement(bound(), "000fa5ff", browser).join("\n")
     }
 
+    /// The word the claim about the transport turns on. A rewording that drops it
+    /// has changed the claim rather than the wording.
+    const ENCRYPTION: &str = "encrypt";
+
+    /// How a sentence says there is none of something.
+    ///
+    /// The closed set English denies with, rather than a list of ways to phrase this
+    /// particular sentence: a reword is free to say it however it likes, so long as
+    /// it still says *not*.
+    const DENIAL: &[&str] = &[
+        "not",
+        "no",
+        "none",
+        "nothing",
+        "never",
+        "without",
+        "unencrypted",
+    ];
+
+    /// What an unencrypted connection lets somebody do.
+    const READING: &[&str] = &["read", "see"];
+
+    /// Who it lets do it, which is somebody who is not the operator.
+    const SOMEBODY_ELSE: &[&str] = &["else", "other"];
+
+    /// What a starting surface says about the connection, as sentences, with the
+    /// address taken out of them.
+    ///
+    /// The address goes first because `http` in front of it is not this product
+    /// saying anything. A guard that read the scheme would pass a run that had
+    /// deleted every word about the transport and left the address to speak for
+    /// itself, which is the failure this is here for.
+    fn about_the_connection(browser: Browser) -> Vec<String> {
+        said(browser)
+            .replace(&address(bound()), " ")
+            .to_lowercase()
+            .split(['.', ';', '\n', '\u{2014}'])
+            .map(|sentence| sentence.trim().to_owned())
+            .filter(|sentence| !sentence.is_empty())
+            .collect()
+    }
+
+    /// Whether a sentence says there is none of what it is about.
+    fn denies(sentence: &str) -> bool {
+        sentence
+            .split_whitespace()
+            .map(|word| word.trim_matches(|mark: char| !mark.is_alphanumeric()))
+            .any(|word| DENIAL.contains(&word))
+    }
+
     #[test]
     fn naming_no_port_asks_for_whichever_one_is_free() {
         assert_eq!(wanted(None).port(), 0);
@@ -490,18 +540,6 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn a_browser_that_will_not_open_is_not_a_failure() {
-        // The two ways it goes wrong: the program is not there at all, and the
-        // program is there and would not do it. Neither is this command failing.
-        for runner in [missing(), exited(1)] {
-            assert_eq!(
-                opening(&runner, HostOs::Linux, "http://127.0.0.1:8471").await,
-                Browser::Unopened
-            );
-        }
-    }
-
     #[test]
     fn a_browser_that_will_not_open_leaves_the_address_to_open_by_hand() {
         let said = said(Browser::Unopened);
@@ -510,28 +548,92 @@ mod tests {
         assert!(said.contains("http://127.0.0.1:8471"), "{said}");
     }
 
-    #[test]
-    fn the_address_is_printed_whichever_way_the_browser_went() {
-        for browser in [Browser::Opened, Browser::Unopened, Browser::Unasked] {
+    #[tokio::test]
+    async fn whatever_the_browser_did_the_address_is_the_first_thing_said() {
+        // The outcomes come from runners rather than being named, so these are the
+        // three a run reaches: one that opened, one that would not, and one that was
+        // never asked for. Line 0, because an operator whose browser did not open has
+        // to find the address, and one printed below an apology is one they scroll for.
+        let url = address(bound());
+        let reached = [
+            Browser::Unasked,
+            opening(&exited(0), HostOs::Linux, &url).await,
+            opening(&exited(1), HostOs::Linux, &url).await,
+            opening(&missing(), HostOs::Linux, &url).await,
+        ];
+        for outcome in [Browser::Opened, Browser::Unopened, Browser::Unasked] {
             assert!(
-                said(browser).contains("http://127.0.0.1:8471"),
+                reached.contains(&outcome),
+                "{outcome:?} is not among {reached:?}, so this proves less than it reads as"
+            );
+        }
+        for browser in reached {
+            assert_eq!(
+                announcement(bound(), "000fa5ff", browser)
+                    .first()
+                    .map(|line| line.contains(&url)),
+                Some(true),
                 "{browser:?}"
             );
         }
     }
 
     #[test]
-    fn it_says_in_words_that_the_connection_is_not_encrypted() {
-        // Not the scheme in the address, which is a fact an operator has no
-        // reason to be able to read.
+    fn the_transport_is_stated_in_words_rather_than_left_to_the_scheme() {
+        // Every outcome, because what is said about the browser is the only part of
+        // this that changes and the transport is not one of the things it changes.
         for browser in [Browser::Opened, Browser::Unopened, Browser::Unasked] {
-            let said = said(browser);
-            assert!(said.contains("is not encrypted"), "{browser:?}: {said}");
+            let about = about_the_connection(browser);
+            let mentioned: Vec<&String> = about
+                .iter()
+                .filter(|sentence| sentence.contains(ENCRYPTION))
+                .collect();
             assert!(
-                said.contains("read what passes over it"),
-                "and what that costs: {said}"
+                !mentioned.is_empty(),
+                "{browser:?} leaves the transport to the scheme: {about:?}"
+            );
+            assert!(
+                mentioned.iter().all(|sentence| denies(sentence)),
+                "{browser:?} says the connection is protected: {mentioned:?}"
             );
         }
+    }
+
+    #[test]
+    fn what_being_unencrypted_costs_is_said_as_well_as_that_it_is() {
+        // A fact about a protocol is not a warning. What makes it one is who it lets
+        // in, and an operator told only the fact has been told nothing they can act on.
+        let about = about_the_connection(Browser::Unasked);
+        assert!(
+            about.iter().any(|sentence| {
+                READING.iter().any(|verb| sentence.contains(verb))
+                    && SOMEBODY_ELSE.iter().any(|who| sentence.contains(who))
+            }),
+            "nothing here says what being unencrypted lets anybody do: {about:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_words_are_about_the_connection_a_run_actually_takes() {
+        // The address is one really taken, through the same call a run makes, so the
+        // claim is held against the connection rather than against a number written
+        // down beside it. A surface that one day serves over TLS prints a different
+        // scheme here, and the sentence above it has to change with it.
+        let held = taken(wanted(None)).await.ok();
+        let checked = held.map(|(_listener, bound)| {
+            let said = announcement(bound, "000fa5ff", Browser::Unasked).join("\n");
+            (
+                address(bound).starts_with("http://"),
+                bound.ip().is_loopback(),
+                said.contains(&address(bound)),
+            )
+        });
+        assert_eq!(
+            checked,
+            Some((true, true, true)),
+            "unencrypted, reachable from nowhere else, and printed in full — the three \
+             things these words claim"
+        );
     }
 
     #[test]
@@ -595,10 +697,10 @@ mod tests {
     // ── Starting the whole of it, and stopping it again ───────────────────────
 
     /// A context over the stack this binary ships, with the randomness a test
-    /// chose and a runner that answers every program the same way.
-    fn ctx(bytes: Option<Vec<u8>>) -> Ctx {
+    /// chose and the runner it wants every program answered by.
+    fn running(runner: Arc<dyn Runner>, bytes: Option<Vec<u8>>) -> Ctx {
         Ctx::new(
-            Arc::new(Idle),
+            runner,
             Arc::new(lemonfiber_core::adapters::Daemon::local()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
@@ -607,6 +709,11 @@ mod tests {
             Environment::MacOs,
         )
         .with_random(Arc::new(Chance::exactly(bytes)))
+    }
+
+    /// The same, over a runner that spawns nothing.
+    fn ctx(bytes: Option<Vec<u8>>) -> Ctx {
+        running(Arc::new(Idle), bytes)
     }
 
     /// Bytes enough to mint a token from.
@@ -646,17 +753,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_browser_that_will_not_open_does_not_fail_the_command() {
-        // The whole of it end to end: the runner runs no program, so no browser
-        // opens, and the surface starts and serves regardless.
+    async fn no_way_of_failing_to_open_a_browser_fails_the_command() {
+        // The two ways it goes wrong: the program is not there at all, and the program
+        // is there and would not do it. Each is checked to be the failing shape and
+        // then driven through the whole of a run — a mapping that quietly called one of
+        // them success would otherwise leave this passing on a run that never met a
+        // browser which would not open.
         let asked = Asked {
             browser: true,
             ..Asked::default()
         };
-        assert_eq!(
-            started(ctx(Some(enough())), asked).await,
-            crate::exit::shown(ExitCode::SUCCESS)
-        );
+        for runner in [missing(), exited(1)] {
+            assert_eq!(
+                opening(&runner, HostOs::Linux, &address(bound())).await,
+                Browser::Unopened
+            );
+            assert_eq!(
+                started(running(Arc::new(runner), Some(enough())), asked.clone()).await,
+                crate::exit::shown(ExitCode::SUCCESS)
+            );
+        }
     }
 
     #[tokio::test]
