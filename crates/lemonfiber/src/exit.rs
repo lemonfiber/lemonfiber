@@ -69,6 +69,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // left skipped or failed may complete on a re-run, so it stays FAILURE. A
         // script can then tell "fix your config" from "wait and retry".
         Outcome::Seed(report) => seed_exit(report),
+        // Anything left unmended is a non-zero result, and a run that only offered
+        // has mended everything it carried out — which is none of it.
+        Outcome::Repair(report) => repairing(report),
         // A held quality choice was not recorded — it needs the operator to
         // confirm a preset this machine would software-transcode, so a script sees
         // a non-zero result it can act on rather than a false success.
@@ -136,6 +139,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Word(_)
         | Outcome::Glossary(_)
         | Outcome::Wizard(_)
+        // Putting back what the last repair changed either happened or came back as
+        // a problem; there is no third answer for a code to distinguish.
+        | Outcome::Undo(_)
         // A capture that was written and a bundle that was described are each an
         // answer that arrived, and a run that could not produce one comes back as
         // a problem rather than as an outcome with a code on it.

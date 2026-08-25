@@ -8,11 +8,18 @@
 //! Nothing here decides what may be offered. That is [`crate::repair`]'s, purely: what has
 //! been declined, what has been tried too often and which findings share a cause are all
 //! settled before this module sees them. What is here is the running of it.
+//!
+//! How much of it a run was given consent for is [`consent`]'s, which is the half a
+//! surface with no terminal to hold a question open in has to send with the request.
+
+mod consent;
+
+pub use consent::{Consent, STALE};
 
 use crate::condition::Fault;
 use crate::config::paths::{Paths, JOURNAL};
 use crate::doctor::{Check, Finding, Mend, Verdict};
-use crate::error::{Diagnose as _, Problem, Remedy};
+use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
 use crate::journal::Undo;
 use crate::repair::{self, Attempt, Outcome, Repair, Stance};
 
@@ -24,13 +31,27 @@ use super::Ctx;
 /// A trait rather than a closure: a surface that builds one to capture what it asks with
 /// builds a function of its own, and the sequence here would be copied around it. What
 /// asks is the surface's business either way — this only needs the answer.
-pub trait Confirm {
+///
+/// Shareable across threads, because a surface that answers a request with a name for
+/// the work hands the run to a runtime and the sequence carries this into it.
+pub trait Confirm: Sync {
     /// Whether this repair may be carried out.
     fn agreed(&self, repair: &Repair) -> bool;
+
+    /// Whether the offer this consent was given for is the offer that stands now.
+    ///
+    /// Asked once, before anything is carried out. A terminal answers yes by
+    /// construction: the question and the answer are the same run over the same
+    /// look. A surface whose consent crossed a request boundary read an offer that
+    /// this run has just looked again for, and an answer to the old one is an
+    /// answer to a question nobody is asking any more.
+    fn stands(&self, _offered: &[Repair]) -> bool {
+        true
+    }
 }
 
 /// One repair, and what became of it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Mended {
     /// What was proposed.
     pub repair: Repair,
@@ -39,7 +60,7 @@ pub struct Mended {
 }
 
 /// A repair that has run out of chances, and where to go instead.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Beyond {
     /// The check whose fault has outlasted every attempt at it.
     pub check: String,
@@ -48,10 +69,16 @@ pub struct Beyond {
 }
 
 /// What a repairing run offered, and what it did.
-#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, schemars::JsonSchema)]
 pub struct Report {
     /// What could be put right, whether or not it was.
     pub offered: Vec<Repair>,
+    /// What this offer is, so consent given for it can name which offer it read.
+    ///
+    /// Carried on every report rather than only on the ones that offer something: a
+    /// surface that has to look for it is a surface that can fail to find it, and an
+    /// offer of nothing is still an offer somebody may agree to nothing of.
+    pub agreement: String,
     /// What was carried out, in the order it was.
     pub mended: Vec<Mended>,
     /// What has been tried too often to keep offering.
@@ -123,13 +150,17 @@ pub async fn mending(
     let all: Vec<Repair> = proposals.iter().map(|(_, repair)| repair.clone()).collect();
     let offered = repair::offered(&all, &conditions.all());
 
+    // Asked before the loop rather than inside it, so an offer that has moved on since
+    // it was read costs nothing and leaves no record of a decline nobody made.
+    let acting = stance.may_act() && confirm.stands(&offered);
     let mut report = Report {
+        agreement: repair::agreement(&offered),
         offered: offered.clone(),
         mended: Vec::new(),
         beyond: beyond(&conditions.all(), &all),
-        acted: stance.may_act(),
+        acted: acting,
     };
-    if !stance.may_act() {
+    if !acting {
         return report;
     }
 
@@ -189,6 +220,76 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
         super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
     super::recover::undo(&left, &paths.env_file(), unreached)?;
     Ok(undos)
+}
+
+/// Raised when a run cannot say where lemonfiber's own files are.
+pub const NOWHERE_TO_LOOK: Code = Code::new("REPAIR-2");
+
+/// What putting back the last repair came to.
+///
+/// A report rather than a bare list, because it is what an envelope carries and an
+/// envelope carries a document. The list is the whole of it: what went back, and
+/// against what.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, schemars::JsonSchema)]
+pub struct Reversal {
+    /// What was put back, in the order it was.
+    pub reversed: Vec<Undo>,
+}
+
+/// Offer or carry out the repairs, at whatever this run was given consent for.
+///
+/// The one way in for a run whose consent is settled before it begins, so the
+/// mapping from consent to stance is made once rather than per surface. A consent
+/// given for an offer that has since moved on is refused here, having carried
+/// nothing out.
+///
+/// What it cannot carry is the question a terminal puts mid-run and waits on, which
+/// reaches [`mend`] with an [`Confirm`] of its own.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the stack cannot be read, or where the offer the
+/// consent names is not the offer that stands now.
+pub async fn putting_right(
+    ctx: &Ctx,
+    consent: &Consent,
+    disruptive: bool,
+) -> Result<Report, Box<Problem>> {
+    let report = mend(ctx, consent.stance(), disruptive, consent).await?;
+    consent.held(&report)?;
+    Ok(report)
+}
+
+/// Put back what the last repair changed, from wherever this machine keeps them.
+///
+/// Apart from [`retract`] by exactly one thing: resolving the layout. A surface
+/// that already holds one passes it; one that holds a context alone asks here.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where this machine will not say where lemonfiber's own
+/// files are, and every reason [`retract`] gives.
+pub async fn reversing(ctx: &Ctx) -> Result<Reversal, Box<Problem>> {
+    let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
+    retract(ctx, &paths)
+        .await
+        .map(|reversed| Reversal { reversed })
+}
+
+/// The refusal for a run that cannot say where lemonfiber's own files are.
+///
+/// The journal is the record of what a repair changed, and a run that cannot name
+/// it has nothing to read a reversal out of.
+fn nowhere_to_look() -> Problem {
+    Problem::new(
+        NOWHERE_TO_LOOK,
+        Severity::Error,
+        "This run has nowhere it knows to look for what a repair changed",
+        "What each repair changed is recorded in lemonfiber's own directory, and this \
+         machine would not say where that is. Nothing was put back.",
+        Remedy::new("Set a home directory for this user and run it again"),
+    )
+    .in_state(State::Guided)
 }
 
 /// Fold what this run found into the store, and answer with it.
@@ -398,7 +499,9 @@ fn recorded(ctx: &Ctx, repair: &Repair, outcome: &Outcome) {
 
 #[cfg(test)]
 mod tests {
-    use super::{beyond, proved, wrong, Beyond};
+    use super::{
+        beyond, proved, putting_right, reversing, wrong, Beyond, Consent, NOWHERE_TO_LOOK,
+    };
     use crate::app::fixtures::ctx_at;
     use crate::condition::{Conditions, Fault};
     use crate::doctor::{Category, Finding, Verdict};
@@ -572,5 +675,77 @@ mod tests {
             &[repair("vpn.port-forward-client")]
         ))
         .is_empty());
+    }
+
+    /// A run given no consent offers what it found and puts none of it right, which
+    /// is what a surface asks for before it has anything to show anybody.
+    #[tokio::test]
+    async fn a_run_with_no_consent_offers_and_acts_on_none_of_it() {
+        // Read as one value rather than unwrapped through a branch nothing takes:
+        // nothing is wrong on this machine that lemonfiber could put right, so the
+        // offer is empty — and an empty offer still names itself, because consent
+        // to nothing is a thing somebody can give.
+        let offer = putting_right(&ctx_at("repair-offering"), &Consent::Offer, false)
+            .await
+            .ok()
+            .map(|report| (report.acted, report.offered.len(), report.agreement));
+
+        assert_eq!(offer, Some((false, 0, crate::repair::agreement(&[]))));
+    }
+
+    /// Consent given for an offer that is not the offer that stands is refused, and
+    /// nothing is carried out — which is the whole of what a request boundary costs
+    /// a flow that a terminal gets for nothing.
+    #[tokio::test]
+    async fn consent_given_for_an_offer_that_has_moved_on_is_refused() {
+        let consent = Consent::Given {
+            offer: "deadbeef".to_owned(),
+            repairs: vec!["vpn.port-forward-client".to_owned()],
+        };
+        let refused = putting_right(&ctx_at("repair-stale"), &consent, false)
+            .await
+            .err()
+            .map(|problem| problem.code);
+
+        assert_eq!(refused, Some(super::STALE));
+    }
+
+    /// A run that cannot say where lemonfiber keeps its own files has nothing to
+    /// read a reversal out of, and says so rather than reporting that there was
+    /// nothing to put back — which is what a machine with a clean journal says.
+    #[tokio::test]
+    async fn an_undo_with_nowhere_to_look_says_so_rather_than_finding_nothing() {
+        let refused = reversing(&ctx_at("repair-nowhere"))
+            .await
+            .err()
+            .map(|problem| problem.code);
+
+        assert_eq!(refused, Some(NOWHERE_TO_LOOK));
+    }
+
+    /// With a layout to read, the reversal is the one [`super::retract`] gives, in
+    /// the report an envelope carries.
+    #[tokio::test]
+    async fn an_undo_that_knows_where_to_look_answers_with_what_went_back() {
+        let dir = std::env::temp_dir().join(format!(
+            "lemonfiber-reversing-{}-{}",
+            std::process::id(),
+            "layout"
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(dir.join("config"));
+        let _ = std::fs::create_dir_all(dir.join("data"));
+        let settings = crate::config::Settings {
+            env_file: Some(dir.join("config").join(".env")),
+            stack_dir: Some(dir.join("data").join("stack")),
+            ..crate::config::Settings::default()
+        };
+        let ctx = crate::test_support::a_context().settings(settings).build();
+
+        // Nothing has been repaired here, so there is nothing to put back — said as
+        // an empty reversal rather than as a failure.
+        let reversal = reversing(&ctx).await.ok().map(|it| it.reversed.len());
+
+        assert_eq!(reversal, Some(0));
     }
 }

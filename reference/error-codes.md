@@ -54,6 +54,8 @@ what to do about it, is written for operators at
 - `QUAL-3`
 - `READ-1`
 - `READ-2`
+- `REPAIR-1`
+- `REPAIR-2`
 - `RESTORE-1`
 - `RESTORE-2`
 - `RESTORE-3`

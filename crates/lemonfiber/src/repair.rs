@@ -10,15 +10,14 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::repair::{mend, retract, Confirm};
-use lemonfiber_core::app::Ctx;
+use lemonfiber_core::app::repair::{mend, putting_right, retract, Confirm, Consent, Reversal};
+use lemonfiber_core::app::{Ctx, Outcome};
 use lemonfiber_core::repair::{Repair, Stance};
 
 use lemonfiber_core::config::paths::Paths;
 
 use crate::exit::USAGE;
 use crate::prompt::{yes_no, Answers};
-use crate::render::repair::{mended, reversed};
 use crate::render::Lines;
 use crate::say::complain;
 use lemonfiber::cli::Mending;
@@ -28,7 +27,7 @@ pub(crate) async fn run(
     ctx: Ctx,
     paths: Paths,
     asked: Mending,
-    answers: &dyn Answers,
+    answers: &(dyn Answers + Sync),
     json: bool,
 ) -> ExitCode {
     if asked.undo {
@@ -41,10 +40,16 @@ pub(crate) async fn run(
     // A run with nowhere to read an answer from is refused rather than asked. The offer
     // reaches a terminal nobody is at, and the read that follows it blocks on input that
     // never comes — once per repair, invisibly, with the run appearing to hang.
-    let stance = match (asked.fixing.yes, json, answers.present()) {
-        (true, _, _) => Stance::Unattended,
-        (false, true, _) => Stance::ReportOnly,
-        (false, false, true) => Stance::Ask,
+    //
+    // Two of the three consents are settled before the run begins and are data, so
+    // they go in through the entry a browser goes in through. Nothing here decides
+    // what each one comes to.
+    let consent = match (asked.fixing.yes, json, answers.present()) {
+        (true, _, _) => Some(Consent::Standing),
+        (false, true, _) => Some(Consent::Offer),
+        // The third is a question put mid-run and answered by whoever is at the
+        // terminal, which is the one shape no request can carry.
+        (false, false, true) => None,
         (false, false, false) => {
             complain!(
                 "error: repairing here is non-interactive, so there is nobody to agree to each repair:"
@@ -56,13 +61,26 @@ pub(crate) async fn run(
         }
     };
 
-    match mend(&ctx, stance, asked.fixing.disruptive, &Asking(answers)).await {
-        Ok(report) => {
-            mended(&report, json).print();
-            crate::exit::repairing(&report)
-        }
+    let repaired = match &consent {
+        Some(consent) => putting_right(&ctx, consent, asked.fixing.disruptive).await,
+        None => mend(&ctx, Stance::Ask, asked.fixing.disruptive, &Asking(answers)).await,
+    };
+    match repaired {
+        Ok(report) => answered(&Outcome::Repair(report), json),
         Err(problem) => crate::complain(&problem),
     }
+}
+
+/// One outcome, read out and scored, through the paths every other answer takes.
+///
+/// The offer and the question in front of it are this surface's own; what became of
+/// the run is not. Rendered where every outcome is rendered and scored where every
+/// outcome is scored, so the words a person reads and the document a script parses
+/// are the ones the web serves for the same run.
+fn answered(outcome: &Outcome, json: bool) -> ExitCode {
+    let code = crate::exit::settled(outcome);
+    crate::render::render(outcome, json);
+    code
 }
 
 /// Put back what the last repair changed.
@@ -71,16 +89,13 @@ pub(crate) async fn run(
 /// takes, and which of those need a service to reach. What is here is the saying.
 async fn undone(ctx: &Ctx, paths: &Paths, json: bool) -> ExitCode {
     match retract(ctx, paths).await {
-        Ok(undos) => {
-            reversed(&undos, json).print();
-            ExitCode::SUCCESS
-        }
+        Ok(reversed) => answered(&Outcome::Undo(Reversal { reversed }), json),
         Err(problem) => crate::complain(&problem),
     }
 }
 
 /// Asking whoever is at the terminal.
-struct Asking<'a>(&'a dyn Answers);
+struct Asking<'a>(&'a (dyn Answers + Sync));
 
 impl Confirm for Asking<'_> {
     /// Ask about one repair, having said what it would do and what else changes.
@@ -171,7 +186,7 @@ mod tests {
     /// question was never put — which is the claim — instead of only that the run
     /// ended badly, which a dozen other faults would also produce.
     #[derive(Default)]
-    struct Nobody(std::cell::Cell<bool>);
+    struct Nobody(std::sync::atomic::AtomicBool);
 
     impl Answers for Nobody {
         fn present(&self) -> bool {
@@ -179,7 +194,7 @@ mod tests {
         }
 
         fn ask(&self, _question: &str) -> String {
-            self.0.set(true);
+            self.0.store(true, std::sync::atomic::Ordering::Relaxed);
             String::new()
         }
 
@@ -200,6 +215,7 @@ mod tests {
     fn report(outcomes: Vec<Outcome>) -> Report {
         Report {
             offered: Vec::new(),
+            agreement: String::new(),
             beyond: Vec::new(),
             mended: outcomes
                 .into_iter()
@@ -430,14 +446,17 @@ mod tests {
             "a run that cannot be asked is told what to pass instead"
         );
         assert!(
-            !nobody.0.get(),
+            !nobody.0.load(std::sync::atomic::Ordering::Relaxed),
             "the question was never put, rather than put and left waiting"
         );
 
         // The recorder itself, so what the assertion above rests on is exercised.
         let probe = Nobody::default();
         let _ = probe.secret("anything");
-        assert!(probe.0.get(), "being asked is what it records");
+        assert!(
+            probe.0.load(std::sync::atomic::Ordering::Relaxed),
+            "being asked is what it records"
+        );
     }
 
     async fn asked_for(yes: bool, json: bool) -> String {

@@ -22,6 +22,7 @@ use schemars::{schema_for, Schema};
 use serde::Serialize;
 
 use crate::app::backup::Report as BackupReport;
+use crate::app::repair::{Report as RepairReport, Reversal};
 use crate::app::restore::Restoration;
 use crate::app::support::Bundle;
 use crate::dashboard::Snapshot;
@@ -58,97 +59,8 @@ impl Contract {
     #[must_use]
     pub fn describe() -> Self {
         let mut kinds = BTreeMap::new();
-        describing(
-            &mut kinds,
-            kind::BACKUP,
-            schema_for!(Envelope<BackupReport>),
-        );
-        describing(&mut kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
-        describing(
-            &mut kinds,
-            kind::CONFIG,
-            schema_for!(Envelope<ConfigReport>),
-        );
-        describing(&mut kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
-        describing(
-            &mut kinds,
-            kind::DOCTOR,
-            schema_for!(Envelope<DoctorReport>),
-        );
-        describing(&mut kinds, kind::ERROR, schema_for!(Envelope<Problem>));
-        describing(&mut kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
-        describing(
-            &mut kinds,
-            kind::GLOSSARY,
-            schema_for!(Envelope<Vocabulary>),
-        );
-        describing(
-            &mut kinds,
-            kind::HOUSEHOLD,
-            schema_for!(Envelope<HouseholdReport>),
-        );
-        describing(&mut kinds, kind::JOB, schema_for!(Envelope<Started>));
-        describing(
-            &mut kinds,
-            kind::LIFECYCLE,
-            schema_for!(Envelope<LifecycleReport>),
-        );
-        describing(&mut kinds, kind::LOG, schema_for!(Envelope<LogLine>));
-        describing(&mut kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
-        describing(&mut kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
-        describing(&mut kinds, kind::PULL, schema_for!(Envelope<String>));
-        describing(
-            &mut kinds,
-            kind::QUALITY,
-            schema_for!(Envelope<QualityReport>),
-        );
-        describing(&mut kinds, kind::RESET, schema_for!(Envelope<ResetReport>));
-        describing(
-            &mut kinds,
-            kind::RESTORE,
-            schema_for!(Envelope<Restoration>),
-        );
-        describing(
-            &mut kinds,
-            kind::SEED,
-            schema_for!(Envelope<crate::seed::Report>),
-        );
-        describing(&mut kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
-        describing(&mut kinds, kind::START, schema_for!(Envelope<String>));
-        describing(
-            &mut kinds,
-            kind::STATUS,
-            schema_for!(Envelope<StatusReport>),
-        );
-        describing(&mut kinds, kind::STEP, schema_for!(Envelope<Line>));
-        describing(&mut kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
-        describing(&mut kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
-        describing(
-            &mut kinds,
-            kind::UPGRADE,
-            schema_for!(Envelope<UpgradeReport>),
-        );
-        describing(
-            &mut kinds,
-            kind::VERSION,
-            schema_for!(Envelope<VersionReport>),
-        );
-        describing(
-            &mut kinds,
-            kind::WALKTHROUGH,
-            schema_for!(Envelope<WalkthroughReport>),
-        );
-        describing(
-            &mut kinds,
-            kind::WATCH,
-            schema_for!(Envelope<SupervisionReport>),
-        );
-        describing(
-            &mut kinds,
-            kind::WIZARD,
-            schema_for!(Envelope<WizardReport>),
-        );
-        describing(&mut kinds, kind::WORD, schema_for!(Envelope<Term>));
+        answered(&mut kinds);
+        beside(&mut kinds);
 
         Self {
             api_version: API_VERSION,
@@ -165,6 +77,67 @@ impl Contract {
         text.push('\n');
         Some(text)
     }
+}
+
+/// The shapes a command's own answer takes, one per [`Outcome`] variant.
+fn answered(kinds: &mut BTreeMap<String, Schema>) {
+    describing(kinds, kind::BACKUP, schema_for!(Envelope<BackupReport>));
+    describing(kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
+    describing(kinds, kind::CONFIG, schema_for!(Envelope<ConfigReport>));
+    describing(kinds, kind::DOCTOR, schema_for!(Envelope<DoctorReport>));
+    describing(kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
+    describing(kinds, kind::GLOSSARY, schema_for!(Envelope<Vocabulary>));
+    describing(
+        kinds,
+        kind::HOUSEHOLD,
+        schema_for!(Envelope<HouseholdReport>),
+    );
+    describing(
+        kinds,
+        kind::LIFECYCLE,
+        schema_for!(Envelope<LifecycleReport>),
+    );
+    describing(kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
+    describing(kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
+    describing(kinds, kind::QUALITY, schema_for!(Envelope<QualityReport>));
+    describing(kinds, kind::REPAIR, schema_for!(Envelope<RepairReport>));
+    describing(kinds, kind::RESET, schema_for!(Envelope<ResetReport>));
+    describing(kinds, kind::RESTORE, schema_for!(Envelope<Restoration>));
+    describing(
+        kinds,
+        kind::SEED,
+        schema_for!(Envelope<crate::seed::Report>),
+    );
+    describing(kinds, kind::STATUS, schema_for!(Envelope<StatusReport>));
+    describing(kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
+    describing(kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
+    describing(kinds, kind::UNDO, schema_for!(Envelope<Reversal>));
+    describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
+    describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
+    describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
+    describing(kinds, kind::WORD, schema_for!(Envelope<Term>));
+}
+
+/// The shapes that belong to no command's answer.
+///
+/// A failure, a name for work that outlives its request, and the lines a long run
+/// says while it is still running — none of which any [`Outcome`] carries, and each
+/// of which a caller still has to parse.
+fn beside(kinds: &mut BTreeMap<String, Schema>) {
+    describing(kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
+    describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
+    describing(kinds, kind::JOB, schema_for!(Envelope<Started>));
+    describing(kinds, kind::LOG, schema_for!(Envelope<LogLine>));
+    describing(kinds, kind::PULL, schema_for!(Envelope<String>));
+    describing(kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
+    describing(kinds, kind::START, schema_for!(Envelope<String>));
+    describing(kinds, kind::STEP, schema_for!(Envelope<Line>));
+    describing(
+        kinds,
+        kind::WALKTHROUGH,
+        schema_for!(Envelope<WalkthroughReport>),
+    );
+    describing(kinds, kind::WATCH, schema_for!(Envelope<SupervisionReport>));
 }
 
 /// One kind, and the shape of the envelope carrying it.
@@ -193,7 +166,7 @@ mod tests {
     use crate::stack::closure::Plan;
 
     /// Arms in `Outcome::envelope`, so a variant added without a sample here fails.
-    const OUTCOMES: usize = 20;
+    const OUTCOMES: usize = 22;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -246,6 +219,28 @@ mod tests {
                 overall: crate::doctor::Overall::Healthy,
                 findings: Vec::new(),
             }),
+            Outcome::Repair(crate::app::repair::Report {
+                offered: vec![a_repair()],
+                agreement: crate::repair::agreement(&[a_repair()]),
+                mended: vec![crate::app::repair::Mended {
+                    repair: a_repair(),
+                    outcome: crate::repair::Outcome::Fixed,
+                }],
+                beyond: vec![crate::app::repair::Beyond {
+                    check: "vpn.killswitch".to_owned(),
+                    remedy: crate::error::Remedy::new("ask for help"),
+                }],
+                acted: true,
+            }),
+            Outcome::Undo(crate::app::repair::Reversal {
+                reversed: vec![crate::journal::Undo {
+                    target: "qbittorrent".to_owned(),
+                    action: crate::journal::Action::Restore {
+                        key: "QBITTORRENT_PORT".to_owned(),
+                        value: Some("8080".to_owned()),
+                    },
+                }],
+            }),
             Outcome::Seed(crate::seed::Report::default()),
             Outcome::Reset(ResetReport::default()),
             Outcome::Word(a_word()),
@@ -272,6 +267,17 @@ mod tests {
                 words: vec![a_word()],
             }),
         ]
+    }
+
+    /// One repair with every field filled, so the shape is compared whole rather
+    /// than with the halves an empty offer leaves out.
+    fn a_repair() -> crate::repair::Repair {
+        crate::repair::Repair {
+            check: "vpn.port-forward-client".to_owned(),
+            does: "move the download client onto the forwarded port".to_owned(),
+            effects: vec!["transfers in flight pause briefly".to_owned()],
+            reversible: true,
+        }
     }
 
     /// One word with every field of an entry filled, so the shape is compared

@@ -51,10 +51,53 @@ pub struct Arguments {
     pub filenames: Filenames,
     /// The settings to show as they are, named as the bundle names them.
     pub reveal: Vec<String>,
+    /// The check a warning is being answered for.
+    pub check: Option<String>,
+    /// Whether the checks that disturb the running system are included.
+    pub disruptive: Disturbing,
+    /// The offer the repairs agreed to were read in, as it named itself.
+    pub offer: Option<String>,
+    /// The checks whose repairs were agreed to, as that offer names them.
+    pub agreed: Vec<String>,
     /// Whether a cost the action would incur was agreed to in advance.
     pub confirm: bool,
     /// The one thing to add end to end, as it would be said.
     pub item: Option<String>,
+}
+
+/// Whether a run includes the checks that disturb a running system.
+///
+/// A two-variant reading of the bare word a surface carries rather than a fourth
+/// flag among three: `--fix-disruptive` on a command line and a `disruptive` in a
+/// request body are one word that is there or is not, and which way round it reads
+/// is decided here, once. A surface that read it the other way round would drop the
+/// default route out from under a stack nobody asked it to disturb.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(from = "bool")]
+pub enum Disturbing {
+    /// Left out, which is what an ordinary run does.
+    #[default]
+    Left,
+    /// Included, because the operator asked for them.
+    Included,
+}
+
+impl From<bool> for Disturbing {
+    fn from(asked: bool) -> Self {
+        if asked {
+            Self::Included
+        } else {
+            Self::Left
+        }
+    }
+}
+
+impl Disturbing {
+    /// Whether the command this reaches is told to include them.
+    #[must_use]
+    pub const fn included(self) -> bool {
+        matches!(self, Self::Included)
+    }
 }
 
 /// The actions whose command carries the forms it was given.
@@ -72,15 +115,24 @@ pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "w
 
 /// The actions whose command carries the operator's agreement.
 ///
-/// Five, and no others. Each names something that cannot be taken back once it is
+/// Six, and no others. Each names something that cannot be taken back once it is
 /// done: quality this host would have to transcode in software, bandwidth spent
 /// re-fetching a library that is already here, hand-edits to the stack files
-/// discarded, a configuration overwritten by an archive, and a credential printed
-/// into a file people post in public. Unconfirmed, each of the five reports what
+/// discarded, a configuration overwritten by an archive, a credential printed
+/// into a file people post in public, and a machine changed under an operator who
+/// only asked what was wrong with it. Unconfirmed, each of the six reports what
 /// it would cost and changes nothing, so the agreement is a fork inside the
 /// command rather than a gate in front of it.
 ///
-/// Four of them the command line declares a flag for. A restore is the one it
+/// A repair is the one where it is the whole of the design rather than a guard in
+/// front of it. Unconfirmed it *is* the offer — each repair with what it would do
+/// and what else changes if it does — and the yes that follows names the offer it
+/// was read in through [`TAKES_CONSENT`]. Given alone it is the standing consent
+/// the command line spells `--yes`: a decision taken before there was an offer to
+/// read, which is a different thing from skipping being told.
+///
+/// Four of them the command line declares a `--confirm` for, and a repair declares
+/// `--yes`, which is the same fork under the name that fits it. A restore is the one it
 /// answers for itself: it lists what the archive holds and then restores, which is
 /// the same two commands in one run, because the operator who typed it is there to
 /// read the listing. A browser is not, so it is given the listing and asked again.
@@ -97,10 +149,45 @@ pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "w
 pub const TAKES_AGREEMENT: &[&str] = &[
     "quality-set",
     "quality-upgrade",
+    "repair",
     "reset",
     "restore",
     "support",
 ];
+
+/// The actions whose command carries the operator's consent to *this* offer.
+///
+/// A repair and nothing else. The two are one group because neither means anything
+/// without the other: repairs are agreed to out of an offer, and an offer with no
+/// repair agreed to out of it is consent that has lost its subject. Together with
+/// the agreement beside them they are the whole of what a consent that crossed a
+/// request boundary has to say — which offer, and which of it.
+///
+/// No other action needs one, because no other action shows the operator something
+/// and then acts on what they answered. Everywhere else the reply is the answer.
+pub const TAKES_CONSENT: &[&str] = &["repair"];
+
+/// The actions whose command carries whether the disturbing checks are included.
+///
+/// Two. The command line spells it as two flags because clap keys an argument by
+/// the field it sits on, so widening the suite while accepting a warning is
+/// `doctor --disruptive` and widening it while repairing is
+/// `doctor --fix --fix-disruptive`. One argument here, because what it asks for is
+/// one thing: run the checks that disturb a running system.
+///
+/// It is not consent to a repair. Which checks run and which repairs are agreed to
+/// are separate decisions, and an action that took one for the other would have an
+/// operator widening the suite and finding it had also carried something out.
+///
+/// The diagnosis this surface serves as a read takes no such argument. A check that
+/// disturbs a running system changes something, and changes are asked for here.
+pub const TAKES_DISRUPTION: &[&str] = &["repair", "accept"];
+
+/// The action whose command carries the check whose warning is being answered.
+///
+/// Accepting and nothing else. It is required rather than optional: an accept that
+/// names no check is a diagnosis, which this surface already serves as a read.
+pub const TAKES_CHECK: &[&str] = &["accept"];
 
 /// The actions whose command carries the services it was given.
 ///
@@ -175,7 +262,7 @@ pub const TAKES_ITEM: &[&str] = &["walkthrough"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 15] = [
+    let carried: [(&str, bool, &[&str]); 19] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         ("service", given.service.is_some(), TAKES_SERVICE),
@@ -193,6 +280,10 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
             TAKES_BUNDLING,
         ),
         ("reveal", !given.reveal.is_empty(), TAKES_BUNDLING),
+        ("check", given.check.is_some(), TAKES_CHECK),
+        ("disruptive", given.disruptive.included(), TAKES_DISRUPTION),
+        ("offer", given.offer.is_some(), TAKES_CONSENT),
+        ("agreed", !given.agreed.is_empty(), TAKES_CONSENT),
         ("confirm", given.confirm, TAKES_AGREEMENT),
         ("item", given.item.is_some(), TAKES_ITEM),
     ];

@@ -161,6 +161,26 @@ pub enum Command {
         /// cost and chosen it, so it stops leading from now on.
         accept: Option<String>,
     },
+    /// Offer what the diagnosis found that lemonfiber can put right, and carry out
+    /// whatever this run was given consent for.
+    ///
+    /// Apart from [`Command::Doctor`] because looking and changing are two errands:
+    /// a diagnosis is a read every surface serves without asking anybody anything,
+    /// and this states what each repair would do and what else changes if it does,
+    /// and then acts only on what was agreed to.
+    Repair {
+        /// How much of the putting-right this run was given consent for.
+        consent: repair::Consent,
+        /// Whether the checks that disturb the running system are included, which
+        /// is a decision apart from consenting to any repair they turn up.
+        disruptive: bool,
+    },
+    /// Put back what the last repair changed, and nothing else.
+    ///
+    /// Its own command rather than an argument to [`Command::Repair`]: which repair
+    /// was last, what reversing it takes and which of those need a service to reach
+    /// are the core's to decide, so this carries no subject at all.
+    Undo,
     /// Show or change the quality preset — how good media should look, and how
     /// much disk it should cost — in plain language.
     Quality(QualityAction),
@@ -333,6 +353,10 @@ pub enum Outcome {
     Status(StatusReport),
     /// What the diagnostic checks found.
     Doctor(DoctorReport),
+    /// What could be put right, and what became of the ones agreed to.
+    Repair(repair::Report),
+    /// What putting back the last repair came to.
+    Undo(repair::Reversal),
     /// What seeding wired, and what it left for a re-run.
     Seed(crate::seed::Report),
     /// What a full reset did, or would do — the operator edits reverted to lemonfiber's.
@@ -371,6 +395,8 @@ impl Outcome {
             Self::Glossary(_) => kind::GLOSSARY,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
+            Self::Repair(_) => kind::REPAIR,
+            Self::Undo(_) => kind::UNDO,
             Self::Seed(_) => kind::SEED,
             Self::Reset(_) => kind::RESET,
             Self::Wizard(_) => kind::WIZARD,
@@ -402,6 +428,8 @@ impl serde::Serialize for Outcome {
             Self::Glossary(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
+            Self::Repair(report) => report.serialize(serializer),
+            Self::Undo(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
             Self::Reset(report) => report.serialize(serializer),
             Self::Wizard(report) => report.serialize(serializer),
@@ -474,6 +502,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
             accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
         }
+        Command::Repair {
+            consent,
+            disruptive,
+        } => repair::putting_right(ctx, &consent, disruptive)
+            .await
+            .map(Outcome::Repair),
+        Command::Undo => repair::reversing(ctx).await.map(Outcome::Undo),
         // Held open until the location is lost, which is what a guard is. The
         // interval is this command's own rather than the caller's: a surface that
         // could choose it could choose one that misses the moment it exists for.
@@ -615,6 +650,59 @@ mod tests {
         assert!(
             json.contains(r#""path":null"#),
             "nothing was written: {json}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_offer_serialises_under_its_own_kind() {
+        // In-crate as well as from `tests/`, for the reason the bundle above is:
+        // this file carries tests of its own and so is mapped twice, and an arm
+        // reached only from outside the crate is one this mapping never runs.
+        //
+        // Given no consent, so it offers and puts none of it right — which is still
+        // the whole of the dispatch, envelope and serialise arms.
+        let json = dispatch(
+            Command::Repair {
+                consent: super::repair::Consent::Offer,
+                disruptive: false,
+            },
+            &crate::app::fixtures::ctx_at("dispatched-offer"),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(json.contains(r#""kind":"repair""#), "{json}");
+        assert!(
+            json.contains(r#""acted":false"#),
+            "nothing was carried out: {json}"
+        );
+        // The offer names itself on the way out, which is what a consent sent back
+        // in another request has to be able to say.
+        assert!(json.contains(r#""agreement":"#), "{json}");
+    }
+
+    #[tokio::test]
+    async fn a_dispatched_reversal_serialises_under_its_own_kind() {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-dispatched-undo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(dir.join("config"));
+        let _ = std::fs::create_dir_all(dir.join("data"));
+        let settings = Settings {
+            env_file: Some(dir.join("config").join(".env")),
+            stack_dir: Some(dir.join("data").join("stack")),
+            ..Settings::default()
+        };
+        let json = dispatch(Command::Undo, &a_context().settings(settings).build())
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(json.contains(r#""kind":"undo""#), "{json}");
+        assert!(
+            json.contains(r#""reversed":[]"#),
+            "nothing had been repaired, so nothing went back: {json}"
         );
     }
 
@@ -1001,6 +1089,8 @@ mod tests {
                 | Outcome::Glossary(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
+                | Outcome::Repair(_)
+                | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
                 | Outcome::Wizard(_)
@@ -1034,6 +1124,8 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Status(_)
+                | Outcome::Repair(_)
+                | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
                 | Outcome::Wizard(_)
@@ -1684,6 +1776,8 @@ mod tests {
                 | Outcome::Glossary(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
+                | Outcome::Repair(_)
+                | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
                 | Outcome::Wizard(_)
@@ -2667,6 +2761,8 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Doctor(_)
+                | Outcome::Repair(_)
+                | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
                 | Outcome::Wizard(_)

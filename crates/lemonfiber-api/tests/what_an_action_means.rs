@@ -16,15 +16,16 @@ use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
 use lemonfiber_api::actions;
 use lemonfiber_api::actions::{
-    answering, declined, named, Answering, Arguments, Refused, OFFERED, TAKES_AGREEMENT,
-    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_FORMS, TAKES_ITEM, TAKES_PRESET, TAKES_SERVICE,
-    TAKES_SERVICES, TAKES_SETTING,
+    answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED,
+    TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
+    TAKES_FORMS, TAKES_ITEM, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
 };
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::bundle::Wanted;
+use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::{Command, Ctx, QualityAction};
 use lemonfiber_core::bundle::Filenames;
@@ -455,6 +456,14 @@ fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
+        check: takes(TAKES_CHECK).then(|| WARNED.to_owned()),
+        disruptive: takes(TAKES_DISRUPTION).into(),
+        offer: takes(TAKES_CONSENT).then(|| OFFER.to_owned()),
+        agreed: if takes(TAKES_CONSENT) {
+            vec![WARNED.to_owned()]
+        } else {
+            Vec::new()
+        },
         confirm: takes(TAKES_AGREEMENT),
         item: takes(TAKES_ITEM).then(|| ITEM.to_owned()),
     }
@@ -469,6 +478,14 @@ const LOGS: u32 = 12;
 
 /// One thing to walk end to end, named the way somebody would say it.
 const ITEM: &str = "Sintel";
+
+/// A check by the name a finding gives it — the one a warning is answered for, and
+/// the one a repair is agreed to for.
+const WARNED: &str = "vpn.unprotected";
+
+/// An offer, as one names itself. Not one any real offer would produce, so consent
+/// carrying it can only have come from here.
+const OFFER: &str = "0f0f0f0f";
 
 /// Whether the command has the forms it was given in it.
 fn carries_forms(command: &Command) -> bool {
@@ -534,6 +551,59 @@ fn carries_agreement(command: &Command) -> bool {
                 },
                 ..
             }
+    ) || carries_a_yes(command)
+}
+
+/// Whether a repairing run was told yes, in either of the two ways of saying it.
+///
+/// A repair carries the agreement inside the consent rather than beside it, because
+/// what was agreed to and whether anything was are one decision. An offer is the
+/// only shape that carries no yes, which is what makes it the offer.
+fn carries_a_yes(command: &Command) -> bool {
+    match command {
+        Command::Repair { consent, .. } => !matches!(consent, Consent::Offer),
+        _ => false,
+    }
+}
+
+/// Whether the command has the check whose warning is being answered in it.
+fn carries_check(command: &Command) -> bool {
+    matches!(command, Command::Doctor { accept: Some(check), .. } if check == WARNED)
+}
+
+/// Whether the command was told to include the checks that disturb the system.
+fn carries_disruption(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Repair {
+            disruptive: true,
+            ..
+        } | Command::Doctor {
+            disruptive: true,
+            ..
+        }
+    )
+}
+
+/// Whether the command has the offer the consent was read in.
+fn carries_offer(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Repair {
+            consent: Consent::Given { offer, .. },
+            ..
+        } if offer == OFFER
+    )
+}
+
+/// Whether the command has the repairs that were agreed to.
+fn carries_agreed(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Repair {
+            consent: Consent::Given { repairs, .. },
+            ..
+        } if repairs.iter().any(|check| check == WARNED)
     )
 }
 
@@ -647,6 +717,25 @@ fn give_item(given: &mut Arguments) {
     given.item = Some(ITEM.to_owned());
 }
 
+fn give_check(given: &mut Arguments) {
+    given.check = Some(WARNED.to_owned());
+}
+
+fn give_disruption(given: &mut Arguments) {
+    given.disruptive = Disturbing::Included;
+}
+
+// One at a time, like every other sweep. The action that takes them was given both
+// already; an action that takes neither must be refused for the one being swept for
+// rather than for its companion.
+fn give_offer(given: &mut Arguments) {
+    given.offer = Some(OFFER.to_owned());
+}
+
+fn give_agreed(given: &mut Arguments) {
+    given.agreed = vec![WARNED.to_owned()];
+}
+
 /// One argument the carrier holds: its name, how to give it, and what it looks like
 /// to have arrived on the command the action reached.
 type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
@@ -657,7 +746,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 15] = [
+const SWEEPS: [Sweep; 19] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("service", give_service, carries_service),
@@ -671,6 +760,10 @@ const SWEEPS: [Sweep; 15] = [
     ("logs", give_logs, carries_logs),
     ("filenames", give_filenames, carries_filenames),
     ("reveal", give_reveal, carries_reveal),
+    ("check", give_check, carries_check),
+    ("disruptive", give_disruption, carries_disruption),
+    ("offer", give_offer, carries_offer),
+    ("agreed", give_agreed, carries_agreed),
     ("confirm", give_agreement, carries_agreement),
     ("item", give_item, carries_item),
 ];
@@ -734,6 +827,10 @@ fn every_argument_the_carrier_holds_is_swept() {
         "logs",
         "filenames",
         "reveal",
+        "check",
+        "disruptive",
+        "offer",
+        "agreed",
         "confirm",
         "item",
     ];

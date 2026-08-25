@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber_core::app::repair::retract;
-use lemonfiber_core::app::{diagnose, Ctx};
+use lemonfiber_core::app::{diagnose, dispatch, Command, Ctx};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Narrowing};
@@ -246,4 +246,38 @@ async fn nothing_repaired_puts_nothing_back() {
     let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
 
     assert!(put_back.is_ok_and(|undos| undos.is_empty()));
+}
+
+/// The reversal, asked for the way every surface asks for it.
+///
+/// Through the dispatcher rather than through [`retract`] directly, and from here as
+/// well as in-crate for the reason at the top of this file. The change goes back on
+/// the host, so no service has to answer for the shape of the reply to be held.
+#[tokio::test]
+async fn a_dispatched_reversal_answers_under_its_own_kind_and_says_what_went_back() {
+    let root = scratch("dispatched");
+    journalled(
+        &root,
+        &[Change {
+            at: "3000".to_owned(),
+            operation: OPERATION.to_owned(),
+            target: "qbittorrent".to_owned(),
+            kind: Kind::Set {
+                key: "QBITTORRENT_PORT".to_owned(),
+                previous: Some("8080".to_owned()),
+                current: "51413".to_owned(),
+            },
+        }],
+    );
+
+    let json = dispatch(Command::Undo, &ctx(&root, Fake::silent()))
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+
+    assert!(json.contains(r#""kind":"undo""#), "{json}");
+    // What went back, said as what reversing it does rather than as a count.
+    assert!(json.contains(r#""does":"restore""#), "{json}");
+    assert!(json.contains(r#""value":"8080""#), "{json}");
 }
