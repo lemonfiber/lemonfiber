@@ -8,6 +8,10 @@
 //! reply that waited for it would tie the work to whoever asked. So the reply is a
 //! name for the work instead, and what happens to that request afterwards — answered,
 //! abandoned, a browser tab closed — cannot reach what it started.
+//!
+//! A name is only an answer if it can be redeemed. The surface that hands one out
+//! answers for it afterwards: what the work came to is asked for by the name, and
+//! the answer is the envelope the equivalent command renders.
 
 use serde::Serialize;
 
@@ -18,7 +22,7 @@ use serde::Serialize;
 /// asking it to keep a second copy of what this already knows.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Started {
-    /// The name to follow this work by on the event stream.
+    /// The name to ask what became of this work by.
     pub job: String,
     /// The action that was asked for, as it was named.
     pub action: String,

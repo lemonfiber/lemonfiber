@@ -1,4 +1,4 @@
-//! The six reads: one endpoint per question a command already answers.
+//! The seven reads: one endpoint per question a command already answers.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
 //! into the command a person would type, hands that to the dispatcher the
@@ -11,11 +11,14 @@
 //! warning or running the checks that disturb a running system changes something
 //! and belongs where changes are asked for.
 //!
-//! Four commands answer six endpoints. `status` and `services` are one reading of
-//! what is running, whole and narrowed to named forms; `storage` is the group of
-//! checks about the disk, which `checks` will also narrow to. Two endpoints over
-//! one command is two names for one answer, which is the opposite of two gathers
-//! that can disagree.
+//! The endpoints and the commands do not count the same, and the mismatch runs
+//! both ways. `status` and `services` are one reading of what is running, whole
+//! and narrowed to named forms; `storage` is the group of checks about the disk,
+//! which `checks` will also narrow to. Two endpoints over one command is two names
+//! for one answer, which is the opposite of two gathers that can disagree. `forms`
+//! goes the other way and is one endpoint over two commands, because the request
+//! is one word on the command line too: naming no form lists what the stack
+//! declares, and naming some says what starting those would come to.
 
 use axum::body::Body;
 use axum::extract::{RawQuery, State};
@@ -67,12 +70,29 @@ const UNRENDERABLE: &str = "This answer could not be rendered.";
 /// The reads this surface answers.
 pub fn routes() -> Router<Serving> {
     Router::new()
+        .route("/api/forms", get(forms))
         .route("/api/status", get(status))
         .route("/api/services", get(services))
         .route("/api/checks", get(checks))
         .route("/api/storage", get(storage))
         .route("/api/logs", get(log_lines))
         .route("/api/requests", get(requests))
+}
+
+/// Every form the stack declares, or what naming some of them would come to.
+///
+/// Forms come from the stack rather than from lemonfiber, so their names are not
+/// something a caller can hold in advance. Naming none lists them and naming some
+/// resolves them, which is the fork `lemonfiber forms` takes on the same word.
+async fn forms(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
+    let asked = Asked::read(query.as_deref());
+    let named = asked.every(FORM);
+    let command = if named.is_empty() {
+        Command::Forms
+    } else {
+        Command::Preview { forms: named }
+    };
+    carried_out(&serving.ctx, command).await
 }
 
 /// What the whole stack is doing.

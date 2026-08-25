@@ -14,13 +14,13 @@
 //! and a request that waited for it would tie the work to a connection. So those
 //! are answered with a name for the work instead, and the work runs somewhere the
 //! connection cannot reach — a browser tab closed mid-repair takes nothing with
-//! it. An action that only reads and writes lemonfiber's own files is answered
-//! with its outcome, because it has already finished by the time it could be.
+//! it. What that name is redeemed for lives in [`crate::jobs`]. An action that
+//! only reads and writes lemonfiber's own files is answered with its outcome,
+//! because it has already finished by the time it could be.
 //!
 //! No payload is serialised here. An envelope renders itself, and the same
 //! rendering answers the command line.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -29,29 +29,29 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
-use lemonfiber_core::app::{dispatch, Command, Ctx, QualityAction};
+use lemonfiber_core::app::{Command, QualityAction};
 use lemonfiber_core::audio::Format;
-use lemonfiber_core::model::{kind, Envelope, Started};
-use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 use serde::Deserialize;
-use tokio::sync::Mutex;
 
-use crate::guard::hex;
-use crate::read::{carried_out, enveloped};
+use crate::jobs::{accepted, Job};
+use crate::read::carried_out;
 use crate::router::Serving;
 use crate::serve::{carrying, SENTENCE};
-
-/// Bytes of name. Wide enough that two runs never mint the same one.
-const WIDTH: usize = 8;
 
 /// The arguments an action was given, mirroring the flags its command takes.
 ///
 /// Declared as one carrier rather than one shape per action, so a caller sends
-/// the field an action names and nothing else. A field an action does not use is
-/// refused rather than ignored: a caller who spelled `service` where `services`
+/// the field an action names and nothing else. A name the carrier does not hold
+/// is refused rather than ignored: a caller who spelled `service` where `services`
 /// was meant has been told, instead of watching a whole form stop.
+///
+/// A name the carrier holds and the action's command has nowhere to put is refused
+/// too. Those are the fields that would have changed what the action did, so
+/// dropping one answers a different request from the one that was asked — an
+/// agreement that turns out to guard nothing, or a service named to a start that
+/// then starts the whole form.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Arguments {
@@ -93,6 +93,13 @@ pub enum Refused {
         /// What it said, and what it could have said instead.
         offered: String,
     },
+    /// The argument was given to an action whose command has nowhere to put it.
+    Unwanted {
+        /// The action it was given to.
+        action: String,
+        /// The argument it does not take.
+        argument: String,
+    },
 }
 
 impl Refused {
@@ -101,7 +108,9 @@ impl Refused {
     pub const fn status(&self) -> StatusCode {
         match self {
             Self::Unknown { .. } => StatusCode::NOT_FOUND,
-            Self::Missing { .. } | Self::Unrecognised { .. } => StatusCode::BAD_REQUEST,
+            Self::Missing { .. } | Self::Unrecognised { .. } | Self::Unwanted { .. } => {
+                StatusCode::BAD_REQUEST
+            }
         }
     }
 
@@ -119,6 +128,11 @@ impl Refused {
             Self::Unrecognised { argument, offered } => {
                 format!("The `{argument}` given is not one this stack knows: {offered}")
             }
+            Self::Unwanted { action, argument } => format!(
+                "The action `{action}` takes no `{argument}`. It is refused rather \
+                 than dropped, because dropping it would carry out a different \
+                 request from the one asked for."
+            ),
         }
     }
 }
@@ -172,6 +186,23 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     if NAMES_ITS_FORMS.contains(&action) && forms.is_empty() {
         return Err(needs("forms"));
     }
+    // An argument that changes what an action does, given to an action whose command
+    // has nowhere to put it, is refused rather than dropped: dropped, it carries out
+    // a different request from the one that was asked and says nothing about having
+    // done so. Only for a name this surface offers — a name it does not offer is
+    // absent before it is anything else.
+    let carried: [(&str, bool, &[&str]); 2] = [
+        ("confirm", confirm, TAKES_AGREEMENT),
+        ("services", !services.is_empty(), TAKES_SERVICES),
+    ];
+    for (argument, given, takers) in carried {
+        if given && OFFERED.contains(&action) && !takers.contains(&action) {
+            return Err(Refused::Unwanted {
+                action: action.to_owned(),
+                argument: argument.to_owned(),
+            });
+        }
+    }
     match action {
         "up" => Ok(Command::Up { forms }),
         // Stopping named services and tearing a form down are different requests
@@ -204,6 +235,40 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
 
 /// The actions that must be told what to act on.
 const NAMES_ITS_FORMS: [&str; 3] = ["switch", "restart", "pull"];
+
+/// The actions whose command carries the operator's agreement.
+///
+/// The three the command line declares `--confirm` on, and no others. Each names
+/// something that cannot be taken back once it is done: quality this host would
+/// have to transcode in software, bandwidth spent re-fetching a library that is
+/// already here, and hand-edits to the stack files discarded. Unconfirmed, each of
+/// the three reports what it would cost and changes nothing, so the agreement is a
+/// fork inside the command rather than a gate in front of it.
+///
+/// A teardown is not one of them. `down` removes what a form started and `up` puts
+/// it back, so there is no cost to agree to in advance — and the question the
+/// command line does ask before a teardown is not this one. It asks whether to let
+/// a download in flight finish, which is answered by waiting rather than by
+/// agreeing, and a machine-readable run is never asked it at all.
+///
+/// Choosing for music is inside `quality-set` and drops the agreement, because
+/// picking an audio format is not a choice this host has to transcode for. The
+/// command line drops it there too.
+const TAKES_AGREEMENT: &[&str] = &["quality-set", "quality-upgrade", "reset"];
+
+/// The actions whose command carries the services it was given.
+///
+/// Stopping named services is `Command::Halt`, a different request from a teardown
+/// rather than a teardown with an argument, and a restart carries the services it
+/// restarts. No other command has a field to put them in.
+///
+/// `up` is the one whose absence costs something. The command line starts named
+/// services through a streamed path of its own that never reaches a `Command`, so
+/// there is nothing here to hand them to — and dropping them starts every service
+/// the form holds, which is the answer to a request nobody made. Whether starting
+/// named services is its own request, the way `Halt` is its own request, is a
+/// question for the core rather than for this table.
+const TAKES_SERVICES: &[&str] = &["down", "restart"];
 
 /// Every action this surface offers, in the order they are worth reading.
 ///
@@ -266,90 +331,6 @@ fn quality(preset: &str, media_type: Option<String>, confirm: bool) -> Result<Co
     }
 }
 
-/// A name for work that outlives the request that started it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Job(String);
-
-impl Job {
-    /// Mints one, or nothing when the operating system will not say.
-    ///
-    /// Through the port rather than taken directly, so a test names a job it
-    /// chose instead of depending on what the machine happens to produce.
-    pub fn mint(random: &dyn Random) -> Option<Self> {
-        Some(Self(hex(&random.bytes(WIDTH)?)))
-    }
-
-    /// The name as it is answered with, and as it appears on the stream.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// Where a piece of work got to.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Standing {
-    /// Still going.
-    Running,
-    /// Finished, and this is the envelope it came to.
-    Done(String),
-    /// Stopped, and this is the envelope saying why.
-    Failed(String),
-}
-
-/// The work this run started, and where each piece of it got to.
-///
-/// Held for the life of the run rather than written down. A job names work in
-/// flight, and work in flight does not survive the process that is doing it —
-/// so a record that outlived the run would describe jobs nothing is running.
-#[derive(Clone, Default)]
-pub struct Jobs(Arc<Mutex<HashMap<String, Standing>>>);
-
-impl Jobs {
-    /// Start work under a name, and stop holding on to it.
-    ///
-    /// The work is handed to the runtime rather than awaited, which is the whole
-    /// point: what happens to the request afterwards — answered, abandoned, a tab
-    /// closed — cannot reach it.
-    pub async fn start(&self, job: &Job, command: Command, ctx: Arc<Ctx>) {
-        let (name, held) = (job.as_str().to_owned(), Arc::clone(&self.0));
-        held.lock().await.insert(name.clone(), Standing::Running);
-        tokio::spawn(async move {
-            // Nothing is invented for a payload that could not be rendered: these
-            // are plain owned values, and the empty arm is reached only by being
-            // handed one, which nothing here can be.
-            let standing = match dispatch(command, &ctx).await {
-                Ok(outcome) => Standing::Done(outcome.envelope().to_json().unwrap_or_default()),
-                Err(problem) => Standing::Failed(
-                    Envelope::new(kind::ERROR, &*problem)
-                        .to_json()
-                        .unwrap_or_default(),
-                ),
-            };
-            held.lock().await.insert(name, standing);
-        });
-    }
-
-    /// Where a named piece of work got to, or nothing for a name this run never
-    /// handed out.
-    pub async fn standing(&self, job: &str) -> Option<Standing> {
-        self.0.lock().await.get(job).cloned()
-    }
-}
-
-/// A job accepted, named so the stream can be followed for it.
-#[must_use]
-pub fn accepted(job: &Job, action: &str) -> Response {
-    let started = Started {
-        job: job.as_str().to_owned(),
-        action: action.to_owned(),
-    };
-    enveloped(
-        StatusCode::ACCEPTED,
-        Envelope::new(kind::JOB, started).to_json(),
-    )
-}
-
 /// An action refused, said plainly rather than as a bare status.
 ///
 /// Prose rather than an envelope, and labelled as prose, the way every other
@@ -386,7 +367,7 @@ async fn taken(
             };
             serving
                 .jobs
-                .start(&job, command, Arc::clone(&serving.ctx))
+                .start(&job, &action, command, Arc::clone(&serving.ctx))
                 .await;
             accepted(&job, &action)
         }
