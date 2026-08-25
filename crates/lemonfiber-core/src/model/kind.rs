@@ -46,6 +46,8 @@ pub const DOCTOR: Kind = Kind("doctor");
 pub const ERROR: Kind = Kind("error");
 /// Every form the stack declares.
 pub const FORMS: Kind = Kind("forms");
+/// Every word this product explains.
+pub const GLOSSARY: Kind = Kind("glossary");
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
 /// The name given to work that outlives the request that started it.
@@ -97,6 +99,7 @@ pub const ALL: &[Kind] = &[
     DOCTOR,
     ERROR,
     FORMS,
+    GLOSSARY,
     HOUSEHOLD,
     JOB,
     LIFECYCLE,

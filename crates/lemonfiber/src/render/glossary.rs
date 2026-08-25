@@ -1,4 +1,9 @@
-//! The words a report used, explained underneath it.
+//! What this product's words mean, wherever they are shown.
+//!
+//! Three shapes over the one table: a footnote under a report that used a word, the
+//! longer form for somebody who went and asked about one, and the list of what there
+//! is to ask about for somebody who does not yet know a word to name. Only the first
+//! of them is a decision about when to explain; the other two were asked for.
 //!
 //! An explanation has to arrive where the word does — a glossary somewhere else is a
 //! page nobody opens while they are in the middle of something. But an explanation
@@ -18,11 +23,10 @@
 //! offered and an explanation imposed.
 
 use lemonfiber_core::acknowledged::Acknowledged;
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
-use lemonfiber_core::glossary::{explain, mentioned, Term, TERMS};
+use lemonfiber_core::glossary::{mentioned, Term, Vocabulary};
 use lemonfiber_core::text::Overrun;
 
-use super::Lines;
+use super::{Lines, PRODUCT};
 
 /// How many words one report will explain before it stops.
 const MOST: usize = 3;
@@ -34,6 +38,9 @@ const WIDTH: usize = 74;
 const FIRST: &str = "  ";
 /// Deeper than the word, so a wrapped explanation cannot be mistaken for a new one.
 const AFTER: &str = "      ";
+
+/// Where the longer form of any of these words is, said under both of the lists.
+const SAYS_MORE: &str = "`lemonfiber explain <word>` says more.";
 
 /// The words this operator has already gone and found out about.
 ///
@@ -119,19 +126,12 @@ pub(crate) fn footnotes(text: &str, wanted: bool, known: &Acknowledged) -> Lines
             lines.put(format!("{FIRST}{line}"));
         }
     }
-    lines.put(format!("{FIRST}`lemonfiber explain <word>` says more."));
+    lines.put(format!("{FIRST}{SAYS_MORE}"));
     lines
 }
 
 /// The longer form of one word, for somebody who asked for it.
-///
-/// `None` where this product does not explain that word, which the caller reports as
-/// a refusal rather than showing an empty answer that reads as "it means nothing".
-pub(crate) fn explained(word: &str, parsed: bool) -> Option<Lines> {
-    let term = explain(word)?;
-    if parsed {
-        return Some(as_a_document(term));
-    }
+pub(crate) fn explanation(term: &Term) -> Lines {
     let mut lines = Lines::default();
 
     lines.put(term.word);
@@ -152,40 +152,21 @@ pub(crate) fn explained(word: &str, parsed: bool) -> Option<Lines> {
             term.also_called.join(", ")
         ));
     }
-    Some(lines)
+    lines
 }
 
-/// A word this product does not explain, as a refusal that says what it does.
+/// Every word there is to ask about, each with the sentence somebody needs.
 ///
-/// Through the error model rather than a bare line, so it carries a code and a way
-/// forward like every other refusal — and the way forward is the list itself, which
-/// is short enough to be the answer rather than a pointer at one.
-pub(crate) fn unrecognised(word: &str) -> Problem {
-    let words: Vec<&str> = TERMS.iter().map(|term| term.word).collect();
-    Problem::new(
-        Code::new("WORD-1"),
-        Severity::Error,
-        format!("`{word}` is not one of the words this product explains"),
-        "What is explained here is this ecosystem's own vocabulary — the words that \
-         are load-bearing and cannot be guessed. Having no entry is not the same as \
-         meaning nothing, and nothing is wrong with your stack.",
-        Remedy::new("Ask about one of the words its reports use"),
-    )
-    .with_detail(format!("It explains these — {}.", words.join(", ")))
-}
-
-/// The same word, for something that will parse it.
-///
-/// The whole entry rather than the sentence: a script asking what a word means has
-/// no way to ask a second time for the rest, and the longer form and the other
-/// services' names are the parts it could not have guessed.
-fn as_a_document(term: &Term) -> Lines {
-    let mut lines = Lines::for_a_parser();
-    lines.put(
-        lemonfiber_core::model::Envelope::new(lemonfiber_core::model::kind::WORD, term)
-            .to_json()
-            .unwrap_or(super::UNRENDERABLE.to_owned()),
-    );
+/// The whole table at once, which is the answer to "what can I ask about" rather
+/// than to "what does this mean" — so the short form only, and the longer one a
+/// command away for whichever of them the reader stops at.
+pub(crate) fn vocabulary(listed: &Vocabulary) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("{PRODUCT} explains these words:"));
+    for term in &listed.words {
+        entry(&mut lines, term);
+    }
+    lines.spaced(format!("{FIRST}{SAYS_MORE}"));
     lines
 }
 
@@ -234,9 +215,24 @@ fn wrapped(text: &str, width: usize) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        explained, footnotes, known, settle, settle_known, unrecognised, wanted, wrapped, WIDTH,
+        explanation, footnotes, known, settle, settle_known, vocabulary, wanted, wrapped, WIDTH,
     };
     use lemonfiber_core::acknowledged::Acknowledged;
+    use lemonfiber_core::glossary::{explain, Term};
+
+    /// One word, or a word that stands for the table having lost it.
+    ///
+    /// Named rather than looked up at each call: every test below is about how an
+    /// entry is shown, and a missing one is a failure of the table this file does
+    /// not own.
+    fn a_word(word: &str) -> Term {
+        explain(word).copied().unwrap_or(Term {
+            word: "",
+            short: "",
+            deep: None,
+            also_called: &[],
+        })
+    }
 
     /// The whole point: a report that used a word says what it meant, underneath.
     #[test]
@@ -426,9 +422,7 @@ mod tests {
 
     #[test]
     fn asking_about_a_word_gives_the_longer_form_and_the_other_names() {
-        let said = explained("indexer", false)
-            .map(|lines| lines.text())
-            .unwrap_or_default();
+        let said = explanation(&a_word("indexer")).text();
 
         assert!(said.starts_with("indexer\n"), "{said}");
         assert!(
@@ -446,9 +440,7 @@ mod tests {
     /// the sentence they never had to read rather than run on from it.
     #[test]
     fn the_longer_form_is_separated_from_the_sentence() {
-        let said = explained("hardlink", false)
-            .map(|lines| lines.text())
-            .unwrap_or_default();
+        let said = explanation(&a_word("hardlink")).text();
 
         assert!(said.contains("space once"), "the sentence is there: {said}");
         assert!(said.contains("Deleting one"), "and the longer form: {said}");
@@ -459,50 +451,37 @@ mod tests {
     /// a blank space that reads as a missing explanation.
     #[test]
     fn a_word_with_no_longer_form_still_answers() {
-        let said = explained("killswitch", false)
-            .map(|lines| lines.text())
-            .unwrap_or_default();
+        let said = explanation(&a_word("killswitch")).text();
 
         assert!(said.contains("Stops the torrent client"), "{said}");
     }
 
-    /// Answering "it means nothing" for a word this product never explains would be
-    /// a wrong answer rather than an absent one.
-    /// A script asking what a word means gets the whole entry, because it has no
-    /// way to ask a second time for the rest — and the longer form and the other
-    /// services' names are the parts it could not have guessed.
+    /// Somebody who does not know the vocabulary cannot name a word out of it, so
+    /// asking what there is to ask about is answered with the whole table.
     #[test]
-    fn a_word_a_script_asked_about_is_one_document_it_can_parse() {
-        let said = explained("indexer", true)
-            .map(|lines| lines.text())
-            .unwrap_or_default();
+    fn asking_what_can_be_explained_lists_every_word_with_its_sentence() {
+        let listed = lemonfiber_core::glossary::vocabulary();
+        let said = vocabulary(&listed).text();
 
-        assert_eq!(said.lines().count(), 1, "one document: {said}");
-        assert!(said.contains("\"kind\":\"word\""), "{said}");
-        assert!(said.contains("\"word\":\"indexer\""), "{said}");
-        assert!(said.contains("Prowlarr"), "the longer form as well: {said}");
         assert!(
-            said.contains("search provider"),
-            "and the other names: {said}"
+            said.starts_with("lemonfiber explains these words:"),
+            "{said}"
         );
-    }
-
-    #[test]
-    fn a_word_this_product_does_not_explain_has_no_answer() {
-        assert!(explained("flux capacitor", false).is_none());
-    }
-
-    /// A refusal an operator cannot act on is worse than none, and here what to do
-    /// about it is short enough to simply be said.
-    #[test]
-    fn a_word_it_does_not_explain_is_refused_with_the_ones_it_does() {
-        let problem = unrecognised("indexr");
-
-        let summary = &problem.summary;
-        assert!(summary.contains("indexr"), "{summary}");
-        let detail = problem.detail.clone().unwrap_or_default();
-        assert!(detail.contains("indexer"), "{detail}");
-        assert!(detail.contains("hardlink"), "{detail}");
+        assert!(said.contains("indexer — Search engines"), "{said}");
+        assert!(
+            said.contains("`lemonfiber explain <word>` says more."),
+            "and where the longer form is: {said}"
+        );
+        // Asserted word by word rather than by counting the dashes between them: an
+        // explanation may itself hold an em dash, and a count would have failed for
+        // a reason with nothing to do with a word being left out.
+        let missing: Vec<&str> = listed
+            .words
+            .iter()
+            .map(|term| term.word)
+            .filter(|word| !said.contains(&format!("\n  {word} — ")))
+            .collect();
+        assert!(missing.is_empty(), "left out of the list: {missing:?}");
     }
 
     /// Cutting a word in half costs a reader more than the overrun does.

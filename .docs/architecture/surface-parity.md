@@ -69,7 +69,7 @@ and the rest is named in **Standing**.
 | `trace` | `/api/trace` | none | Served on the web, and it completes a screen that half-existed: `/api/requests` reports what the household asked for, and this follows one of them. What to follow is one query parameter — the command line takes it as words so it can be typed unquoted, and a query string carries the title whole. The terminal has no view of one item. |
 | `household` | `/api/requests` | none | Served on the web. The terminal has no view of what the household asked for. |
 | `walkthrough` | none | none | Unbuilt, and the surface it is least built for is the one it was designed for: it narrates for minutes, which is a job plus the event stream, and its audience is a first-time operator who is likelier to be in a browser than in a shell. |
-| `explain` | none | glossary | Answered from a table compiled into the binary, so it needs neither a stack nor a daemon. The terminal offers it on `?`. The browser has no route to it, and shipping a second copy of the glossary into the web app would be a surface implementing behaviour of its own. |
+| `explain` | `/api/explain` | glossary | Reachable in full, and the one read that needs neither a stack nor a daemon: the words are a table compiled into the binary, so a browser meeting one in a failure can ask what it means while the thing that failed is still down. One endpoint over two commands, the way `forms` is: naming a word explains that one, naming none lists what there is to ask about — which a caller that has never met this vocabulary needs before it can name anything. Served rather than shipped; a second copy of the table in the web app would be a surface explaining a word its own way. The terminal offers it on `?`, over the words on the screen. |
 | `stuck` | `/api/stuck` | dashboard, partial | Served on the web, which is where the dashboard's own "N stuck" figure lands: each entry is named the way `/api/trace` is asked, so the count leads somewhere. The terminal's panel lists them and offers no way to follow one. |
 | `seed` | `seed` | none | Offered on the web. No terminal form, like every other write. |
 | `adopt` | `adopt` | none | As above. |
@@ -81,8 +81,8 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, fourteen reach the web in full, five reach it in
-part, six do not reach it at all, and one — `ui` — is an honest exception. Eleven
+Of the twenty-six requests, fifteen reach the web in full, five reach it in
+part, five do not reach it at all, and one — `ui` — is an honest exception. Ten
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
 
@@ -115,10 +115,12 @@ an operator asks for, and a surface that could not say what is running would be
 crippled in exactly the way parity exists to prevent. So `version`, `forms`,
 `stuck`, `trace` and `explain` were counted alongside the writes. Being reads makes
 them cheap to build, not optional to build — and cheap was the argument for doing
-them first: each of the four now served was one endpoint over a command the core
-already carried out. `explain` is the one left, and it is the one that never had a
-command to reach: it is answered from a table compiled into the binary, so an
-endpoint for it is a read of that table rather than a dispatch.
+them first: each of the four served before it was one endpoint over a command the
+core already carried out. `explain` was the one left, and the one with no command to
+reach: the command line read the table compiled into the binary itself. So it was
+given one — rather than a second reader of that table beside the first, which is what
+would have made the endpoint a surface with behaviour of its own instead of a read
+like the others.
 
 ## The terminal acts on five of them
 

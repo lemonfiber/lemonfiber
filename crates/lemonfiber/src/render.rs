@@ -170,6 +170,12 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
         return machine_readable(outcome);
     }
     let mut lines = shaped(outcome);
+    // An explanation is not a report that used a word; it is the word. A footnote
+    // under it would explain the same word a second time and point at the command
+    // that had just been run.
+    if matches!(outcome, Outcome::Word(_) | Outcome::Glossary(_)) {
+        return lines;
+    }
     // Built from the finished report rather than by each renderer, because what a
     // report explains is a property of what it ended up saying — a renderer that
     // had to remember to do this would be a renderer that could forget.
@@ -195,6 +201,8 @@ fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Trace(report) => trace::trace(report),
         Outcome::Household(report) => trace::household(report),
         Outcome::Stuck(report) => trace::stuck(report),
+        Outcome::Word(term) => glossary::explanation(term),
+        Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Lifecycle(report) => stack::lifecycle(report),
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),
@@ -335,7 +343,7 @@ pub(crate) fn logged(service: &str, line: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::fixtures::{
-        a_lifecycle, a_plan, a_trace, a_version, a_watch, music_pick, preset, seed_report,
+        a_lifecycle, a_plan, a_term, a_trace, a_version, a_watch, music_pick, preset, seed_report,
         some_forms,
     };
     use super::{
@@ -345,6 +353,7 @@ mod tests {
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
+    use lemonfiber_core::glossary::Vocabulary;
     use lemonfiber_core::model::{
         ConfigReport, Disposition, DoctorReport, FormsReport, HouseholdReport, MusicReport,
         QualityReport, ResetReport, SettingReport, StatusReport, StuckReport, UpgradeReport,
@@ -541,6 +550,32 @@ mod tests {
         assert!(!settings(&unchanged).text().contains("save"));
     }
 
+    /// An explanation is the word rather than a report that used one, so explaining
+    /// it again underneath would be the same sentence twice and a pointer at the
+    /// command that had just been run.
+    #[test]
+    fn an_explanation_carries_no_footnote_about_the_word_it_explains() {
+        // Held against the switch that would also have emptied it, so a run with
+        // explanations turned off could not pass this by explaining nothing at all.
+        assert!(super::glossary::wanted(), "explanations are on");
+
+        let one = answer(&Outcome::Word(a_term()), false).text();
+        assert!(
+            one.contains("Search engines"),
+            "the word is answered: {one}"
+        );
+        assert!(!one.contains("Words used here:"), "{one}");
+
+        let listed = answer(
+            &Outcome::Glossary(Vocabulary {
+                words: vec![a_term()],
+            }),
+            false,
+        )
+        .text();
+        assert!(!listed.contains("Words used here:"), "{listed}");
+    }
+
     #[test]
     fn every_outcome_renders_and_every_outcome_renders_as_json() {
         let outcomes = vec![
@@ -599,6 +634,10 @@ mod tests {
                 reverted: Vec::new(),
                 reverted_connections: Vec::new(),
                 confirmed: false,
+            }),
+            Outcome::Word(a_term()),
+            Outcome::Glossary(Vocabulary {
+                words: vec![a_term()],
             }),
         ];
         // Every arm of the dispatch renders something, and every one of them also

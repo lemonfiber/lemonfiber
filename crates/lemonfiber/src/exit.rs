@@ -108,6 +108,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Household(_)
         | Outcome::Stuck(_)
         | Outcome::Status(_)
+        | Outcome::Word(_)
+        | Outcome::Glossary(_)
         | Outcome::Wizard(_) => ExitCode::SUCCESS,
     }
 }

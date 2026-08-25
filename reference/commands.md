@@ -863,6 +863,8 @@ Say what one of this product's words means.
 
 A report explains the words it used underneath itself, in a sentence. This is the longer form, for somebody who wants it — nothing needs it in order to act, which is the difference between an explanation offered and one imposed.
 
+Name a word, or name nothing and be told which words there are.
+
 Usage: lemonfiber explain [OPTIONS] [WORD]...
 
 Arguments:
