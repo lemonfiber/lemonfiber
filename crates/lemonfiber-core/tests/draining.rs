@@ -102,14 +102,15 @@ fn rendered(outcome: Result<Outcome, Box<lemonfiber_core::error::Problem>>) -> O
 
 #[tokio::test(start_paused = true)]
 async fn a_teardown_asked_to_wait_holds_on_until_nothing_is_coming_down() {
-    // qBittorrent answers first with a torrent still coming down and then with one
-    // that has finished, so the wait has something to wait for and something to
-    // notice. `SABnzbd` has no key on this filesystem and contributes nothing.
+    // qBittorrent answers with the same torrent still coming down twice, and then
+    // with one that has finished: something to wait for, a look that has no news,
+    // and an end. `SABnzbd` has no key on this filesystem and contributes nothing.
     let fake = Fake::by_path_in_turn(vec![
         ("/auth/login", vec![Answer::reply(200, "Ok.")]),
         (
             "/torrents/info",
             vec![
+                Answer::reply(200, QBIT_TORRENTS),
                 Answer::reply(200, QBIT_TORRENTS),
                 Answer::reply(200, QBIT_FINISHED),
             ],
@@ -131,10 +132,14 @@ async fn a_teardown_asked_to_wait_holds_on_until_nothing_is_coming_down() {
     );
 
     let said = heard.said().await;
-    assert!(
+    // Once, not once per look: a line repeated every ten seconds is one whoever is
+    // reading scrolls past, and the moment it has news is the moment a count changes.
+    assert_eq!(
         said.iter()
-            .any(|line| line.contains("waiting for 1 download to finish")),
-        "the wait says what it is waiting for: {said:?}"
+            .filter(|line| line.contains("waiting for 1 download to finish"))
+            .count(),
+        1,
+        "the wait says what it is waiting for, and says it once: {said:?}"
     );
     assert_eq!(
         said.last().map(String::as_str),

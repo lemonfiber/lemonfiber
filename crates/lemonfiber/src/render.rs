@@ -766,6 +766,22 @@ mod tests {
     }
 
     #[test]
+    fn an_apply_that_stopped_part_way_names_what_it_had_already_written() {
+        // A recovery is chosen about the partial state, so the partial state is
+        // what a read of where setup stands has to say.
+        let said = standing(&WizardReport {
+            phase: Phase::Applying,
+            written: vec!["the setting DATA_ROOT".to_owned()],
+            ..part_way()
+        })
+        .text();
+        assert!(
+            said.contains("it had written: the setting DATA_ROOT"),
+            "{said}"
+        );
+    }
+
+    #[test]
     fn a_complete_set_of_answers_shows_what_applying_would_write() {
         let said = standing(&WizardReport {
             at: Step::Review,
