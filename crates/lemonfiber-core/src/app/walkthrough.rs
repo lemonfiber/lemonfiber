@@ -162,11 +162,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn no_two_stacks_built_here_keep_their_credential_in_one_file() {
+        // The guard on the fixture: two stacks sharing one file have one rewritten
+        // under the other, and a walk reading the media server's credential mid-rewrite
+        // finds none and stops on a stack that has one. Which walk loses depends on what
+        // else the suite is running, so nothing catches it except this.
+        let one = ctx_watching(&Fake::default());
+        let two = ctx_library_only(&Fake::default());
+        assert!(
+            one.settings.env_file.is_some(),
+            "the credential is recorded somewhere"
+        );
+        assert_ne!(one.settings.env_file, two.settings.env_file);
+    }
+
     #[tokio::test]
     async fn a_walk_that_works_ends_playable_and_points_somewhere() {
         // The whole point: something the operator asked for goes all the way through and
         // they are left with somewhere to go rather than a green dashboard.
-        let ctx = ctx_watching(&Fake::default(), "complete");
+        let ctx = ctx_watching(&Fake::default());
         let (report, said) = walked(&ctx, Some("Sintel")).await;
 
         assert_eq!(report.state, State::Complete);
@@ -201,7 +216,7 @@ mod tests {
     async fn the_narration_and_the_report_are_the_same_run() {
         // A walkthrough that narrated one thing and reported another would be two
         // accounts of one event, and nothing would say which was true.
-        let ctx = ctx_watching(&Fake::default(), "same-run");
+        let ctx = ctx_watching(&Fake::default());
         let (report, said) = walked(&ctx, Some("Sintel")).await;
         assert_eq!(report.lines, said);
         assert!(!said.is_empty());
@@ -462,13 +477,10 @@ mod tests {
 
     #[tokio::test]
     async fn imported_and_still_not_in_the_library_is_its_own_answer() {
-        let ctx = ctx_watching(
-            &Fake {
-                library: NO_ITEMS,
-                ..Fake::default()
-            },
-            "invisible",
-        );
+        let ctx = ctx_watching(&Fake {
+            library: NO_ITEMS,
+            ..Fake::default()
+        });
         let (report, _) = walked(&ctx, Some("Sintel")).await;
         assert_eq!(
             report.stopped.map(|stopped| stopped.reason),
@@ -478,7 +490,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_library_only_household_is_asked_whether_its_own_media_is_visible() {
-        let ctx = ctx_library_only(&Fake::default(), "library-only");
+        let ctx = ctx_library_only(&Fake::default());
         let (report, said) = walked(&ctx, None).await;
 
         assert_eq!(report.shape, Shape::LibraryOnly);
@@ -492,13 +504,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_library_only_household_whose_media_is_not_there_is_told() {
-        let ctx = ctx_library_only(
-            &Fake {
-                library: NO_ITEMS,
-                ..Fake::default()
-            },
-            "library-empty",
-        );
+        let ctx = ctx_library_only(&Fake {
+            library: NO_ITEMS,
+            ..Fake::default()
+        });
         let (report, _) = walked(&ctx, Some("Sintel")).await;
         assert_eq!(report.shape, Shape::LibraryOnly);
         assert_eq!(
@@ -523,7 +532,7 @@ mod tests {
     async fn nothing_named_is_answered_with_something_safe() {
         // An operator with an empty library has no way to know what their indexers carry,
         // so a first attempt is chosen for them rather than guessed by them.
-        let ctx = ctx_watching(&Fake::default(), "suggested");
+        let ctx = ctx_watching(&Fake::default());
         let (report, said) = walked(&ctx, None).await;
         assert!(report.item.is_some());
         assert!(
@@ -555,7 +564,7 @@ mod tests {
         // other command narrates to whoever the context is listening with, so a
         // browser hears the steps a terminal would have printed.
         let heard = std::sync::Arc::new(Recording::default());
-        let ctx = ctx_watching(&Fake::default(), "complete")
+        let ctx = ctx_watching(&Fake::default())
             .narrating_steps(heard.clone() as std::sync::Arc<dyn crate::walkthrough::Narrator>);
         let outcome = crate::app::dispatch(
             crate::app::Command::Walkthrough {
@@ -567,17 +576,23 @@ mod tests {
 
         // The same report the walk comes to when it is called directly, so
         // dispatching changes only where the steps are said.
-        let (expected, _) =
-            walked(&ctx_watching(&Fake::default(), "complete"), Some("Sintel")).await;
+        let (expected, _) = walked(&ctx_watching(&Fake::default()), Some("Sintel")).await;
+        // Every line of it reached the narrator the context carries — the run's whole
+        // account rather than one early step, which a walk that stopped anywhere after
+        // it would satisfy just as well.
+        assert_eq!(heard.lines(), expected.lines);
+        assert!(
+            expected
+                .lines
+                .iter()
+                .any(|line| line.step == Step::Available),
+            "it got all the way through: {:?}",
+            expected.lines
+        );
         assert_eq!(
             outcome.ok(),
             Some(crate::app::Outcome::Walkthrough(expected))
         );
-        // The steps reached the narrator the context carries. Said without a
-        // message: an argument built only for a failure is a line no passing run
-        // ever reaches, and every run here passes.
-        let steps: Vec<Step> = heard.lines().iter().map(|line| line.step).collect();
-        assert!(steps.contains(&Step::Searching));
     }
 
     #[tokio::test]
@@ -585,14 +600,14 @@ mod tests {
         // The default narrator says nothing, and saying nothing changes nothing:
         // whether anyone is listening is the surface's business and never the
         // walk's, so the two runs come to the same report.
-        let watched = walked(&ctx_watching(&Fake::default(), "complete"), Some("Sintel"))
+        let watched = walked(&ctx_watching(&Fake::default()), Some("Sintel"))
             .await
             .0;
         let alone = crate::app::dispatch(
             crate::app::Command::Walkthrough {
                 item: Some("Sintel".to_owned()),
             },
-            &ctx_watching(&Fake::default(), "complete"),
+            &ctx_watching(&Fake::default()),
         )
         .await;
 
