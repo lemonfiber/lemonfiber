@@ -54,6 +54,9 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 # The fakes the ports are driven through, shared with every other crate's tests
 # rather than written again here.
 lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
+# Reading the embedded stack's own declaration of itself. Already a build
+# dependency, and a build dependency is not on a test target's path.
+lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 # Driving a router without a socket, so what a route answers is checked as a fact
 # rather than by starting a server to ask it.
 tower = { version = "0.5", features = ["util"] }
