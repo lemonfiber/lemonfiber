@@ -17,6 +17,8 @@ crates/
 │   ├── reference.rs      renders the command reference from those definitions
 │   ├── codes.rs          renders the error-code reference from the crates' own
 │   │                     declarations, read out of their source
+│   ├── reaching.rs       which requests the dashboard reaches, published where a
+│   │                     guard outside the binary can hold the parity table to it
 │   ├── render/           what each outcome looks like
 │   ├── acting/           what a dashboard keypress asks for and what becomes
 │   │                     of it — which action, which question, and every other

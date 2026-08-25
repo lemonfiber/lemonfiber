@@ -23,10 +23,10 @@ of what that requirement asks for.
 | Command line | [`cli.rs`](../../crates/lemonfiber/src/cli.rs) | the `Request` enum, which clap renders |
 | Web, writes | [`named.rs`](../../crates/lemonfiber-api/src/actions/named.rs) | `OFFERED`, one name per action |
 | Web, reads | [`read.rs`](../../crates/lemonfiber-api/src/read.rs) · [`setup.rs`](../../crates/lemonfiber-api/src/setup.rs) · [`jobs.rs`](../../crates/lemonfiber-api/src/jobs.rs) | the routes each declares |
-| Terminal, writes | [`acting/offer.rs`](../../crates/lemonfiber/src/acting/offer.rs) | `OFFERED`, one key per action |
+| Terminal, writes | [`acting/offer.rs`](../../crates/lemonfiber/src/acting/offer.rs) · [`acting/errand.rs`](../../crates/lemonfiber/src/acting/errand.rs) | `OFFERED`, one key per action, and the errands behind one more key |
 | Terminal, reads | [`acting/question.rs`](../../crates/lemonfiber/src/acting/question.rs) · [`terminal.rs`](../../crates/lemonfiber/src/terminal.rs) | the questions the list holds, and the screens the loop opens |
 
-The table below is checked against the first three by
+The table below is checked against all five by
 [`surface_parity.rs`](../../crates/lemonfiber/tests/surface_parity.rs): a request
 with no row fails, a row naming an action or a route that does not exist fails,
 and an action or a route the web offers that no row accounts for fails. A route
@@ -35,14 +35,23 @@ asked for through, and the one a job's name is redeemed at — is declared there
 by name, so adding a route is a decision somebody makes rather than one that
 happens.
 
-The terminal column is still the one a reader has to check by eye, but for a
-smaller reason than before. Its actions and its questions are each declared in a
-list now rather than being knowable only by reading a match arm at a time, and a
-test beside each list holds every entry to something the web already offers — so an
-action or a read this screen alone could reach fails there. What nothing joins is
-either list to this column: `acting/` lives in the binary rather than in the library
-this test reads, so a row claiming `dashboard` is a claim about a file rather than a
-claim read out of one.
+The terminal column is read the same way now, and the join it was missing is
+[`reaching.rs`](../../crates/lemonfiber/src/reaching.rs). `acting/` is `mod acting;`
+in `main.rs` and private to the binary, so an integration test could never reach the
+screen's own lists; what is in the library instead is a projection of them, naming
+each command-line request the dashboard reaches and the action or the read it
+reaches it through. It is held at both ends. `acting/`'s own tests hold every action
+and every question the screen offers to an entry there, and every entry there to
+something the screen offers; the guard holds every `dashboard` cell below to the
+same list, in both directions — a row claiming this screen reaches a request it
+does not fails, and an offer no row accounts for fails.
+
+Two kinds of claim in that column are still a reader's job: the three rows naming a
+screen that is not the dashboard — `wizard`, `viewer` and `glossary` — and the three
+requests the dashboard's *panels* answer rather than its lists. A panel is a
+rendering rather than a named request, so there is no list of them to hold a row
+against; those three are written down in the projection instead, where a reader can
+at least see the claim in one place.
 
 ## The table
 
@@ -72,13 +81,13 @@ and the rest is named in **Standing**.
 | `walkthrough` | `walkthrough` | none | Reachable in full, on the surface it was designed for: a first-time operator is likelier to be in a browser than in a shell. It is a job plus the stream — the report at the end is what the name is redeemed for, and each step goes down the stream the moment it is true, because a walk read back afterwards is a report and the operator would have learned what happened rather than watched it happen. The step goes down whole rather than as a sentence: the words are the core's own, and rendering them into a line for the browser would be a second copy of the walk's prose beside the one the terminal draws. Naming nothing is a request rather than an omission, and is offered as one. The terminal has no form of it. |
 | `explain` | `/api/explain` | glossary | Reachable in full, and the one read that needs neither a stack nor a daemon: the words are a table compiled into the binary, so a browser meeting one in a failure can ask what it means while the thing that failed is still down. One endpoint over two commands, the way `forms` is: naming a word explains that one, naming none lists what there is to ask about — which a caller that has never met this vocabulary needs before it can name anything. Served rather than shipped; a second copy of the table in the web app would be a surface explaining a word its own way. The terminal offers it on `?`, over the words on the screen. |
 | `stuck` | `/api/stuck` | dashboard, partial | Served on the web, which is where the dashboard's own "N stuck" figure lands: each entry is named the way `/api/trace` is asked, so the count leads somewhere. The terminal's panel lists them and offers no way to follow one. |
-| `seed` | `seed` | none | Offered on the web. No terminal form, like every other write. |
-| `adopt` | `adopt` | none | As above. |
-| `reset` | `reset` | none | As above. It is the one write in this group that destroys work, which makes the terminal's silence about it the least costly silence in the table. |
-| `backup` | `backup` | none | Reachable in full. It takes the one thing the command line takes — the single service to capture instead of the whole stack — and takes no path at all, because a capture goes into the backups directory lemonfiber chose, whoever asked for it. Refusing a stack that cannot be proven stopped is the command's own rule now rather than the command line's, so a browser cannot ask for the live-database capture a shell was never allowed either. No terminal form, like every other write. |
-| `support` | `support`, partial | none | Everything that decides what the bundle holds is offered: whether to produce one at all, how much of each service's log to take, whether media filenames survive, which settings are shown as they are, and the agreement that showing one takes. Where it goes is the one thing that is not — `--out` names a path on the host and a browser has none to name — so a bundle asked for here is written with lemonfiber's own files, under a name carrying the moment it was taken. Nothing leaves the machine on either surface. |
+| `seed` | `seed` | dashboard | Reachable from all three. It is the first of the six errands the dashboard keeps behind one key, and the one with nothing to leave out: the command takes no arguments, so the question names what wiring the services to each other comes to and an explicit yes is the whole of what it needs. |
+| `adopt` | `adopt` | dashboard | As above, and the pair it makes with `reset` is what the errands are ordered by. Keeping what an operator changed sits near the top of that list and throwing it away sits at the bottom of it, so nobody lands on the destructive one by pressing enter at a list they have only just opened. |
+| `reset` | `reset` | dashboard | Reachable in full on both. It is the one write in this group that destroys work, so the terminal does not put the question until the stack has said what would be lost: the unconfirmed command goes first, the reverts it names are what the box shows, and the question sits under that account rather than over it. An effect somebody reads after agreeing to it is not one they agreed to, which is the reading every repair is already offered under. The agreement itself is the command's own field, so the screen carries no second idea of what confirming means. |
+| `backup` | `backup` | dashboard, partial | Reachable in full from a browser. It takes the one thing the command line takes — the single service to capture instead of the whole stack — and takes no path at all, because a capture goes into the backups directory lemonfiber chose, whoever asked for it. Refusing a stack that cannot be proven stopped is the command's own rule now rather than the command line's, so a browser cannot ask for the live-database capture a shell was never allowed either. What the terminal leaves is that single service: the names are a gather this list does not have, and a line to type one on would be a name nothing checked before the capture ran. |
+| `support` | `support`, partial | dashboard, partial | Everything that decides what the bundle holds is offered on the web: whether to produce one at all, how much of each service's log to take, whether media filenames survive, which settings are shown as they are, and the agreement that showing one takes. Where it goes is the one thing that is not — `--out` names a path on the host and a browser has none to name — so a bundle asked for here is written with lemonfiber's own files, under a name carrying the moment it was taken. The terminal offers the half that decides whether there is a file at all and none of the four that decide what is in one: it asks what a bundle would hold, shows the answer, and writes one only if that is agreed to, with every careful default left where it is — the ordinary window of log lines, media filenames replaced, nothing revealed. Which settings are shown as they are is deliberately the one thing not offered anywhere but the browser: a terminal-only way past the withholding list would be a surface showing a credential no other surface shows. Nothing leaves the machine on any of the three. |
 | `ui` | intrinsic | none | **The one honest exception in this table.** A surface cannot start itself: the request either reaches a server that is already serving, where it means nothing, or it means starting a second server, which is a different request — and it would make a running server hand out the per-run token for a new one. Unbuilt rather than excepted on the terminal, where a key that starts the web surface and prints its address is meaningful. |
-| `restore` | `restore`, partial | none | Offered, and the confirmation is inside the command rather than in a screen: unconfirmed it verifies the archive and answers with what it holds, having touched nothing, and only a second request carrying the agreement overwrites — so a surface that skipped the listing would be asking for something else, not rendering the same thing differently. Accepting a re-point is offered. Restoring an archive from anywhere on the host is not: a browser names one of the backups this machine took and the name is resolved beneath the backups directory, so a name carrying a path, or climbing out of that directory, is refused by name rather than followed. |
+| `restore` | `restore`, partial | dashboard, partial | Offered on both, and the confirmation is inside the command rather than in a screen: unconfirmed it verifies the archive and answers with what it holds, having touched nothing, and only a second request carrying the agreement overwrites — so a surface that skipped the listing would be asking for something else, not rendering the same thing differently. That is what makes the listing the terminal's consequence-before-the-question: what the archive would overwrite is on the screen, and the question is the line under it. The name is typed rather than picked, because no surface anywhere lists what this machine has kept — a browser types one too — and it goes through the same translation, which carries it as a name and never as a path, so a name holding one, or climbing out of the backups directory, is refused by name rather than followed. Accepting a re-point is offered on the web and not here, so a restore onto a different data root is refused at this screen and taken to a browser or a shell. |
 
 ## What the table adds up to
 
@@ -90,10 +99,16 @@ lopsided: an exception has to survive being argued, and almost nothing does.
 Nothing is now wholly out of a browser's reach. What is left is the three requests
 reachable in part, each of which loses an argument rather than the request.
 
-These four numbers are read back from the table above by the guard, because a
+On the other side of the table three have no terminal form, which is where nine
+stood before this slice and twenty before the one that began it. `watch` and
+`walkthrough` are reachable from a browser and unbuilt on a screen; `ui` is the
+exception, and unbuilt rather than excepted here.
+
+These five numbers are read back from the table above by the guard, because a
 version of this paragraph said ten and five where the rows said eleven and four,
 and a summary nobody checks is how a page that exists to be counted stops being
-countable.
+countable. The terminal count is read back the same way now, and so is the column
+it counts.
 
 The other three exceptions the spec names run the other way — a live-refreshing
 dashboard and an open event stream have no command-line form, and `--json` has no
@@ -148,7 +163,7 @@ given one — rather than a second reader of that table beside the first, which 
 would have made the endpoint a surface with behaviour of its own instead of a read
 like the others.
 
-## The terminal acts on five and asks about six
+## The terminal acts on eleven and asks about six
 
 It did neither. The dashboard read and the log viewer read; the wizard was the
 only screen that changed anything, and it only runs on a machine that has not been
@@ -159,17 +174,22 @@ operator could open a terminal. The operator this surface exists for is the one 
 the far end of a remote session, who is the least able of the three to reach
 another surface to act on what this one has just told them.
 
-The dashboard now offers the five the screen already showed state for — starting,
+The dashboard offers the five the screen already showed state for — starting,
 stopping, switching, restarting and fetching — and answers the six reads it showed
 nothing of: the versions in play, the forms the stack declares, the settings, the
 quality in force, what the household asked for, and where one of those things got
-to. Nine of the twenty-six requests still have a terminal form of `none`, which is
-what the rest of this gap looks like now.
+to. Beside them are the six writes that are not about what is running at all: the
+wiring, keeping an operator's edits, throwing them away, a capture, a bundle and an
+archive put back. Three of the twenty-six requests still have a terminal form of
+`none`, and none of the three is built anywhere.
 
 **The action is the web's action.** A key names one of the actions
 [`actions.rs`](../../crates/lemonfiber-api/src/actions.rs) offers and that name is
 put through the same translation a browser's request goes through, so the terminal
 reaches the command a browser reaches and cannot grow one a browser has no form of.
+An errand off the list the second key opens names one the same way, and what it may
+be given is that table's answer too — including which of them carry the operator's
+agreement, which is what decides the three that say what they would do first.
 Which of them refuse an empty list of forms is asked of that table rather than
 written down again, so the two surfaces cannot come to disagree about it. What the
 screen decides — which key, which subject, which question, the question in front of
@@ -188,12 +208,19 @@ others and are withheld like the others: the screen asks for `config show` and n
 opens the file, which a guard beside the withholding list refuses to let it start
 doing.
 
-**Six questions, one key.** The screen already answered `q`, `r`, `?` and five
-actions, and a key per request does not survive being done twice — twenty-six
-requests will not fit on one row of a footer, let alone in anybody's memory. So one
-key opens the list of what this stack can be asked, which is the same list, the same
-movement and the same enter an action's own subjects are chosen with. A seventh
-question goes on that list without costing anybody a letter to learn.
+**Six questions, one key — and six errands behind another.** The screen already
+answered `q`, `r`, `?` and five actions, and a key per request does not survive being
+done twice: twenty-six requests will not fit on one row of a footer, let alone in
+anybody's memory. So one key opens the list of what this stack can be asked, and one
+more opens the rest of what it can be told to do — the same list, the same movement
+and the same enter an action's own subjects are chosen with. A seventh of either goes
+on its list without costing anybody a letter to learn.
+
+The second key says only `more`, which is the most it can honestly say. A wiring, a
+capture, a bundle, an archive put back and a revert have no one word between them
+that is not vaguer than the six names on the list, and a key claiming something the
+list does not hold is worse than one claiming nothing. What each errand is is said on
+its own row, where there is room to say it.
 
 **An answer is read rather than glanced at.** Every setting a stack declares is
 dozens of lines and a trace is a season at a time, so the box moves through the
@@ -209,6 +236,26 @@ what; only an explicit yes goes ahead, the way the teardown's own question is re
 On a screen where one finger reaches a teardown that is the difference between an
 action and an accident, and it is also where the operator is told what the action
 reaches before it reaches it.
+
+**And where the consequence is larger than a sentence, it is read before it is
+agreed to.** Three of the errands have a half that reports and changes nothing —
+what a reset would revert, what a bundle would hold, what an archive would overwrite
+— and those three send that half first. Its answer is what the box shows, and the
+question is the line under the answer rather than a sentence in front of it. An
+effect somebody reads after agreeing is not one they agreed to, which is the reading
+each repair `doctor --fix` offers is already put under. Which three is asked of the
+same table that says which actions carry the operator's agreement, rather than
+decided again here — the place two lists would come to disagree is in front of
+somebody about to throw work away.
+
+**A name, and never a path.** The one errand that has to be given something is the
+restore, and what it takes is the name a backup was written under, typed on a line
+of its own. Nothing on any surface lists what this machine has kept, so a browser
+types one too; what the terminal cannot do is name a *file*, because the name goes
+through the same translation a browser's does and that translation carries a name
+and never a path. Resolving it beneath the backups directory is the core's, and a
+name climbing out of that directory reaches the core's own refusal rather than the
+file it climbed to.
 
 **A long action reports through the screen it interrupted, and is left rather than
 stopped.** The web answers an action that reaches the container engine with a job's
