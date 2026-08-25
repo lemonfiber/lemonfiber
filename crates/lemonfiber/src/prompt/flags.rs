@@ -66,14 +66,6 @@ pub(super) fn parse_ids(answer: &str) -> Option<(u32, u32)> {
     Some((uid.trim().parse().ok()?, gid.trim().parse().ok()?))
 }
 
-/// Whether a setting's value is a secret, by its key — a password, an API key, a
-/// token. Such a value is never printed, only marked present.
-pub(super) fn is_secret(key: &str) -> bool {
-    ["PASS", "KEY", "TOKEN", "SECRET"]
-        .iter()
-        .any(|mark| key.contains(mark))
-}
-
 /// The answers a non-interactive run supplies as flags instead of at a prompt.
 ///
 /// Parsed once from the command line, then read back as a [`Prompt`] so the very
@@ -317,7 +309,7 @@ mod tests {
     use lemonfiber_core::validate::Validation;
     use lemonfiber_core::wizard::{Library, Step};
 
-    use super::{is_secret, parse_ids, Flags, RawSetup, SetupFlags};
+    use super::{parse_ids, Flags, RawSetup, SetupFlags};
     use crate::prompt::fixtures::{answered, raw, wizard, workable};
 
     #[test]
@@ -487,15 +479,6 @@ mod tests {
         // Only a question can be answered by a flag; the rest of the walk is work,
         // and naming a flag for it would be nonsense.
         assert_eq!(SetupFlags::none().flag_for(Step::Welcome), None);
-    }
-
-    #[test]
-    fn a_key_a_password_or_a_token_is_a_secret_by_its_name() {
-        assert!(is_secret("INDEXER_KEY"));
-        assert!(is_secret("USENET_PASS"));
-        assert!(is_secret("SOME_TOKEN"));
-        assert!(is_secret("A_SECRET"));
-        assert!(!is_secret("DATA_ROOT"));
     }
 
     #[test]

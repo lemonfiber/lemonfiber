@@ -17,7 +17,9 @@ use lemonfiber_core::storage::COPY_CONSEQUENCE;
 use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Library, Plan};
 
-use super::flags::{is_secret, parse_ids};
+use lemonfiber_core::config::store::is_secret;
+
+use super::flags::parse_ids;
 use super::Answers;
 use crate::say::say;
 
