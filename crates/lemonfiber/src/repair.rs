@@ -16,9 +16,11 @@ use lemonfiber_core::repair::{Repair, Stance};
 
 use lemonfiber_core::config::paths::Paths;
 
+use crate::exit::USAGE;
 use crate::prompt::{yes_no, Answers};
 use crate::render::repair::{mended, reversed};
 use crate::render::Lines;
+use crate::say::complain;
 use lemonfiber::cli::Mending;
 
 /// Offer the repairs and carry out the ones agreed to, or put back what the last one did.
@@ -35,10 +37,23 @@ pub(crate) async fn run(
     // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
     // repairs carried out says so with --yes. So one that did not gets the offer and no
     // action, which is what report-only is for.
-    let stance = match (asked.fixing.yes, json) {
-        (true, _) => Stance::Unattended,
-        (false, true) => Stance::ReportOnly,
-        (false, false) => Stance::Ask,
+    //
+    // A run with nowhere to read an answer from is refused rather than asked. The offer
+    // reaches a terminal nobody is at, and the read that follows it blocks on input that
+    // never comes — once per repair, invisibly, with the run appearing to hang.
+    let stance = match (asked.fixing.yes, json, answers.present()) {
+        (true, _, _) => Stance::Unattended,
+        (false, true, _) => Stance::ReportOnly,
+        (false, false, true) => Stance::Ask,
+        (false, false, false) => {
+            complain!(
+                "error: repairing here is non-interactive, so there is nobody to agree to each repair:"
+            );
+            complain!("  --yes    carry out every repair offered, without asking");
+            complain!("  --json   report what would be repaired and change nothing");
+            complain!("\nRun it in a terminal to be asked about each instead.");
+            return ExitCode::from(USAGE);
+        }
     };
 
     match mend(&ctx, stance, asked.fixing.disruptive, &Asking(answers)).await {
@@ -143,6 +158,29 @@ mod tests {
     impl Answers for Says {
         fn ask(&self, _question: &str) -> String {
             self.0.to_owned()
+        }
+
+        fn secret(&self, question: &str) -> String {
+            self.ask(question)
+        }
+    }
+
+    /// Nobody is at the other end, which is what a script looks like from here.
+    ///
+    /// It records being asked rather than refusing to be, so the test can say the
+    /// question was never put — which is the claim — instead of only that the run
+    /// ended badly, which a dozen other faults would also produce.
+    #[derive(Default)]
+    struct Nobody(std::cell::Cell<bool>);
+
+    impl Answers for Nobody {
+        fn present(&self) -> bool {
+            false
+        }
+
+        fn ask(&self, _question: &str) -> String {
+            self.0.set(true);
+            String::new()
         }
 
         fn secret(&self, question: &str) -> String {
@@ -363,6 +401,45 @@ mod tests {
     /// A named function rather than a closure: a closure is a function of its own as far
     /// as coverage is concerned, and one inside a test is one the gate counts and no other
     /// test enters.
+    #[tokio::test]
+    async fn a_repair_with_nobody_there_is_told_which_flags_rather_than_asked() {
+        // The offer would reach a terminal nobody is at, and the read after it would
+        // block on input that never comes — once per repair, with the run appearing to
+        // hang. `Nobody` refuses to be asked at all, so this fails rather than waits if
+        // the question is ever put again.
+        let nobody = Nobody::default();
+        let code = run(
+            ctx(),
+            paths("nobody"),
+            Mending {
+                fixing: Fixing {
+                    fix: true,
+                    yes: false,
+                    disruptive: false,
+                },
+                undo: false,
+            },
+            &nobody,
+            false,
+        )
+        .await;
+
+        assert_ne!(
+            shown(code),
+            success(),
+            "a run that cannot be asked is told what to pass instead"
+        );
+        assert!(
+            !nobody.0.get(),
+            "the question was never put, rather than put and left waiting"
+        );
+
+        // The recorder itself, so what the assertion above rests on is exercised.
+        let probe = Nobody::default();
+        let _ = probe.secret("anything");
+        assert!(probe.0.get(), "being asked is what it records");
+    }
+
     async fn asked_for(yes: bool, json: bool) -> String {
         shown(
             run(

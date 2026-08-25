@@ -19,6 +19,10 @@ use crate::setup::Surface;
 pub(crate) struct Keyboard;
 
 impl Answers for Keyboard {
+    fn present(&self) -> bool {
+        std::io::stdin().is_terminal()
+    }
+
     fn ask(&self, question: &str) -> String {
         crate::say::asked(&format!("{question} "));
         let mut line = String::new();
