@@ -13,8 +13,16 @@
 //! wants none of, or finds nothing at all, is a *warning* the operator can act on by
 //! easing the preset — never confused with the indexer having failed.
 //!
-//! The search hits the indexers live, so it runs only on a disruptive check; an
-//! ordinary run reports it skipped rather than burdening the indexer unasked.
+//! The search hits the indexers live and spends one against the daily cap for every
+//! service it searches, so it is only run where it was asked for. Nothing on the
+//! operator's own machine is disturbed by it — what it spends belongs to the indexers,
+//! which is a cost to state rather than a thing to take away.
+//!
+//! An ordinary run reports it unverified rather than skipped. Skipped is for a check
+//! that does not apply, and this one applies perfectly well: television and film are
+//! configured, content is wanted, and the only reason nothing was established is that
+//! no search was spent on it. Calling that inapplicable would let a stack read as
+//! healthy on the strength of a search nobody made.
 
 use std::sync::Arc;
 
@@ -38,18 +46,28 @@ pub const NONE_AVAILABLE: Code = Code::new("QUAL-3");
 /// The id under which the check reports where there is nothing to run it against.
 const NONE: &str = "services.releases";
 
-/// What this check says when the operator has not asked for the disruptive checks.
+/// What this check says when the operator has not asked for it.
 ///
 /// It says what running it costs and for how long, which is what an operator has to
-/// weigh before opting in: the searches are real, they are spent against the quota the
-/// indexers hold the operator to, and the check is abandoned at its budget rather than
-/// left to run.
+/// weigh before opting in: the searches are real, they are spent against the daily cap
+/// the indexers hold the operator to, and the check is abandoned at its budget rather
+/// than left to run.
+///
+/// A number of searches rather than something that stops working, because that is what
+/// this actually costs. The stack carries on throughout.
 fn not_asked_for() -> String {
     format!(
-        "a live release search is only run with --disruptive: it spends one real search \
-         per service against the indexers {}",
+        "a live release search is only run where it is asked for: it spends one real search \
+         per service against the indexers, counted towards the daily cap they hold the \
+         operator to, {}",
         crate::doctor::disturbing_for(crate::doctor::CHECK_BUDGET)
     )
+}
+
+/// How to get a real answer, said the way the other opt-in check says it.
+fn how_to_ask() -> Remedy {
+    Remedy::new("Run the search when one can be spent against the indexers")
+        .with_detail("lemonfiber doctor --only services.releases --disruptive")
 }
 
 /// Searches the resolution services for the operator's wanted content, so a preset that
@@ -149,8 +167,9 @@ impl Check for ReleasesCheck {
                 Category::Services,
                 NONE,
                 "Releases for the chosen quality",
-                Verdict::Skipped {
+                Verdict::Unverified {
                     reason: not_asked_for(),
+                    remedy: how_to_ask(),
                 },
             )];
         }
