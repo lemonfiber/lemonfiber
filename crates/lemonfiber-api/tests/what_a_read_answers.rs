@@ -15,6 +15,7 @@ use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::read::enveloped;
+use lemonfiber_api::reads;
 use lemonfiber_api::router::{routes, Serving};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
 use lemonfiber_core::config::store::REDACTED;
@@ -793,4 +794,33 @@ async fn an_answer_that_could_not_be_rendered_is_not_invented() {
         body.ok().as_deref(),
         Some("This answer could not be rendered.".as_bytes())
     );
+}
+
+#[test]
+fn a_read_no_name_reaches_is_refused_rather_than_invented() {
+    // Reachable only by being called: the router serves a fixed set of paths, so no
+    // request arrives here under a name this surface does not answer. What reaches
+    // it is another surface asking by name, and a name that reaches no read has to
+    // be told so rather than quietly answered with something else.
+    assert_eq!(
+        reads::named("/api/secrets", reads::Wanted::default()),
+        Err(reads::NO_SUCH_READ)
+    );
+}
+
+#[tokio::test]
+async fn every_read_this_surface_offers_by_name_is_one_it_serves() {
+    // The converse of the table being reachable by name: a name offered to another
+    // surface and served by nothing here would be a read only that surface could
+    // make. Asked for rather than read out of the source, so what is proven is that
+    // the path answers and not that somebody wrote it down twice.
+    let mut missing: Vec<&str> = Vec::new();
+    for read in reads::OFFERED {
+        let answered = asked(world(running(), stack()), read).await;
+        if answered.is_none_or(|(status, _)| status == StatusCode::NOT_FOUND) {
+            missing.push(read);
+        }
+    }
+
+    assert!(missing.is_empty(), "{missing:?}");
 }

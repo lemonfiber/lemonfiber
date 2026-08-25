@@ -19,7 +19,10 @@ nothing serves.
 Scope is `crates/lemonfiber-api/src/read/`, which is exactly what the block is
 about. `crate::read::routes()` merges the modules in that directory and nothing
 else: the stream, the actions, the jobs and the wizard are each their own
-section of the same page and are named there rather than here.
+section of the same page and are named there rather than here. A route naming a
+constant is resolved against the crate that declares it, since the paths are
+declared once and named by the surfaces that ask for them; a constant nothing
+declares is reported rather than skipped.
 
 The spec is a different repository and this one does not vendor it, so the page
 arrives as an argument. CI checks it out beside the tree under review; by hand
@@ -41,15 +44,20 @@ import sys
 # Where the reads are declared, relative to the repository root.
 READS = pathlib.Path("crates/lemonfiber-api/src/read")
 
+# Where a path held in a constant is declared, relative to the same root.
+DECLARING = pathlib.Path("crates/lemonfiber-api/src")
+
 # The page, relative to a spec checkout, and the heading the block sits under.
 PAGE = pathlib.Path("20-architecture/contracts/web-api.md")
 HEADING = "## Reading"
 
-# A route call, and the path it names. Only a literal is read: a path held in a
-# constant is a shape this does not know, and saying so is better than passing
-# because the route was invisible.
+# A route call, and the path it names. A literal is read as written; a constant
+# is looked up where the crate declares it, and one that is declared nowhere is
+# reported rather than skipped, because a route this cannot read is a route that
+# is invisible to the whole check.
 ROUTE = re.compile(r"\.route\(\s*([^,]+),")
 LITERAL = re.compile(r'^"([^"]+)"$')
+NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 # One entry of the block. The path only: an entry carrying `?…` says the
 # endpoint takes parameters, which is not part of the path it is served on.
@@ -64,6 +72,19 @@ FENCE = re.compile(r"```[a-z]*\n(.*?)```", re.DOTALL)
 FEWEST = 5
 
 
+def declared(root: pathlib.Path) -> dict[str, str]:
+    """Every path this crate declares as a constant, by the name it goes under."""
+    here = root / DECLARING
+    found: dict[str, str] = {}
+    for source in sorted(here.rglob("*.rs")):
+        text = source.read_text(encoding="utf-8")
+        for name, path in re.findall(
+            r'const ([A-Z][A-Z0-9_]*): &str = "(/api/[^"]*)";', text
+        ):
+            found[name] = path
+    return found
+
+
 def served(root: pathlib.Path) -> tuple[set[str], list[str]]:
     """Every path the read modules route, and anything unreadable about them."""
     here = root / READS
@@ -72,19 +93,25 @@ def served(root: pathlib.Path) -> tuple[set[str], list[str]]:
             f"no read modules at {here} — this is looking in the wrong place"
         ]
 
+    constants = declared(root)
     paths: set[str] = set()
     problems: list[str] = []
     for source in sorted(here.rglob("*.rs")):
         text = source.read_text(encoding="utf-8")
         for argument in ROUTE.findall(text):
-            written = LITERAL.match(argument.strip())
-            if written is None:
-                problems.append(
-                    f"{source}: a route is declared as `{argument.strip()}` rather "
-                    "than a written-out path, so this cannot tell what it serves"
-                )
+            argument = argument.strip()
+            written = LITERAL.match(argument)
+            if written is not None:
+                paths.add(written.group(1))
                 continue
-            paths.add(written.group(1))
+            if NAME.match(argument) and argument in constants:
+                paths.add(constants[argument])
+                continue
+            problems.append(
+                f"{source}: a route is declared as `{argument}`, which is neither a "
+                "written-out path nor a constant this crate declares as one, so "
+                "this cannot tell what it serves"
+            )
     return paths, problems
 
 

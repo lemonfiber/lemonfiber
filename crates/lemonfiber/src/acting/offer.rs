@@ -15,6 +15,8 @@ use lemonfiber_api::actions::{named, Arguments};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::model::FormsReport;
 
+use super::chooser::Listed;
+
 /// What the whole stack is called where it is one of the choices.
 const WHOLE: &str = "everything";
 
@@ -84,6 +86,16 @@ pub(crate) struct Choice {
     pub(crate) about: String,
     /// The command acting on it comes to.
     pub(crate) command: Command,
+}
+
+impl Listed for Choice {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn about(&self) -> &str {
+        &self.about
+    }
 }
 
 impl Offer {
@@ -217,10 +229,10 @@ pub(crate) mod tests {
         }
     }
 
-    /// The three keys the screen already answers stay answered by it.
+    /// The four keys the screen already answers stay answered by it.
     #[test]
     fn no_action_takes_a_key_the_screen_already_uses() {
-        for taken in ['q', 'r', '?'] {
+        for taken in ['q', 'r', '?', crate::acting::question::KEY] {
             assert!(for_key(taken).is_none(), "{taken:?} was already spoken for");
         }
     }

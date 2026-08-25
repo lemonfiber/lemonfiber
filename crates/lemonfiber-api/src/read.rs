@@ -11,19 +11,12 @@
 //! warning or running the checks that disturb a running system changes something
 //! and belongs where changes are asked for.
 //!
-//! The endpoints and the commands do not count the same, and the mismatch runs
-//! both ways. `status` and `services` are one reading of what is running, whole
-//! and narrowed to named forms; `storage` is the group of checks about the disk,
-//! which `checks` will also narrow to. Two endpoints over one command is two names
-//! for one answer, which is the opposite of two gathers that can disagree. `forms`
-//! goes the other way and is one endpoint over two commands, because the request
-//! is one word on the command line too: naming no form lists what the stack
-//! declares, and naming some says what starting those would come to. `config` and
-//! `explain` are one endpoint over two for the same reason.
-//!
-//! What every read shares is here — how one is carried out, and how a query string
-//! is read. The endpoints themselves are grouped beside it by what they are about:
-//! the stack, the diagnosis, one item, the choices in force, and the words.
+//! Which command a read reaches is [`crate::reads`]'s, named by the path it is
+//! served at, so another surface can ask for the same read by the same name and
+//! reach the same command. What is left here is the reading of a query string and
+//! the carrying out. The endpoints themselves are grouped beside it by what they
+//! are about: the stack, the diagnosis, one item, the choices in force, and the
+//! words.
 
 mod chosen;
 mod diagnosis;
@@ -39,6 +32,7 @@ use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
 
+use crate::reads::{named, Wanted};
 use crate::router::Serving;
 use crate::serve::{answered, carrying, SENTENCE};
 
@@ -59,6 +53,18 @@ pub fn routes() -> Router<Serving> {
         .merge(items::routes())
         .merge(chosen::routes())
         .merge(glossary::routes())
+}
+
+/// Carry out the read a name reaches, or say why it reaches none.
+///
+/// Every endpoint below arrives here, so the name a path is served under and the
+/// command it comes to are one decision made in one place rather than one made
+/// per handler.
+pub(crate) async fn reading(ctx: &Ctx, read: &str, given: Wanted) -> Response {
+    match named(read, given) {
+        Ok(command) => carried_out(ctx, command).await,
+        Err(said) => unreadable(said),
+    }
 }
 
 /// Carry out a command and answer with the envelope it renders.

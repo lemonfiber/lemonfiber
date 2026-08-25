@@ -9,13 +9,20 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use lemonfiber_core::app::{logs, Command, Ctx};
+use lemonfiber_core::app::{logs, Ctx};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::{LogLine, LogQuery};
 
+use crate::reads::{Wanted, FORMS, SERVICES, STATUS, VERSION};
 use crate::router::Serving;
 
-use super::{carried_out, enveloped, unreadable, went_wrong, Asked};
+use super::{enveloped, reading, unreadable, went_wrong, Asked};
+
+/// Where the services' own lines are read.
+///
+/// The one read with no row in [`crate::reads`], because it reaches no command: it
+/// opens a stream and answers with a document per line.
+const LOGS: &str = "/api/logs";
 
 /// The parameter naming a form to narrow to.
 const FORM: &str = "form";
@@ -36,16 +43,16 @@ const NOT_A_COUNT: &str = "How many lines to begin with must be a number.";
 /// The reads about the stack itself.
 pub(super) fn routes() -> Router<Serving> {
     Router::new()
-        .route("/api/version", get(version))
-        .route("/api/forms", get(forms))
-        .route("/api/status", get(status))
-        .route("/api/services", get(services))
-        .route("/api/logs", get(log_lines))
+        .route(VERSION, get(version))
+        .route(FORMS, get(forms))
+        .route(STATUS, get(status))
+        .route(SERVICES, get(services))
+        .route(LOGS, get(log_lines))
 }
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
 async fn version(State(serving): State<Serving>) -> Response {
-    carried_out(&serving.ctx, Command::Version).await
+    reading(&serving.ctx, VERSION, Wanted::default()).await
 }
 
 /// Every form the stack declares, or what naming some of them would come to.
@@ -55,27 +62,31 @@ async fn version(State(serving): State<Serving>) -> Response {
 /// resolves them, which is the fork `lemonfiber forms` takes on the same word.
 async fn forms(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
     let asked = Asked::read(query.as_deref());
-    let named = asked.every(FORM);
-    let command = if named.is_empty() {
-        Command::Forms
-    } else {
-        Command::Preview { forms: named }
-    };
-    carried_out(&serving.ctx, command).await
+    reading(
+        &serving.ctx,
+        FORMS,
+        Wanted {
+            forms: asked.every(FORM),
+            ..Wanted::default()
+        },
+    )
+    .await
 }
 
 /// What the whole stack is doing.
 async fn status(State(serving): State<Serving>) -> Response {
-    carried_out(&serving.ctx, Command::Ps { forms: Vec::new() }).await
+    reading(&serving.ctx, STATUS, Wanted::default()).await
 }
 
 /// What each service is doing, narrowed to the forms that were named.
 async fn services(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
     let asked = Asked::read(query.as_deref());
-    carried_out(
+    reading(
         &serving.ctx,
-        Command::Ps {
+        SERVICES,
+        Wanted {
             forms: asked.every(FORM),
+            ..Wanted::default()
         },
     )
     .await

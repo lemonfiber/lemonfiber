@@ -18,8 +18,10 @@ use lemonfiber_core::plural::s;
 use lemonfiber_core::text::{fitted, plain};
 use ratatui::text::{Line, Span};
 
-use super::chooser::Chooser;
+use super::chooser::{Chooser, Listed};
 use super::offer::{Choice, Offer, OFFERED};
+use super::question::{self, Question};
+use super::reading::Reading;
 use super::Stage;
 use crate::pane::quiet;
 
@@ -29,8 +31,20 @@ const ALWAYS: &str = "q quit   r refresh   ? words";
 /// What the box holding a report calls itself.
 const CAME: &str = " what it came to ";
 
+/// What the box holding the questions calls itself.
+const ASK: &str = " ask ";
+
 /// What the box says while the stack is being asked what there is to act on.
 const ASKING: &str = "asking this stack what there is to act on";
+
+/// What the box says while a question is with the stack.
+const ANSWERING: &str = "waiting for this stack to answer";
+
+/// How a word a question has to be given is typed, and how to leave it.
+const TYPING: &str = "enter asks   esc leaves it";
+
+/// How a reading is moved through, and how it is put away.
+const MOVING: &str = "up and down move   any other key closes";
 
 /// How to move over the list, and how to leave it.
 const CHOOSING: &str = "up and down choose   enter goes on   esc leaves it";
@@ -42,9 +56,6 @@ const CHOOSING: &str = "up and down choose   enter goes on   esc leaves it";
 /// nothing, and on a screen where one key reaches an action it is a keypress that
 /// was not meant that this is guarding against.
 const AGREEING: &str = "y goes ahead   any other key changes nothing";
-
-/// How a report is put away.
-const CLOSING: &str = "any key closes this";
 
 /// What is said beside a running action, and what leaving does about it.
 const WAITING: &str = "still running   q stops watching, and the work goes on";
@@ -78,9 +89,25 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
             title: titled(offer),
             lines: confirming(offer, chosen, across),
         }),
-        Stage::Came(said) => Some(Pane {
+        Stage::Came(reading) => Some(Pane {
             title: CAME.to_owned(),
-            lines: came(said, rows, across),
+            lines: read(reading, rows, across),
+        }),
+        Stage::Wondering(chooser) => Some(Pane {
+            title: ASK.to_owned(),
+            lines: choosing(chooser, rows, across),
+        }),
+        Stage::Typing { asks, typed, .. } => Some(Pane {
+            title: ASK.to_owned(),
+            lines: typing(asks, typed, across),
+        }),
+        Stage::Waiting(question) => Some(Pane {
+            title: asked(question),
+            lines: vec![dimmed(ANSWERING, across)],
+        }),
+        Stage::Answered { question, reading } => Some(Pane {
+            title: asked(question),
+            lines: read(reading, rows, across),
         }),
     }
 }
@@ -106,7 +133,10 @@ pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
 /// Built from the offers rather than written out, so an action added to the table
 /// is an action the operator is told about.
 fn keys() -> String {
-    let mut said = vec![ALWAYS.to_owned()];
+    let mut said = vec![
+        ALWAYS.to_owned(),
+        format!("{} {}", question::KEY, question::HINT),
+    ];
     said.extend(
         OFFERED
             .iter()
@@ -120,8 +150,13 @@ fn titled(offer: &Offer) -> String {
     format!(" {} ", offer.hint)
 }
 
-/// The choices, the selected one marked, and how to move over them.
-fn choosing(chooser: &Chooser, rows: usize, across: usize) -> Vec<Line<'static>> {
+/// What the box holding one question's answer is called.
+fn asked(question: &Question) -> String {
+    format!(" {} ", question.name)
+}
+
+/// The entries, the selected one marked, and how to move over them.
+fn choosing<T: Listed>(chooser: &Chooser<T>, rows: usize, across: usize) -> Vec<Line<'static>> {
     // Two rows are kept back for the blank and the hint under the list, which is
     // what tells an operator that enter is what they are looking for.
     let room = rows.saturating_sub(2);
@@ -145,21 +180,35 @@ fn choosing(chooser: &Chooser, rows: usize, across: usize) -> Vec<Line<'static>>
     lines
 }
 
-/// One choice: its name, and what it is for beside it.
-fn offered(here: bool, choice: &Choice, across: usize) -> Line<'static> {
+/// One entry: its name, and what it is for beside it.
+fn offered(here: bool, entry: &impl Listed, across: usize) -> Line<'static> {
     let mark = if here { "> " } else { "  " };
     // The marker and the two spaces after the name are taken off before the name is
     // fitted, so the row it ends up on is the width it was given rather than that
     // width plus whatever the marker cost.
     let named = format!(
         "{mark}{}  ",
-        shortened(&choice.name, across.saturating_sub(4))
+        shortened(entry.name(), across.saturating_sub(4))
     );
     let room = across.saturating_sub(named.chars().count());
     Line::from(vec![
         Span::raw(named),
-        Span::styled(shortened(&choice.about, room), quiet()),
+        Span::styled(shortened(entry.about(), room), quiet()),
     ])
+}
+
+/// What a question has to be given, and what has been typed of it so far.
+///
+/// The word is drawn as typed and never made to fit from the left, so what is being
+/// typed stays where it was put — a field that scrolled under the operator's own
+/// fingers would be a field nobody could correct.
+fn typing(asks: &str, typed: &str, across: usize) -> Vec<Line<'static>> {
+    vec![
+        Line::raw(shortened(asks, across)),
+        Line::raw(shortened(&format!("> {typed}"), across)),
+        Line::raw(""),
+        dimmed(TYPING, across),
+    ]
 }
 
 /// The question before an action, and what it is being asked about.
@@ -175,24 +224,39 @@ fn confirming(offer: &Offer, chosen: &Choice, across: usize) -> Vec<Line<'static
     ]
 }
 
-/// What an action came to, in the words the command line gives for the same run.
-fn came(said: &[String], rows: usize, across: usize) -> Vec<Line<'static>> {
+/// An answer, in the words the command line gives for the same question.
+///
+/// What is not on the screen is counted rather than left to be inferred from a box
+/// that has stopped moving, because either end of a reading looks the same as a
+/// reading that was short.
+fn read(reading: &Reading, rows: usize, across: usize) -> Vec<Line<'static>> {
+    // Two rows are kept back for the blank and the hint under the answer, which is
+    // what tells an operator the box moves at all.
     let room = rows.saturating_sub(2);
-    let mut lines: Vec<Line<'static>> = said
-        .iter()
-        .take(room)
+    let (shown, above, below) = reading.window(room);
+    let mut lines: Vec<Line<'static>> = shown
+        .into_iter()
         .map(|line| Line::raw(shortened(line, across)))
         .collect();
-    let left = said.len().saturating_sub(lines.len());
-    if left > 0 {
-        lines.push(dimmed(
-            &format!("{left} more line{} than this screen has room for", s(left)),
-            across,
-        ));
+    if let Some(place) = elsewhere(above, below) {
+        lines.push(dimmed(&place, across));
     }
     lines.push(Line::raw(""));
-    lines.push(dimmed(CLOSING, across));
+    lines.push(dimmed(MOVING, across));
     lines
+}
+
+/// What is off the top and off the bottom of the box, or nothing where it holds
+/// the whole answer.
+fn elsewhere(above: usize, below: usize) -> Option<String> {
+    let over = format!("{above} more line{} above", s(above));
+    let under = format!("{below} more line{} below", s(below));
+    match (above, below) {
+        (0, 0) => None,
+        (0, _) => Some(under),
+        (_, 0) => Some(over),
+        _ => Some(format!("{over}, {under}")),
+    }
 }
 
 /// A line that is not the one being read, drawn as such.
@@ -210,9 +274,11 @@ fn shortened(value: &str, room: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{came, footer, keys, pane, Offer, Stage};
+    use super::{elsewhere, footer, keys, pane, read, Offer, Stage};
     use crate::acting::chooser::Chooser;
     use crate::acting::offer::{Choice, OFFERED};
+    use crate::acting::question::{Needed, Question, HINT, KEY};
+    use crate::acting::reading::Reading;
     use lemonfiber_core::app::Command;
     use ratatui::text::Line;
 
@@ -224,6 +290,19 @@ mod tests {
         hint: "start",
         asks: "Start",
     };
+
+    /// One question that takes a word, held here for the same reason.
+    static A_TRACE: Question = Question {
+        name: "where one thing is",
+        about: "follow one show or film across the services",
+        read: "/api/trace",
+        needs: Needed::Term("What to follow"),
+    };
+
+    /// A reading over nine numbered lines.
+    fn nine() -> Reading {
+        Reading::of((0..9).map(|at| format!("line {at}")).collect())
+    }
 
     /// A choice by name, for the tests that only read what is drawn.
     fn a_choice(name: &str, about: &str) -> Choice {
@@ -255,7 +334,7 @@ mod tests {
     }
 
     /// A chooser over two, for the list tests.
-    fn two() -> Chooser {
+    fn two() -> Chooser<Choice> {
         Chooser::over(
             a_choice("Full stack", "everything, behind the tunnel"),
             vec![a_choice("Lean stack", "the download clients only")],
@@ -269,6 +348,7 @@ mod tests {
         let said = keys();
 
         assert!(said.contains("q quit"), "{said}");
+        assert!(said.contains(&format!("{KEY} {HINT}")), "{said}");
         for offer in OFFERED {
             assert!(
                 said.contains(offer.hint),
@@ -368,17 +448,28 @@ mod tests {
         assert!(said.contains("asking this stack"), "{said}");
     }
 
-    /// A report says how to put it away, and counts what it had no room for.
+    /// An answer says how to move through it, and counts what is off each end —
+    /// because either end of a reading looks exactly like a reading that was short.
     #[test]
-    fn a_report_too_long_for_the_screen_counts_what_it_left_out() {
-        let report: Vec<String> = (0..9).map(|at| format!("line {at}")).collect();
+    fn an_answer_longer_than_the_screen_counts_what_is_off_each_end() {
+        let mut reading = nine();
 
-        let short: Vec<String> = came(&report, 4, 80).iter().map(text).collect();
-        let whole: Vec<String> = came(&report, 40, 80).iter().map(text).collect();
+        let opened: Vec<String> = read(&reading, 4, 80).iter().map(text).collect();
+        reading.forward();
+        let moved: Vec<String> = read(&reading, 4, 80).iter().map(text).collect();
+        let whole: Vec<String> = read(&nine(), 40, 80).iter().map(text).collect();
 
         assert!(
-            short.iter().any(|line| line.contains("7 more lines")),
-            "{short:?}"
+            opened
+                .iter()
+                .any(|line| line.contains("7 more lines below")),
+            "{opened:?}"
+        );
+        assert!(
+            moved
+                .iter()
+                .any(|line| line.contains("1 more line above, 6 more lines below")),
+            "{moved:?}"
         );
         assert!(
             whole.iter().any(|line| line.contains("line 8")),
@@ -389,9 +480,72 @@ mod tests {
             "{whole:?}"
         );
         assert!(
-            whole.iter().any(|line| line.contains("any key closes")),
+            whole.iter().any(|line| line.contains("up and down move")),
             "{whole:?}"
         );
+    }
+
+    /// The end of a long answer says what is behind it and claims nothing is ahead.
+    #[test]
+    fn the_end_of_an_answer_says_only_what_is_behind_it() {
+        assert_eq!(elsewhere(0, 0), None);
+        assert_eq!(elsewhere(8, 0), Some("8 more lines above".to_owned()));
+        assert_eq!(elsewhere(1, 0), Some("1 more line above".to_owned()));
+    }
+
+    /// The list of questions is the list of choices, drawn by the same thing: a
+    /// second way to draw a list is a second way for two lists to disagree.
+    #[test]
+    fn the_questions_are_listed_the_way_the_choices_are() {
+        let stage = Stage::Wondering(Chooser::over(&A_TRACE, Vec::new()));
+
+        let said = said(&stage, 20, 80);
+
+        assert!(said.contains("> where one thing is"), "{said}");
+        assert!(said.contains("follow one show or film"), "{said}");
+        assert!(said.contains("enter goes on"), "{said}");
+    }
+
+    /// A question that takes a word says what it wants, shows what has been typed,
+    /// and says which key asks it.
+    #[test]
+    fn a_question_taking_a_word_says_what_it_wants_and_what_was_typed() {
+        let stage = Stage::Typing {
+            question: &A_TRACE,
+            asks: "What to follow",
+            typed: "The Exp".to_owned(),
+        };
+
+        let said = said(&stage, 20, 80);
+
+        assert!(said.contains("What to follow"), "{said}");
+        assert!(said.contains("> The Exp"), "{said}");
+        assert!(said.contains("enter asks"), "{said}");
+    }
+
+    /// A question with the core says so, under the name of the question asked, so
+    /// an answer that is slow to arrive does not read as a screen that stopped.
+    #[test]
+    fn a_question_with_the_core_says_what_it_is_waiting_for() {
+        let said = said(&Stage::Waiting(&A_TRACE), 20, 80);
+
+        assert!(said.contains("where one thing is"), "{said}");
+        assert!(said.contains("waiting for this stack to answer"), "{said}");
+    }
+
+    /// An answer is drawn under the name of the question it answers, so a box that
+    /// is still open a minute later still says what it was asked.
+    #[test]
+    fn an_answer_is_drawn_under_the_question_it_answers() {
+        let stage = Stage::Answered {
+            question: &A_TRACE,
+            reading: nine(),
+        };
+
+        let said = said(&stage, 20, 80);
+
+        assert!(said.contains("where one thing is"), "{said}");
+        assert!(said.contains("line 0"), "{said}");
     }
 
     /// A control character in another service's account of a failure is an
@@ -409,17 +563,38 @@ mod tests {
         assert!(said.contains("Full[2Jstack"), "{said}");
     }
 
-    /// A narrow screen shortens rather than running past its edge.
+    /// A narrow screen shortens rather than running past its edge, whichever of the
+    /// boxes is open on it.
     #[test]
     fn no_row_runs_past_the_edge_of_a_narrow_screen() {
-        let stage = Stage::Choosing {
-            offer: &A_START,
-            chooser: two(),
-        };
+        let opened = [
+            Stage::Choosing {
+                offer: &A_START,
+                chooser: two(),
+            },
+            Stage::Confirming {
+                offer: &A_START,
+                chosen: a_choice("Full stack", "everything, behind the tunnel"),
+            },
+            Stage::Wondering(Chooser::over(&A_TRACE, Vec::new())),
+            Stage::Typing {
+                question: &A_TRACE,
+                asks: "What to follow",
+                typed: "something with a very long name indeed".to_owned(),
+            },
+            Stage::Waiting(&A_TRACE),
+            Stage::Answered {
+                question: &A_TRACE,
+                reading: nine(),
+            },
+            Stage::Came(nine()),
+        ];
 
-        for across in [4usize, 12, 24, 40] {
-            for row in said(&stage, 20, across).lines().skip(1) {
-                assert!(row.chars().count() <= across, "at {across}: {row:?}");
+        for stage in &opened {
+            for across in [4usize, 12, 24, 40] {
+                for row in said(stage, 20, across).lines().skip(1) {
+                    assert!(row.chars().count() <= across, "at {across}: {row:?}");
+                }
             }
         }
     }

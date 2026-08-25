@@ -14,12 +14,19 @@
 //! What runs here is the display path itself rather than the name test under it:
 //! the claim is that an operator's value does not come back out, which is a
 //! property of what is rendered and not of what a predicate says about a name.
+//!
+//! The second guard below is about the same path from the other end. A value is
+//! withheld where the settings are read, so a surface that read them for itself
+//! would be outside all of this — and the dashboard now has a screen that shows
+//! them.
 
 use std::collections::BTreeSet;
 
 use lemonfiber::cli::STACK;
 use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_core::config::store::showing;
+
+mod source_tree;
 
 /// The file the stack declares its settings in.
 const SETTINGS: &str = ".env.example";
@@ -220,5 +227,44 @@ fn every_displayed_setting_says_why_it_is_one() {
         silent.is_empty(),
         "these are displayed with their values and the list does not say what makes that \
          safe: {silent:?}"
+    );
+}
+
+/// The module trees that draw a full screen, which is where a setting could reach
+/// a terminal without passing the display path.
+const DRAWING: [&str; 4] = ["acting", "dashboard", "pane.rs", "terminal.rs"];
+
+/// How the settings are read, which no screen may do for itself.
+const READING: [&str; 2] = ["config::store", "env_file"];
+
+/// Nothing that draws a screen reads a setting for itself.
+///
+/// Withholding happens where the settings are read. A screen that opened the
+/// environment file would be outside that path, and would put on a terminal exactly
+/// the values the list above exists to keep out of a report. The dashboard asks for
+/// them by naming the read a browser names, which comes to `config show` and to the
+/// display path under it.
+#[test]
+fn nothing_that_draws_a_screen_reads_a_setting_for_itself() {
+    let mut reaching: Vec<String> = Vec::new();
+    for (path, text) in source_tree::sources() {
+        let where_it_lives = path.to_string_lossy().replace('\\', "/");
+        let drawn = DRAWING
+            .iter()
+            .any(|tree| where_it_lives.contains(&format!("/src/{tree}")));
+        if !drawn {
+            continue;
+        }
+        for (number, line) in source_tree::production(&text).lines().enumerate() {
+            if READING.iter().any(|how| line.contains(how)) {
+                reaching.push(format!("{where_it_lives}:{}", number + 1));
+            }
+        }
+    }
+
+    assert!(
+        reaching.is_empty(),
+        "a screen reads settings by asking the core for them, never by reading them: \
+         {reaching:?}"
     );
 }

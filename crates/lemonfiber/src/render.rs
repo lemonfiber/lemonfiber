@@ -189,7 +189,12 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
 }
 
 /// The lines one outcome renders to, before anything is said about its words.
-fn shaped(outcome: &Outcome) -> Lines {
+///
+/// Reached by the dashboard as well as by the printer, so a question asked at a
+/// screen is answered in the words the same request typed at a prompt is. The
+/// footnotes are not part of it: a report ends and can put its words underneath
+/// itself, and a screen that never ends explains them on a keypress instead.
+pub(crate) fn shaped(outcome: &Outcome) -> Lines {
     match outcome {
         Outcome::Version(report) => versions(report),
         Outcome::Forms(report) => forms(report),

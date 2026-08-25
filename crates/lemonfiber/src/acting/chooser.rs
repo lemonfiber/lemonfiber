@@ -1,4 +1,4 @@
-//! Which of the things an action can be given is selected.
+//! Which of the things offered is selected.
 //!
 //! A cursor over a list that is never empty, held as the entry selected and the
 //! entries either side of it rather than as a list and a number. A list and a
@@ -8,23 +8,44 @@
 //!
 //! Emptiness is ruled out the same way. The one selected arrives on its own rather
 //! than as the first of a list that might have been empty, so "there is nothing to
-//! choose between" is answered where the choices are built and never here.
+//! choose between" is answered where the entries are built and never here.
+//!
+//! What is being chosen between is the caller's: what an action can be given, and
+//! what this stack can be asked, are the same movement over two lists. Both are
+//! drawn from the two things every entry has — what it is called, and what it is
+//! for — which is what [`Listed`] asks of them and the whole of what it asks.
 
-use super::offer::Choice;
-
-/// A list of choices with exactly one of them selected.
-pub(crate) struct Chooser {
-    /// The choices above the one selected, the nearest last.
-    above: Vec<Choice>,
-    /// The one selected.
-    selected: Choice,
-    /// The choices below it, the nearest first.
-    below: Vec<Choice>,
+/// Something a list offers: what it is called, and what it is for.
+pub(crate) trait Listed {
+    /// What it is called, on the row the cursor moves over.
+    fn name(&self) -> &str;
+    /// What it is for, in the one line beside the name.
+    fn about(&self) -> &str;
 }
 
-impl Chooser {
-    /// A chooser over one choice and whatever follows it.
-    pub(crate) const fn over(selected: Choice, below: Vec<Choice>) -> Self {
+impl<T: Listed> Listed for &T {
+    fn name(&self) -> &str {
+        (*self).name()
+    }
+
+    fn about(&self) -> &str {
+        (*self).about()
+    }
+}
+
+/// A list with exactly one entry selected.
+pub(crate) struct Chooser<T> {
+    /// The entries above the one selected, the nearest last.
+    above: Vec<T>,
+    /// The one selected.
+    selected: T,
+    /// The entries below it, the nearest first.
+    below: Vec<T>,
+}
+
+impl<T> Chooser<T> {
+    /// A chooser over one entry and whatever follows it.
+    pub(crate) const fn over(selected: T, below: Vec<T>) -> Self {
         Self {
             above: Vec::new(),
             selected,
@@ -51,12 +72,12 @@ impl Chooser {
     }
 
     /// Take the one selected, the rest having been offered and passed over.
-    pub(crate) fn taken(self) -> Choice {
+    pub(crate) fn taken(self) -> T {
         self.selected
     }
 
-    /// Every choice in the order it was offered, marked where it is the selected one.
-    pub(crate) fn listed(&self) -> impl Iterator<Item = (bool, &Choice)> {
+    /// Every entry in the order it was offered, marked where it is the selected one.
+    pub(crate) fn listed(&self) -> impl Iterator<Item = (bool, &T)> {
         self.above
             .iter()
             .map(|choice| (false, choice))
@@ -83,12 +104,12 @@ mod tests {
     }
 
     /// A chooser over three, for the movement tests.
-    fn three() -> Chooser {
+    fn three() -> Chooser<Choice> {
         Chooser::over(a_choice("one"), vec![a_choice("two"), a_choice("three")])
     }
 
     /// The names in the order they are drawn, and which one is marked.
-    fn shown(chooser: &Chooser) -> Vec<(bool, String)> {
+    fn shown(chooser: &Chooser<Choice>) -> Vec<(bool, String)> {
         chooser
             .listed()
             .map(|(here, choice)| (here, choice.name.clone()))
@@ -97,7 +118,7 @@ mod tests {
 
     /// The name of the one selected, read off the list the screen is given rather
     /// than off a field, so what is asserted is what an operator would see marked.
-    fn selected(chooser: &Chooser) -> String {
+    fn selected(chooser: &Chooser<Choice>) -> String {
         chooser
             .listed()
             .filter(|(here, _)| *here)
