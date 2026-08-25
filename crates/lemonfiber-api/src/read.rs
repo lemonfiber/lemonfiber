@@ -1,4 +1,4 @@
-//! The twelve reads: one endpoint per question a command already answers.
+//! The thirteen reads: one endpoint per question a command already answers.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
 //! into the command a person would type, hands that to the dispatcher the
@@ -18,15 +18,16 @@
 //! for one answer, which is the opposite of two gathers that can disagree. `forms`
 //! goes the other way and is one endpoint over two commands, because the request
 //! is one word on the command line too: naming no form lists what the stack
-//! declares, and naming some says what starting those would come to. `config` is
-//! one endpoint over two for the same reason.
+//! declares, and naming some says what starting those would come to. `config` and
+//! `explain` are one endpoint over two for the same reason.
 //!
 //! What every read shares is here — how one is carried out, and how a query string
 //! is read. The endpoints themselves are grouped beside it by what they are about:
-//! the stack, the diagnosis, one item, and the choices in force.
+//! the stack, the diagnosis, one item, the choices in force, and the words.
 
 mod chosen;
 mod diagnosis;
+mod glossary;
 mod items;
 mod stack;
 
@@ -57,6 +58,7 @@ pub fn routes() -> Router<Serving> {
         .merge(diagnosis::routes())
         .merge(items::routes())
         .merge(chosen::routes())
+        .merge(glossary::routes())
 }
 
 /// Carry out a command and answer with the envelope it renders.

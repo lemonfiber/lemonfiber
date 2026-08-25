@@ -22,7 +22,7 @@ use schemars::{schema_for, Schema};
 use serde::Serialize;
 
 use crate::dashboard::Snapshot;
-use crate::glossary::Term;
+use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind::{self, Kind},
     ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
@@ -67,6 +67,11 @@ impl Contract {
         );
         describing(&mut kinds, kind::ERROR, schema_for!(Envelope<Problem>));
         describing(&mut kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
+        describing(
+            &mut kinds,
+            kind::GLOSSARY,
+            schema_for!(Envelope<Vocabulary>),
+        );
         describing(
             &mut kinds,
             kind::HOUSEHOLD,
@@ -163,6 +168,7 @@ mod tests {
 
     use super::{Contract, CONTRACT_PATH};
     use crate::app::Outcome;
+    use crate::glossary::{Term, Vocabulary};
     use crate::model::{
         ConfigReport, DoctorReport, FormsReport, HouseholdReport, LifecycleReport, MusicReport,
         QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
@@ -171,7 +177,7 @@ mod tests {
     use crate::stack::closure::Plan;
 
     /// Arms in `Outcome::envelope`, so a variant added without a sample here fails.
-    const OUTCOMES: usize = 15;
+    const OUTCOMES: usize = 17;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -226,7 +232,22 @@ mod tests {
             }),
             Outcome::Seed(crate::seed::Report::default()),
             Outcome::Reset(ResetReport::default()),
+            Outcome::Word(a_word()),
+            Outcome::Glossary(Vocabulary {
+                words: vec![a_word()],
+            }),
         ]
+    }
+
+    /// One word with every field of an entry filled, so the shape is compared
+    /// whole rather than with the optional halves left out.
+    fn a_word() -> Term {
+        Term {
+            word: "indexer",
+            short: "Search engines that find what you are looking for.",
+            deep: Some("An indexer keeps track of what has been posted and where."),
+            also_called: &["search provider"],
+        }
     }
 
     /// An empty closure, which is all the shape comparison needs of one.

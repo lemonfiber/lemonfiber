@@ -5,6 +5,7 @@
 
 use lemonfiber_core::docker::{Criticality, Service, State};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+use lemonfiber_core::glossary::{explain, Term};
 use lemonfiber_core::model::{
     FormReport, FormsReport, LifecycleReport, MusicChoice, PresetChoice, SupervisionReport,
     TraceReport, VersionReport,
@@ -98,6 +99,20 @@ pub(super) fn a_version() -> VersionReport {
         stack: "1.2.3".to_owned(),
         compose: Some("2.29".to_owned()),
     }
+}
+
+/// One glossary entry, with every part of one filled.
+///
+/// Taken from the table rather than written out. The entry that has every part is
+/// the one that records what another service calls the same thing, and this product
+/// writes those words nowhere but the table.
+pub(super) fn a_term() -> Term {
+    explain("indexer").copied().unwrap_or(Term {
+        word: "word",
+        short: "what it is for.",
+        deep: None,
+        also_called: &[],
+    })
 }
 
 /// A watch that ended having stopped its forms.

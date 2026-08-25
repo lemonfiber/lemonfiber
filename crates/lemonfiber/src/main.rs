@@ -190,9 +190,9 @@ async fn main() -> ExitCode {
         // A walkthrough narrates for minutes and produces one report at its end, not a
         // value that arrives once, so like streaming and watching it runs its own way.
         Request::Walkthrough { item } => return walk(&ctx, &item.join(" "), cli.json).await,
-        // Answered from a table compiled into the binary, so unlike every command
-        // below it this one needs neither a stack nor a daemon to say anything.
-        Request::Explain { word } => return explaining(&word.join(" "), cli.dry_run),
+        // Naming a word says what it means and naming none lists them, and both are
+        // answered from a table compiled into the binary rather than from a stack.
+        Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
         Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
         Request::Seed => Command::Seed,
@@ -255,29 +255,37 @@ async fn serving(ctx: Ctx, asked: RawUi) -> ExitCode {
     ui::run(ctx, asked, EMBEDDED_APP, Box::pin(std::future::pending())).await
 }
 
-/// Say what a word means, or say that this product does not explain that one.
+/// Say what a word means, or list what there is to ask about, and record what this
+/// operator has been told.
 ///
-/// A word with no entry is a refusal rather than an empty answer: somebody who typed
-/// `indexr` needs to be told they did, and a blank response reads as "it means
-/// nothing" — a wrong answer where they wanted an absent one. Reported through the
-/// same error model as everything else, so it carries a code and a way forward
-/// rather than being this one command's private way of saying no.
-fn explaining(word: &str, rehearsing: bool) -> ExitCode {
-    let Some(lines) = render::glossary::explained(word, say::for_a_parser()) else {
-        return complain(&render::glossary::unrecognised(word));
+/// Kept apart from the fall-through in [`main`] by the record it writes: an
+/// explanation a person read is recorded, and one a script fetched is not. A word
+/// with no entry is refused by the core through the same error model as everything
+/// else, so it carries a code and a way forward rather than being this one
+/// command's private way of saying no.
+///
+/// The word is taken as words so it can be typed unquoted, and joined back into the
+/// term as said.
+async fn explaining(ctx: &Ctx, word: &[String], json: bool, rehearsing: bool) -> ExitCode {
+    let said = word.join(" ");
+    let command = if word.is_empty() {
+        Command::Glossary
+    } else {
+        Command::Explain { word: said.clone() }
     };
-    lines.print();
-    // A script fetching the text is not a person learning the word. Acknowledgement
-    // is about what this operator has been told, and recording a machine's lookup
-    // would quietly stop explaining it to the person who never made one.
+    let outcome = match dispatch(command, ctx).await {
+        Ok(outcome) => outcome,
+        Err(problem) => return complain(&problem),
+    };
+    render(&outcome, json);
     // A rehearsal changes nothing, which this record is not exempt from. And a
     // script fetching the text is not a person learning the word: recording a
     // machine's lookup would quietly stop explaining it to the operator who never
-    // made one.
-    if !say::for_a_parser() {
-        context::remember(&[word], rehearsing);
+    // made one. A listing teaches no one word, so there is none to record.
+    if !word.is_empty() && !say::for_a_parser() {
+        context::remember(&[said.as_str()], rehearsing);
     }
-    ExitCode::SUCCESS
+    settled(&outcome)
 }
 
 /// Say what starting these forms will start, before it starts.

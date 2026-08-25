@@ -1862,6 +1862,84 @@
         }
       }
     },
+    "glossary": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Vocabulary"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Term": {
+          "description": "A word this product uses, and what somebody meeting it needs to know.",
+          "type": "object",
+          "properties": {
+            "also_called": {
+              "description": "What other services in this stack call the same thing.\n\nSonarr and `SABnzbd` do not agree on words, and an operator moving between\ntheir screens should not have to work out that two of them are one.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "deep": {
+              "description": "More, for somebody who asks — never needed in order to act.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "short": {
+              "description": "One sentence: what it is for and what it costs or gains.\n\nEnough to act on. Somebody who reads only this should not be stuck.",
+              "type": "string"
+            },
+            "word": {
+              "description": "The word as it appears in the interface.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "word",
+            "short",
+            "also_called"
+          ]
+        },
+        "Vocabulary": {
+          "description": "Every word this product explains, for somebody who asked what there is to ask\nabout.",
+          "type": "object",
+          "properties": {
+            "words": {
+              "description": "The words, in the order somebody meets them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Term"
+              }
+            }
+          },
+          "required": [
+            "words"
+          ]
+        }
+      }
+    },
     "household": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

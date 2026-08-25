@@ -12,6 +12,7 @@
 use crate::audio::Format;
 use crate::doctor::Narrowing;
 use crate::error::{Code, Problem};
+use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
     MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
@@ -194,6 +195,20 @@ pub enum Command {
     /// List the items whose downloads are stuck, each named so it links to its own
     /// trace — the landing point for "N items stuck".
     Stuck,
+    /// Say what one of this product's words means, at length.
+    ///
+    /// Answered from a table compiled into the binary, so it needs neither a stack
+    /// nor a daemon.
+    Explain {
+        /// The word, as it would be said.
+        word: String,
+    },
+    /// List every word this product explains.
+    ///
+    /// Apart from [`Command::Explain`] the way listing forms is apart from
+    /// resolving them: a surface that has to name a word cannot know the names in
+    /// advance, and asking is what keeps it from carrying its own copy of the table.
+    Glossary,
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they
@@ -263,6 +278,10 @@ pub enum Outcome {
     Household(HouseholdReport),
     /// The items whose downloads are stuck, each linkable to its trace.
     Stuck(StuckReport),
+    /// What one of this product's words means.
+    Word(Term),
+    /// Every word this product explains.
+    Glossary(Vocabulary),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -291,6 +310,8 @@ impl Outcome {
             Self::Trace(_) => kind::TRACE,
             Self::Household(_) => kind::HOUSEHOLD,
             Self::Stuck(_) => kind::STUCK,
+            Self::Word(_) => kind::WORD,
+            Self::Glossary(_) => kind::GLOSSARY,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Seed(_) => kind::SEED,
@@ -315,6 +336,8 @@ impl serde::Serialize for Outcome {
             Self::Trace(report) => report.serialize(serializer),
             Self::Household(report) => report.serialize(serializer),
             Self::Stuck(report) => report.serialize(serializer),
+            Self::Word(term) => term.serialize(serializer),
+            Self::Glossary(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
@@ -368,6 +391,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .await
             .map(Outcome::Household),
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
+        Command::Explain { word } => crate::glossary::explain(&word)
+            .map(|term| Outcome::Word(*term))
+            .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
+        Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
         Command::QualityUpgrade { confirm } => {
             upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
         }
@@ -498,6 +525,51 @@ mod tests {
             json.contains("\"kind\":\"stuck\""),
             "envelope names the kind"
         );
+    }
+
+    /// The words need no stack and no engine, so this is the one command that runs
+    /// through dispatch, envelope and serialise against a context that has nothing.
+    #[tokio::test]
+    async fn a_dispatched_explanation_serialises_under_its_own_kind() {
+        let ctx = ctx(Ok(spoke("")));
+
+        let word = dispatch(
+            Command::Explain {
+                word: "indexer".to_owned(),
+            },
+            &ctx,
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(word.contains("\"kind\":\"word\""), "{word}");
+        assert!(word.contains("\"word\":\"indexer\""), "{word}");
+
+        let listed = dispatch(Command::Glossary, &ctx)
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(listed.contains("\"kind\":\"glossary\""), "{listed}");
+        assert!(listed.contains("\"words\":[{"), "{listed}");
+    }
+
+    /// Answering "it means nothing" for a word this product never explains would be a
+    /// wrong answer where an absent one was wanted.
+    #[tokio::test]
+    async fn a_word_with_no_entry_is_refused_rather_than_answered_emptily() {
+        let refused = dispatch(
+            Command::Explain {
+                word: "kubernetes".to_owned(),
+            },
+            &ctx(Ok(spoke(""))),
+        )
+        .await
+        .err()
+        .map(|problem| problem.code.as_str().to_owned());
+
+        assert_eq!(refused.as_deref(), Some("WORD-1"));
     }
 
     #[tokio::test]
@@ -747,6 +819,8 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
                 | Outcome::Stuck(_)
+                | Outcome::Word(_)
+                | Outcome::Glossary(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
@@ -774,6 +848,8 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
                 | Outcome::Stuck(_)
+                | Outcome::Word(_)
+                | Outcome::Glossary(_)
                 | Outcome::Status(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
@@ -1416,6 +1492,8 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
                 | Outcome::Stuck(_)
+                | Outcome::Word(_)
+                | Outcome::Glossary(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
@@ -2393,6 +2471,8 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
                 | Outcome::Stuck(_)
+                | Outcome::Word(_)
+                | Outcome::Glossary(_)
                 | Outcome::Doctor(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)

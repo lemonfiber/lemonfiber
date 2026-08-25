@@ -282,6 +282,8 @@ pub enum Request {
     /// A report explains the words it used underneath itself, in a sentence. This is
     /// the longer form, for somebody who wants it — nothing needs it in order to act,
     /// which is the difference between an explanation offered and one imposed.
+    ///
+    /// Name a word, or name nothing and be told which words there are.
     Explain {
         /// The word, as you would say it.
         word: Vec<String>,

@@ -29,6 +29,8 @@
 
 use serde::Serialize;
 
+use crate::error::{Code, Problem, Remedy, Severity};
+
 /// A word this product uses, and what somebody meeting it needs to know.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Term {
@@ -243,6 +245,14 @@ pub const TERMS: &[Term] = &[
     ),
 ];
 
+/// Every word this product explains, for somebody who asked what there is to ask
+/// about.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Vocabulary {
+    /// The words, in the order somebody meets them.
+    pub words: Vec<Term>,
+}
+
 /// What this product says a word means, where it explains it.
 ///
 /// Matched without regard to case, because a word at the start of a sentence is the
@@ -252,6 +262,39 @@ pub fn explain(word: &str) -> Option<&'static Term> {
     TERMS
         .iter()
         .find(|term| term.word.eq_ignore_ascii_case(word.trim()))
+}
+
+/// Every word there is to ask about, whole.
+///
+/// The table rather than a page of it: two dozen entries is a list somebody reads
+/// to the end, and a surface paging through it would need a cursor for an answer
+/// that fits on one screen. A surface asks for this rather than carrying its own
+/// copy, which is what keeps every surface explaining a word the same way.
+#[must_use]
+pub fn vocabulary() -> Vocabulary {
+    Vocabulary {
+        words: TERMS.to_vec(),
+    }
+}
+
+/// A word this product does not explain, as a refusal that says what it does.
+///
+/// Through the error model rather than a bare line, so it carries a code and a way
+/// forward like every other refusal — and the way forward is the list itself, which
+/// is short enough to be the answer rather than a pointer at one.
+#[must_use]
+pub fn unrecognised(word: &str) -> Problem {
+    let words: Vec<&str> = TERMS.iter().map(|term| term.word).collect();
+    Problem::new(
+        Code::new("WORD-1"),
+        Severity::Error,
+        format!("`{word}` is not one of the words this product explains"),
+        "What is explained here is this ecosystem's own vocabulary — the words that \
+         are load-bearing and cannot be guessed. Having no entry is not the same as \
+         meaning nothing, and nothing is wrong with your stack.",
+        Remedy::new("Ask about one of the words its reports use"),
+    )
+    .with_detail(format!("It explains these — {}.", words.join(", ")))
 }
 
 /// What marks a token as somebody's name for something rather than a word.
@@ -352,7 +395,30 @@ fn same(said: &str, wanted: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{borrowed, explain, mentioned, Term, TERMS};
+    use super::{borrowed, explain, mentioned, unrecognised, vocabulary, Term, TERMS};
+
+    /// Every surface asks for the words rather than carrying its own copy, so the
+    /// list handed out is the table itself.
+    #[test]
+    fn the_vocabulary_is_every_word_in_the_table() {
+        let listed = vocabulary();
+
+        assert_eq!(listed.words.len(), TERMS.len());
+        assert_eq!(listed.words.first().map(|term| term.word), Some("indexer"));
+    }
+
+    /// A refusal an operator cannot act on is worse than none, and here what to do
+    /// about it is short enough to simply be said.
+    #[test]
+    fn a_word_it_does_not_explain_is_refused_with_the_ones_it_does() {
+        let problem = unrecognised("indexr");
+
+        let summary = &problem.summary;
+        assert!(summary.contains("indexr"), "{summary}");
+        let detail = problem.detail.clone().unwrap_or_default();
+        assert!(detail.contains("indexer"), "{detail}");
+        assert!(detail.contains("hardlink"), "{detail}");
+    }
 
     #[test]
     fn a_word_is_explained_however_it_is_capitalised() {
