@@ -53,11 +53,11 @@ and the rest is named in **Standing**.
 
 | Request | Web | Terminal | Standing |
 |---------|-----|----------|----------|
-| `setup` | `/api/setup`, `/api/setup/answer`, `/api/setup/next`, `/api/setup/back`, `/api/setup/apply`, partial | wizard | Completable from a browser and from a terminal. Two affordances are terminal-only — proving a credential against the provider while the answer is being given, and choosing how to recover an interrupted apply — and neither blocks finishing setup. |
+| `setup` | `/api/setup`, `/api/setup/answer`, `/api/setup/next`, `/api/setup/back`, `/api/setup/apply`, `/api/setup/recover` | wizard | Reachable in full from a browser and from a terminal. The two affordances that were terminal-only were the command line doing something around the command, not anything a browser is unsuited to. A credential is proven against its live service as the answer is given, so what is recorded is what the test established rather than what the caller claimed, and what the service did comes back on the report; a test that does not prove one is not a refusal, which leaves the three ways out a terminal run offers — enter another, enter none, or go on with one recorded as unverified. The three ways out of an apply that stopped part-way are a request of their own, put after the report has named what that apply had already written, so the choice is made by somebody who has seen it. |
 | `version` | `/api/version` | dashboard | Reachable from all three, and the cheapest read on this page: no arguments, and an answer the core already renders. The dashboard asks for it off the list one key opens, and a request with no arguments has nothing left over to leave out. |
 | `forms` | `/api/forms` | dashboard, partial | Served on the web, and through one endpoint because the command line spells it as one request: naming no form lists what the stack declares, naming some says what starting those would come to. The profile carried on `/api/services` is a Compose profile and not a form, and neither list contains the other, so this needed an endpoint of its own rather than a reading of that one. The dashboard asks the listing half. Naming a form to see what starting it would come to is not on the list, and it is the half the screen loses least by: the five actions each open the same forms and say what they are about before they run. |
-| `up` | `up`, partial | dashboard, partial | Starting a form is offered on both, and on the terminal the whole stack is a choice too, because the command carries an empty list. Starting only some of a form's services is not reachable at all: `--service` never reaches a `Command` — the command line runs its own streamed start around it — so there is nothing to hand them to, and services named to this action are refused rather than dropped for a start of the whole form. Whether that is its own request, the way `Halt` is not `Down`, is a question for the core. Naming several forms at once is reachable from a browser, which sends the list whole, and not from the dashboard, whose list takes one. |
-| `down` | `down`, partial | dashboard, partial | The teardown is offered on both, and so is stopping named services on the web, which is `Command::Halt` rather than an argument to this one — the terminal offers neither that nor several forms at once. Letting anything still downloading finish first is on no other surface: `--wait` is a loop the command line runs around a queue reading before it asks for the stop, not something `Command::Down` carries. Its companion `--yes` answers a prompt no machine-readable run is put; the terminal asks its own question instead, on a screen where one key reaches a teardown. |
+| `up` | `up` | dashboard, partial | Reachable in full from a browser, and on the terminal the whole stack is a choice too, because the command carries an empty list. Starting only some of a form's services was the gap, and the question it left the core — whether that is its own request, the way `Halt` is not `Down` — is answered yes: bringing a form up creates everything its closure holds and starting named services starts the ones named, which is the same pair `down` and `stop` are, and Compose spells both pairs differently. So the action forks the way `down` already forked, reaching `Command::Start` where services are named and `Command::Up` where none are. The command line still runs its own streamed start around it, because Compose narrates for minutes and that is not a value that arrives once — but both paths resolve what they are about through the same reading of the manifest, so neither can answer about a different set of services from the other. Naming several forms at once is reachable from a browser, which sends the list whole, and not from the dashboard, whose list takes one. |
+| `down` | `down` | dashboard, partial | Reachable in full from a browser. The teardown is offered on both, and so is stopping named services on the web, which is `Command::Halt` rather than an argument to this one — the terminal offers neither that nor several forms at once. Letting anything still downloading finish first is a field on `Command::Down` now rather than a loop the command line ran around it, so a browser asks for it by saying so and is answered with a job's name, which is what a wait that can last an hour has to be answered with. What stayed on the command line is the question in front of it: it reports what stopping would interrupt, asks, and hands the answer over — and its companion `--yes` answers that prompt, which no machine-readable run is put, so it needs no web form. The wait and the named services cannot be asked for together, because what is in flight is a question about the download clients a form holds; both surfaces refuse the pair rather than dropping one of them. |
 | `switch` | `switch` | dashboard, partial | Reachable in full from a browser. It refuses an empty `forms`, and `/api/forms` serves the names — which is what it was waiting on; the dashboard asks the same list of the core and offers the names it comes back with, so a stack declaring none is refused there in the same words. What the terminal leaves is naming several forms at once, its list taking one. |
 | `restart` | `restart` | dashboard, partial | As `switch` on both counts. The terminal leaves the same two things: several forms at once, and the named services `--service` restarts, which its list has no way to name. |
 | `pull` | `pull` | dashboard, partial | As `switch`: it refuses an empty `forms`, which `/api/forms` and the dashboard's own list both serve. The terminal leaves naming several forms at once. It is the one of the five that stops nothing, and it is asked about before it runs anyway, because it can spend an hour of somebody's connection. |
@@ -82,12 +82,12 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, nineteen reach the web in full, six reach it in
-part, zero do not reach it at all, and one — `ui` — is an honest exception. Six
+Of the twenty-six requests, twenty-two reach the web in full, three reach it in
+part, zero do not reach it at all, and one — `ui` — is an honest exception. Three
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
 
-Nothing is now wholly out of a browser's reach. What is left is the six requests
+Nothing is now wholly out of a browser's reach. What is left is the three requests
 reachable in part, each of which loses an argument rather than the request.
 
 These four numbers are read back from the table above by the guard, because a
@@ -100,7 +100,7 @@ dashboard and an open event stream have no command-line form, and `--json` has n
 meaning on a screen — so none of them is a row here. This table reads from the
 command line outwards.
 
-Three arguments were made and did not survive, which is worth recording so they
+Four arguments were made and did not survive, which is worth recording so they
 are not made again:
 
 **Backup, restore and support are not web exceptions.** The appeal is that a
@@ -123,6 +123,18 @@ it and a browser has nothing to interrupt with, so the name it was answered with
 the handle — released, and the work ends where a shell's own interruption would
 have left it. That is a property of the name rather than of any one of the three,
 which is why it is one verb on the job rather than three actions.
+
+**A conversation is not a terminal's alone.** Setup proved a credential while the
+answer was being given, and offered three ways out of an apply that stopped
+part-way, and this page recorded both as things only a terminal did. Neither is
+about a terminal. Proving a key is a live test the server runs — the server is on
+the host, as it was for the path argument above — and a browser is the better place
+to watch one happen than a line that scrolls past. Choosing how to recover is an
+offer-and-consent flow, which is the thing HTML does better than a prompt; and the
+command line's own refusal to make that choice for a piped run is the proof, because
+a surface that can only ask interactively has not built a request, it has built a
+prompt. Both are offered now, and what building them took from the argument is that
+neither could be moved without moving what it decided into the command first.
 
 **A read is not exempt from a requirement about actions.** Reading is most of what
 an operator asks for, and a surface that could not say what is running would be

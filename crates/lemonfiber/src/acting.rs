@@ -536,7 +536,7 @@ mod tests {
     use super::offer::tests::{a_listing, nothing_declared};
     use super::{meaning, question, Acting, Line, Press, Wanted};
     use crate::render::fixtures::{a_lifecycle, a_plan};
-    use lemonfiber_core::app::{Command, Outcome};
+    use lemonfiber_core::app::{Command, Outcome, Waiting};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
     use lemonfiber_core::model::{FormsReport, VersionReport};
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -696,7 +696,13 @@ mod tests {
         acting.pressed(&Press::Accept);
         let carried = acting.pressed(&Press::Typed('y'));
 
-        assert_eq!(carried, Wanted::Carry(Command::Down { forms: Vec::new() }));
+        assert_eq!(
+            carried,
+            Wanted::Carry(Command::Down {
+                forms: Vec::new(),
+                wait: Waiting::Never
+            })
+        );
     }
 
     /// Anything but an explicit yes changes nothing, and leaves the screen where an

@@ -8,14 +8,18 @@
 //! A name the carrier holds and the action's command has nowhere to put is refused
 //! too. Those are the fields that would have changed what the action did, so
 //! dropping one answers a different request from the one that was asked — an
-//! agreement that turns out to guard nothing, a service named to a start that then
-//! starts the whole form, or a bundle asked to show a setting by an action that
-//! writes no bundle.
+//! agreement that turns out to guard nothing, a preset named to an upgrade that
+//! then re-fetches the library at the preset already recorded, or a bundle asked to
+//! show a setting by an action that writes no bundle.
+//!
+//! And a pair the carrier holds that name two different requests when they arrive
+//! together is refused as a pair, because there is no one of them to drop.
 //!
 //! Which action takes what is a list per argument rather than a match arm, so that
 //! the answer can be read, counted and held against the flags the command line
 //! declares.
 
+use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
 use serde::Deserialize;
 
@@ -29,6 +33,8 @@ pub struct Arguments {
     pub forms: Vec<String>,
     /// The services to act on, leaving the rest of the form alone.
     pub services: Vec<String>,
+    /// Whether anything still downloading is let finish before the stop.
+    pub wait: Waiting,
     /// The one service to act on instead of the whole stack.
     pub service: Option<String>,
     /// The setting to change.
@@ -191,17 +197,28 @@ pub const TAKES_CHECK: &[&str] = &["accept"];
 
 /// The actions whose command carries the services it was given.
 ///
-/// Stopping named services is `Command::Halt`, a different request from a teardown
-/// rather than a teardown with an argument, and a restart carries the services it
-/// restarts. No other command has a field to put them in.
+/// Three, and each of them a name for something narrower than the form. Starting
+/// named services is `Command::Start` and stopping them is `Command::Halt` — each a
+/// different request from the whole-form one rather than that request with an
+/// argument, which is how Compose spells them too. A restart is the one that takes
+/// the same command either way, because restarting a form is restarting every
+/// service in it.
+pub const TAKES_SERVICES: &[&str] = &["up", "down", "restart"];
+
+/// The action whose command carries whether to let the downloads finish.
 ///
-/// `up` is the one whose absence costs something. The command line starts named
-/// services through a streamed path of its own that never reaches a `Command`, so
-/// there is nothing here to hand them to — and dropping them starts every service
-/// the form holds, which is the answer to a request nobody made. Whether starting
-/// named services is its own request, the way `Halt` is its own request, is a
-/// question for the core rather than for this table.
-pub const TAKES_SERVICES: &[&str] = &["down", "restart"];
+/// A teardown and nothing else. It is the one action that takes something away
+/// while it may be in the middle of arriving, and the wait is inside the command
+/// rather than in front of it — so a caller that cannot sit in a loop asks for it
+/// by saying so, and what it gets back is a name for work that goes on after the
+/// reply.
+///
+/// Not for the stop of named services beside it. What is in flight is a question
+/// about the download clients a form holds, so a wait asked of two services that
+/// are not download clients would hold up a stop for downloads stopping them
+/// cannot interrupt — which is why the two are refused together rather than one of
+/// them being dropped, and why the command line declares them in conflict.
+pub const TAKES_WAITING: &[&str] = &["down"];
 
 /// The action whose command carries the one service it was given.
 ///
@@ -262,9 +279,14 @@ pub const TAKES_ITEM: &[&str] = &["walkthrough"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 19] = [
+    let carried: [(&str, bool, &[&str]); 20] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
+        (
+            "wait",
+            matches!(given.wait, Waiting::ForTheDownloads),
+            TAKES_WAITING,
+        ),
         ("service", given.service.is_some(), TAKES_SERVICE),
         ("key", given.key.is_some(), TAKES_SETTING),
         ("value", given.value.is_some(), TAKES_SETTING),

@@ -23,7 +23,8 @@ mod waiting;
 
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
-pub use inflight::{in_flight, Interrupted};
+pub(super) use inflight::teardown;
+pub use inflight::{in_flight, Interrupted, Waiting};
 pub use lock::{claimed, released, Claim};
 pub use streaming::{logs, pull_progress, start_progress, started};
 // Reached only by the tests that drive the decision directly rather than through a

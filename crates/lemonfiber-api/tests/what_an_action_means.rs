@@ -19,6 +19,7 @@ use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED,
     TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
     TAKES_FORMS, TAKES_ITEM, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
+    TAKES_WAITING,
 };
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
@@ -27,7 +28,7 @@ use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::Kept;
-use lemonfiber_core::app::{Command, Ctx, QualityAction};
+use lemonfiber_core::app::{Command, Ctx, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
@@ -155,7 +156,7 @@ fn a_walk_told_nothing_in_particular_asks_to_be_suggested_something() {
 }
 
 #[test]
-fn a_refusal_says_which_of_the_four_it_was() {
+fn a_refusal_says_which_of_the_five_it_was() {
     let said = [
         Refused::Unknown {
             name: "reticulate".to_owned(),
@@ -171,6 +172,11 @@ fn a_refusal_says_which_of_the_four_it_was() {
         Refused::Unwanted {
             action: "down".to_owned(),
             argument: "confirm".to_owned(),
+        },
+        Refused::Together {
+            action: "down".to_owned(),
+            argument: "wait".to_owned(),
+            alongside: "services".to_owned(),
         },
     ];
     let spoken: BTreeSet<String> = said.iter().map(Refused::said).collect();
@@ -247,34 +253,72 @@ fn starting_and_stopping_take_the_forms_they_are_given() {
     assert_eq!(
         command("down", naming("tv")),
         Some(Command::Down {
-            forms: vec!["tv".to_owned()]
+            forms: vec!["tv".to_owned()],
+            wait: Waiting::Never
         })
     );
 }
 
 #[test]
-fn starting_named_services_is_refused_rather_than_answered_with_the_whole_form() {
-    // `--service` on a start never reaches a `Command`: the command line runs its
-    // own streamed start around it, so there is nothing here to hand them to.
-    // Dropped, they would start every service the form holds — the answer to a
-    // request nobody made — so they are refused instead, and the caller is told.
+fn starting_named_services_is_a_different_request_from_bringing_a_form_up() {
+    // Not a start with an argument: bringing a form up creates everything its
+    // closure holds, and this starts the ones named. Dropping them would start
+    // every service the form holds — the answer to a request nobody made.
     let given = Arguments {
         forms: vec!["tv".to_owned()],
         services: vec!["sonarr".to_owned()],
         ..Arguments::default()
     };
     assert_eq!(
-        refusal("up", given),
-        Some(Refused::Unwanted {
-            action: "up".to_owned(),
-            argument: "services".to_owned()
+        command("up", given),
+        Some(Command::Start {
+            forms: vec!["tv".to_owned()],
+            services: vec!["sonarr".to_owned()]
         })
     );
-    // Naming none, it is the start it says it is.
+    // Naming none, it is the whole-form start it says it is.
     assert_eq!(
         command("up", naming("tv")),
         Some(Command::Up {
             forms: vec!["tv".to_owned()]
+        })
+    );
+}
+
+#[test]
+fn a_teardown_can_be_asked_to_let_the_downloads_finish_first() {
+    let waiting = Arguments {
+        forms: vec!["tv".to_owned()],
+        wait: Waiting::ForTheDownloads,
+        ..Arguments::default()
+    };
+    assert_eq!(
+        command("down", waiting),
+        Some(Command::Down {
+            forms: vec!["tv".to_owned()],
+            wait: Waiting::ForTheDownloads
+        })
+    );
+}
+
+#[test]
+fn waiting_and_naming_services_are_refused_together_rather_than_one_being_dropped() {
+    // Two arguments, two requests: a teardown that waits, and a stop of named
+    // services that leaves the rest of the form running. A run given both would
+    // have to pick one, and what is in flight is a question about the download
+    // clients a form holds rather than about two named services.
+    let both = Arguments {
+        forms: vec!["tv".to_owned()],
+        services: vec!["sonarr".to_owned()],
+        wait: Waiting::ForTheDownloads,
+        ..Arguments::default()
+    };
+    assert_eq!(
+        refusal("down", both),
+        Some(Refused::Together {
+            action: "down".to_owned(),
+            argument: "wait".to_owned(),
+            alongside: "services".to_owned()
         })
     );
 }
@@ -436,11 +480,17 @@ fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
-        services: if takes(TAKES_SERVICES) {
+        // Everything that takes services, apart from the one that takes a wait as
+        // well: those two name different requests, so an action given both would
+        // be given a pair no run can carry. The teardown is handed its wait and
+        // the stop of named services beside it is left to the tests that are
+        // about that request.
+        services: if takes(TAKES_SERVICES) && !takes(TAKES_WAITING) {
             vec!["sonarr".to_owned()]
         } else {
             Vec::new()
         },
+        wait: takes(TAKES_WAITING).into(),
         service: takes(TAKES_SERVICE).then(|| "sonarr".to_owned()),
         key: takes(TAKES_SETTING).then(|| "DATA_ROOT".to_owned()),
         value: takes(TAKES_SETTING).then(|| "/srv".to_owned()),
@@ -491,10 +541,11 @@ const OFFER: &str = "0f0f0f0f";
 fn carries_forms(command: &Command) -> bool {
     match command {
         Command::Up { forms }
-        | Command::Down { forms }
+        | Command::Down { forms, .. }
         | Command::Switch { forms }
         | Command::Pull { forms }
         | Command::Watch { forms }
+        | Command::Start { forms, .. }
         | Command::Halt { forms, .. }
         | Command::Restart { forms, .. } => !forms.is_empty(),
         _ => false,
@@ -502,9 +553,22 @@ fn carries_forms(command: &Command) -> bool {
 }
 
 /// Whether the command has the services it was given in it.
+/// Whether the command has the wait it was asked for in it.
+fn carries_wait(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Down {
+            wait: Waiting::ForTheDownloads,
+            ..
+        }
+    )
+}
+
 fn carries_services(command: &Command) -> bool {
     match command {
-        Command::Halt { services, .. } | Command::Restart { services, .. } => !services.is_empty(),
+        Command::Start { services, .. }
+        | Command::Halt { services, .. }
+        | Command::Restart { services, .. } => !services.is_empty(),
         _ => false,
     }
 }
@@ -660,6 +724,10 @@ fn give_services(given: &mut Arguments) {
     given.services = vec!["sonarr".to_owned()];
 }
 
+fn give_wait(given: &mut Arguments) {
+    given.wait = Waiting::ForTheDownloads;
+}
+
 fn give_key(given: &mut Arguments) {
     given.key = Some("DATA_ROOT".to_owned());
 }
@@ -746,9 +814,10 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 19] = [
+const SWEEPS: [Sweep; 20] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
+    ("wait", give_wait, carries_wait),
     ("service", give_service, carries_service),
     ("key", give_key, carries_setting),
     ("value", give_value, carries_setting),
@@ -790,6 +859,15 @@ fn swept(argument: &str, give: fn(&mut Arguments), carries: fn(&Command) -> bool
             Err(Refused::Unwanted {
                 argument: named, ..
             }) if named == argument => {}
+            // Refused by name for the other reason there is: it and something the
+            // action already holds name two different requests. That refusal names
+            // both of them, and either half is this argument being refused rather
+            // than dropped, which is the whole of what this sweeps for.
+            Err(Refused::Together {
+                argument: named,
+                alongside,
+                ..
+            }) if named == argument || alongside == argument => {}
             Err(refused) => {
                 wrong.push(format!(
                     "{action} was refused for something else: {refused:?}"
@@ -816,6 +894,7 @@ fn every_argument_the_carrier_holds_is_swept() {
     let held = [
         "forms",
         "services",
+        "wait",
         "service",
         "key",
         "value",
@@ -846,7 +925,8 @@ fn stopping_a_whole_stack_is_not_gated_the_way_a_reset_is() {
     assert_eq!(
         command("down", naming("tv")),
         Some(Command::Down {
-            forms: vec!["tv".to_owned()]
+            forms: vec!["tv".to_owned()],
+            wait: Waiting::Never
         })
     );
     let agreed = Arguments {

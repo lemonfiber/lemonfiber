@@ -6054,6 +6054,83 @@
             }
           ]
         },
+        "Validation": {
+          "description": "What proving a credential against its live service established — never the\ninput, only the outcome.\n\nRead back as well as built. A surface that is not in this process asks setup to\nprove a credential and is told what came of it, so the four outcomes are tagged\nby name rather than distinguished by which field is present — the same reason an\nanswer carries the step it belongs to.",
+          "oneOf": [
+            {
+              "description": "Proven working, carrying the capability observed while proving it.",
+              "type": "object",
+              "properties": {
+                "observed": {
+                  "description": "The observed fact — what the service did, not that it merely answered.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "valid"
+                }
+              },
+              "required": [
+                "outcome",
+                "observed"
+              ]
+            },
+            {
+              "description": "The service answered and refused: the credential is wrong for it.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "What the service said, in terms the operator can act on.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "rejected"
+                }
+              },
+              "required": [
+                "outcome",
+                "detail"
+              ]
+            },
+            {
+              "description": "Nothing usable answered, so nothing can be concluded about the credential.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "Why nothing usable came back.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "unreachable"
+                }
+              },
+              "required": [
+                "outcome",
+                "detail"
+              ]
+            },
+            {
+              "description": "It authenticated, but cannot do the job it is for — exhausted, limited, or\notherwise unable.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "What it can no longer do, and why where the service says.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "degraded"
+                }
+              },
+              "required": [
+                "outcome",
+                "detail"
+              ]
+            }
+          ]
+        },
         "WizardReport": {
           "description": "Where a setup run stands, and what it is still asking for.\n\nThe answer to every step of setup driven from outside this process: a surface\nasks where the walk is, submits one answer, and is told where the walk is now.\nNothing here is a copy of the wizard's own state — it is read off the wizard\neach time, so a surface cannot hold a stale one and act on it.\n\n**The answers themselves are never in it.** Setup gathers an indexer key and a\nprovider password, and this report is one a script can log, so it says what was\n*decided* and never what was *entered* — the same line [`SetupReport`] holds.\nWhat will be written is in `plan`, with every credential withheld exactly as\n`config show` withholds one.",
           "type": "object",
@@ -6081,6 +6158,17 @@
                 "$ref": "#/$defs/SettingReport"
               }
             },
+            "proof": {
+              "description": "What proving the credential just given came to, where one was given.\n\nSetup tests an indexer key and a Usenet login against their live services as\nthey are entered, and this is what the service answered — never what was\nentered. Absent for every other answer, and for a step that gave none.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Validation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "ready_for_review": {
               "description": "Whether every applicable question is answered, so the plan can be applied.",
               "type": "boolean"
@@ -6091,6 +6179,13 @@
               "items": {
                 "$ref": "#/$defs/Step"
               }
+            },
+            "written": {
+              "description": "What an apply that stopped part-way had already written, each said plainly.\n\nThe partial state a recovery is chosen about, so whoever chooses has seen it.\nEmpty for every other phase, and empty too for an apply that stopped before\nit wrote anything.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [
@@ -6100,7 +6195,8 @@
             "asks",
             "unanswered",
             "ready_for_review",
-            "plan"
+            "plan",
+            "written"
           ]
         }
       }

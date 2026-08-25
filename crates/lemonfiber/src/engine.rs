@@ -6,7 +6,6 @@
 //! it stays a dispatcher.
 
 use std::process::ExitCode;
-use std::time::Duration;
 
 use lemonfiber_core::app::{
     claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started, Command,
@@ -195,52 +194,25 @@ impl Narrator for Narrating {
     }
 }
 
-/// How often a wait looks again.
-///
-/// Ten seconds: long enough that two clients are not being polled at, short enough
-/// that an operator watching the last download finish is not left wondering whether
-/// the wait noticed.
-const AGAIN: Duration = Duration::from_secs(10);
-
-/// Report what stopping would interrupt, and do what the operator says about it.
+/// Report what stopping would interrupt, and say what the operator decided about it.
 ///
 /// Silent where nothing is coming down, which is the ordinary case — a teardown that
 /// remarked on an empty queue every time would teach the operator to skip the part
 /// that matters on the day it is not empty.
-pub(crate) async fn settle(ctx: &Ctx, forms: &[String], wait: bool, yes: bool) {
+///
+/// The question is put here and the waiting is not: an answer is what the teardown
+/// carries, and a surface that sat in the loop itself would be a wait only the
+/// command line could ask for.
+pub(crate) async fn settle(ctx: &Ctx, forms: &[String], wait: bool, yes: bool) -> Choice {
     let active = in_flight(ctx, forms).await;
     if active.is_empty() {
-        return;
+        return Choice::Stop;
     }
     interrupting(&active).print();
 
-    let choice = match asking(wait, yes, Console.interactive()) {
+    match asking(wait, yes, Console.interactive()) {
         Asking::Settled(choice) => choice,
         Asking::Ask => answered(&Keyboard.ask(ASK_TO_WAIT)),
-    };
-    if choice == Choice::Wait {
-        drained(ctx, forms).await;
-    }
-}
-
-/// Wait until nothing is coming down any more.
-///
-/// Said again only when the count changes, because a list reprinted every ten seconds
-/// is something an operator scrolls past rather than reads — and the one moment it
-/// has news is the moment one of them finishes.
-async fn drained(ctx: &Ctx, forms: &[String]) {
-    let mut counted = usize::MAX;
-    loop {
-        let active = in_flight(ctx, forms).await;
-        if active.is_empty() {
-            say!("downloads finished — stopping now");
-            return;
-        }
-        if active.len() != counted {
-            counted = active.len();
-            interrupting(&active).print();
-        }
-        tokio::time::sleep(AGAIN).await;
     }
 }
 

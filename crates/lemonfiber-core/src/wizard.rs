@@ -33,7 +33,7 @@ pub use answers::{
     Answer, Answers, Credentials, Indexer, Library, Provider, Rejected, Usenet, Vpn,
 };
 pub use plan::{on_off, Plan, APPLY, ENV_FILE};
-pub use recovery::{Choice, Recovery, Resolution, Status};
+pub use recovery::{described, Choice, Recovery, Resolution, Status};
 pub use steps::{offer_setup, Direction, Phase, Progress, Step};
 
 /// The setup wizard: where the operator is, what they have answered, and the
@@ -355,8 +355,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        offer_setup, Answer, Choice, Library, Phase, Progress, Recovery, Resolution, Status, Step,
-        Vpn, Wizard,
+        described, offer_setup, Answer, Choice, Library, Phase, Progress, Recovery, Resolution,
+        Status, Step, Vpn, Wizard,
     };
     use crate::config::env::EnvFile;
     use crate::config::Protocols;
@@ -997,6 +997,52 @@ mod tests {
                 a_fresh_write("DATA_ROOT", "/srv/media"),
                 a_fresh_write("USENET", "on")
             ],
+        );
+    }
+
+    #[test]
+    fn a_written_change_is_said_plainly_enough_to_recognise() {
+        // What whoever is choosing is shown of an interrupted run: the point is
+        // that they recognise it, not that it round-trips.
+        let change = |kind| Change {
+            at: String::new(),
+            operation: "setup".to_owned(),
+            target: "the environment file".to_owned(),
+            kind,
+        };
+        assert_eq!(
+            described(&change(Kind::Set {
+                key: "DATA_ROOT".to_owned(),
+                previous: None,
+                current: "/srv".to_owned(),
+            })),
+            "the setting DATA_ROOT"
+        );
+        assert_eq!(
+            described(&change(Kind::Made {
+                path: "/srv/media".to_owned()
+            })),
+            "the directory /srv/media"
+        );
+        assert_eq!(
+            described(&change(Kind::Created {
+                resource: "root folder".to_owned(),
+                id: "1".to_owned(),
+            })),
+            "a root folder"
+        );
+        // A repair's own record. Not something a first run writes, but the journal
+        // is shared, so an interrupted setup can find one — and whoever is deciding
+        // whether to roll back is owed a name for it rather than silence.
+        assert_eq!(
+            described(&change(Kind::Configured {
+                resource: "downloadclient".to_owned(),
+                id: "7".to_owned(),
+                field: "tvCategory".to_owned(),
+                previous: None,
+                current: "tv-sonarr".to_owned(),
+            })),
+            "a downloadclient's tvCategory"
         );
     }
 

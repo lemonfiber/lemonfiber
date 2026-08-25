@@ -237,6 +237,9 @@ fn standing(report: &WizardReport) -> Lines {
     }
     if report.phase == Phase::Applying {
         lines.put("An earlier apply stopped part-way and has not been recovered.".to_owned());
+        for change in &report.written {
+            lines.put(format!("  · it had written: {change}"));
+        }
     }
     lines.put(format!("Setup is at: {}", report.at.label()));
     for step in &report.unanswered {
@@ -394,6 +397,8 @@ mod tests {
             unanswered: vec![Step::DataLocation, Step::Library],
             ready_for_review: false,
             plan: Vec::new(),
+            written: Vec::new(),
+            proof: None,
         }
     }
 
@@ -756,6 +761,22 @@ mod tests {
         .text();
         assert!(
             said.starts_with("An earlier apply stopped part-way"),
+            "{said}"
+        );
+    }
+
+    #[test]
+    fn an_apply_that_stopped_part_way_names_what_it_had_already_written() {
+        // A recovery is chosen about the partial state, so the partial state is
+        // what a read of where setup stands has to say.
+        let said = standing(&WizardReport {
+            phase: Phase::Applying,
+            written: vec!["the setting DATA_ROOT".to_owned()],
+            ..part_way()
+        })
+        .text();
+        assert!(
+            said.contains("it had written: the setting DATA_ROOT"),
             "{said}"
         );
     }

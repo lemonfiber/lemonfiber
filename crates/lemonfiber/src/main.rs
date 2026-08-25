@@ -10,7 +10,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::Kept;
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 use lemonfiber_core::doctor::Narrowing;
 
 mod acting;
@@ -42,6 +42,7 @@ use render::render;
 use render::stack::Doing;
 use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
+use stopping::Choice;
 use translate::{bundling, configuration, quality};
 
 /// Logs as a screen, or logs as a stream.
@@ -407,8 +408,8 @@ async fn starting(ctx: &Ctx, forms: &[String], services: &[String], json: bool) 
     start(ctx, forms, services, json).await
 }
 
-/// Announce what stopping would affect, settle what to do about anything still
-/// coming down, and only then ask for the stop.
+/// Announce what stopping would affect, put the question about anything still coming
+/// down, and hand the answer to the teardown.
 ///
 /// Both happen before the teardown rather than during it: an operator who is going to
 /// be told a download is at ninety per cent wants to be told while stopping is still
@@ -421,27 +422,24 @@ async fn halting(
     yes: bool,
     json: bool,
 ) -> Command {
-    // Not announced where services are named, for the same reason starting is not:
-    // the announcement is about what a form holds, and naming two services is not a
-    // request about the form.
-    if services.is_empty() {
-        announce(ctx, &forms, json, Doing::Stopping).await;
-    }
-    // Asked only of a whole teardown. What is in flight is a question about the
-    // download clients a form holds, and stopping two named services that are not
-    // download clients would report downloads that stopping them cannot interrupt.
-    //
-    // Machine-readable runs are left alone either way. A prompt has nobody to answer
-    // it, and a report not in the envelope is noise on a stream something is parsing.
-    if !json && services.is_empty() {
-        settle(ctx, &forms, wait, yes).await;
-    }
     // Stopping named services and tearing a form down are different requests rather
     // than one request with an argument, and Compose spells them differently too.
-    if services.is_empty() {
-        Command::Down { forms }
+    // The command line refuses the two flags together for the same reason.
+    if !services.is_empty() {
+        return Command::Halt { forms, services };
+    }
+    announce(ctx, &forms, json, Doing::Stopping).await;
+    // Asked only where there is somebody to ask. A machine-readable run is put no
+    // prompt — it has nobody to answer one, and a report not in the envelope is noise
+    // on a stream something is parsing — so what it typed is what the teardown gets.
+    let waiting = if json {
+        wait
     } else {
-        Command::Halt { forms, services }
+        settle(ctx, &forms, wait, yes).await == Choice::Wait
+    };
+    Command::Down {
+        forms,
+        wait: Waiting::from(waiting),
     }
 }
 

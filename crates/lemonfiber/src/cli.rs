@@ -157,7 +157,11 @@ pub enum Request {
         #[arg(long = "service", value_name = "NAME")]
         services: Vec<String>,
         /// Let anything still downloading finish before stopping.
-        #[arg(long)]
+        ///
+        /// Not for a stop of named services: what is in flight is a question about
+        /// the download clients a form holds, so naming two services that are not
+        /// download clients would wait on downloads stopping them cannot interrupt.
+        #[arg(long, conflicts_with = "services")]
         wait: bool,
         /// Stop without asking about anything still downloading.
         #[arg(long, conflicts_with = "wait")]

@@ -20,6 +20,7 @@ use crate::ports::narration::Silent;
 use crate::ports::random::Random;
 use crate::ports::{Clock, FileSystem, Narrator, Runner};
 use crate::stack::Source;
+use crate::validate::{Live, Validator};
 use crate::walkthrough::{Narrator as Stepwise, Unheard};
 
 /// Everything a command needs that is not part of the command itself.
@@ -47,6 +48,12 @@ pub struct Ctx {
     /// Where unpredictable bytes come from, for the one credential seeding mints
     /// itself.
     pub random: Arc<dyn Random>,
+    /// How a credential is proven against the service it authenticates to.
+    ///
+    /// A port because setup proves one the moment it is entered, on every surface:
+    /// a browser submitting an indexer key gets the same live test a terminal run
+    /// gives it, and neither is trusted to say for itself that a key works.
+    pub validator: Arc<dyn Validator>,
     /// Where a wait says what it is waiting for, for the surface to render.
     ///
     /// A port for the same reason printing is not done here: the core has no
@@ -87,6 +94,19 @@ pub struct Ctx {
     pub archives: Option<Archiving>,
 }
 
+/// A validator proving credentials against the real services, over `http` and over
+/// a real NNTP dialer.
+///
+/// Both halves, because setup proves a Usenet login as well as an indexer key, and
+/// a validator with no transport for one reports it unreachable rather than
+/// pretending it was proven.
+fn live(http: &Arc<dyn Http>) -> Arc<dyn Validator> {
+    Arc::new(Live::with_nntp(
+        Arc::clone(http),
+        Arc::new(crate::adapters::Dialer::new()),
+    ))
+}
+
 impl Ctx {
     /// A context that runs programs for real, against a given stack.
     #[must_use]
@@ -99,6 +119,16 @@ impl Ctx {
         settings: Settings,
         environment: Environment,
     ) -> Self {
+        // The real transport is the only sensible default; the one code path that
+        // needs to answer for a fake service overrides it with `with_http`, so no
+        // test reaches the network to build a context.
+        //
+        // Wrapped so a service that is merely still starting is tried again rather
+        // than reported. Applied here rather than at each caller: a retry policy
+        // written into fifteen call sites is fifteen policies.
+        let http: Arc<dyn Http> = Arc::new(crate::adapters::Retrying::around(
+            crate::adapters::Web::new(),
+        ));
         Self {
             dry_run: false,
             force: false,
@@ -106,20 +136,12 @@ impl Ctx {
             engine,
             clock,
             filesystem,
-            // The real volume for the same reason the transport below is real:
-            // the one command that asks is asking about this machine's drives,
-            // and a test that means something else says so by name.
+            // The real volume for the same reason the transport is real: the one
+            // command that asks is asking about this machine's drives, and a test
+            // that means something else says so by name.
             volume: Arc::new(crate::adapters::Disk),
-            // The real transport is the only sensible default; the one code path
-            // that needs to answer for a fake service overrides it with
-            // `with_http`, so no test reaches the network to build a context.
-            //
-            // Wrapped so a service that is merely still starting is tried again
-            // rather than reported. Applied here rather than at each caller: a
-            // retry policy written into fifteen call sites is fifteen policies.
-            http: Arc::new(crate::adapters::Retrying::around(
-                crate::adapters::Web::new(),
-            )),
+            validator: live(&http),
+            http,
             random: Arc::new(crate::adapters::Os),
             // Nobody, until a surface says otherwise. A context is built before the
             // thing that would listen exists in both surfaces, and a default that
@@ -155,9 +177,27 @@ impl Ctx {
     ///
     /// The seam seeding is driven through in a test: a fake here answers as a
     /// service would, so wiring is exercised with nothing running.
+    ///
+    /// Proving a credential goes over the same transport, so this replaces the
+    /// validator too — a context told to reach services through a fake and still
+    /// proving keys against the real internet would be reaching the network from a
+    /// test that said it was not. A caller that wants to script the outcomes
+    /// themselves says so with [`Self::proving`], afterwards.
     #[must_use]
     pub fn with_http(mut self, http: Arc<dyn Http>) -> Self {
+        self.validator = live(&http);
         self.http = http;
+        self
+    }
+
+    /// The same context, proving credentials through the given validator.
+    ///
+    /// For a caller that wants the outcome itself rather than the service that
+    /// produces one: a test naming what a rejected key comes to says so here
+    /// instead of scripting the answer an indexer would have given.
+    #[must_use]
+    pub fn proving(mut self, validator: Arc<dyn Validator>) -> Self {
+        self.validator = validator;
         self
     }
 
