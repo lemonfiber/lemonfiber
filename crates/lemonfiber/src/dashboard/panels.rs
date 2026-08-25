@@ -121,7 +121,7 @@ pub(super) fn vpn(panel: Option<&Panel<Vpn>>, room: usize) -> Vec<Line<'static>>
             if vpn.egress_matches {
                 Span::raw("the client's traffic leaves through the tunnel")
             } else {
-                Span::raw("the client's traffic is NOT going through the tunnel")
+                Span::raw("the client's traffic is NOT inside the tunnel")
             },
         ]),
         Line::from(vec![port]),
@@ -505,7 +505,9 @@ mod tests {
             egress_matches: false,
         });
         let lines = said(&vpn(Some(&leaking), WIDE));
-        assert!(lines.iter().any(|line| line.contains("NOT going through")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("NOT inside the tunnel")));
         assert!(lines.iter().any(|line| line.contains("no forwarded port")));
 
         let behind = Panel::Ready(Vpn {
@@ -808,6 +810,70 @@ mod tests {
         assert!(lines
             .first()
             .is_some_and(|line| line.contains("Some.Release") && line.contains("7 hours")));
+    }
+
+    /// The narrowest a panel gets before the screen stops offering two of them.
+    ///
+    /// At the width where two columns begin, a row is halved and each place gives
+    /// up its borders, so this is the smallest room a panel is asked to work in
+    /// while the screen still claims to present two.
+    const NARROW: usize = (crate::dashboard::TWO_COLUMNS as usize / 2) - 2;
+
+    /// Nothing a panel writes for itself runs past the room it was given.
+    ///
+    /// A value is shortened to fit and a sentence the product wrote is not, so a
+    /// sentence longer than the narrowest place is one the screen cuts — and the
+    /// existing tests ask these panels for two hundred columns, which is a width
+    /// this dashboard never gives them.
+    #[test]
+    fn no_panel_writes_a_line_longer_than_its_narrowest_place() {
+        /// The lines of a panel that run past the room it was given.
+        fn over(what: &str, lines: &[ratatui::text::Line<'static>], room: usize) -> Vec<String> {
+            said(lines)
+                .into_iter()
+                .filter(|line| line.chars().count() > room)
+                .map(|line| format!("{what}: {} chars — {line}", line.chars().count()))
+                .collect()
+        }
+
+        let vpn_out = Panel::Ready(Vpn {
+            exit_ip: "203.0.113.7".to_owned(),
+            country: "nl".to_owned(),
+            forwarded_port: None,
+            egress_matches: false,
+        });
+        let vpn_in = Panel::Ready(Vpn {
+            exit_ip: "203.0.113.7".to_owned(),
+            country: "nl".to_owned(),
+            forwarded_port: Some(51413),
+            egress_matches: true,
+        });
+
+        let mut found: Vec<String> = Vec::new();
+        found.extend(over(
+            "vpn, traffic outside",
+            &vpn(Some(&vpn_out), NARROW),
+            NARROW,
+        ));
+        found.extend(over(
+            "vpn, traffic inside",
+            &vpn(Some(&vpn_in), NARROW),
+            NARROW,
+        ));
+        found.extend(over("vpn, absent", &vpn(None, NARROW), NARROW));
+        found.extend(over("alerts, none", &alerts(&[], NARROW), NARROW));
+        found.extend(over("stuck, none", &stuck(&[], NARROW), NARROW));
+
+        assert!(
+            found.is_empty(),
+            "these run past the {NARROW} columns the narrowest place gives them: {found:#?}"
+        );
+
+        // The measure itself, so what the assertion above rests on is exercised: a
+        // line one column too long is reported, and the same line at its room is not.
+        let long = ratatui::text::Line::from("x".repeat(NARROW + 1));
+        assert_eq!(over("probe", std::slice::from_ref(&long), NARROW).len(), 1);
+        assert!(over("probe", std::slice::from_ref(&long), NARROW + 1).is_empty());
     }
 
     #[test]
