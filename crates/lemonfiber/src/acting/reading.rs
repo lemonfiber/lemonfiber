@@ -35,6 +35,16 @@ impl Reading {
         Self { lines, at: 0 }
     }
 
+    /// Add a line to the end of it, leaving the box where the operator put it.
+    ///
+    /// Where they put it rather than at the newest line: a reading that jumped to the
+    /// end every time something arrived would move out from under somebody who had
+    /// scrolled back to read an earlier one, which on a walk that says a step every
+    /// few seconds is most of the time they are reading it.
+    pub(crate) fn put(&mut self, line: String) {
+        self.lines.push(line);
+    }
+
     /// Move one line towards the beginning, or stay where it begins.
     pub(crate) fn back(&mut self) {
         self.at = self.at.saturating_sub(1);

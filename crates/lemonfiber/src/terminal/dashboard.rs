@@ -12,6 +12,8 @@ use std::time::Duration;
 use lemonfiber_core::app::{dashboard::gather, dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::stack::Source;
+use lemonfiber_core::walkthrough::{Line as Step, Narrator};
 
 use super::screen::{drawing, read_keyboard, Screen};
 use crate::acting::{meaning, Acting, Wanted};
@@ -25,12 +27,54 @@ use crate::say::{complain, say};
 /// rather than queueing gathers it will never catch up on.
 const TICK: Duration = Duration::from_secs(1);
 
+/// A narrator that puts each of a walk's steps on the screen that asked for it.
+///
+/// The same shape the web surface's own narrator has, and for the same reason: a
+/// step is said on whatever thread the walk is running on, and this screen is drawn
+/// on another. Sending it and moving on is the whole of the wire — what a step reads
+/// as is [`crate::render::walkthrough`]'s, and what becomes of one is
+/// [`crate::acting`]'s.
+struct Stepping(tokio::sync::mpsc::UnboundedSender<Step>);
+
+impl Narrator for Stepping {
+    fn said(&self, line: &Step) {
+        let _ = self.0.send(line.clone());
+    }
+}
+
+/// What this run does once the screen is given back.
+enum After {
+    /// Ends, which is what leaving has always meant.
+    Nothing,
+    /// Starts the web surface on the terminal it has just handed over.
+    Serve,
+}
+
+/// What a context is built from, kept for the surface that will want one of its own.
+///
+/// Kept rather than the context itself because the context is shared with the tasks
+/// the loop starts the moment it begins, and the web surface takes one by value.
+struct Rebuilding {
+    /// Which stack is being operated.
+    stack: Source,
+    /// Whether this run changes anything.
+    dry_run: bool,
+    /// Whether this run takes a claim another one left behind.
+    force: bool,
+}
+
 /// Run the dashboard until the operator leaves it.
 ///
 /// The terminal is given back before anything is waited on, so an action still with
 /// the core is finished on an ordinary screen where what it came to reads like any
-/// other command's answer.
+/// other command's answer — and so is the web surface, whose announcement is eleven
+/// lines an operator has to be able to read and copy.
 pub(super) async fn shown(ctx: Ctx) -> ExitCode {
+    let again = Rebuilding {
+        stack: ctx.stack,
+        dry_run: ctx.dry_run,
+        force: ctx.force,
+    };
     let mut screen = match Screen::open() {
         Ok(screen) => screen,
         // A terminal that will not go into raw mode is not a fault in the stack,
@@ -40,10 +84,44 @@ pub(super) async fn shown(ctx: Ctx) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let (outcome, unfinished) = run(&mut screen, ctx).await;
+    let (outcome, unfinished, after) = run(&mut screen, ctx).await;
     drop(screen);
     finishing(unfinished).await;
-    outcome
+    match after {
+        After::Nothing => outcome,
+        After::Serve => serving(again).await,
+    }
+}
+
+/// Start the web surface on the terminal this screen has just given back.
+///
+/// With a context of its own, read afresh rather than carried over: the screen that
+/// has just closed can put an archive back over the settings, and a surface serving
+/// the ones this run started with would be answering out of a file that is no longer
+/// on the disk.
+///
+/// Every choice `lemonfiber ui` offers is left at its default, because none of them
+/// has anywhere to be made on a dashboard: a port typed at a screen would be a
+/// number nothing had checked was free, and the address that is bound is printed
+/// either way.
+async fn serving(again: Rebuilding) -> ExitCode {
+    let stack = match again.stack {
+        Source::External(path) => Some(path.to_path_buf()),
+        Source::Embedded(_) => None,
+    };
+    let ctx = crate::context::context(stack, again.dry_run, again.force);
+    let asked = crate::ui::Asked {
+        port: None,
+        browser: true,
+        assets: None,
+    };
+    crate::ui::run(
+        ctx,
+        asked,
+        crate::EMBEDDED_APP,
+        Box::pin(std::future::pending()),
+    )
+    .await
 }
 
 /// The loop itself, with the terminal already in hand.
@@ -58,8 +136,12 @@ pub(super) async fn shown(ctx: Ctx) -> ExitCode {
 /// taken with an action still running: a key, a keyboard that has ended, and a screen
 /// that stopped accepting output alike. What comes back beside the exit code is what
 /// is left to wait for.
-async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>) {
-    let ctx = Arc::new(ctx);
+async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, After) {
+    // A walk says its steps through the context it runs under, so this gives it one
+    // that says them here. The sending end lives in that context for as long as the
+    // loop holds it, so the receiving end never closes under the loop.
+    let (steps, mut said) = tokio::sync::mpsc::unbounded_channel();
+    let ctx = Arc::new(ctx.narrating_steps(Arc::new(Stepping(steps))));
     let (keys, mut typed) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&keys, meaning));
 
@@ -80,12 +162,13 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>) {
     let mut carrying: Option<tokio::task::JoinHandle<Answer>> = None;
     // Every way out carries what is still running away with it, because each of them
     // can be taken with an action in flight.
-    let (outcome, leaving) = loop {
+    let (outcome, leaving, after) = loop {
         if let Some(snapshot) = snapshot.as_ref() {
             if let Err(err) = screen.draw(snapshot, &acting) {
                 break (
                     complain(&drawing("dashboard", &err.to_string())),
                     acting.staying_for(),
+                    After::Nothing,
                 );
             }
         }
@@ -94,9 +177,10 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>) {
             // which is the difference between a screen that feels alive and one
             // that ignores you for three seconds at a time.
             key = typed.recv() => match key {
-                None => break (ExitCode::SUCCESS, acting.staying_for()),
+                None => break (ExitCode::SUCCESS, acting.staying_for(), After::Nothing),
                 Some(press) => match acting.pressed(&press) {
-                    Wanted::Leave => break (ExitCode::SUCCESS, acting.staying_for()),
+                    Wanted::Leave => break (ExitCode::SUCCESS, acting.staying_for(), After::Nothing),
+                    Wanted::Serve => break (ExitCode::SUCCESS, acting.staying_for(), After::Serve),
                     Wanted::Nothing => {}
                     Wanted::Gather => {
                         refreshing.abort();
@@ -116,6 +200,16 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>) {
                     // why being asked is not one of [`crate::acting`]'s stages.
                     Wanted::Ask(command) => acting.told(dispatch(command, &ctx).await),
                     Wanted::Carry(command) => carrying = Some(carry(command, Arc::clone(&ctx))),
+                    // Aborted rather than asked to stop: there is nothing to ask,
+                    // and a run abandoned at its next await point is exactly what
+                    // this command's own interruption leaves behind at a shell —
+                    // which is also what the web does to it when the name it was
+                    // answered with is given back.
+                    Wanted::Stop => {
+                        if let Some(running) = carrying.take() {
+                            running.abort();
+                        }
+                    }
                 }
             },
             gathered = &mut refreshing => {
@@ -130,12 +224,20 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>) {
                     acting.came_to(done);
                 }
             }
+            // A walk's steps, each as it becomes true. Nothing is drawn between one
+            // and the next beyond the frame at the top of the loop, which is the
+            // whole point of them arriving one at a time.
+            step = said.recv() => {
+                if let Some(line) = step {
+                    acting.stepped(&line);
+                }
+            }
         }
     };
     refreshing.abort();
     drop(typed);
     let _ = reader.join();
-    (outcome, unfinished(leaving, carrying))
+    (outcome, unfinished(leaving, carrying), after)
 }
 
 /// What the core came back with, or nothing at all where it was not asked.

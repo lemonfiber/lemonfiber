@@ -16,11 +16,20 @@
 //! What a question has to be given before it can be asked is asked of that table
 //! too: an empty answer goes to the same translation, and the refusal put in front
 //! of the operator is the sentence a browser is answered with.
+//!
+//! Everything a question does between the key and the answer is here too — the list,
+//! the line a word is typed on, and the wait — for the reason each of the other three
+//! flows keeps its own: [`super`] routes a press to the flow it belongs to, and what
+//! that flow decides belongs beside the list it decides over.
 
-use lemonfiber_api::reads::{named, Wanted, CONFIG, FORMS, QUALITY, REQUESTS, TRACE, VERSION};
+use lemonfiber_api::reads::{
+    named, Wanted as Asking, CONFIG, FORMS, QUALITY, REQUESTS, TRACE, VERSION,
+};
 use lemonfiber_core::app::Command;
 
-use super::chooser::Listed;
+use super::chooser::{Chooser, Listed};
+use super::reading::Reading;
+use super::{Press, Stage, Wanted};
 
 /// The key that opens the list of questions.
 pub(crate) const KEY: char = 'a';
@@ -67,10 +76,10 @@ impl Question {
     /// surface gives for the same request rather than in one written here.
     pub(crate) fn command(&self, typed: &str) -> Result<Command, &'static str> {
         let given = match self.needs {
-            Needed::Nothing => Wanted::default(),
-            Needed::Term(_) => Wanted {
+            Needed::Nothing => Asking::default(),
+            Needed::Term(_) => Asking {
                 term: Some(typed.to_owned()),
-                ..Wanted::default()
+                ..Asking::default()
             },
         };
         named(self.read, given)
@@ -143,6 +152,93 @@ pub(crate) fn all() -> (&'static Question, Vec<&'static Question>) {
 #[cfg(test)]
 fn every() -> impl Iterator<Item = &'static Question> {
     std::iter::once(&OPENS_ON).chain(AFTER)
+}
+
+/// Over the questions: move, take one, or leave it.
+pub(super) fn wondering(
+    stage: &mut Stage,
+    mut chooser: Chooser<&'static Question>,
+    press: &Press,
+) -> Wanted {
+    match *press {
+        Press::Abandon => return Wanted::Nothing,
+        Press::Accept => return take(stage, chooser.taken()),
+        Press::Back => chooser.back(),
+        Press::Forward => chooser.forward(),
+        Press::Typed(_) | Press::Rubout => (),
+    }
+    *stage = Stage::Wondering(chooser);
+    Wanted::Nothing
+}
+
+/// Ask the question that was taken, or open the line it has to be given first.
+fn take(stage: &mut Stage, question: &'static Question) -> Wanted {
+    match question.needs.asks() {
+        Some(asks) => {
+            *stage = Stage::Typing {
+                question,
+                asks,
+                typed: String::new(),
+            };
+            Wanted::Nothing
+        }
+        None => put(stage, question, ""),
+    }
+}
+
+/// Over the line being typed: type, take back, ask, or leave it.
+pub(super) fn typing(
+    stage: &mut Stage,
+    question: &'static Question,
+    asks: &'static str,
+    mut typed: String,
+    press: &Press,
+) -> Wanted {
+    match *press {
+        Press::Abandon => return Wanted::Nothing,
+        Press::Accept => return put(stage, question, &typed),
+        Press::Rubout => {
+            typed.pop();
+        }
+        Press::Typed(character) => typed.push(character),
+        Press::Back | Press::Forward => (),
+    }
+    *stage = Stage::Typing {
+        question,
+        asks,
+        typed,
+    };
+    Wanted::Nothing
+}
+
+/// Put the question to the core, or say why it cannot be put.
+///
+/// Carried rather than awaited, because a question about what the household asked
+/// for reaches the services over the network and a screen that waited on it would
+/// stop answering keys while it did.
+fn put(stage: &mut Stage, question: &'static Question, typed: &str) -> Wanted {
+    match question.command(typed) {
+        Ok(command) => {
+            *stage = Stage::Waiting(question);
+            Wanted::Carry(command)
+        }
+        Err(said) => {
+            *stage = Stage::Answered {
+                question,
+                reading: Reading::of(vec![said.to_owned()]),
+            };
+            Wanted::Nothing
+        }
+    }
+}
+
+/// While the question is with the core: back out, or wait for it.
+pub(super) fn waiting(stage: &mut Stage, question: &'static Question, press: &Press) -> Wanted {
+    if matches!(*press, Press::Abandon) {
+        return Wanted::Nothing;
+    }
+    *stage = Stage::Waiting(question);
+    Wanted::Nothing
 }
 
 #[cfg(test)]

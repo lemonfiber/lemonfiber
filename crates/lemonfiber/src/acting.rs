@@ -34,6 +34,16 @@
 //! report. The panels go on gathering every second while the work runs, so a
 //! restart shows as the services going down and coming back, in the panel that
 //! lists them. Nothing is drawn over that — only the footer says what is running.
+//! The one exception is a walk, whose steps nothing behind the box is showing, and
+//! which says them as they become true rather than at the end.
+//!
+//! **What has no ending of its own is offered one.** Every other thing this screen
+//! sends finishes, so leaving is all it needs to offer. A guard does not: it holds
+//! until the data location is lost, which on a machine where the drive stays put is
+//! never. The web answers that with a lease it lets go of; a terminal answers it
+//! with the interruption a shell would use, which on this screen is a keypress
+//! rather than a signal. Which of them is which is asked of the web's own table in
+//! [`lasting`] rather than decided a second time.
 //!
 //! **Leaving closes the screen, not the run.** A closed browser tab leaves a server
 //! carrying the job on; a closed dashboard has no server to leave it to. The process
@@ -45,20 +55,23 @@
 
 mod chooser;
 mod errand;
+mod lasting;
 mod offer;
 mod question;
 mod reading;
 mod stage;
+mod surface;
 mod words;
 
 use lemonfiber_core::app::{Command, Outcome};
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::walkthrough::Line as Step;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::Line;
 
 use chooser::Chooser;
-use offer::{Choice, Offer};
-use question::Question;
+use lasting::Lasting;
+use offer::Offer;
 use reading::{complaint, lines_of, moved, unexpected, Reading};
 use stage::Stage;
 
@@ -126,19 +139,37 @@ pub(crate) enum Wanted {
     Words,
     /// Gather afresh now rather than at the next tick.
     Gather,
+    /// End what is running, which is what an interruption does at a terminal.
+    ///
+    /// Only ever asked for the one command with no ending of its own. Everything
+    /// else this screen sends finishes, and ending work that was going to succeed
+    /// because somebody pressed escape is not something to offer.
+    Stop,
+    /// Leave the dashboard, and start the web surface on the terminal it gives back.
+    Serve,
     /// Leave the dashboard.
     Leave,
+}
+
+/// What an outstanding [`Wanted::Ask`] was begun for.
+///
+/// Taken when the answer arrives, so an answer to a question that was never asked —
+/// or was asked for something else — changes nothing. Two things are chosen a subject
+/// off the stack's own list of forms and they are chosen it the same way, so the
+/// answer has to say which of them was waiting for it.
+enum Asked {
+    /// One of the five actions on a key of its own.
+    Action(&'static Offer),
+    /// The guard, which insists on a form the way three of those five do.
+    Guard(&'static Lasting),
 }
 
 /// What this screen has open, and what it is waiting for.
 pub(crate) struct Acting {
     /// Where the action stands.
     stage: Stage,
-    /// The action an outstanding [`Wanted::Ask`] was begun for.
-    ///
-    /// Taken by [`Acting::told`], so an answer to a question that was never asked —
-    /// or was asked for something else — changes nothing.
-    asked: Option<&'static Offer>,
+    /// What an outstanding [`Wanted::Ask`] was begun for.
+    asked: Option<Asked>,
     /// Whether the pane explaining this screen's words is open.
     words: bool,
     /// Whether this run explains its words at all.
@@ -183,16 +214,22 @@ impl Acting {
         }
         match std::mem::replace(&mut self.stage, Stage::Idle) {
             Stage::Idle => self.idle(press),
-            Stage::Choosing { offer, chooser } => self.choosing(offer, chooser, press),
-            Stage::Confirming { offer, chosen } => self.confirming(offer, chosen, press),
-            Stage::Running { offer, chosen } => self.while_running(offer, chosen, press),
-            Stage::Wondering(chooser) => self.wondering(chooser, press),
+            Stage::Choosing { offer, chooser } => {
+                offer::choosing(&mut self.stage, offer, chooser, press)
+            }
+            Stage::Confirming { offer, chosen } => {
+                offer::confirming(&mut self.stage, offer, chosen, press)
+            }
+            Stage::Running { offer, chosen } => {
+                offer::running(&mut self.stage, offer, chosen, press)
+            }
+            Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
             Stage::Typing {
                 question,
                 asks,
                 typed,
-            } => self.typing(question, asks, typed, press),
-            Stage::Waiting(question) => self.while_waiting(question, press),
+            } => question::typing(&mut self.stage, question, asks, typed, press),
+            Stage::Waiting(question) => question::waiting(&mut self.stage, question, press),
             Stage::Sending(chooser) => errand::sending(&mut self.stage, chooser, press),
             Stage::Naming {
                 errand,
@@ -208,6 +245,27 @@ impl Acting {
                 would,
             } => errand::agreeing(&mut self.stage, errand, typed, would, press),
             Stage::Doing { errand, typed } => errand::doing(&mut self.stage, errand, typed, press),
+            Stage::Starting(chooser) => {
+                lasting::starting(&mut self.stage, &mut self.asked, chooser, press)
+            }
+            Stage::Wording {
+                lasting,
+                asks,
+                typed,
+            } => lasting::wording(&mut self.stage, lasting, asks, typed, press),
+            Stage::Picking { lasting, chooser } => {
+                lasting::picking(&mut self.stage, lasting, chooser, press)
+            }
+            Stage::Beginning { lasting, begun } => {
+                lasting::beginning(&mut self.stage, lasting, begun, press)
+            }
+            Stage::Keeping {
+                lasting,
+                named,
+                ends,
+                said,
+            } => lasting::keeping(&mut self.stage, lasting, named, ends, said, press),
+            Stage::Handing => surface::handing(&mut self.stage, press),
             // A reading moves, and any key that is not a move puts it away — the
             // way the pane of words is put away.
             Stage::Came(mut reading) => {
@@ -247,174 +305,65 @@ impl Acting {
                 self.stage = Stage::Sending(Chooser::over(first, rest));
                 Wanted::Nothing
             }
-            Press::Typed(key) => self.begin(key),
+            Press::Typed(lasting::KEY) => {
+                let (first, rest) = lasting::all();
+                self.stage = Stage::Starting(Chooser::over(first, rest));
+                Wanted::Nothing
+            }
+            Press::Typed(surface::KEY) => {
+                self.stage = Stage::Handing;
+                Wanted::Nothing
+            }
+            Press::Typed(key) => offer::begin(&mut self.asked, key),
             Press::Rubout | Press::Back | Press::Forward | Press::Accept => Wanted::Nothing,
         }
     }
 
-    /// Begin the action a key reaches, by asking what there is to act on.
-    ///
-    /// The list is asked for rather than remembered from a previous run: a stack's
-    /// declarations are a file on disk that an operator may have just edited, and a
-    /// list gathered once would offer a form that is no longer there.
-    fn begin(&mut self, key: char) -> Wanted {
-        let Some(offer) = offer::for_key(key) else {
-            return Wanted::Nothing;
-        };
-        self.asked = Some(offer);
-        Wanted::Ask(Command::Forms)
-    }
-
-    /// Over the list: move, take one, or leave it.
-    fn choosing(
-        &mut self,
-        offer: &'static Offer,
-        mut chooser: Chooser<Choice>,
-        press: &Press,
-    ) -> Wanted {
-        match *press {
-            Press::Abandon => return Wanted::Nothing,
-            Press::Accept => {
-                self.stage = Stage::Confirming {
-                    offer,
-                    chosen: chooser.taken(),
-                };
-                return Wanted::Nothing;
-            }
-            Press::Back => chooser.back(),
-            Press::Forward => chooser.forward(),
-            Press::Typed(_) | Press::Rubout => (),
-        }
-        self.stage = Stage::Choosing { offer, chooser };
-        Wanted::Nothing
-    }
-
-    /// At the question: only an explicit yes goes ahead.
-    ///
-    /// Everything else — a no, a stray return, a key that is neither — leaves the
-    /// stack as it is, which is the same way the teardown's own question is read.
-    /// The answer that changes something should never be the one given by accident.
-    fn confirming(&mut self, offer: &'static Offer, chosen: Choice, press: &Press) -> Wanted {
-        if !matches!(*press, Press::Typed('y' | 'Y')) {
-            return Wanted::Nothing;
-        }
-        let command = chosen.command.clone();
-        self.stage = Stage::Running { offer, chosen };
-        Wanted::Carry(command)
-    }
-
-    /// While the action is with the core: leaving is the only thing left to ask.
-    ///
-    /// The stage is put back either way. Leaving does not stop the action — the run
-    /// waits for it once the screen is given back — so it is still where it was, and
-    /// [`Acting::staying_for`] is what says so on the way out.
-    fn while_running(&mut self, offer: &'static Offer, chosen: Choice, press: &Press) -> Wanted {
-        self.stage = Stage::Running { offer, chosen };
-        if matches!(*press, Press::Typed('q') | Press::Abandon) {
-            return Wanted::Leave;
-        }
-        Wanted::Nothing
-    }
-
-    /// Over the questions: move, take one, or leave it.
-    fn wondering(&mut self, mut chooser: Chooser<&'static Question>, press: &Press) -> Wanted {
-        match *press {
-            Press::Abandon => return Wanted::Nothing,
-            Press::Accept => return self.take(chooser.taken()),
-            Press::Back => chooser.back(),
-            Press::Forward => chooser.forward(),
-            Press::Typed(_) | Press::Rubout => (),
-        }
-        self.stage = Stage::Wondering(chooser);
-        Wanted::Nothing
-    }
-
-    /// Ask the question that was taken, or open the line it has to be given first.
-    fn take(&mut self, question: &'static Question) -> Wanted {
-        match question.needs.asks() {
-            Some(asks) => {
-                self.stage = Stage::Typing {
-                    question,
-                    asks,
-                    typed: String::new(),
-                };
-                Wanted::Nothing
-            }
-            None => self.put(question, ""),
-        }
-    }
-
-    /// Over the line being typed: type, take back, ask, or leave it.
-    fn typing(
-        &mut self,
-        question: &'static Question,
-        asks: &'static str,
-        mut typed: String,
-        press: &Press,
-    ) -> Wanted {
-        match *press {
-            Press::Abandon => return Wanted::Nothing,
-            Press::Accept => return self.put(question, &typed),
-            Press::Rubout => {
-                typed.pop();
-            }
-            Press::Typed(character) => typed.push(character),
-            Press::Back | Press::Forward => (),
-        }
-        self.stage = Stage::Typing {
-            question,
-            asks,
-            typed,
-        };
-        Wanted::Nothing
-    }
-
-    /// Put the question to the core, or say why it cannot be put.
-    ///
-    /// Carried rather than awaited, because a question about what the household
-    /// asked for reaches the services over the network and a screen that waited on
-    /// it would stop answering keys while it did.
-    fn put(&mut self, question: &'static Question, typed: &str) -> Wanted {
-        match question.command(typed) {
-            Ok(command) => {
-                self.stage = Stage::Waiting(question);
-                Wanted::Carry(command)
-            }
-            Err(said) => {
-                self.stage = Stage::Answered {
-                    question,
-                    reading: Reading::of(vec![said.to_owned()]),
-                };
-                Wanted::Nothing
-            }
-        }
-    }
-
-    /// While the question is with the core: back out, or wait for it.
-    fn while_waiting(&mut self, question: &'static Question, press: &Press) -> Wanted {
-        if matches!(*press, Press::Abandon) {
-            return Wanted::Nothing;
-        }
-        self.stage = Stage::Waiting(question);
-        Wanted::Nothing
-    }
-
     /// What the stack answered when it was asked what there is to act on.
+    ///
+    /// One answer and two things that may have been waiting for it: an action, and
+    /// the guard, which insists on a form the same way three of the five actions do.
+    /// Which of them was waiting is what the screen recorded when it asked.
     pub(crate) fn told(&mut self, answer: Result<Outcome, Box<Problem>>) {
-        let Some(offer) = self.asked.take() else {
+        let Some(asked) = self.asked.take() else {
             return;
         };
-        self.stage = match answer {
-            Ok(Outcome::Forms(report)) => match offer.given(&report) {
+        let report = match answer {
+            Ok(Outcome::Forms(report)) => report,
+            Ok(_) => {
+                self.stage = Stage::Came(Reading::of(unexpected()));
+                return;
+            }
+            Err(problem) => {
+                self.stage = Stage::Came(Reading::of(complaint(&problem)));
+                return;
+            }
+        };
+        self.stage = match asked {
+            Asked::Action(offer) => match offer.given(&report) {
                 Ok((selected, rest)) => Stage::Choosing {
                     offer,
                     chooser: Chooser::over(selected, rest),
                 },
                 Err(refused) => Stage::Came(Reading::of(vec![refused])),
             },
-            Ok(_) => Stage::Came(Reading::of(unexpected())),
-            Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
+            Asked::Guard(lasting) => match offer::choices(lasting.action, &report) {
+                Ok((selected, rest)) => Stage::Picking {
+                    lasting,
+                    chooser: Chooser::over(selected, rest),
+                },
+                Err(refused) => Stage::Came(Reading::of(vec![refused])),
+            },
         };
+    }
+
+    /// One of a walk's steps, as the core said it.
+    ///
+    /// Handed on rather than rendered here: what a step reads as on a terminal is
+    /// [`crate::render::walkthrough`]'s, and it is the same rendering a shell is
+    /// given for the same walk.
+    pub(crate) fn stepped(&mut self, line: &Step) {
+        lasting::stepped(&mut self.stage, line);
     }
 
     /// What the action came to, or what the question was answered with.
@@ -445,6 +394,16 @@ impl Acting {
                 Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
                 Err(problem) => complaint(&problem),
             })),
+            // What a walk came to goes under the steps that were watched on the way,
+            // which is the order a shell shows them in. A guard has said nothing
+            // until now, so what it came to is the whole of its box.
+            Stage::Keeping { said, .. } => lasting::came_to(
+                said,
+                match answer {
+                    Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
+                    Err(problem) => complaint(&problem),
+                },
+            ),
             // Rendered by the same renderer the command line reaches for the same
             // answer, so the two surfaces cannot come to say different things about
             // one stack.
@@ -481,13 +440,14 @@ impl Acting {
 #[cfg(test)]
 mod tests {
     use super::offer::tests::{a_listing, nothing_declared};
-    use super::{errand, meaning, question, Acting, Line, Press, Wanted};
+    use super::{errand, lasting, meaning, question, surface, Acting, Line, Press, Step, Wanted};
     use crate::render::fixtures::{a_lifecycle, a_plan};
     use lemonfiber_core::app::restore::Kept;
     use lemonfiber_core::app::{backup, Command, Outcome, Waiting};
     use lemonfiber_core::backup::Scope;
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
     use lemonfiber_core::model::{FormsReport, ResetReport, StackEdit, VersionReport};
+    use lemonfiber_core::walkthrough::Step as WalkStep;
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::path::PathBuf;
 
@@ -1403,21 +1363,317 @@ mod tests {
         assert!(said.contains("There is no action named"), "{said}");
     }
 
-    /// Every request this screen reaches is one of the two lists it is built from,
-    /// and every entry on those lists is a request it reaches. What the parity
-    /// table's terminal column is held to is this list, so a screen that grew an
-    /// offer nothing published would leave that column quietly short.
+    /// Every request this screen reaches is one of the lists it is built from, and
+    /// every entry on those lists is a request it reaches. What the parity table's
+    /// terminal column is held to is this list, so a screen that grew an offer
+    /// nothing published would leave that column quietly short.
     #[test]
     fn what_this_screen_reaches_is_what_it_publishes() {
         let published = lemonfiber::reaching::reached();
 
-        for request in ["up", "seed", "reset", "restore", "version", "trace"] {
+        for request in [
+            "up",
+            "seed",
+            "reset",
+            "restore",
+            "version",
+            "trace",
+            "walkthrough",
+            "watch",
+            "ui",
+        ] {
             assert!(published.contains(&request), "{request} is not published");
         }
-        assert!(
-            !published.contains(&"watch"),
-            "nothing here reaches a watch"
+    }
+
+    /// The screen, having taken one of the two that keep going off its own list.
+    fn starting(action: &str) -> Acting {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(lasting::KEY));
+        let named = lasting::tests::listed(action);
+        while !showing(&acting).contains(&format!("> {named}")) {
+            acting.pressed(&Press::Forward);
+        }
+        acting.pressed(&Press::Accept);
+        acting
+    }
+
+    /// A walk takes the key, a line to type on and an explicit yes before it reaches
+    /// a command — and the command is one of the core's own, carrying what was typed.
+    #[test]
+    fn a_walk_takes_a_key_a_word_and_an_answer_before_it_reaches_a_command() {
+        let mut acting = starting("walkthrough");
+        assert!(showing(&acting).contains("What to look for"));
+
+        for character in "Sintel".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+        let asking = showing(&acting);
+        assert!(asking.contains("Walk through Sintel?"), "{asking}");
+
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Walkthrough {
+                item: Some("Sintel".to_owned())
+            })
         );
-        assert!(!published.contains(&"ui"), "a surface cannot start itself");
+    }
+
+    /// Naming nothing is a request rather than a half-finished one, so it is put as
+    /// one — and what it reaches is the walk that suggests something.
+    #[test]
+    fn a_walk_asked_for_nothing_is_asked_about_as_its_own_request() {
+        let mut acting = starting("walkthrough");
+
+        acting.pressed(&Press::Accept);
+        let asking = showing(&acting);
+
+        assert!(asking.contains("Find something"), "{asking}");
+        assert!(!asking.contains("Walk through?"), "{asking}");
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Walkthrough { item: None })
+        );
+    }
+
+    /// A walk's steps are put on the screen as they arrive, in the words a shell is
+    /// given for the same step — and the one that is kept for the report is not said
+    /// aloud here either.
+    #[test]
+    fn a_walk_says_each_step_in_the_words_a_shell_is_given_for_it() {
+        let mut acting = starting("walkthrough");
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Typed('y'));
+
+        acting.stepped(&Step::at(WalkStep::Choosing));
+        assert!(showing(&acting).contains("asking the services"));
+
+        acting.stepped(&Step::searched(3, 47));
+        let said = showing(&acting);
+
+        assert!(said.contains("Searching indexers"), "{said}");
+        assert!(said.contains("47 releases"), "{said}");
+        assert!(!said.contains("asking the services"), "{said}");
+    }
+
+    /// And what it came to goes under them rather than over them, which is the order
+    /// a shell shows them in.
+    #[test]
+    fn what_a_walk_came_to_goes_under_the_steps_that_were_watched() {
+        let mut acting = starting("walkthrough");
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Typed('y'));
+        acting.stepped(&Step::searched(3, 47));
+
+        acting.came_to(Err(Box::new(a_failure())));
+        let said = showing(&acting);
+
+        assert!(said.contains("Searching indexers"), "{said}");
+        assert!(said.contains("could not be reached"), "{said}");
+    }
+
+    /// A walk naming an action no surface offers reaches no command and says so.
+    /// Nothing on the list is one, and that is what the guard beside the list holds;
+    /// this is the arm that would carry a name that stopped being offered.
+    #[test]
+    fn a_walk_naming_an_action_nothing_offers_says_so() {
+        let mut acting = Acting::opened();
+
+        let wanted = lasting::beginning(
+            &mut acting.stage,
+            &lasting::tests::NOTHING_ANSWERS,
+            lasting::Begun::Looked("Sintel".to_owned()),
+            &Press::Typed('y'),
+        );
+
+        assert_eq!(wanted, Wanted::Nothing);
+        let said = showing(&acting);
+        assert!(said.contains("There is no action named"), "{said}");
+    }
+
+    /// A guard is chosen one of the stack's own forms, and the whole stack is not
+    /// among them: the translation refuses a guard with nothing to stop, so that
+    /// choice never reaches the operator. Nothing here decides that a second time.
+    #[test]
+    fn a_guard_is_offered_the_forms_and_never_the_whole_stack() {
+        let mut acting = starting("watch");
+        acting.told(Ok(Outcome::Forms(a_listing())));
+        let offered = showing(&acting);
+
+        assert!(offered.contains("Full stack"), "{offered}");
+        assert!(offered.contains("Lean stack"), "{offered}");
+        assert!(
+            !offered.contains("the whole stack, rather than one form"),
+            "{offered}"
+        );
+    }
+
+    /// A stack declaring no forms leaves a guard nothing to be given, and the words
+    /// the operator is refused in are the web surface's own.
+    #[test]
+    fn a_guard_over_a_stack_that_declares_no_forms_is_refused_in_the_webs_words() {
+        let mut acting = starting("watch");
+
+        acting.told(Ok(Outcome::Forms(nothing_declared())));
+        let said = showing(&acting);
+
+        assert!(said.contains("forms"), "{said}");
+    }
+
+    /// The screen, with a guard running over one form.
+    fn guarding() -> Acting {
+        let mut acting = starting("watch");
+        acting.told(Ok(Outcome::Forms(a_listing())));
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Typed('y'));
+        acting
+    }
+
+    /// A guard takes the same three steps and reaches the core's own command.
+    #[test]
+    fn a_guard_takes_a_key_a_form_and_an_answer_before_it_reaches_a_command() {
+        let mut acting = starting("watch");
+        acting.told(Ok(Outcome::Forms(a_listing())));
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+        let asking = showing(&acting);
+        assert!(asking.contains("Guard the data location"), "{asking}");
+
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Watch {
+                forms: vec!["full".to_owned()]
+            })
+        );
+    }
+
+    /// The one thing on this screen with no ending of its own is the one the screen
+    /// offers to end, and an interruption is what ends it — which on a terminal in
+    /// raw mode is a keypress rather than a signal.
+    #[test]
+    fn an_interruption_lets_a_guard_go_and_says_what_it_left_alone() {
+        let mut acting = guarding();
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Stop);
+
+        let said = showing(&acting);
+        assert!(said.contains("let go"), "{said}");
+        assert!(said.contains("as they were"), "{said}");
+        assert_eq!(
+            acting.staying_for(),
+            None,
+            "a guard that has been let go is not something to wait for"
+        );
+    }
+
+    /// And leaving does not end it. The stage is still the guard, so the run is
+    /// still holding the task — and what is said on the way out says it will not end
+    /// by itself and what does end it.
+    #[test]
+    fn leaving_a_guard_leaves_it_guarding_and_says_so() {
+        let mut acting = guarding();
+
+        assert_eq!(acting.pressed(&Press::Typed('q')), Wanted::Leave);
+
+        let leaving = acting.staying_for().unwrap_or_default();
+        assert!(leaving.contains("still running"), "{leaving}");
+        assert!(leaving.contains("data location is lost"), "{leaving}");
+        assert!(leaving.contains("Ctrl-C ends it"), "{leaving}");
+    }
+
+    /// A walk ends by itself, so the screen offers no end for it: an interruption
+    /// leaves the screen the way it does for every other running thing here, and the
+    /// run waits for the walk on the ordinary terminal.
+    #[test]
+    fn a_walk_is_left_running_rather_than_offered_an_end() {
+        let mut acting = starting("walkthrough");
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Typed('y'));
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Leave);
+
+        let leaving = acting.staying_for().unwrap_or_default();
+        assert!(leaving.contains("waiting for a walk through"), "{leaving}");
+        assert!(!leaving.contains("stack claimed"), "{leaving}");
+    }
+
+    /// What a guard is doing is said on the footer rather than drawn over the panels
+    /// it is guarding, and a walk's steps are drawn because nothing behind them is
+    /// showing them.
+    #[test]
+    fn a_guard_leaves_the_panels_showing_and_a_walk_does_not() {
+        let guard = guarding();
+        assert_eq!(guard.pane(20, 100).map(|pane| pane.title), None);
+        let footing = footing(&guard);
+        assert!(footing.contains("esc lets it go"), "{footing}");
+        assert!(footing.contains("leaves it guarding"), "{footing}");
+
+        let mut walk = starting("walkthrough");
+        walk.pressed(&Press::Accept);
+        walk.pressed(&Press::Typed('y'));
+        assert!(walk.pane(20, 100).is_some());
+    }
+
+    /// A walk that has said more than the box holds is moved through rather than
+    /// cut, the way every other answer on this screen is.
+    #[test]
+    fn a_walk_that_outgrows_its_box_is_moved_through() {
+        let mut acting = starting("walkthrough");
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Typed('y'));
+        for _ in 0..12 {
+            acting.stepped(&Step::searched(3, 47));
+        }
+
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+
+        assert!(showing(&acting).contains("1 more line above"));
+    }
+
+    /// A step said while nothing is walking changes nothing, which is what a walk
+    /// left running and then let go of would say into.
+    #[test]
+    fn a_step_said_with_no_walk_open_changes_nothing() {
+        let mut acting = Acting::opened();
+
+        acting.stepped(&Step::searched(3, 47));
+
+        assert_eq!(showing(&acting), String::new());
+    }
+
+    /// Each of the three lists is opened by its own key, and backing out of any of
+    /// them leaves the screen as it was.
+    #[test]
+    fn backing_out_of_the_list_that_keeps_going_leaves_the_screen_alone() {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(lasting::KEY));
+        assert!(showing(&acting).contains("keeps going"));
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+
+        assert_eq!(showing(&acting), String::new());
+    }
+
+    /// And so does backing out of what either of them is given before the question.
+    #[test]
+    fn backing_out_of_what_one_is_given_leaves_the_screen_alone() {
+        let mut walking = starting("walkthrough");
+        assert_eq!(walking.pressed(&Press::Abandon), Wanted::Nothing);
+        assert_eq!(showing(&walking), String::new());
+
+        let mut guarding = starting("watch");
+        guarding.told(Ok(Outcome::Forms(a_listing())));
+        assert_eq!(guarding.pressed(&Press::Abandon), Wanted::Nothing);
+        assert_eq!(showing(&guarding), String::new());
+    }
+
+    /// The footer names every key the screen answers, including the two this slice
+    /// added, since a key nobody is told about is a key nobody presses.
+    #[test]
+    fn the_footer_names_the_keys_that_keep_going_and_the_one_that_hands_over() {
+        let footing = footing(&Acting::opened());
+
+        assert!(footing.contains(&format!("{} keeps going", lasting::KEY)));
+        assert!(footing.contains(&format!("{} web", surface::KEY)));
     }
 }

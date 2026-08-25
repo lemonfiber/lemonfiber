@@ -1,4 +1,5 @@
-//! What the dashboard offers to do, and what each offer can be given.
+//! What the dashboard offers to do, what each offer can be given, and what becomes
+//! of one.
 //!
 //! Five actions, each held by the name every surface calls it by. The name is what
 //! the web surface's own table turns into one of the core's commands, and this
@@ -9,13 +10,17 @@
 //! What an action may be given is asked of that table too. Three of the five refuse
 //! an empty list of forms, and which three is not written down here: every subject
 //! is offered to the translation and only the ones that come to a command are put
-//! in front of the operator.
+//! in front of the operator. Building that list is [`choices`] rather than a method,
+//! because the guard behind [`super::lasting`]'s own key is given one of the stack's
+//! forms in exactly the same way and refuses the whole stack for exactly the same
+//! reason.
 
 use lemonfiber_api::actions::{named, Arguments};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::model::FormsReport;
 
-use super::chooser::Listed;
+use super::chooser::{Chooser, Listed};
+use super::{Asked, Press, Stage, Wanted};
 
 /// What the whole stack is called where it is one of the choices.
 const WHOLE: &str = "everything";
@@ -100,39 +105,119 @@ impl Listed for Choice {
 
 impl Offer {
     /// What this action can be given, or the refusal where it can be given nothing.
-    ///
-    /// Every subject goes through the translation, and only what comes to a command
-    /// is offered. A stack that declares no forms leaves the three actions that
-    /// insist on one with nothing to offer, and the words the operator gets then are
-    /// the words the web surface gives for the same request.
-    ///
-    /// The first choice comes back apart from the rest, so that what is handed on is
-    /// a list something is already selected in. A list and a selection carried
-    /// separately can disagree, and the place they would disagree is under the
-    /// operator's finger.
     pub(crate) fn given(&self, report: &FormsReport) -> Result<(Choice, Vec<Choice>), String> {
-        let mut choices = Vec::new();
-        let mut refused = String::new();
-        for (forms, name, about) in subjects(report) {
-            let asked = Arguments {
-                forms,
-                ..Arguments::default()
-            };
-            match named(self.action, asked) {
-                Ok(command) => choices.push(Choice {
-                    name,
-                    about,
-                    command,
-                }),
-                Err(no) => refused = no.said(),
-            }
-        }
-        let mut offered = choices.into_iter();
-        match offered.next() {
-            Some(first) => Ok((first, offered.collect())),
-            None => Err(refused),
+        choices(self.action, report)
+    }
+}
+
+/// What one action can be given, or the refusal where it can be given nothing.
+///
+/// Every subject goes through the translation, and only what comes to a command is
+/// offered. A stack that declares no forms leaves the actions that insist on one
+/// with nothing to offer, and the words the operator gets then are the words the
+/// web surface gives for the same request. A guard is refused the whole stack the
+/// same way and for the same reason, which is why this takes an action rather than
+/// belonging to the five that sit on keys.
+///
+/// The first choice comes back apart from the rest, so that what is handed on is a
+/// list something is already selected in. A list and a selection carried separately
+/// can disagree, and the place they would disagree is under the operator's finger.
+pub(super) fn choices(action: &str, report: &FormsReport) -> Result<(Choice, Vec<Choice>), String> {
+    let mut choices = Vec::new();
+    let mut refused = String::new();
+    for (forms, name, about) in subjects(report) {
+        let asked = Arguments {
+            forms,
+            ..Arguments::default()
+        };
+        match named(action, asked) {
+            Ok(command) => choices.push(Choice {
+                name,
+                about,
+                command,
+            }),
+            Err(no) => refused = no.said(),
         }
     }
+    let mut offered = choices.into_iter();
+    match offered.next() {
+        Some(first) => Ok((first, offered.collect())),
+        None => Err(refused),
+    }
+}
+
+/// Begin the action a key reaches, by asking what there is to act on.
+///
+/// The list is asked for rather than remembered from a previous run: a stack's
+/// declarations are a file on disk that an operator may have just edited, and a list
+/// gathered once would offer a form that is no longer there.
+pub(super) fn begin(asked: &mut Option<Asked>, key: char) -> Wanted {
+    let Some(offer) = for_key(key) else {
+        return Wanted::Nothing;
+    };
+    *asked = Some(Asked::Action(offer));
+    Wanted::Ask(Command::Forms)
+}
+
+/// Over the list: move, take one, or leave it.
+pub(super) fn choosing(
+    stage: &mut Stage,
+    offer: &'static Offer,
+    mut chooser: Chooser<Choice>,
+    press: &Press,
+) -> Wanted {
+    match *press {
+        Press::Abandon => return Wanted::Nothing,
+        Press::Accept => {
+            *stage = Stage::Confirming {
+                offer,
+                chosen: chooser.taken(),
+            };
+            return Wanted::Nothing;
+        }
+        Press::Back => chooser.back(),
+        Press::Forward => chooser.forward(),
+        Press::Typed(_) | Press::Rubout => (),
+    }
+    *stage = Stage::Choosing { offer, chooser };
+    Wanted::Nothing
+}
+
+/// At the question: only an explicit yes goes ahead.
+///
+/// Everything else — a no, a stray return, a key that is neither — leaves the stack
+/// as it is, which is the same way the teardown's own question is read. The answer
+/// that changes something should never be the one given by accident.
+pub(super) fn confirming(
+    stage: &mut Stage,
+    offer: &'static Offer,
+    chosen: Choice,
+    press: &Press,
+) -> Wanted {
+    if !matches!(*press, Press::Typed('y' | 'Y')) {
+        return Wanted::Nothing;
+    }
+    let command = chosen.command.clone();
+    *stage = Stage::Running { offer, chosen };
+    Wanted::Carry(command)
+}
+
+/// While the action is with the core: leaving is the only thing left to ask.
+///
+/// The stage is put back either way. Leaving does not stop the action — the run
+/// waits for it once the screen is given back — so it is still where it was, and
+/// what the screen says on the way out is what says so.
+pub(super) fn running(
+    stage: &mut Stage,
+    offer: &'static Offer,
+    chosen: Choice,
+    press: &Press,
+) -> Wanted {
+    *stage = Stage::Running { offer, chosen };
+    if matches!(*press, Press::Typed('q') | Press::Abandon) {
+        return Wanted::Leave;
+    }
+    Wanted::Nothing
 }
 
 /// Everything an action could be given, the whole stack first.

@@ -79,6 +79,14 @@ pub const ACTS: &[Reach] = &[
         request: "reset",
         through: "reset",
     },
+    Reach {
+        request: "walkthrough",
+        through: "walkthrough",
+    },
+    Reach {
+        request: "watch",
+        through: "watch",
+    },
 ];
 
 /// The requests the dashboard answers as a question, by the path the web serves the
@@ -119,6 +127,14 @@ pub const ASKS: &[Reach] = &[
 /// name here that a reader can see is unaccompanied.
 pub const SHOWS: &[&str] = &["ps", "doctor", "stuck"];
 
+/// The requests the dashboard reaches by giving the terminal back.
+///
+/// One, and it carries no second name because there is no table to name it in: no
+/// other surface has an action for starting a surface, so there is nothing on the
+/// web this could go through. What it goes through is the key itself, and the
+/// screen's own test holds this to the request that key reaches.
+pub const OPENS: &[&str] = &["ui"];
+
 /// Every request this screen reaches, however it reaches it.
 #[must_use]
 pub fn reached() -> Vec<&'static str> {
@@ -126,12 +142,13 @@ pub fn reached() -> Vec<&'static str> {
         .chain(ASKS)
         .map(|reach| reach.request)
         .chain(SHOWS.iter().copied())
+        .chain(OPENS.iter().copied())
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{reached, ACTS, ASKS, SHOWS};
+    use super::{reached, ACTS, ASKS, OPENS, SHOWS};
 
     /// Every request is reached one way, or a reader of the table has two rows'
     /// worth of claim to reconcile against one row.
@@ -143,7 +160,10 @@ mod tests {
             let same = every.iter().filter(|other| *other == request).count();
             assert_eq!(same, 1, "{request} is reached more than one way");
         }
-        assert_eq!(every.len(), ACTS.len() + ASKS.len() + SHOWS.len());
+        assert_eq!(
+            every.len(),
+            ACTS.len() + ASKS.len() + SHOWS.len() + OPENS.len()
+        );
     }
 
     /// A read is named by its path and an action by a bare word, which is what tells
