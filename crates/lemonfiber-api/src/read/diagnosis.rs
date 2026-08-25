@@ -11,13 +11,10 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
-use crate::reads::{Wanted, CHECKS, STORAGE};
+use crate::reads::{CHECKS, STORAGE};
 use crate::router::Serving;
 
-use super::{reading, Asked};
-
-/// The parameter naming what the checks are narrowed to.
-const ONLY: &str = "only";
+use super::reading;
 
 /// The reads that run the diagnostic checks.
 pub(super) fn routes() -> Router<Serving> {
@@ -28,19 +25,10 @@ pub(super) fn routes() -> Router<Serving> {
 
 /// What the diagnostic checks found, or one group of them.
 async fn checks(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
-    reading(
-        &serving.ctx,
-        CHECKS,
-        Wanted {
-            only: asked.one(ONLY).map(str::to_owned),
-            ..Wanted::default()
-        },
-    )
-    .await
+    reading(&serving.ctx, CHECKS, query.as_deref()).await
 }
 
 /// What the checks about the disk found.
-async fn storage(State(serving): State<Serving>) -> Response {
-    reading(&serving.ctx, STORAGE, Wanted::default()).await
+async fn storage(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
+    reading(&serving.ctx, STORAGE, query.as_deref()).await
 }

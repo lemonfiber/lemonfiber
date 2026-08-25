@@ -14,13 +14,10 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
-use crate::reads::{Wanted, EXPLAIN};
+use crate::reads::EXPLAIN;
 use crate::router::Serving;
 
-use super::{reading, Asked};
-
-/// The parameter naming the word to explain.
-const WORD: &str = "word";
+use super::reading;
 
 /// The read about this product's own words.
 pub(super) fn routes() -> Router<Serving> {
@@ -38,14 +35,5 @@ pub(super) fn routes() -> Router<Serving> {
 /// its detail. Naming an empty word is naming one it does not explain, and is
 /// refused for that rather than read as having named none.
 async fn explain(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
-    reading(
-        &serving.ctx,
-        EXPLAIN,
-        Wanted {
-            word: asked.one(WORD).map(str::to_owned),
-            ..Wanted::default()
-        },
-    )
-    .await
+    reading(&serving.ctx, EXPLAIN, query.as_deref()).await
 }

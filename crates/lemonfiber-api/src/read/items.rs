@@ -10,17 +10,10 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
-use crate::reads::{Wanted, REQUESTS, STUCK, TRACE};
+use crate::reads::{REQUESTS, STUCK, TRACE};
 use crate::router::Serving;
 
-use super::{reading, Asked};
-
-/// The parameter naming the household member to narrow to.
-const MEMBER: &str = "member";
-/// The parameter naming what to follow.
-const TERM: &str = "term";
-/// The parameter naming the season to narrow the per-part coverage to.
-const SEASON: &str = "season";
+use super::reading;
 
 /// The reads about what was asked for and where it got to.
 pub(super) fn routes() -> Router<Serving> {
@@ -32,34 +25,15 @@ pub(super) fn routes() -> Router<Serving> {
 
 /// What the household has asked for, and where each request stands.
 async fn requests(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
-    reading(
-        &serving.ctx,
-        REQUESTS,
-        Wanted {
-            member: asked.one(MEMBER).map(str::to_owned),
-            ..Wanted::default()
-        },
-    )
-    .await
+    reading(&serving.ctx, REQUESTS, query.as_deref()).await
 }
 
 /// Where one item is, followed by the words a person would name it with.
 async fn trace(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    let asked = Asked::read(query.as_deref());
-    reading(
-        &serving.ctx,
-        TRACE,
-        Wanted {
-            term: asked.one(TERM).map(str::to_owned),
-            season: asked.one(SEASON).map(str::to_owned),
-            ..Wanted::default()
-        },
-    )
-    .await
+    reading(&serving.ctx, TRACE, query.as_deref()).await
 }
 
 /// The items whose downloads have stopped, each named so it can be followed.
-async fn stuck(State(serving): State<Serving>) -> Response {
-    reading(&serving.ctx, STUCK, Wanted::default()).await
+async fn stuck(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
+    reading(&serving.ctx, STUCK, query.as_deref()).await
 }
