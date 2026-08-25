@@ -15,7 +15,10 @@ use std::sync::Arc;
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
 use lemonfiber_api::actions;
-use lemonfiber_api::actions::{answering, declined, named, Answering, Arguments, Refused, OFFERED};
+use lemonfiber_api::actions::{
+    answering, declined, named, Answering, Arguments, Refused, OFFERED, TAKES_AGREEMENT,
+    TAKES_FORMS, TAKES_PRESET, TAKES_SERVICES, TAKES_SETTING,
+};
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
@@ -58,18 +61,10 @@ fn every_action_this_surface_offers_reaches_a_command() {
     let unreachable: Vec<&str> = OFFERED
         .iter()
         .copied()
-        .filter(|action| {
-            // Named with everything any of them could need, so a refusal here is
-            // about the name rather than about a missing argument.
-            let given = Arguments {
-                forms: vec!["tv".to_owned()],
-                key: Some("DATA_ROOT".to_owned()),
-                value: Some("/srv".to_owned()),
-                preset: Some("balanced".to_owned()),
-                ..Arguments::default()
-            };
-            named(action, given).is_err()
-        })
+        // Named with exactly what the table says each takes: no less, since a
+        // missing argument is refused, and no more, since one the command cannot
+        // carry is refused too. So a refusal here is about the name.
+        .filter(|action| named(action, exactly_what(action)).is_err())
         .collect();
     assert!(
         unreachable.is_empty(),
@@ -363,14 +358,45 @@ fn an_argument_no_action_takes_is_refused_rather_than_ignored() {
 
 // ── An argument reaches the commands that carry it, and no others ─────────────
 
-/// Whether the command has the operator's agreement in it.
-fn carries_agreement(command: &Command) -> bool {
-    matches!(
-        command,
-        Command::Quality(QualityAction::Set { confirm: true, .. })
-            | Command::QualityUpgrade { confirm: true }
-            | Command::Reset { confirm: true }
-    )
+/// Exactly what the table says this action takes, and nothing else.
+///
+/// Built from the same lists the translation refuses by, so the arguments under
+/// test and the arguments the rule governs cannot come apart. A carrier holding
+/// everything any action could need is what hid this: the one sweep shaped to
+/// catch a dropped argument named `forms`, `key`, `value` and `preset`, and never
+/// sent `services` or `confirm`.
+fn exactly_what(action: &str) -> Arguments {
+    let takes = |takers: &[&str]| takers.contains(&action);
+    Arguments {
+        forms: if takes(TAKES_FORMS) {
+            vec!["tv".to_owned()]
+        } else {
+            Vec::new()
+        },
+        services: if takes(TAKES_SERVICES) {
+            vec!["sonarr".to_owned()]
+        } else {
+            Vec::new()
+        },
+        key: takes(TAKES_SETTING).then(|| "DATA_ROOT".to_owned()),
+        value: takes(TAKES_SETTING).then(|| "/srv".to_owned()),
+        preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
+        media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),
+        confirm: takes(TAKES_AGREEMENT),
+    }
+}
+
+/// Whether the command has the forms it was given in it.
+fn carries_forms(command: &Command) -> bool {
+    match command {
+        Command::Up { forms }
+        | Command::Down { forms }
+        | Command::Switch { forms }
+        | Command::Pull { forms }
+        | Command::Halt { forms, .. }
+        | Command::Restart { forms, .. } => !forms.is_empty(),
+        _ => false,
+    }
 }
 
 /// Whether the command has the services it was given in it.
@@ -381,64 +407,144 @@ fn carries_services(command: &Command) -> bool {
     }
 }
 
-/// Everything an action wants, so a refusal is about the argument under test
-/// rather than about a missing one.
-fn wanting() -> Arguments {
-    Arguments {
-        forms: vec!["tv".to_owned()],
-        key: Some("DATA_ROOT".to_owned()),
-        value: Some("/srv".to_owned()),
-        preset: Some("balanced".to_owned()),
-        ..Arguments::default()
-    }
+/// Whether the command has the setting it was given in it.
+fn carries_setting(command: &Command) -> bool {
+    matches!(command, Command::ConfigSet { .. })
 }
 
-/// Every offered action swept for one argument, gathering what is wrong.
+/// Whether the command has the quality it was given in it.
+fn carries_preset(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Quality(QualityAction::Set { .. }) | Command::QualityMusic { .. }
+    )
+}
+
+/// Whether the command has the media type it was given in it.
+fn carries_media_type(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Quality(QualityAction::Set {
+            media_type: Some(_),
+            ..
+        }) | Command::QualityMusic { .. }
+    )
+}
+
+/// Whether the command has the operator's agreement in it.
+fn carries_agreement(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Quality(QualityAction::Set { confirm: true, .. })
+            | Command::QualityUpgrade { confirm: true }
+            | Command::Reset { confirm: true }
+    )
+}
+
+fn give_forms(given: &mut Arguments) {
+    given.forms = vec!["tv".to_owned()];
+}
+
+fn give_services(given: &mut Arguments) {
+    given.services = vec!["sonarr".to_owned()];
+}
+
+fn give_key(given: &mut Arguments) {
+    given.key = Some("DATA_ROOT".to_owned());
+}
+
+fn give_value(given: &mut Arguments) {
+    given.value = Some("/srv".to_owned());
+}
+
+fn give_preset(given: &mut Arguments) {
+    given.preset = Some("balanced".to_owned());
+}
+
+fn give_media_type(given: &mut Arguments) {
+    given.media_type = Some("tv".to_owned());
+}
+
+fn give_agreement(given: &mut Arguments) {
+    given.confirm = true;
+}
+
+/// One argument the carrier holds: its name, how to give it, and what it looks like
+/// to have arrived on the command the action reached.
+type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
+
+/// Every argument the carrier holds: how to give it, and what it looks like to have
+/// arrived.
 ///
-/// The property rather than a second copy of the table: an action may accept an
-/// argument only if the command it reaches has somewhere to put it, and must refuse
-/// it by that name otherwise. An action that takes one and drops it is what this
-/// exists to catch, and dropping it is invisible from outside — the request is
-/// carried out, as something else.
-fn swept(argument: &str, given: &Arguments, carries: fn(&Command) -> bool) -> Vec<String> {
+/// One row per argument rather than one test per argument, because the rule is one
+/// thing: an action may accept an argument only if the command it reaches has
+/// somewhere to put it, and must refuse it by that name otherwise.
+const SWEEPS: [Sweep; 7] = [
+    ("forms", give_forms, carries_forms),
+    ("services", give_services, carries_services),
+    ("key", give_key, carries_setting),
+    ("value", give_value, carries_setting),
+    ("preset", give_preset, carries_preset),
+    ("media_type", give_media_type, carries_media_type),
+    ("confirm", give_agreement, carries_agreement),
+];
+
+/// Every offered action given one argument on top of what it takes, gathering what
+/// is wrong.
+///
+/// An action that takes the argument already had it and is unchanged; one that does
+/// not is being given something its command cannot carry, and must say so. Taking it
+/// and dropping it is what this exists to catch, and dropping it is invisible from
+/// outside — the request is carried out, as something else.
+fn swept(argument: &str, give: fn(&mut Arguments), carries: fn(&Command) -> bool) -> Vec<String> {
     let mut wrong: Vec<String> = Vec::new();
     for action in OFFERED {
-        match named(action, given.clone()) {
+        let mut given = exactly_what(action);
+        give(&mut given);
+        match named(action, given) {
             Ok(command) if carries(&command) => {}
-            Ok(command) => wrong.push(format!(
-                "{action} took `{argument}` and dropped it: {command:?}"
-            )),
+            Ok(command) => {
+                wrong.push(format!(
+                    "{action} took `{argument}` and dropped it: {command:?}"
+                ));
+            }
             Err(Refused::Unwanted {
                 argument: named, ..
             }) if named == argument => {}
-            Err(refused) => wrong.push(format!(
-                "{action} was refused for something else: {refused:?}"
-            )),
+            Err(refused) => {
+                wrong.push(format!(
+                    "{action} was refused for something else: {refused:?}"
+                ));
+            }
         }
     }
     wrong
 }
 
 #[test]
-fn agreement_is_taken_exactly_where_a_command_carries_it() {
-    let agreeing = Arguments {
-        confirm: true,
-        ..wanting()
-    };
-    let wrong = swept("confirm", &agreeing, carries_agreement);
+fn an_argument_is_taken_exactly_where_the_command_it_reaches_carries_it() {
+    let mut wrong: Vec<String> = Vec::new();
+    for (argument, give, carries) in SWEEPS {
+        wrong.extend(swept(argument, give, carries));
+    }
     assert!(wrong.is_empty(), "{wrong:?}");
 }
 
 #[test]
-fn named_services_are_taken_exactly_where_a_command_carries_them() {
-    // The sweep that would have caught `up`: it accepted the services it was given
-    // and started the whole form, and nothing said so.
-    let naming_services = Arguments {
-        services: vec!["sonarr".to_owned()],
-        ..wanting()
-    };
-    let wrong = swept("services", &naming_services, carries_services);
-    assert!(wrong.is_empty(), "{wrong:?}");
+fn every_argument_the_carrier_holds_is_swept() {
+    // A field added to the carrier and not to the table above is a field nothing
+    // decides about, which is how one comes to be dropped in the first place.
+    let held = [
+        "forms",
+        "services",
+        "key",
+        "value",
+        "preset",
+        "media_type",
+        "confirm",
+    ];
+    let swept: Vec<&str> = SWEEPS.iter().map(|(argument, _, _)| *argument).collect();
+    assert_eq!(swept, held);
 }
 
 #[test]
@@ -506,7 +612,9 @@ fn choosing_for_music_takes_the_agreement_and_drops_it_as_the_command_line_does(
 #[test]
 fn an_action_reaching_the_engine_is_answered_with_a_name_for_the_work() {
     for action in ["up", "down", "switch", "restart", "pull", "seed", "adopt"] {
-        let Some(command) = command(action, naming("tv")) else {
+        // Given what each takes: seeding and adopting are whole-stack requests and
+        // refuse a form, so naming one would be refused rather than answered.
+        let Some(command) = command(action, exactly_what(action)) else {
             unreachable!("every offered action reaches a command");
         };
         assert_eq!(answering(&command), Answering::Later, "{action}");
