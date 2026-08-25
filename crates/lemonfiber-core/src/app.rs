@@ -552,6 +552,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_support_request_serialises_under_its_own_kind() {
+        // Told to write nothing, so it describes a bundle and touches no disk —
+        // which is still the whole of the dispatch, envelope and serialise arms.
+        // In-crate as well as from `tests/`, because this file carries tests of its
+        // own and so is mapped twice: an arm reached only from outside the crate is
+        // an arm the mapping this file's own tests build never runs.
+        let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
+        let ctx = keeping_archives(&vault).with_http(Fake::silent());
+        let json = dispatch(
+            Command::Support {
+                write: false,
+                wanted: super::bundle::Wanted::default(),
+                dest: super::support::Destination::Kept,
+            },
+            &ctx,
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(json.contains(r#""kind":"bundle""#), "{json}");
+        assert!(
+            json.contains(r#""path":null"#),
+            "nothing was written: {json}"
+        );
+    }
+
+    #[tokio::test]
     async fn a_dispatched_quality_show_serialises_under_its_own_kind() {
         // Through dispatch, a quality command reaches its outcome, envelope and
         // serialisation — the arms the handler's own tests, calling it directly,
