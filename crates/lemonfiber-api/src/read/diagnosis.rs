@@ -1,6 +1,7 @@
 //! What the checks found.
 //!
-//! One diagnosis, whole or narrowed. The disk has an endpoint of its own because
+//! Two reads over one diagnosis, whole or narrowed. The disk has an endpoint of its
+//! own because
 //! the dashboard asks about it on its own, and it is the same group of checks the
 //! narrowing parameter reaches — two names for one answer rather than two gathers
 //! that can disagree.

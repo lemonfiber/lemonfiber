@@ -40,8 +40,10 @@ const SPELLED: [(&str, usize); 15] = [
 
 /// The fewest modules this surface has ever declared its reads across.
 ///
-/// A reader that matched nothing would agree with every number at once, which is
-/// the way a guard like this fails silently.
+/// Counted among the ones that **stated a number**, not among the files found. A
+/// reader that stopped parsing would find every file and hold none of them, which
+/// is the way this fails silently — and it did: two modules stated their reads in
+/// a form the first parser ignored, and were exempt rather than checked.
 const FEWEST: usize = 4;
 
 /// How many routes a file declares.
@@ -104,12 +106,29 @@ fn modules() -> BTreeMap<String, (Option<usize>, usize)> {
 }
 
 #[test]
-fn a_module_that_counts_its_reads_counts_the_routes_it_declares() {
+fn every_module_counts_the_reads_it_declares() {
     let modules = modules();
+
+    // Every module states one, so a module that states none is a module this stopped
+    // reading rather than one with nothing to say. Written the other way round first,
+    // `stack.rs` and `diagnosis.rs` were silently exempt — five reads and two, held
+    // to nothing — and the sentence claiming each module opens with its share was
+    // false for two of the five.
+    let silent: Vec<&String> = modules
+        .iter()
+        .filter(|(_, (said, _))| said.is_none())
+        .map(|(name, _)| name)
+        .collect();
+    assert!(
+        silent.is_empty(),
+        "these declare reads and their module doc states no count, so nothing holds \
+         them to it: {silent:?}"
+    );
+
     assert!(
         modules.len() >= FEWEST,
-        "read {} modules under {READS}, fewer than the {FEWEST} this surface has \
-         never gone below — the files have moved and this is no longer reading them",
+        "read {} modules that state a count under {READS}, fewer than the {FEWEST} \
+         this surface has never gone below — the reader has stopped parsing them",
         modules.len()
     );
 
