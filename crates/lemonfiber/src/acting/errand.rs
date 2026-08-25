@@ -357,7 +357,7 @@ pub(super) fn doing(
     press: &Press,
 ) -> Wanted {
     *stage = Stage::Doing { errand, typed };
-    if matches!(*press, Press::Typed('q') | Press::Abandon) {
+    if super::leaving(press) {
         return Wanted::Leave;
     }
     Wanted::Nothing

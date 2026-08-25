@@ -214,7 +214,7 @@ pub(super) fn running(
     press: &Press,
 ) -> Wanted {
     *stage = Stage::Running { offer, chosen };
-    if matches!(*press, Press::Typed('q') | Press::Abandon) {
+    if super::leaving(press) {
         return Wanted::Leave;
     }
     Wanted::Nothing

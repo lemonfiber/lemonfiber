@@ -332,7 +332,7 @@ pub(super) fn keeping(
         *stage = Stage::Came(Reading::of(vec![LET_GO.to_owned()]));
         return Wanted::Stop;
     }
-    let leaving = matches!(*press, Press::Typed('q') | Press::Abandon);
+    let leaving = super::leaving(press);
     *stage = Stage::Keeping {
         lasting,
         named,

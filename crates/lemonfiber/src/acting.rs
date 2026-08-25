@@ -126,6 +126,16 @@ pub(crate) const fn meaning(key: KeyEvent) -> Option<Press> {
     }
 }
 
+/// Whether a press is the operator leaving the screen.
+///
+/// One predicate rather than the same pair of keys written out beside each thing
+/// that can be running. Three flows have something the operator can leave while it
+/// is with the core, and the day either key changes is the day the two that kept
+/// their own copy stop agreeing with the one that did not about what leaving is.
+const fn leaving(press: &Press) -> bool {
+    matches!(*press, Press::Typed('q') | Press::Abandon)
+}
+
 /// What the loop has to go and do about a press.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Wanted {
