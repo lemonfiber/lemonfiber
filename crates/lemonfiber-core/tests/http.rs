@@ -248,35 +248,68 @@ async fn a_service_that_is_not_listening_is_unreachable() {
     );
 }
 
-#[tokio::test]
-async fn a_secret_in_the_query_is_masked_out_of_an_unreachable() {
-    // An indexer authenticates by an apikey in the URL, not a header. When it
-    // cannot be reached the failure must not carry that key — not in the URL it
-    // keeps, and not in the reason read from the transport error, which can quote
-    // the URL it failed on.
+/// A failed request as an operator would see it: the URL the failure keeps and the
+/// transport's own reason, together, since a credential surfacing in either is the
+/// same leak.
+async fn shown_for(query: &str) -> String {
     let request = Request {
         method: Method::Get,
-        url: format!("{}/api?t=search&apikey=super-secret-key", dead_url().await),
+        url: format!("{}/api?{query}", dead_url().await),
         headers: Vec::new(),
         body: None,
     };
-    let outcome = Web::new().send(&request).await;
-    let unreachable = outcome.err();
+    let unreachable = Web::new().send(&request).await.err();
     assert!(
         unreachable.is_some(),
         "nothing answered, so it is unreachable"
     );
-    let rendered = unreachable
+    unreachable
         .map(|failure| format!("{} {}", failure.url, failure.reason))
-        .unwrap_or_default();
-    assert!(
-        !rendered.contains("super-secret-key"),
-        "the apikey must appear nowhere the operator could see it: {rendered:?}"
-    );
-    assert!(
-        rendered.contains("t=search"),
-        "a non-secret parameter is left legible for diagnosis: {rendered:?}"
-    );
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn a_query_is_withheld_from_an_unreachable_whatever_its_parameters_are_called() {
+    // An indexer authenticates by a parameter in the URL, not a header — and which
+    // parameter that is belongs to whoever wrote the service. `apikey` was caught by
+    // the accident of holding `KEY`; a Newznab-family `r=` and a session `sid=` carry
+    // exactly the same credential and no name rule recognises either. So the whole
+    // query is withheld, from the URL the failure keeps and from the reason read from
+    // the transport error, which quotes the URL it failed on.
+    //
+    // Assembled rather than written out, and a placeholder rather than a plausible key:
+    // a run that reads as one in this source is a secret scanner's finding for as long
+    // as the commit exists.
+    let key = ["the", "indexer", "key"].join("-");
+    for query in [
+        format!("t=search&apikey={key}"),
+        format!("t=search&r={key}"),
+        format!("mode=queue&sid={key}"),
+    ] {
+        let rendered = shown_for(&query).await;
+        assert!(
+            !rendered.contains(&key),
+            "{query}: the key must appear nowhere the operator could see it: {rendered:?}"
+        );
+        assert!(
+            rendered.contains("/api?"),
+            "{query}: the address and the fact of a query survive: {rendered:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn an_ordinary_query_goes_with_the_rest_and_the_address_is_what_is_left() {
+    // The price, stated: a query holding nothing secret is withheld too, because
+    // telling one from the other is the guess this deliberately does not make. What an
+    // operator keeps is the scheme, host, port and path — which service, on which port,
+    // at which endpoint — and that there was a query.
+    let rendered = shown_for("t=search&limit=50&cat=5000").await;
+    for parameter in ["t=search", "limit=50", "cat=5000"] {
+        assert!(!rendered.contains(parameter), "{rendered:?}");
+    }
+    assert!(rendered.contains("127.0.0.1"), "{rendered:?}");
+    assert!(rendered.contains("/api?"), "{rendered:?}");
 }
 
 #[tokio::test]
