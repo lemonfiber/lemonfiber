@@ -414,7 +414,7 @@ async fn a_line_count_that_is_not_a_number_is_refused() {
         asked(world(running(), stack()), "/api/logs?tail=plenty").await,
         Some((
             StatusCode::BAD_REQUEST,
-            "How many lines to begin with must be a number.".to_owned()
+            "How many lines to begin with must be a number, and no more than 10000.".to_owned()
         ))
     );
 }
@@ -872,4 +872,177 @@ async fn every_read_this_surface_offers_by_name_is_one_it_serves() {
     }
 
     assert!(missing.is_empty(), "{missing:?}");
+}
+
+#[tokio::test]
+async fn a_setting_asked_for_under_a_name_this_read_does_not_take_is_refused() {
+    // The defect, in the spelling it was found in. `keys` is one letter from `key`,
+    // and the answer to it was every setting this stack has: the values are withheld
+    // and the names are not, so a mistyped request handed over the map.
+    let seen = asked(
+        configured("misspelled", &kept()),
+        "/api/config?keys=LEMONFIBER_USENET",
+    )
+    .await;
+
+    assert_eq!(
+        seen.as_ref().map(|(status, _)| *status),
+        Some(StatusCode::BAD_REQUEST),
+        "a parameter this read does not take is refused"
+    );
+    assert!(
+        seen.as_ref()
+            .is_some_and(|(_, body)| body.contains(r#""code":"READ-1""#)),
+        "and refused under the code that says which mistake it was: {seen:?}"
+    );
+    assert!(
+        seen.is_some_and(|(_, body)| !body.contains("SONARR_API_KEY")),
+        "and nothing about the settings is answered on the way past"
+    );
+}
+
+#[tokio::test]
+async fn the_refusal_names_what_the_read_does_take() {
+    // A caller here has misspelled something, and what the read takes is short
+    // enough to be the answer rather than a pointer at one.
+    let seen = asked(world(running(), stack()), "/api/config?keys=x").await;
+    assert!(
+        seen.is_some_and(|(_, body)| body.contains("It takes key.")),
+        "the way forward is the name that was meant"
+    );
+}
+
+#[tokio::test]
+async fn a_read_that_takes_nothing_refuses_a_parameter_all_the_same() {
+    // The reads a check written per handler would never have covered: they took no
+    // query string, so there was nowhere to write one.
+    let seen = asked(world(running(), stack()), "/api/status?nonsense=1").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::BAD_REQUEST
+            && body.contains(r#""code":"READ-1""#)
+            && body.contains("takes no parameters at all")),
+        "a read with nothing to narrow by is still a read that was asked wrongly"
+    );
+}
+
+#[tokio::test]
+async fn the_glossary_refuses_a_misspelled_word_rather_than_listing_every_word() {
+    let seen = asked(world(running(), stack()), "/api/explain?words=indexer").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::BAD_REQUEST
+            && body.contains(r#""code":"READ-1""#)
+            && !body.contains(r#""word":"hardlink""#)),
+        "the whole vocabulary is not the answer to a question about one word"
+    );
+}
+
+#[tokio::test]
+async fn the_checks_refuse_a_misspelled_narrowing_rather_than_running_the_suite() {
+    // A narrowing with two letters swapped, which ran every check there is —
+    // including the ones that reach the services — for a request about the disk.
+    let seen = asked(world(running(), stack()), "/api/checks?onyl=storage").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::BAD_REQUEST
+            && body.contains(r#""code":"READ-1""#)
+            && !body.contains(r#""kind":"doctor""#)),
+        "a narrowing that was misspelled is not a request for everything"
+    );
+}
+
+#[tokio::test]
+async fn a_log_read_refuses_a_parameter_it_does_not_take() {
+    // The one read that reaches no command still arrives at the same door.
+    let seen = asked(world(running(), stack()), "/api/logs?lines=10").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::BAD_REQUEST
+            && body.contains(r#""code":"READ-1""#)),
+        "a read with no command behind it is not a read exempt from this"
+    );
+}
+
+#[tokio::test]
+async fn what_to_follow_given_twice_is_refused_rather_than_answered_for_the_first() {
+    // Two titles named and one traced, with nothing said about the other: the
+    // request was answered, about something it did not ask.
+    let seen = asked(
+        world(running(), stack()),
+        "/api/trace?term=the+expanse&term=dune",
+    )
+    .await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::BAD_REQUEST
+            && body.contains(r#""code":"READ-2""#)
+            && !body.contains("expanse")),
+        "which of the two was meant is not something this can work out"
+    );
+}
+
+#[tokio::test]
+async fn a_form_may_be_named_more_than_once_because_it_names_one_of_several() {
+    // The other half of the rule: two parameters carry lists, and naming a second
+    // form is a wider request that was asked for.
+    let seen = asked(
+        world(running(), stack()),
+        "/api/services?form=library&form=library",
+    )
+    .await;
+    assert!(
+        seen.is_some_and(|(status, _)| status == StatusCode::OK),
+        "a repeat is refused only where one value was asked for"
+    );
+}
+
+#[tokio::test]
+async fn every_read_this_surface_serves_refuses_a_parameter_no_read_takes() {
+    // The guard the sweep is finished by. Written against the whole list rather than
+    // the reads that were known to be wrong, so the next read added arrives holding
+    // this or fails here.
+    let mut accepted: Vec<&str> = Vec::new();
+    for read in reads::OFFERED
+        .iter()
+        .copied()
+        .chain(std::iter::once(reads::LOGS))
+    {
+        let path = format!("{read}?nonsense=1");
+        let seen = asked(world(running(), stack()), &path).await;
+        let refused = seen.is_some_and(|(status, body)| {
+            status == StatusCode::BAD_REQUEST && body.contains(r#""code":"READ-1""#)
+        });
+        if !refused {
+            accepted.push(read);
+        }
+    }
+
+    assert!(accepted.is_empty(), "{accepted:?}");
+}
+
+#[test]
+fn a_name_that_reaches_no_read_takes_no_parameter_either() {
+    // Asked of the table rather than through the router, because no path serves a
+    // name like this — and a read added without a row must refuse everything rather
+    // than accept everything, which is the direction this settles.
+    let refused = reads::wanted("/api/secrets", Some("key=LEMONFIBER_USENET"));
+    let code = refused.err().map(|problem| problem.code.as_str());
+
+    assert_eq!(code, Some("READ-1"));
+}
+
+#[tokio::test]
+async fn a_line_count_past_what_this_read_will_gather_is_refused() {
+    // The scrollback is gathered whole before any of it is answered, so the number
+    // asked for here is the number of lines this machine holds at once.
+    assert_eq!(
+        asked(world(running(), stack()), "/api/logs?tail=4294967295").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "How many lines to begin with must be a number, and no more than 10000.".to_owned()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_line_count_at_the_ceiling_is_still_asked_for() {
+    // The ceiling is a ceiling and not a fence one short of it.
+    let seen = asked(world(running(), stack()), "/api/logs?tail=10000").await;
+    assert_eq!(seen.map(|(status, _)| status), Some(StatusCode::OK));
 }
