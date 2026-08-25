@@ -54,7 +54,12 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
         stack,
         settings,
         environment,
-    );
+    )
+    // A wait says what it is waiting for, and this is where those words go on a
+    // terminal. The web surface replaces it with one that says them on the stream a
+    // browser holds open, which is the only reason this is a value rather than a
+    // call from inside the wait.
+    .narrating(Arc::new(crate::engine::Narrating));
 
     // A rehearsal takes nothing, so the two never both apply — but a rehearsal that
     // was also asked to force is a rehearsal, because the harmless reading of an

@@ -13,6 +13,7 @@
 pub mod backlog;
 pub mod dashboard;
 pub mod live;
+pub mod saying;
 pub mod wire;
 
 use std::convert::Infallible;

@@ -19,6 +19,7 @@ mod lock;
 mod stopping;
 mod streaming;
 mod switch;
+mod waiting;
 
 pub use diagnosis::diagnose;
 pub(super) use diagnosis::{assembled, examined};
@@ -48,12 +49,21 @@ const LAST_WORDS: u32 = 20;
 /// already resolved and validated it to know what to start, and reading it a
 /// second time would add a way for this to fail that cannot happen — a failure
 /// no test can reach is a failure nobody has checked the wording of.
+///
+/// What it is waiting for is said as it waits, through the narrator the surface
+/// supplied. Compose's own narration stops the moment the containers exist, and
+/// that is the moment this begins — so without it the operator meets minutes of
+/// silence exactly where they have most reason to think the command has hung.
 async fn settle(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     profiles: &[String],
 ) -> Result<Vec<Service>, Box<Problem>> {
-    let deadline = ctx.clock.now() + ctx.patience;
+    let began = ctx.clock.now();
+    let deadline = began + ctx.patience;
+    // How much of the wait has already been spoken for, which is what keeps the
+    // narration on its own interval rather than on the poll's.
+    let mut spoken = 0;
 
     loop {
         let containers = ctx
@@ -73,8 +83,16 @@ async fn settle(
 
         // Checked after the survey rather than before it, so a patience of zero
         // still reports what it saw rather than reporting nothing at all.
-        if ctx.clock.now() >= deadline {
+        let now = ctx.clock.now();
+        if now >= deadline {
             return Err(Box::new(never_settled(ctx, manifest, &waiting).await));
+        }
+
+        // Read from the same clock the deadline is, so what a line says about how
+        // far into the budget it is agrees with when the budget actually runs out.
+        let waited = now.duration_since(began).unwrap_or_default();
+        if let Some(line) = waiting::due(&waiting, waited, ctx.patience, &mut spoken) {
+            ctx.narrator.say(&line).await;
         }
 
         tokio::time::sleep(POLL).await;

@@ -17,6 +17,7 @@ use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
+use lemonfiber_core::ports::Narrator;
 
 use crate::exit::{complain, settled, FAILURE};
 use crate::keyboard::{Console, Keyboard};
@@ -172,6 +173,27 @@ pub(crate) fn emit_line(kind: Kind, line: &str, json: bool) {
             .to_json()
             .unwrap_or(UNRENDERABLE.to_owned())
     );
+}
+
+/// What a wait says, put where the command's own narration is already going.
+///
+/// The other half of the seam a streamed start has. Compose's lines arrive on a
+/// channel and go out through [`emit_line`]; the wait that follows them arrives
+/// through this and goes out the same way, under the same kind — a consumer
+/// filtering `--json` for a start is filtering for the whole of one, and the wait
+/// is the part of a start it can least afford to miss.
+///
+/// Who the output is for is asked rather than carried, for the reason the funnel
+/// settles it once: a flag threaded to every place that might eventually print is a
+/// flag that will one day be threaded wrong, and this one is reached from a context
+/// built before the command is known.
+pub(crate) struct Narrating;
+
+#[async_trait::async_trait]
+impl Narrator for Narrating {
+    async fn say(&self, said: &str) {
+        emit_line(kind::START, said, crate::say::for_a_parser());
+    }
 }
 
 /// Watch the data location until it is lost, then report what was stopped.
