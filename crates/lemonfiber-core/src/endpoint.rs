@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::Failure;
+use crate::text::fitted;
 
 /// The header a Servarr-shape service authenticates with — Sonarr, Radarr,
 /// Lidarr and Prowlarr all read the key from it, and the setup validator sends
@@ -174,25 +175,20 @@ impl Endpoint {
 const DETAIL_LIMIT: usize = 200;
 
 /// A non-success response as the detail of a refusal: the service's own words
-/// where it gave any — clipped to a diagnostic length — its status code alone
+/// where it gave any — shortened to a diagnostic length — its status code alone
 /// otherwise.
+///
+/// Shortened by [`fitted`], which elides the middle and keeps both ends. A
+/// service's error text commonly opens with boilerplate and closes with the
+/// specific failure, so the end is the half that names the cause, and a body cut
+/// at the tail keeps the half every such body shares.
 pub(crate) fn describe(response: &Response) -> String {
     let body = response.body.trim();
     if body.is_empty() {
         format!("HTTP {}", response.status)
     } else {
-        format!("HTTP {}: {}", response.status, clip(body, DETAIL_LIMIT))
+        format!("HTTP {}: {}", response.status, fitted(body, DETAIL_LIMIT))
     }
-}
-
-/// `text` cut to at most `limit` characters — counted as characters, not bytes, so
-/// a multibyte boundary is never split — and marked where it was cut.
-fn clip(text: &str, limit: usize) -> String {
-    if text.chars().count() <= limit {
-        return text.to_owned();
-    }
-    let kept: String = text.chars().take(limit).collect();
-    format!("{kept}…")
 }
 
 #[cfg(test)]
@@ -219,21 +215,58 @@ mod tests {
     }
 
     #[test]
-    fn a_long_error_body_is_clipped_and_marked() {
+    fn a_long_error_body_is_shortened_and_marked() {
         // A verbose error page (which could echo a submitted field) is carried only
-        // to a diagnostic length, marked as cut, not folded whole into the refusal.
+        // to a diagnostic length, marked where it was shortened, not folded whole
+        // into the refusal.
         let response = Response {
             status: 500,
             body: "x".repeat(500),
         };
         let detail = describe(&response);
         assert!(
-            detail.contains('…'),
-            "clipped detail is marked as cut: {detail}"
+            detail.contains("..."),
+            "a shortened detail is marked as shortened: {detail}"
         );
         assert!(
             detail.chars().count() < 260,
             "the 500-char body is not carried whole"
         );
+    }
+
+    /// The defect this exists for. A service's error text opens with boilerplate
+    /// and closes with the failure it is reporting; a body cut at the tail keeps
+    /// the half every such body shares and drops the half that names the cause.
+    #[test]
+    fn a_long_error_body_still_names_the_cause_at_its_end() {
+        let response = Response {
+            status: 502,
+            body: format!(
+                "Bad Gateway. {}Connection refused by 10.0.0.5:8080.",
+                "The upstream server did not answer. ".repeat(20)
+            ),
+        };
+
+        let detail = describe(&response);
+
+        assert!(detail.starts_with("HTTP 502: Bad Gateway."), "{detail}");
+        assert!(
+            detail.ends_with("Connection refused by 10.0.0.5:8080."),
+            "{detail}"
+        );
+    }
+
+    /// The marker is full stops rather than an ellipsis, so a terminal that cannot
+    /// render the character is never handed one.
+    #[test]
+    fn shortening_an_error_body_uses_no_character_a_terminal_might_not_have() {
+        let response = Response {
+            status: 500,
+            body: "y".repeat(500),
+        };
+
+        let detail = describe(&response);
+
+        assert!(detail.is_ascii(), "{detail}");
     }
 }
