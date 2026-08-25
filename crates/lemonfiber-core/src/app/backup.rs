@@ -12,7 +12,7 @@
 //! quiescing is the orchestration that wraps this, so [`capture`] is a building
 //! block of a backup rather than a command run against a running stack.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -20,6 +20,8 @@ use crate::archive::{Archive, Fault, Space};
 use crate::backup::{self, Manifest, Retention, Scope};
 use crate::config::paths::Paths;
 use crate::error::{Code, Problem, Remedy, Severity, State};
+
+use super::{quiesced, Ctx};
 
 /// Bytes kept free beyond the estimate, so a capture never spends the last of the
 /// disk it exists to protect.
@@ -34,8 +36,21 @@ pub const NOT_WRITTEN: Code = Code::new("BACKUP-2");
 /// Raised when the room for a backup could not be measured.
 pub const NOT_MEASURED: Code = Code::new("BACKUP-3");
 
+/// Raised when a capture could not be shown that nothing is writing to a database.
+pub const STILL_RUNNING: Code = Code::new("BACKUP-4");
+
+/// Raised when this run has nowhere it knows to keep an archive.
+pub const NOWHERE_TO_KEEP: Code = Code::new("BACKUP-5");
+
+/// How many backups of each scope are kept before the oldest are pruned.
+///
+/// Here rather than in the surface that used to say, because it is retention's
+/// policy and not one surface's: a browser and a shell that kept different numbers
+/// would prune each other's archives.
+pub const KEEP: usize = 5;
+
 /// What a capture produced.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Report {
     /// Where the archive was written.
     pub path: PathBuf,
@@ -102,6 +117,68 @@ pub async fn capture(
         sensitive: manifest.sensitive,
         pruned,
     })
+}
+
+/// Capture this run's configuration, refusing while anything may be writing to a
+/// service database.
+///
+/// The whole of what a `backup` request comes to: prove the stack is stopped, work
+/// out the scope from the one service named or the absence of one, and capture.
+/// Every part of it that could differ between surfaces — the moment stamped into
+/// the name, the data root recorded, how many archives are kept — is read from the
+/// run rather than supplied, so two surfaces asking for a backup ask for the same
+/// backup.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the stack is not confirmed stopped, where this run
+/// has nowhere it knows to keep an archive, or for any reason [`capture`] gives.
+pub async fn run(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Problem>> {
+    let archives = ctx
+        .archives
+        .as_ref()
+        .ok_or_else(|| Box::new(nowhere_to_keep()))?;
+    quiesced::required(ctx, STILL_RUNNING, "backup").await?;
+
+    let scope = match service {
+        Some(name) => Scope::Service { name },
+        None => Scope::WholeStack,
+    };
+    let data_root = ctx
+        .settings
+        .data_root
+        .as_deref()
+        .map(Path::to_string_lossy)
+        .unwrap_or_default()
+        .into_owned();
+
+    capture(
+        &archives.paths,
+        scope,
+        env!("CARGO_PKG_VERSION"),
+        &ctx.stamp(),
+        &data_root,
+        Retention::keeping(KEEP),
+        archives.vault.as_ref(),
+    )
+    .await
+}
+
+/// The refusal for a run that cannot say where its own files go.
+///
+/// Resolving the configuration home is the surface's half of this, and a machine
+/// that will not answer leaves no backups directory to name. Refused rather than
+/// written to a guessed path: a backup nobody can find again is not a backup.
+fn nowhere_to_keep() -> Problem {
+    Problem::new(
+        NOWHERE_TO_KEEP,
+        Severity::Error,
+        "This run has nowhere it knows to keep a backup",
+        "An archive is written into lemonfiber's own directory, and this machine would not say \
+         where that is. Nothing was written.",
+        Remedy::new("Set a home directory for this user and run it again"),
+    )
+    .in_state(State::Guided)
 }
 
 /// The name that marks an archive's scope in its filename, so retention can tell a
@@ -205,17 +282,19 @@ fn not_measured(fault: &Fault) -> Problem {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
+    use std::sync::Arc;
 
-    use super::{capture, Report, NOT_MEASURED, NOT_WRITTEN, NO_ROOM};
-    use crate::app::fixtures::FakeArchive;
+    use lemonfiber_fixtures::support::Reporting;
+
+    use super::{
+        capture, run, Report, NOT_MEASURED, NOT_WRITTEN, NOWHERE_TO_KEEP, NO_ROOM, STILL_RUNNING,
+    };
+    use crate::app::fixtures::{keeping, paths, FakeArchive};
+    use crate::app::Ctx;
     use crate::archive::{Fault, Space};
     use crate::backup::{Existing, Retention, Scope};
-    use crate::config::paths::Paths;
-
-    fn paths() -> Paths {
-        Paths::rooted(Path::new("/cfg"), Path::new("/data"))
-    }
+    use crate::ports::docker::{Health, Lifecycle};
 
     async fn capturing(archive: &FakeArchive) -> Result<Report, Box<super::super::Problem>> {
         capture(
@@ -463,5 +542,82 @@ mod tests {
             vec!["lemonfiber-full-2026-07-01.tar.gz".to_owned()],
             "it was attempted"
         );
+    }
+
+    /// A run whose engine answers and reports nothing running.
+    fn stopped() -> Ctx {
+        crate::test_support::a_context()
+            .engine(Arc::new(Reporting::holding(
+                &["sonarr"],
+                Lifecycle::Exited,
+                Health::None,
+            )))
+            .build()
+    }
+
+    /// The same run, keeping its archives through `vault`.
+    fn a_stopped_run(vault: &Arc<FakeArchive>) -> Ctx {
+        keeping(stopped(), vault)
+    }
+
+    #[tokio::test]
+    async fn a_run_with_nowhere_to_keep_an_archive_refuses_rather_than_guessing_a_path() {
+        let refusal = run(&stopped(), None)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(NOWHERE_TO_KEEP));
+    }
+
+    #[tokio::test]
+    async fn a_capture_of_the_whole_stack_lands_in_the_backups_directory() {
+        let vault = Arc::new(FakeArchive::roomy());
+        let report = run(&a_stopped_run(&vault), None)
+            .await
+            .map_err(|problem| problem.code);
+        assert_eq!(report.map(|report| report.scope), Ok(Scope::WholeStack));
+        let written = vault.writes();
+        assert_eq!(written.len(), 1, "one archive was written");
+        assert!(
+            written
+                .first()
+                .is_some_and(|path| path.starts_with("/data/lemonfiber/backups")),
+            "{written:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_capture_of_one_service_records_that_scope() {
+        let vault = Arc::new(FakeArchive::roomy());
+        let report = run(&a_stopped_run(&vault), Some("sonarr".to_owned()))
+            .await
+            .map_err(|problem| problem.code);
+        assert_eq!(
+            report.map(|report| report.scope),
+            Ok(Scope::Service {
+                name: "sonarr".to_owned()
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_capture_is_refused_while_the_services_may_be_writing() {
+        // The rule the command line used to keep for itself: a copy of a live
+        // database is the corruption a backup exists to prevent, so a browser
+        // cannot ask for the capture a shell was never allowed either.
+        let vault = Arc::new(FakeArchive::roomy());
+        let running = crate::test_support::a_context()
+            .engine(Arc::new(Reporting::holding(
+                &["sonarr"],
+                Lifecycle::Running,
+                Health::Healthy,
+            )))
+            .build();
+        let refusal = run(&keeping(running, &vault), None)
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(STILL_RUNNING));
+        assert!(vault.writes().is_empty(), "nothing was written");
     }
 }

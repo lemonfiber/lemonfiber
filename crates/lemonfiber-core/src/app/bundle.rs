@@ -38,7 +38,7 @@ pub const LINES: u32 = 200;
 /// The command carries choices and the bundle carries their consequences. Keeping the two
 /// apart means the stated window is worked out in one place, rather than once by whoever
 /// collects and again by whoever prints.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Wanted {
     /// How many log lines to take from each service.
     pub lines: u32,
@@ -46,6 +46,12 @@ pub struct Wanted {
     pub filenames: Filenames,
     /// The settings to show as they are, named as the bundle names them.
     pub reveal: Vec<String>,
+    /// Whether showing those settings was agreed to on the same request.
+    ///
+    /// Beside what it agrees to rather than apart from it: a flag that publishes a
+    /// credential and the agreement to publish it are one decision, and two values
+    /// a caller carries separately are two that eventually arrive apart.
+    pub confirmed: bool,
 }
 
 impl Default for Wanted {
@@ -56,11 +62,27 @@ impl Default for Wanted {
             lines: LINES,
             filenames: Filenames::Replaced,
             reveal: Vec::new(),
+            confirmed: false,
         }
     }
 }
 
 impl Wanted {
+    /// What a caller asked for, as one value rather than four.
+    ///
+    /// Gathered here so a surface hands over what was wanted rather than spelling
+    /// out the same four fields, and so a field added to the four is added to the
+    /// surfaces that carry it rather than silently defaulted at one of them.
+    #[must_use]
+    pub fn asked(lines: u32, filenames: Filenames, reveal: Vec<String>, confirmed: bool) -> Self {
+        Self {
+            lines,
+            filenames,
+            reveal,
+            confirmed,
+        }
+    }
+
     /// The terms a bundle made this way carries.
     fn terms(&self) -> Terms {
         Terms {

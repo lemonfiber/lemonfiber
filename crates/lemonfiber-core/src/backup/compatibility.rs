@@ -120,7 +120,7 @@ impl Compatibility {
 
 /// A restore whose archive was taken against a different data root than the one
 /// configured now, so its stored paths would land where nothing exists.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Relocation {
     /// The data root the archive was taken against.
     pub was: String,

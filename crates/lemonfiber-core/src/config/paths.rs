@@ -161,6 +161,17 @@ impl Paths {
     pub fn backups(&self) -> PathBuf {
         self.data.join("backups")
     }
+
+    /// Where support bundles are written for a caller that named no directory.
+    ///
+    /// Not the backups directory, though both hold a `.tar.gz`: retention prunes
+    /// what it finds beside the backups, and a bundle left there would be deleted
+    /// by a rule about how many backups to keep. Regenerable — a bundle is produced
+    /// again by asking again.
+    #[must_use]
+    pub fn bundles(&self) -> PathBuf {
+        self.data.join("support")
+    }
 }
 
 #[cfg(test)]
@@ -204,6 +215,7 @@ mod tests {
             paths.stack(),
             paths.service_config(),
             paths.backups(),
+            paths.bundles(),
             paths.storage_state(),
         ];
 

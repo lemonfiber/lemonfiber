@@ -93,6 +93,7 @@ pub mod text;
 pub mod transcoding;
 pub mod validate;
 pub mod walkthrough;
+pub mod within;
 pub mod wizard;
 
 /// The name of the product, as it appears to users.

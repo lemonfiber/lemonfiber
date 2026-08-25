@@ -92,22 +92,13 @@ impl Source {
 
 /// Where a path lands within the app, or nothing where it leads outside it.
 ///
-/// Split on the separator a request uses rather than handed to the platform's
-/// own path parser: a backslash means one thing on Windows and nothing on Linux,
-/// and a rule about what may be reached must not change with the machine.
-///
-/// Only ordinary names survive. A parent link is refused rather than resolved,
-/// because the directory above an app directory is the operator's home.
+/// The rule about what a supplied name may reach is [`crate::within`]'s, shared
+/// with the other caller that turns request text into a path beneath a directory
+/// lemonfiber chose. What is decided here is only what naming nothing means, which
+/// is about the app rather than about paths: a path with no file in it is a route
+/// the app's own router reads once the page is loaded, so the app is the answer.
 fn within(asked: &str) -> Option<PathBuf> {
-    let mut path = PathBuf::new();
-    for segment in asked.split('/') {
-        match segment {
-            "" | "." => {}
-            ".." => return None,
-            name if name.contains('\\') => return None,
-            name => path.push(name),
-        }
-    }
+    let path = crate::within::beneath(asked)?;
     if path.as_os_str().is_empty() {
         return Some(PathBuf::from(INDEX));
     }

@@ -44,7 +44,16 @@ pub use scan::{residual, Residual};
 /// are the one thing in a bundle that says something about the person rather than about
 /// the machine, and replacing them costs a diagnostic a reader can still follow — the
 /// marks keep two mentions of one file recognisable as one file.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+///
+/// Read from the bare flag a surface carries rather than from a name of its own,
+/// because that is what both surfaces have: `--filenames` on a command line and a
+/// `filenames` in a request body are one word that is there or is not. Which way
+/// round it reads is decided here, once — a surface that read it the other way
+/// round would put a library's contents in a file people post in public.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(from = "bool")]
 pub enum Filenames {
     /// Replaced by their marks.
     #[default]
@@ -53,12 +62,22 @@ pub enum Filenames {
     Shown,
 }
 
+impl From<bool> for Filenames {
+    fn from(shown: bool) -> Self {
+        if shown {
+            Self::Shown
+        } else {
+            Self::Replaced
+        }
+    }
+}
+
 /// How a bundle was made: what was bounded, what was replaced, and what its operator asked
 /// to have shown as it is.
 ///
 /// Carried in the bundle rather than known only to the command that wrote it, because the
 /// person who reads one is usually not the person who chose any of this.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Terms {
     /// How much of the logs was taken, said as it would be said aloud.
     pub window: String,
@@ -108,7 +127,7 @@ impl Terms {
 /// before anything is written. A bundle that had already put one file on disk when it
 /// found a credential in the next would have to be unwritten, and unwriting is the kind of
 /// thing that half-works.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Piece {
     /// What it is called inside the bundle.
     pub name: String,
@@ -120,7 +139,7 @@ pub struct Piece {
 ///
 /// An operator pasting last week's bundle into this week's thread is the commonest way one
 /// of those threads goes wrong, and nothing in the contents tells either of them.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Taken {
     /// The lemonfiber that wrote it.
     pub lemonfiber: String,
@@ -131,7 +150,7 @@ pub struct Taken {
 }
 
 /// Everything gathered for a bundle, and everything that could not be.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Contents {
     /// The files, in the order a reader would want them.
     pub pieces: Vec<Piece>,

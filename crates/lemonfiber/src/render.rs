@@ -14,6 +14,7 @@
 #[cfg(test)]
 pub(crate) mod fixtures;
 
+mod archive;
 mod doctor;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
@@ -21,7 +22,6 @@ mod quality;
 pub(crate) mod repair;
 mod seed;
 pub(crate) mod stack;
-pub(crate) mod support;
 mod trace;
 pub(crate) mod walkthrough;
 
@@ -209,6 +209,9 @@ fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Seed(report) => seed::seeding(report),
         Outcome::Reset(report) => stack::reset(report),
         Outcome::Wizard(report) => standing(report),
+        Outcome::Backup(report) => archive::backup(report),
+        Outcome::Support(report) => archive::bundle(report),
+        Outcome::Restore(report) => archive::restoration(report),
     }
 }
 
@@ -350,7 +353,12 @@ mod tests {
         answer, forms, logged, machine_readable, render, settings, standing, versions, watched,
         Lines,
     };
+    use lemonfiber_core::app::backup::Report as Capture;
+    use lemonfiber_core::app::restore::{Preview, Restoration};
+    use lemonfiber_core::app::support::Bundle;
     use lemonfiber_core::app::Outcome;
+    use lemonfiber_core::backup::{Manifest, Scope, SCHEMA};
+    use lemonfiber_core::bundle::Contents;
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::glossary::Vocabulary;
@@ -360,6 +368,19 @@ mod tests {
         VersionReport, WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
+
+    /// An archive's own account of itself, holding nothing.
+    fn an_archive() -> Manifest {
+        Manifest {
+            schema: SCHEMA,
+            product_version: "0.8.0".to_owned(),
+            created_at: "2026-07-30".to_owned(),
+            data_root: "/srv/media".to_owned(),
+            scope: Scope::WholeStack,
+            sensitive: true,
+            members: Vec::new(),
+        }
+    }
 
     /// A setup part-way through, which is what most of these vary from.
     fn part_way() -> WizardReport {
@@ -638,6 +659,27 @@ mod tests {
             Outcome::Word(a_term()),
             Outcome::Glossary(Vocabulary {
                 words: vec![a_term()],
+            }),
+            Outcome::Backup(Capture {
+                path: std::path::PathBuf::from("/data/lemonfiber/backups/full.tar.gz"),
+                scope: Scope::WholeStack,
+                sensitive: false,
+                pruned: Vec::new(),
+            }),
+            // Nothing gathered, nothing revealed and nothing written: the answer a
+            // bare run gives, which is the one with every optional paragraph absent.
+            Outcome::Support(Bundle {
+                contents: Contents::default(),
+                bytes: 0,
+                path: None,
+            }),
+            Outcome::Restore(Restoration {
+                would: Preview {
+                    manifest: an_archive(),
+                    downgrade: false,
+                    relocation: None,
+                },
+                done: None,
             }),
         ];
         // Every arm of the dispatch renders something, and every one of them also

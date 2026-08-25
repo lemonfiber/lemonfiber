@@ -21,7 +21,7 @@
 /// Whole-stack is the common case, but restoring one service is often what is
 /// actually wanted — one \*arr's configuration mangled while the rest is fine —
 /// so the scope is recorded in the archive and honoured on the way back.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "scope", rename_all = "snake_case")]
 pub enum Scope {
     /// Every service's configuration, plus lemonfiber's own and the stack.
@@ -54,7 +54,7 @@ pub struct Item {
 /// the archive, when, what data root it was taken against, what it covers, whether
 /// it is sensitive, and the contents to list. Round-trips through JSON so the same
 /// value the capture wrote is the value the restore reads.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Manifest {
     /// The archive format, checked before anything inside is trusted.
     pub schema: u32,
@@ -73,7 +73,7 @@ pub struct Manifest {
 }
 
 /// One entry in an archive's contents listing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Member {
     /// Where it sits inside the archive.
     pub archive_path: String,

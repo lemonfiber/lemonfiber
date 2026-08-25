@@ -10,6 +10,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::archive::Archiving;
 use crate::config::Settings;
 use crate::platform::Environment;
 use crate::ports::docker::Engine;
@@ -62,6 +63,13 @@ pub struct Ctx {
     /// silently — so the surface answers, and today it answers with what it can
     /// see until the engine adapter can tell it the rest.
     pub environment: Environment,
+    /// Where this run keeps archives, and what writes them.
+    ///
+    /// Optional because where lemonfiber's own files live is the surface's answer
+    /// and the surface can fail to give one: a machine that will not say where a
+    /// configuration home is has no backups directory, and the commands that need
+    /// one refuse rather than guessing at a path to write over.
+    pub archives: Option<Archiving>,
 }
 
 impl Ctx {
@@ -102,7 +110,24 @@ impl Ctx {
             stack,
             settings,
             environment,
+            // Nowhere, until a surface says where. Resolving the configuration
+            // home means asking the operating system, which is the surface's
+            // half of this and not something a default could stand in for.
+            archives: None,
         }
+    }
+
+    /// The same context, keeping its archives where this says.
+    ///
+    /// How a surface hands over the two things a capture or a restore needs and no
+    /// other command does: the layout to write into, and the adapter that turns
+    /// trees into a `.tar.gz`. Given here rather than at [`Self::new`] because the
+    /// packing lives in the binary, and a core that took it as a required argument
+    /// would be a core every test had to hand an archiver it never uses.
+    #[must_use]
+    pub fn keeping(mut self, archives: Archiving) -> Self {
+        self.archives = Some(archives);
+        self
     }
 
     /// The same context, reaching services over the given transport.
