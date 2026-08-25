@@ -20,6 +20,7 @@
 use lemonfiber_core::acknowledged::Acknowledged;
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::glossary::{explain, mentioned, Term, TERMS};
+use lemonfiber_core::text::Overrun;
 
 use super::Lines;
 
@@ -223,21 +224,11 @@ fn remainder(words: &[&'static str]) -> Option<String> {
 
 /// The text broken at spaces so no line runs past this width.
 ///
-/// A word longer than the width gets a line of its own rather than being cut: what a
-/// break in the middle of a word costs a reader is more than what the overrun does,
-/// and nothing explained here is long enough for it to happen in practice.
+/// A word longer than the width gets a line of its own rather than being cut. The
+/// overrun is re-wrapped by the terminal the report is read at; a screen has no such
+/// reader and asks for the other edge.
 fn wrapped(text: &str, width: usize) -> Vec<String> {
-    let mut lines: Vec<String> = Vec::new();
-    for word in text.split_whitespace() {
-        match lines.last_mut() {
-            Some(line) if line.chars().count() + 1 + word.chars().count() <= width => {
-                line.push(' ');
-                line.push_str(word);
-            }
-            _ => lines.push(word.to_owned()),
-        }
-    }
-    lines
+    lemonfiber_core::text::wrapped(text, width, Overrun::Allowed)
 }
 
 #[cfg(test)]

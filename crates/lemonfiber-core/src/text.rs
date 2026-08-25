@@ -15,6 +15,10 @@
 //! is stripped is only what a terminal reads as an instruction; everything a
 //! person could have meant — accents, scripts, punctuation, emoji — survives
 //! untouched, because a release name in Japanese is a release name.
+//!
+//! Beside it lives the other thing that happens to text on its way to being read:
+//! breaking it so it fits the room there is. The two surfaces that need it want
+//! different things at the edge, and [`Overrun`] is how each says which.
 
 /// The same text with anything a terminal would obey removed.
 ///
@@ -40,9 +44,78 @@ const fn obeyed(character: char) -> bool {
     matches!(character, '\u{0}'..='\u{1f}' | '\u{7f}'..='\u{9f}' | '\u{2028}' | '\u{2029}')
 }
 
+/// What a run with nothing to break on does when it reaches the edge.
+///
+/// A report's width is a preference: it is read at whatever width the reader's
+/// terminal is, which re-wraps an overrun. A screen's is a wall: it is a grid of
+/// cells, and past the edge is not re-wrapped, it is not drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Overrun {
+    /// Runs past the edge, keeping the run whole.
+    Allowed,
+    /// Broken at the edge, the alternative being that its tail is never seen.
+    Broken,
+}
+
+/// The text broken so that no line is longer than this width.
+///
+/// Broken at whitespace wherever there is whitespace to break at, the space a break
+/// is taken at being spent on the break. Spaces inside a line are left as they
+/// arrived: a service that aligned its own output with them meant them.
+///
+/// A run with nothing to break on — a path, a URL, a hash — is broken at the edge or
+/// left whole according to what the caller says its edge is.
+#[must_use]
+pub fn wrapped(text: &str, width: usize, overrun: Overrun) -> Vec<String> {
+    if width == 0 {
+        return Vec::new();
+    }
+    let marks: Vec<char> = text.chars().collect();
+    let mut lines: Vec<String> = Vec::new();
+    let mut at = 0;
+    while at < marks.len() {
+        let end = broken_at(&marks, at, width, overrun);
+        let line: String = marks.get(at..end).unwrap_or_default().iter().collect();
+        lines.push(line.trim_end().to_owned());
+        at = end;
+        while marks.get(at).is_some_and(|mark| mark.is_whitespace()) {
+            at += 1;
+        }
+    }
+    lines
+}
+
+/// Where the line starting here ends.
+///
+/// The character at the edge is looked at as well as the ones before it, so text
+/// that fills the width exactly and is followed by a space ends where it fills
+/// rather than one word short of it.
+///
+/// A break is only taken at whitespace that has something in front of it. Taking one
+/// at the whitespace a line opens with would end a line that had not started, and
+/// the caller would read the same run forever — so indentation a service wrote
+/// stays with the line it indents.
+fn broken_at(marks: &[char], at: usize, width: usize, overrun: Overrun) -> usize {
+    let edge = at.saturating_add(width).min(marks.len());
+    if edge == marks.len() {
+        return edge;
+    }
+    let window = marks.get(at..=edge).unwrap_or_default();
+    let opens = window.iter().position(|mark| !mark.is_whitespace());
+    match window.iter().rposition(|mark| mark.is_whitespace()) {
+        Some(space) if opens.is_some_and(|first| space > first) => at + space,
+        _ if matches!(overrun, Overrun::Allowed) => marks
+            .iter()
+            .skip(edge)
+            .position(|mark| mark.is_whitespace())
+            .map_or(marks.len(), |past| edge + past),
+        _ => edge,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::plain;
+    use super::{plain, wrapped, Overrun};
 
     #[test]
     fn a_release_name_that_would_clear_the_screen_no_longer_can() {
@@ -96,5 +169,83 @@ mod tests {
     fn text_with_nothing_to_remove_comes_back_as_it_was() {
         assert_eq!(plain(""), "");
         assert_eq!(plain("plain"), "plain");
+    }
+
+    /// The ordinary case, and the one both callers are built on.
+    #[test]
+    fn text_is_broken_at_spaces_and_no_line_runs_past_the_width() {
+        let broken = wrapped("the quick brown fox jumps", 10, Overrun::Broken);
+
+        assert_eq!(broken, ["the quick", "brown fox", "jumps"]);
+        assert!(broken.iter().all(|line| line.chars().count() <= 10));
+    }
+
+    /// Shorter than the width is one line, and nothing at all is no lines.
+    #[test]
+    fn text_that_already_fits_is_left_alone() {
+        assert_eq!(wrapped("short", 40, Overrun::Broken), ["short"]);
+        assert!(wrapped("", 40, Overrun::Broken).is_empty());
+        assert!(wrapped("anything", 0, Overrun::Broken).is_empty());
+    }
+
+    /// A service that lined its own output up with spaces meant them, so what is
+    /// inside a line arrives as it was written.
+    #[test]
+    fn spaces_inside_a_line_survive_the_break() {
+        assert_eq!(
+            wrapped("a  b  c  ddddd", 8, Overrun::Broken),
+            ["a  b  c", "ddddd"]
+        );
+    }
+
+    /// The difference between the two edges, on the one input that tells them
+    /// apart: a run with nothing in it to break at.
+    #[test]
+    fn a_run_with_nothing_to_break_on_answers_to_the_edge_it_was_given() {
+        let path = format!("saw {}", "x".repeat(20));
+
+        assert_eq!(
+            wrapped(&path, 10, Overrun::Allowed),
+            ["saw", &"x".repeat(20)],
+            "a report is re-wrapped by the terminal reading it"
+        );
+        assert_eq!(
+            wrapped(&path, 10, Overrun::Broken),
+            ["saw", &"x".repeat(10), &"x".repeat(10)],
+            "a screen is a grid, and past the edge is not drawn"
+        );
+    }
+
+    /// A run past the edge is kept whole rather than run to the end of the text.
+    #[test]
+    fn an_overrun_that_is_allowed_still_ends_where_the_run_does() {
+        assert_eq!(
+            wrapped(
+                &format!("{} and more", "x".repeat(20)),
+                10,
+                Overrun::Allowed
+            ),
+            ["x".repeat(20), "and more".to_owned()]
+        );
+    }
+
+    /// Leading whitespace has nothing before it to end a line at, and a break taken
+    /// there would take nothing at all.
+    #[test]
+    fn text_that_starts_with_a_space_still_makes_progress() {
+        assert_eq!(
+            wrapped("  abcdefgh", 4, Overrun::Broken),
+            ["  ab", "cdef", "gh"]
+        );
+    }
+
+    /// Width is counted in characters rather than in bytes: a name in another
+    /// script is measured by what a terminal draws, not by what it stores.
+    #[test]
+    fn a_line_is_measured_in_what_a_terminal_draws() {
+        assert_eq!(
+            wrapped("Amélie Amélie Amélie", 13, Overrun::Broken),
+            ["Amélie Amélie", "Amélie"]
+        );
     }
 }
