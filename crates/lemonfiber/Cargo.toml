@@ -60,6 +60,11 @@ lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 # Driving a router without a socket, so what a route answers is checked as a fact
 # rather than by starting a server to ask it.
 tower = { version = "0.5", features = ["util"] }
+# Reading the two declarations the privacy guards check against each other — the
+# resolved dependency graph in `Cargo.lock`, and cargo-deny's ban list. Both are
+# TOML, and a hand-rolled reader for either would be a second opinion about what
+# they say. Already in the tree via the manifest parser.
+toml = { workspace = true }
 
 [lints]
 workspace = true

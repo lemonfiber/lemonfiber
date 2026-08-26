@@ -1,10 +1,20 @@
 //! Every `.rs` file in the workspace, read as text.
 //!
-//! Shared by the two guards that read it: one asks where a name is allowed to
-//! appear, the other asks what the words say. Crawling the tree twice would be two
-//! answers to what this workspace contains, and they would drift.
+//! Shared by the guards that read it: one asks where a name is allowed to appear,
+//! one asks what the words say, and the rest ask what the shipped half reaches.
+//! Crawling the tree twice would be two answers to what this workspace contains,
+//! and they would drift.
+//!
+//! [`shipped`] is the narrower corpus those last ones want, and it lives here for
+//! the same reason: a second crawl deciding for itself what a release contains
+//! would be a second answer to that question too.
 
-use std::collections::BTreeMap;
+// Every test binary that declares this module compiles all of it, and each of them
+// reads the tree its own way — the narrower corpus below is what some of them
+// want and the raw crawl is what the rest do.
+#![allow(dead_code)]
+
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -67,4 +77,74 @@ pub(crate) fn production(text: &str) -> &str {
     let kept = at.saturating_sub(1);
     let taken: usize = text.lines().take(kept).map(|line| line.len() + 1).sum();
     text.get(..taken).unwrap_or(text)
+}
+
+/// The half of every `src/` file that ships, keyed by its path in the workspace.
+pub(crate) fn shipped() -> BTreeMap<String, String> {
+    let all: BTreeMap<String, String> = sources()
+        .into_iter()
+        .map(|(path, text)| (path.to_string_lossy().replace('\\', "/"), text))
+        .filter(|(path, _)| path.contains("/src/"))
+        .collect();
+    let unshipped = only_for_tests(&all);
+    let found: BTreeMap<String, String> = all
+        .iter()
+        .filter(|(path, _)| !unshipped.iter().any(|tree| within(path, tree)))
+        .map(|(path, text)| (path.clone(), production(text).to_owned()))
+        .collect();
+    assert!(
+        found.len() > 10,
+        "the crawl found {} files that ship, which means it is reading the wrong tree",
+        found.len()
+    );
+    assert!(
+        !unshipped.is_empty(),
+        "no module here is declared test-only, which means this is reading the declaration \
+         wrong and is about to hold a fake to a rule meant for what ships"
+    );
+    found
+}
+
+/// The module trees the compiler only builds for tests.
+///
+/// `production` cuts a file's own tests off the bottom. This is the other shape: a
+/// whole module declared behind the test gate, which this workspace uses to keep a
+/// fake beside the code it fakes. Nothing in one of those is compiled into a
+/// release, so holding one to what a release may do reports a fixture.
+fn only_for_tests(all: &BTreeMap<String, String>) -> BTreeSet<String> {
+    let mut trees = BTreeSet::new();
+    for (path, text) in all {
+        let lines: Vec<&str> = text.lines().collect();
+        for pair in lines.windows(2) {
+            let [gate, declared] = pair else { continue };
+            if gate.trim() != "#[cfg(test)]" {
+                continue;
+            }
+            if let Some(name) = module_named(declared) {
+                trees.insert(format!("{}/{name}", path.trim_end_matches(".rs")));
+            }
+        }
+    }
+    trees
+}
+
+/// The module one line declares as a file of its own, where it declares one.
+///
+/// A `mod tests {` opens a block in the file it is written in and is somebody
+/// else's problem; only the form ending in a semicolon names another file.
+fn module_named(line: &str) -> Option<&str> {
+    let declared = line.trim_start();
+    let bare = declared
+        .split_once("mod ")
+        .filter(|(before, _)| before.is_empty() || before.starts_with("pub"))
+        .map(|(_, name)| name)?;
+    bare.strip_suffix(';')
+}
+
+/// Whether a file belongs to a module tree.
+///
+/// A directory tree takes the file that declares it as well as the files inside it:
+/// `fixtures.rs` and `fixtures/` are one module written in two places.
+fn within(path: &str, tree: &str) -> bool {
+    path == format!("{tree}.rs") || path.starts_with(&format!("{tree}/"))
 }

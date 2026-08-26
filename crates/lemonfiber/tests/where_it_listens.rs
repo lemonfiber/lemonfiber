@@ -21,12 +21,12 @@
 //! here; both would be a change to the one function that makes the address, in the
 //! one file this names.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::net::{IpAddr, SocketAddr};
 
 mod source_tree;
 
-use source_tree::{production, sources};
+use source_tree::shipped;
 
 /// The calls that take an address from the operating system, and the call that
 /// serves on what one of them gave.
@@ -86,76 +86,6 @@ struct Named {
     written: String,
     /// Whether it names somewhere only this machine can reach.
     loopback: bool,
-}
-
-/// The half of every `src/` file that ships, keyed by its path in the workspace.
-fn shipped() -> BTreeMap<String, String> {
-    let all: BTreeMap<String, String> = sources()
-        .into_iter()
-        .map(|(path, text)| (path.to_string_lossy().replace('\\', "/"), text))
-        .filter(|(path, _)| path.contains("/src/"))
-        .collect();
-    let unshipped = only_for_tests(&all);
-    let found: BTreeMap<String, String> = all
-        .iter()
-        .filter(|(path, _)| !unshipped.iter().any(|tree| within(path, tree)))
-        .map(|(path, text)| (path.clone(), production(text).to_owned()))
-        .collect();
-    assert!(
-        found.len() > 10,
-        "the crawl found {} files that ship, which means it is reading the wrong tree",
-        found.len()
-    );
-    assert!(
-        !unshipped.is_empty(),
-        "no module here is declared test-only, which means this is reading the declaration \
-         wrong and is about to hold a fake to a rule meant for what ships"
-    );
-    found
-}
-
-/// The module trees the compiler only builds for tests.
-///
-/// `production` cuts a file's own tests off the bottom. This is the other shape: a
-/// whole module declared behind the test gate, which this workspace uses to keep a
-/// fake beside the code it fakes. Nothing in one of those is compiled into a
-/// release, so holding one to what a release may do reports a fixture.
-fn only_for_tests(all: &BTreeMap<String, String>) -> BTreeSet<String> {
-    let mut trees = BTreeSet::new();
-    for (path, text) in all {
-        let lines: Vec<&str> = text.lines().collect();
-        for pair in lines.windows(2) {
-            let [gate, declared] = pair else { continue };
-            if gate.trim() != "#[cfg(test)]" {
-                continue;
-            }
-            if let Some(name) = module_named(declared) {
-                trees.insert(format!("{}/{name}", path.trim_end_matches(".rs")));
-            }
-        }
-    }
-    trees
-}
-
-/// The module one line declares as a file of its own, where it declares one.
-///
-/// A `mod tests {` opens a block in the file it is written in and is somebody
-/// else's problem; only the form ending in a semicolon names another file.
-fn module_named(line: &str) -> Option<&str> {
-    let declared = line.trim_start();
-    let bare = declared
-        .split_once("mod ")
-        .filter(|(before, _)| before.is_empty() || before.starts_with("pub"))
-        .map(|(_, name)| name)?;
-    bare.strip_suffix(';')
-}
-
-/// Whether a file belongs to a module tree.
-///
-/// A directory tree takes the file that declares it as well as the files inside it:
-/// `fixtures.rs` and `fixtures/` are one module written in two places.
-fn within(path: &str, tree: &str) -> bool {
-    path == format!("{tree}.rs") || path.starts_with(&format!("{tree}/"))
 }
 
 /// The text inside double quotes on one line.
