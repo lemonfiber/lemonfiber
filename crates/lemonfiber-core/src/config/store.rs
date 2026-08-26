@@ -13,11 +13,12 @@ use lemonfiber_ports::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// Withholding a credential from text that has no field names to read.
 ///
-/// The rule for prose — an error's detail, a diff of a file, a line quoted back.
-/// Which settings are *displayed*, where there are names to read, is decided by the
+/// The rule for prose — an error's detail, a condition, a line quoted back. Which
+/// settings are *displayed*, where there are names to read, is decided by the
 /// allow-list in [`super::display`] instead: a keyword rule cannot answer about a
-/// name nobody has thought of yet, and that is the name that leaks.
-pub use lemonfiber_ports::withheld::{is_secret, withheld, withheld_text, REDACTED};
+/// name nobody has thought of yet, and that is the name that leaks. A file's line has
+/// names to read, so it goes through `withheld_by` with that same list.
+pub use lemonfiber_ports::withheld::{is_secret, withheld, withheld_by, withheld_text, REDACTED};
 
 /// One setting, as it is safe to display.
 #[derive(Debug, Clone, PartialEq, Eq)]

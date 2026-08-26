@@ -195,17 +195,55 @@ pub fn in_full(name: &str) -> bool {
 /// A value that is allowed through therefore keeps its address and loses its parameters
 /// wholesale — the same call [`crate::bundle::allowed`] makes for the same value, for the
 /// same reason. A query nobody reads is a smaller loss than a key everybody can.
+///
+/// Kept with the rest of the withholding rather than here, because the same address
+/// reaches an operator three ways — displayed, kept on a transport failure, and quoted
+/// inside a sentence somebody else wrote — and a second copy of the rule is a second
+/// place for it to be right in.
+pub use lemonfiber_ports::withheld::without_query;
+
+/// Whether a line of a settings file may be shown with its value.
+///
+/// The door a file's line goes through, so that a value withheld at `/api/config` is
+/// withheld in a drift diff of the same file too. Which is not what happened: the diff
+/// read names against the marker list, so `OPENVPN_USER` — a provider's account number,
+/// carrying no word any keyword rule knows — was printed in one field of a run that
+/// withheld it in another.
+///
+/// Two languages meet in these files, and the shape of a name says which one it is
+/// written in. An environment setting shouts: every name in a `.env` file and in a
+/// Compose `environment:` block is upper case, and those are the names the allow-list is
+/// about, so the allow-list answers for them. Compose's own schema is lower case
+/// throughout — `image`, `network_mode`, `depends_on` — and those are structure rather
+/// than settings, with no list that could vouch for them; the marker rule answers there,
+/// as it did before, so a diff of the lines an operator actually edits still reads as a
+/// diff.
+///
+/// What this costs is the allow-list's usual cost, in the place it is least felt: a
+/// Compose environment line naming a setting nobody has argued for shows `(set, not
+/// shown)` on both sides. What it buys is that the credential nobody thought of is
+/// withheld there before anybody thinks of it.
 #[must_use]
-pub fn without_query(value: &str) -> String {
-    match value.split_once('?') {
-        None => value.to_owned(),
-        Some((address, _)) => format!("{address}?{}", super::store::REDACTED),
+pub fn shown_in_a_file(name: &str) -> bool {
+    let name = name.trim();
+    if shouts(name) {
+        return in_full(name);
     }
+    !super::store::is_secret(name)
+}
+
+/// Whether a name is written the way an environment setting is written.
+///
+/// Upper case, and holding a letter to be upper case about — `PUID`, `OPENVPN_USER`,
+/// `UN_SONARR_0_URL`. A name with a lower-case letter in it is Compose's own vocabulary
+/// and not a setting this list has an opinion about.
+fn shouts(name: &str) -> bool {
+    name.chars().any(char::is_alphabetic) && !name.chars().any(char::is_lowercase)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{in_full, without_query, SHOWN};
+    use super::{in_full, shown_in_a_file, without_query, SHOWN};
 
     #[test]
     fn a_setting_on_the_list_is_displayed_and_one_beside_it_is_not() {
@@ -232,6 +270,23 @@ mod tests {
         ] {
             assert!(!in_full(name), "{name} is displayed and nobody said why");
         }
+    }
+
+    #[test]
+    fn a_files_line_is_read_against_the_list_only_where_its_name_is_a_setting() {
+        // An environment setting shouts, and the list answers for it — including for
+        // the account number no marker word names, which is the case the list exists
+        // for and the case a diff of the same file used to print.
+        assert!(!shown_in_a_file("OPENVPN_USER"));
+        assert!(!shown_in_a_file("SONARR_API_KEY"));
+        assert!(shown_in_a_file("DATA_ROOT"));
+        assert!(shown_in_a_file("  TZ  "));
+        // Compose's own schema is lower case throughout, and no list vouches for it.
+        // The marker rule answers there, as it did before, so a diff of the lines an
+        // operator actually edits still reads as a diff.
+        assert!(shown_in_a_file("image"));
+        assert!(shown_in_a_file("network_mode"));
+        assert!(!shown_in_a_file("api_key"));
     }
 
     #[test]

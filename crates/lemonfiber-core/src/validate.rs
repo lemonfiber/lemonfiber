@@ -94,6 +94,38 @@ pub enum Validation {
     },
 }
 
+impl Validation {
+    /// The same outcome with any credential in it withheld.
+    ///
+    /// What a service says when it refuses a credential is said with the credential in
+    /// hand — an indexer quotes the key back inside its own `description`, and that
+    /// sentence is carried here verbatim. The outcome is serialised into
+    /// [`crate::model::WizardReport`] during first-run setup, which is the moment those
+    /// credentials are being entered, and printed to a terminal by the prompt beside it.
+    ///
+    /// Safe to apply twice: the marker is recognised where a value would be, so a
+    /// detail that has already been through the rule comes back unchanged rather than
+    /// half-withheld again.
+    #[must_use]
+    pub fn withheld(self) -> Self {
+        let said = |text: String| crate::config::store::withheld_text(&text);
+        match self {
+            Self::Valid { observed } => Self::Valid {
+                observed: said(observed),
+            },
+            Self::Rejected { detail } => Self::Rejected {
+                detail: said(detail),
+            },
+            Self::Unreachable { detail } => Self::Unreachable {
+                detail: said(detail),
+            },
+            Self::Degraded { detail } => Self::Degraded {
+                detail: said(detail),
+            },
+        }
+    }
+}
+
 /// Proves credentials against their live services.
 ///
 /// A port, so the setup wizard drives it in a test through a scripted outcome with
@@ -248,7 +280,7 @@ use reading::{interpret_indexer, interpret_service, interpret_usenet, persisting
 #[async_trait]
 impl Validator for Live {
     async fn validate(&self, credential: &Credential) -> Validation {
-        match credential {
+        let came_to = match credential {
             Credential::Indexer { url, key } => self.indexer(url, key).await,
             Credential::Service { url, key } => self.service(url, key).await,
             Credential::Usenet {
@@ -258,7 +290,12 @@ impl Validator for Live {
                 user,
                 pass,
             } => self.usenet(host, *port, *secure, user, pass).await,
-        }
+        };
+        // Withheld as the service's words cross into the model, which is the one point
+        // every one of them passes. What reads an outcome afterwards — a report that is
+        // serialised to a caller, a prompt that prints it to a terminal — is reading text
+        // the rule has already been applied to rather than remembering to apply it.
+        came_to.withheld()
     }
 }
 
@@ -285,6 +322,24 @@ mod tests {
             url: "http://indexer.test/api".to_owned(),
             key: "abc".to_owned(),
         }
+    }
+
+    #[tokio::test]
+    async fn what_an_indexer_says_about_a_key_comes_back_without_the_key_in_it() {
+        // An indexer refuses in its own words, with the key it was given in hand, and
+        // those words are carried into the outcome verbatim. The outcome is serialised
+        // into the wizard's report during first-run setup — the minutes in which the
+        // key is being entered — and printed to a terminal beside it.
+        let key = ["the", "indexer", "key"].join("-");
+        let body = format!("<error code=\"100\" description=\"apikey={key} has expired\"/>");
+
+        let outcome = format!("{:?}", answering(&body).validate(&indexer()).await);
+
+        assert!(!outcome.contains(&key), "{outcome}");
+        // And the reason survives, which is the whole of what the operator is given:
+        // a refusal with its refusal withheld says only that something went wrong.
+        assert!(outcome.contains("the indexer refused the key"), "{outcome}");
+        assert!(outcome.contains("has expired"), "{outcome}");
     }
 
     #[tokio::test]

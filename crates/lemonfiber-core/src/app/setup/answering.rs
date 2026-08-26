@@ -145,7 +145,11 @@ fn open(saved: Option<&Progress>, paths: &Paths) -> bool {
 fn reported(wizard: &Wizard, paths: &Paths, proof: Option<Validation>) -> WizardReport {
     let saved = super::progress_at(&paths.setup_progress());
     WizardReport {
-        proof,
+        // Withheld here as well as where the outcome was made, because a validator is a
+        // port and whoever supplies one decides what it says. This is first-run setup —
+        // the minutes in which the credentials are entered — and what it answers is
+        // serialised to a caller that may log it.
+        proof: proof.map(Validation::withheld),
         written: if wizard.phase() == Phase::Applying {
             super::written_so_far(paths)
         } else {
@@ -682,6 +686,46 @@ mod tests {
                 && !rendered.contains(&withheld_value("provider")),
             "neither reaches anything a caller could log: {rendered}"
         );
+    }
+
+    #[tokio::test]
+    async fn what_a_service_said_about_a_credential_is_reported_without_the_credential() {
+        // An indexer refuses with the key it was given in hand, and setup is where that
+        // key is being entered. What the service said is reported back, and the report
+        // is serialised to a caller that may log it.
+        let paths = scratch("proof");
+        let said = format!(
+            "the indexer refused the key: apikey={} has expired",
+            withheld_value("indexer")
+        );
+        let context = proving(
+            &paths,
+            Arc::new(Saying(Validation::Rejected { detail: said })),
+        );
+        assert!(setting_up(
+            &context,
+            SetupAction::Answer(Answer::Protocols(Protocols::both()))
+        )
+        .await
+        .is_ok());
+
+        let report = walked(&context, SetupAction::Answer(an_indexer(true))).await;
+        let rendered = report
+            .as_ref()
+            .and_then(|report| serde_json::to_string(report).ok())
+            .unwrap_or_default();
+
+        assert!(
+            !rendered.contains(&withheld_value("indexer")),
+            "the key reaches a caller that may log it: {rendered}"
+        );
+        // And what the operator is deciding on survives. A refusal whose reason has
+        // been withheld says only that something went wrong.
+        assert!(
+            rendered.contains("the indexer refused the key"),
+            "and the reason it was refused does not: {rendered}"
+        );
+        assert!(rendered.contains("has expired"), "{rendered}");
     }
 
     #[tokio::test]
