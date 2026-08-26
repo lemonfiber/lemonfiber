@@ -60,8 +60,14 @@ const HEADING: &str = "## The table";
 /// Where the page states what its rows add up to.
 const SUMMARY: &str = "## What the table adds up to";
 
-/// What the web column may say that is not an action or a route.
-const WEB_WORDS: [&str; 3] = ["none", "intrinsic", "partial"];
+/// What either column may say that is not something it names.
+///
+/// Three verdicts, shared, because the two columns are counted the same way: a row
+/// that names a thing and adds none of these reaches the request in full, and one
+/// carrying `partial` reaches it in part. The web column may also name an action or
+/// a route and the terminal column a screen, which is the only difference between
+/// them and is why each still has its own list of the words it may name.
+const VERDICTS: [&str; 3] = ["none", "intrinsic", "partial"];
 
 /// What the terminal column may say.
 ///
@@ -201,7 +207,7 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
 
     let full = counted
         .iter()
-        .filter(|row| !tokens(&row.web).iter().any(|word| WEB_WORDS.contains(word)))
+        .filter(|row| !tokens(&row.web).iter().any(|word| VERDICTS.contains(word)))
         .count();
     let partial = counted
         .iter()
@@ -209,6 +215,22 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         .count();
     let none = counted.iter().filter(|row| row.web == "none").count();
     let silent = counted.iter().filter(|row| row.terminal == "none").count();
+    // The same three counts down the other column. It had only the one that says how
+    // many requests reach no screen at all, which reached zero — so a column with
+    // seventeen rows still losing an argument each read as finished, and every slice
+    // closing one of them moved a figure nothing was reading.
+    let reached = counted
+        .iter()
+        .filter(|row| {
+            !tokens(&row.terminal)
+                .iter()
+                .any(|word| VERDICTS.contains(word))
+        })
+        .count();
+    let short = counted
+        .iter()
+        .filter(|row| tokens(&row.terminal).contains(&QUALIFIER))
+        .count();
     let intrinsic = counted
         .iter()
         .filter(|row| tokens(&row.web).contains(&"intrinsic"))
@@ -251,6 +273,19 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         (none, "do not reach it at all", "does not reach it at all"),
         (partial + none, "gaps", "gap"),
         (silent, "have no terminal form", "has no terminal form"),
+        // Named for the column rather than said of it, so neither can satisfy the
+        // web's own two: `reach the terminal in part` does not contain `reach it in
+        // part`, which is the substring the row above but one is looked for by.
+        (
+            reached,
+            "reach the terminal in full",
+            "reaches the terminal in full",
+        ),
+        (
+            short,
+            "reach the terminal in part",
+            "reaches the terminal in part",
+        ),
     ] {
         let said = spelled(number);
         let what = if number == 1 { one } else { many };
@@ -498,7 +533,7 @@ fn path_of(argument: &str, source: &str) -> Option<String> {
 fn every_cell_speaks_the_vocabulary_and_carries_its_reason() {
     let mut wrong: Vec<String> = Vec::new();
     for row in rows() {
-        check(&row.request, "web", &row.web, &WEB_WORDS, true, &mut wrong);
+        check(&row.request, "web", &row.web, &VERDICTS, true, &mut wrong);
         check(
             &row.request,
             "terminal",

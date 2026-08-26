@@ -41,7 +41,7 @@ use lemonfiber_core::app::Command;
 use lemonfiber_core::walkthrough::Line as Step;
 
 use super::chooser::{Chooser, Listed};
-use super::offer::Choice;
+use super::offer::{Choice, Over, Taken};
 use super::reading::{moved, Reading};
 use super::{Asked, Press, Stage, Wanted};
 use crate::render::walkthrough::{is_worth_saying, spoken};
@@ -133,8 +133,8 @@ impl Listed for Lasting {
 pub(super) enum Begun {
     /// What a walk was asked to look for, which is empty where nothing was named.
     Looked(String),
-    /// The form a guard was chosen for, and what guarding it comes to.
-    Chosen(Choice),
+    /// The forms a guard was chosen for, and what guarding them comes to.
+    Chosen(Taken),
 }
 
 /// The two, the one the list opens on apart from the rest.
@@ -224,27 +224,30 @@ pub(super) fn wording(
     Wanted::Nothing
 }
 
-/// Over the forms a guard could be given: move, take one, or leave it.
+/// Over the forms a guard could be given: move, mark, take, or leave it.
+///
+/// The same movement an action's own subjects are chosen with, because it is the same
+/// list — the stack's own forms, offered to the same translation. A guard named
+/// several is one guard over several forms, which is what the command line has always
+/// taken and what a browser sends whole.
 pub(super) fn picking(
     stage: &mut Stage,
     lasting: &'static Lasting,
-    mut chooser: Chooser<Choice>,
+    chooser: Chooser<Choice>,
     press: &Press,
 ) -> Wanted {
-    match *press {
-        Press::Abandon => return Wanted::Nothing,
-        Press::Accept => {
-            *stage = Stage::Beginning {
-                lasting,
-                begun: Begun::Chosen(chooser.taken()),
-            };
-            return Wanted::Nothing;
+    match super::offer::over(lasting.action, chooser, press) {
+        Over::Left => (),
+        Over::Choosing(chooser) => *stage = Stage::Picking { lasting, chooser },
+        Over::Taken(taken) => {
+            if let Some(taken) = super::offer::or_refused(stage, taken) {
+                *stage = Stage::Beginning {
+                    lasting,
+                    begun: Begun::Chosen(taken),
+                };
+            }
         }
-        Press::Back => chooser.back(),
-        Press::Forward => chooser.forward(),
-        Press::Typed(_) | Press::Rubout => (),
     }
-    *stage = Stage::Picking { lasting, chooser };
     Wanted::Nothing
 }
 
@@ -263,9 +266,9 @@ pub(super) fn beginning(
         return Wanted::Nothing;
     }
     match begun {
-        Begun::Chosen(chosen) => {
-            let command = chosen.command.clone();
-            keep(stage, lasting, chosen.name, command)
+        Begun::Chosen(taken) => {
+            let command = taken.command.clone();
+            keep(stage, lasting, taken.name(), command)
         }
         Begun::Looked(typed) => match named(lasting.action, looking(&typed)) {
             Ok(command) => keep(stage, lasting, typed, command),

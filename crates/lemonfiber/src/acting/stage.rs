@@ -23,7 +23,7 @@
 use super::chooser::Chooser;
 use super::errand::Errand;
 use super::lasting::{Begun, Lasting};
-use super::offer::{Choice, Offer};
+use super::offer::{Choice, Offer, Taken};
 use super::quality::{Change, Grade};
 use super::question::Question;
 use super::reading::Reading;
@@ -43,15 +43,15 @@ pub(super) enum Stage {
     Confirming {
         /// The action about to be taken.
         offer: &'static Offer,
-        /// What it is about to be taken on.
-        chosen: Choice,
+        /// What it is about to be taken on: one subject, or the forms marked together.
+        taken: Taken,
     },
     /// The action is with the core.
     Running {
         /// The action that is running.
         offer: &'static Offer,
         /// What it is running on.
-        chosen: Choice,
+        taken: Taken,
     },
     /// What it came to, until it is put away.
     Came(Reading),
