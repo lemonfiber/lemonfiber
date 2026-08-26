@@ -887,8 +887,17 @@ mod tests {
         action: Option<&str>,
         token: Option<&str>,
     ) -> Option<u16> {
+        answering(surface, asking(action, token)).await
+    }
+
+    /// The same, for a request a caller built itself.
+    ///
+    /// The one place a surface that was never built is answered for, so a test
+    /// asking about a path rather than an action does not carry a second arm for
+    /// the case only one test reaches.
+    async fn answering(surface: Option<Router>, request: Request) -> Option<u16> {
         match surface {
-            Some(surface) => tower::ServiceExt::oneshot(surface, asking(action, token))
+            Some(surface) => tower::ServiceExt::oneshot(surface, request)
                 .await
                 .ok()
                 .map(|response| response.status().as_u16()),
@@ -936,5 +945,39 @@ mod tests {
         // a surface whose token could not be minted is one every request reaches.
         let unguarded = as_served(&Chance::exactly(None));
         assert_eq!(met(unguarded, Some("up"), None).await, None);
+    }
+
+    /// A path with no route under it is answered by the app, not by the guard.
+    ///
+    /// Asked of the whole surface rather than of `router::routes`, which is the
+    /// difference that matters: the endpoints are merged *under* the app's
+    /// fallback, axum keeps one fallback per tree, and so the guarded one is not
+    /// the one that answers. Every test beside this one asks for a path that has a
+    /// route, where the guard does wrap — which is how the router's own account of
+    /// itself stayed wrong through the change that made it wrong.
+    ///
+    /// So an unauthenticated caller can tell a path that exists from one that does
+    /// not. That is written down where it is true now; this holds the surface to
+    /// it, and will fail if the composition changes in either direction.
+    #[tokio::test]
+    async fn a_path_no_route_declares_is_an_absence_rather_than_a_refusal() {
+        let mut request = Request::new(Body::empty());
+        *request.uri_mut() = "/api/nothing-declares-this".parse().unwrap_or_default();
+        request
+            .headers_mut()
+            .insert("host", HeaderValue::from_static("127.0.0.1:8471"));
+
+        assert_eq!(
+            answering(working(), request).await,
+            Some(StatusCode::NOT_FOUND.as_u16()),
+            "an unmatched path under `/api/` is an absence"
+        );
+        // And the same run refuses a path that does have a route, so the two are
+        // told apart by a caller carrying no token at all.
+        assert_eq!(
+            met(working(), Some("up"), None).await,
+            Some(StatusCode::FORBIDDEN.as_u16()),
+            "while a path that has one is refused"
+        );
     }
 }
