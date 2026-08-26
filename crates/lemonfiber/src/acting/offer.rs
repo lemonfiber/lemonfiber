@@ -14,13 +14,36 @@
 //! because the guard behind [`super::lasting`]'s own key is given one of the stack's
 //! forms in exactly the same way and refuses the whole stack for exactly the same
 //! reason.
+//!
+//! **The list names several.** The command line takes a list of forms and a browser
+//! sends one whole; this list took one, and that was the last thing four of these
+//! actions and the guard were short of. A row is marked with [`MARKS`] and the marked
+//! rows are what enter takes — and where none is marked, enter takes the row under
+//! the cursor, which is what this list has always done. An operator who never presses
+//! the new key sees the screen they saw before it existed.
+//!
+//! **Naming nothing is not a state this reaches.** The cursor is always on a row, so
+//! an empty list of forms reaches the core only from the row that says `everything` —
+//! and that row is offered only where the translation carries one. The two actions
+//! that read an empty list as the whole stack and the three that refuse it therefore
+//! stay exactly as far apart on this screen as they are in the table both are asked
+//! of, rather than being blurred into one keypress that means two things.
 
 use lemonfiber_api::actions::{named, Arguments};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::model::FormsReport;
+use lemonfiber_core::plural::s;
 
 use super::chooser::{Chooser, Listed};
+use super::reading::Reading;
 use super::{Asked, Press, Stage, Wanted};
+
+/// The character that marks the row under the cursor, and takes the mark off again.
+///
+/// Space, which is what marks a row on every list anybody has met that takes several.
+/// It is free on this screen: every other key here is a letter, and a list has never
+/// had anything to do with one.
+const MARKS: char = ' ';
 
 /// What the whole stack is called where it is one of the choices.
 const WHOLE: &str = "everything";
@@ -89,7 +112,15 @@ pub(crate) struct Choice {
     pub(crate) name: String,
     /// What it is for, in one line.
     pub(crate) about: String,
-    /// The command acting on it comes to.
+    /// The forms naming it names, which is empty where it is the whole stack.
+    ///
+    /// Kept beside the command rather than read back out of it: several of these are
+    /// taken together by joining what each names, and a list assembled by taking a
+    /// command apart again would be this screen deciding what a command means.
+    pub(crate) forms: Vec<String>,
+    /// Whether it is one of the several this action is about to be given.
+    pub(crate) marked: bool,
+    /// The command acting on it alone comes to.
     pub(crate) command: Command,
 }
 
@@ -100,6 +131,34 @@ impl Listed for Choice {
 
     fn about(&self) -> &str {
         &self.about
+    }
+
+    fn marked(&self) -> Option<bool> {
+        Some(self.marked)
+    }
+}
+
+/// What an action is about to be taken on: the row under the cursor, or every row
+/// marked.
+pub(crate) struct Taken {
+    /// The rows it covers, in the order the list offered them. Never empty.
+    pub(crate) covers: Vec<Choice>,
+    /// The command acting on them comes to.
+    pub(crate) command: Command,
+}
+
+impl Taken {
+    /// What it is called: the one name, or how many forms were named together.
+    ///
+    /// A count where there are several, because this is what the footer says while
+    /// the work runs and what the line on the way out says — one row, on a screen
+    /// whose width belongs to the panels behind it. The names themselves are said
+    /// where there is room for them, which is the question asked before it runs.
+    pub(crate) fn name(&self) -> String {
+        match self.covers.as_slice() {
+            [only] => only.name.clone(),
+            several => format!("{} form{}", several.len(), s(several.len())),
+        }
     }
 }
 
@@ -127,13 +186,15 @@ pub(super) fn choices(action: &str, report: &FormsReport) -> Result<(Choice, Vec
     let mut refused = String::new();
     for (forms, name, about) in subjects(report) {
         let asked = Arguments {
-            forms,
+            forms: forms.clone(),
             ..Arguments::default()
         };
         match named(action, asked) {
             Ok(command) => choices.push(Choice {
                 name,
                 about,
+                forms,
+                marked: false,
                 command,
             }),
             Err(no) => refused = no.said(),
@@ -159,27 +220,102 @@ pub(super) fn begin(asked: &mut Option<Asked>, key: char) -> Wanted {
     Wanted::Ask(Command::Forms)
 }
 
-/// Over the list: move, take one, or leave it.
+/// Mark the row under the cursor, or take the mark off it.
+///
+/// The whole stack is *instead of* naming forms rather than one more of them, so
+/// marking it takes the marks off the forms and marking a form takes the mark off it.
+/// Nothing else would be honest: what the two together would send is what the whole
+/// stack alone would send, and a list showing both marked would be naming something
+/// the action was not about to be given. The marks move where the operator can watch
+/// them move, which is the whole of how that rule is taught.
+fn marking(chooser: &mut Chooser<Choice>) {
+    let whole = chooser
+        .listed()
+        .any(|(here, choice)| here && choice.forms.is_empty());
+    for (here, choice) in chooser.each() {
+        if here {
+            choice.marked = !choice.marked;
+        } else if whole || choice.forms.is_empty() {
+            choice.marked = false;
+        }
+    }
+}
+
+/// What the list comes to when it is taken: every row marked, or the row under the
+/// cursor where none is.
+///
+/// Several go through the translation exactly as one does, over the forms the marked
+/// rows name joined together — so a list the command will not carry is refused in the
+/// words a browser is refused with rather than in a sentence written here, and the
+/// screen still cannot ask for something no other surface can ask for.
+fn taking(action: &str, chooser: Chooser<Choice>) -> Result<Taken, String> {
+    if !chooser.listed().any(|(_, choice)| choice.marked) {
+        let chosen = chooser.taken();
+        return Ok(Taken {
+            command: chosen.command.clone(),
+            covers: vec![chosen],
+        });
+    }
+    let covers: Vec<Choice> = chooser
+        .all()
+        .into_iter()
+        .filter(|choice| choice.marked)
+        .collect();
+    let asked = Arguments {
+        forms: covers
+            .iter()
+            .flat_map(|choice| choice.forms.clone())
+            .collect(),
+        ..Arguments::default()
+    };
+    named(action, asked)
+        .map(|command| Taken { covers, command })
+        .map_err(|no| no.said())
+}
+
+/// What a press over a list of the stack's own forms came to.
+///
+/// Two lists are made of these — the five actions on keys of their own, and the guard
+/// behind the key that opens what keeps going — and they move, mark and take
+/// identically. One movement rather than a copy beside each, because the day the two
+/// stopped being one is the day the screen behaved differently depending on which key
+/// opened it. What each of them does with what was taken is its own, which is why this
+/// answers with the outcome rather than setting a stage.
+pub(super) enum Over {
+    /// Still choosing, and the list as it now stands.
+    Choosing(Chooser<Choice>),
+    /// Taken, and what it comes to.
+    Taken(Result<Taken, String>),
+    /// Left, with nothing taken.
+    Left,
+}
+
+/// Over a list of the stack's own forms: move, mark, take, or leave it.
+pub(super) fn over(action: &str, mut chooser: Chooser<Choice>, press: &Press) -> Over {
+    match *press {
+        Press::Abandon => return Over::Left,
+        Press::Accept => return Over::Taken(taking(action, chooser)),
+        Press::Back => chooser.back(),
+        Press::Forward => chooser.forward(),
+        Press::Typed(MARKS) => marking(&mut chooser),
+        Press::Typed(_) | Press::Rubout => (),
+    }
+    Over::Choosing(chooser)
+}
+
+/// Over the list: move, mark, take, or leave it.
 pub(super) fn choosing(
     stage: &mut Stage,
     offer: &'static Offer,
-    mut chooser: Chooser<Choice>,
+    chooser: Chooser<Choice>,
     press: &Press,
 ) -> Wanted {
-    match *press {
-        Press::Abandon => return Wanted::Nothing,
-        Press::Accept => {
-            *stage = Stage::Confirming {
-                offer,
-                chosen: chooser.taken(),
-            };
-            return Wanted::Nothing;
-        }
-        Press::Back => chooser.back(),
-        Press::Forward => chooser.forward(),
-        Press::Typed(_) | Press::Rubout => (),
+    match over(offer.action, chooser, press) {
+        Over::Left => (),
+        Over::Choosing(chooser) => *stage = Stage::Choosing { offer, chooser },
+        Over::Taken(Ok(taken)) => *stage = Stage::Confirming { offer, taken },
+        Over::Taken(Err(refused)) => *stage = Stage::Came(Reading::of(vec![refused])),
     }
-    *stage = Stage::Choosing { offer, chooser };
     Wanted::Nothing
 }
 
@@ -191,14 +327,14 @@ pub(super) fn choosing(
 pub(super) fn confirming(
     stage: &mut Stage,
     offer: &'static Offer,
-    chosen: Choice,
+    taken: Taken,
     press: &Press,
 ) -> Wanted {
     if !matches!(*press, Press::Typed('y' | 'Y')) {
         return Wanted::Nothing;
     }
-    let command = chosen.command.clone();
-    *stage = Stage::Running { offer, chosen };
+    let command = taken.command.clone();
+    *stage = Stage::Running { offer, taken };
     Wanted::Carry(command)
 }
 
@@ -210,10 +346,10 @@ pub(super) fn confirming(
 pub(super) fn running(
     stage: &mut Stage,
     offer: &'static Offer,
-    chosen: Choice,
+    taken: Taken,
     press: &Press,
 ) -> Wanted {
-    *stage = Stage::Running { offer, chosen };
+    *stage = Stage::Running { offer, taken };
     if super::leaving(press) {
         return Wanted::Leave;
     }
@@ -238,7 +374,10 @@ fn subjects(report: &FormsReport) -> Vec<(Vec<String>, String, String)> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{for_key, subjects, Choice, OFFERED, WHOLE};
+    use super::{
+        for_key, marking, over, subjects, taking, Choice, Chooser, Command, Over, Press, OFFERED,
+        WHOLE,
+    };
     use lemonfiber_api::actions::{named, Arguments, OFFERED as WEB};
     use lemonfiber_core::model::{FormReport, FormsReport};
 
@@ -265,6 +404,175 @@ pub(crate) mod tests {
     /// A stack that declares no forms at all.
     pub(crate) fn nothing_declared() -> FormsReport {
         FormsReport { forms: Vec::new() }
+    }
+
+    /// One form, as a row of the list holds it.
+    fn a_form(id: &str) -> Choice {
+        Choice {
+            name: format!("{id} stack"),
+            about: format!("what {id} is for"),
+            forms: vec![id.to_owned()],
+            marked: false,
+            command: Command::Pull {
+                forms: vec![id.to_owned()],
+            },
+        }
+    }
+
+    /// The whole stack, which is the one row of the list that names no form.
+    fn the_whole_stack() -> Choice {
+        Choice {
+            name: WHOLE.to_owned(),
+            about: super::EVERY_FORM.to_owned(),
+            forms: Vec::new(),
+            marked: false,
+            command: Command::Up { forms: Vec::new() },
+        }
+    }
+
+    /// The list an action that can mean everything is given: the whole stack, then
+    /// two forms.
+    fn a_list() -> Chooser<Choice> {
+        Chooser::over(the_whole_stack(), vec![a_form("full"), a_form("lean")])
+    }
+
+    /// Which rows are marked, read off the list the screen is given rather than off
+    /// a field, so what is asserted is what an operator would see marked.
+    fn marked(chooser: &Chooser<Choice>) -> Vec<String> {
+        chooser
+            .listed()
+            .filter(|(_, choice)| choice.marked)
+            .map(|(_, choice)| choice.name.clone())
+            .collect()
+    }
+
+    /// The list with the cursor moved to the row of this name.
+    ///
+    /// Back to the top first and then down, because the cursor may be below the row
+    /// being looked for and a walk that only goes one way would stop on whatever it
+    /// ended on — which is a mark put on the wrong row, silently.
+    fn at(mut chooser: Chooser<Choice>, name: &str) -> Chooser<Choice> {
+        for _ in 0..3 {
+            chooser.back();
+        }
+        for _ in 0..3 {
+            if chooser
+                .listed()
+                .any(|(here, choice)| here && choice.name == name)
+            {
+                break;
+            }
+            chooser.forward();
+        }
+        chooser
+    }
+
+    /// Space marks the row under the cursor, and space again takes the mark off.
+    /// Both from the same key, because a mark nobody can undo is a mark somebody has
+    /// to abandon the whole list to escape.
+    #[test]
+    fn the_row_under_the_cursor_is_marked_and_unmarked_by_the_same_key() {
+        let mut chooser = at(a_list(), "full stack");
+
+        marking(&mut chooser);
+        assert_eq!(marked(&chooser), vec!["full stack".to_owned()]);
+
+        marking(&mut chooser);
+        assert!(marked(&chooser).is_empty(), "{:?}", marked(&chooser));
+    }
+
+    /// The whole stack is *instead of* naming forms rather than one more of them.
+    /// What the two together would send is what the whole stack alone would send, so
+    /// a list showing both marked would be naming something it was not about to send.
+    #[test]
+    fn the_whole_stack_and_a_form_are_never_marked_together() {
+        let mut chooser = at(a_list(), "full stack");
+        marking(&mut chooser);
+        let mut chooser = at(chooser, WHOLE);
+
+        marking(&mut chooser);
+        assert_eq!(marked(&chooser), vec![WHOLE.to_owned()]);
+
+        let mut chooser = at(chooser, "lean stack");
+        marking(&mut chooser);
+        assert_eq!(marked(&chooser), vec!["lean stack".to_owned()]);
+    }
+
+    /// Several marked forms go to the translation as one list, and come back as the
+    /// one command the command line produces for the same request — rather than as
+    /// several commands this screen would have to decide the order of.
+    #[test]
+    fn several_marked_forms_reach_one_command_over_all_of_them() {
+        let mut chooser = at(a_list(), "full stack");
+        marking(&mut chooser);
+        let mut chooser = at(chooser, "lean stack");
+        marking(&mut chooser);
+
+        let taken = taking("pull", chooser).ok();
+
+        assert_eq!(
+            taken.as_ref().map(|taken| taken.command.clone()),
+            named(
+                "pull",
+                Arguments {
+                    forms: vec!["full".to_owned(), "lean".to_owned()],
+                    ..Arguments::default()
+                }
+            )
+            .ok()
+        );
+        assert_eq!(taken.map(|taken| taken.name()), Some("2 forms".to_owned()));
+    }
+
+    /// Nothing marked is the list this screen has always had: enter takes the row
+    /// under the cursor. An operator who never presses the new key gets the screen
+    /// they had before it existed.
+    #[test]
+    fn nothing_marked_takes_the_row_under_the_cursor() {
+        let taken = taking("pull", at(a_list(), "lean stack")).ok();
+
+        assert_eq!(
+            taken.as_ref().map(|taken| taken.command.clone()),
+            Some(Command::Pull {
+                forms: vec!["lean".to_owned()]
+            })
+        );
+        assert_eq!(
+            taken.map(|taken| taken.name()),
+            Some("lean stack".to_owned())
+        );
+    }
+
+    /// A list the translation will not carry is refused in the words the web surface
+    /// gives, rather than being swallowed on the way to a command. Nothing on this
+    /// screen can reach it — every action here is one the table knows, which the test
+    /// above this file's list already holds — and it is the second place a refusal
+    /// can arrive, so it answers the same way the first does.
+    #[test]
+    fn a_list_the_translation_refuses_is_refused_in_its_own_words() {
+        let mut chooser = at(a_list(), "full stack");
+        marking(&mut chooser);
+
+        let refused = taking("nonsense", chooser).err().unwrap_or_default();
+
+        assert!(refused.contains("nonsense"), "{refused}");
+    }
+
+    /// Space reaches the marking, enter reaches the taking, and escape leaves the
+    /// list with nothing taken — the three things a press over this list can be.
+    #[test]
+    fn a_press_over_the_list_marks_takes_or_leaves_it() {
+        let marked = match over("pull", at(a_list(), "full stack"), &Press::Typed(' ')) {
+            Over::Choosing(chooser) => marked(&chooser),
+            Over::Taken(_) | Over::Left => Vec::new(),
+        };
+        assert_eq!(marked, vec!["full stack".to_owned()]);
+
+        let taken = over("pull", at(a_list(), "full stack"), &Press::Accept);
+        assert!(matches!(taken, Over::Taken(Ok(_))));
+
+        let left = over("pull", a_list(), &Press::Abandon);
+        assert!(matches!(left, Over::Left));
     }
 
     /// What one action can be given over this listing.

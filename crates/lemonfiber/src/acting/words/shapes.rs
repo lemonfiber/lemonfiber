@@ -26,8 +26,25 @@ const TYPING: &str = "enter asks   esc leaves it";
 /// How a reading is moved through, and how it is put away.
 const MOVING: &str = "up and down move   any other key closes";
 
-/// How to move over the list, and how to leave it.
-const CHOOSING: &str = "up and down choose   enter goes on   esc leaves it";
+/// How the cursor is moved over a list, whatever the list takes.
+const OVER: &str = "up and down choose";
+
+/// How a list is left, whatever it takes.
+const AWAY: &str = "esc leaves it";
+
+/// How a row is marked on a list that can take several.
+const MARKS: &str = "space marks";
+
+/// A row that has been marked to be taken with the others.
+const MARKED: &str = "[x]";
+
+/// A row on the same list that has not been.
+///
+/// An empty box rather than an empty column: what it says is that this row *can* be
+/// marked and is not, which is the whole of what an operator needs to learn about a
+/// key nobody told them existed. A blank there would read as a row that takes no mark
+/// at all.
+const UNMARKED: &str = "[ ]";
 
 /// How the question before something that changes the stack is answered.
 ///
@@ -66,20 +83,72 @@ pub(super) fn choosing<T: Listed>(
         ));
     }
     lines.push(Line::raw(""));
-    lines.push(dimmed(CHOOSING, across));
+    lines.push(dimmed(&hint(marks(chooser)), across));
     lines
 }
 
-/// One entry: its name, and what it is for beside it.
+/// How many rows are marked, or nothing where this list takes one.
+///
+/// Read off the entries rather than handed in, because whether a list takes several
+/// is a fact about what is on it: a question and an errand cannot be taken together
+/// and say so by having nowhere to put a mark.
+fn marks<T: Listed>(chooser: &Chooser<T>) -> Option<usize> {
+    let mut marked = None;
+    for (_, entry) in chooser.listed() {
+        if let Some(here) = entry.marked() {
+            marked = Some(marked.unwrap_or(0) + usize::from(here));
+        }
+    }
+    marked
+}
+
+/// What the line under a list says, which is what enter would do.
+///
+/// Stated rather than left to a rule somebody has to remember. A list that takes
+/// several has two things enter can mean — the rows marked, or the row under the
+/// cursor where none is — and the only moment that is ambiguous is the moment this
+/// line resolves it.
+fn hint(marked: Option<usize>) -> String {
+    match marked {
+        None => format!("{OVER}   enter goes on   {AWAY}"),
+        Some(0) => format!("{OVER}   {MARKS}   enter takes this one   {AWAY}"),
+        Some(several) => {
+            format!("{OVER}   {MARKS}   enter takes the {several} marked   {AWAY}")
+        }
+    }
+}
+
+/// One entry on a list: where the cursor is, whether it is marked, and what it says.
 fn offered(here: bool, entry: &impl Listed, across: usize) -> Line<'static> {
-    let mark = if here { "> " } else { "  " };
-    // The marker and the two spaces after the name are taken off before the name is
-    // fitted, so the row it ends up on is the width it was given rather than that
-    // width plus whatever the marker cost.
-    let named = format!(
-        "{mark}{}  ",
-        shortened(entry.name(), across.saturating_sub(4))
+    let mark = match entry.marked() {
+        None => String::new(),
+        Some(true) => format!("{MARKED} "),
+        Some(false) => format!("{UNMARKED} "),
+    };
+    row(
+        &format!("{}{mark}", if here { "> " } else { "  " }),
+        entry,
+        across,
+    )
+}
+
+/// One entry somewhere the cursor is not, which is where several are being named.
+pub(super) fn named(entry: &impl Listed, across: usize) -> Line<'static> {
+    row("  ", entry, across)
+}
+
+/// One row: whatever leads it, the name, and what it is for beside it.
+fn row(leading: &str, entry: &impl Listed, across: usize) -> Line<'static> {
+    // What leads the row and the two spaces after the name are taken off before the
+    // name is fitted, so the row it ends up on is the width it was given rather than
+    // that width plus whatever the lead cost. The whole of it is then fitted again,
+    // because on a screen narrower than the lead itself the name has already been cut
+    // to nothing and what is left to give back is the lead.
+    let name = shortened(
+        entry.name(),
+        across.saturating_sub(leading.chars().count().saturating_add(2)),
     );
+    let named = shortened(&format!("{leading}{name}  "), across);
     let room = across.saturating_sub(named.chars().count());
     Line::from(vec![
         Span::raw(named),

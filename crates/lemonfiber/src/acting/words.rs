@@ -22,12 +22,13 @@ use ratatui::text::Line;
 
 use super::errand::{self, Errand};
 use super::lasting::{self, Begun, Lasting};
-use super::offer::{Choice, Offer, OFFERED};
+use super::offer::{Offer, Taken, OFFERED};
 use super::quality::{self, Change};
 use super::question::{self, Question};
 use super::reading::Reading;
 use super::{surface, Stage};
-use shapes::{agreed, choosing, dimmed, elsewhere, read, shortened, typing, AGREEING};
+use lemonfiber_core::plural::s;
+use shapes::{agreed, choosing, dimmed, elsewhere, named, read, shortened, typing, AGREEING};
 
 /// The keys the screen answers whatever else is open.
 const ALWAYS: &str = "q quit   r refresh   ? words";
@@ -105,7 +106,9 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         | Stage::Applying { .. }
         | Stage::Keeping { said: None, .. } => return None,
         Stage::Choosing { offer, chooser } => (titled(offer), choosing(chooser, rows, across)),
-        Stage::Confirming { offer, chosen } => (titled(offer), confirming(offer, chosen, across)),
+        Stage::Confirming { offer, taken } => {
+            (titled(offer), confirming(offer, taken, rows, across))
+        }
         Stage::Came(reading) => (CAME.to_owned(), read(reading, rows, across)),
         Stage::Wondering(chooser) => (ASK.to_owned(), choosing(chooser, rows, across)),
         Stage::Typing { asks, typed, .. } => (ASK.to_owned(), typing(asks, typed, across)),
@@ -134,7 +137,7 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         } => (keeping(lasting), typing(asks, typed, across)),
         Stage::Picking { lasting, chooser } => (keeping(lasting), choosing(chooser, rows, across)),
         Stage::Beginning { lasting, begun } => {
-            (keeping(lasting), beginning(lasting, begun, across))
+            (keeping(lasting), beginning(lasting, begun, rows, across))
         }
         // A walk's steps are its whole report and nothing behind this box is showing
         // them, so the box stays. A guard says nothing until it ends and what it is
@@ -169,8 +172,8 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
 /// is over.
 pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
     let said = match stage {
-        Stage::Running { offer, chosen } => {
-            format!("{} {}   {WAITING}", offer.hint, chosen.name)
+        Stage::Running { offer, taken } => {
+            format!("{} {}   {WAITING}", offer.hint, taken.name())
         }
         Stage::Doing { errand, .. } => format!("{}   {WAITING}", errand.name),
         Stage::Applying { change, .. } => format!("{}   {WAITING}", change.name),
@@ -204,7 +207,7 @@ pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
 /// through [`plain`] alone rather than through [`shortened`].
 pub(super) fn staying_for(stage: &Stage) -> Option<String> {
     let said = match stage {
-        Stage::Running { offer, chosen } => waited(&format!("{} {}", offer.hint, chosen.name)),
+        Stage::Running { offer, taken } => waited(&format!("{} {}", offer.hint, taken.name())),
         Stage::Doing { errand, .. } => waited(errand.name),
         Stage::Applying { change, .. } => waited(change.name),
         // The one that never ends by itself is the one this cannot say "to finish"
@@ -331,21 +334,26 @@ fn doing(lasting: &Lasting, named: &str) -> String {
 }
 
 /// The question before one of them, and what it was given.
-fn beginning(lasting: &Lasting, begun: &Begun, across: usize) -> Vec<Line<'static>> {
+fn beginning(lasting: &Lasting, begun: &Begun, rows: usize, across: usize) -> Vec<Line<'static>> {
     let asked = match begun {
-        Begun::Chosen(chosen) => format!("{} {}", lasting.asks, chosen.name),
+        Begun::Chosen(taken) => format!("{} {}", lasting.asks, taken.name()),
         // A walk asked for nothing in particular is a request of its own rather than
         // a half-finished one, so it is put as one — "walk through?" asks nothing at
         // all, and an operator answering it would not know what they had agreed to.
         Begun::Looked(typed) if typed.trim().is_empty() => lasting::ANYTHING.to_owned(),
         Begun::Looked(typed) => format!("{} {typed}", lasting.asks),
     };
-    vec![
-        Line::raw(shortened(&format!("{asked}?"), across)),
-        dimmed(lasting.about, across),
-        Line::raw(""),
-        dimmed(AGREEING, across),
-    ]
+    let mut lines = vec![Line::raw(shortened(&format!("{asked}?"), across))];
+    if let Begun::Chosen(taken) = begun {
+        // Four rows are kept back for the question, the line under it, the blank and
+        // the hint, so the forms being named never grow over the thing being agreed
+        // to.
+        lines.extend(covering(taken, rows.saturating_sub(4), across));
+    }
+    lines.push(dimmed(lasting.about, across));
+    lines.push(Line::raw(""));
+    lines.push(dimmed(AGREEING, across));
+    lines
 }
 
 /// What a walk has said so far, or that it has not said anything yet.
@@ -378,16 +386,49 @@ fn handing(across: usize) -> Vec<Line<'static>> {
 }
 
 /// The question before an action, and what it is being asked about.
-fn confirming(offer: &Offer, chosen: &Choice, across: usize) -> Vec<Line<'static>> {
-    vec![
-        Line::raw(shortened(
-            &format!("{} {}?", offer.asks, chosen.name),
+///
+/// One name is answered with the one line under it the list already showed. Several
+/// are answered with the names themselves: agreeing to a teardown of four forms is
+/// agreeing to four names, and a box saying only "4 forms" would be asking somebody
+/// to remember what they had marked a moment ago.
+fn confirming(offer: &Offer, taken: &Taken, rows: usize, across: usize) -> Vec<Line<'static>> {
+    let mut lines = vec![Line::raw(shortened(
+        &format!("{} {}?", offer.asks, taken.name()),
+        across,
+    ))];
+    match taken.covers.as_slice() {
+        [only] => lines.push(dimmed(&only.about, across)),
+        // Three rows are kept back for the question, the blank and the hint under it.
+        _ => lines.extend(covering(taken, rows.saturating_sub(3), across)),
+    }
+    lines.push(Line::raw(""));
+    lines.push(dimmed(AGREEING, across));
+    lines
+}
+
+/// The forms a question covers, where it covers more than one.
+///
+/// Nothing at all for a single, whose name is already in the question above. What
+/// will not fit is counted rather than dropped, because a list of four that showed
+/// two would be asking for agreement to something other than what it displayed.
+fn covering(taken: &Taken, room: usize, across: usize) -> Vec<Line<'static>> {
+    let covers = &taken.covers;
+    if covers.len() < 2 {
+        return Vec::new();
+    }
+    let mut lines: Vec<Line<'static>> = covers
+        .iter()
+        .take(room)
+        .map(|choice| named(choice, across))
+        .collect();
+    let left = covers.len().saturating_sub(lines.len());
+    if left > 0 {
+        lines.push(dimmed(
+            &format!("{left} more form{} than this screen has room for", s(left)),
             across,
-        )),
-        dimmed(&chosen.about, across),
-        Line::raw(""),
-        dimmed(AGREEING, across),
-    ]
+        ));
+    }
+    lines
 }
 
 #[cfg(test)]
@@ -395,7 +436,7 @@ mod tests {
     use super::{footer, keys, pane, staying_for, Offer, Stage};
     use crate::acting::chooser::Chooser;
     use crate::acting::errand::{self, Errand};
-    use crate::acting::offer::{Choice, OFFERED};
+    use crate::acting::offer::{Choice, Taken, OFFERED};
     use crate::acting::question::{Needed, Question, HINT, KEY};
     use crate::acting::reading::Reading;
     use lemonfiber_core::app::Command;
@@ -428,9 +469,36 @@ mod tests {
         Choice {
             name: name.to_owned(),
             about: about.to_owned(),
+            forms: vec![name.to_owned()],
+            marked: false,
             command: Command::Up {
                 forms: vec![name.to_owned()],
             },
+        }
+    }
+
+    /// One choice taken on its own, which is what a list with nothing marked on it
+    /// comes to when enter is pressed over that row.
+    fn a_taking(name: &str, about: &str) -> Taken {
+        Taken {
+            command: Command::Up {
+                forms: vec![name.to_owned()],
+            },
+            covers: vec![a_choice(name, about)],
+        }
+    }
+
+    /// Several taken together, which is what marking them and pressing enter comes
+    /// to.
+    fn several() -> Taken {
+        Taken {
+            command: Command::Up {
+                forms: vec!["full".to_owned(), "lean".to_owned()],
+            },
+            covers: vec![
+                a_choice("Full stack", "everything, behind the tunnel"),
+                a_choice("Lean stack", "the download clients only"),
+            ],
         }
     }
 
@@ -500,7 +568,7 @@ mod tests {
     fn a_running_action_says_what_leaving_the_screen_does_about_it() {
         let stage = Stage::Running {
             offer: &A_START,
-            chosen: a_choice("Full stack", "everything"),
+            taken: a_taking("Full stack", "everything"),
         };
 
         let said = text(&footer(&stage, 120));
@@ -517,7 +585,7 @@ mod tests {
     fn leaving_mid_action_says_what_is_being_waited_on_and_why() {
         let stage = Stage::Running {
             offer: &A_START,
-            chosen: a_choice("Full stack", "everything"),
+            taken: a_taking("Full stack", "everything"),
         };
 
         let said = staying_for(&stage).unwrap_or_default();
@@ -536,7 +604,7 @@ mod tests {
     fn a_name_from_somewhere_else_is_made_safe_before_it_is_said() {
         let stage = Stage::Running {
             offer: &A_START,
-            chosen: a_choice("Full\u{1b}[2Jstack", "everything"),
+            taken: a_taking("Full\u{1b}[2Jstack", "everything"),
         };
 
         let said = staying_for(&stage).unwrap_or_default();
@@ -550,7 +618,7 @@ mod tests {
     fn a_running_action_leaves_the_screen_behind_it_visible() {
         let stage = Stage::Running {
             offer: &A_START,
-            chosen: a_choice("Full stack", "everything"),
+            taken: a_taking("Full stack", "everything"),
         };
 
         assert!(pane(&stage, 20, 80).is_none());
@@ -558,8 +626,8 @@ mod tests {
         assert!(text(&footer(&Stage::Idle, 120)).contains("r refresh"));
     }
 
-    /// The list says what each choice is for, marks the one selected, and says how
-    /// to take it.
+    /// The list says what each choice is for, marks the one selected, shows every
+    /// row as one that could be marked, and says how to take it.
     #[test]
     fn the_list_marks_what_is_selected_and_says_how_to_take_it() {
         let stage = Stage::Choosing {
@@ -569,10 +637,99 @@ mod tests {
 
         let said = said(&stage, 20, 80);
 
-        assert!(said.contains("> Full stack"), "{said}");
-        assert!(said.contains("  Lean stack"), "{said}");
+        assert!(said.contains("> [ ] Full stack"), "{said}");
+        assert!(said.contains("  [ ] Lean stack"), "{said}");
         assert!(said.contains("the download clients only"), "{said}");
+        assert!(said.contains("space marks"), "{said}");
+    }
+
+    /// The line under the list says what enter would do, and changes when that
+    /// changes — which is the whole of how the one ambiguity on a list that takes
+    /// several is resolved. A rule an operator has to remember is a rule they will
+    /// get wrong once, on the teardown.
+    #[test]
+    fn the_line_under_a_list_says_which_thing_enter_would_take() {
+        let mut chooser = two();
+        let nothing = said(
+            &Stage::Choosing {
+                offer: &A_START,
+                chooser: two(),
+            },
+            20,
+            80,
+        );
+
+        for (_, choice) in chooser.each() {
+            choice.marked = true;
+        }
+        let both = said(
+            &Stage::Choosing {
+                offer: &A_START,
+                chooser,
+            },
+            20,
+            80,
+        );
+
+        assert!(nothing.contains("enter takes this one"), "{nothing}");
+        assert!(!nothing.contains("marked"), "{nothing}");
+        assert!(both.contains("enter takes the 2 marked"), "{both}");
+        assert!(both.contains("> [x] Full stack"), "{both}");
+        assert!(both.contains("  [x] Lean stack"), "{both}");
+    }
+
+    /// A list that takes one draws no box beside its rows and offers no key for
+    /// marking, because there is nothing on it that could be taken with another.
+    #[test]
+    fn a_list_that_takes_one_offers_nothing_to_mark() {
+        let said = said(
+            &Stage::Wondering(Chooser::over(&A_TRACE, Vec::new())),
+            20,
+            80,
+        );
+
+        assert!(said.contains("> where one thing is"), "{said}");
+        assert!(!said.contains("[ ]"), "{said}");
+        assert!(!said.contains("space marks"), "{said}");
         assert!(said.contains("enter goes on"), "{said}");
+    }
+
+    /// Several named together are named in the question, one row each. A box saying
+    /// only how many there were would be asking somebody to remember what they
+    /// marked a moment ago, which on a teardown is the wrong thing to be unsure of.
+    #[test]
+    fn the_question_over_several_names_every_one_of_them() {
+        let stage = Stage::Confirming {
+            offer: &A_START,
+            taken: several(),
+        };
+
+        let said = said(&stage, 20, 80);
+
+        assert!(said.contains("Start 2 forms?"), "{said}");
+        assert!(said.contains("Full stack"), "{said}");
+        assert!(said.contains("Lean stack"), "{said}");
+        assert!(said.contains("the download clients only"), "{said}");
+        assert!(said.contains("any other key changes nothing"), "{said}");
+    }
+
+    /// More forms than the box has room for are counted rather than dropped: a
+    /// question that displayed two of four would be asking for agreement to
+    /// something other than what it showed.
+    #[test]
+    fn a_question_over_more_forms_than_fit_counts_the_rest() {
+        let stage = Stage::Confirming {
+            offer: &A_START,
+            taken: several(),
+        };
+
+        let said = said(&stage, 4, 80);
+
+        assert!(said.contains("Start 2 forms?"), "{said}");
+        assert!(
+            said.contains("1 more form than this screen has room for"),
+            "{said}"
+        );
     }
 
     /// A list longer than the screen counts what it left out rather than showing
@@ -597,7 +754,7 @@ mod tests {
     fn the_question_names_what_is_about_to_happen_and_to_what() {
         let stage = Stage::Confirming {
             offer: &A_START,
-            chosen: a_choice("Full stack", "everything, behind the tunnel"),
+            taken: a_taking("Full stack", "everything, behind the tunnel"),
         };
 
         let said = said(&stage, 20, 80);
@@ -666,7 +823,7 @@ mod tests {
     fn text_from_somewhere_else_is_made_safe_before_it_is_drawn() {
         let stage = Stage::Confirming {
             offer: &A_START,
-            chosen: a_choice("Full\u{1b}[2Jstack", "quietly clearing the screen"),
+            taken: a_taking("Full\u{1b}[2Jstack", "quietly clearing the screen"),
         };
 
         let said = said(&stage, 20, 120);
@@ -686,7 +843,11 @@ mod tests {
             },
             Stage::Confirming {
                 offer: &A_START,
-                chosen: a_choice("Full stack", "everything, behind the tunnel"),
+                taken: a_taking("Full stack", "everything, behind the tunnel"),
+            },
+            Stage::Confirming {
+                offer: &A_START,
+                taken: several(),
             },
             Stage::Wondering(Chooser::over(&A_TRACE, Vec::new())),
             Stage::Typing {

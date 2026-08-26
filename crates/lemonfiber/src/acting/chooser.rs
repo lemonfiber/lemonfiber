@@ -11,16 +11,33 @@
 //! choose between" is answered where the entries are built and never here.
 //!
 //! What is being chosen between is the caller's: what an action can be given, and
-//! what this stack can be asked, are the same movement over two lists. Both are
+//! what this stack can be asked, are the same movement over four lists. All four are
 //! drawn from the two things every entry has — what it is called, and what it is
-//! for — which is what [`Listed`] asks of them and the whole of what it asks.
+//! for — and from one more some of them have, which is whether they have been marked
+//! to be taken together. That is what [`Listed`] asks of them and the whole of what
+//! it asks.
+//!
+//! Whether a list takes several is the entry's answer rather than the caller's. One
+//! drawing serves all four, and a flag handed to it is a flag two callers can hand it
+//! differently — which is how one screen comes to behave two ways depending on which
+//! key opened it.
 
-/// Something a list offers: what it is called, and what it is for.
+/// Something a list offers: what it is called, what it is for, and whether it is one
+/// of several that may be taken together.
 pub(crate) trait Listed {
     /// What it is called, on the row the cursor moves over.
     fn name(&self) -> &str;
     /// What it is for, in the one line beside the name.
     fn about(&self) -> &str;
+    /// Whether it is marked, or nothing where the list it sits on takes one.
+    ///
+    /// Nothing is the answer for a list of questions and a list of errands: a box
+    /// drawn beside a question would be an affordance for something the screen has
+    /// no way to do, and a row that can never be marked is better off saying so by
+    /// having nowhere to put a mark.
+    fn marked(&self) -> Option<bool> {
+        None
+    }
 }
 
 impl<T: Listed> Listed for &T {
@@ -30,6 +47,10 @@ impl<T: Listed> Listed for &T {
 
     fn about(&self) -> &str {
         (*self).about()
+    }
+
+    fn marked(&self) -> Option<bool> {
+        (*self).marked()
     }
 }
 
@@ -84,6 +105,30 @@ impl<T> Chooser<T> {
             .chain(std::iter::once((true, &self.selected)))
             .chain(self.below.iter().map(|choice| (false, choice)))
     }
+
+    /// The same, to change rather than to read.
+    ///
+    /// Both walk the three fields in the order the list was offered in, so a row a
+    /// caller changes is the row a reader would have watched change.
+    pub(crate) fn each(&mut self) -> impl Iterator<Item = (bool, &mut T)> {
+        self.above
+            .iter_mut()
+            .map(|choice| (false, choice))
+            .chain(std::iter::once((true, &mut self.selected)))
+            .chain(self.below.iter_mut().map(|choice| (false, choice)))
+    }
+
+    /// Every entry, taken, in the order it was offered.
+    ///
+    /// Which one the cursor was on is not said, because the caller taking them all is
+    /// taking them by what is marked rather than by where the cursor is — and a
+    /// caller handed both would have two answers to choose between.
+    pub(crate) fn all(self) -> Vec<T> {
+        let mut every = self.above;
+        every.push(self.selected);
+        every.extend(self.below);
+        every
+    }
 }
 
 #[cfg(test)]
@@ -97,6 +142,8 @@ mod tests {
         Choice {
             name: name.to_owned(),
             about: format!("what {name} is for"),
+            forms: vec![name.to_owned()],
+            marked: false,
             command: Command::Up {
                 forms: vec![name.to_owned()],
             },
@@ -206,5 +253,50 @@ mod tests {
         chooser.forward();
 
         assert_eq!(chooser.taken().name, "two");
+    }
+
+    /// Every entry can be reached to change, in the order it was offered and with
+    /// the selected one told apart — which is what putting a mark on the row under
+    /// the cursor needs, and what taking the marks off the rest needs.
+    #[test]
+    fn every_entry_can_be_changed_where_it_was_offered() {
+        let mut chooser = three();
+        chooser.forward();
+
+        for (here, choice) in chooser.each() {
+            if here {
+                choice.name = format!("{} (here)", choice.name);
+            }
+        }
+
+        assert_eq!(
+            shown(&chooser),
+            vec![
+                (false, "one".to_owned()),
+                (true, "two (here)".to_owned()),
+                (false, "three".to_owned()),
+            ]
+        );
+    }
+
+    /// Taking them all takes them in the order they were offered, which is the order
+    /// the question over several of them names them in. A list that came back in
+    /// cursor order would name them in an order nobody had seen.
+    #[test]
+    fn taking_them_all_takes_them_in_the_order_they_were_offered() {
+        let mut chooser = three();
+        chooser.forward();
+        chooser.forward();
+
+        let names: Vec<String> = chooser
+            .all()
+            .into_iter()
+            .map(|choice| choice.name)
+            .collect();
+
+        assert_eq!(
+            names,
+            vec!["one".to_owned(), "two".to_owned(), "three".to_owned()]
+        );
     }
 }

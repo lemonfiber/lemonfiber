@@ -236,12 +236,10 @@ impl Acting {
             Stage::Choosing { offer, chooser } => {
                 offer::choosing(&mut self.stage, offer, chooser, press)
             }
-            Stage::Confirming { offer, chosen } => {
-                offer::confirming(&mut self.stage, offer, chosen, press)
+            Stage::Confirming { offer, taken } => {
+                offer::confirming(&mut self.stage, offer, taken, press)
             }
-            Stage::Running { offer, chosen } => {
-                offer::running(&mut self.stage, offer, chosen, press)
-            }
+            Stage::Running { offer, taken } => offer::running(&mut self.stage, offer, taken, press),
             Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
             Stage::Typing {
                 question,
@@ -608,7 +606,7 @@ mod tests {
         acting.pressed(&Press::Back);
         assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
         let said = showing(&acting);
-        assert!(said.contains("> Full stack"), "{said}");
+        assert!(said.contains("> [ ] Full stack"), "{said}");
 
         acting.pressed(&Press::Accept);
         let carried = acting.pressed(&Press::Typed('y'));
@@ -638,6 +636,123 @@ mod tests {
         for line in printed.lines().filter(|line| !line.is_empty()) {
             assert!(said.contains(line), "{line:?} is missing from {said}");
         }
+    }
+
+    /// The claim this slice exists to make: the list names several forms at once,
+    /// which is what the command line takes and what a browser sends whole, and the
+    /// several reach one command over all of them rather than one command each.
+    #[test]
+    fn marking_several_forms_acts_on_every_one_of_them() {
+        let (mut acting, _) = choosing('t', a_listing());
+
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Typed(' '));
+        let listed = showing(&acting);
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+        let asked = showing(&acting);
+        let carried = acting.pressed(&Press::Typed('y'));
+
+        assert!(listed.contains("[x] Full stack"), "{listed}");
+        assert!(listed.contains("[x] Lean stack"), "{listed}");
+        assert!(listed.contains("enter takes the 2 marked"), "{listed}");
+        assert!(asked.contains("Restart 2 forms?"), "{asked}");
+        assert!(asked.contains("Full stack"), "{asked}");
+        assert!(asked.contains("Lean stack"), "{asked}");
+        assert_eq!(
+            carried,
+            Wanted::Carry(Command::Restart {
+                forms: vec!["full".to_owned(), "lean".to_owned()],
+                services: Vec::new(),
+            })
+        );
+    }
+
+    /// A mark comes off the way it went on, and a list with every mark taken off is
+    /// the list it was: enter falls back to the row under the cursor. Nobody should
+    /// have to abandon a list to escape a keypress they did not mean.
+    #[test]
+    fn taking_every_mark_off_again_leaves_the_row_under_the_cursor() {
+        let (mut acting, _) = choosing('t', a_listing());
+
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Typed(' '));
+        let listed = showing(&acting);
+        acting.pressed(&Press::Accept);
+        let carried = acting.pressed(&Press::Typed('y'));
+
+        assert!(listed.contains("enter takes this one"), "{listed}");
+        assert_eq!(
+            carried,
+            Wanted::Carry(Command::Restart {
+                forms: vec!["full".to_owned()],
+                services: Vec::new(),
+            })
+        );
+    }
+
+    /// The whole stack is instead of naming forms rather than one more of them, so
+    /// marking it takes the marks off the forms and what is sent is the empty list
+    /// the command reads as everything — never that list with a form's name also in
+    /// it, which would be a request for something other than what was shown.
+    #[test]
+    fn marking_the_whole_stack_takes_the_marks_off_the_forms() {
+        let (mut acting, _) = choosing('u', a_listing());
+
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Back);
+        acting.pressed(&Press::Typed(' '));
+        let listed = showing(&acting);
+        acting.pressed(&Press::Accept);
+        let carried = acting.pressed(&Press::Typed('y'));
+
+        assert!(listed.contains("[x] everything"), "{listed}");
+        assert!(listed.contains("[ ] Full stack"), "{listed}");
+        assert_eq!(carried, Wanted::Carry(Command::Up { forms: Vec::new() }));
+    }
+
+    /// A guard is chosen off the same list by the same movement, so it names several
+    /// forms at once too. One list behaving two ways depending on which key opened it
+    /// is the thing the shared movement exists to prevent.
+    #[test]
+    fn a_guard_can_be_set_over_several_forms_at_once() {
+        let mut acting = starting("watch");
+        acting.told(Ok(Outcome::Forms(a_listing())));
+
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Accept);
+        let asked = showing(&acting);
+        let carried = acting.pressed(&Press::Typed('y'));
+
+        assert!(asked.contains("2 forms?"), "{asked}");
+        assert_eq!(
+            carried,
+            Wanted::Carry(Command::Watch {
+                forms: vec!["full".to_owned(), "lean".to_owned()],
+            })
+        );
+    }
+
+    /// While several are running the footer says how many rather than running their
+    /// names together, and the line on the way out says the same — one row, on a
+    /// screen whose width belongs to the panels behind it.
+    #[test]
+    fn a_running_action_over_several_says_how_many_it_is_running_on() {
+        let (mut acting, _) = choosing('t', a_listing());
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Typed('y'));
+
+        let footer = footing(&acting);
+        let leaving = acting.staying_for().unwrap_or_default();
+
+        assert!(footer.contains("restart 2 forms"), "{footer}");
+        assert!(leaving.contains("restart 2 forms"), "{leaving}");
     }
 
     /// Choosing something further down the list acts on that one, which is the
