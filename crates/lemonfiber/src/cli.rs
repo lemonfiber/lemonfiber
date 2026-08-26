@@ -295,6 +295,13 @@ pub enum Request {
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,
+    /// Name the one address to send somebody who lives here.
+    ///
+    /// The stack publishes several things to your network and only one of them is
+    /// somewhere to begin. This says which, why the others are not, and — where this
+    /// stack runs nothing anybody could begin at — that there is no address to send
+    /// rather than naming the nearest thing that would open.
+    FrontDoor,
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.

@@ -57,6 +57,7 @@ pub mod contract;
 pub mod dashboard;
 pub mod docker;
 pub mod doctor;
+pub mod door;
 mod endpoint;
 pub mod frontend;
 pub mod glossary;

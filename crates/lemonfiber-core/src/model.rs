@@ -12,6 +12,7 @@
 pub const API_VERSION: u32 = 1;
 
 mod checking;
+mod door;
 mod envelope;
 mod household;
 mod job;
@@ -25,6 +26,7 @@ mod upgrade;
 mod walkthrough;
 
 pub use checking::*;
+pub use door::*;
 pub use envelope::*;
 pub use household::*;
 pub use job::*;
