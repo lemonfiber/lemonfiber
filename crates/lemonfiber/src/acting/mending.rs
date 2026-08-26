@@ -50,11 +50,14 @@
 //! **The widening is not here either.** `--fix-disruptive` asks for the one thing
 //! `--disruptive` asks for — [`lemonfiber_api::actions::TAKES_DISRUPTION`] carries a
 //! single argument for all three actions, and the command line spells it twice only
-//! because clap keys an argument by the field it sits on. This screen reaches it on
-//! the request it is about, under the diagnosis, where taking the tunnel away is the
-//! thing being asked for. Carrying it here would take the tunnel away to *produce* an
-//! offer and again to act on it, because the offer and the consent are two runs that
-//! each look afresh — and an offer that disturbed the stack would not be an offer.
+//! because clap keys an argument by the field it sits on. Which half of a repair it
+//! belongs to is the core's: the half that *acts*, an offer asked to include those
+//! checks being refused rather than widened, because an offer is what somebody reads
+//! before deciding and these checks prove themselves by disturbing. What is left of
+//! it is a widening over checks that turn up no repair to offer. So this screen asks
+//! for it where it is the thing being asked for — under the diagnosis, on the request
+//! `--disruptive` is spelled on — and neither half of what is asked for here carries
+//! it.
 
 mod warning;
 
