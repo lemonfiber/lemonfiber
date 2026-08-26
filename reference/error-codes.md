@@ -70,6 +70,7 @@ what to do about it, is written for operators at
 - `RESTORE-8`
 - `RESTORE-9`
 - `RESTORE-10`
+- `RESTORE-11`
 - `SEED-1`
 - `SEED-2`
 - `SEED-3`
@@ -84,6 +85,7 @@ what to do about it, is written for operators at
 - `SETUP-6`
 - `SETUP-7`
 - `SETUP-8`
+- `SETUP-9`
 - `STACK-1`
 - `STACK-2`
 - `STACK-3`

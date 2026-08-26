@@ -66,9 +66,12 @@ fn restoring(action: &Action) -> String {
         Action::Restore {
             key,
             value: Some(value),
+            ..
         } => format!("{key} back to {value}"),
         // Nothing was there before, so putting it back means taking it away again.
-        Action::Restore { key, value: None } => format!("{key} removed, as it was"),
+        Action::Restore {
+            key, value: None, ..
+        } => format!("{key} removed, as it was"),
         Action::Remove { resource, id } => format!("{resource} {id} removed"),
         Action::Reconfigure {
             resource,
@@ -229,6 +232,7 @@ mod tests {
                 action: Action::Restore {
                     key: "PORT".to_owned(),
                     value: Some("8080".to_owned()),
+                    wrote: "6881".to_owned(),
                 },
             },
             Undo {
@@ -236,6 +240,7 @@ mod tests {
                 action: Action::Restore {
                     key: "PROXY".to_owned(),
                     value: None,
+                    wrote: "on".to_owned(),
                 },
             },
             Undo {

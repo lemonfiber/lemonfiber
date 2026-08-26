@@ -91,9 +91,14 @@ impl Change {
                 resource: resource.clone(),
                 id: id.clone(),
             },
-            Kind::Set { key, previous, .. } => Action::Restore {
+            Kind::Set {
+                key,
+                previous,
+                current,
+            } => Action::Restore {
                 key: key.clone(),
                 value: previous.clone(),
+                wrote: current.clone(),
             },
             Kind::Made { path } => Action::Delete { path: path.clone() },
             Kind::Configured {
@@ -145,6 +150,14 @@ pub enum Action {
         key: String,
         /// What to restore it to, or `None` to remove it.
         value: Option<String>,
+        /// What lemonfiber put there, which has to still be there for putting the
+        /// old value back to be putting anything back.
+        ///
+        /// Carried so that a reversal can ask whether it is undoing its own work.
+        /// Without it a reversal knows only what it would like the setting to say,
+        /// and a setting the operator has since chosen for themselves reads exactly
+        /// like one nobody has touched.
+        wrote: String,
     },
     /// Remove a path that was created.
     Delete {
@@ -373,6 +386,7 @@ mod tests {
             Action::Restore {
                 key: "JELLYFIN_MODE".to_owned(),
                 value: Some("docker".to_owned()),
+                wrote: "native".to_owned(),
             }
         );
     }
@@ -394,6 +408,7 @@ mod tests {
             Action::Restore {
                 key: "JELLYFIN_MODE".to_owned(),
                 value: None,
+                wrote: "docker".to_owned(),
             }
         );
     }
@@ -432,6 +447,7 @@ mod tests {
                     action: Action::Restore {
                         key: "DATA_ROOT".to_owned(),
                         value: None,
+                        wrote: "/srv/media".to_owned(),
                     },
                 },
                 Undo {
@@ -464,6 +480,7 @@ mod tests {
             Action::Restore {
                 key: "VPN_COUNTRIES".to_owned(),
                 value: Some(String::new()),
+                wrote: "Netherlands".to_owned(),
             }
         );
     }
@@ -521,8 +538,9 @@ mod tests {
             written(Action::Restore {
                 key: "PORT".to_owned(),
                 value: Some("8080".to_owned()),
+                wrote: "6881".to_owned(),
             }),
-            r#"{"target":"qbittorrent","action":{"does":"restore","key":"PORT","value":"8080"}}"#
+            r#"{"target":"qbittorrent","action":{"does":"restore","key":"PORT","value":"8080","wrote":"6881"}}"#
         );
         // Nothing there before, so putting it back means taking it away again — said
         // as an absent value rather than as a missing key.
@@ -530,8 +548,9 @@ mod tests {
             written(Action::Restore {
                 key: "PORT".to_owned(),
                 value: None,
+                wrote: "8080".to_owned(),
             }),
-            r#"{"target":"qbittorrent","action":{"does":"restore","key":"PORT","value":null}}"#
+            r#"{"target":"qbittorrent","action":{"does":"restore","key":"PORT","value":null,"wrote":"8080"}}"#
         );
         assert_eq!(
             written(Action::Remove {

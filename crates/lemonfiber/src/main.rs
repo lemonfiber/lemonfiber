@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
-use lemonfiber_core::app::restore::Kept;
+use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 use lemonfiber_core::doctor::Narrowing;
 
@@ -104,16 +104,20 @@ async fn restoring(ctx: &Ctx, archive: Kept, repoint: bool, json: bool) -> ExitC
     let looking = Command::Restore {
         archive: archive.clone(),
         repoint,
-        confirm: false,
+        consent: Consent::List,
     };
     match dispatch(looking, ctx).await {
         Ok(outcome) => render(&outcome, json),
         Err(problem) => return complain(&problem),
     }
+    // Standing consent rather than a name for the listing just printed. The two
+    // commands are one run over one look, so there is no gap for the archive to
+    // move in — which is exactly what the operator who typed the agreement in
+    // advance was agreeing to.
     let doing = Command::Restore {
         archive,
         repoint,
-        confirm: true,
+        consent: Consent::Standing,
     };
     match dispatch(doing, ctx).await {
         Ok(outcome) => {

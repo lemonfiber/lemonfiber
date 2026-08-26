@@ -96,32 +96,24 @@ pub struct Repair {
 ///
 /// Not a secret and not a signature. It says which offer, not who agreed: this
 /// surface's admission is decided above it, once, for every request.
+///
+/// Named through [`crate::agreement`], which is where the one way of naming a
+/// reading lives — a restore's listing is named the same way, and two spellings of
+/// the same idea would drift into two answers to the same question.
 #[must_use]
 pub fn agreement(offered: &[Repair]) -> String {
-    let mut hasher = crc32fast::Hasher::new();
+    let mut words: Vec<&str> = Vec::new();
     for repair in offered {
-        for word in [
-            repair.check.as_str(),
-            repair.does.as_str(),
-            if repair.reversible {
-                "reversible"
-            } else {
-                "irreversible"
-            },
-        ] {
-            said(&mut hasher, word);
-        }
-        for effect in &repair.effects {
-            said(&mut hasher, effect);
-        }
+        words.push(repair.check.as_str());
+        words.push(repair.does.as_str());
+        words.push(if repair.reversible {
+            "reversible"
+        } else {
+            "irreversible"
+        });
+        words.extend(repair.effects.iter().map(String::as_str));
     }
-    format!("{:08x}", hasher.finalize())
-}
-
-/// One word of an offer, ended so that two words cannot run together into a third.
-fn said(hasher: &mut crc32fast::Hasher, word: &str) {
-    hasher.update(word.as_bytes());
-    hasher.update(&[0]);
+    crate::agreement::over(&words)
 }
 
 /// What carrying out a repair did, as the mender that carried it out saw it.
@@ -325,12 +317,28 @@ pub fn may_write(recorded: Option<&Record>, holds: Option<&str>) -> Writing {
         // operator's own and not a difference from anything lemonfiber intended.
         None => Writing::TheirsAlone,
         Some(record) if record.origin.is_adopted() => Writing::Adopted,
-        // Recorded as lemonfiber's own, but the service no longer holds it. Something
-        // moved it, and the only hand that reaches a service's settings besides
-        // lemonfiber's is the operator's. Reading the origin alone would call this
-        // lemonfiber's to overwrite, which is the whole thing this rule exists to stop.
-        Some(record) if holds != Some(record.value.as_str()) => Writing::Changed,
-        Some(_) => Writing::Ours,
+        Some(record) => may_put_back(&record.value, holds),
+    }
+}
+
+/// Whether lemonfiber's own value is still the one that is there, and so still
+/// lemonfiber's to write.
+///
+/// The comparison at the heart of [`may_write`], apart from it so that reversing a
+/// repair asks the same question rather than a second one that agrees with it by
+/// coincidence. A reversal reads no baseline — the journal already says what the
+/// repair put there — but the rule it has to keep is the same one: a value that is
+/// no longer what lemonfiber wrote has been moved by the only other hand that
+/// reaches it, and is theirs now whoever wrote it first.
+///
+/// Reading `wrote` alone would call every one of those lemonfiber's to write over,
+/// which is the whole thing this rule exists to stop.
+#[must_use]
+pub fn may_put_back(wrote: &str, holds: Option<&str>) -> Writing {
+    if holds == Some(wrote) {
+        Writing::Ours
+    } else {
+        Writing::Changed
     }
 }
 
@@ -496,6 +504,7 @@ mod tests {
             action: crate::journal::Action::Restore {
                 key: key.to_owned(),
                 value: Some("before".to_owned()),
+                wrote: "after".to_owned(),
             },
         };
 

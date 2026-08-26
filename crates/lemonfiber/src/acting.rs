@@ -505,7 +505,7 @@ mod tests {
         errand, lasting, meaning, quality, question, surface, Acting, Line, Press, Step, Wanted,
     };
     use crate::render::fixtures::{a_lifecycle, a_plan};
-    use lemonfiber_core::app::restore::Kept;
+    use lemonfiber_core::app::restore::{Consent, Kept};
     use lemonfiber_core::app::{backup, Command, Outcome, QualityAction, Waiting};
     use lemonfiber_core::backup::Scope;
     use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
@@ -1833,7 +1833,7 @@ mod tests {
             Wanted::Carry(Command::Restore {
                 archive: Kept::Named("lemonfiber-full-1.tar.gz".to_owned()),
                 repoint: false,
-                confirm: false,
+                consent: Consent::List,
             })
         );
     }

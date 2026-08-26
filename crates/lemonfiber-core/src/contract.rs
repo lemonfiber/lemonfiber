@@ -240,6 +240,7 @@ mod tests {
                     action: crate::journal::Action::Restore {
                         key: "QBITTORRENT_PORT".to_owned(),
                         value: Some("8080".to_owned()),
+                        wrote: "6881".to_owned(),
                     },
                 }],
             }),
@@ -262,6 +263,7 @@ mod tests {
                     manifest: manifest(),
                     downgrade: false,
                     relocation: None,
+                    agreement: "5c3a1d20".to_owned(),
                 },
                 done: None,
             }),

@@ -16,6 +16,7 @@ use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Action, Change, Journal, Undo};
 use crate::ports::service::Client as _;
+use crate::repair;
 
 use super::Ctx;
 
@@ -132,13 +133,29 @@ pub async fn reconfigured(
 /// `already` carries the ones an earlier step — [`reconfigured`] — could not reach, so an
 /// operator is told about every change still standing in one sentence rather than learning
 /// about them a service at a time.
+///
+/// A setting that no longer holds what the change put there is left exactly as it is,
+/// and named at the end alongside those. It is the rule a repair keeps on the way out —
+/// [`crate::repair::may_put_back`] — kept on the way back: a reversal that wrote its old
+/// value over one the operator has chosen since would be taking away a decision made
+/// after the repair it is undoing.
+///
+/// The settings the operator owns are reported ahead of the services that would not
+/// answer, where a reversal meets both. An unreachable service announces itself in every
+/// other reading of the stack; a reversal that deliberately did not write is something an
+/// operator can find out no other way.
 pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(), Box<Problem>> {
     let mut beyond_reach = already;
+    let mut theirs = Vec::new();
     for undo in undos {
         match carry_out(&undo.action, env_file).map_err(|fault| Box::new(fault.problem()))? {
             Step::Done => {}
             Step::BeyondReach(resource) => beyond_reach.push(resource),
+            Step::TheirsNow(key) => theirs.push(key),
         }
+    }
+    if !theirs.is_empty() {
+        return Err(Box::new(not_put_back(&theirs)));
     }
     if beyond_reach.is_empty() {
         Ok(())
@@ -147,28 +164,23 @@ pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(),
     }
 }
 
-/// What one undo amounted to: carried out, or beyond a filesystem-and-config
-/// reversal's reach.
+/// What one undo amounted to: carried out, beyond a filesystem-and-config
+/// reversal's reach, or the operator's to keep.
 enum Step {
-    /// The undo was carried out.
+    /// The undo was carried out, or there was nothing left of it to carry out.
     Done,
     /// The change was made through a service, named by the resource it created,
     /// and only that service can undo it.
     BeyondReach(String),
+    /// The setting holds neither what the change put there nor what putting it back
+    /// would write, so somebody has chosen it since and it is left alone.
+    TheirsNow(String),
 }
 
 /// Carry out one undo against the filesystem or the environment file.
 fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
     match action {
-        Action::Restore {
-            key,
-            value: Some(value),
-        } => store::set(env_file, key, value)
-            .map(|()| Step::Done)
-            .map_err(Fault::Store),
-        Action::Restore { key, value: None } => store::unset(env_file, key)
-            .map(|()| Step::Done)
-            .map_err(Fault::Store),
+        Action::Restore { key, value, wrote } => put_back(env_file, key, value.as_deref(), wrote),
         Action::Delete { path } => remove(Path::new(path)).map(|()| Step::Done),
         // Both need the service that made the change: one to delete what it created, the
         // other to put a field of it back. Neither is something the host can do, and a
@@ -177,6 +189,39 @@ fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
         Action::Remove { resource, .. } | Action::Reconfigure { resource, .. } => {
             Ok(Step::BeyondReach(resource.clone()))
         }
+    }
+}
+
+/// Put one setting back to `value`, where the change being reversed is still the
+/// last thing that touched it.
+///
+/// Three answers, because there are three things the file can be holding. What the
+/// change put there is lemonfiber's own work and comes off. What putting it back
+/// would write is already there — a reversal carried out once, or one asked for
+/// twice — and there is nothing left to do, which is what makes asking again
+/// harmless rather than forbidden. Anything else was chosen after the change, by
+/// the only other hand that reaches this file, and is left exactly as it is.
+///
+/// The already-back question is asked before the ownership one, and has to be: the
+/// value a reversal leaves behind is by definition not the one the change wrote, so
+/// asking the other way round would have every second reversal accusing the
+/// operator of a change they did not make.
+fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Result<Step, Fault> {
+    let file = store::read(env_file).map_err(Fault::Store)?;
+    let holds = file.get(key);
+    if holds == value {
+        return Ok(Step::Done);
+    }
+    if !repair::may_put_back(wrote, holds).allowed() {
+        return Ok(Step::TheirsNow(key.to_owned()));
+    }
+    match value {
+        Some(value) => store::set(env_file, key, value)
+            .map(|()| Step::Done)
+            .map_err(Fault::Store),
+        None => store::unset(env_file, key)
+            .map(|()| Step::Done)
+            .map_err(Fault::Store),
     }
 }
 
@@ -243,11 +288,38 @@ fn needs_service(resources: &[String]) -> Problem {
     .with_detail(resources.join(", "))
 }
 
+/// The problem naming the settings a reversal left exactly as they are, because
+/// they hold neither what the change wrote nor what putting it back would write.
+///
+/// Every one of them is named. "Something was left alone" tells an operator that a
+/// reversal was incomplete without telling them which of their settings it decided
+/// was theirs, and the answer decides whether they do anything next.
+///
+/// What was reversed is said too, in the same sentence. A reversal that put three
+/// settings back and left a fourth is not a reversal that failed, and reading only
+/// the refusal would have an operator checking three settings that are already
+/// right.
+fn not_put_back(settings: &[String]) -> Problem {
+    Problem::new(
+        NOT_PUT_BACK,
+        Severity::Warning,
+        "Some settings hold what you chose, so they were left alone",
+        "Undoing a change puts back what lemonfiber replaced, and these settings no longer hold \
+         what it wrote — so they were changed after it, and writing the old value over that \
+         would take away a decision you made. Everything else was put back.",
+        Remedy::new("Set them back by hand if the earlier value is the one you want"),
+    )
+    .with_detail(settings.join(", "))
+}
+
 /// Raised when a directory from an interrupted apply could not be removed.
 pub const NOT_REMOVED: Code = Code::new("SETUP-3");
 
 /// Raised when reversing needs the service that made a change.
 pub const NEEDS_SERVICE: Code = Code::new("SETUP-4");
+
+/// Raised when a reversal would write over a setting the operator has since chosen.
+pub const NOT_PUT_BACK: Code = Code::new("SETUP-9");
 
 #[cfg(test)]
 mod tests {
@@ -267,13 +339,14 @@ mod tests {
     }
 
     /// An undo that restores a setting to `value`, or removes it where `value` is
-    /// `None`.
-    fn restore(key: &str, value: Option<&str>) -> Undo {
+    /// `None`, over the value `wrote` that the change being reversed put there.
+    fn restore(key: &str, value: Option<&str>, wrote: &str) -> Undo {
         Undo {
             target: ".env".to_owned(),
             action: Action::Restore {
                 key: key.to_owned(),
                 value: value.map(str::to_owned),
+                wrote: wrote.to_owned(),
             },
         }
     }
@@ -380,7 +453,12 @@ mod tests {
         let env = dir.join(".env");
         assert!(store::set(&env, "TZ", "Pacific/Auckland").is_ok());
 
-        assert!(undo(&[restore("TZ", Some("Europe/Amsterdam"))], &env, Vec::new()).is_ok());
+        assert!(undo(
+            &[restore("TZ", Some("Europe/Amsterdam"), "Pacific/Auckland")],
+            &env,
+            Vec::new()
+        )
+        .is_ok());
 
         let file = store::read(&env).unwrap_or_default();
         assert_eq!(file.get("TZ"), Some("Europe/Amsterdam"));
@@ -392,7 +470,7 @@ mod tests {
         let env = dir.join(".env");
         assert!(store::set(&env, "USENET", "on").is_ok());
 
-        assert!(undo(&[restore("USENET", None)], &env, Vec::new()).is_ok());
+        assert!(undo(&[restore("USENET", None, "on")], &env, Vec::new()).is_ok());
 
         let file = store::read(&env).unwrap_or_default();
         assert_eq!(file.get("USENET"), None);
@@ -495,7 +573,7 @@ mod tests {
         // A setting to reverse and a service resource that only the service can
         // undo: the setting is still reversed, and the service resource is reported
         // at the end rather than stopping the reversible work before it.
-        let outcome = undo(&[restore("USENET", None), created], &env, Vec::new());
+        let outcome = undo(&[restore("USENET", None, "on"), created], &env, Vec::new());
 
         assert!(matches!(outcome, Err(problem) if problem.code == super::NEEDS_SERVICE));
         let file = store::read(&env).unwrap_or_default();
@@ -510,9 +588,100 @@ mod tests {
         let env = dir.join("env-is-a-directory");
         assert!(std::fs::create_dir_all(&env).is_ok());
 
-        let stopped = undo(&[restore("TZ", Some("Europe/Amsterdam"))], &env, Vec::new());
+        let stopped = undo(
+            &[restore("TZ", Some("Europe/Amsterdam"), "Pacific/Auckland")],
+            &env,
+            Vec::new(),
+        );
 
         assert!(stopped.is_err(), "the setting could not be restored");
+    }
+
+    /// The port a repair moved, as the journal records it: what it was, and what
+    /// the repair put there.
+    fn moved_the_port(previous: &str, current: &str) -> Change {
+        Change {
+            at: "t".to_owned(),
+            operation: crate::repair::OPERATION.to_owned(),
+            target: ".env".to_owned(),
+            kind: Kind::Set {
+                key: "QBITTORRENT_PORT".to_owned(),
+                previous: Some(previous.to_owned()),
+                current: current.to_owned(),
+            },
+        }
+    }
+
+    /// What the environment file holds for that port now.
+    fn port(env: &Path) -> Option<String> {
+        store::read(env)
+            .unwrap_or_default()
+            .get("QBITTORRENT_PORT")
+            .map(str::to_owned)
+    }
+
+    /// A reversal asked for twice does not put its value back over one the operator
+    /// chose in between.
+    ///
+    /// The sequence is the whole of it: a repair moves the port, the operator undoes
+    /// it, the operator then sets a third value deliberately, and asks to undo again.
+    /// The second reversal has the same journal to read and the same value to write,
+    /// and writing it would take away a decision that was made after the repair was
+    /// already reversed.
+    ///
+    /// Both halves are asserted, because a reversal that refused everything would
+    /// pass half of this: the first one is carried out and the port is the repair's
+    /// old value, and only the second is refused.
+    #[test]
+    fn a_second_reversal_does_not_write_over_what_the_operator_set() {
+        let dir = scratch("undo-twice");
+        let env = dir.join(".env");
+        assert!(store::set(&env, "QBITTORRENT_PORT", "51413").is_ok());
+        let undos = crate::repair::undoing(&[moved_the_port("6881", "51413")]);
+
+        // The operator watches the repair and asks for it back.
+        assert!(
+            undo(&undos, &env, Vec::new()).is_ok(),
+            "the first is carried out"
+        );
+        assert_eq!(
+            port(&env).as_deref(),
+            Some("6881"),
+            "the repair is reversed"
+        );
+
+        // Then they choose a third value themselves, which is theirs.
+        assert!(store::set(&env, "QBITTORRENT_PORT", "49152").is_ok());
+        let again = undo(&undos, &env, Vec::new());
+
+        assert!(
+            matches!(&again, Err(problem) if problem.code == super::NOT_PUT_BACK),
+            "{again:?}"
+        );
+        assert_eq!(
+            port(&env).as_deref(),
+            Some("49152"),
+            "the value the operator set stands"
+        );
+    }
+
+    /// The same reversal asked for twice with nothing changed in between is the same
+    /// answer twice, having written nothing the second time.
+    ///
+    /// A reversal is not consumed by being carried out, so an operator whose request
+    /// was cut off part way can ask again — and what makes that safe is that there is
+    /// nothing left to do rather than that nobody may ask.
+    #[test]
+    fn a_reversal_asked_for_twice_over_puts_the_same_value_back_once() {
+        let dir = scratch("undo-again");
+        let env = dir.join(".env");
+        assert!(store::set(&env, "QBITTORRENT_PORT", "51413").is_ok());
+        let undos = crate::repair::undoing(&[moved_the_port("6881", "51413")]);
+
+        assert!(undo(&undos, &env, Vec::new()).is_ok());
+        assert!(undo(&undos, &env, Vec::new()).is_ok(), "and again");
+
+        assert_eq!(port(&env).as_deref(), Some("6881"));
     }
 
     #[test]
@@ -523,7 +692,7 @@ mod tests {
         let env = dir.join("env-is-a-directory");
         assert!(std::fs::create_dir_all(&env).is_ok());
 
-        let stopped = undo(&[restore("USENET", None)], &env, Vec::new());
+        let stopped = undo(&[restore("USENET", None, "on")], &env, Vec::new());
 
         assert!(stopped.is_err(), "the key could not be removed");
     }

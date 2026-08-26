@@ -16,7 +16,7 @@ use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
 use lemonfiber_api::actions;
 use lemonfiber_api::actions::{
-    answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED,
+    answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED, TAKES_AGREED,
     TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
     TAKES_FORMS, TAKES_ITEM, TAKES_NARROWING, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES,
     TAKES_SETTING, TAKES_WAITING,
@@ -27,7 +27,7 @@ use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;
-use lemonfiber_core::app::restore::Kept;
+use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::{Command, Ctx, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::config::Settings;
@@ -511,7 +511,7 @@ fn exactly_what(action: &str) -> Arguments {
         check: takes(TAKES_CHECK).then(|| WARNED.to_owned()),
         disruptive: takes(TAKES_DISRUPTION).into(),
         offer: takes(TAKES_CONSENT).then(|| OFFER.to_owned()),
-        agreed: if takes(TAKES_CONSENT) {
+        agreed: if takes(TAKES_AGREED) {
             vec![WARNED.to_owned()]
         } else {
             Vec::new()
@@ -613,7 +613,10 @@ fn carries_agreement(command: &Command) -> bool {
         Command::Quality(QualityAction::Set { confirm: true, .. })
             | Command::QualityUpgrade { confirm: true }
             | Command::Reset { confirm: true }
-            | Command::Restore { confirm: true, .. }
+            | Command::Restore {
+                consent: RestoreConsent::Given { .. } | RestoreConsent::Standing,
+                ..
+            }
             | Command::Support {
                 wanted: Wanted {
                     confirmed: true,
@@ -655,15 +658,22 @@ fn carries_disruption(command: &Command) -> bool {
     )
 }
 
-/// Whether the command has the offer the consent was read in.
+/// Whether the command has what the consent was read in.
+///
+/// Two actions, and each names its own half: a repair's yes names the offer it was
+/// read in, a restore's names the listing.
 fn carries_offer(command: &Command) -> bool {
-    matches!(
-        command,
+    match command {
         Command::Repair {
             consent: Consent::Given { offer, .. },
             ..
-        } if offer == OFFER
-    )
+        } => offer == OFFER,
+        Command::Restore {
+            consent: RestoreConsent::Given { listing },
+            ..
+        } => listing == OFFER,
+        _ => false,
+    }
 }
 
 /// Whether the command has the repairs that were agreed to.

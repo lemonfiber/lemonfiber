@@ -698,6 +698,7 @@ mod tests {
             },
             downgrade: false,
             relocation: None,
+            agreement: "5c3a1d20".to_owned(),
         };
         assert_eq!(
             shown(settled(&Outcome::Restore(Restoration {

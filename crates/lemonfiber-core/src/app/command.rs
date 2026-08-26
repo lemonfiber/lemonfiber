@@ -246,10 +246,10 @@ pub enum Command {
         archive: restore::Kept,
         /// Whether re-pointing to this machine's data root was accepted.
         repoint: bool,
-        /// Whether what the archive would overwrite has been seen and agreed to.
-        /// Without it the archive is verified and its contents listed, and nothing
-        /// is touched.
-        confirm: bool,
+        /// How much of the restore this run was given consent for, and for which
+        /// listing. Without a yes the archive is verified and its contents listed,
+        /// and nothing is touched.
+        consent: restore::Consent,
     },
     /// Walk first-run setup: read where it stands, answer one question, move
     /// between them, or apply what has been answered.

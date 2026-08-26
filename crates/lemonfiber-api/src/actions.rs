@@ -31,6 +31,7 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
+use lemonfiber_core::app::restore::Consent as RestoreConsent;
 use lemonfiber_core::app::Command;
 
 use crate::jobs::{accepted, Job};
@@ -39,9 +40,9 @@ use crate::router::Serving;
 use crate::serve::{carrying, SENTENCE};
 
 pub use asked::{
-    Arguments, Disturbing, TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK,
-    TAKES_CONSENT, TAKES_DISRUPTION, TAKES_FORMS, TAKES_ITEM, TAKES_NARROWING, TAKES_PRESET,
-    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_WAITING,
+    Arguments, Disturbing, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING,
+    TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_FORMS, TAKES_ITEM, TAKES_NARROWING,
+    TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_WAITING,
 };
 pub use named::{named, OFFERED};
 pub use refused::Refused;
@@ -73,7 +74,10 @@ pub const fn answering(command: &Command) -> Answering {
         Command::ConfigSet { .. }
         | Command::Quality(_)
         | Command::Setup(_)
-        | Command::Restore { confirm: false, .. } => Answering::Now,
+        | Command::Restore {
+            consent: RestoreConsent::List,
+            ..
+        } => Answering::Now,
         _ => Answering::Later,
     }
 }

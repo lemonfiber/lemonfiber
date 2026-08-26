@@ -20,7 +20,7 @@
 
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
-use lemonfiber_core::app::restore::Kept;
+use lemonfiber_core::app::restore::{self, Kept};
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::audio::Format;
@@ -184,10 +184,10 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // operator, so a path it accepted would be a path it could read; a name is
         // resolved beneath the backups directory by the core and nowhere else.
         "restore" => match archive {
-            Some(name) => Ok(Command::Restore {
+            Some(name) => listing(confirm, offer).map(|consent| Command::Restore {
                 archive: Kept::Named(name),
                 repoint,
-                confirm,
+                consent,
             }),
             None => Err(needs("archive")),
         },
@@ -286,6 +286,35 @@ fn consent(confirm: bool, offer: Option<String>, agreed: Vec<String>) -> Result<
         (true, Some(_), true) => Err(needs("agreed")),
         (true, None, false) => Err(needs("offer")),
         (false, _, _) => Err(needs("confirm")),
+    }
+}
+
+/// What a restoring run was given consent for, or why it names none.
+///
+/// The same three shapes a repair's consent has, and the same word tells them
+/// apart. Without the yes the request is the listing itself, which overwrites
+/// nothing and is what an operator reads before deciding. With it and the listing
+/// it was read in, it is consent given to that listing. With it and nothing else it
+/// is standing consent — the decision taken before there was a listing, which is
+/// what a shell run with the agreement typed in advance is, and what a screen that
+/// lists and asks inside one process is.
+///
+/// The fourth is refused rather than read charitably: naming the listing without
+/// the yes is an answer to a question nobody was asked, and it would restore or not
+/// restore depending on which half was believed.
+///
+/// Apart from [`consent`] because they are not the same decision. A repair's yes
+/// also says *which* repairs, out of an offer of several; a restore has one archive
+/// and nothing to choose out of it, so there is no `agreed` here to be missing.
+fn listing(confirm: bool, offer: Option<String>) -> Result<restore::Consent, Refused> {
+    match (confirm, offer) {
+        (false, None) => Ok(restore::Consent::List),
+        (true, None) => Ok(restore::Consent::Standing),
+        (true, Some(listing)) => Ok(restore::Consent::Given { listing }),
+        (false, Some(_)) => Err(Refused::Missing {
+            action: "restore".to_owned(),
+            argument: "confirm".to_owned(),
+        }),
     }
 }
 

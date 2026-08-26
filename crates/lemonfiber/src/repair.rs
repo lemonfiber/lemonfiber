@@ -296,6 +296,10 @@ mod tests {
             serde_json::to_string(&recorded).unwrap_or_default() + "\n",
         )
         .ok();
+        // And the setting as that repair left it. A reversal puts back what it wrote
+        // over, so a machine that never held the repair's value has nothing of the
+        // repair on it to reverse.
+        lemonfiber_core::config::store::set(&paths.env_file(), "QBITTORRENT_PORT", "51413").ok();
 
         let code = run(
             ctx(),
