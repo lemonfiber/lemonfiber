@@ -739,6 +739,68 @@ fn no_source_file_outgrows_reading_in_one_sitting() {
     );
 }
 
+/// Every door of the funnel treats the text before it puts it out.
+///
+/// The funnel exists so that a question about how something is shown has one
+/// answer. It has two doors, and for a long time only one of them treated what it
+/// was given: the person's half made the text plain, and the parser's half printed
+/// it exactly as it arrived — on the stated grounds that serialising had already
+/// escaped every control character. It escapes the ones below a space, and carries
+/// the C1 controls, the line separators, the bidirectional overrides and the
+/// zero-widths raw. So `--json` was the one way out a release title could still
+/// reach a terminal through intact, and the sentence saying otherwise was the whole
+/// reason nobody looked.
+///
+/// Pinned by shape rather than by output, for the same reason the funnel's other
+/// rules are: what this catches is a **third** door added later, printing directly
+/// because that is what the two beside it appear to do. Reading the streams back
+/// would be a harness, and would say nothing about the door nobody has written yet.
+#[test]
+fn nothing_leaves_this_binary_without_passing_through_a_treatment() {
+    /// What puts a line where somebody can read it.
+    const DOORS: [&str; 3] = ["println!", "eprintln!", "print!"];
+    /// The two answers to what happens to it first: for a person, for a parser.
+    const TREATMENTS: [&str; 2] = ["rendered(", "written("];
+
+    let say = fs::read_to_string("src/say.rs").unwrap_or_default();
+    let shipped = production(&say);
+    let mut untreated: Vec<&str> = Vec::new();
+    let mut doors = 0_usize;
+    for line in shipped.lines() {
+        let statement = line.trim_start();
+        if !DOORS.iter().any(|door| statement.starts_with(door)) {
+            continue;
+        }
+        doors += 1;
+        if !TREATMENTS.iter().any(|how| statement.contains(how)) {
+            untreated.push(statement);
+        }
+    }
+
+    // What this is reading, asserted before what it found. A funnel that has been
+    // renamed or moved leaves the loop above matching nothing, and a guard that
+    // found no doors would pass while watching an empty file — which is the shape
+    // this repository has been caught by twice.
+    assert!(
+        doors >= DOORS.len(),
+        "fewer doors than there are ways to print, so this is reading the wrong \
+         file: {doors} found"
+    );
+    assert!(
+        untreated.is_empty(),
+        "these put text out with neither treatment, so somebody else's control \
+         characters reach a terminal through them: {untreated:?}"
+    );
+
+    // And the treatments themselves, since a door naming one that does nothing
+    // would satisfy the loop above without disarming anything.
+    let core = fs::read_to_string("../lemonfiber-core/src/text.rs").unwrap_or_default();
+    assert!(
+        core.contains("pub fn plain") && core.contains("pub fn escaped"),
+        "the two treatments are where the doors reach for them"
+    );
+}
+
 /// A failure reaches the operator on stderr, so a script can read the answer on
 /// stdout and a person can read the problem beside it.
 ///

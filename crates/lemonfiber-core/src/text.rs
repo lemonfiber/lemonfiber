@@ -16,7 +16,13 @@
 //! person could have meant — accents, scripts, punctuation, emoji — survives
 //! untouched, because a release name in Japanese is a release name.
 //!
-//! Beside it live the two other things that happen to text on its way to being
+//! That is the answer where a person is reading. Where a parser is, the same text
+//! is [`escaped`] rather than made plain: a script asked for a value it could act
+//! on, and a name with a character taken out of it no longer matches what the
+//! service holds — while a `\uXXXX` in its place is the same string to anything
+//! that reads JSON and six harmless characters to a terminal.
+//!
+//! Beside them live the two other things that happen to text on its way to being
 //! read: breaking it so it fits the room there is, and — where the room is one row
 //! and cannot be given a second — shortening it to that row. The two surfaces that
 //! wrap want different things at the edge, and [`Overrun`] is how each says which.
@@ -68,6 +74,62 @@ const fn obeyed(character: char) -> bool {
             | '\u{2066}'..='\u{2069}'
             | '\u{feff}'
     )
+}
+
+/// The three a JSON document may be laid out with.
+///
+/// A terminal obeys all three, and inside a string every one of them arrives
+/// written out — but between two tokens they are whitespace, and writing one out
+/// there produces an escape where a document expected a space. Serialising here is
+/// compact, so today there are none; a pretty-printed document later would carry
+/// them, and would be corrupted rather than disarmed.
+const fn laid_out(character: char) -> bool {
+    matches!(character, '\t' | '\n' | '\r')
+}
+
+/// The same document with anything a terminal would obey written as an escape.
+///
+/// The parser's door, where making text plain is the wrong answer: a script asked
+/// for something it could parse, and taking a character out of a release name
+/// changes the value it is handed. An escape changes nothing — a character and the
+/// `\uXXXX` standing for it are the same string to every reader of JSON — and a
+/// terminal the document is printed to reads six ASCII characters instead of an
+/// instruction.
+///
+/// It was skipped here on the grounds that serialising had already made the text
+/// safe, and that is true of exactly the range below a space. Above it, `serde_json`
+/// carries the character raw: the C1 controls some emulators still act on, the two
+/// line separators, the bidirectional overrides that draw a name backwards, and the
+/// zero-widths that draw nothing at all. So `--json` was the one way out that a
+/// release title could still reach a terminal through intact.
+///
+/// The set is [`obeyed`]'s, so the two doors cannot come to disagree about what a
+/// terminal obeys — a character added there is answered on both.
+#[must_use]
+pub fn escaped(document: &str) -> String {
+    let mut written = String::with_capacity(document.len());
+    for character in document.chars() {
+        if obeyed(character) && !laid_out(character) {
+            written.push_str("\\u");
+            for shift in [12_u32, 8, 4, 0] {
+                written.push(digit((u32::from(character) >> shift) & 0xf));
+            }
+        } else {
+            written.push(character);
+        }
+    }
+    written
+}
+
+/// One hex digit, lower case, which is how JSON writes an escape.
+///
+/// Taken a digit at a time rather than formatted, because a `format!` into the
+/// string it is building is an allocation a lint refuses and a `write!` is a result
+/// nothing here can act on — a string cannot fail to be written to. The nibble is
+/// masked to four bits before it arrives, so the fallback stands for nothing that
+/// can happen and is there because a digit has to be returned.
+fn digit(nibble: u32) -> char {
+    char::from_digit(nibble, 16).unwrap_or('0')
 }
 
 /// What a run with nothing to break on does when it reaches the edge.
@@ -178,7 +240,7 @@ pub fn fitted(text: &str, width: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{fitted, plain, wrapped, Overrun};
+    use super::{escaped, fitted, plain, wrapped, Overrun};
 
     #[test]
     fn a_release_name_that_would_clear_the_screen_no_longer_can() {
@@ -266,6 +328,119 @@ mod tests {
     fn text_with_nothing_to_remove_comes_back_as_it_was() {
         assert_eq!(plain(""), "");
         assert_eq!(plain("plain"), "plain");
+    }
+
+    /// What serialising leaves for somebody else to deal with.
+    ///
+    /// The claim this door was built on — that JSON escapes every control character
+    /// — is true only below a space. Asserted against the serialiser itself rather
+    /// than restated, because the whole defect was a sentence about `serde_json`
+    /// that nothing checked: this fails the day it starts escaping them, which is
+    /// the day the door could stop.
+    #[test]
+    fn serialising_carries_the_ones_above_a_space_raw() {
+        for carried in ['\u{9b}', '\u{2028}', '\u{202e}', '\u{200b}', '\u{feff}'] {
+            let written =
+                serde_json::to_string(&format!("Some{carried}Release")).unwrap_or_default();
+            assert!(
+                written.contains(carried),
+                "{carried:?} arrives raw: {written:?}"
+            );
+        }
+        let below = serde_json::to_string("Some\u{1b}Release").unwrap_or_default();
+        assert!(!below.contains('\u{1b}'), "and below a space it does not");
+    }
+
+    /// A document printed to a terminal carries no instruction for it.
+    ///
+    /// The same names the plain-text tests above are written from, put through the
+    /// other door. What comes out is a document, so the check is that nothing a
+    /// terminal obeys survives in it — not that the characters are gone from the
+    /// value, which is the next test.
+    #[test]
+    fn the_parsers_door_leaves_nothing_a_terminal_obeys() {
+        for hidden in [
+            '\u{1b}', '\u{9b}', '\u{7f}', '\u{2028}', '\u{2029}', '\u{202a}', '\u{202b}',
+            '\u{202c}', '\u{202d}', '\u{202e}', '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}',
+            '\u{200b}', '\u{feff}',
+        ] {
+            let written =
+                serde_json::to_string(&format!("Some{hidden}Release")).unwrap_or_default();
+            let out = escaped(&written);
+            assert!(
+                !out.contains(hidden),
+                "{hidden:?} still reaches the terminal: {out:?}"
+            );
+        }
+    }
+
+    /// And the value a script is handed is the one the service holds.
+    ///
+    /// The reason this door escapes rather than makes plain. A name with the
+    /// character removed no longer matches what it was taken from, and matching it
+    /// is what a script asked for the document to do.
+    #[test]
+    fn what_a_parser_reads_back_is_the_name_it_was_sent() {
+        for hidden in ['\u{9b}', '\u{2028}', '\u{202e}', '\u{200b}', '\u{feff}'] {
+            let name = format!("Some{hidden}Release");
+            let written = serde_json::to_string(&name).unwrap_or_default();
+            let read: String = serde_json::from_str(&escaped(&written)).unwrap_or_default();
+            assert_eq!(read, name, "{hidden:?} did not survive the door");
+        }
+    }
+
+    /// The two doors answer about the same set.
+    ///
+    /// The drift this is bought against: a character recognised as an instruction on
+    /// one door and not on the other leaves the quieter door open, and nothing about
+    /// either function would look wrong. Every code point below the astral planes is
+    /// asked of both, so a range added to one and not the other fails here.
+    #[test]
+    fn a_character_one_door_answers_for_is_answered_by_the_other() {
+        // Filtered rather than pushed into from a branch. A branch that only runs
+        // where the doors disagree is a line nothing executes while they agree, and
+        // the coverage gate reads test code too.
+        let disagreeing: Vec<u32> = (0..=0xffff_u32)
+            .filter_map(char::from_u32)
+            .filter(|character| {
+                let name = format!("a{character}b");
+                let removed = !plain(&name).contains(*character);
+                let written_out = !escaped(&name).contains(*character);
+                removed != (written_out || super::laid_out(*character))
+            })
+            .map(u32::from)
+            .collect();
+        assert!(
+            disagreeing.is_empty(),
+            "one door treats these as an instruction and the other does not: {disagreeing:?}"
+        );
+    }
+
+    /// The three a document may be laid out with are left where they are.
+    ///
+    /// Between two tokens each of them is whitespace, and an escape there is a
+    /// document that will not parse. Nothing serialises that way today, which is why
+    /// this is stated rather than discovered by whoever adds pretty-printing.
+    #[test]
+    fn the_characters_a_document_is_laid_out_with_are_left_alone() {
+        assert_eq!(escaped("{\n\t\"a\": 1\r\n}"), "{\n\t\"a\": 1\r\n}");
+    }
+
+    #[test]
+    fn a_document_with_nothing_to_write_out_comes_back_as_it_was() {
+        assert_eq!(escaped(""), "");
+        assert_eq!(escaped("{\"name\":\"Amélie\"}"), "{\"name\":\"Amélie\"}");
+    }
+
+    /// An escape is written the way JSON spells one.
+    ///
+    /// Four hex digits, lower case, so what is produced is the same text the
+    /// serialiser would have produced had it written the character out itself.
+    #[test]
+    fn an_escape_is_written_the_way_the_serialiser_writes_one() {
+        assert_eq!(escaped("a\u{202e}b"), "a\\u202eb");
+        assert_eq!(escaped("a\u{9b}b"), "a\\u009bb");
+        assert_eq!(escaped("a\u{feff}b"), "a\\ufeffb");
     }
 
     /// The ordinary case, and the one both callers are built on.
