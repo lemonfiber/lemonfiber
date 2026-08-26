@@ -367,7 +367,7 @@ pub(super) fn doing(
 pub(crate) mod tests {
     use super::{all, every, Errand, Going, KEY};
     use crate::acting::offer::OFFERED as KEYED;
-    use lemonfiber::reaching::ACTS;
+    use lemonfiber::reaching::{ACTS, ALSO};
     use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
     use lemonfiber_core::app::restore::Kept;
     use lemonfiber_core::app::Command;
@@ -432,13 +432,19 @@ pub(crate) mod tests {
         assert!(KEYED.iter().all(|offer| offer.key != KEY));
     }
 
-    /// The one thing the screen's three lists of actions are checked against from
-    /// outside the binary, and the whole of that list rather than this file's third
+    /// The one thing the screen's four lists of actions are checked against from
+    /// outside the binary, and the whole of that list rather than this file's quarter
     /// of it — the projection is one list, so only one place can hold it to be
     /// exactly what the screen offers. An action offered on any of them with no entry
     /// there leaves the parity table's terminal column claiming less than the screen
     /// does, and an entry there naming an action nothing offers leaves it claiming
     /// more.
+    ///
+    /// The published names come off two lists because the requests do. Every other
+    /// action is the only way its request is reached; the three quality writes act on
+    /// a request the screen already reaches as a read, so they are published beside
+    /// the rest rather than among them — and both lists are read here, or a write
+    /// could be added to the screen and excused by the list it was not on.
     #[test]
     fn every_action_this_screen_offers_is_published_for_the_parity_table() {
         let mut offered: Vec<&str> = KEYED
@@ -446,8 +452,9 @@ pub(crate) mod tests {
             .map(|offer| offer.action)
             .chain(every().map(|errand| errand.action))
             .chain(crate::acting::lasting::every().map(|lasting| lasting.action))
+            .chain(crate::acting::quality::every().map(|change| change.action))
             .collect();
-        let mut published: Vec<&str> = ACTS.iter().map(|reach| reach.through).collect();
+        let mut published: Vec<&str> = ACTS.iter().chain(ALSO).map(|reach| reach.through).collect();
         offered.sort_unstable();
         published.sort_unstable();
 
