@@ -1,17 +1,29 @@
 //! The rest of what this stack can be told to do, and what becomes of one.
 //!
-//! Six errands behind one key. The screen already answers `q`, `r`, `?`, the key
+//! Seven errands behind one key. The screen already answers `q`, `r`, `?`, the key
 //! that opens the questions and five actions of its own, and there is no letter
 //! left that anybody would guess — so this is the arrangement [`super::question`]
 //! already made for the reads, made again for the writes that are not the lifecycle
-//! five. A seventh errand goes on the list without costing anybody a letter to
+//! five. An eighth errand goes on the list without costing anybody a letter to
 //! learn.
 //!
 //! The key promises only that there is more. A wiring, a capture, a bundle, an
 //! archive put back and a revert have no one word between them that is not vaguer
-//! than the six names on the list, and a key claiming something the list does not
+//! than the seven names on the list, and a key claiming something the list does not
 //! hold is worse than one claiming nothing — so what each errand is is said on the
 //! row, where there is room to say it.
+//!
+//! **Putting the last repair back is one of these, and putting a fault right is
+//! not.** The two are one errand read in both directions, and the command line says
+//! so — `--fix` and `--undo` are two errands rather than four settings, which is why
+//! it declares them apart. But only one of them fits this list's rule. A repair is
+//! offered, read, and then agreed to *in part*: the yes is a selection out of an
+//! offer, which is the one thing no errand here does. An undo reads nothing and names
+//! nothing — which repair was last, what reversing it takes and which of those need a
+//! service to reach are the core's to decide — so its yes is the whole of the
+//! agreement, exactly as the wiring's and the capture's are. It sits beside the other
+//! reversal, the narrower of the two first, so nobody reaching for the one that puts
+//! back a single repair lands on the one that puts back the whole configuration.
 //!
 //! Each errand is held by the name every surface calls the action by, and that name
 //! goes through [`lemonfiber_api::actions::named`] exactly as the five on their own
@@ -123,6 +135,14 @@ static AFTER: &[Errand] = &[
         asks: "Write the bundle",
         names: None,
         going: Going::Written,
+    },
+    Errand {
+        name: "the last repair put back",
+        about: "reverse what the last repair changed, leaving the wiring under it alone",
+        action: "undo",
+        asks: "Put back what the last repair changed",
+        names: None,
+        going: Going::Once,
     },
     Errand {
         name: "a backup put back",
@@ -439,9 +459,9 @@ pub(crate) mod tests {
     /// parity table's terminal column claiming less than the screen does, and an
     /// entry there naming an action nothing offers leaves it claiming more.
     ///
-    /// Five places offer one: the keys, this list, the two that keep going, the three
-    /// quality changes, and the widening offered under a diagnosis, which is on no
-    /// list at all because there is one of it.
+    /// Six places offer one: the keys, this list, the two that keep going, the three
+    /// quality changes, the two that answer a diagnosis, and the widening offered
+    /// under one, which is on no list at all because there is one of it.
     ///
     /// The published names come off two lists because the requests do. Every other
     /// action is the only way its request is reached; the three quality writes and
@@ -457,6 +477,7 @@ pub(crate) mod tests {
             .chain(every().map(|errand| errand.action))
             .chain(crate::acting::lasting::every().map(|lasting| lasting.action))
             .chain(crate::acting::quality::every().map(|change| change.action))
+            .chain(crate::acting::mending::every().map(|mending| mending.action))
             .chain(std::iter::once(crate::acting::disturbing::ACTION))
             .collect();
         let mut published: Vec<&str> = ACTS.iter().chain(ALSO).map(|reach| reach.through).collect();
@@ -563,11 +584,15 @@ pub(crate) mod tests {
         );
     }
 
-    /// The three that carry no agreement are sent as they stand, and each reaches
+    /// The four that carry no agreement are sent as they stand, and each reaches
     /// the command every other surface produces for the same request.
+    ///
+    /// Putting the last repair back is one of them, and it carries no subject either:
+    /// which repair was last and what reversing it takes are the core's, so there is
+    /// nothing here for this screen to name.
     #[test]
     fn an_errand_carrying_no_agreement_is_sent_as_it_stands() {
-        let sent: Vec<Result<Command, String>> = ["seed", "adopt", "backup"]
+        let sent: Vec<Result<Command, String>> = ["seed", "adopt", "backup", "undo"]
             .into_iter()
             .filter_map(sending)
             .map(|errand| errand.sent(""))
@@ -579,6 +604,7 @@ pub(crate) mod tests {
                 Ok(Command::Seed),
                 Ok(Command::Adopt),
                 Ok(Command::Backup { service: None }),
+                Ok(Command::Undo),
             ]
         );
     }
