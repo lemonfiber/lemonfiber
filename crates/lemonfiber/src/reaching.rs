@@ -116,6 +116,10 @@ pub const ASKS: &[Reach] = &[
         request: "trace",
         through: "/api/trace",
     },
+    Reach {
+        request: "stuck",
+        through: "/api/stuck",
+    },
 ];
 
 /// The requests the dashboard's panels show without being asked.
@@ -125,7 +129,14 @@ pub const ASKS: &[Reach] = &[
 /// hold this against. What it still buys is the parity table — a row claiming this
 /// screen shows what is running has to say so here too, and a panel removed leaves a
 /// name here that a reader can see is unaccompanied.
-pub const SHOWS: &[&str] = &["ps", "doctor", "stuck"];
+///
+/// `stuck` was here and is a question now. The panel that carried it reads the queue
+/// health gather, which counts what has stopped and names the cause where several
+/// items share one; the read the command line means by `stuck` names each item by the
+/// title a trace is asked for. They are two renderings of one worry rather than one
+/// rendering, and it was the second that the screen had no way to reach — so the
+/// panel stays and the request is reached where it can be followed.
+pub const SHOWS: &[&str] = &["ps", "doctor"];
 
 /// The requests the dashboard reaches a second way, by acting on what one of its
 /// questions answers.

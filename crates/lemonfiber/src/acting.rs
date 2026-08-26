@@ -64,6 +64,7 @@
 mod chooser;
 mod errand;
 mod lasting;
+mod narrowing;
 mod offer;
 mod quality;
 mod question;
@@ -246,7 +247,15 @@ impl Acting {
                 asks,
                 typed,
             } => question::typing(&mut self.stage, question, asks, typed, press),
-            Stage::Waiting(question) => question::waiting(&mut self.stage, question, press),
+            Stage::Waiting(question) => {
+                question::waiting(&mut self.stage, Stage::Waiting(question), press)
+            }
+            Stage::Following(question) => {
+                question::waiting(&mut self.stage, Stage::Following(question), press)
+            }
+            Stage::Narrowing { question, chooser } => {
+                narrowing::narrowing(&mut self.stage, question, chooser, press)
+            }
             Stage::Sending(chooser) => errand::sending(&mut self.stage, chooser, press),
             Stage::Naming {
                 errand,
@@ -459,14 +468,11 @@ impl Acting {
             },
             // Rendered by the same renderer the command line reaches for the same
             // answer, so the two surfaces cannot come to say different things about
-            // one stack.
-            Stage::Waiting(question) => Stage::Answered {
-                question,
-                reading: Reading::of(match answer {
-                    Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
-                    Err(problem) => complaint(&problem),
-                }),
-            },
+            // one stack. A question that narrows by picking is answered with a list
+            // to take one of instead, which is the same answer read as a choice —
+            // and what one of those comes to is an answer again, whichever shape.
+            Stage::Waiting(question) => narrowing::asked(question, answer),
+            Stage::Following(question) => narrowing::followed(question, answer),
             waiting_for_nothing => waiting_for_nothing,
         };
     }
@@ -503,10 +509,11 @@ mod tests {
     use lemonfiber_core::backup::Scope;
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
     use lemonfiber_core::model::{
-        Disposition, FormsReport, PresetChoice, QualityReport, ResetReport, StackEdit,
-        SupervisionReport, UpgradeMedia, UpgradeReport, VersionReport,
+        Disposition, FormsReport, PresetChoice, QualityReport, ResetReport, StackEdit, StuckEntry,
+        StuckReport, SupervisionReport, TraceReport, UpgradeMedia, UpgradeReport, VersionReport,
     };
     use lemonfiber_core::quality::Preset;
+    use lemonfiber_core::trace::Stage as TraceStage;
     use lemonfiber_core::walkthrough::Step as WalkStep;
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::path::PathBuf;
@@ -553,15 +560,65 @@ mod tests {
         }
     }
 
-    /// The screen, having got as far as the line where what to follow is typed.
-    fn asking_where() -> Acting {
+    /// The screen, with the list of questions open at the one named.
+    ///
+    /// Moved to by name off the list an operator moves over, rather than reached by
+    /// index: a question added above one of these would silently renumber every test
+    /// below, and each of them would go on passing about the wrong question.
+    fn at(name: &str) -> Acting {
         let mut acting = Acting::opened();
         acting.pressed(&Press::Typed(question::KEY));
-        while !showing(&acting).contains("> where one thing is") {
+        let wanted = format!("> {name}");
+        for _ in 0..MOST {
+            if showing(&acting).contains(&wanted) {
+                break;
+            }
             acting.pressed(&Press::Forward);
         }
+        acting
+    }
+
+    /// More presses than there are questions, so a name nothing matches stops rather
+    /// than moving for ever.
+    const MOST: usize = 30;
+
+    /// The screen, having taken the question named.
+    fn asking(name: &str) -> Acting {
+        let mut acting = at(name);
         acting.pressed(&Press::Accept);
         acting
+    }
+
+    /// The screen, having got as far as the line where what to follow is typed.
+    fn asking_where() -> Acting {
+        asking("where one thing is")
+    }
+
+    /// A trace of the item a test follows, which is what the second read answers
+    /// with — a different shape from the listing that led to it.
+    fn a_trace(item: &str) -> TraceReport {
+        TraceReport {
+            item: item.to_owned(),
+            matched: true,
+            ..TraceReport::default()
+        }
+    }
+
+    /// Two stuck items, the second of them the one a test takes.
+    fn two_stuck() -> StuckReport {
+        StuckReport {
+            items: vec![a_stuck("The Expanse", "sonarr"), a_stuck("Dune", "radarr")],
+            incomplete: false,
+        }
+    }
+
+    /// One stuck item, held where it is said to be held.
+    fn a_stuck(title: &str, service: &str) -> StuckEntry {
+        StuckEntry {
+            title: title.to_owned(),
+            service: service.to_owned(),
+            stage: TraceStage::Downloading,
+        }
     }
 
     /// A failure to render, for the paths that report one.
@@ -1195,6 +1252,238 @@ mod tests {
 
         assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
         assert!(showing(&acting).is_empty());
+    }
+
+    /// A question narrowed by picking asks its own read for the whole listing, and
+    /// what comes back is offered as a list to take one of rather than as an answer.
+    ///
+    /// Carried rather than asked for the reason every other question is: reading what
+    /// is stuck reaches the \*arrs over the network, and a screen that waited on it
+    /// would stop answering keys while it did.
+    #[test]
+    fn a_question_that_picks_asks_for_its_listing_and_then_offers_it() {
+        let mut acting = at("what is stuck");
+
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Stuck)
+        );
+
+        acting.came_to(Ok(Outcome::Stuck(two_stuck())));
+        let said = showing(&acting);
+        assert!(said.contains("what is stuck"), "{said}");
+        assert!(said.contains("> The Expanse"), "{said}");
+        assert!(said.contains("Dune"), "{said}");
+        assert!(said.contains("radarr, stuck at downloading"), "{said}");
+    }
+
+    /// Taking one of them follows that one, by the title the entry carries — which
+    /// is the second read, and the arrangement the web's own stuck list already has.
+    #[test]
+    fn taking_one_of_the_stuck_items_follows_that_one() {
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Stuck(two_stuck())));
+
+        acting.pressed(&Press::Forward);
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Trace {
+                term: "Dune".to_owned(),
+                season: None,
+            })
+        );
+
+        // And what *that* comes to is read as an answer, under the question that led
+        // here. It is a trace rather than another stuck listing, which is the whole
+        // of what the second read being a different read means: sent back through the
+        // listing it would be a shape this question cannot list, and would have been
+        // called unexpected on the one answer the operator actually asked for.
+        acting.came_to(Ok(Outcome::Trace(a_trace("Dune"))));
+        let said = showing(&acting);
+        assert!(said.contains("what is stuck"), "{said}");
+        assert!(said.contains("Dune"), "{said}");
+    }
+
+    /// Backing out of the second read leaves the screen clear, the way backing out of
+    /// the first does — and an answer nobody is waiting for then changes nothing.
+    #[test]
+    fn one_of_the_listed_things_can_be_left_while_it_is_with_the_core() {
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Stuck(two_stuck())));
+        acting.pressed(&Press::Accept);
+
+        assert!(showing(&acting).contains("waiting for this stack to answer"));
+        assert_eq!(acting.pressed(&Press::Typed('x')), Wanted::Nothing);
+        assert!(showing(&acting).contains("waiting for this stack to answer"));
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        acting.came_to(Ok(Outcome::Trace(a_trace("Dune"))));
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// A listing with nothing in it is an answer, not a refusal — and it is the
+    /// answer the command line gives for the same read, rather than a sentence this
+    /// screen wrote about there being nothing to choose.
+    #[test]
+    fn a_listing_with_nothing_in_it_is_read_as_the_answer_it_is() {
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Stuck(StuckReport::default())));
+
+        let said = showing(&acting);
+        assert!(said.contains("Nothing is stuck"), "{said}");
+        assert!(!said.contains("enter"), "{said}");
+    }
+
+    /// An entry carrying no title cannot be followed, so it is not offered — and a
+    /// listing of nothing but those is the answer rather than an empty list.
+    #[test]
+    fn a_stuck_entry_with_nothing_to_follow_by_is_not_offered() {
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Stuck(StuckReport {
+            items: vec![a_stuck("", "sonarr"), a_stuck("Dune", "radarr")],
+            incomplete: false,
+        })));
+
+        assert!(showing(&acting).contains("> Dune"));
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Trace {
+                term: "Dune".to_owned(),
+                season: None,
+            })
+        );
+
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Stuck(StuckReport {
+            items: vec![a_stuck("", "sonarr")],
+            incomplete: false,
+        })));
+        assert!(showing(&acting).contains("item(s) stuck"));
+    }
+
+    /// A failure on the second read is said under the question that led to it, the
+    /// way a failure on the first is — the operator asked one question and is owed
+    /// one account of what became of it.
+    #[test]
+    fn a_failure_following_one_of_them_is_said_under_the_question() {
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Stuck(two_stuck())));
+        acting.pressed(&Press::Accept);
+
+        acting.came_to(Err(Box::new(a_failure())));
+
+        let said = showing(&acting);
+        assert!(said.contains("what is stuck"), "{said}");
+        assert!(
+            said.contains("the container engine could not be reached"),
+            "{said}"
+        );
+    }
+
+    /// The same shape over the forms: the listing is asked for, offered in the
+    /// stack's own words, and taking one says what starting it would come to.
+    #[test]
+    fn taking_one_of_the_forms_says_what_starting_it_would_come_to() {
+        let mut acting = at("what starting one would come to");
+
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Forms)
+        );
+
+        acting.came_to(Ok(Outcome::Forms(a_listing())));
+        let said = showing(&acting);
+        assert!(said.contains("> Full stack"), "{said}");
+        assert!(said.contains("the download clients only"), "{said}");
+
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Preview {
+                forms: vec!["full".to_owned()],
+            })
+        );
+    }
+
+    /// A stack that declares no forms answers with the listing that says so.
+    #[test]
+    fn a_stack_declaring_no_forms_answers_the_listing_rather_than_a_list() {
+        let mut acting = asking("what starting one would come to");
+        acting.came_to(Ok(Outcome::Forms(nothing_declared())));
+
+        assert!(!showing(&acting).is_empty());
+    }
+
+    /// Moving over a listing and leaving it take nothing, the way every other list
+    /// on this screen does.
+    #[test]
+    fn moving_over_a_listing_and_leaving_it_take_nothing() {
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Stuck(two_stuck())));
+
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Back);
+        assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
+        assert_eq!(acting.pressed(&Press::Rubout), Wanted::Nothing);
+        assert!(showing(&acting).contains("> The Expanse"));
+
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// An answer of a shape the question does not list is said to be unexpected
+    /// rather than drawn as an empty list nobody can take anything off.
+    #[test]
+    fn an_answer_a_picking_question_cannot_list_is_unexpected() {
+        let mut acting = asking("what is stuck");
+        acting.came_to(Ok(Outcome::Version(a_version())));
+
+        assert!(!showing(&acting).is_empty());
+        assert!(!showing(&acting).contains("0.8.0"));
+    }
+
+    /// The two narrowings that are typed are typed on the line a trace already had,
+    /// fill the argument their own read names, and are refused empty in that read's
+    /// own words.
+    #[test]
+    fn a_setting_and_a_member_are_named_on_the_line_a_trace_is_named_on() {
+        let mut acting = asking("one setting");
+        assert!(showing(&acting).contains("Which setting"));
+        for character in "SONARR_API_KEY".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::ConfigGet {
+                key: "SONARR_API_KEY".to_owned(),
+            })
+        );
+
+        let mut acting = asking("what one person asked for");
+        assert!(showing(&acting).contains("Which member"));
+        for character in "ada".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Household {
+                member: Some("ada".to_owned()),
+            })
+        );
+    }
+
+    /// Naming neither is refused in the sentence a browser is refused with, which is
+    /// a different sentence for each of them because each names a different thing.
+    #[test]
+    fn naming_no_setting_and_naming_no_member_are_each_refused_in_their_own_words() {
+        let mut acting = asking("one setting");
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+        let said = showing(&acting);
+        assert!(said.contains(lemonfiber_api::reads::NO_SETTING), "{said}");
+
+        let mut acting = asking("what one person asked for");
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+        let said = showing(&acting);
+        assert!(said.contains(lemonfiber_api::reads::NO_MEMBER), "{said}");
     }
 
     /// Moving over the questions and typing at them take nothing, the way the list
