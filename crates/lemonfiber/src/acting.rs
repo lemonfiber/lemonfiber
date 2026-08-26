@@ -246,6 +246,16 @@ impl Acting {
     }
 
     /// What a press asks for.
+    /// What a press asks for.
+    ///
+    /// Routed in two, because the stages a press can arrive at are two kinds. One is
+    /// a flow that began by taking something off a list of things to *do* — an
+    /// errand, one of the two that keep going, a quality change, a repair, or the
+    /// hand-over. The other is a flow that began at a key: the five lifecycle actions
+    /// and the services inside what they named, the questions, and the readings a
+    /// press moves through. Each half claims its own and hands back what is not, so
+    /// what neither claims is the screen with nothing open — where a press belongs to
+    /// no flow at all and is the screen's own.
     pub(crate) fn pressed(&mut self, press: &Press) -> Wanted {
         // The pane of words closes on any key and takes the key with it, which is
         // what makes it dismissible without anybody having to learn how.
@@ -253,33 +263,20 @@ impl Acting {
             self.words = false;
             return Wanted::Nothing;
         }
-        match std::mem::replace(&mut self.stage, Stage::Idle) {
-            Stage::Idle => self.idle(press),
-            Stage::Choosing { offer, chooser } => {
-                offer::choosing(&mut self.stage, offer, chooser, press, &self.services)
-            }
-            Stage::Inside { inside, chooser } => {
-                service::choosing(&mut self.stage, inside, chooser, press)
-            }
-            Stage::Confirming { offer, taken } => {
-                offer::confirming(&mut self.stage, offer, taken, press)
-            }
-            Stage::Running { offer, taken } => offer::running(&mut self.stage, offer, taken, press),
-            Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
-            Stage::Typing {
-                question,
-                asks,
-                typed,
-            } => question::typing(&mut self.stage, question, asks, typed, press),
-            Stage::Waiting { question, typed } => {
-                question::waiting(&mut self.stage, Stage::Waiting { question, typed }, press)
-            }
-            Stage::Following(question) => {
-                question::waiting(&mut self.stage, Stage::Following(question), press)
-            }
-            Stage::Narrowing { question, chooser } => {
-                narrowing::narrowing(&mut self.stage, question, chooser, press)
-            }
+        match self.off_a_list(press) {
+            Some(wanted) => wanted,
+            None => match self.on_a_key(press) {
+                Some(wanted) => wanted,
+                // Only one stage is neither, and it is the one with nothing open.
+                None => self.idle(press),
+            },
+        }
+    }
+
+    /// A press over a flow that began by taking something off a list of things to do,
+    /// or nothing where it began somewhere else — the stage put back as it was.
+    fn off_a_list(&mut self, press: &Press) -> Option<Wanted> {
+        Some(match std::mem::replace(&mut self.stage, Stage::Idle) {
             Stage::Sending(chooser) => {
                 errand::sending(&mut self.stage, chooser, press, &self.services)
             }
@@ -348,6 +345,44 @@ impl Acting {
             Stage::Handing => surface::handing(&mut self.stage, press),
             // A reading moves, and any key that is not a move puts it away — the
             // way the pane of words is put away.
+            // Put back rather than carried out: a stage this does not claim is one
+            // the dispatcher below it does, and it has to be there to be taken again.
+            elsewhere => {
+                self.stage = elsewhere;
+                return None;
+            }
+        })
+    }
+
+    /// A press over a flow that began at a key, or nothing where none is open — the
+    /// stage put back as it was.
+    fn on_a_key(&mut self, press: &Press) -> Option<Wanted> {
+        Some(match std::mem::replace(&mut self.stage, Stage::Idle) {
+            Stage::Choosing { offer, chooser } => {
+                offer::choosing(&mut self.stage, offer, chooser, press, &self.services)
+            }
+            Stage::Inside { inside, chooser } => {
+                service::choosing(&mut self.stage, inside, chooser, press)
+            }
+            Stage::Confirming { offer, taken } => {
+                offer::confirming(&mut self.stage, offer, taken, press)
+            }
+            Stage::Running { offer, taken } => offer::running(&mut self.stage, offer, taken, press),
+            Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
+            Stage::Typing {
+                question,
+                asks,
+                typed,
+            } => question::typing(&mut self.stage, question, asks, typed, press),
+            Stage::Waiting { question, typed } => {
+                question::waiting(&mut self.stage, Stage::Waiting { question, typed }, press)
+            }
+            Stage::Following(question) => {
+                question::waiting(&mut self.stage, Stage::Following(question), press)
+            }
+            Stage::Narrowing { question, chooser } => {
+                narrowing::narrowing(&mut self.stage, question, chooser, press)
+            }
             Stage::Came(reading) => reading::came(&mut self.stage, reading, press),
             Stage::Answered {
                 question,
@@ -355,7 +390,13 @@ impl Acting {
                 reading,
             } => question::answered(&mut self.stage, question, widening, reading, press),
             Stage::Disturbing => disturbing::disturbing(&mut self.stage, press),
-        }
+            // Put back rather than carried out: a stage this does not claim is one
+            // the dispatcher below it does, and it has to be there to be taken again.
+            elsewhere => {
+                self.stage = elsewhere;
+                return None;
+            }
+        })
     }
 
     /// With nothing open: leave, gather afresh, explain, or begin an action.
