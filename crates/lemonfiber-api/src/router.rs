@@ -50,9 +50,20 @@ pub struct Serving {
 
 /// Every endpoint this surface answers, behind the guard they share.
 ///
-/// Routes are merged before the layer is applied, so the guard wraps the whole
-/// tree — a path nothing serves is refused rather than reported as missing, and
-/// which paths exist is not something an unauthenticated caller can map.
+/// Routes are merged before the layer is applied, so the guard wraps every route
+/// declared here: an endpoint added beside the others is guarded by having been
+/// added, rather than by anyone remembering to wrap it.
+///
+/// What it does **not** wrap is a path under `/api/` that no route here declares.
+/// This router is merged under the app's fallback, and axum keeps one fallback per
+/// tree, so an unmatched path is answered by [`crate::frontend::page`] — which
+/// refuses to hand a page to anything under `/api/` and returns a plain absence
+/// instead. That absence is deliberate and argued where it is written; the cost of
+/// it is that an unauthenticated caller can tell a path that exists from one that
+/// does not, since the first answers `403` and the second `404`. The endpoints are
+/// named in the contract every SDK is generated from, so what that reveals is
+/// already published — but it is not nothing, and this said the opposite until a
+/// test asked the composed surface rather than this function.
 ///
 /// The stream is merged here too, after the state the rest share and before the
 /// layer, even though it carries its own state and checks admission itself. Its
