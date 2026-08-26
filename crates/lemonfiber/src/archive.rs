@@ -62,13 +62,13 @@ fn atomically(
     // No branch on whether there is a parent: `parent()` is empty for a bare filename and
     // absent only for a root path, and `create_dir_all` treats both as nothing to do. The
     // wrapper this replaces left its own closing brace as a line no test could reach.
-    fs::create_dir_all(dest.parent().unwrap_or(dest)).map_err(fault)?;
+    own_dir(dest.parent().unwrap_or(dest)).map_err(fault)?;
 
     let staging = write_staging(dest);
     let _ = fs::remove_file(&staging);
 
     let result = (|| {
-        let file = File::create(&staging)?;
+        let file = own_file(&staging)?;
         let encoder = GzEncoder::new(file, Compression::default());
         let mut builder = tar::Builder::new(encoder);
         pack(&mut builder)?;
@@ -83,10 +83,55 @@ fn atomically(
     fs::rename(&staging, dest).map_err(fault)
 }
 
+/// The archive itself, created readable by its owner alone.
+///
+/// The mode goes on at creation rather than after, so the bytes are never even briefly
+/// world-readable — the same reason [`crate::config`]'s store opens the settings file this
+/// way. A `.tar.gz` of a configuration directory holds everything that directory holds, so
+/// the container has to be as private as the tightest thing inside it; the entry modes
+/// below say what an extracted file gets and say nothing about who may read the archive.
+#[cfg(unix)]
+fn own_file(path: &Path) -> std::io::Result<File> {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
+}
+
+/// Where the platform tracks no file mode, an ordinary create.
+#[cfg(not(unix))]
+fn own_file(path: &Path) -> std::io::Result<File> {
+    File::create(path)
+}
+
+/// The directory archives are kept in, private to its owner.
+///
+/// The mode is set as it is created, so a parent this does not own — a home directory, a
+/// mount point — is left exactly as it was.
+#[cfg(unix)]
+fn own_dir(dir: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::DirBuilderExt as _;
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)
+}
+
+/// Elsewhere there is no owner-only notion to honour, so an ordinary recursive create.
+#[cfg(not(unix))]
+fn own_dir(dir: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dir)
+}
+
 /// One entry whose bytes are in hand, held at a mode nobody else can read.
 ///
-/// Both archives carry the operator's own configuration — one of them redacted, both of
-/// them theirs — and a mode nobody sets is a mode the umask chose.
+/// This is the mode an extracted file gets, and it is not what protects the archive: the
+/// container's own mode is [`own_file`]'s to set. Both archives carry the operator's own
+/// configuration — one of them redacted, both of them theirs — and a mode nobody sets is a
+/// mode the umask chose.
 fn held(
     builder: &mut tar::Builder<GzEncoder<File>>,
     name: &str,
@@ -812,5 +857,38 @@ mod tests {
     #[test]
     fn the_manifest_name_is_stable() {
         assert_eq!(MANIFEST, "manifest.json");
+    }
+
+    /// The archive is no more readable than the settings file it carries.
+    ///
+    /// A backup takes the configuration directory whole, so it holds the `.env` the store
+    /// goes to trouble to keep at `0600` inside a `0700` directory. Written with no mode of
+    /// its own it landed at whatever the umask allowed — `0644` under the ordinary `0022` —
+    /// which is the credential readable beside the copy that is not. The entry modes inside
+    /// say what an extracted file gets and say nothing about who may open the archive.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn an_archive_is_no_more_readable_than_the_settings_it_carries() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = scratch("mode");
+        let paths = install(&root);
+        let plan = backup::plan(&paths, &Scope::WholeStack);
+        let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+        let dest = paths.backups().join("backup.tar.gz");
+        let written = Tar.write(&dest, &manifest, &plan.items).await;
+
+        let mode = |path: &Path| {
+            fs::metadata(path)
+                .map(|data| data.permissions().mode() & 0o777)
+                .ok()
+        };
+        assert!(written.is_ok(), "{written:?}");
+        assert_eq!(mode(&dest), Some(0o600), "the archive is the owner's alone");
+        assert_eq!(
+            mode(&paths.backups()),
+            Some(0o700),
+            "and so is the directory it is kept in"
+        );
     }
 }
