@@ -308,7 +308,7 @@ pub(crate) mod tests {
             Some((offer, taken)) => or_the_question(offer, taken, having),
             None => sending(action)
                 .and_then(|errand| for_the_errand(errand, having))
-                .map_or(Stage::Idle, |stage| stage),
+                .unwrap_or(Stage::Idle),
         }
     }
 
