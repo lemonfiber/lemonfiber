@@ -280,6 +280,24 @@ jobs:
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
+      # `dist` writes this file, and what it writes gives the host job
+      # `contents: write` — which this repository's token cannot have, because the
+      # default workflow permission is `read` at both org and repo, and a job may
+      # only ask for what that default allows. So the release is created with the
+      # same App the record, the site and the contract move already use.
+      #
+      # Kept when `dist init` regenerates this file: `tests/release_token.rs` fails
+      # if this step or its use below goes missing, because a regeneration that
+      # dropped it would answer 403 at the last step of a release, after every
+      # artefact had been built and against a tag that cannot be moved.
+      - name: Mint a token that may create a release
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: lemonfiber
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
@@ -323,6 +341,7 @@ jobs:
           rm -f artifacts/*-dist-manifest.json
       - name: Create GitHub Release
         env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
           PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
           ANNOUNCEMENT_TITLE: "${{ fromJson(steps.host.outputs.manifest).announcement_title }}"
           ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
