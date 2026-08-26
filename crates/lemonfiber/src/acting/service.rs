@@ -258,9 +258,11 @@ pub(super) fn choosing(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{choosing, fills, for_the_errand, gathered, or_the_question, Fills};
-    use crate::acting::errand::tests::sending;
+    use super::{choosing, fills, for_the_errand, gathered, or_the_question, Fills, Inside};
+    use crate::acting::chooser::Chooser;
+    use crate::acting::errand::tests::{sending, UNTRANSLATABLE};
     use crate::acting::offer::tests::{a_form_taken, offering};
+    use crate::acting::offer::Choice;
     use crate::acting::{Press, Stage};
     use lemonfiber_api::actions::{named, Arguments, TAKES_SERVICE, TAKES_SERVICES};
     use lemonfiber_core::app::{Command, Waiting};
@@ -361,12 +363,13 @@ pub(crate) mod tests {
         }
     }
 
-    /// What the question a stage holds calls what it is about.
-    fn about(stage: &Stage) -> String {
+    /// What the question a stage holds calls what it is about, or nothing where it
+    /// holds no question.
+    fn about(stage: &Stage) -> Option<String> {
         match *stage {
-            Stage::Confirming { ref taken, .. } => taken.name(),
-            Stage::Agreeing { ref given, .. } => given.said().to_owned(),
-            _ => String::new(),
+            Stage::Confirming { ref taken, .. } => Some(taken.name()),
+            Stage::Agreeing { ref given, .. } => Some(given.said().to_owned()),
+            _ => None,
         }
     }
 
@@ -435,6 +438,10 @@ pub(crate) mod tests {
             assert!(
                 listed(&opened(action, &in_hand())).is_empty(),
                 "{action} was offered a list of services"
+            );
+            assert!(
+                about(&taking(action, "Full stack")).is_some(),
+                "{action} did not reach the question it always asked"
             );
         }
         assert_eq!(listed(&opened("up", &in_hand())).len(), 3);
@@ -512,7 +519,7 @@ pub(crate) mod tests {
                 services: vec!["sonarr".to_owned(), "radarr".to_owned()],
             })
         );
-        assert_eq!(about(&stage), "2 services");
+        assert_eq!(about(&stage).as_deref(), Some("2 services"));
     }
 
     /// Naming no service goes on with what was already named, in the words that
@@ -522,7 +529,7 @@ pub(crate) mod tests {
     fn naming_no_service_goes_on_with_what_was_already_named() {
         let stage = taking("down", "all of them");
 
-        assert_eq!(about(&stage), "Full stack");
+        assert_eq!(about(&stage).as_deref(), Some("Full stack"));
         assert_eq!(
             carried(&stage),
             Some(Command::Down {
@@ -559,9 +566,62 @@ pub(crate) mod tests {
     fn the_capture_is_given_the_service_it_was_shown() {
         let whole = taking("backup", "the whole stack");
 
-        assert_eq!(about(&taking("backup", "Radarr")), "Radarr");
-        assert_eq!(about(&whole), "the whole stack");
+        assert_eq!(
+            about(&taking("backup", "Radarr")).as_deref(),
+            Some("Radarr")
+        );
+        assert_eq!(about(&whole).as_deref(), Some("the whole stack"));
         assert!(carried(&whole).is_none(), "a capture is not an action");
+    }
+
+    /// Backing out of the list starts nothing. The forms taken a moment ago are let
+    /// go with it, because a half-answered question left standing is one the next
+    /// keypress would answer.
+    #[test]
+    fn backing_out_of_the_list_starts_nothing() {
+        let left = after(opened("up", &in_hand()), &[Press::Abandon]);
+
+        assert!(about(&left).is_none());
+        assert!(listed(&left).is_empty());
+    }
+
+    /// A list the translation refuses is put in front of the operator in the words a
+    /// browser is refused with, rather than swallowed on the way to a command.
+    ///
+    /// Nothing this screen offers can reach it — every row was accepted by the same
+    /// translation before it was drawn — so it is driven through the errand that
+    /// names an action no surface offers, which is how the list of forms beside this
+    /// one drives the same path.
+    #[test]
+    fn a_list_the_translation_refuses_is_put_in_front_of_the_operator() {
+        let mut stage = Stage::Idle;
+        let marked = Choice {
+            name: "Sonarr".to_owned(),
+            about: "healthy".to_owned(),
+            names: vec!["sonarr".to_owned()],
+            marked: Some(true),
+            command: Command::Backup { service: None },
+        };
+
+        choosing(
+            &mut stage,
+            Inside::Errand(&UNTRANSLATABLE),
+            Chooser::over(marked, Vec::new()),
+            &Press::Accept,
+        );
+        let said = crate::acting::words::pane(&stage, 20, 100)
+            .map(|pane| {
+                pane.lines
+                    .iter()
+                    .flat_map(|line| line.spans.iter())
+                    .map(|span| span.content.as_ref())
+                    .collect::<Vec<&str>>()
+                    .join(" ")
+            })
+            .unwrap_or_default();
+
+        assert!(said.contains("no action named"), "{said}");
+        assert!(about(&stage).is_none(), "{said}");
     }
 
     /// A gather that could not be filled has no service to narrow to, so no list is
@@ -571,8 +631,15 @@ pub(crate) mod tests {
         let nothing = gathered(&Panel::unavailable("the engine did not answer"));
 
         assert!(nothing.is_empty());
-        assert!(matches!(opened("up", &nothing), Stage::Confirming { .. }));
-        assert!(matches!(opened("backup", &nothing), Stage::Idle));
+        assert_eq!(
+            about(&opened("up", &nothing)).as_deref(),
+            Some("Full stack"),
+            "the action goes straight to the question it always asked"
+        );
+        assert!(
+            about(&opened("backup", &nothing)).is_none(),
+            "and the capture opens no list to put a question under"
+        );
     }
 
     /// One service in hand is still a choice, because the row naming none is a real

@@ -1989,11 +1989,9 @@ mod tests {
         onto(&mut acting, "Radarr");
         acting.pressed(&Press::Accept);
 
-        assert!(
-            showing(&acting).contains("Stop Radarr?"),
-            "{}",
-            showing(&acting)
-        );
+        let question = showing(&acting);
+
+        assert!(question.contains("Stop Radarr?"), "{question}");
         assert_eq!(
             acting.pressed(&Press::Typed('y')),
             Wanted::Carry(Command::Halt {
@@ -2031,11 +2029,9 @@ mod tests {
         acting.pressed(&Press::Accept);
         acting.pressed(&Press::Accept);
 
-        assert!(
-            showing(&acting).contains("Start Full stack?"),
-            "{}",
-            showing(&acting)
-        );
+        let question = showing(&acting);
+
+        assert!(question.contains("Start Full stack?"), "{question}");
         assert_eq!(
             acting.pressed(&Press::Typed('y')),
             Wanted::Carry(Command::Up {
@@ -2053,10 +2049,11 @@ mod tests {
         onto(&mut acting, "Full stack");
         acting.pressed(&Press::Accept);
 
+        let question = showing(&acting);
+
         assert!(
-            showing(&acting).contains("Fetch newer images for Full stack?"),
-            "{}",
-            showing(&acting)
+            question.contains("Fetch newer images for Full stack?"),
+            "{question}"
         );
     }
 
@@ -2096,10 +2093,11 @@ mod tests {
     fn a_capture_with_no_services_in_hand_is_the_whole_stack_it_always_was() {
         let (mut acting, _) = sending("backup");
 
+        let question = showing(&acting);
+
         assert!(
-            showing(&acting).contains("Capture the configuration of the whole stack?"),
-            "{}",
-            showing(&acting)
+            question.contains("Capture the configuration of the whole stack?"),
+            "{question}"
         );
         assert_eq!(
             acting.pressed(&Press::Typed('y')),
