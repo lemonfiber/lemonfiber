@@ -259,6 +259,30 @@ fn nothing_that_draws_a_screen_reads_a_setting_for_itself() {
          is — a screen has been renamed or moved: {unwatched:?}"
     );
 
+    // And the other half of the same question, which the list above had and this one
+    // did not. `DRAWING` fails when it names a tree nothing matches; `READING` could
+    // name a way of reaching the settings that nothing does any more, and the failure
+    // would look identical from outside — a green run about a rule nobody is held to.
+    //
+    // Read from what ships, and **not** from the tests. The corpus the crawler
+    // returns is everything under `crates/`, this file among it — so a first version
+    // of this check found each name in the `const` that declares it and passed about
+    // nothing at all, which is the shape it was written to catch.
+    let shipped: String = source_tree::sources()
+        .into_iter()
+        .filter(|(path, _)| path.to_string_lossy().replace('\\', "/").contains("/src/"))
+        .map(|(_, text)| text)
+        .collect();
+    let gone: Vec<&&str> = READING
+        .iter()
+        .filter(|how| !shipped.contains(**how))
+        .collect();
+    assert!(
+        gone.is_empty(),
+        "these name no way anything reads the settings, so watching for them holds \
+         nothing — the reading has been renamed and this guard did not follow: {gone:?}"
+    );
+
     assert!(
         reaching.is_empty(),
         "a screen reads settings by asking the core for them, never by reading them: \
