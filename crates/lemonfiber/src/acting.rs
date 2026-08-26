@@ -62,6 +62,7 @@
 //! the name of a process that no longer exists.
 
 mod chooser;
+mod disturbing;
 mod errand;
 mod lasting;
 mod narrowing;
@@ -247,8 +248,8 @@ impl Acting {
                 asks,
                 typed,
             } => question::typing(&mut self.stage, question, asks, typed, press),
-            Stage::Waiting(question) => {
-                question::waiting(&mut self.stage, Stage::Waiting(question), press)
+            Stage::Waiting { question, typed } => {
+                question::waiting(&mut self.stage, Stage::Waiting { question, typed }, press)
             }
             Stage::Following(question) => {
                 question::waiting(&mut self.stage, Stage::Following(question), press)
@@ -315,13 +316,10 @@ impl Acting {
             }
             Stage::Answered {
                 question,
-                mut reading,
-            } => {
-                if moved(&mut reading, press) {
-                    self.stage = Stage::Answered { question, reading };
-                }
-                Wanted::Nothing
-            }
+                widening,
+                reading,
+            } => question::answered(&mut self.stage, question, widening, reading, press),
+            Stage::Disturbing => disturbing::disturbing(&mut self.stage, press),
         }
     }
 
@@ -434,7 +432,10 @@ impl Acting {
                 }
                 Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
             },
-            Stage::Doing { .. } => Stage::Came(Reading::of(match answer {
+            // An errand and the widened diagnosis land the same way. Both were
+            // agreed to rather than asked, and nothing further is offered under
+            // either — the second is already the run that disturbs.
+            Stage::Doing { .. } | Stage::Disturbing => Stage::Came(Reading::of(match answer {
                 Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
                 Err(problem) => complaint(&problem),
             })),
@@ -471,7 +472,7 @@ impl Acting {
             // one stack. A question that narrows by picking is answered with a list
             // to take one of instead, which is the same answer read as a choice —
             // and what one of those comes to is an answer again, whichever shape.
-            Stage::Waiting(question) => narrowing::asked(question, answer),
+            Stage::Waiting { question, typed } => narrowing::asked(question, &typed, answer),
             Stage::Following(question) => narrowing::followed(question, answer),
             waiting_for_nothing => waiting_for_nothing,
         };
@@ -507,10 +508,12 @@ mod tests {
     use lemonfiber_core::app::restore::Kept;
     use lemonfiber_core::app::{backup, Command, Outcome, QualityAction, Waiting};
     use lemonfiber_core::backup::Scope;
+    use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
     use lemonfiber_core::model::{
-        Disposition, FormsReport, PresetChoice, QualityReport, ResetReport, StackEdit, StuckEntry,
-        StuckReport, SupervisionReport, TraceReport, UpgradeMedia, UpgradeReport, VersionReport,
+        Disposition, DoctorReport, FormsReport, PresetChoice, QualityReport, ResetReport,
+        StackEdit, StuckEntry, StuckReport, SupervisionReport, TraceReport, UpgradeMedia,
+        UpgradeReport, VersionReport,
     };
     use lemonfiber_core::quality::Preset;
     use lemonfiber_core::trace::Stage as TraceStage;
@@ -619,6 +622,35 @@ mod tests {
             service: service.to_owned(),
             stage: TraceStage::Downloading,
         }
+    }
+
+    /// A diagnosis whose one check could not be established, which is what an
+    /// ordinary run reports about both of the checks that disturb — each of them
+    /// saying to run that one.
+    fn a_diagnosis() -> DoctorReport {
+        DoctorReport {
+            overall: Overall::Unknown,
+            findings: vec![Finding::in_category(
+                Category::Vpn,
+                "vpn.killswitch",
+                "Traffic stops when the tunnel does",
+                Verdict::Unverified {
+                    reason: "the check that takes the tunnel away has not been asked for"
+                        .to_owned(),
+                    remedy: Remedy::new(
+                        "Run the disruptive check when transfers can be interrupted",
+                    ),
+                },
+            )],
+        }
+    }
+
+    /// The screen, having read a diagnosis and agreed to the checks that disturb.
+    fn widened() -> Acting {
+        let mut acting = asking("how this stack is doing");
+        acting.came_to(Ok(Outcome::Doctor(a_diagnosis())));
+        acting.pressed(&Press::Typed('y'));
+        acting
     }
 
     /// A failure to render, for the paths that report one.
@@ -1165,6 +1197,156 @@ mod tests {
             Wanted::Carry(Command::Version)
         );
         assert!(showing(&acting).contains("waiting for this stack to answer"));
+    }
+
+    /// The claim this slice makes, end to end. The panels already show storage and
+    /// VPN facts a diagnosis reads, and a fact is not a verdict: what a check found,
+    /// and what to do about it, were on no screen at all. So the diagnosis is asked
+    /// for like any other read, its verdicts and its remedies are what the box shows,
+    /// and the checks that disturb a running system are offered *under* that report
+    /// rather than in front of it — the account is the run that named the gap.
+    #[test]
+    fn the_diagnosis_is_read_and_then_widened_under_its_own_report() {
+        let report = a_diagnosis();
+        let printed = crate::render::shaped(&Outcome::Doctor(report.clone())).text();
+        let mut acting = at("how this stack is doing");
+
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Doctor {
+                narrowing: Narrowing::Suite,
+                disruptive: false,
+                accept: None,
+            })
+        );
+
+        acting.came_to(Ok(Outcome::Doctor(report)));
+        let said = showing(&acting);
+        for line in printed.lines().filter(|line| !line.is_empty()) {
+            assert!(said.contains(line), "{line:?} is missing from {said}");
+        }
+        assert!(
+            said.contains("Run the disruptive check"),
+            "the remedy: {said}"
+        );
+        assert!(said.contains("including the ones that disturb?"), "{said}");
+        assert!(
+            said.contains("takes the tunnel away"),
+            "what it costs: {said}"
+        );
+
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Doctor {
+                narrowing: Narrowing::Suite,
+                disruptive: true,
+                accept: None,
+            })
+        );
+    }
+
+    /// A diagnosis narrowed to one family is widened over that family and no other.
+    /// Both disturbing checks name what to run in what they tell the operator, and a
+    /// screen that could only widen the whole suite would take the tunnel away to
+    /// spend one indexer search.
+    #[test]
+    fn a_narrowed_diagnosis_is_widened_over_the_narrowing_it_was_asked_with() {
+        let mut acting = asking("one family of checks");
+        for character in "vpn".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Doctor {
+                narrowing: Narrowing::Category(Category::Vpn),
+                disruptive: false,
+                accept: None,
+            })
+        );
+
+        acting.came_to(Ok(Outcome::Doctor(a_diagnosis())));
+
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Doctor {
+                narrowing: Narrowing::Category(Category::Vpn),
+                disruptive: true,
+                accept: None,
+            })
+        );
+    }
+
+    /// Every other answer is closed by the same key rather than acted on. A `y` over
+    /// a trace taking the tunnel away would be an action arriving through a key that
+    /// puts a box away everywhere else on this screen.
+    #[test]
+    fn a_yes_over_an_answer_that_is_not_a_diagnosis_puts_it_away() {
+        let mut acting = asking_where();
+        for character in "The Expanse".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Accept);
+        acting.came_to(Ok(Outcome::Trace(a_trace("The Expanse"))));
+
+        let said = showing(&acting);
+        assert!(!said.contains("disturb"), "{said}");
+        assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
+
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// A diagnosis that could not be run offers nothing to widen. There is no report
+    /// to read, so there is no account for the question to sit under — and offering
+    /// to disturb the stack on the strength of a failure would be offering it about
+    /// nothing.
+    #[test]
+    fn a_diagnosis_that_could_not_be_run_offers_no_widening() {
+        let mut acting = asking("how this stack is doing");
+
+        acting.came_to(Err(Box::new(a_failure())));
+
+        let said = showing(&acting);
+        assert!(
+            said.contains("the container engine could not be reached"),
+            "{said}"
+        );
+        assert!(!said.contains("disturb"), "{said}");
+        assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
+    }
+
+    /// While the widened run is with the core the panels are the report — the VPN
+    /// panel is showing the very thing being tested — so nothing is drawn over them
+    /// and the footer says what is running. Leaving is the only thing left to ask,
+    /// and it leaves the run going: it took the tunnel away and has to put it back.
+    #[test]
+    fn a_run_that_disturbs_reports_through_the_panels_and_is_left_rather_than_stopped() {
+        let mut acting = widened();
+
+        assert!(showing(&acting).is_empty());
+        let footing = footing(&acting);
+        assert!(footing.contains("the checks that disturb"), "{footing}");
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+
+        assert_eq!(acting.pressed(&Press::Typed('q')), Wanted::Leave);
+    }
+
+    /// What it came to is read where an action's answer is read, and offers no
+    /// second widening: it is already the run that disturbs.
+    #[test]
+    fn what_the_widened_run_came_to_is_read_without_a_second_offer() {
+        let report = a_diagnosis();
+        let printed = crate::render::shaped(&Outcome::Doctor(report.clone())).text();
+        let mut acting = widened();
+
+        acting.came_to(Ok(Outcome::Doctor(report)));
+
+        let said = showing(&acting);
+        assert!(said.contains("what it came to"), "{said}");
+        for line in printed.lines().filter(|line| !line.is_empty()) {
+            assert!(said.contains(line), "{line:?} is missing from {said}");
+        }
+        assert!(!said.contains("including the ones that disturb?"), "{said}");
     }
 
     /// An answer is shown in the words the command line gives for the same request,
