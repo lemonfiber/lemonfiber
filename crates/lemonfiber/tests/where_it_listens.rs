@@ -73,6 +73,11 @@ const ASKED: &[(&str, &str)] = &[
         "assets",
         "the directory the app being served is read from, which is a path and not an address",
     ),
+    (
+        "set_password",
+        "whether a password is asked for before it starts, which settles who may open it and \
+         nothing about where it is opened from",
+    ),
 ];
 
 /// An address named in the workspace: what was written, where, and what it reaches.

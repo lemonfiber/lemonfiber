@@ -1102,6 +1102,11 @@ Options:
       --force
           Take the stack from a run that claimed it and did not give it back
 
+      --set-password
+          Set the password this surface asks for, before it starts.
+
+          Asked for at the keyboard and never on this line: a password typed as an argument is a password in your shell's history and in the list of processes this machine is running.
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 

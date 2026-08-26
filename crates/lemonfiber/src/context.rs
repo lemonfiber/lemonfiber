@@ -107,6 +107,7 @@ pub(crate) fn read_settings() -> Settings {
         service_user: service_user_from_env(&recorded),
         port_forward: port_forward_from_env(&recorded),
         indexer: indexer_from_env(&recorded),
+        admission: here().map(|paths| paths.admission()),
         // On unless it is explicitly turned off: somebody meeting this vocabulary
         // does not know there is a setting to look for, and somebody who wants the
         // explanations gone knows exactly what they want to stop.

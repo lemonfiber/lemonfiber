@@ -17,6 +17,11 @@ authors = ["NightWorks.io"]
 [workspace.dependencies]
 schemars = "1.2"
 async-trait = "0.1"
+# Argon2id for the one password lemonfiber verifies rather than reads: the operator's
+# own, in front of the web surface. Memory-hard, so an attacker's advantage is bounded
+# by memory bandwidth rather than by how many cores they can rent. Its own randomness
+# feature is left off — the salt comes through the port every other secret does.
+argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash"] }
 # The web surface's router. Default features pull in a URL query parser, tracing and
 # websockets, none of which this API has; what is left is routing, HTTP/1 and JSON,
 # which is the whole of what the contract describes.

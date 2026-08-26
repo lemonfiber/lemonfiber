@@ -265,7 +265,7 @@ fn the_fixtures_crate_does_not_depend_on_the_core() {
 /// to the network fails the build.
 #[test]
 fn talking_to_the_outside_world_only_happens_in_adapters() {
-    let confined: [(&str, &[&str]); 8] = [
+    let confined: [(&str, &[&str]); 9] = [
         ("tokio::process", &["adapters/process.rs"]),
         ("std::process::Command", &["adapters/process.rs"]),
         (
@@ -282,6 +282,11 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         // for the same reason the rest are: the day something else wants to read
         // a compose file, it asks the module that already knows how.
         ("serde_yaml_ng", &["stack/mounts.rs"]),
+        // Nor is this one. Hashing a password is pure, and it is confined for a
+        // sharper reason than the rest: a second place that hashed one its own way
+        // would be a second set of parameters, and the weaker of the two would be
+        // invisible in everything it produced.
+        ("argon2", &["admission/credential.rs"]),
     ];
 
     for (crate_name, permitted) in confined {

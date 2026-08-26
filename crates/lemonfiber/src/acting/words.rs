@@ -1329,6 +1329,7 @@ mod tests {
                 port: Some(7171),
                 browser: false,
                 assets: Some(std::path::PathBuf::from("/srv/app")),
+                password: true,
             },
             open: Open::Nothing { refused: None },
         };

@@ -20,9 +20,10 @@
 //! dashboard, and an operator who reached for the wrong letter should not lose the
 //! screen they were reading.
 //!
-//! **The three choices are made here, because afterwards there is no screen to make
-//! them on.** `lemonfiber ui` takes a port, whether to open a browser, and a
-//! directory to serve the interface from, and this key left all three at their
+//! **The four choices are made here, because afterwards there is no screen to make
+//! them on.** `lemonfiber ui` takes a port, whether to open a browser, a
+//! directory to serve the interface from, and whether to set the password this
+//! surface asks for, and this key left them all at their
 //! defaults — so a screen reached the request and not its arguments, which is the
 //! same gap every other partial row on the parity table records. They are made under
 //! the question rather than before it: what the surface is about to be given is on
@@ -30,7 +31,7 @@
 //! shown.
 //!
 //! **They are offered on enter rather than on a key of their own.** This screen
-//! answers thirteen letters already, and the three are settings on one request
+//! answers thirteen letters already, and the four are settings on one request
 //! rather than alternatives to choose between — so a list opened before the
 //! question would be asking which of them to serve with. Enter is what every list
 //! here is taken with and the one key this question had no use for, so the two
@@ -53,6 +54,16 @@
 //! end of a remote session — where opening a browser reaches a machine nobody is
 //! sitting at, and the line saying one has been opened is false to the person
 //! reading it.
+//!
+//! **A password is answered on the terminal this screen gives back, not on this
+//! screen.** The other three are values this box can draw as they are typed, and a
+//! password is the one that must not be: every line typed here is drawn by this
+//! program into a box, and a box showing the credential in front of the most
+//! privileged surface in the product shows it to whoever is standing behind the
+//! reader. So the row says only whether one will be asked for, and the asking
+//! happens after the handover — the same arrangement the port already has, where
+//! what this screen can check is that a word is a port at all and what only the
+//! surface can do is take it.
 //!
 //! **A directory is a path, and this is the one surface a path may be typed at.** A
 //! browser is handed a name and never a path, because resolving a caller's path with
@@ -80,6 +91,12 @@ pub(crate) const ASKS: &str = "Close this screen and start the web interface";
 /// What that comes to, in the line under the question.
 pub(crate) const ABOUT: &str =
     "it serves to this machine only, and says its address and the word it will ask you for";
+
+/// What the password row says where one is to be asked for.
+const ASKED_FOR: &str = "you are asked for one before it starts";
+
+/// What it says where the password is left as it stands.
+const LEFT: &str = "left as it is";
 
 /// What the port row says where no port was named.
 const WHICHEVER: &str = "whichever one is free";
@@ -124,12 +141,34 @@ impl Fills {
     }
 }
 
+/// Which of the surface's yes-or-no choices a row turns over.
+///
+/// Named for the same reason [`Fills`] is: what a row does is a fact about that row,
+/// and the alternative is one branch here that knows which row it is looking at.
+pub(super) enum Turns {
+    /// Whether a browser is opened when it starts.
+    Browser,
+    /// Whether a password is asked for before it starts.
+    Password,
+}
+
+impl Turns {
+    /// What the surface is given, with this choice turned over.
+    fn given(&self, asked: &Asked) -> Asked {
+        match *self {
+            Self::Browser => asked.turned(),
+            Self::Password => asked.asking(),
+        }
+    }
+}
+
 /// What taking one of the choices does.
 ///
 /// Two shapes, and which one a choice takes is a question about what it holds. A
-/// port and a directory are values nothing can list, so they are typed. A browser is
-/// one thing or the other, and a line to type `yes` on would be a spelling test with
-/// two answers.
+/// port and a directory are values nothing can list, so they are typed. A browser
+/// and a password are one thing or the other — a browser opens or it does not, and a
+/// password is either asked for on the way or left alone — and a line to type `yes`
+/// on would be a spelling test with two answers.
 enum Takes {
     /// A word, under the line it is typed on, filling one of the choices.
     Typed {
@@ -139,10 +178,10 @@ enum Takes {
         fills: Fills,
     },
     /// A yes or no, which taking turns over.
-    Turned,
+    Turned(Turns),
 }
 
-/// One of the three choices, and what it is set to.
+/// One of the four choices, and what it is set to.
 pub(super) struct Chosen {
     /// What it is called on the row.
     name: &'static str,
@@ -162,7 +201,7 @@ impl Listed for Chosen {
     }
 }
 
-/// The three as they stand, the one the list opens on apart from the rest.
+/// The four as they stand, the one the list opens on apart from the rest.
 ///
 /// Built from what the surface is about to be given rather than held beside it, so
 /// the row an operator reads and the value the surface is started with cannot come
@@ -183,7 +222,7 @@ pub(super) fn choices(asked: &Asked) -> (Chosen, Vec<Chosen>) {
             Chosen {
                 name: "browser",
                 about: if asked.browser { OPENED } else { UNOPENED }.to_owned(),
-                takes: Takes::Turned,
+                takes: Takes::Turned(Turns::Browser),
             },
             Chosen {
                 name: "app",
@@ -195,6 +234,11 @@ pub(super) fn choices(asked: &Asked) -> (Chosen, Vec<Chosen>) {
                     asks: DIRECTORY,
                     fills: Fills::Directory,
                 },
+            },
+            Chosen {
+                name: "password",
+                about: if asked.password { ASKED_FOR } else { LEFT }.to_owned(),
+                takes: Takes::Turned(Turns::Password),
             },
         ],
     )
@@ -212,11 +256,11 @@ pub(super) enum Open {
         /// Why the last word typed was not taken, where it was not.
         refused: Option<&'static str>,
     },
-    /// The three choices, one of them selected.
+    /// The four choices, one of them selected.
     Choosing(Chooser<Chosen>),
     /// The line one of their values is typed on.
     Typing {
-        /// Which of the three the word being typed fills.
+        /// Which of the four the word being typed fills.
         fills: Fills,
         /// What is asked for, above the line being typed.
         asks: &'static str,
@@ -242,7 +286,7 @@ pub(super) fn handing(stage: &mut Stage, asked: Asked, open: Open, press: &Press
     }
 }
 
-/// At the question: go ahead, open the three choices, or leave it.
+/// At the question: go ahead, open the four choices, or leave it.
 ///
 /// Only an explicit yes goes ahead, and what it goes ahead with is what the question
 /// showed — including a choice that was refused, which the question says so about
@@ -262,7 +306,7 @@ fn agreeing(stage: &mut Stage, asked: Asked, press: &Press) -> Wanted {
     }
 }
 
-/// Over the three: move, take one, or leave it.
+/// Over the four: move, take one, or leave it.
 fn choosing(
     stage: &mut Stage,
     asked: Asked,
@@ -289,8 +333,8 @@ fn choosing(
 /// the surface will be given is read.
 fn take(stage: &mut Stage, asked: Asked, chosen: Chosen) -> Wanted {
     *stage = match chosen.takes {
-        Takes::Turned => Stage::Handing {
-            asked: asked.turned(),
+        Takes::Turned(turns) => Stage::Handing {
+            asked: turns.given(&asked),
             open: Open::Nothing { refused: None },
         },
         Takes::Typed { asks, fills } => Stage::Handing {
@@ -355,7 +399,7 @@ fn typing(
 
 #[cfg(test)]
 mod tests {
-    use super::{ABOUT, ASKS, BUILT_IN, KEY, UNOPENED, WHICHEVER};
+    use super::{ABOUT, ASKED_FOR, ASKS, BUILT_IN, KEY, LEFT, UNOPENED, WHICHEVER};
     use crate::acting::{Acting, Press, Wanted};
     use crate::ui::{Asked, NOT_A_PORT};
     use lemonfiber::reaching::OPENS;
@@ -554,6 +598,42 @@ mod tests {
         down(&mut acting, 1);
         acting.pressed(&Press::Accept);
 
+        assert_eq!(started(&mut acting), Some(Asked::unsaid()));
+    }
+
+    /// Asking for a password is the fourth row, and the row is the whole of what the
+    /// screen settles: the answer is given afterwards, on the terminal this screen
+    /// gives back.
+    #[test]
+    fn the_password_row_says_one_is_asked_for_and_never_what_it_is() {
+        let mut acting = changing();
+        down(&mut acting, 3);
+        acting.pressed(&Press::Accept);
+
+        let said = showing(&acting);
+        assert!(said.contains(ASKED_FOR), "{said}");
+        assert_eq!(
+            started(&mut acting),
+            Some(Asked {
+                password: true,
+                ..Asked::unsaid()
+            })
+        );
+    }
+
+    /// Turning it back is the same row again, and taking the surface at its defaults
+    /// leaves the password exactly as it stands.
+    #[test]
+    fn leaving_the_password_row_alone_leaves_the_password_alone() {
+        let mut acting = changing();
+        down(&mut acting, 3);
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Accept);
+        down(&mut acting, 3);
+        acting.pressed(&Press::Accept);
+
+        let said = showing(&acting);
+        assert!(said.contains(LEFT), "{said}");
         assert_eq!(started(&mut acting), Some(Asked::unsaid()));
     }
 

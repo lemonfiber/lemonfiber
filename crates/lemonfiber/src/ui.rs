@@ -14,6 +14,8 @@
 //! The words are here and the printing is at the edge, so what an operator is
 //! told is proven rather than demonstrated.
 
+pub(crate) mod password;
+
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
@@ -57,6 +59,8 @@ pub(crate) struct Asked {
     pub browser: bool,
     /// A directory holding a built app, for a build that carries none.
     pub assets: Option<PathBuf>,
+    /// Whether to ask for a password for this surface before starting it.
+    pub password: bool,
 }
 
 /// What is said to a request whose port is not a number a machine could listen on.
@@ -80,6 +84,7 @@ impl Asked {
             port: None,
             browser: true,
             assets: None,
+            password: false,
         }
     }
 
@@ -125,6 +130,14 @@ impl Asked {
             ..self.clone()
         }
     }
+
+    /// The same, with the question about a password turned over.
+    pub(crate) fn asking(&self) -> Self {
+        Self {
+            password: !self.password,
+            ..self.clone()
+        }
+    }
 }
 
 impl From<RawUi> for Asked {
@@ -138,6 +151,7 @@ impl From<RawUi> for Asked {
             port: raw.port,
             browser: !raw.no_browser,
             assets: raw.assets,
+            password: raw.set_password,
         }
     }
 }
@@ -313,9 +327,49 @@ pub(crate) type Until = Pin<Box<dyn Future<Output = ()> + Send>>;
 pub(crate) async fn run(
     ctx: Ctx,
     asked: Asked,
+    answers: &dyn crate::prompt::Answers,
     embedded: Option<Source>,
     until: Until,
 ) -> ExitCode {
+    // Before the socket rather than after it. A run asked for a password and given
+    // one it could not keep has not been given what it asked for, and serving anyway
+    // would put the surface up under the arrangement the operator was trying to
+    // change.
+    //
+    // Kept out of the serving loop rather than folded into it, because a person at a
+    // keyboard is not something a task sent to another thread may hold — and the
+    // loop below is spawned. So the asking finishes before the loop begins, which is
+    // also the order an operator reads it in.
+    match asked.password.then(|| asking(&ctx, answers)).flatten() {
+        Some(code) => code,
+        None => serving(ctx, asked, embedded, until).await,
+    }
+}
+
+/// Set the password, and say what to exit with where it could not be set.
+///
+/// Nothing where it was set, because there is nothing to exit with yet: the surface
+/// still has to be served, and the words said here are the ones an operator reads
+/// above the announcement.
+fn asking(ctx: &Ctx, answers: &dyn crate::prompt::Answers) -> Option<ExitCode> {
+    match password::set(
+        answers,
+        ctx.random.as_ref(),
+        ctx.settings.admission.as_deref(),
+    ) {
+        Ok(lines) => {
+            for line in lines {
+                say!("{line}");
+            }
+            say!("");
+            None
+        }
+        Err(problem) => Some(complain(&problem)),
+    }
+}
+
+/// Hold the socket until the signal arrives.
+async fn serving(ctx: Ctx, asked: Asked, embedded: Option<Source>, until: Until) -> ExitCode {
     let (listener, bound) = match taken(wanted(asked.port)).await {
         Ok(held) => held,
         Err(problem) => return complain(&problem),
@@ -437,11 +491,15 @@ mod tests {
     use lemonfiber_fixtures::ports::{Chance, Idle};
 
     use super::{
-        address, announcement, app, opener, opening, run, surface, taken, tokenless, unavailable,
-        wanted, Asked, Browser, NOT_A_PORT,
+        address, announcement, app, opener, opening, run, serving, surface, taken, tokenless,
+        unavailable, wanted, Asked, Browser, NOT_A_PORT,
     };
     use clap::Parser as _;
+    use lemonfiber_core::admission::credential;
+    use lemonfiber_fixtures::support::a_password;
     use std::path::PathBuf;
+
+    use crate::prompt::fixtures::Script;
 
     /// A run of a program that went the way the test chose.
     struct Ran(Result<Output, Failure>);
@@ -816,11 +874,13 @@ mod tests {
                 "--no-browser",
                 "--assets",
                 "/srv/app",
+                "--set-password",
             ]),
             Some(Asked {
                 port: Some(7171),
                 browser: false,
                 assets: Some(PathBuf::from("/srv/app")),
+                password: true,
             })
         );
     }
@@ -879,11 +939,11 @@ mod tests {
         }
     }
 
-    /// Filling one choice leaves the other two where they were, or a screen setting
+    /// Filling one choice leaves the other three where they were, or a screen setting
     /// a port would be taking a browser away with it.
     #[test]
-    fn filling_one_choice_leaves_the_other_two_alone() {
-        let asked = Asked::unsaid().serving_from("/srv/app").turned();
+    fn filling_one_choice_leaves_the_other_three_alone() {
+        let asked = Asked::unsaid().serving_from("/srv/app").turned().asking();
 
         assert_eq!(
             asked.on_port("7171"),
@@ -891,9 +951,13 @@ mod tests {
                 port: Some(7171),
                 browser: false,
                 assets: Some(PathBuf::from("/srv/app")),
+                password: true,
             })
         );
-        assert_eq!(asked.turned(), Asked::unsaid().serving_from("/srv/app"));
+        assert_eq!(
+            asked.turned().asking(),
+            Asked::unsaid().serving_from("/srv/app")
+        );
     }
 
     #[test]
@@ -911,14 +975,14 @@ mod tests {
 
     /// A context over the stack this binary ships, with the randomness a test
     /// chose and the runner it wants every program answered by.
-    fn running(runner: Arc<dyn Runner>, bytes: Option<Vec<u8>>) -> Ctx {
+    fn running(runner: Arc<dyn Runner>, bytes: Option<Vec<u8>>, settings: Settings) -> Ctx {
         Ctx::new(
             runner,
             Arc::new(lemonfiber_core::adapters::Daemon::local()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
             lemonfiber_core::stack::Source::Embedded(&lemonfiber::cli::STACK),
-            Settings::default(),
+            settings,
             Environment::MacOs,
         )
         .with_random(Arc::new(Chance::exactly(bytes)))
@@ -926,7 +990,27 @@ mod tests {
 
     /// The same, over a runner that spawns nothing.
     fn ctx(bytes: Option<Vec<u8>>) -> Ctx {
-        running(Arc::new(Idle), bytes)
+        running(Arc::new(Idle), bytes, Settings::default())
+    }
+
+    /// The same, keeping a password wherever a test says.
+    fn keeping(admission: Option<PathBuf>) -> Ctx {
+        running(
+            Arc::new(Idle),
+            Some(enough()),
+            Settings {
+                admission,
+                ..Settings::default()
+            },
+        )
+    }
+
+    /// A directory of this test's own, emptied first so a rerun starts fresh.
+    fn a_directory(named: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-ui-{named}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
     }
 
     /// Bytes enough to mint a token from.
@@ -942,7 +1026,7 @@ mod tests {
     /// Start the surface, stop it at once, and say what it exited with.
     async fn started(ctx: Ctx, asked: Asked) -> String {
         let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-        let serving = tokio::spawn(run(
+        let running = tokio::spawn(serving(
             ctx,
             asked,
             None,
@@ -954,7 +1038,7 @@ mod tests {
         // proves a surface that started rather than one that never did.
         tokio::task::yield_now().await;
         let _ = stop.send(());
-        serving.await.map(crate::exit::shown).unwrap_or_default()
+        running.await.map(crate::exit::shown).unwrap_or_default()
     }
 
     #[tokio::test]
@@ -982,7 +1066,11 @@ mod tests {
                 Browser::Unopened
             );
             assert_eq!(
-                started(running(Arc::new(runner), Some(enough())), asked.clone()).await,
+                started(
+                    running(Arc::new(runner), Some(enough()), Settings::default()),
+                    asked.clone()
+                )
+                .await,
                 crate::exit::shown(ExitCode::SUCCESS)
             );
         }
@@ -999,7 +1087,7 @@ mod tests {
             port: held.as_ref().map(|(_, bound)| bound.port()),
             ..Asked::default()
         };
-        let code = run(
+        let code = serving(
             ctx(Some(enough())),
             asked,
             None,
@@ -1017,7 +1105,7 @@ mod tests {
     async fn a_machine_that_will_not_supply_randomness_serves_nothing() {
         // A surface whose token could not be minted would be one every request
         // reached, so there is nothing here to fall back to.
-        let code = run(
+        let code = serving(
             ctx(None),
             Asked::default(),
             None,
@@ -1178,5 +1266,86 @@ mod tests {
             Some(StatusCode::FORBIDDEN.as_u16()),
             "while a path that has one is refused"
         );
+    }
+
+    // ── The password this surface asks for ────────────────────────────────────
+
+    /// A run asked for a password sets one, says so, and goes on to serve.
+    #[tokio::test]
+    async fn a_run_asked_for_a_password_sets_one_and_then_serves() {
+        let dir = a_directory("kept");
+        let path = dir.join("admission.json");
+        let chosen = a_password();
+        let answers = Script::of(&[&chosen, &chosen]);
+
+        let code = run(
+            keeping(Some(path.clone())),
+            Asked {
+                password: true,
+                ..Asked::default()
+            },
+            &answers,
+            None,
+            Box::pin(std::future::ready(())),
+        )
+        .await;
+
+        assert_eq!(
+            crate::exit::shown(code),
+            crate::exit::shown(ExitCode::SUCCESS)
+        );
+        assert!(credential::at(&path).is_some_and(|held| held.verifies(&chosen)));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Every way of not getting a password serves nothing, because a run asked for
+    /// one and given none has not been given what it asked for — and serving anyway
+    /// would put the surface up under exactly the arrangement the operator was
+    /// changing.
+    #[tokio::test]
+    async fn a_password_that_could_not_be_set_stops_the_run_rather_than_serving() {
+        let dir = a_directory("refused");
+        let path = dir.join("admission.json");
+        let chosen = a_password();
+        let short: String = chosen.chars().take(3).collect();
+        let asked = Asked {
+            password: true,
+            ..Asked::default()
+        };
+
+        // Nowhere to keep one; the two answers differed; the password is too short;
+        // and the file cannot be written because a directory is in its place.
+        assert!(std::fs::create_dir_all(dir.join("taken.json")).is_ok());
+        let ways: Vec<(Option<PathBuf>, Vec<String>)> = vec![
+            (None, vec![chosen.clone(), chosen.clone()]),
+            (
+                Some(path.clone()),
+                vec![chosen.clone(), chosen.to_uppercase()],
+            ),
+            (Some(path.clone()), vec![short.clone(), short]),
+            (
+                Some(dir.join("taken.json")),
+                vec![chosen.clone(), chosen.clone()],
+            ),
+        ];
+        for (kept, said) in ways {
+            let lines: Vec<&str> = said.iter().map(String::as_str).collect();
+            let answers = Script::of(&lines);
+            let code = run(
+                keeping(kept.clone()),
+                asked.clone(),
+                &answers,
+                None,
+                Box::pin(std::future::ready(())),
+            )
+            .await;
+            assert_ne!(
+                crate::exit::shown(code),
+                crate::exit::shown(ExitCode::SUCCESS),
+                "{kept:?}"
+            );
+        }
+        assert_eq!(credential::at(&path), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

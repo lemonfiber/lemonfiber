@@ -8,6 +8,9 @@ what to do about it, is written for operators at
 <https://docs.lemonfiber.app/fixing/every-error-by-code/>.
 
 - `ACK-1`
+- `ADMIT-1`
+- `ADMIT-2`
+- `ADMIT-3`
 - `BACKUP-1`
 - `BACKUP-2`
 - `BACKUP-3`
