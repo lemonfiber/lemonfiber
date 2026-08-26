@@ -168,8 +168,9 @@ pub(crate) enum Wanted {
     /// else this screen sends finishes, and ending work that was going to succeed
     /// because somebody pressed escape is not something to offer.
     Stop,
-    /// Leave the dashboard, and start the web surface on the terminal it gives back.
-    Serve,
+    /// Leave the dashboard, and start the web surface on the terminal it gives back,
+    /// with the three choices the screen was asked for before it closed.
+    Serve(crate::ui::Asked),
     /// Leave the dashboard.
     Leave,
 }
@@ -250,10 +251,10 @@ impl Acting {
     ///
     /// Routed in two, because the stages a press can arrive at are two kinds. One is
     /// a flow that began by taking something off a list of things to *do* — an
-    /// errand, one of the two that keep going, a quality change, a repair, or the
-    /// hand-over. The other is a flow that began at a key: the five lifecycle actions
-    /// and the services inside what they named, the questions, and the readings a
-    /// press moves through. Each half claims its own and hands back what is not, so
+    /// errand, one of the two that keep going, a quality change, or a repair. The
+    /// other is a flow that began at a key: the five lifecycle actions and the
+    /// services inside what they named, the questions, the readings a press moves
+    /// through, and the hand-over, which a key reaches and no list holds. Each half claims its own and hands back what is not, so
     /// what neither claims is the screen with nothing open — where a press belongs to
     /// no flow at all and is the screen's own.
     pub(crate) fn pressed(&mut self, press: &Press) -> Wanted {
@@ -342,7 +343,6 @@ impl Acting {
                 mending::answering(&mut self.stage, mending, warning, press)
             }
             Stage::Putting(mending) => mending::putting(&mut self.stage, mending, press),
-            Stage::Handing => surface::handing(&mut self.stage, press),
             // A reading moves, and any key that is not a move puts it away — the
             // way the pane of words is put away.
             // Put back rather than carried out: a stage this does not claim is one
@@ -390,6 +390,7 @@ impl Acting {
                 reading,
             } => question::answered(&mut self.stage, question, widening, reading, press),
             Stage::Disturbing => disturbing::disturbing(&mut self.stage, press),
+            Stage::Handing { asked, open } => surface::handing(&mut self.stage, asked, open, press),
             // Put back rather than carried out: a stage this does not claim is one
             // the dispatcher below it does, and it has to be there to be taken again.
             elsewhere => {
@@ -434,7 +435,7 @@ impl Acting {
                 Wanted::Nothing
             }
             Press::Typed(surface::KEY) => {
-                self.stage = Stage::Handing;
+                self.stage = surface::asking();
                 Wanted::Nothing
             }
             Press::Typed(key) => offer::begin(&mut self.asked, key),

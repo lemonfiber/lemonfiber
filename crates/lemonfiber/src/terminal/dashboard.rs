@@ -46,8 +46,9 @@ impl Narrator for Stepping {
 enum After {
     /// Ends, which is what leaving has always meant.
     Nothing,
-    /// Starts the web surface on the terminal it has just handed over.
-    Serve,
+    /// Starts the web surface on the terminal it has just handed over, with what
+    /// the screen was asked for before it closed.
+    Serve(crate::ui::Asked),
 }
 
 /// What a context is built from, kept for the surface that will want one of its own.
@@ -89,7 +90,7 @@ pub(super) async fn shown(ctx: Ctx) -> ExitCode {
     finishing(unfinished).await;
     match after {
         After::Nothing => outcome,
-        After::Serve => serving(again).await,
+        After::Serve(asked) => serving(again, asked).await,
     }
 }
 
@@ -100,21 +101,15 @@ pub(super) async fn shown(ctx: Ctx) -> ExitCode {
 /// the ones this run started with would be answering out of a file that is no longer
 /// on the disk.
 ///
-/// Every choice `lemonfiber ui` offers is left at its default, because none of them
-/// has anywhere to be made on a dashboard: a port typed at a screen would be a
-/// number nothing had checked was free, and the address that is bound is printed
-/// either way.
-async fn serving(again: Rebuilding) -> ExitCode {
+/// The three choices `lemonfiber ui` offers were made at the screen that has just
+/// closed, since afterwards there is nowhere to make them — so they are carried
+/// here rather than decided here, which is where they would be untested.
+async fn serving(again: Rebuilding, asked: crate::ui::Asked) -> ExitCode {
     let stack = match again.stack {
         Source::External(path) => Some(path.to_path_buf()),
         Source::Embedded(_) => None,
     };
     let ctx = crate::context::context(stack, again.dry_run, again.force);
-    let asked = crate::ui::Asked {
-        port: None,
-        browser: true,
-        assets: None,
-    };
     crate::ui::run(
         ctx,
         asked,
@@ -180,7 +175,9 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                 None => break (ExitCode::SUCCESS, acting.staying_for(), After::Nothing),
                 Some(press) => match acting.pressed(&press) {
                     Wanted::Leave => break (ExitCode::SUCCESS, acting.staying_for(), After::Nothing),
-                    Wanted::Serve => break (ExitCode::SUCCESS, acting.staying_for(), After::Serve),
+                    Wanted::Serve(asked) => {
+                        break (ExitCode::SUCCESS, acting.staying_for(), After::Serve(asked))
+                    }
                     Wanted::Nothing => {}
                     Wanted::Gather => {
                         refreshing.abort();

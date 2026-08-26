@@ -42,6 +42,8 @@ use super::quality::{Change, Grade};
 use super::question::Question;
 use super::reading::Reading;
 use super::service::Inside;
+use super::surface::Open;
+use crate::ui::Asked;
 
 /// Where an action, a question or an errand stands.
 pub(super) enum Stage {
@@ -275,6 +277,12 @@ pub(super) enum Stage {
     /// narrowed to went into the command when the offer was agreed to, and the panels
     /// behind this are the report.
     Disturbing,
-    /// Holding the question before the terminal is handed to the web surface.
-    Handing,
+    /// Holding the question before the terminal is handed to the web surface, and
+    /// whatever is open under it.
+    Handing {
+        /// What the surface is about to be started with.
+        asked: Asked,
+        /// The three choices being read, chosen between, or typed at.
+        open: Open,
+    },
 }

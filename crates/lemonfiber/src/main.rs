@@ -321,12 +321,13 @@ pub(crate) const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = None;
 /// surface can be started, asked something, and stopped, in a test. A real run is
 /// handed a signal that never arrives.
 async fn serving(ctx: Ctx, asked: RawUi) -> ExitCode {
-    let asked = ui::Asked {
-        port: asked.port,
-        browser: !asked.no_browser,
-        assets: asked.assets,
-    };
-    ui::run(ctx, asked, EMBEDDED_APP, Box::pin(std::future::pending())).await
+    ui::run(
+        ctx,
+        asked.into(),
+        EMBEDDED_APP,
+        Box::pin(std::future::pending()),
+    )
+    .await
 }
 
 /// Say what a word means, or list what there is to ask about, and record what this

@@ -21,6 +21,7 @@ mod titles;
 use lemonfiber_core::text::plain;
 use ratatui::text::Line;
 
+use super::chooser::Listed;
 use super::disturbing;
 use super::errand::{self, Errand};
 use super::lasting::{self, Begun, Lasting};
@@ -29,9 +30,13 @@ use super::offer::{Offer, Taken, OFFERED};
 use super::quality::{self, Change};
 use super::question;
 use super::reading::Reading;
-use super::{surface, Stage};
+use super::surface::{self, Open};
+use super::Stage;
+use crate::ui::Asked;
 use lemonfiber_core::plural::s;
-use shapes::{agreed, choosing, dimmed, elsewhere, named, read, shortened, typing, AGREEING};
+use shapes::{
+    agreed, choosing, dimmed, elsewhere, named, read, setting, shortened, typing, AGREEING,
+};
 use titles::{
     asked, changing, keeping, narrowing, righting, sending, titled, ASK, CAME, KEEPS_GOING, MORE,
     PUT_RIGHT, QUALITY, WEB,
@@ -202,7 +207,7 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         Stage::Answering { mending, warning } => {
             (righting(mending), answered(mending, warning, rows, across))
         }
-        Stage::Handing => (WEB.to_owned(), handing(across)),
+        Stage::Handing { asked, open } => (WEB.to_owned(), handing(asked, open, rows, across)),
     };
     Some(Pane { title, lines })
 }
@@ -443,14 +448,50 @@ fn walking(reading: &Reading, rows: usize, across: usize) -> Vec<Line<'static>> 
 }
 
 /// The question before the terminal is handed to the web surface.
-fn handing(across: usize) -> Vec<Line<'static>> {
-    vec![
+/// The question before the terminal is handed to the web surface, over the three
+/// choices it is about to be started with.
+///
+/// The values are read off what the surface will be given rather than held beside
+/// it, so the rows an operator agrees to are the ones it starts with. A refusal sits
+/// under them where the last word typed was not taken, because a choice that did not
+/// land and a question that does not say so is an operator agreeing to something
+/// other than what they typed.
+fn handing(asked: &Asked, open: &Open, rows: usize, across: usize) -> Vec<Line<'static>> {
+    match open {
+        Open::Nothing { refused } => handed(asked, *refused, across),
+        Open::Choosing(chooser) => choosing(chooser, rows, across),
+        Open::Typing { asks, typed, .. } => setting(asks, typed, across),
+    }
+}
+
+/// The question itself, over the three choices as they stand.
+fn handed(asked: &Asked, refused: Option<&str>, across: usize) -> Vec<Line<'static>> {
+    let mut lines = vec![
         Line::raw(shortened(&format!("{}?", surface::ASKS), across)),
         dimmed(surface::ABOUT, across),
         Line::raw(""),
-        dimmed(AGREEING, across),
-    ]
+    ];
+    let (first, rest) = surface::choices(asked);
+    lines.extend(
+        std::iter::once(first)
+            .chain(rest)
+            .map(|given| named(given.name(), given.about(), across)),
+    );
+    if let Some(refused) = refused {
+        lines.push(Line::raw(""));
+        lines.push(Line::raw(shortened(refused, across)));
+    }
+    lines.push(Line::raw(""));
+    lines.push(dimmed(SERVING, across));
+    lines
 }
+
+/// How the question about the web surface is answered.
+///
+/// [`AGREEING`] with the one more thing this question offers, since the three
+/// choices under it are no use to somebody who is not told they can be changed.
+const SERVING: &str =
+    "y goes ahead   enter changes how it is served   any other key changes nothing";
 
 /// The question before an action, and what it is being asked about.
 ///
@@ -504,7 +545,7 @@ fn covering(taken: &Taken, room: usize, across: usize) -> Vec<Line<'static>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{footer, keys, pane, staying_for, Offer, Stage};
+    use super::{footer, keys, pane, staying_for, surface, Asked, Offer, Open, Stage};
     use crate::acting::chooser::Chooser;
     use crate::acting::disturbing::{under, Widening, NAME};
     use crate::acting::errand::{self, Errand, Given};
@@ -1370,5 +1411,94 @@ mod tests {
         };
 
         assert!(staying_for(&stage).is_none());
+    }
+
+    /// The question about the web surface names the three choices and what each of
+    /// them is set to, because what an operator agrees to is what is on the screen.
+    #[test]
+    fn the_web_question_says_what_the_surface_will_be_given() {
+        let stage = Stage::Handing {
+            asked: Asked::unsaid(),
+            open: Open::Nothing { refused: None },
+        };
+        let said = said(&stage, 20, 100);
+
+        assert!(said.contains("Close this screen"), "{said}");
+        assert!(said.contains("port"), "{said}");
+        assert!(said.contains("whichever one is free"), "{said}");
+        assert!(said.contains("browser"), "{said}");
+        assert!(said.contains("app"), "{said}");
+        assert!(said.contains("y goes ahead"), "{said}");
+        assert!(said.contains("any other key changes nothing"), "{said}");
+    }
+
+    /// A value that was named is the value the row shows, or the row is showing a
+    /// default the surface will not be started with.
+    #[test]
+    fn the_rows_show_what_was_named_rather_than_what_it_would_have_been() {
+        let stage = Stage::Handing {
+            asked: Asked {
+                port: Some(7171),
+                browser: false,
+                assets: Some(std::path::PathBuf::from("/srv/app")),
+            },
+            open: Open::Nothing { refused: None },
+        };
+        let said = said(&stage, 20, 100);
+
+        assert!(said.contains("7171"), "{said}");
+        assert!(said.contains("/srv/app"), "{said}");
+        assert!(said.contains("none is opened"), "{said}");
+    }
+
+    /// A word that was not taken is said under the rows, because a choice that did
+    /// not land and a question that does not say so is somebody agreeing to
+    /// something other than what they typed.
+    #[test]
+    fn a_refused_word_is_said_under_the_question_it_goes_back_to() {
+        let stage = Stage::Handing {
+            asked: Asked::unsaid(),
+            open: Open::Nothing {
+                refused: Some(crate::ui::NOT_A_PORT),
+            },
+        };
+        let said = said(&stage, 20, 100);
+
+        assert!(said.contains(crate::ui::NOT_A_PORT), "{said}");
+        assert!(said.contains("whichever one is free"), "{said}");
+    }
+
+    /// The three are listed the way every other list on this screen is, so nobody
+    /// has to learn a second movement for them.
+    #[test]
+    fn the_three_choices_are_listed_the_way_the_others_are() {
+        let (first, rest) = surface::choices(&Asked::unsaid());
+        let stage = Stage::Handing {
+            asked: Asked::unsaid(),
+            open: Open::Choosing(Chooser::over(first, rest)),
+        };
+        let said = said(&stage, 20, 100);
+
+        assert!(said.contains("> port"), "{said}");
+        assert!(said.contains("up and down choose"), "{said}");
+        assert!(said.contains("esc leaves it"), "{said}");
+    }
+
+    /// The line a value is typed on says what it wants and shows what has been typed,
+    /// which is the same line every other typed answer on this screen is given.
+    #[test]
+    fn a_value_the_surface_takes_says_what_it_wants_and_what_was_typed() {
+        let stage = Stage::Handing {
+            asked: Asked::unsaid(),
+            open: Open::Typing {
+                fills: surface::Fills::Port,
+                asks: "Which port to listen on",
+                typed: "717".to_owned(),
+            },
+        };
+        let said = said(&stage, 20, 100);
+
+        assert!(said.contains("Which port to listen on"), "{said}");
+        assert!(said.contains("> 717"), "{said}");
     }
 }

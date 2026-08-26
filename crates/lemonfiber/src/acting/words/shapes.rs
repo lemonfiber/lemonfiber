@@ -23,6 +23,9 @@ use crate::pane::quiet;
 /// How a word a question has to be given is typed, and how to leave it.
 const TYPING: &str = "enter asks   esc leaves it";
 
+/// How a value the web surface is given is typed, and how to leave it.
+const SETTING: &str = "enter takes it   esc leaves it";
+
 /// How a reading is moved through, and how it is put away.
 const MOVING: &str = "up and down move   any other key closes";
 
@@ -176,11 +179,25 @@ fn row(leading: &str, name: &str, about: &str, across: usize) -> Line<'static> {
 /// typed stays where it was put — a field that scrolled under the operator's own
 /// fingers would be a field nobody could correct.
 pub(super) fn typing(asks: &str, typed: &str, across: usize) -> Vec<Line<'static>> {
+    line(asks, typed, TYPING, across)
+}
+
+/// The same, for a value the surface is given rather than a question to ask.
+///
+/// One drawing and two lines underneath it, because what enter does here is not what
+/// it does at a question: nothing is put to the stack, the value is taken and the
+/// question it belongs to comes back.
+pub(super) fn setting(asks: &str, typed: &str, across: usize) -> Vec<Line<'static>> {
+    line(asks, typed, SETTING, across)
+}
+
+/// What has to be given, what has been typed of it, and how to leave the line.
+fn line(asks: &str, typed: &str, hint: &str, across: usize) -> Vec<Line<'static>> {
     vec![
         Line::raw(shortened(asks, across)),
         Line::raw(shortened(&format!("> {typed}"), across)),
         Line::raw(""),
-        dimmed(TYPING, across),
+        dimmed(hint, across),
     ]
 }
 
