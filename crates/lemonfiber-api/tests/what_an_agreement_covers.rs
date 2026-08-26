@@ -16,7 +16,7 @@
 use lemonfiber_api::actions::{named, Arguments, Refused, TAKES_AGREEMENT};
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
-use lemonfiber_core::app::restore::Kept;
+use lemonfiber_core::app::restore::{self, Kept};
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{Command, QualityAction};
 use lemonfiber_core::bundle::Filenames;
@@ -99,7 +99,9 @@ fn a_reset_an_upgrade_and_a_restore_carry_the_agreement_into_the_command() {
         Some(Command::Restore {
             archive: Kept::Named("a-backup.tar.gz".to_owned()),
             repoint: false,
-            confirm: true,
+            // A yes carrying no listing is the standing consent, which is what
+            // `confirm` alone has always meant here.
+            consent: restore::Consent::Standing,
         })
     );
 }
