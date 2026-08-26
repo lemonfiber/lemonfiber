@@ -101,6 +101,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/forms",
     },
     Reach {
+        request: "doctor",
+        through: "/api/checks",
+    },
+    Reach {
         request: "config",
         through: "/api/config",
     },
@@ -136,17 +140,29 @@ pub const ASKS: &[Reach] = &[
 /// title a trace is asked for. They are two renderings of one worry rather than one
 /// rendering, and it was the second that the screen had no way to reach — so the
 /// panel stays and the request is reached where it can be followed.
-pub const SHOWS: &[&str] = &["ps", "doctor"];
+///
+/// `doctor` went the same way, for the same reason and a sharper one. Two panels read
+/// facts the diagnosis reads too — how much room is left on the disk and whether
+/// imports link, where traffic leaves from and whether the client's is inside the
+/// tunnel — but a fact is not a verdict, and neither panel carries the one thing a
+/// diagnosis is for: what to do about it. A pass, a warning and a check that could
+/// not be established all render as the same number in a panel. So the panels stay,
+/// and the diagnosis is reached as a question, where its verdicts and its remedies
+/// are read in the words the command line gives for the same run.
+pub const SHOWS: &[&str] = &["ps"];
 
 /// The requests the dashboard reaches a second way, by acting on what one of its
 /// questions answers.
 ///
-/// One request, three actions. `quality` is on [`ASKS`] as a read — the preset in
-/// force, what each one means and what it costs — and these three are the writes
-/// offered beside that reading. They are not entries in [`ACTS`], because the
-/// request is already reached: [`reached`] is what the parity table's terminal
-/// column is held against in both directions, and a request named there twice would
-/// leave a reader of one row with two claims to reconcile against it.
+/// Two requests, four actions. `quality` is on [`ASKS`] as a read — the preset in
+/// force, what each one means and what it costs — and three of these are the writes
+/// offered beside that reading. `doctor` is on [`ASKS`] too, and the fourth is the
+/// same diagnosis widened to the checks that disturb a running system: a read that
+/// disturbed something would not be a read, so it is asked for as an action, at the
+/// door this screen asks for changes. None of the four is an entry in [`ACTS`],
+/// because both requests are already reached: [`reached`] is what the parity table's
+/// terminal column is held against in both directions, and a request named there
+/// twice would leave a reader of one row with two claims to reconcile against it.
 ///
 /// What they are published for is the other direction. Every action the screen
 /// offers is held to a name here by `acting/`'s own tests, so a write added to that
@@ -164,6 +180,10 @@ pub const ALSO: &[Reach] = &[
     Reach {
         request: "quality",
         through: "quality-upgrade",
+    },
+    Reach {
+        request: "doctor",
+        through: "diagnose",
     },
 ];
 

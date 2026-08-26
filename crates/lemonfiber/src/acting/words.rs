@@ -20,6 +20,7 @@ mod shapes;
 use lemonfiber_core::text::plain;
 use ratatui::text::Line;
 
+use super::disturbing;
 use super::errand::{self, Errand};
 use super::lasting::{self, Begun, Lasting};
 use super::offer::{Offer, Taken, OFFERED};
@@ -104,6 +105,7 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         | Stage::Running { .. }
         | Stage::Doing { .. }
         | Stage::Applying { .. }
+        | Stage::Disturbing
         | Stage::Keeping { said: None, .. } => return None,
         Stage::Choosing { offer, chooser } => (titled(offer), choosing(chooser, rows, across)),
         Stage::Confirming { offer, taken } => {
@@ -112,10 +114,32 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         Stage::Came(reading) => (CAME.to_owned(), read(reading, rows, across)),
         Stage::Wondering(chooser) => (ASK.to_owned(), choosing(chooser, rows, across)),
         Stage::Typing { asks, typed, .. } => (ASK.to_owned(), typing(asks, typed, across)),
-        Stage::Waiting(question) | Stage::Following(question) => {
+        Stage::Waiting { question, .. } | Stage::Following(question) => {
             (asked(question), vec![dimmed(ANSWERING, across)])
         }
-        Stage::Answered { question, reading } => (asked(question), read(reading, rows, across)),
+        // A diagnosis is the one answer with something offered under it, and the
+        // account that offer sits under is the answer itself: the checks that
+        // disturb are exactly the ones this reading reports as unverified, each of
+        // them saying to run that one. So the box goes on moving through the report
+        // and the question is the line beneath it, which is where a consequence
+        // larger than a sentence is read on this screen.
+        Stage::Answered {
+            question,
+            widening: Some(_),
+            reading,
+        } => (
+            asked(question),
+            agreed(
+                disturbing::ASKS,
+                disturbing::ABOUT,
+                Some(reading),
+                rows,
+                across,
+            ),
+        ),
+        Stage::Answered {
+            question, reading, ..
+        } => (asked(question), read(reading, rows, across)),
         // Titled by the question rather than by the taking, because what is on
         // the screen is that question's answer — a list of what there is, which
         // taking one of asks the next question about it.
@@ -185,6 +209,7 @@ pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
         }
         Stage::Doing { errand, .. } => format!("{}   {WAITING}", errand.name),
         Stage::Applying { change, .. } => format!("{}   {WAITING}", change.name),
+        Stage::Disturbing => format!("{}   {WAITING}", disturbing::NAME),
         // The one with no ending of its own says how it is ended; the one that ends
         // by itself says what leaving does, as every other running thing here does.
         Stage::Keeping {
@@ -218,6 +243,10 @@ pub(super) fn staying_for(stage: &Stage) -> Option<String> {
         Stage::Running { offer, taken } => waited(&format!("{} {}", offer.hint, taken.name())),
         Stage::Doing { errand, .. } => waited(errand.name),
         Stage::Applying { change, .. } => waited(change.name),
+        // It takes the tunnel away on purpose and puts it back. A screen left in the
+        // middle of that would leave the stack without one, which is exactly the
+        // failure the check itself reports when the tunnel does not come back.
+        Stage::Disturbing => waited(disturbing::NAME),
         // The one that never ends by itself is the one this cannot say "to finish"
         // about. What it will go on doing, and the one thing that ends it once the
         // screen is gone, are said instead — a run held open on a promise nobody
@@ -443,6 +472,7 @@ fn covering(taken: &Taken, room: usize, across: usize) -> Vec<Line<'static>> {
 mod tests {
     use super::{footer, keys, pane, staying_for, Offer, Stage};
     use crate::acting::chooser::Chooser;
+    use crate::acting::disturbing::{under, Widening, NAME};
     use crate::acting::errand::{self, Errand};
     use crate::acting::narrowing::Subject;
     use crate::acting::offer::{Choice, Taken, OFFERED};
@@ -481,6 +511,20 @@ mod tests {
             narrows: Narrows::Term,
         },
     };
+
+    /// The question that answers with a diagnosis, which is the one answer this
+    /// screen offers anything under.
+    static A_DIAGNOSIS: Question = Question {
+        name: "how this stack is doing",
+        about: "every check that disturbs nothing, and what each one found",
+        read: "/api/checks",
+        needs: Needed::Nothing,
+    };
+
+    /// The widened run offered under that answer.
+    fn a_widening() -> Option<Widening> {
+        under(&A_DIAGNOSIS, "")
+    }
 
     /// A reading over nine numbered lines.
     fn nine() -> Reading {
@@ -836,7 +880,12 @@ mod tests {
     /// an answer that is slow to arrive does not read as a screen that stopped.
     #[test]
     fn a_question_with_the_core_says_what_it_is_waiting_for() {
-        let said = said(&Stage::Waiting(&A_TRACE), 20, 80);
+        let waiting = Stage::Waiting {
+            question: &A_TRACE,
+            typed: "The Expanse".to_owned(),
+        };
+
+        let said = said(&waiting, 20, 80);
 
         assert!(said.contains("where one thing is"), "{said}");
         assert!(said.contains("waiting for this stack to answer"), "{said}");
@@ -848,6 +897,7 @@ mod tests {
     fn an_answer_is_drawn_under_the_question_it_answers() {
         let stage = Stage::Answered {
             question: &A_TRACE,
+            widening: None,
             reading: nine(),
         };
 
@@ -855,6 +905,49 @@ mod tests {
 
         assert!(said.contains("where one thing is"), "{said}");
         assert!(said.contains("line 0"), "{said}");
+        assert!(said.contains("any other key closes"), "{said}");
+        assert!(!said.contains("disturb"), "{said}");
+    }
+
+    /// A diagnosis is the one answer with a question under it: the report goes on
+    /// being moved through, and the line beneath it offers to run the same checks
+    /// again including the ones that disturb — which is what those very findings say
+    /// to do. An account read after agreeing is not one anybody agreed to.
+    #[test]
+    fn a_diagnosis_is_read_with_the_widening_offered_under_it() {
+        let stage = Stage::Answered {
+            question: &A_DIAGNOSIS,
+            widening: a_widening(),
+            reading: nine(),
+        };
+
+        let said = said(&stage, 20, 100);
+
+        assert!(said.contains("how this stack is doing"), "{said}");
+        assert!(said.contains("line 0"), "{said}");
+        assert!(said.contains("including the ones that disturb?"), "{said}");
+        assert!(said.contains("takes the tunnel away"), "{said}");
+        assert!(said.contains("y goes ahead"), "{said}");
+    }
+
+    /// While it runs, nothing is drawn over the panels — the VPN panel behind this
+    /// box is the check being run — and the footer says what is running and what
+    /// leaving would leave the stack in.
+    #[test]
+    fn a_run_that_disturbs_covers_nothing_and_is_named_in_the_footer() {
+        let said = said(&Stage::Disturbing, 20, 200);
+        let footing = text(&footer(&Stage::Disturbing, 200));
+        let staying = staying_for(&Stage::Disturbing);
+
+        assert!(said.is_empty(), "{said}");
+        assert!(footing.contains("the checks that disturb"), "{footing}");
+        assert!(footing.contains("still running"), "{footing}");
+        assert_eq!(
+            staying,
+            Some(format!(
+                "waiting for {NAME} to finish — leaving it now would leave the stack claimed"
+            ))
+        );
     }
 
     /// A listing offered to be taken one of is drawn under the name of the question
@@ -912,9 +1005,18 @@ mod tests {
                 asks: "What to follow",
                 typed: "something with a very long name indeed".to_owned(),
             },
-            Stage::Waiting(&A_TRACE),
+            Stage::Waiting {
+                question: &A_TRACE,
+                typed: "The Expanse".to_owned(),
+            },
             Stage::Answered {
                 question: &A_TRACE,
+                widening: None,
+                reading: nine(),
+            },
+            Stage::Answered {
+                question: &A_DIAGNOSIS,
+                widening: a_widening(),
                 reading: nine(),
             },
             Stage::Narrowing {

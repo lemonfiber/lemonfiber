@@ -20,8 +20,14 @@
 //!
 //! The sixth key has one stage and no flow: [`super::surface`] asks whether to hand
 //! the terminal over, and a yes ends the screen rather than beginning anything here.
+//!
+//! One stage is reached by no key at all. The checks that disturb a running system
+//! are offered under the diagnosis that does not, so what opens that question is an
+//! answer already on the screen — which is why [`Stage::Answered`] carries the offer
+//! and [`super::disturbing`] decides what becomes of it.
 
 use super::chooser::Chooser;
+use super::disturbing::Widening;
 use super::errand::Errand;
 use super::lasting::{Begun, Lasting};
 use super::narrowing::Subject;
@@ -69,7 +75,16 @@ pub(super) enum Stage {
         typed: String,
     },
     /// The question is with the core.
-    Waiting(&'static Question),
+    ///
+    /// The word it was given travels with it, because what it narrowed is what a
+    /// widening offered under the answer is narrowed by — and by the time the answer
+    /// arrives the line it was typed on is gone.
+    Waiting {
+        /// The question waiting on the core.
+        question: &'static Question,
+        /// The word it was given, or nothing where it takes none.
+        typed: String,
+    },
     /// One of the things the question listed is with the core.
     ///
     /// Apart from [`Stage::Waiting`] because what comes back is a different shape:
@@ -88,6 +103,8 @@ pub(super) enum Stage {
     Answered {
         /// The question that was asked.
         question: &'static Question,
+        /// The widened run offered under it, where the answer is a diagnosis.
+        widening: Option<Widening>,
         /// The answer, and where in it the box is.
         reading: Reading,
     },
@@ -192,6 +209,12 @@ pub(super) enum Stage {
         /// The preset it was given, or nothing where it takes none.
         chosen: Option<&'static str>,
     },
+    /// The checks that disturb a running system are with the core.
+    ///
+    /// It carries nothing, because there is nothing left to decide: what it was
+    /// narrowed to went into the command when the offer was agreed to, and the panels
+    /// behind this are the report.
+    Disturbing,
     /// Holding the question before the terminal is handed to the web surface.
     Handing,
 }

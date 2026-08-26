@@ -432,19 +432,23 @@ pub(crate) mod tests {
         assert!(KEYED.iter().all(|offer| offer.key != KEY));
     }
 
-    /// The one thing the screen's four lists of actions are checked against from
-    /// outside the binary, and the whole of that list rather than this file's quarter
-    /// of it — the projection is one list, so only one place can hold it to be
-    /// exactly what the screen offers. An action offered on any of them with no entry
-    /// there leaves the parity table's terminal column claiming less than the screen
-    /// does, and an entry there naming an action nothing offers leaves it claiming
-    /// more.
+    /// The one thing the screen's actions are checked against from outside the
+    /// binary, and the whole of what it offers rather than this file's share of it —
+    /// the projection is one list, so only one place can hold it to be exactly what
+    /// the screen offers. An action offered anywhere with no entry there leaves the
+    /// parity table's terminal column claiming less than the screen does, and an
+    /// entry there naming an action nothing offers leaves it claiming more.
+    ///
+    /// Five places offer one: the keys, this list, the two that keep going, the three
+    /// quality changes, and the widening offered under a diagnosis, which is on no
+    /// list at all because there is one of it.
     ///
     /// The published names come off two lists because the requests do. Every other
-    /// action is the only way its request is reached; the three quality writes act on
-    /// a request the screen already reaches as a read, so they are published beside
-    /// the rest rather than among them — and both lists are read here, or a write
-    /// could be added to the screen and excused by the list it was not on.
+    /// action is the only way its request is reached; the three quality writes and
+    /// the widened diagnosis act on requests the screen already reaches as reads, so
+    /// they are published beside the rest rather than among them — and both lists are
+    /// read here, or a write could be added to the screen and excused by the list it
+    /// was not on.
     #[test]
     fn every_action_this_screen_offers_is_published_for_the_parity_table() {
         let mut offered: Vec<&str> = KEYED
@@ -453,6 +457,7 @@ pub(crate) mod tests {
             .chain(every().map(|errand| errand.action))
             .chain(crate::acting::lasting::every().map(|lasting| lasting.action))
             .chain(crate::acting::quality::every().map(|change| change.action))
+            .chain(std::iter::once(crate::acting::disturbing::ACTION))
             .collect();
         let mut published: Vec<&str> = ACTS.iter().chain(ALSO).map(|reach| reach.through).collect();
         offered.sort_unstable();

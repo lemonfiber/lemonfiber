@@ -1,10 +1,12 @@
 //! What the dashboard can be asked, and what each question comes to.
 //!
-//! Six questions behind one key, rather than six keys. The screen already answers
+//! Eight reads behind one key, rather than eight keys. The screen already answers
 //! `q`, `r`, `?` and five actions, and a key per request does not survive being
 //! done twice — so what a person opens is the list of what this stack can be
-//! asked, and the list is where a seventh question would go without costing
-//! anybody a letter to remember.
+//! asked, and the list is where a ninth read would go without costing anybody a
+//! letter to remember. Twelve questions sit over those eight, because four of the
+//! reads are asked both whole and narrowed and each of those pairs is two entries
+//! on the list and one request in the parity table either way.
 //!
 //! Each question is held by the name of the read every surface answers it at. That
 //! name is what [`lemonfiber_api::reads`] turns into one of the core's own
@@ -23,12 +25,13 @@
 //! that flow decides belongs beside the list it decides over.
 
 use lemonfiber_api::reads::{
-    named, Wanted as Asking, CONFIG, FORMS, QUALITY, REQUESTS, STUCK, TRACE, VERSION,
+    named, Wanted as Asking, CHECKS, CONFIG, FORMS, QUALITY, REQUESTS, STUCK, TRACE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
 use super::chooser::{Chooser, Listed};
-use super::reading::Reading;
+use super::disturbing::{self, Widening};
+use super::reading::{moved, Reading};
 use super::{Press, Stage, Wanted};
 
 /// The key that opens the list of questions.
@@ -56,6 +59,8 @@ pub(crate) enum Narrows {
     Member,
     /// The form to say what starting would come to.
     Form,
+    /// The family of checks, or the one check, to narrow a diagnosis to.
+    Family,
 }
 
 impl Narrows {
@@ -77,6 +82,10 @@ impl Narrows {
             },
             Self::Form => Asking {
                 forms: vec![said],
+                ..Asking::default()
+            },
+            Self::Family => Asking {
+                only: Some(said),
                 ..Asking::default()
             },
         }
@@ -191,12 +200,27 @@ static OPENS_ON: Question = Question {
 /// for the people who asked.
 ///
 /// Each narrowing sits under the listing it narrows. The pair is two entries rather
-/// than one that takes an optional word, because for four of these reads naming
+/// than one that takes an optional word, because for five of these reads naming
 /// nothing is already a request in its own right — every setting, the whole
-/// household, every form — so a line where nothing typed meant the listing would
-/// leave no way to refuse an empty one, and an empty one is exactly what somebody
-/// who meant to name something has given.
+/// household, every form, the whole diagnosis — so a line where nothing typed meant
+/// the listing would leave no way to refuse an empty one, and an empty one is exactly
+/// what somebody who meant to name something has given.
 static AFTER: &[Question] = &[
+    Question {
+        name: "how this stack is doing",
+        about: "every check that disturbs nothing, and what each one found",
+        read: CHECKS,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "one family of checks",
+        about: "narrow that to one family, or to one check by the name its finding gives it",
+        read: CHECKS,
+        needs: Needed::Typed {
+            asks: "Which checks, by the family or by the name a finding gives one",
+            narrows: Narrows::Family,
+        },
+    },
     Question {
         name: "forms",
         about: "the forms this stack declares, and what each one is for",
@@ -363,17 +387,48 @@ pub(super) fn typing(
 fn put(stage: &mut Stage, question: &'static Question, typed: &str) -> Wanted {
     match question.command(typed) {
         Ok(command) => {
-            *stage = Stage::Waiting(question);
+            *stage = Stage::Waiting {
+                question,
+                typed: typed.to_owned(),
+            };
             Wanted::Carry(command)
         }
+        // A question that reached no command has disturbed nothing and reported
+        // nothing, so there is no reading for a widening to be offered under.
         Err(said) => {
             *stage = Stage::Answered {
                 question,
+                widening: None,
                 reading: Reading::of(vec![said.to_owned()]),
             };
             Wanted::Nothing
         }
     }
+}
+
+/// Over an answer: move through it, take up what is offered under it, or put it
+/// away.
+///
+/// A reading moves, and any key that is not a move puts it away — the way the pane
+/// of words is put away. The one answer with something offered under it is a
+/// diagnosis, and there the key that is not a move is the one that widens it, which
+/// [`super::disturbing`] decides rather than this.
+pub(super) fn answered(
+    stage: &mut Stage,
+    question: &'static Question,
+    widening: Option<Widening>,
+    mut reading: Reading,
+    press: &Press,
+) -> Wanted {
+    if moved(&mut reading, press) {
+        *stage = Stage::Answered {
+            question,
+            widening,
+            reading,
+        };
+        return Wanted::Nothing;
+    }
+    disturbing::answered(stage, widening, press)
 }
 
 /// While a question, or one of the things it listed, is with the core: back out, or
@@ -391,7 +446,7 @@ pub(super) fn waiting(stage: &mut Stage, waiting_on: Stage, press: &Press) -> Wa
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{all, asked_at, every, Narrows, Needed, Question, CONFIG, FORMS, OPENS_ON, TRACE};
     use lemonfiber_api::reads::{NO_MEMBER, NO_SETTING, NO_TERM, OFFERED as SERVED};
     use lemonfiber_core::app::Command;
@@ -435,7 +490,7 @@ mod tests {
     }
 
     /// The question by that name, which is how each one below is reached.
-    fn called(name: &str) -> &'static Question {
+    pub(crate) fn called(name: &str) -> &'static Question {
         every()
             .find(|question| question.name == name)
             .unwrap_or(&OPENS_ON)

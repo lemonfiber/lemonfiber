@@ -31,6 +31,7 @@ use lemonfiber_core::error::Problem;
 use lemonfiber_core::app::Command;
 
 use super::chooser::{Chooser, Listed};
+use super::disturbing::{self, Widening};
 use super::question::Question;
 use super::reading::{complaint, lines_of, unexpected, Reading};
 use super::{Press, Stage, Wanted};
@@ -66,10 +67,16 @@ impl Listed for Subject {
 /// Either what it listed, to take one of, or what it answered — and a failure is an
 /// answer like any other, said under the question that was asked rather than in the
 /// box an action's own failures land in.
-pub(super) fn asked(question: &'static Question, answer: Result<Outcome, Box<Problem>>) -> Stage {
+pub(super) fn asked(
+    question: &'static Question,
+    typed: &str,
+    answer: Result<Outcome, Box<Problem>>,
+) -> Stage {
     match answer {
-        Ok(outcome) => answered(question, &outcome),
-        Err(problem) => said(question, complaint(&problem)),
+        Ok(outcome) => answered(question, typed, &outcome),
+        // A question that could not be answered has reported nothing, so there is no
+        // account for a widening to be offered under.
+        Err(problem) => said(question, None, complaint(&problem)),
     }
 }
 
@@ -84,6 +91,7 @@ pub(super) fn followed(
 ) -> Stage {
     said(
         question,
+        None,
         match answer {
             Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
             Err(problem) => complaint(&problem),
@@ -91,10 +99,12 @@ pub(super) fn followed(
     )
 }
 
-/// Those lines, in a box titled by the question they answer.
-fn said(question: &'static Question, lines: Vec<String>) -> Stage {
+/// Those lines, in a box titled by the question they answer, with whatever is
+/// offered under them.
+fn said(question: &'static Question, widening: Option<Widening>, lines: Vec<String>) -> Stage {
     Stage::Answered {
         question,
+        widening,
         reading: Reading::of(lines),
     }
 }
@@ -102,9 +112,9 @@ fn said(question: &'static Question, lines: Vec<String>) -> Stage {
 /// What an answer to a question that narrows by picking came to.
 ///
 /// Either the entries it listed, or the listing itself where it listed none.
-fn answered(question: &'static Question, outcome: &Outcome) -> Stage {
+fn answered(question: &'static Question, typed: &str, outcome: &Outcome) -> Stage {
     let Some((at, narrows)) = question.needs.picking() else {
-        return read(question, outcome);
+        return read(question, typed, outcome);
     };
     let Some(listed) = listed(outcome) else {
         return Stage::Came(Reading::of(unexpected()));
@@ -123,13 +133,18 @@ fn answered(question: &'static Question, outcome: &Outcome) -> Stage {
             question,
             chooser: Chooser::over(first, choices.collect()),
         },
-        None => read(question, outcome),
+        None => read(question, typed, outcome),
     }
 }
 
-/// The answer as the command line gives it, in a box to move through.
-fn read(question: &'static Question, outcome: &Outcome) -> Stage {
-    said(question, lines_of(&crate::render::shaped(outcome)))
+/// The answer as the command line gives it, in a box to move through — and, under a
+/// diagnosis, the offer to run it again including the checks that disturb.
+fn read(question: &'static Question, typed: &str, outcome: &Outcome) -> Stage {
+    said(
+        question,
+        disturbing::under(question, typed),
+        lines_of(&crate::render::shaped(outcome)),
+    )
 }
 
 /// Everything a listing offers: what taking each one names the second read, what it
