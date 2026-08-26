@@ -14,10 +14,8 @@
 //! forks on whether something was named. `backups` is the same fork read from the
 //! other side: `lemonfiber restore` with nothing named lists what there is to restore
 //! from, and this is the half of that word a browser asks for on its own, because the
-//! other half is a write and writes are asked for elsewhere. `backups` is the same fork read from the
-//! other side: `lemonfiber restore` with nothing named lists what there is to
-//! restore from, and this is the half of that word a browser asks for on its own,
-//! because the other half is a write and writes are asked for elsewhere.
+//! other half is a write and writes are asked for elsewhere. `front-door` counts the
+//! plainest way of all — one name, one command, and no parameter to fork on.
 //!
 //! Only the flags that read are here. Narrowing a diagnosis is a parameter; running
 //! the checks that disturb a running system and accepting a warning both change
@@ -58,6 +56,9 @@ pub const STORAGE: &str = "/api/storage";
 
 /// What the household has asked for, and where each request stands.
 pub const REQUESTS: &str = "/api/requests";
+
+/// The one address to hand somebody who lives here.
+pub const FRONT_DOOR: &str = "/api/front-door";
 
 /// Where one item is, followed by the words a person would name it with.
 pub const TRACE: &str = "/api/trace";
@@ -105,8 +106,8 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// would be asking the core something no browser can ask it, which is the whole
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
-    VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, TRACE, STUCK, CONFIG, QUALITY,
-    EXPLAIN, BACKUPS,
+    VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, FRONT_DOOR, TRACE, STUCK, CONFIG,
+    QUALITY, EXPLAIN, BACKUPS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -192,6 +193,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         CHECKS => narrowed(only.as_deref()).ok_or(NO_SUCH_GROUP),
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
         REQUESTS => household(member),
+        FRONT_DOOR => Ok(Command::FrontDoor),
         TRACE => following(term, season.as_deref()),
         STUCK => Ok(Command::Stuck),
         CONFIG => setting(key),

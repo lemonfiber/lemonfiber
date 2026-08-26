@@ -564,6 +564,27 @@ async fn what_has_stopped_is_answered_under_its_own_kind() {
 }
 
 #[tokio::test]
+async fn the_one_address_for_the_household_is_answered_under_its_own_kind() {
+    // The question a browser has no other way to ask: which one link to send. The
+    // answer names the request service and names the index over every service as
+    // something that is not a way in, rather than leaving a browser to decide.
+    let household = Reporting::holding(
+        &["jellyfin", "seerr", "homepage"],
+        Lifecycle::Running,
+        Health::Healthy,
+    );
+    let seen = asked(world(household, stack()), "/api/front-door").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"front-door","data":{"#)
+            && body.contains(r#""standing":"established""#)
+            && body.contains(r#""service":"Seerr","facing":"asking""#)
+            && body.contains(r#""service":"Homepage","facing":"operators""#)),
+        "the front door is answered in the front-door envelope"
+    );
+}
+
+#[tokio::test]
 async fn every_setting_is_the_envelope_the_command_renders() {
     let contents = kept();
     let expected =

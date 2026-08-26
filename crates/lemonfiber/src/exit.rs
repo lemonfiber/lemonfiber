@@ -121,8 +121,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::SUCCESS
             }
         }
-        // A trace, a stuck-item listing or the household's requests is a query — it
-        // answers where things are; asking is never a failure, whatever the answer.
+        // A trace, a stuck-item listing, the household's requests or where the
+        // household begins is a query — it answers where things are; asking is never a
+        // failure, whatever the answer. A stack with no front door has been asked and
+        // answered, so the answer arrives as one rather than as a code.
         //
         // A guard that ended is one too. It ended because the data location went,
         // which is the thing it was watching for, and it reports whether it got the
@@ -134,6 +136,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Config(_)
         | Outcome::Trace(_)
         | Outcome::Household(_)
+        | Outcome::FrontDoor(_)
         | Outcome::Stuck(_)
         | Outcome::Status(_)
         | Outcome::Word(_)

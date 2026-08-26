@@ -16,6 +16,7 @@ pub(crate) mod fixtures;
 
 mod archive;
 mod doctor;
+mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
 mod quality;
@@ -209,6 +210,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Music(report) => quality::music(report),
         Outcome::Trace(report) => trace::trace(report),
         Outcome::Household(report) => trace::household(report),
+        Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
@@ -376,9 +378,9 @@ mod tests {
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::glossary::Vocabulary;
     use lemonfiber_core::model::{
-        ConfigReport, Disposition, DoctorReport, FormsReport, HouseholdReport, MusicReport,
-        QualityReport, ResetReport, SettingReport, StatusReport, StuckReport, UpgradeReport,
-        VersionReport, WizardReport,
+        ConfigReport, Disposition, DoctorReport, FormsReport, FrontDoorReport, HouseholdReport,
+        MusicReport, QualityReport, ResetReport, SettingReport, Standing, StatusReport,
+        StuckReport, UpgradeReport, VersionReport, WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -654,6 +656,13 @@ mod tests {
             Outcome::Stuck(StuckReport {
                 items: Vec::new(),
                 incomplete: false,
+            }),
+            Outcome::FrontDoor(FrontDoorReport {
+                standing: Standing::Absent,
+                service: None,
+                facing: None,
+                meaning: "there is none".to_owned(),
+                beside: Vec::new(),
             }),
             Outcome::Lifecycle(a_lifecycle("up", a_plan("media", Vec::new()))),
             Outcome::Status(StatusReport {

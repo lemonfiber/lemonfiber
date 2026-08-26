@@ -20,7 +20,7 @@ const READS: &str = "../lemonfiber-api/src/read";
 const ROOT: &str = "../lemonfiber-api/src/read.rs";
 
 /// The spelled numbers a module doc may open with.
-const SPELLED: [(&str, usize); 15] = [
+const SPELLED: [(&str, usize); 16] = [
     ("one", 1),
     ("two", 2),
     ("three", 3),
@@ -36,6 +36,7 @@ const SPELLED: [(&str, usize); 15] = [
     ("thirteen", 13),
     ("fourteen", 14),
     ("fifteen", 15),
+    ("sixteen", 16),
 ];
 
 /// The fewest modules this surface has ever declared its reads across.

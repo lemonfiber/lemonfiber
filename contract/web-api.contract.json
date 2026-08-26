@@ -2211,6 +2211,162 @@
         }
       }
     },
+    "front-door": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/FrontDoorReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Beside": {
+          "description": "A service the household can reach that is not the front door, and why it is not.\n\nCarried rather than left out, because the decision is the useful part: an operator\nwho can see that the index over every service was considered and refused has been\ntold something, where one shown a single name has only been given an answer.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why it is not somewhere to begin.",
+              "type": "string"
+            },
+            "facing": {
+              "description": "What it is to the household.",
+              "$ref": "#/$defs/Facing"
+            },
+            "service": {
+              "description": "The service, by the name it shows itself under.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "facing",
+            "because"
+          ]
+        },
+        "Facing": {
+          "description": "What a service published to the local network is to the people in the house.",
+          "oneOf": [
+            {
+              "description": "Where asking for something begins, and where what was asked for is followed.\nIt links onward to the library, which is what makes it a place to start\nrather than one more address to be sent.",
+              "type": "string",
+              "const": "asking"
+            },
+            {
+              "description": "The library, where what arrived is watched. A place to start only where there\nis nothing to ask for, because somebody sent there has no way to ask.",
+              "type": "string",
+              "const": "watching"
+            },
+            {
+              "description": "One kind of media and no other, reached from the library rather than instead\nof it.",
+              "type": "string",
+              "const": "shelf"
+            },
+            {
+              "description": "An index over every service, including the ones nobody in the house should\nlearn exist.",
+              "type": "string",
+              "const": "operators"
+            },
+            {
+              "description": "How the others are reached, rather than one of them.",
+              "type": "string",
+              "const": "carriage"
+            },
+            {
+              "description": "Published to the household, and nothing here says what it is to them.",
+              "type": "string",
+              "const": "unstated"
+            }
+          ]
+        },
+        "FrontDoorReport": {
+          "description": "The household's one front door: which service it is, where it stands, and what\nelse they can reach that is not it.",
+          "type": "object",
+          "properties": {
+            "beside": {
+              "description": "Everything else the household can reach, and why none of it is the door.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Beside"
+              }
+            },
+            "facing": {
+              "description": "What that service is to them. Absent for the same reason.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Facing"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "meaning": {
+              "description": "What this comes to, in the words an operator would say it in — including,\nwhere there is no door, that there is none.",
+              "type": "string"
+            },
+            "service": {
+              "description": "The service the household begins at, by the name it shows itself under.\nAbsent where this stack publishes nothing they could begin at.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "standing": {
+              "description": "Where the front door stands.",
+              "$ref": "#/$defs/Standing"
+            }
+          },
+          "required": [
+            "standing",
+            "meaning",
+            "beside"
+          ]
+        },
+        "Standing": {
+          "description": "Where the household's one front door stands.",
+          "oneOf": [
+            {
+              "description": "The door is the request surface, and it is running.",
+              "type": "string",
+              "const": "established"
+            },
+            {
+              "description": "This stack has no request surface, so the library is the door — there is\nnothing here to ask for.",
+              "type": "string",
+              "const": "library-only"
+            },
+            {
+              "description": "There is a door and it is not answering.",
+              "type": "string",
+              "const": "unreachable"
+            },
+            {
+              "description": "Nothing at all is published to the household: an operator-only configuration.",
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        }
+      }
+    },
     "glossary": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

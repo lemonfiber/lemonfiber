@@ -30,10 +30,10 @@ use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind::{self, Kind},
-    Admitted, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
-    MusicReport, QualityReport, ResetReport, SetupReport, Started, StatusReport, StuckReport,
-    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
-    API_VERSION,
+    Admitted, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HouseholdReport,
+    LifecycleReport, MusicReport, QualityReport, ResetReport, SetupReport, Started, StatusReport,
+    StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
+    WizardReport, API_VERSION,
 };
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
@@ -88,6 +88,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::CONFIG, schema_for!(Envelope<ConfigReport>));
     describing(kinds, kind::DOCTOR, schema_for!(Envelope<DoctorReport>));
     describing(kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
+    describing(
+        kinds,
+        kind::FRONT_DOOR,
+        schema_for!(Envelope<FrontDoorReport>),
+    );
     describing(kinds, kind::GLOSSARY, schema_for!(Envelope<Vocabulary>));
     describing(
         kinds,

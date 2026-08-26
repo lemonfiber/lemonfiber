@@ -12,9 +12,9 @@
 use crate::error::{Code, Problem};
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
-    kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
-    MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, SupervisionReport,
-    TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
+    kind, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HouseholdReport,
+    LifecycleReport, MusicReport, QualityReport, ResetReport, StatusReport, StuckReport,
+    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
 };
 use crate::stack::closure::Plan;
 use crate::stack::compose::Action;
@@ -30,6 +30,7 @@ pub mod conditions;
 mod configuring;
 mod ctx;
 pub mod dashboard;
+mod door;
 pub mod egress;
 mod engine;
 #[cfg(test)]
@@ -100,6 +101,8 @@ pub enum Outcome {
     Trace(TraceReport),
     /// What the household asked for, member by member.
     Household(HouseholdReport),
+    /// The one address to hand somebody who lives here.
+    FrontDoor(FrontDoorReport),
     /// The items whose downloads are stuck, each linkable to its trace.
     Stuck(StuckReport),
     /// What one of this product's words means.
@@ -149,6 +152,7 @@ impl Outcome {
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
             Self::Household(_) => kind::HOUSEHOLD,
+            Self::FrontDoor(_) => kind::FRONT_DOOR,
             Self::Stuck(_) => kind::STUCK,
             Self::Word(_) => kind::WORD,
             Self::Glossary(_) => kind::GLOSSARY,
@@ -183,6 +187,7 @@ impl serde::Serialize for Outcome {
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),
             Self::Household(report) => report.serialize(serializer),
+            Self::FrontDoor(report) => report.serialize(serializer),
             Self::Stuck(report) => report.serialize(serializer),
             Self::Word(term) => term.serialize(serializer),
             Self::Glossary(report) => report.serialize(serializer),
@@ -249,6 +254,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Household { member } => household::household(ctx, member.as_deref())
             .await
             .map(Outcome::Household),
+        Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Explain { word } => crate::glossary::explain(&word)
             .map(|term| Outcome::Word(*term))
@@ -567,6 +573,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_front_door_serialises_under_its_own_kind() {
+        // The stack this repository carries runs a request service, so the answer
+        // names one — and the command runs through dispatch, envelope and serialise
+        // for its outcome on the way.
+        let household = a_context()
+            .engine(Arc::new(Reporting::holding(
+                &["seerr"],
+                crate::ports::docker::Lifecycle::Running,
+                crate::ports::docker::Health::Healthy,
+            )))
+            .build();
+        let json = dispatch(Command::FrontDoor, &household)
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"front-door\""),
+            "envelope names the kind"
+        );
+    }
+
+    #[tokio::test]
     async fn a_dispatched_stuck_serialises_under_its_own_kind() {
         // No key opens a target, so nothing is stuck — but the command still runs through
         // dispatch, envelope and serialise for its outcome.
@@ -872,6 +901,7 @@ mod tests {
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
+                | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
@@ -909,6 +939,7 @@ mod tests {
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
+                | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
@@ -1726,6 +1757,7 @@ mod tests {
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
+                | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
@@ -2717,6 +2749,7 @@ mod tests {
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
                 | Outcome::Household(_)
+                | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)

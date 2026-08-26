@@ -81,6 +81,7 @@ and the rest is named in **Standing**.
 | `watch` | `watch` | dashboard | Reachable in full, and it is the command with no ending of its own: it holds until the data location is lost, which on a machine where the drive stays put is never. So it is answered with a job's name like every other long action, and the name is also how it is stopped — a browser has no interruption to send, so releasing the name is its Ctrl-C, and what the container engine was already asked to do goes on exactly as it does when a terminal is closed. A tab closing stops nothing, which is the useful case. What bounds an abandoned one is that asking what became of it renews it: a guard nobody has asked about across two sweeps of half an hour is let go and says so, so one started on a Friday does not outlive the day. Nothing else is leased, because everything else ends by itself. The dashboard offers it behind the key that opens the two that keep going, and it is the one thing on that screen offered an end — which is the same answer, asked of the same table: a terminal's interruption is what a released name stands in for, and on a screen in raw mode that interruption is a keypress rather than a signal, so escape lets the guard go and says that nothing was stopped with it. Leaving the screen leaves it guarding, and the line on the way out says it will not end by itself and that Ctrl-C ends it. It is chosen its forms off the same list an action's own subjects are chosen from and by the same movement, so one guard covers several forms at once; the whole stack is not among the choices at all, because the command refuses a guard with nothing to stop and the list is built by offering each subject to that refusal. |
 | `trace` | `/api/trace` | dashboard | Served on the web, and it completes a screen that half-existed: `/api/requests` reports what the household asked for, and this follows one of them. What to follow is one query parameter — the command line takes it as words so it can be typed unquoted, and a query string carries the title whole. It is the one question the dashboard has to be given something before it can ask, so taking it opens a line to type the title on, and an empty one is refused in the sentence a browser is refused with. Narrowing to one season is offered there now, as a second entry on the same list: taking it opens the line the title is typed on and then a second line for the season, with what has already been given left on the screen above it. Typed rather than taken, for the reason a setting and a member are typed — the list a season would be picked off is the trace itself, which is the request the narrowing exists to avoid making. A season that is not a number is refused in the sentence a query string carrying one is refused with, rather than in one that screen wrote; the line takes digits and nothing else, so what is turned away is a keystroke rather than a request. "It is a second thing to type" was the argument for leaving it, and it argued for the second line rather than against the narrowing: that screen already had one. |
 | `household` | `/api/requests` | dashboard | Served on the web, and asked off the dashboard's own list of questions. Narrowing to one member is offered there now, as a second entry on the same list: taking it opens the line a trace is typed on, and what is typed fills the member a query string carries. Typed rather than taken off a list of the household, because the list it would be taken off is the answer the narrowing exists to avoid asking for — which is the difference between this and the two that are picked. An empty name is refused in the sentence a browser is refused with, which it also was not before: it matched nobody and came back as a household that has asked for nothing, the one reading this report is written to refuse. |
+| `front-door` | `/api/front-door` | dashboard | Reachable from all three, and new with the question it answers: which one address to hand somebody who lives here. The answer is derived in the core from what the stack declares — the request service where there is one, the library where there is not, and none at all where there is neither — so no surface picks a different door, and none of them can be talked into offering the page that links every service. It takes no arguments, so there is nothing a screen could leave out; the dashboard asks for it off the list one key opens, beside the household's own requests. |
 | `walkthrough` | `walkthrough` | dashboard | Reachable in full, on the surface it was designed for: a first-time operator is likelier to be in a browser than in a shell. It is a job plus the stream — the report at the end is what the name is redeemed for, and each step goes down the stream the moment it is true, because a walk read back afterwards is a report and the operator would have learned what happened rather than watched it happen. The step goes down whole rather than as a sentence: the words are the core's own, and rendering them into a line for the browser would be a second copy of the walk's prose beside the one the terminal draws. Naming nothing is a request rather than an omission, and is offered as one. Reachable in full from the dashboard too, behind the same key: what to look for is typed on a line of its own and naming nothing there is the same request it is everywhere else, and the steps arrive in the box as they become true. They are drawn by the renderer a shell reaches for the same step, so there is one account of a walk on this surface and not two — and what it came to goes under the steps that were watched, which is the order a shell shows them in. It ends by itself, so the screen offers no end for it and leaving waits for it, as leaving waits for every other action. |
 | `explain` | `/api/explain` | glossary | Reachable in full, and the one read that needs neither a stack nor a daemon: the words are a table compiled into the binary, so a browser meeting one in a failure can ask what it means while the thing that failed is still down. One endpoint over two commands, the way `forms` is: naming a word explains that one, naming none lists what there is to ask about — which a caller that has never met this vocabulary needs before it can name anything. Served rather than shipped; a second copy of the table in the web app would be a surface explaining a word its own way. The terminal offers it on `?`, over the words on the screen. |
 | `stuck` | `/api/stuck` | dashboard | Served on the web, which is where the dashboard's own "N stuck" figure lands: each entry is named the way `/api/trace` is asked, so the count leads somewhere. The terminal reaches it as a question now and follows one the same way the web's list does: taking the question asks that read, and the entries it comes back with are offered as a list to take one of, which asks `/api/trace` by that entry's own title. Taken rather than typed, because the title is on the screen already and retyping it is a spelling test. The panel stays and is not this: it renders the queue-health gather, which counts what has stopped and names the cause where several items share one, rather than naming each item the way a trace is asked for — two readings of one worry, and it was the second the screen could not reach. |
@@ -94,7 +95,7 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, twenty-five reach the web in full, zero reach it in
+Of the twenty-seven requests, twenty-six reach the web in full, zero reach it in
 part, zero do not reach it at all, and one — `ui` — is an honest exception. Zero
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
@@ -107,7 +108,7 @@ read that disturbed something would still not be a read, so it is asked for at t
 door changes are asked for instead. That leaves `ui` as the only exception this
 table permits, in either column.
 
-On the other side of the table twenty-five reach the terminal in full, zero reach
+On the other side of the table twenty-six reach the terminal in full, zero reach
 the terminal in part, one reaches the terminal but for an exception, and zero have
 no terminal form — which is where three stood six slices ago, nine before the one
 ahead of that, and twenty before the one that began it. Every request the command
@@ -307,7 +308,7 @@ argument is that the fork belongs to the surface: the core spells this as a fiel
 on the command it already had, so a second command here would have been a browser
 asking for something no command line can.
 
-## The terminal acts on thirteen and asks about eight
+## The terminal acts on thirteen and asks about nine
 
 It did neither. The dashboard read and the log viewer read; the wizard was the
 only screen that changed anything, and it only runs on a machine that has not been
@@ -319,11 +320,12 @@ the far end of a remote session, who is the least able of the three to reach
 another surface to act on what this one has just told them.
 
 The dashboard offers the five the screen already showed state for — starting,
-stopping, switching, restarting and fetching — and answers the eight reads it showed
+stopping, switching, restarting and fetching — and answers the nine reads it showed
 nothing of, or showed the raw material of: the versions in play, how this stack is
 doing, the forms it declares, the settings, the quality in force, what the household
-asked for, where one of those things got to, and what has stopped on the way. Beside
-them are the seven writes that are not about what is running at all: the wiring,
+asked for, where the household begins, where one of those things got to, and what
+has stopped on the way. Beside them are the seven writes that are not about what is
+running at all: the wiring,
 keeping an operator's edits, throwing them away, a capture, a bundle, an archive put
 back and the last repair put back; the two that keep going once they are started;
 the key that hands the terminal to the web surface; the three changes to the quality
