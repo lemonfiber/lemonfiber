@@ -1,11 +1,12 @@
-//! The three shapes a box takes, whichever flow opened it.
+//! The four shapes a box takes, whichever flow opened it.
 //!
-//! Four flows put boxes on this screen and between them they say a dozen different
-//! things, but a box is only ever one of three arrangements: a list to move over, a
-//! line to type on, and an answer to read through. Those are here, apart from the
-//! words, because they are the part no flow owns — an errand's list and a question's
-//! list are one drawing over two lists, and the day they stopped being one is the day
-//! the screen started behaving differently depending on which key opened it.
+//! Five flows put boxes on this screen and between them they say a dozen different
+//! things, but a box is only ever one of four arrangements: a list to move over, a
+//! line to type on, an answer to read through, and a question under the account of
+//! what answering it would come to. Those are here, apart from the words, because
+//! they are the part no flow owns — an errand's list and a question's list are one
+//! drawing over two lists, and the day they stopped being one is the day the screen
+//! started behaving differently depending on which key opened it.
 //!
 //! Text from somewhere else — a form's own name, another service's account of what
 //! went wrong — reaches the screen through [`shortened`] and never past it, so no
@@ -27,6 +28,18 @@ const MOVING: &str = "up and down move   any other key closes";
 
 /// How to move over the list, and how to leave it.
 const CHOOSING: &str = "up and down choose   enter goes on   esc leaves it";
+
+/// How the question before something that changes the stack is answered.
+///
+/// Only an explicit yes goes ahead, which is how the teardown's own question is read
+/// too: an answer that is neither should land on the thing that changes nothing, and
+/// on a screen where one key reaches an action it is a keypress that was not meant
+/// that this is guarding against.
+pub(super) const AGREEING: &str = "y goes ahead   any other key changes nothing";
+
+/// The same, under an account the box also moves through.
+const READING_AND_AGREEING: &str =
+    "up and down move   y goes ahead   any other key changes nothing";
 
 /// The entries, the selected one marked, and how to move over them.
 pub(super) fn choosing<T: Listed>(
@@ -107,6 +120,55 @@ pub(super) fn read(reading: &Reading, rows: usize, across: usize) -> Vec<Line<'s
     }
     lines.push(Line::raw(""));
     lines.push(dimmed(MOVING, across));
+    lines
+}
+
+/// A question, under the account of what answering it would come to.
+///
+/// Under it rather than over it: an effect somebody reads after they have agreed is
+/// not something they agreed to, so what a reset would revert, what a bundle would
+/// hold and what an upgrade would cost are the lines above the question rather than
+/// the answer to it.
+///
+/// One drawing over every flow that asks one, for the reason the list is one drawing
+/// over four lists: two flows arranging the same three parts differently is how one
+/// screen becomes two, and this is the arrangement where the difference would decide
+/// what somebody agreed to.
+pub(super) fn agreed(
+    asks: &str,
+    about: &str,
+    account: Option<&Reading>,
+    rows: usize,
+    across: usize,
+) -> Vec<Line<'static>> {
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    if let Some(account) = account {
+        // Three rows are kept back for the question, the blank and the hint under
+        // it, so the account never grows over the thing being agreed to.
+        let (shown, above, below) = account.window(rows.saturating_sub(4));
+        lines.extend(
+            shown
+                .into_iter()
+                .map(|line| Line::raw(shortened(line, across))),
+        );
+        if let Some(place) = elsewhere(above, below) {
+            lines.push(dimmed(&place, across));
+        }
+    }
+    lines.push(Line::raw(shortened(
+        &format!("{}?", asks.trim_end()),
+        across,
+    )));
+    lines.push(dimmed(about, across));
+    lines.push(Line::raw(""));
+    lines.push(dimmed(
+        if account.is_some() {
+            READING_AND_AGREEING
+        } else {
+            AGREEING
+        },
+        across,
+    ));
     lines
 }
 

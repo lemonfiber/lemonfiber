@@ -6,22 +6,25 @@
 //! that does not await, so no frame is drawn between them — which is why the offer
 //! waiting for that answer is a field on [`super::Acting`] rather than a stage.
 //!
-//! Four flows share the list at the top and the reading at the bottom. An action on
+//! Five flows share the list at the top and the reading at the bottom. An action on
 //! a key of its own is chosen a subject and then asked about; a question is taken off
 //! a list and then answered; an errand is taken off another list, given a name where
-//! it needs one, and shown what it would do before it is asked about; and one of the
+//! it needs one, and shown what it would do before it is asked about; one of the
 //! two that keep going is taken off a third, told what to look for or chosen a form,
-//! and then watched rather than waited for. What each of them decides is next door —
-//! in [`super::offer`], [`super::question`], [`super::errand`] and
-//! [`super::lasting`] — and what each of them says is in [`super::words`].
+//! and then watched rather than waited for; and a quality change is taken off a
+//! fourth, chosen a preset or asked what it would cost, and then asked about. What
+//! each of them decides is next door — in [`super::offer`], [`super::question`],
+//! [`super::errand`], [`super::lasting`] and [`super::quality`] — and what each of
+//! them says is in [`super::words`].
 //!
-//! The fifth key has one stage and no flow: [`super::surface`] asks whether to hand
+//! The sixth key has one stage and no flow: [`super::surface`] asks whether to hand
 //! the terminal over, and a yes ends the screen rather than beginning anything here.
 
 use super::chooser::Chooser;
 use super::errand::Errand;
 use super::lasting::{Begun, Lasting};
 use super::offer::{Choice, Offer};
+use super::quality::{Change, Grade};
 use super::question::Question;
 use super::reading::Reading;
 
@@ -142,6 +145,36 @@ pub(super) enum Stage {
         ends: bool,
         /// What it has said so far, where it says anything while it runs.
         said: Option<Reading>,
+    },
+    /// Choosing which change to make to the quality this stack aims for.
+    Deciding(Chooser<&'static Change>),
+    /// Choosing the preset one of them records.
+    Grading {
+        /// The change being chosen for.
+        change: &'static Change,
+        /// The presets, one of them selected.
+        chooser: Chooser<Grade>,
+    },
+    /// Asking the core what a change would cost, before anybody agrees to it.
+    Costing {
+        /// The change being costed.
+        change: &'static Change,
+    },
+    /// Holding the question, with the account above it where there is one to read.
+    Settling {
+        /// The change about to be made.
+        change: &'static Change,
+        /// The preset it was given, or nothing where it takes none.
+        chosen: Option<&'static str>,
+        /// What was read before the question, and where in it the box is.
+        account: Option<Reading>,
+    },
+    /// The change is with the core.
+    Applying {
+        /// The change that is running.
+        change: &'static Change,
+        /// The preset it was given, or nothing where it takes none.
+        chosen: Option<&'static str>,
     },
     /// Holding the question before the terminal is handed to the web surface.
     Handing,

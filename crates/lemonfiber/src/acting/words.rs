@@ -23,10 +23,11 @@ use ratatui::text::Line;
 use super::errand::{self, Errand};
 use super::lasting::{self, Begun, Lasting};
 use super::offer::{Choice, Offer, OFFERED};
+use super::quality::{self, Change};
 use super::question::{self, Question};
 use super::reading::Reading;
 use super::{surface, Stage};
-use shapes::{choosing, dimmed, elsewhere, read, shortened, typing};
+use shapes::{agreed, choosing, dimmed, elsewhere, read, shortened, typing, AGREEING};
 
 /// The keys the screen answers whatever else is open.
 const ALWAYS: &str = "q quit   r refresh   ? words";
@@ -46,6 +47,12 @@ const KEEPS_GOING: &str = " keeps going ";
 /// What the box asking about the web surface calls itself.
 const WEB: &str = " web interface ";
 
+/// What the box holding the three quality changes calls itself.
+const QUALITY: &str = " quality ";
+
+/// What the box says while the core is working out what a change would cost.
+const COSTING: &str = "working out what this would cost";
+
 /// What the box says while a walk is running and has not said anything yet.
 ///
 /// Said rather than shown as an empty box: a walk's first step arrives once the
@@ -64,18 +71,6 @@ const WEIGHING: &str = "working out what this would do";
 
 /// What the box says while a question is with the stack.
 const ANSWERING: &str = "waiting for this stack to answer";
-
-/// How the question before an action is answered.
-///
-/// Only an explicit yes goes ahead, which is how the teardown's own question is
-/// read too: an answer that is neither should land on the thing that changes
-/// nothing, and on a screen where one key reaches an action it is a keypress that
-/// was not meant that this is guarding against.
-const AGREEING: &str = "y goes ahead   any other key changes nothing";
-
-/// The same, under an answer the box also moves through.
-const READING_AND_AGREEING: &str =
-    "up and down move   y goes ahead   any other key changes nothing";
 
 /// What is said beside a running action, and what leaving does about it.
 ///
@@ -100,83 +95,47 @@ pub(crate) struct Pane {
 /// so what the action is doing to the services shows where the services are listed,
 /// and a box over that would take away the one thing worth watching.
 pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
-    match stage {
+    // What each arm decides is the two things a box is: what it is called, and what
+    // it says. The box itself is put together once underneath, so an arm cannot come
+    // to disagree with the others about what a box is made of.
+    let (title, lines) = match stage {
         Stage::Idle
         | Stage::Running { .. }
         | Stage::Doing { .. }
-        | Stage::Keeping { said: None, .. } => None,
-        Stage::Choosing { offer, chooser } => Some(Pane {
-            title: titled(offer),
-            lines: choosing(chooser, rows, across),
-        }),
-        Stage::Confirming { offer, chosen } => Some(Pane {
-            title: titled(offer),
-            lines: confirming(offer, chosen, across),
-        }),
-        Stage::Came(reading) => Some(Pane {
-            title: CAME.to_owned(),
-            lines: read(reading, rows, across),
-        }),
-        Stage::Wondering(chooser) => Some(Pane {
-            title: ASK.to_owned(),
-            lines: choosing(chooser, rows, across),
-        }),
-        Stage::Typing { asks, typed, .. } => Some(Pane {
-            title: ASK.to_owned(),
-            lines: typing(asks, typed, across),
-        }),
-        Stage::Waiting(question) => Some(Pane {
-            title: asked(question),
-            lines: vec![dimmed(ANSWERING, across)],
-        }),
-        Stage::Answered { question, reading } => Some(Pane {
-            title: asked(question),
-            lines: read(reading, rows, across),
-        }),
-        Stage::Sending(chooser) => Some(Pane {
-            title: MORE.to_owned(),
-            lines: choosing(chooser, rows, across),
-        }),
+        | Stage::Applying { .. }
+        | Stage::Keeping { said: None, .. } => return None,
+        Stage::Choosing { offer, chooser } => (titled(offer), choosing(chooser, rows, across)),
+        Stage::Confirming { offer, chosen } => (titled(offer), confirming(offer, chosen, across)),
+        Stage::Came(reading) => (CAME.to_owned(), read(reading, rows, across)),
+        Stage::Wondering(chooser) => (ASK.to_owned(), choosing(chooser, rows, across)),
+        Stage::Typing { asks, typed, .. } => (ASK.to_owned(), typing(asks, typed, across)),
+        Stage::Waiting(question) => (asked(question), vec![dimmed(ANSWERING, across)]),
+        Stage::Answered { question, reading } => (asked(question), read(reading, rows, across)),
+        Stage::Sending(chooser) => (MORE.to_owned(), choosing(chooser, rows, across)),
         Stage::Naming {
             errand,
             asks,
             typed,
-        } => Some(Pane {
-            title: sending(errand),
-            lines: typing(asks, typed, across),
-        }),
-        Stage::Weighing { errand, .. } => Some(Pane {
-            title: sending(errand),
-            lines: vec![dimmed(WEIGHING, across)],
-        }),
+        } => (sending(errand), typing(asks, typed, across)),
+        Stage::Weighing { errand, .. } => (sending(errand), vec![dimmed(WEIGHING, across)]),
         Stage::Agreeing {
             errand,
             typed,
             would,
-        } => Some(Pane {
-            title: sending(errand),
-            lines: agreeing(errand, typed, would.as_ref(), rows, across),
-        }),
-        Stage::Starting(chooser) => Some(Pane {
-            title: KEEPS_GOING.to_owned(),
-            lines: choosing(chooser, rows, across),
-        }),
+        } => (
+            sending(errand),
+            agreeing(errand, typed, would.as_ref(), rows, across),
+        ),
+        Stage::Starting(chooser) => (KEEPS_GOING.to_owned(), choosing(chooser, rows, across)),
         Stage::Wording {
             lasting,
             asks,
             typed,
-        } => Some(Pane {
-            title: keeping(lasting),
-            lines: typing(asks, typed, across),
-        }),
-        Stage::Picking { lasting, chooser } => Some(Pane {
-            title: keeping(lasting),
-            lines: choosing(chooser, rows, across),
-        }),
-        Stage::Beginning { lasting, begun } => Some(Pane {
-            title: keeping(lasting),
-            lines: beginning(lasting, begun, across),
-        }),
+        } => (keeping(lasting), typing(asks, typed, across)),
+        Stage::Picking { lasting, chooser } => (keeping(lasting), choosing(chooser, rows, across)),
+        Stage::Beginning { lasting, begun } => {
+            (keeping(lasting), beginning(lasting, begun, across))
+        }
         // A walk's steps are its whole report and nothing behind this box is showing
         // them, so the box stays. A guard says nothing until it ends and what it is
         // guarding is the panels underneath, which is why it is up there with the
@@ -185,15 +144,21 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
             lasting,
             said: Some(reading),
             ..
-        } => Some(Pane {
-            title: keeping(lasting),
-            lines: walking(reading, rows, across),
-        }),
-        Stage::Handing => Some(Pane {
-            title: WEB.to_owned(),
-            lines: handing(across),
-        }),
-    }
+        } => (keeping(lasting), walking(reading, rows, across)),
+        Stage::Deciding(chooser) => (QUALITY.to_owned(), choosing(chooser, rows, across)),
+        Stage::Grading { change, chooser } => (changing(change), choosing(chooser, rows, across)),
+        Stage::Costing { change } => (changing(change), vec![dimmed(COSTING, across)]),
+        Stage::Settling {
+            change,
+            chosen,
+            account,
+        } => (
+            changing(change),
+            settling(change, *chosen, account.as_ref(), rows, across),
+        ),
+        Stage::Handing => (WEB.to_owned(), handing(across)),
+    };
+    Some(Pane { title, lines })
 }
 
 /// The one line at the foot of the screen: the keys, or what is running.
@@ -208,6 +173,7 @@ pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
             format!("{} {}   {WAITING}", offer.hint, chosen.name)
         }
         Stage::Doing { errand, .. } => format!("{}   {WAITING}", errand.name),
+        Stage::Applying { change, .. } => format!("{}   {WAITING}", change.name),
         // The one with no ending of its own says how it is ended; the one that ends
         // by itself says what leaving does, as every other running thing here does.
         Stage::Keeping {
@@ -240,6 +206,7 @@ pub(super) fn staying_for(stage: &Stage) -> Option<String> {
     let said = match stage {
         Stage::Running { offer, chosen } => waited(&format!("{} {}", offer.hint, chosen.name)),
         Stage::Doing { errand, .. } => waited(errand.name),
+        Stage::Applying { change, .. } => waited(change.name),
         // The one that never ends by itself is the one this cannot say "to finish"
         // about. What it will go on doing, and the one thing that ends it once the
         // screen is gone, are said instead — a run held open on a promise nobody
@@ -281,6 +248,7 @@ fn keys() -> String {
         format!("{} {}", question::KEY, question::HINT),
         format!("{} {}", errand::KEY, errand::HINT),
         format!("{} {}", lasting::KEY, lasting::HINT),
+        format!("{} {}", quality::KEY, quality::HINT),
         format!("{} {}", surface::KEY, surface::HINT),
     ];
     said.extend(
@@ -307,10 +275,6 @@ fn sending(errand: &Errand) -> String {
 }
 
 /// The question before an errand, under what it would do where the errand could say.
-///
-/// Under it rather than over it: an effect somebody reads after they have agreed is
-/// not something they agreed to, so what a reset would revert and what a bundle would
-/// hold are the lines above the question rather than the answer to it.
 fn agreeing(
     errand: &Errand,
     typed: &str,
@@ -318,36 +282,38 @@ fn agreeing(
     rows: usize,
     across: usize,
 ) -> Vec<Line<'static>> {
-    let asks = format!("{} {typed}", errand.asks);
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    if let Some(would) = would {
-        // Three rows are kept back for the question, the blank and the hint under
-        // it, so what it would do never grows over the thing being agreed to.
-        let (shown, above, below) = would.window(rows.saturating_sub(4));
-        lines.extend(
-            shown
-                .into_iter()
-                .map(|line| Line::raw(shortened(line, across))),
-        );
-        if let Some(place) = elsewhere(above, below) {
-            lines.push(dimmed(&place, across));
-        }
-    }
-    lines.push(Line::raw(shortened(
-        &format!("{}?", asks.trim_end()),
+    agreed(
+        &format!("{} {typed}", errand.asks),
+        errand.about,
+        would,
+        rows,
         across,
-    )));
-    lines.push(dimmed(errand.about, across));
-    lines.push(Line::raw(""));
-    lines.push(dimmed(
-        if would.is_some() {
-            READING_AND_AGREEING
-        } else {
-            AGREEING
-        },
-        across,
-    ));
-    lines
+    )
+}
+
+/// What the box holding one quality change is called.
+fn changing(change: &Change) -> String {
+    format!(" {} ", change.name)
+}
+
+/// The question before a quality change, under the account where there is one.
+///
+/// The preset completes the question where one was chosen, the way a form completes
+/// an action's. Where none was, the question is whole on its own: neither of the
+/// other two is given anything, and a sentence left hanging for a subject that does
+/// not exist would be asking about nothing.
+fn settling(
+    change: &Change,
+    chosen: Option<&str>,
+    account: Option<&Reading>,
+    rows: usize,
+    across: usize,
+) -> Vec<Line<'static>> {
+    let asks = match chosen {
+        Some(chosen) => format!("{} {chosen}", change.asks),
+        None => change.asks.to_owned(),
+    };
+    agreed(&asks, change.about, account, rows, across)
 }
 
 /// What the box holding one of the two that keep going is called.

@@ -127,6 +127,35 @@ pub const ASKS: &[Reach] = &[
 /// name here that a reader can see is unaccompanied.
 pub const SHOWS: &[&str] = &["ps", "doctor", "stuck"];
 
+/// The requests the dashboard reaches a second way, by acting on what one of its
+/// questions answers.
+///
+/// One request, three actions. `quality` is on [`ASKS`] as a read — the preset in
+/// force, what each one means and what it costs — and these three are the writes
+/// offered beside that reading. They are not entries in [`ACTS`], because the
+/// request is already reached: [`reached`] is what the parity table's terminal
+/// column is held against in both directions, and a request named there twice would
+/// leave a reader of one row with two claims to reconcile against it.
+///
+/// What they are published for is the other direction. Every action the screen
+/// offers is held to a name here by `acting/`'s own tests, so a write added to that
+/// screen with no row accounting for it fails rather than going unnoticed — which is
+/// the whole of what this list buys and the only thing it is read for.
+pub const ALSO: &[Reach] = &[
+    Reach {
+        request: "quality",
+        through: "quality-set",
+    },
+    Reach {
+        request: "quality",
+        through: "quality-reapply",
+    },
+    Reach {
+        request: "quality",
+        through: "quality-upgrade",
+    },
+];
+
 /// The requests the dashboard reaches by giving the terminal back.
 ///
 /// One, and it carries no second name because there is no table to name it in: no
@@ -148,7 +177,7 @@ pub fn reached() -> Vec<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{reached, ACTS, ASKS, OPENS, SHOWS};
+    use super::{reached, ACTS, ALSO, ASKS, OPENS, SHOWS};
 
     /// Every request is reached one way, or a reader of the table has two rows'
     /// worth of claim to reconcile against one row.
@@ -172,5 +201,25 @@ mod tests {
     fn a_question_is_named_by_a_path_and_an_action_by_a_word() {
         assert!(ASKS.iter().all(|reach| reach.through.starts_with("/api/")));
         assert!(ACTS.iter().all(|reach| !reach.through.contains('/')));
+        assert!(ALSO.iter().all(|reach| !reach.through.contains('/')));
+    }
+
+    /// A second way is a second way to something already reached.
+    ///
+    /// An entry here naming a request no other list holds would be a write nothing in
+    /// the parity table accounts for — the failure the list beside it exists to catch,
+    /// arriving through the list added to catch it.
+    #[test]
+    fn a_second_way_reaches_something_this_screen_already_reaches() {
+        let every = reached();
+
+        for reach in ALSO {
+            assert!(
+                every.contains(&reach.request),
+                "{} is reached no other way",
+                reach.request
+            );
+        }
+        assert!(!ALSO.is_empty());
     }
 }
