@@ -100,6 +100,47 @@ pub fn without_query(value: &str) -> String {
     }
 }
 
+/// A value with both of the things a URL can carry a credential in withheld.
+///
+/// The query is one, and the other is the password a URL may carry in front of its host.
+/// Nothing in this stack hands one out — an indexer of the Torznab and Newznab families
+/// authenticates by a query parameter, which is why the key is a setting of its own — but
+/// an operator whose indexer sits behind a proxy that asks for a login can write one, and
+/// the client this stack sends with will use it.
+///
+/// What separates it from the query is that no guessing is involved. The rule above takes
+/// a query wholesale precisely because a parameter's name belongs to whoever wrote the
+/// service; here the URI syntax itself says that everything after the first colon of a
+/// userinfo is a password, and that no application should render one as clear text. So
+/// this is a fact about the shape rather than a guess about somebody's vocabulary.
+///
+/// The username stays. It names the account, an operator whose login is refused needs to
+/// see which one, and it is not what the syntax calls a password.
+#[must_use]
+pub fn without_credentials(value: &str) -> String {
+    without_query(&without_password(value))
+}
+
+/// The same value with the password half of any userinfo in it withheld, or the value
+/// itself where there is none to withhold.
+fn without_password(value: &str) -> String {
+    password_withheld(value).unwrap_or_else(|| value.to_owned())
+}
+
+/// The rebuilt value, where this one is a URL carrying a password before its host.
+///
+/// Read out of the authority alone — what stands between `://` and the first `/`, `?` or
+/// `#` — so a colon in a path and a stray `@` in a query are not mistaken for a login.
+/// The last `@` in it rather than the first, because that is the one every client splits
+/// on, and splitting anywhere else would leave part of the password in what is shown.
+fn password_withheld(value: &str) -> Option<String> {
+    let (scheme, rest) = value.split_once("://")?;
+    let ends = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let at = rest.get(..ends)?.rfind('@')?;
+    let (user, _) = rest.get(..at)?.split_once(':')?;
+    Some(format!("{scheme}://{user}:{REDACTED}{}", rest.get(at..)?))
+}
+
 /// Whether what stands after a separator is the marker itself, left by an earlier pass
 /// over the same text.
 ///
@@ -280,9 +321,12 @@ fn joined(token: &str) -> Option<String> {
 ///
 /// Parameters and not a question mark on its own: a question mark with nothing that
 /// reads as a parameter after it is somebody asking a question in a log line.
+///
+/// A password written in front of the host goes with the query, since a service quoting
+/// an address back at itself quotes whatever was configured into it.
 fn queried(token: &str) -> Option<String> {
     let (_, query) = token.split_once('?')?;
-    query.contains('=').then(|| without_query(token))
+    query.contains('=').then(|| without_credentials(token))
 }
 
 /// Every line of `text`, each withheld where it carries a credential.
@@ -293,7 +337,10 @@ pub fn withheld_text(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_secret, withheld, withheld_by, withheld_text, without_query, REDACTED};
+    use super::{
+        is_secret, withheld, withheld_by, withheld_text, without_credentials, without_query,
+        REDACTED,
+    };
 
     /// A stand-in for a credential, assembled rather than written out so no value
     /// that reads as one sits in this source.
@@ -542,5 +589,53 @@ mod tests {
         let shown = without_query(&format!("https://indexer.example/api?apikey={key}"));
         assert!(shown.starts_with("https://indexer.example/api?"), "{shown}");
         assert!(!shown.contains(&key), "{shown}");
+    }
+
+    #[test]
+    fn a_password_written_in_front_of_a_host_is_withheld_and_the_account_is_not() {
+        // An indexer behind a proxy that asks for a login, written the one way a URL can
+        // carry one. The host, the path and the account survive, because each of those is
+        // what somebody checks when a login is refused.
+        let secret = a_credential();
+        let shown = without_credentials(&format!("https://operator:{secret}@indexer.example/api"));
+        assert!(!shown.contains(&secret), "{shown}");
+        assert!(shown.starts_with("https://operator:"), "{shown}");
+        assert!(shown.ends_with("@indexer.example/api"), "{shown}");
+    }
+
+    #[test]
+    fn a_password_goes_whether_or_not_the_address_also_carries_a_query() {
+        // Both halves on one value, and the sentence around it kept: this is the shape a
+        // service logs when the address it was configured with was refused.
+        let secret = a_credential();
+        let shown = withheld(&format!(
+            "prowlarr refused https://operator:{secret}@indexer.example/api?t=caps&apikey={secret}"
+        ));
+        assert!(!shown.contains(&secret), "{shown}");
+        assert!(
+            shown.starts_with("prowlarr refused https://operator:"),
+            "{shown}"
+        );
+        assert!(shown.contains("@indexer.example/api?"), "{shown}");
+    }
+
+    #[test]
+    fn an_address_that_carries_no_password_is_shown_exactly_as_it_was_written() {
+        // The cost of firing wrongly is the whole reason this is narrow: a rule that took
+        // a path apart because it held a colon would hide the value somebody came to read.
+        for kept in [
+            "https://indexer.example/api",
+            // A username and no password: the syntax says a password is what stands after
+            // the first colon, and there is none.
+            "https://operator@indexer.example/api",
+            // Colons and an at-sign, none of them in an authority.
+            "https://indexer.example/api/v3:search/user@host",
+            "/srv/media/tv",
+            "Europe/Amsterdam",
+            "127.0.0.1:8989",
+            "",
+        ] {
+            assert_eq!(without_credentials(kept), kept, "{kept}");
+        }
     }
 }

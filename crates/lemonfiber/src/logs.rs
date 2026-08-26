@@ -358,13 +358,21 @@ impl Viewer {
     /// A title cannot be given a second row, so what it says is built to fit the one
     /// it has. The count of unseen lines is kept whatever else goes; it sits at the
     /// end, which is where a cut would take it first.
+    ///
+    /// Made plain here, at the end, because the names in it are a container's and not
+    /// this product's. The rows in the body of the same box are made plain where they
+    /// are built; a title is drawn by the border rather than by them, so it would
+    /// otherwise be the one run of somebody else's text on this screen that was not.
+    /// After the fitting rather than before it: what is measured is never narrower
+    /// than what is drawn, and dropping a character an emulator would have obeyed
+    /// only ever leaves room over.
     pub(crate) fn heading(&self, across: usize) -> String {
         let unseen = match self.held.unseen() {
             0 => String::new(),
             unseen => format!(" — {unseen} unseen"),
         };
         let room = across.saturating_sub(unseen.chars().count());
-        format!("{}{unseen}", self.sources(room))
+        lemonfiber_core::text::plain(&format!("{}{unseen}", self.sources(room)))
     }
 
     /// Which services are being shown, named while there is room to name them.
@@ -643,6 +651,19 @@ mod tests {
             "4 services",
             "where not one name fits, the count stands on its own"
         );
+    }
+
+    /// The names in the title are a container's, and the title is drawn by the box's
+    /// border rather than by the rows inside it.
+    ///
+    /// The rows are made plain where they are built, which left the title as the one run
+    /// of somebody else's text on this screen that was not — and a name is exactly where
+    /// an override goes, because it is the short run an operator reads rather than scans.
+    #[test]
+    fn a_container_cannot_name_itself_something_the_title_would_obey() {
+        let viewer = fed(&[("son\u{1b}arr", "up"), ("rad\u{202e}arr", "up")]);
+        let heading = viewer.heading(80);
+        assert_eq!(heading, "sonarr, radarr", "{heading:?}");
     }
 
     /// How far behind the screen is survives however narrow the title gets: it is

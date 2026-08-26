@@ -41,8 +41,33 @@ pub fn plain(text: &str) -> String {
 /// Unicode separators that move a cursor without being control characters. Not
 /// `is_control` alone: that misses C1 written as a single code point, which is the
 /// form that survives a UTF-8 round trip through a service's JSON.
+///
+/// Then the two families that instruct without being control characters at all.
+/// The bidirectional embeddings, overrides and isolates say which way the text
+/// after them runs, so `\u{202e}` in a release name draws `gpj.exe` as `exe.jpg`
+/// — the name on the screen is not the name in the queue, and the operator is
+/// reading the attacker's version of it. The zero-width space and the byte-order
+/// mark draw nothing at all, which is how two names that differ by one of them
+/// read as the same name.
+///
+/// The marks that are *needed* to draw somebody's language are not here. A
+/// zero-width joiner holds an emoji sequence together and separates a Persian
+/// word's forms; the left-to-right and right-to-left marks settle which way a
+/// neutral character leans in mixed text. None of those reverses a run — that
+/// takes an override — and dropping them would misspell the name rather than
+/// disarm it.
 const fn obeyed(character: char) -> bool {
-    matches!(character, '\u{0}'..='\u{1f}' | '\u{7f}'..='\u{9f}' | '\u{2028}' | '\u{2029}')
+    matches!(
+        character,
+        '\u{0}'..='\u{1f}'
+            | '\u{7f}'..='\u{9f}'
+            | '\u{200b}'
+            | '\u{2028}'
+            | '\u{2029}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2066}'..='\u{2069}'
+            | '\u{feff}'
+    )
 }
 
 /// What a run with nothing to break on does when it reaches the edge.
@@ -187,6 +212,31 @@ mod tests {
     }
 
     #[test]
+    fn an_override_can_no_longer_reverse_the_name_it_precedes() {
+        // The classic one: a right-to-left override in front of the extension draws
+        // `Some.Releaseexe.jpg` on the screen while the queue holds `...gpj.exe`.
+        // The characters either side of it are kept, so what is drawn is the name.
+        let disguised = "Some.Release\u{202e}gpj.exe";
+        let shown = plain(disguised);
+        assert!(!shown.contains('\u{202e}'), "{shown:?}");
+        assert_eq!(shown, "Some.Releasegpj.exe");
+    }
+
+    #[test]
+    fn every_shape_of_reordering_and_every_invisible_space_goes() {
+        // Each of these draws no glyph of its own and changes what the glyphs
+        // around it say: five embeddings and overrides, four isolates, and the two
+        // spaces that occupy no cell at all.
+        for hidden in [
+            '\u{202a}', '\u{202b}', '\u{202c}', '\u{202d}', '\u{202e}', '\u{2066}', '\u{2067}',
+            '\u{2068}', '\u{2069}', '\u{200b}', '\u{feff}',
+        ] {
+            let name = format!("Some{hidden}Release");
+            assert_eq!(plain(&name), "SomeRelease", "U+{:04X}", u32::from(hidden));
+        }
+    }
+
+    #[test]
     fn everything_a_person_could_have_meant_survives() {
         // A release name in another script is a release name. Stripping more than
         // a terminal obeys would corrupt the very names this is meant to show.
@@ -198,6 +248,15 @@ mod tests {
             "a — b · c",
             "🎬 premiere",
             "path/with spaces & (brackets)",
+            // Right-to-left text needs no override to be drawn the way it reads,
+            // and the marks that settle a neutral character's direction are not
+            // overrides. Dropping these would misspell a name rather than disarm it.
+            "الحلقة الأولى",
+            "\u{200f}العنوان\u{200e} (2024)",
+            // A joiner is what makes one emoji out of four, and what keeps a
+            // Persian word's letters apart without a space between them.
+            "👩‍👩‍👧‍👦 family",
+            "می\u{200c}شود",
         ] {
             assert_eq!(plain(kept), kept);
         }

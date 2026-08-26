@@ -8,6 +8,7 @@
 
 use lemonfiber_core::model::WalkthroughReport;
 use lemonfiber_core::walkthrough::{Handover, Stopped};
+use lemonfiber_core::PRODUCT;
 
 use super::super::Lines;
 
@@ -95,7 +96,14 @@ fn still_going(report: &WalkthroughReport) -> Lines {
         "{named} is still downloading — it will finish on its own."
     ));
     lines.put("Nothing was cancelled by stopping here.");
-    lines.spaced(format!("  Follow it:  lemonfiber trace \"{named}\""));
+    // Quoted the way the other trace link is quoted, and by the same function: this is a
+    // command the operator copies, and the title in it is the catalogue's rather than
+    // ours. Two spellings of one command line would drift, and the one that drifted
+    // would be the one nobody pastes until the day a title has an apostrophe in it.
+    lines.spaced(format!(
+        "  Follow it:  {PRODUCT} trace {}",
+        crate::render::trace::one_argument(&named)
+    ));
     lines
 }
 
@@ -260,6 +268,30 @@ mod tests {
         assert!(
             said.contains("lemonfiber trace"),
             "and how to follow it: {said}"
+        );
+    }
+
+    /// The follow-up line is a command an operator copies, and the item in it was named
+    /// by whoever released it.
+    ///
+    /// The same quoting as the other trace link and by the same function, so a title with
+    /// a quote in it closes nothing: this line used to be spelled out here on its own, and
+    /// two spellings of one command drift until the day a title has an apostrophe.
+    #[test]
+    fn a_title_cannot_close_the_quoting_of_the_command_that_follows_it() {
+        let going = WalkthroughReport {
+            in_background: true,
+            item: Some(r#"Say "Anything" (1989)"#.to_owned()),
+            ..report(State::Downloading)
+        };
+        let said = ending(&going).text();
+        let followed = said
+            .lines()
+            .find(|line| line.contains("Follow it:"))
+            .unwrap_or_default();
+        assert!(
+            followed.ends_with(r#"trace 'Say "Anything" (1989)'"#),
+            "{said}"
         );
     }
 

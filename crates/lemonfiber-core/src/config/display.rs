@@ -196,11 +196,15 @@ pub fn in_full(name: &str) -> bool {
 /// wholesale — the same call [`crate::bundle::allowed`] makes for the same value, for the
 /// same reason. A query nobody reads is a smaller loss than a key everybody can.
 ///
+/// A password written in front of the host goes the same way, for a reason the query's
+/// is not: there the parameter's name belongs to whoever wrote the service, and here the
+/// URI syntax itself says what a password is.
+///
 /// Kept with the rest of the withholding rather than here, because the same address
 /// reaches an operator three ways — displayed, kept on a transport failure, and quoted
 /// inside a sentence somebody else wrote — and a second copy of the rule is a second
 /// place for it to be right in.
-pub use lemonfiber_ports::withheld::without_query;
+pub use lemonfiber_ports::withheld::without_credentials;
 
 /// Whether a line of a settings file may be shown with its value.
 ///
@@ -243,7 +247,7 @@ fn shouts(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{in_full, shown_in_a_file, without_query, SHOWN};
+    use super::{in_full, shown_in_a_file, without_credentials, SHOWN};
 
     #[test]
     fn a_setting_on_the_list_is_displayed_and_one_beside_it_is_not() {
@@ -295,18 +299,24 @@ mod tests {
     }
 
     #[test]
-    fn a_displayed_address_keeps_its_address_and_loses_its_query() {
+    fn a_displayed_address_keeps_its_address_and_loses_what_it_carries() {
         assert_eq!(
-            without_query("https://indexer.example/api"),
+            without_credentials("https://indexer.example/api"),
             "https://indexer.example/api"
         );
         // Assembled rather than written out, and a placeholder rather than a plausible
         // key: what this fixture has to be is withheld, and a run of hex in source is a
         // secret scanner's finding for as long as the commit exists.
         let key = ["the", "indexer", "key"].join("-");
-        let shown = without_query(&format!("https://indexer.example/api?apikey={key}"));
+        let shown = without_credentials(&format!("https://indexer.example/api?apikey={key}"));
         assert!(shown.starts_with("https://indexer.example/api?"), "{shown}");
         assert!(!shown.contains(&key), "{shown}");
+        // The other half a URL can carry a credential in, on the surface an operator
+        // reads their own settings back from.
+        let behind = without_credentials(&format!("https://operator:{key}@indexer.example/api"));
+        assert!(!behind.contains(&key), "{behind}");
+        assert!(behind.starts_with("https://operator:"), "{behind}");
+        assert!(behind.ends_with("@indexer.example/api"), "{behind}");
     }
 
     #[test]

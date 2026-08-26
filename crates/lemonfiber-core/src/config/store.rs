@@ -210,7 +210,7 @@ pub fn showing(key: &str, value: &str) -> Shown {
         // would report the wrong one.
         value: match (displayed, value.is_empty()) {
             (_, true) => String::new(),
-            (true, false) => super::display::without_query(value),
+            (true, false) => super::display::without_credentials(value),
             (false, false) => REDACTED.to_owned(),
         },
         secret: !displayed,
