@@ -31,6 +31,7 @@
 //! answer already on the screen — which is why [`Stage::Answered`] carries the offer
 //! and [`super::disturbing`] decides what becomes of it.
 
+use super::bundling::Held;
 use super::chooser::Chooser;
 use super::disturbing::Widening;
 use super::errand::{Errand, Given};
@@ -38,7 +39,7 @@ use super::lasting::{Begun, Lasting};
 use super::mending::{Agreed, Mending, Offering, Warning};
 use super::narrowing::Subject;
 use super::offer::{Choice, Offer, Taken};
-use super::quality::{Change, Grade};
+use super::quality::{Change, Chosen, Grade, Scope};
 use super::question::Question;
 use super::reading::Reading;
 use super::service::Inside;
@@ -85,25 +86,29 @@ pub(super) enum Stage {
     Came(Reading),
     /// Choosing what to ask this stack.
     Wondering(Chooser<&'static Question>),
-    /// Typing the word a question has to be given.
+    /// Typing the words a question has to be given, one line at a time.
+    ///
+    /// What is asked for above the line is not held here: it is read off how many
+    /// words are already in hand, so the prompt and the argument the next word fills
+    /// cannot come apart.
     Typing {
-        /// The question waiting on it.
+        /// The question waiting on them.
         question: &'static Question,
-        /// What is asked for, above the line being typed.
-        asks: &'static str,
-        /// What has been typed of it.
+        /// The words already given, in the order they were asked for.
+        said: Vec<String>,
+        /// What has been typed of the next one.
         typed: String,
     },
     /// The question is with the core.
     ///
-    /// The word it was given travels with it, because what it narrowed is what a
-    /// widening offered under the answer is narrowed by — and by the time the answer
-    /// arrives the line it was typed on is gone.
+    /// The words it was given travel with it, because what one of them narrowed is
+    /// what a widening offered under the answer is narrowed by — and by the time the
+    /// answer arrives the line they were typed on is gone.
     Waiting {
         /// The question waiting on the core.
         question: &'static Question,
-        /// The word it was given, or nothing where it takes none.
-        typed: String,
+        /// The words it was given, empty where it takes none.
+        said: Vec<String>,
     },
     /// One of the things the question listed is with the core.
     ///
@@ -138,6 +143,14 @@ pub(super) enum Stage {
         asks: &'static str,
         /// What has been typed of it.
         typed: String,
+    },
+    /// Choosing what a bundle does with media filenames, the window having been typed.
+    Bundling {
+        /// The errand being chosen for, which is the one that writes a bundle.
+        errand: &'static Errand,
+        /// The two answers, one of them selected, each carrying the whole of what the
+        /// bundle would then be asked for.
+        chooser: Chooser<Held>,
     },
     /// Asking the core what the errand would do, before anybody agrees to it.
     Weighing {
@@ -201,11 +214,24 @@ pub(super) enum Stage {
     },
     /// Choosing which change to make to the quality this stack aims for.
     Deciding(Chooser<&'static Change>),
-    /// Choosing the preset one of them records.
+    /// Choosing which media the change is about.
+    ///
+    /// In front of the bars rather than after them, because what a bar even is
+    /// depends on the answer: music has no resolution, so choosing for it picks an
+    /// audio format and the translation reaches a different command with it.
+    Scoping {
+        /// The change being chosen for.
+        change: &'static Change,
+        /// The media it can be about, one of them selected.
+        chooser: Chooser<Scope>,
+    },
+    /// Choosing the bar one of them records for that media.
     Grading {
         /// The change being chosen for.
         change: &'static Change,
-        /// The presets, one of them selected.
+        /// The media it is about, taken off the list before this one.
+        chosen: Chosen,
+        /// The bars, one of them selected.
         chooser: Chooser<Grade>,
     },
     /// Asking the core what a change would cost, before anybody agrees to it.
@@ -217,8 +243,8 @@ pub(super) enum Stage {
     Settling {
         /// The change about to be made.
         change: &'static Change,
-        /// The preset it was given, or nothing where it takes none.
-        chosen: Option<&'static str>,
+        /// The media and the bar it was given, empty where it takes neither.
+        chosen: Chosen,
         /// What was read before the question, and where in it the box is.
         account: Option<Reading>,
     },
@@ -226,8 +252,8 @@ pub(super) enum Stage {
     Applying {
         /// The change that is running.
         change: &'static Change,
-        /// The preset it was given, or nothing where it takes none.
-        chosen: Option<&'static str>,
+        /// The media and the bar it was given, empty where it takes neither.
+        chosen: Chosen,
     },
     /// Choosing what to do about what a diagnosis found.
     Righting(Chooser<&'static Mending>),

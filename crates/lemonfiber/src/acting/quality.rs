@@ -44,14 +44,18 @@
 //! there is a cost at all depends on the media server and the platform, which are
 //! the core's to know and not this screen's to guess.
 
-use lemonfiber_api::actions::{named, Arguments, TAKES_AGREEMENT};
+mod chosen;
+
+use lemonfiber_api::actions::{named, TAKES_AGREEMENT};
 use lemonfiber_core::app::{Command, Outcome};
 use lemonfiber_core::model::Disposition;
-use lemonfiber_core::quality::Preset;
+use lemonfiber_core::recyclarr::Kind;
 
 use super::chooser::{Chooser, Listed};
 use super::reading::{moved, Reading};
 use super::{Press, Stage, Wanted};
+
+pub(crate) use chosen::{Chosen, Grade, Scope};
 
 /// The key that opens the three.
 ///
@@ -133,41 +137,6 @@ impl Listed for Change {
     }
 }
 
-/// One preset, and what choosing it comes to.
-pub(crate) struct Grade {
-    /// The plain-language name the preset is chosen and stored by.
-    pub(crate) name: &'static str,
-    /// What it means, and roughly what an hour of it costs.
-    pub(crate) about: String,
-}
-
-impl Listed for Grade {
-    fn name(&self) -> &str {
-        self.name
-    }
-
-    fn about(&self) -> &str {
-        &self.about
-    }
-}
-
-impl Grade {
-    /// One preset as a row: its own name, and what it means beside what it costs.
-    ///
-    /// The two halves are joined as one line rather than left as a sentence followed
-    /// by a fragment, since a row has one line to say both in.
-    fn of(preset: Preset) -> Self {
-        Self {
-            name: preset.label(),
-            about: format!(
-                "{} — {}.",
-                preset.means().trim_end_matches('.'),
-                preset.consequence().size_per_hour
-            ),
-        }
-    }
-}
-
 impl Change {
     /// What this change sends, given what it was chosen and whether the account in
     /// front of the question has been read.
@@ -176,28 +145,53 @@ impl Change {
     /// this action carries one at all is the web's own table's answer rather than a
     /// second one kept here, so an action that stopped taking an agreement stops
     /// being sent one on this screen too.
-    fn sent(&self, chosen: Option<&str>, read: bool) -> Result<Command, String> {
-        let given = Arguments {
-            preset: chosen.map(str::to_owned),
-            confirm: read && TAKES_AGREEMENT.contains(&self.action),
-            ..Arguments::default()
-        };
+    fn sent(&self, chosen: &Chosen, read: bool) -> Result<Command, String> {
+        let mut given = chosen.asked();
+        given.confirm = read && TAKES_AGREEMENT.contains(&self.action);
         named(self.action, given).map_err(|no| no.said())
     }
 
-    /// The presets this change can be given, or the refusal where it can be given
-    /// none.
+    /// What a choice can be made about, or the refusal where it can be made about
+    /// nothing.
     ///
-    /// Every preset goes through the translation and only what comes to a command is
-    /// offered, which is the rule the five actions on their own keys build their
-    /// subjects by. The first comes back apart from the rest, so what is handed on is
-    /// a list something is already selected in.
-    fn grades(&self) -> Result<(Grade, Vec<Grade>), String> {
+    /// The whole library, then each kind of media the quality model configures, then
+    /// music. Every one of them goes through the translation carrying every bar in
+    /// turn, and a scope no bar at all reaches a command for is not offered — which is
+    /// the rule the five actions on their own keys build their subjects by, and the
+    /// reason no list of media types is written down on this screen.
+    fn scopes(&self) -> Result<(Scope, Vec<Scope>), String> {
+        let offered = std::iter::once(Scope::everything())
+            .chain(Kind::ALL.into_iter().map(Scope::kind))
+            .chain(std::iter::once(Scope::music()));
+        let mut scopes = Vec::new();
+        let mut refused = String::new();
+        for scope in offered {
+            match self.grades(&Chosen::media(&scope)) {
+                Ok(_) => scopes.push(scope),
+                Err(said) => refused = said,
+            }
+        }
+        let mut offered = scopes.into_iter();
+        match offered.next() {
+            Some(first) => Ok((first, offered.collect())),
+            None => Err(refused),
+        }
+    }
+
+    /// The bars this change can be given for that media, or the refusal where it can
+    /// be given none.
+    ///
+    /// Every bar goes through the translation and only what comes to a command is
+    /// offered. That is what makes music three audio formats where everything else is
+    /// four resolution presets: the same list is put to the same table, and the table
+    /// keeps what the action it reaches can carry. The first comes back apart from the
+    /// rest, so what is handed on is a list something is already selected in.
+    fn grades(&self, about: &Chosen) -> Result<(Grade, Vec<Grade>), String> {
         let mut grades = Vec::new();
         let mut refused = String::new();
-        for preset in Preset::ALL {
-            match self.sent(Some(preset.label()), false) {
-                Ok(_) => grades.push(Grade::of(preset)),
+        for grade in Grade::every() {
+            match self.sent(&about.graded(grade.name), false) {
+                Ok(_) => grades.push(grade),
                 Err(said) => refused = said,
             }
         }
@@ -237,13 +231,13 @@ pub(super) fn deciding(
     Wanted::Nothing
 }
 
-/// Take the one selected: open the presets, ask what it would cost, or put the
-/// question where the change has nothing to say first.
+/// Take the one selected: open the media a choice is about, ask what it would cost,
+/// or put the question where the change has nothing to say first.
 fn taken(stage: &mut Stage, change: &'static Change) -> Wanted {
     match change.before {
-        Before::Presets => match change.grades() {
+        Before::Presets => match change.scopes() {
             Ok((first, rest)) => {
-                *stage = Stage::Grading {
+                *stage = Stage::Scoping {
                     change,
                     chooser: Chooser::over(first, rest),
                 };
@@ -254,12 +248,12 @@ fn taken(stage: &mut Stage, change: &'static Change) -> Wanted {
         Before::Nothing => {
             *stage = Stage::Settling {
                 change,
-                chosen: None,
+                chosen: Chosen::nothing(),
                 account: None,
             };
             Wanted::Nothing
         }
-        Before::Cost => match change.sent(None, false) {
+        Before::Cost => match change.sent(&Chosen::nothing(), false) {
             Ok(command) => {
                 *stage = Stage::Costing { change };
                 Wanted::Carry(command)
@@ -269,10 +263,47 @@ fn taken(stage: &mut Stage, change: &'static Change) -> Wanted {
     }
 }
 
-/// Over the presets: move, take one, or leave it.
+/// Over the media a choice can be about: move, take one, or leave it.
+///
+/// Taking one opens the bars that media can be given, which is the same list put to
+/// the same table with a different media named — so music comes back as three audio
+/// formats and everything else as four resolution presets, without this screen
+/// knowing which is which.
+pub(super) fn scoping(
+    stage: &mut Stage,
+    change: &'static Change,
+    mut chooser: Chooser<Scope>,
+    press: &Press,
+) -> Wanted {
+    match *press {
+        Press::Abandon => return Wanted::Nothing,
+        Press::Accept => {
+            let chosen = Chosen::media(&chooser.taken());
+            return match change.grades(&chosen) {
+                Ok((first, rest)) => {
+                    *stage = Stage::Grading {
+                        change,
+                        chosen,
+                        chooser: Chooser::over(first, rest),
+                    };
+                    Wanted::Nothing
+                }
+                Err(said) => came(stage, said),
+            };
+        }
+        Press::Back => chooser.back(),
+        Press::Forward => chooser.forward(),
+        Press::Typed(_) | Press::Rubout => (),
+    }
+    *stage = Stage::Scoping { change, chooser };
+    Wanted::Nothing
+}
+
+/// Over the bars: move, take one, or leave it.
 pub(super) fn grading(
     stage: &mut Stage,
     change: &'static Change,
+    chosen: Chosen,
     mut chooser: Chooser<Grade>,
     press: &Press,
 ) -> Wanted {
@@ -281,7 +312,7 @@ pub(super) fn grading(
         Press::Accept => {
             *stage = Stage::Settling {
                 change,
-                chosen: Some(chooser.taken().name),
+                chosen: chosen.graded(chooser.taken().name),
                 account: None,
             };
             return Wanted::Nothing;
@@ -290,7 +321,11 @@ pub(super) fn grading(
         Press::Forward => chooser.forward(),
         Press::Typed(_) | Press::Rubout => (),
     }
-    *stage = Stage::Grading { change, chooser };
+    *stage = Stage::Grading {
+        change,
+        chosen,
+        chooser,
+    };
     Wanted::Nothing
 }
 
@@ -307,7 +342,7 @@ pub(super) fn costing(stage: &mut Stage, change: &'static Change, press: &Press)
 pub(super) fn costed(change: &'static Change, would: Vec<String>) -> Stage {
     Stage::Settling {
         change,
-        chosen: None,
+        chosen: Chosen::nothing(),
         account: Some(Reading::of(would)),
     }
 }
@@ -320,7 +355,7 @@ pub(super) fn costed(change: &'static Change, would: Vec<String>) -> Stage {
 pub(super) fn settling(
     stage: &mut Stage,
     change: &'static Change,
-    chosen: Option<&'static str>,
+    chosen: Chosen,
     mut account: Option<Reading>,
     press: &Press,
 ) -> Wanted {
@@ -337,7 +372,7 @@ pub(super) fn settling(
     if !matches!(*press, Press::Typed('y' | 'Y')) {
         return Wanted::Nothing;
     }
-    match change.sent(chosen, account.is_some()) {
+    match change.sent(&chosen, account.is_some()) {
         Ok(command) => {
             *stage = Stage::Applying { change, chosen };
             Wanted::Carry(command)
@@ -350,7 +385,7 @@ pub(super) fn settling(
 pub(super) fn applying(
     stage: &mut Stage,
     change: &'static Change,
-    chosen: Option<&'static str>,
+    chosen: Chosen,
     press: &Press,
 ) -> Wanted {
     *stage = Stage::Applying { change, chosen };
@@ -369,7 +404,7 @@ pub(super) fn applying(
 /// question because whether there is a cost at all is the core's to know.
 pub(super) fn applied(
     change: &'static Change,
-    chosen: Option<&'static str>,
+    chosen: Chosen,
     outcome: &Outcome,
     said: Vec<String>,
 ) -> Stage {
@@ -399,7 +434,7 @@ fn came(stage: &mut Stage, said: String) -> Wanted {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{all, every, Before, Change, KEY};
+    use super::{all, every, Before, Change, Chooser, Chosen, Press, Scope, Stage, Wanted, KEY};
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
     use lemonfiber_core::app::{Command, QualityAction};
@@ -448,15 +483,25 @@ pub(crate) mod tests {
     fn presets_of(action: &str) -> Vec<(&'static str, String)> {
         every()
             .filter(|change| change.action == action)
-            .filter_map(|change| change.grades().ok())
+            .filter_map(|change| change.grades(&Chosen::nothing()).ok())
             .flat_map(|(first, rest)| std::iter::once(first).chain(rest))
             .map(|grade| (grade.name, grade.about))
             .collect()
     }
 
     /// What one change sends, once it has been chosen this and read that.
-    fn sends(action: &str, chosen: Option<&str>, read: bool) -> Option<Result<Command, String>> {
-        changing(action).map(|change| change.sent(chosen, read))
+    fn sends(
+        action: &str,
+        chosen: Option<&'static str>,
+        read: bool,
+    ) -> Option<Result<Command, String>> {
+        changing(action).map(|change| change.sent(&aiming(chosen), read))
+    }
+
+    /// A choice about the whole library, at the bar named or at none.
+    fn aiming(chosen: Option<&'static str>) -> Chosen {
+        let nothing = Chosen::nothing();
+        chosen.map_or(nothing, |grade| Chosen::everywhere().graded(grade))
     }
 
     /// The whole point of naming the action rather than assembling a command here:
@@ -511,23 +556,23 @@ pub(crate) mod tests {
     fn the_agreement_goes_on_once_the_account_has_been_read_and_never_before() {
         for change in every() {
             let takes = TAKES_AGREEMENT.contains(&change.action);
-            let chosen = matches!(change.before, Before::Presets).then_some("balanced");
+            let chosen = aiming(matches!(change.before, Before::Presets).then_some("balanced"));
 
             assert_eq!(
-                carries(&change.sent(chosen, true)),
+                carries(&change.sent(&chosen, true)),
                 Some(takes),
                 "{} having read the account",
                 change.name
             );
             assert_eq!(
-                carries(&change.sent(chosen, false)),
+                carries(&change.sent(&chosen, false)),
                 Some(false),
                 "{} before there is one",
                 change.name
             );
         }
         assert_eq!(
-            carries(&UNCHOOSABLE.sent(None, true)),
+            carries(&UNCHOOSABLE.sent(&Chosen::nothing(), true)),
             None,
             "a refusal says nothing about an agreement either way"
         );
@@ -647,10 +692,36 @@ pub(crate) mod tests {
     /// other surface gives for the same request, rather than in one written here.
     #[test]
     fn a_change_nothing_answers_is_refused_in_the_words_the_other_surface_gives() {
-        let said: String = UNCHOOSABLE.grades().err().into_iter().collect();
+        let said: String = UNCHOOSABLE
+            .grades(&Chosen::nothing())
+            .err()
+            .into_iter()
+            .collect();
 
         assert!(said.contains("not an action any surface offers"), "{said}");
-        assert!(UNCOSTABLE.sent(None, false).is_err());
+        assert!(UNCOSTABLE.sent(&Chosen::nothing(), false).is_err());
+    }
+
+    /// A media no bar can be chosen for says so, in the words the other surface gives
+    /// for the same request, rather than opening an empty list of bars.
+    ///
+    /// Not a state the list can be left in — a media no bar reaches a command for is
+    /// never offered — so it is driven here directly. It is the arm that would carry a
+    /// media type the translation had stopped accepting, and a screen that fell through
+    /// it would put a choice in front of somebody that they could not make.
+    #[test]
+    fn a_media_no_bar_can_be_chosen_for_says_so_rather_than_opening_an_empty_list() {
+        let mut stage = Stage::Idle;
+
+        let wanted = super::scoping(
+            &mut stage,
+            &UNCHOOSABLE,
+            Chooser::over(Scope::everything(), Vec::new()),
+            &Press::Accept,
+        );
+
+        assert_eq!(wanted, Wanted::Nothing);
+        assert!(matches!(stage, Stage::Came(_)));
     }
 
     /// The list opens on the first change and holds every one of them.

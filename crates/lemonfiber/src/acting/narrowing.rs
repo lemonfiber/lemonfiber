@@ -69,11 +69,11 @@ impl Listed for Subject {
 /// box an action's own failures land in.
 pub(super) fn asked(
     question: &'static Question,
-    typed: &str,
+    given: &[String],
     answer: Result<Outcome, Box<Problem>>,
 ) -> Stage {
     match answer {
-        Ok(outcome) => answered(question, typed, &outcome),
+        Ok(outcome) => answered(question, given, &outcome),
         // A question that could not be answered has reported nothing, so there is no
         // account for a widening to be offered under.
         Err(problem) => said(question, None, complaint(&problem)),
@@ -112,9 +112,9 @@ fn said(question: &'static Question, widening: Option<Widening>, lines: Vec<Stri
 /// What an answer to a question that narrows by picking came to.
 ///
 /// Either the entries it listed, or the listing itself where it listed none.
-fn answered(question: &'static Question, typed: &str, outcome: &Outcome) -> Stage {
+fn answered(question: &'static Question, given: &[String], outcome: &Outcome) -> Stage {
     let Some((at, narrows)) = question.needs.picking() else {
-        return read(question, typed, outcome);
+        return read(question, given, outcome);
     };
     let Some(listed) = listed(outcome) else {
         return Stage::Came(Reading::of(unexpected()));
@@ -133,16 +133,16 @@ fn answered(question: &'static Question, typed: &str, outcome: &Outcome) -> Stag
             question,
             chooser: Chooser::over(first, choices.collect()),
         },
-        None => read(question, typed, outcome),
+        None => read(question, given, outcome),
     }
 }
 
 /// The answer as the command line gives it, in a box to move through — and, under a
 /// diagnosis, the offer to run it again including the checks that disturb.
-fn read(question: &'static Question, typed: &str, outcome: &Outcome) -> Stage {
+fn read(question: &'static Question, given: &[String], outcome: &Outcome) -> Stage {
     said(
         question,
-        disturbing::under(question, typed),
+        disturbing::under(question, given),
         lines_of(&crate::render::shaped(outcome)),
     )
 }

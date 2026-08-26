@@ -15,20 +15,21 @@
 //! those belong to no one flow and two flows drawing a list differently is how one
 //! screen becomes two.
 
+mod footing;
 mod shapes;
 mod titles;
 
-use lemonfiber_core::text::plain;
+pub(super) use footing::{footer, staying_for};
+
 use ratatui::text::Line;
 
 use super::chooser::Listed;
 use super::disturbing;
-use super::errand::{self, Errand};
+use super::errand::Errand;
 use super::lasting::{self, Begun, Lasting};
-use super::mending::{self, Agreed, Mending, Warning};
-use super::offer::{Offer, Taken, OFFERED};
-use super::quality::{self, Change};
-use super::question;
+use super::mending::{Agreed, Mending, Warning};
+use super::offer::{Offer, Taken};
+use super::quality::Change;
 use super::reading::Reading;
 use super::surface::{self, Open};
 use super::Stage;
@@ -42,11 +43,15 @@ use titles::{
     PUT_RIGHT, QUALITY, WEB,
 };
 
-/// The keys the screen answers whatever else is open.
-const ALWAYS: &str = "q quit   r refresh   ? words";
-
 /// What the box says while the core is working out what a change would cost.
 const COSTING: &str = "working out what this would cost";
+
+/// How a walk that is running is left, and how what it has said is moved through.
+///
+/// The same words the foot of the screen says while one runs, because it is the same
+/// walk: the box shows what it has said and the row underneath says what leaving does,
+/// and two sentences about one run would eventually disagree.
+const WATCHING: &str = "up and down move   q closes the screen and waits for it";
 
 /// What the box says while a walk is running and has not said anything yet.
 ///
@@ -55,25 +60,11 @@ const COSTING: &str = "working out what this would cost";
 /// a walk that never started.
 const WALKING: &str = "asking the services";
 
-/// How a walk that is running is left, and how what it has said is moved through.
-const WATCHING: &str = "up and down move   q closes the screen and waits for it";
-
-/// How a guard is ended, and what leaving it does instead.
-const GUARDING: &str = "esc lets it go   q closes the screen and leaves it guarding";
-
 /// What the box says while the core is working out what an errand would do.
 const WEIGHING: &str = "working out what this would do";
 
 /// What the box says while a question is with the stack.
 const ANSWERING: &str = "waiting for this stack to answer";
-
-/// What is said beside a running action, and what leaving does about it.
-///
-/// There is no daemon behind this screen. The process drawing it is the one that
-/// claimed the stack and issued the command, so leaving is not a tab being closed
-/// on a server that carries on: the screen goes at once, and the run stays until
-/// the action it started has finished and given the stack back.
-const WAITING: &str = "still running   q closes the screen and waits for it";
 
 /// A box over the screen: what it is called, and what it says.
 pub(crate) struct Pane {
@@ -93,14 +84,20 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
     // What each arm decides is the two things a box is: what it is called, and what
     // it says. The box itself is put together once underneath, so an arm cannot come
     // to disagree with the others about what a box is made of.
-    let (title, lines) = match stage {
-        Stage::Idle
-        | Stage::Running { .. }
-        | Stage::Doing { .. }
-        | Stage::Applying { .. }
-        | Stage::Putting(_)
-        | Stage::Disturbing
-        | Stage::Keeping { said: None, .. } => return None,
+    let (title, lines) =
+        off_a_list(stage, rows, across).or_else(|| on_a_key(stage, rows, across))?;
+    Some(Pane { title, lines })
+}
+
+/// What the box one of the keyed flows opened says, or nothing where the box belongs
+/// to a flow behind a list — and nothing, too, for the stages that draw no box.
+///
+/// Two functions over one enum, the way the routing beside them is two: thirty stages
+/// arrive here and a reader looking for one of them should not have to walk the other
+/// twenty-nine. Nothing from either is the answer the caller wants, so this one also
+/// carries the stages there is no box for at all.
+fn on_a_key(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<Line<'static>>)> {
+    Some(match stage {
         Stage::Choosing { offer, chooser } => (titled(offer), choosing(chooser, rows, across)),
         // Titled by what the services are being named for, which is the action or the
         // errand the operator opened — a second title for the second list would read
@@ -111,7 +108,14 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         }
         Stage::Came(reading) => (CAME.to_owned(), read(reading, rows, across)),
         Stage::Wondering(chooser) => (ASK.to_owned(), choosing(chooser, rows, across)),
-        Stage::Typing { asks, typed, .. } => (ASK.to_owned(), typing(asks, typed, across)),
+        Stage::Typing {
+            question,
+            said,
+            typed,
+        } => (
+            ASK.to_owned(),
+            typing(said, question.asking(said.len()), typed, across),
+        ),
         Stage::Waiting { question, .. } | Stage::Following(question) => {
             (asked(question), vec![dimmed(ANSWERING, across)])
         }
@@ -144,12 +148,26 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         Stage::Narrowing { question, chooser } => {
             (asked(question), choosing(chooser, rows, across))
         }
+        // Everything else draws no box here. A running action has none, and neither
+        // has an errand under way: the screen behind them is the report, the panels
+        // go on gathering every second while the work runs, and a box over that would
+        // take away the one thing worth watching. The rest have already been drawn by
+        // the one above.
+        _ => return None,
+    })
+}
+
+/// What the box one of the flows behind a list opened says, or nothing where the box
+/// belongs to a flow that began at a key — which is [`on_a_key`]'s to draw.
+fn off_a_list(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<Line<'static>>)> {
+    Some(match stage {
         Stage::Sending(chooser) => (MORE.to_owned(), choosing(chooser, rows, across)),
         Stage::Naming {
             errand,
             asks,
             typed,
-        } => (sending(errand), typing(asks, typed, across)),
+        } => (sending(errand), typing(&[], asks, typed, across)),
+        Stage::Bundling { errand, chooser } => (sending(errand), choosing(chooser, rows, across)),
         Stage::Weighing { errand, .. } => (sending(errand), vec![dimmed(WEIGHING, across)]),
         Stage::Agreeing {
             errand,
@@ -164,7 +182,7 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
             lasting,
             asks,
             typed,
-        } => (keeping(lasting), typing(asks, typed, across)),
+        } => (keeping(lasting), typing(&[], asks, typed, across)),
         Stage::Picking { lasting, chooser } => (keeping(lasting), choosing(chooser, rows, across)),
         Stage::Beginning { lasting, begun } => {
             (keeping(lasting), beginning(lasting, begun, rows, across))
@@ -179,7 +197,10 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
             ..
         } => (keeping(lasting), walking(reading, rows, across)),
         Stage::Deciding(chooser) => (QUALITY.to_owned(), choosing(chooser, rows, across)),
-        Stage::Grading { change, chooser } => (changing(change), choosing(chooser, rows, across)),
+        Stage::Scoping { change, chooser } => (changing(change), choosing(chooser, rows, across)),
+        Stage::Grading {
+            change, chooser, ..
+        } => (changing(change), choosing(chooser, rows, across)),
         Stage::Costing { change } => (changing(change), vec![dimmed(COSTING, across)]),
         Stage::Settling {
             change,
@@ -187,7 +208,7 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
             account,
         } => (
             changing(change),
-            settling(change, *chosen, account.as_ref(), rows, across),
+            settling(change, chosen.said(), account.as_ref(), rows, across),
         ),
         Stage::Righting(chooser) => (PUT_RIGHT.to_owned(), choosing(chooser, rows, across)),
         Stage::Looking(mending) => (righting(mending), vec![dimmed(mending.waiting, across)]),
@@ -208,117 +229,8 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
             (righting(mending), answered(mending, warning, rows, across))
         }
         Stage::Handing { asked, open } => (WEB.to_owned(), handing(asked, open, rows, across)),
-    };
-    Some(Pane { title, lines })
-}
-
-/// The one line at the foot of the screen: the keys, or what is running.
-///
-/// The keys give way to the running action rather than sitting beside it. There is
-/// one row, an operator who has just started something is owed what it is more than
-/// they are owed a list they have just used, and the keys come back the moment it
-/// is over.
-pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
-    let said = match stage {
-        Stage::Running { offer, taken } => {
-            format!("{} {}   {WAITING}", offer.hint, taken.name())
-        }
-        Stage::Doing { errand, .. } => format!("{}   {WAITING}", errand.name),
-        Stage::Applying { change, .. } => format!("{}   {WAITING}", change.name),
-        Stage::Disturbing => format!("{}   {WAITING}", disturbing::NAME),
-        Stage::Putting(mending) => format!("{}   {WAITING}", mending.name),
-        // The one with no ending of its own says how it is ended; the one that ends
-        // by itself says what leaving does, as every other running thing here does.
-        Stage::Keeping {
-            lasting,
-            named,
-            ends,
-            ..
-        } => format!(
-            "{}   {}",
-            doing(lasting, named),
-            if *ends { GUARDING } else { WATCHING }
-        ),
-        _ => keys(),
-    };
-    dimmed(&said, across)
-}
-
-/// What a run leaving this screen now would stay for, or nothing where it may go.
-///
-/// Only what changes something. A read is with the core the same way and claims
-/// nothing, so a screen left with one outstanding has nothing to stay for — which is
-/// why this asks about [`Stage::Running`] and not about [`Stage::Waiting`]. A guard
-/// that has already been let go has nothing to stay for either: it is no longer this
-/// stage by then.
-///
-/// Said on the ordinary terminal once the screen is given back, where there is room
-/// for the whole of it and no width to fit — so this is the one line here that goes
-/// through [`plain`] alone rather than through [`shortened`].
-pub(super) fn staying_for(stage: &Stage) -> Option<String> {
-    let said = match stage {
-        Stage::Running { offer, taken } => waited(&format!("{} {}", offer.hint, taken.name())),
-        Stage::Doing { errand, .. } => waited(errand.name),
-        Stage::Applying { change, .. } => waited(change.name),
-        // It takes the tunnel away on purpose and puts it back. A screen left in the
-        // middle of that would leave the stack without one, which is exactly the
-        // failure the check itself reports when the tunnel does not come back.
-        // A repair reaches the services and proves itself by asking the check again.
-        // A screen left in the middle of that has a stack halfway between two states
-        // and nothing on it saying which.
-        Stage::Putting(mending) => waited(mending.name),
-        Stage::Disturbing => waited(disturbing::NAME),
-        // The one that never ends by itself is the one this cannot say "to finish"
-        // about. What it will go on doing, and the one thing that ends it once the
-        // screen is gone, are said instead — a run held open on a promise nobody
-        // explained is exactly what an operator reads as a hang.
-        Stage::Keeping {
-            lasting,
-            named,
-            ends: true,
-            ..
-        } => format!(
-            "{} is still running — nothing more will happen until the data location is \
-             lost, and Ctrl-C ends it",
-            doing(lasting, named)
-        ),
-        // And this one does end, in minutes, but it does not reach the container
-        // engine and claims nothing — so the reason to wait for it is that there is
-        // nothing else to carry it, not that it holds the stack.
-        Stage::Keeping { lasting, named, .. } => format!(
-            "waiting for {} to finish — nothing else can carry it once this run has gone",
-            doing(lasting, named)
-        ),
         _ => return None,
-    };
-    Some(plain(&said))
-}
-
-/// What is said about a run left with something that claimed the stack to finish.
-fn waited(doing: &str) -> String {
-    format!("waiting for {doing} to finish — leaving it now would leave the stack claimed")
-}
-
-/// Every key this screen answers, in the order they are worth reading.
-///
-/// Built from the offers rather than written out, so an action added to the table
-/// is an action the operator is told about.
-fn keys() -> String {
-    let mut said = vec![
-        ALWAYS.to_owned(),
-        format!("{} {}", question::KEY, question::HINT),
-        format!("{} {}", errand::KEY, errand::HINT),
-        format!("{} {}", lasting::KEY, lasting::HINT),
-        format!("{} {}", quality::KEY, quality::HINT),
-        format!("{} {}", mending::KEY, mending::HINT),
-        format!("{} {}", surface::KEY, surface::HINT),
-    ];
-    said.extend(
-        OFFERED
-            .iter()
-            .map(|offer| format!("{} {}", offer.key, offer.hint)),
-    );
-    said.join("   ")
+    })
 }
 
 /// The question before an errand, under what it would do where the errand could say.
@@ -384,16 +296,18 @@ fn answered(
 /// not exist would be asking about nothing.
 fn settling(
     change: &Change,
-    chosen: Option<&str>,
+    chosen: &str,
     account: Option<&Reading>,
     rows: usize,
     across: usize,
 ) -> Vec<Line<'static>> {
-    let asks = match chosen {
-        Some(chosen) => format!("{} {chosen}", change.asks),
-        None => change.asks.to_owned(),
-    };
-    agreed(&asks, change.about, account, rows, across)
+    agreed(
+        &format!("{} {chosen}", change.asks),
+        change.about,
+        account,
+        rows,
+        across,
+    )
 }
 
 /// What one of them is called while it runs, with what it was given.
@@ -401,7 +315,7 @@ fn settling(
 /// The name alone where nothing was named, which is what a walk asked for nothing in
 /// particular is: there is no subject to say, and inventing one would be this screen
 /// naming something the operator did not.
-fn doing(lasting: &Lasting, named: &str) -> String {
+pub(super) fn doing(lasting: &Lasting, named: &str) -> String {
     format!("{} {named}", lasting.name).trim_end().to_owned()
 }
 
@@ -545,14 +459,14 @@ fn covering(taken: &Taken, room: usize, across: usize) -> Vec<Line<'static>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{footer, keys, pane, staying_for, surface, Asked, Offer, Open, Stage};
+    use super::{footer, pane, staying_for, surface, Asked, Offer, Open, Stage};
     use crate::acting::chooser::Chooser;
     use crate::acting::disturbing::{under, Widening, NAME};
     use crate::acting::errand::{self, Errand, Given};
     use crate::acting::mending::{self, Mending};
     use crate::acting::narrowing::Subject;
-    use crate::acting::offer::{Choice, Taken, OFFERED};
-    use crate::acting::question::{Narrows, Needed, Question, HINT, KEY};
+    use crate::acting::offer::{Choice, Taken};
+    use crate::acting::question::{Narrows, Needed, Question, Wants};
     use crate::acting::reading::Reading;
     use crate::acting::Press;
     use lemonfiber_core::app::Command;
@@ -572,10 +486,10 @@ mod tests {
         name: "where one thing is",
         about: "follow one show or film across the services",
         read: "/api/trace",
-        needs: Needed::Typed {
+        needs: Needed::Typed(&[Wants {
             asks: "What to follow",
             narrows: Narrows::Term,
-        },
+        }]),
     };
 
     /// One question that is narrowed by taking an entry off its own listing.
@@ -600,7 +514,7 @@ mod tests {
 
     /// The widened run offered under that answer.
     fn a_widening() -> Option<Widening> {
-        under(&A_DIAGNOSIS, "")
+        under(&A_DIAGNOSIS, &[])
     }
 
     /// One of the two things that can be done about a diagnosis, by its action.
@@ -704,32 +618,6 @@ mod tests {
             a_choice("Full stack", "everything, behind the tunnel"),
             vec![a_choice("Lean stack", "the download clients only")],
         )
-    }
-
-    /// Every action is on the footer, or the operator has no way to learn a key
-    /// exists — a screen whose only account of what it can do is its source.
-    #[test]
-    fn the_footer_names_every_key_this_screen_answers() {
-        let said = keys();
-
-        assert!(said.contains("q quit"), "{said}");
-        assert!(said.contains(&format!("{KEY} {HINT}")), "{said}");
-        assert!(
-            said.contains(&format!("{} {}", errand::KEY, errand::HINT)),
-            "{said}"
-        );
-        assert!(
-            said.contains(&format!("{} {}", mending::KEY, mending::HINT)),
-            "{said}"
-        );
-        for offer in OFFERED {
-            assert!(
-                said.contains(offer.hint),
-                "{} is missing: {said}",
-                offer.hint
-            );
-            assert!(said.contains(offer.key), "{} is missing: {said}", offer.key);
-        }
     }
 
     /// While something is running the footer says so, and says what leaving does —
@@ -953,7 +841,7 @@ mod tests {
     fn a_question_taking_a_word_says_what_it_wants_and_what_was_typed() {
         let stage = Stage::Typing {
             question: &A_TRACE,
-            asks: "What to follow",
+            said: Vec::new(),
             typed: "The Exp".to_owned(),
         };
 
@@ -961,7 +849,7 @@ mod tests {
 
         assert!(said.contains("What to follow"), "{said}");
         assert!(said.contains("> The Exp"), "{said}");
-        assert!(said.contains("enter asks"), "{said}");
+        assert!(said.contains("enter goes on"), "{said}");
     }
 
     /// A question with the core says so, under the name of the question asked, so
@@ -970,7 +858,7 @@ mod tests {
     fn a_question_with_the_core_says_what_it_is_waiting_for() {
         let waiting = Stage::Waiting {
             question: &A_TRACE,
-            typed: "The Expanse".to_owned(),
+            said: vec!["The Expanse".to_owned()],
         };
 
         let said = said(&waiting, 20, 80);
@@ -1214,12 +1102,12 @@ mod tests {
             Stage::Wondering(Chooser::over(&A_TRACE, Vec::new())),
             Stage::Typing {
                 question: &A_TRACE,
-                asks: "What to follow",
+                said: Vec::new(),
                 typed: "something with a very long name indeed".to_owned(),
             },
             Stage::Waiting {
                 question: &A_TRACE,
-                typed: "The Expanse".to_owned(),
+                said: vec!["The Expanse".to_owned()],
             },
             Stage::Answered {
                 question: &A_TRACE,
@@ -1279,7 +1167,7 @@ mod tests {
 
         assert!(said.contains("Which backup"), "{said}");
         assert!(said.contains("> lemonfiber-full"), "{said}");
-        assert!(said.contains("enter asks"), "{said}");
+        assert!(said.contains("enter goes on"), "{said}");
     }
 
     /// While the core is working out what an errand would do, the box says so

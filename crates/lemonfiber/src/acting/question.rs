@@ -4,9 +4,16 @@
 //! `q`, `r`, `?` and five actions, and a key per request does not survive being
 //! done twice — so what a person opens is the list of what this stack can be
 //! asked, and the list is where a ninth read would go without costing anybody a
-//! letter to remember. Twelve questions sit over those eight, because four of the
+//! letter to remember. Thirteen questions sit over those eight, because four of the
 //! reads are asked both whole and narrowed and each of those pairs is two entries
-//! on the list and one request in the parity table either way.
+//! on the list and one request in the parity table either way — and one of them is
+//! narrowed twice over, a trace being asked for a show and then for one season of
+//! that show.
+//!
+//! A question is given what it needs a word at a time, on a line for each. One read
+//! takes two words and the rest take one or none, and the number of lines is read off
+//! what the question says it needs rather than kept beside it — so the line an
+//! operator is looking at is always the argument the word will fill.
 //!
 //! Each question is held by the name of the read every surface answers it at. That
 //! name is what [`lemonfiber_api::reads`] turns into one of the core's own
@@ -61,59 +68,73 @@ pub(crate) enum Narrows {
     Form,
     /// The family of checks, or the one check, to narrow a diagnosis to.
     Family,
+    /// The season of a followed show to narrow to, instead of every season.
+    ///
+    /// Carried as it was written rather than as a number. The read parses it, and a
+    /// season that is not a number is refused there — so a line typed at this screen
+    /// and a query string carrying the same word are answered in one sentence.
+    Season,
 }
 
 impl Narrows {
-    /// The read's own arguments, with this one filled by what was given.
-    pub(super) fn given(self, said: &str) -> Asking {
+    /// The read's arguments as they now stand, with this one filled by what was
+    /// given.
+    ///
+    /// Filled into what is already there rather than built fresh, because a question
+    /// may be given more than one word and each fills an argument of its own. A
+    /// narrowing that returned a whole set of arguments could only be the last one
+    /// asked for.
+    pub(super) fn fill(self, said: &str, into: &mut Asking) {
         let said = said.to_owned();
         match self {
-            Self::Term => Asking {
-                term: Some(said),
-                ..Asking::default()
-            },
-            Self::Setting => Asking {
-                key: Some(said),
-                ..Asking::default()
-            },
-            Self::Member => Asking {
-                member: Some(said),
-                ..Asking::default()
-            },
-            Self::Form => Asking {
-                forms: vec![said],
-                ..Asking::default()
-            },
-            Self::Family => Asking {
-                only: Some(said),
-                ..Asking::default()
-            },
+            Self::Term => into.term = Some(said),
+            Self::Setting => into.key = Some(said),
+            Self::Member => into.member = Some(said),
+            Self::Form => into.forms = vec![said],
+            Self::Family => into.only = Some(said),
+            Self::Season => into.season = Some(said),
         }
     }
+
+    /// The read's own arguments, with this one filled and nothing else.
+    pub(super) fn given(self, said: &str) -> Asking {
+        let mut given = Asking::default();
+        self.fill(said, &mut given);
+        given
+    }
+}
+
+/// One word a question has to be given, and what that word is for.
+pub(crate) struct Wants {
+    /// What is asked for, above the line it is typed on.
+    pub(crate) asks: &'static str,
+    /// Which of the read's arguments it fills.
+    pub(crate) narrows: Narrows,
 }
 
 /// What a question has to be given before it can be asked.
 ///
 /// Three shapes, and which one a question takes is a question about where the thing
-/// being named already is. A title nobody has listed is typed. A setting or a member
-/// is typed too, because the list it would be picked off is the very answer the
-/// narrowing exists to avoid asking for. A form or a stuck item is taken off a list
-/// the screen can have in hand for the asking, and picking one is exact where typing
-/// it would be a spelling test.
+/// being named already is. A title nobody has listed is typed. A setting, a member
+/// and a season are typed too, because the list each would be picked off is the very
+/// answer the narrowing exists to avoid asking for. A form or a stuck item is taken
+/// off a list the screen can have in hand for the asking, and picking one is exact
+/// where typing it would be a spelling test.
 pub(crate) enum Needed {
     /// Nothing: it is asked as it stands.
     Nothing,
-    /// A word, under the line it is typed on, filling one of the read's arguments.
-    Typed {
-        /// What is asked for, above the line it is typed on.
-        asks: &'static str,
-        /// Which of the read's arguments it fills.
-        narrows: Narrows,
-    },
+    /// A word for each of these, each on a line of its own, filling one of the
+    /// read's arguments.
+    ///
+    /// A slice rather than a single word because one read takes two: following a
+    /// show is a title, and following one season of it is that title and a number.
+    /// Two entries on this list rather than a second flow, so the line a title is
+    /// typed on is the line a title is typed on wherever it is asked for.
+    Typed(&'static [Wants]),
     /// One of the entries this question's own read comes back with.
     ///
-    /// The entry taken is asked at [`Picked::at`], which need not be the read that
-    /// listed it: what is stuck is listed by one read and each entry followed by
+    /// The entry taken is asked at [`Needed::Picked::at`], which need not be the read
+    /// that listed it: what is stuck is listed by one read and each entry followed by
     /// another, exactly as the web's own list of stuck items links to its traces.
     Picked {
         /// The read the entry taken is asked at.
@@ -124,19 +145,23 @@ pub(crate) enum Needed {
 }
 
 impl Needed {
-    /// What is asked for above the line being typed, or nothing where a question
-    /// takes no typing.
-    pub(crate) const fn asks(&self) -> Option<&'static str> {
+    /// What is asked for on the line after the words already said, or nothing where
+    /// the question has everything it needs.
+    ///
+    /// Answered by how many words are in hand rather than by a field on the stage, so
+    /// the line an operator is looking at and the argument what they type will fill
+    /// cannot come apart.
+    pub(crate) fn asks(&self, said: usize) -> Option<&'static str> {
         match self {
             Self::Nothing | Self::Picked { .. } => None,
-            Self::Typed { asks, .. } => Some(*asks),
+            Self::Typed(asking) => asking.get(said).map(|wants| wants.asks),
         }
     }
 
     /// Where an entry taken off a listing is asked, and which argument it fills.
     pub(super) const fn picking(&self) -> Option<(&'static str, Narrows)> {
         match self {
-            Self::Nothing | Self::Typed { .. } => None,
+            Self::Nothing | Self::Typed(_) => None,
             Self::Picked { at, narrows } => Some((*at, *narrows)),
         }
     }
@@ -165,12 +190,23 @@ impl Question {
     /// comes to is that read asked for its whole listing — which is the list the
     /// operator is about to take one of. So the listing is not a second command
     /// written down beside this one; it is this one, given nothing.
-    pub(crate) fn command(&self, typed: &str) -> Result<Command, &'static str> {
-        let given = match self.needs {
-            Needed::Nothing | Needed::Picked { .. } => Asking::default(),
-            Needed::Typed { narrows, .. } => narrows.given(typed),
-        };
+    pub(crate) fn command(&self, said: &[String]) -> Result<Command, &'static str> {
+        let mut given = Asking::default();
+        if let Needed::Typed(asking) = &self.needs {
+            for (wants, word) in asking.iter().zip(said) {
+                wants.narrows.fill(word, &mut given);
+            }
+        }
         named(self.read, given)
+    }
+
+    /// What the line being typed at is asking for.
+    ///
+    /// A question is only ever being typed at while it is short of a word, so what it
+    /// is short of is what the line asks for. One that is short of none has already
+    /// been put to the core and is no longer a line anybody is looking at.
+    pub(crate) fn asking(&self, said: usize) -> &'static str {
+        self.needs.asks(said).unwrap_or_default()
     }
 }
 
@@ -205,6 +241,11 @@ static OPENS_ON: Question = Question {
 /// household, every form, the whole diagnosis — so a line where nothing typed meant
 /// the listing would leave no way to refuse an empty one, and an empty one is exactly
 /// what somebody who meant to name something has given.
+///
+/// A trace is the one narrowing whose listing is not a listing. Following a show
+/// already answers season by season, so what the narrowing sits under is a report
+/// rather than a list — and the season is typed for that very reason: the list it
+/// would be picked off is the answer somebody narrowing is trying not to ask for.
 static AFTER: &[Question] = &[
     Question {
         name: "how this stack is doing",
@@ -216,10 +257,10 @@ static AFTER: &[Question] = &[
         name: "one family of checks",
         about: "narrow that to one family, or to one check by the name its finding gives it",
         read: CHECKS,
-        needs: Needed::Typed {
+        needs: Needed::Typed(&[Wants {
             asks: "Which checks, by the family or by the name a finding gives one",
             narrows: Narrows::Family,
-        },
+        }]),
     },
     Question {
         name: "forms",
@@ -246,10 +287,10 @@ static AFTER: &[Question] = &[
         name: "one setting",
         about: "read one setting by name, withheld where the listing withholds it",
         read: CONFIG,
-        needs: Needed::Typed {
+        needs: Needed::Typed(&[Wants {
             asks: "Which setting, by the name it goes by",
             narrows: Narrows::Setting,
-        },
+        }]),
     },
     Question {
         name: "quality",
@@ -267,10 +308,10 @@ static AFTER: &[Question] = &[
         name: "what one person asked for",
         about: "narrow that to one member of the household",
         read: REQUESTS,
-        needs: Needed::Typed {
+        needs: Needed::Typed(&[Wants {
             asks: "Which member, as you would say their name",
             narrows: Narrows::Member,
-        },
+        }]),
     },
     Question {
         name: "what is stuck",
@@ -285,10 +326,25 @@ static AFTER: &[Question] = &[
         name: "where one thing is",
         about: "follow one show or film across the services",
         read: TRACE,
-        needs: Needed::Typed {
+        needs: Needed::Typed(&[Wants {
             asks: "What to follow",
             narrows: Narrows::Term,
-        },
+        }]),
+    },
+    Question {
+        name: "where one season of it is",
+        about: "narrow that to one season, instead of every season of the show",
+        read: TRACE,
+        needs: Needed::Typed(&[
+            Wants {
+                asks: "What to follow",
+                narrows: Narrows::Term,
+            },
+            Wants {
+                asks: "Which season, as a number",
+                narrows: Narrows::Season,
+            },
+        ]),
     },
 ];
 
@@ -334,44 +390,66 @@ pub(super) fn wondering(
     Wanted::Nothing
 }
 
-/// Ask the question that was taken, or open the line it has to be given first.
+/// Ask the question that was taken, or open the first line it has to be given.
 fn take(stage: &mut Stage, question: &'static Question) -> Wanted {
-    match question.needs.asks() {
-        Some(asks) => {
-            *stage = Stage::Typing {
-                question,
-                asks,
-                typed: String::new(),
-            };
-            Wanted::Nothing
-        }
-        None => put(stage, question, ""),
-    }
+    asking(stage, question, Vec::new(), String::new())
 }
 
-/// Over the line being typed: type, take back, ask, or leave it.
+/// Open the next line the question is short of, or put it where it is short of none.
+fn asking(
+    stage: &mut Stage,
+    question: &'static Question,
+    said: Vec<String>,
+    typed: String,
+) -> Wanted {
+    if question.needs.asks(said.len()).is_none() {
+        return put(stage, question, said);
+    }
+    *stage = Stage::Typing {
+        question,
+        said,
+        typed,
+    };
+    Wanted::Nothing
+}
+
+/// Over the line being typed: type, take back, go on, or leave it.
+///
+/// Taking back at an empty line takes back the word before it, which is the only way
+/// a question asked two words has of correcting the first — and the same key does it,
+/// so nobody has to learn a second one.
 pub(super) fn typing(
     stage: &mut Stage,
     question: &'static Question,
-    asks: &'static str,
+    mut said: Vec<String>,
     mut typed: String,
     press: &Press,
 ) -> Wanted {
     match *press {
         Press::Abandon => return Wanted::Nothing,
-        Press::Accept => return put(stage, question, &typed),
-        Press::Rubout => {
-            typed.pop();
+        Press::Accept => {
+            said.push(typed);
+            return asking(stage, question, said, String::new());
         }
+        Press::Rubout => back(&mut said, &mut typed),
         Press::Typed(character) => typed.push(character),
         Press::Back | Press::Forward => (),
     }
     *stage = Stage::Typing {
         question,
-        asks,
+        said,
         typed,
     };
     Wanted::Nothing
+}
+
+/// Take back the last character, or the last word where there is no character left.
+fn back(said: &mut Vec<String>, typed: &mut String) {
+    if typed.pop().is_none() {
+        if let Some(before) = said.pop() {
+            *typed = before;
+        }
+    }
 }
 
 /// Put the question to the core, or say why it cannot be put.
@@ -384,13 +462,10 @@ pub(super) fn typing(
 /// the list of what is stuck is read off the \*arrs — so what comes back is a
 /// listing to choose from rather than an answer to read. Which of the two it is is
 /// decided where the answer arrives, in [`super::narrowing`].
-fn put(stage: &mut Stage, question: &'static Question, typed: &str) -> Wanted {
-    match question.command(typed) {
+fn put(stage: &mut Stage, question: &'static Question, said: Vec<String>) -> Wanted {
+    match question.command(&said) {
         Ok(command) => {
-            *stage = Stage::Waiting {
-                question,
-                typed: typed.to_owned(),
-            };
+            *stage = Stage::Waiting { question, said };
             Wanted::Carry(command)
         }
         // A question that reached no command has disturbed nothing and reported
@@ -489,6 +564,16 @@ pub(crate) mod tests {
         }
     }
 
+    /// A question's command, given the words typed at its lines in order.
+    ///
+    /// Through the question rather than through the translation, because what is
+    /// being asserted is the pair: which arguments this screen fills, and what the
+    /// table makes of them.
+    fn asking(question: &'static Question, said: &[&str]) -> Result<Command, &'static str> {
+        let said: Vec<String> = said.iter().map(|word| (*word).to_owned()).collect();
+        question.command(&said)
+    }
+
     /// The question by that name, which is how each one below is reached.
     pub(crate) fn called(name: &str) -> &'static Question {
         every()
@@ -510,7 +595,7 @@ pub(crate) mod tests {
         // added later is not quietly a third way to reach the settings.
         let asking: Vec<Result<Command, &str>> = every()
             .filter(|question| question.read == CONFIG)
-            .map(|question| question.command("SONARR_API_KEY"))
+            .map(|question| asking(question, &["SONARR_API_KEY"]))
             .collect();
 
         assert_eq!(
@@ -532,20 +617,20 @@ pub(crate) mod tests {
     #[test]
     fn each_typed_question_fills_the_argument_its_read_names() {
         assert_eq!(
-            called("where one thing is").command("The Expanse"),
+            asking(called("where one thing is"), &["The Expanse"]),
             Ok(Command::Trace {
                 term: "The Expanse".to_owned(),
                 season: None,
             })
         );
         assert_eq!(
-            called("one setting").command("The Expanse"),
+            asking(called("one setting"), &["The Expanse"]),
             Ok(Command::ConfigGet {
                 key: "The Expanse".to_owned(),
             })
         );
         assert_eq!(
-            called("what one person asked for").command("The Expanse"),
+            asking(called("what one person asked for"), &["The Expanse"]),
             Ok(Command::Household {
                 member: Some("The Expanse".to_owned()),
             })
@@ -560,17 +645,17 @@ pub(crate) mod tests {
     #[test]
     fn a_question_that_takes_a_word_is_refused_until_it_has_one() {
         assert_eq!(
-            called("where one thing is").command(""),
+            asking(called("where one thing is"), &[""]),
             Err(NO_TERM),
             "a trace with nothing typed"
         );
         assert_eq!(
-            called("one setting").command(""),
+            asking(called("one setting"), &[""]),
             Err(NO_SETTING),
             "a setting with nothing typed"
         );
         assert_eq!(
-            called("what one person asked for").command(""),
+            asking(called("what one person asked for"), &[""]),
             Err(NO_MEMBER),
             "a member with nothing typed"
         );
@@ -581,12 +666,12 @@ pub(crate) mod tests {
     /// line on the first one.
     #[test]
     fn the_listing_beside_each_narrowing_still_asks_for_everything() {
-        assert_eq!(called("settings").command(""), Ok(Command::ConfigShow));
+        assert_eq!(asking(called("settings"), &[""]), Ok(Command::ConfigShow));
         assert_eq!(
-            called("what was asked for").command(""),
+            asking(called("what was asked for"), &[""]),
             Ok(Command::Household { member: None })
         );
-        assert_eq!(called("forms").command(""), Ok(Command::Forms));
+        assert_eq!(asking(called("forms"), &[""]), Ok(Command::Forms));
     }
 
     /// A question narrowed by picking asks its own read for the whole listing first,
@@ -595,14 +680,14 @@ pub(crate) mod tests {
     #[test]
     fn a_question_that_picks_asks_its_read_for_the_listing_first() {
         assert_eq!(
-            called("what starting one would come to").command(""),
+            asking(called("what starting one would come to"), &[""]),
             Ok(Command::Forms)
         );
-        assert_eq!(called("what is stuck").command(""), Ok(Command::Stuck));
+        assert_eq!(asking(called("what is stuck"), &[""]), Ok(Command::Stuck));
         // Typing at one of these is not how it is narrowed, so a word reaching here
         // changes nothing about what is asked.
         assert_eq!(
-            called("what is stuck").command("ignored"),
+            asking(called("what is stuck"), &["ignored"]),
             Ok(Command::Stuck)
         );
     }
@@ -644,17 +729,37 @@ pub(crate) mod tests {
         assert_eq!(asked_at(TRACE, Narrows::Term, ""), Err(NO_TERM));
     }
 
-    /// What is asked for above the line is asked for only where there is a line.
+    /// What is asked for above the line is asked for only where there is a line, and
+    /// the line asked for is the one the words in hand have got to.
+    ///
+    /// A question given everything it needs asks for nothing more, which is how the
+    /// flow knows to stop opening lines and put the question instead.
     #[test]
     fn only_a_typed_question_asks_for_something_above_a_line() {
         assert_eq!(
-            called("one setting").needs.asks(),
+            called("one setting").needs.asks(0),
             Some("Which setting, by the name it goes by")
         );
-        assert!(called("what is stuck").needs.asks().is_none());
-        assert!(called("settings").needs.asks().is_none());
+        assert!(called("one setting").needs.asks(1).is_none());
+        assert!(called("what is stuck").needs.asks(0).is_none());
+        assert!(called("settings").needs.asks(0).is_none());
         assert!(called("settings").needs.picking().is_none());
         assert!(called("where one thing is").needs.picking().is_none());
+    }
+
+    /// A question given two words asks for the second only once the first is in hand,
+    /// and the line an operator is looking at names the argument that word will fill.
+    ///
+    /// The claim rather than a consequence: the prompt is derived from how many words
+    /// there are, so a question that asked for the season first would fail here.
+    #[test]
+    fn a_question_given_two_words_asks_for_them_one_line_at_a_time() {
+        let season = called("where one season of it is");
+
+        assert_eq!(season.needs.asks(0), Some("What to follow"));
+        assert_eq!(season.needs.asks(1), Some("Which season, as a number"));
+        assert!(season.needs.asks(2).is_none());
+        assert_eq!(season.asking(1), "Which season, as a number");
     }
 
     /// The one thing this list is checked against from outside the binary. A

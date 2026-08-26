@@ -82,13 +82,17 @@ pub(crate) struct Widening {
 /// back. The two are the same fact — only a question over [`CHECKS`] reaches
 /// `Command::Doctor`, and only that command answers with a diagnosis — and the read
 /// is the half this screen chose, which makes it the half worth asking.
-pub(super) fn under(question: &Question, typed: &str) -> Option<Widening> {
+pub(super) fn under(question: &Question, said: &[String]) -> Option<Widening> {
     if question.read != CHECKS {
         return None;
     }
+    // The first word and not a search for one. A question over this read is given a
+    // family or given nothing, so the first word it was given is the word that
+    // narrowed it — and there is never a second.
+    let narrowed = said.first().filter(|word| !word.is_empty());
     let given = Arguments {
         disruptive: Disturbing::Included,
-        only: (!typed.is_empty()).then(|| typed.to_owned()),
+        only: narrowed.cloned(),
         ..Arguments::default()
     };
     named(ACTION, given)
@@ -137,7 +141,7 @@ mod tests {
 
     /// The widened run one answer offers, or nothing where it offers none.
     fn offered(question: &str, typed: &str) -> Option<Widening> {
-        under(called(question), typed)
+        under(called(question), &[typed.to_owned()])
     }
 
     /// The command one answer's offer would send.

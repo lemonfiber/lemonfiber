@@ -62,18 +62,19 @@ const SUMMARY: &str = "## What the table adds up to";
 
 /// What either column may say that is not something it names.
 ///
-/// Three verdicts, shared, because the two columns are counted the same way: a row
-/// that names a thing and adds none of these reaches the request in full, and one
-/// carrying `partial` reaches it in part. The web column may also name an action or
-/// a route and the terminal column a screen, which is the only difference between
-/// them and is why each still has its own list of the words it may name.
-const VERDICTS: [&str; 3] = ["none", "intrinsic", "partial"];
+/// Four verdicts, shared, because the two columns are counted the same way: a row
+/// that names a thing and adds none of these reaches the request in full, one
+/// carrying `partial` reaches it in part, and one carrying `excepted` reaches all of
+/// it but a thing that will never be offered there. The web column may also name an
+/// action or a route and the terminal column a screen, which is the only difference
+/// between them and is why each still has its own list of the words it may name.
+const VERDICTS: [&str; 4] = ["none", "intrinsic", "partial", "excepted"];
 
 /// What the terminal column may say.
 ///
-/// Four screens and three verdicts. A screen is named rather than described so a
+/// Four screens and four verdicts. A screen is named rather than described so a
 /// reader checking by eye is checking one word against one file.
-const TERMINAL_WORDS: [&str; 7] = [
+const TERMINAL_WORDS: [&str; 8] = [
     "dashboard",
     "viewer",
     "wizard",
@@ -81,13 +82,26 @@ const TERMINAL_WORDS: [&str; 7] = [
     "none",
     "intrinsic",
     "partial",
+    "excepted",
 ];
 
-/// A word that qualifies another and cannot stand on its own.
-const QUALIFIER: &str = "partial";
+/// The words that qualify another and cannot stand on their own.
+///
+/// Two, and the difference between them is the difference the whole page turns on: a
+/// request reached in part is short of something somebody is going to build, and one
+/// reached but for an exception is short of something nobody is. `intrinsic` cannot
+/// do this job — it says nothing is reachable and nothing ever will be, which of a
+/// request reached in all but one argument is simply untrue.
+const QUALIFIERS: [&str; 2] = ["partial", "excepted"];
 
 /// A verdict that admits no company: nothing is reachable, or nothing ever will be.
 const ALONE: [&str; 2] = ["none", "intrinsic"];
+
+/// The word for a request reached in part, which is a gap somebody is going to close.
+const PARTIAL: &str = "partial";
+
+/// The word for a request reached but for something that will never be offered there.
+const EXCEPTED: &str = "excepted";
 
 /// The screen a row names where the dashboard is what reaches a request.
 const DASHBOARD: &str = "dashboard";
@@ -211,7 +225,7 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         .count();
     let partial = counted
         .iter()
-        .filter(|row| tokens(&row.web).contains(&QUALIFIER))
+        .filter(|row| tokens(&row.web).contains(&PARTIAL))
         .count();
     let none = counted.iter().filter(|row| row.web == "none").count();
     let silent = counted.iter().filter(|row| row.terminal == "none").count();
@@ -229,7 +243,16 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         .count();
     let short = counted
         .iter()
-        .filter(|row| tokens(&row.terminal).contains(&QUALIFIER))
+        .filter(|row| tokens(&row.terminal).contains(&PARTIAL))
+        .count();
+    // And the terminal's own exceptions, which the web column counts by the word it
+    // spells one with. A row reached but for something that will never be offered
+    // there is neither full nor a gap, and counted as either it would make one of the
+    // other two figures a lie — the gap count claiming work outstanding that is not,
+    // or the full count claiming a reach the row itself denies.
+    let excepted = counted
+        .iter()
+        .filter(|row| tokens(&row.terminal).contains(&EXCEPTED))
         .count();
     let intrinsic = counted
         .iter()
@@ -285,6 +308,15 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
             short,
             "reach the terminal in part",
             "reaches the terminal in part",
+        ),
+        // Named the same way and for the same reason: neither `reach the terminal in
+        // full` nor `reach it in part` is a substring of this, so the figure the page
+        // states about its exceptions cannot be satisfied by a sentence about its
+        // gaps.
+        (
+            excepted,
+            "reach the terminal but for an exception",
+            "reaches the terminal but for an exception",
         ),
     ] {
         let said = spelled(number);
@@ -607,10 +639,13 @@ fn check(
             wrong.push(format!("{request}: the {column} column says `{token}`"));
         }
     }
-    if said.contains(&QUALIFIER) && said.len() == 1 {
-        wrong.push(format!(
-            "{request}: the {column} column is qualified and says nothing to qualify"
-        ));
+    for qualifier in QUALIFIERS {
+        if said.contains(&qualifier) && said.len() == 1 {
+            wrong.push(format!(
+                "{request}: the {column} column says `{qualifier}` and names nothing to \
+                 qualify"
+            ));
+        }
     }
     for verdict in ALONE {
         if said.contains(&verdict) && said.len() > 1 {

@@ -88,9 +88,12 @@ impl Acting {
             // agreeing, so it lands on the question rather than closing over it. A
             // failure ends the errand there: there is nothing to agree to.
             Stage::Weighing { errand, given } => match answer {
-                Ok(outcome) => {
-                    errand::weighed(errand, given, lines_of(&crate::render::shaped(&outcome)))
-                }
+                Ok(outcome) => errand::weighed(
+                    errand,
+                    given,
+                    &outcome,
+                    lines_of(&crate::render::shaped(&outcome)),
+                ),
                 Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
             },
             // An errand and the widened diagnosis land the same way. Both were
@@ -139,7 +142,7 @@ impl Acting {
             // one stack. A question that narrows by picking is answered with a list
             // to take one of instead, which is the same answer read as a choice —
             // and what one of those comes to is an answer again, whichever shape.
-            Stage::Waiting { question, typed } => narrowing::asked(question, &typed, answer),
+            Stage::Waiting { question, said } => narrowing::asked(question, &said, answer),
             Stage::Following(question) => narrowing::followed(question, answer),
             waiting_for_nothing => waiting_for_nothing,
         };

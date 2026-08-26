@@ -21,7 +21,11 @@ use super::super::reading::Reading;
 use crate::pane::quiet;
 
 /// How a word a question has to be given is typed, and how to leave it.
-const TYPING: &str = "enter asks   esc leaves it";
+///
+/// What backspace does is said because a question asked two words has no other way
+/// back to the first, and a key that does one thing at a full line and another at an
+/// empty one is one somebody has to be told about once.
+const TAKING_BACK: &str = "enter goes on   backspace takes back   esc leaves it";
 
 /// How a value the web surface is given is typed, and how to leave it.
 const SETTING: &str = "enter takes it   esc leaves it";
@@ -173,13 +177,27 @@ fn row(leading: &str, name: &str, about: &str, across: usize) -> Line<'static> {
     ])
 }
 
-/// What has to be given, and what has been typed of it so far.
+/// What has to be given, what was given before it, and what has been typed so far.
 ///
 /// The word is drawn as typed and never made to fit from the left, so what is being
 /// typed stays where it was put — a field that scrolled under the operator's own
 /// fingers would be a field nobody could correct.
-pub(super) fn typing(asks: &str, typed: &str, across: usize) -> Vec<Line<'static>> {
-    line(asks, typed, TYPING, across)
+///
+/// A question asked more than one word keeps the earlier ones on the screen, dimmed.
+/// The second line of a trace is a season of *something*, and a box that had taken the
+/// title away would be asking somebody to remember what they were narrowing.
+pub(super) fn typing(
+    said: &[String],
+    asks: &str,
+    typed: &str,
+    across: usize,
+) -> Vec<Line<'static>> {
+    let mut lines: Vec<Line<'static>> = said
+        .iter()
+        .map(|word| dimmed(&format!("> {word}"), across))
+        .collect();
+    lines.extend(line(asks, typed, TAKING_BACK, across));
+    lines
 }
 
 /// The same, for a value the surface is given rather than a question to ask.
