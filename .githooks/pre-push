@@ -38,6 +38,16 @@ while read -r _ pushing onto _; do
 		continue
 	fi
 
+	# Only a branch can be emptied by this mistake. A tag names a commit that is
+	# already somewhere — a release tag names one on the trunk by definition — so
+	# every tag answers yes to the question below and none of them is the accident
+	# this exists to catch. A tag has no commits of its own to lose and no pull
+	# request to close.
+	case "$onto" in
+	refs/heads/*) ;;
+	*) continue ;;
+	esac
+
 	branch=${onto#refs/heads/}
 
 	case "$onto" in
