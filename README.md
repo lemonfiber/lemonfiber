@@ -23,9 +23,11 @@
 
 ---
 
-> **Status: shipping (`0.8.0`).** The core, compose driver, CLI, setup wizard
-> and the trust checks are built and released; the TUI, seed and lifecycle work
-> are under way. See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for
+> **Status: shipping (`0.9.0`).** The core, compose driver, CLI, setup wizard,
+> trust checks, seed and lifecycle work are built and released. Every request
+> reaches all three surfaces: the command line, a terminal dashboard that acts
+> rather than only watching, and a web API a browser is served from.
+> See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for
 > built-vs-roadmap and the
 > [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
 > (this repo is milestones **M2–M10**).
