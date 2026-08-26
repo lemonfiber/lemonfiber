@@ -45,20 +45,41 @@
 //! is resolved beneath the backups directory by the core, and one holding a path or
 //! climbing out of that directory is refused by name rather than followed.
 //!
-//! **Nothing this screen sends can reveal a setting.** A bundle asked for here is
-//! asked for with the careful defaults: the ordinary window of log lines, media
-//! filenames replaced, and nothing revealed. What a bundle withholds is decided
-//! where the bundle is made, and a terminal-only way past it would be a surface
-//! showing a credential no other surface shows.
+//! **A bundle is asked what it is to hold.** How much of each service's log to take is
+//! typed on a line of its own and what becomes of media filenames is taken off a list,
+//! and both are said in the question above the yes — so what is agreed to is what is
+//! written. The careful answers are still where an operator who presses enter twice
+//! lands: an empty line is the ordinary window, and the list opens on filenames
+//! replaced.
+//!
+//! **Nothing this screen sends can reveal a setting.** Which settings are shown as
+//! they are is the one thing about a bundle not offered here, and it is an exception
+//! rather than a gap: a way past the withholding list on this surface would be a
+//! capability no other surface has, on the surface least likely to be sitting behind a
+//! login. The guard beside this list holds it — every bundle this screen can send is
+//! held to naming none — which is also what makes the agreement beside it safe to
+//! carry.
 
 use lemonfiber_api::actions::{named, Arguments};
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::bundle::LINES;
+use lemonfiber_core::app::{Command, Outcome};
 
+mod given;
+
+use super::bundling;
 use super::chooser::{Chooser, Listed};
-use super::offer::Taken;
 use super::reading::{moved, Reading};
 use super::service;
 use super::{Press, Stage, Wanted};
+
+pub(crate) use given::{Given, Needs};
+
+/// How many digits the line a log window is typed on will hold.
+///
+/// Nine, which is every number the argument can carry and no number it cannot. A line
+/// that refuses the tenth digit is a line that can only ever hold an answer, which is
+/// why nothing here has to write a sentence about a window that is not a number.
+const MOST_DIGITS: usize = 9;
 
 /// The key that opens the rest of the errands.
 pub(crate) const KEY: char = 'm';
@@ -77,95 +98,6 @@ enum Going {
     Written,
 }
 
-/// What an errand has to be given before it can be sent.
-///
-/// Two of the six take something, and which of the two shapes each takes is decided
-/// the way the questions on the other list decide it: by where the thing being named
-/// already is. An archive is written under a name nothing on this screen is holding,
-/// so it is typed. A service is on the panel this box is drawn over, so it is taken
-/// off a list — and a typed service name would be a name nothing checked before the
-/// capture ran.
-pub(crate) enum Needs {
-    /// Nothing: it is sent as it stands.
-    Nothing,
-    /// The name a backup was written under, typed on a line of its own, with what is
-    /// asked for above it.
-    Archive(&'static str),
-    /// One of the services the screen has in hand, or the whole stack.
-    Service,
-}
-
-/// What an errand was given, and what that is called where the question says it.
-///
-/// The arguments rather than the text they came from, because they come from two
-/// places — a name typed on a line and a service taken off a list — and what follows
-/// is one path over both: the run that says what the errand would do, the question,
-/// and the errand itself. Two shapes reaching that path would be two accounts of what
-/// an operator agreed to.
-pub(crate) struct Given {
-    /// What the errand is given, empty where it takes nothing.
-    asked: Arguments,
-    /// What that is called where the question has to say it, empty where the errand
-    /// takes nothing and the question is whole without a subject.
-    said: String,
-}
-
-impl Given {
-    /// An errand that takes nothing, given nothing.
-    pub(super) fn nothing() -> Self {
-        Self {
-            asked: Arguments::default(),
-            said: String::new(),
-        }
-    }
-
-    /// The name of an archive, as it was typed.
-    ///
-    /// Nothing typed is nothing named, rather than an empty name. An empty one is a
-    /// name the core would go and fail to find, which costs a round trip to be told
-    /// what the translation already knows — the same reading a trace with nothing
-    /// typed is given.
-    pub(super) fn typed(typed: String) -> Self {
-        Self {
-            asked: Arguments {
-                archive: (!typed.is_empty()).then(|| typed.clone()),
-                ..Arguments::default()
-            },
-            said: typed,
-        }
-    }
-
-    /// The whole of what the errand is about, where there was nothing to narrow it to.
-    ///
-    /// Said rather than left out. A capture with no service to choose between is the
-    /// whole stack, and the question it is put reads as a sentence with its subject
-    /// missing if nothing says so — which is exactly the screen an operator gets when
-    /// the container engine could not be reached.
-    pub(super) fn whole(said: &str) -> Self {
-        Self {
-            asked: Arguments::default(),
-            said: said.to_owned(),
-        }
-    }
-
-    /// The service that was taken off the list, or the whole stack where the row
-    /// naming none was.
-    pub(super) fn picked(taken: &Taken) -> Self {
-        Self {
-            asked: Arguments {
-                service: taken.named().into_iter().next(),
-                ..Arguments::default()
-            },
-            said: taken.name(),
-        }
-    }
-
-    /// What the question calls it.
-    pub(super) fn said(&self) -> &str {
-        &self.said
-    }
-}
-
 /// One errand this stack can be sent on.
 pub(crate) struct Errand {
     /// What it is called on the list, and on the box while it runs.
@@ -178,6 +110,15 @@ pub(crate) struct Errand {
     pub(crate) asks: &'static str,
     /// What it has to be given first.
     pub(crate) needs: Needs,
+    /// The further acceptance this errand's own account can call for, where it can
+    /// call for one.
+    ///
+    /// One errand can. A restore onto a machine whose data root is not the one the
+    /// archive was taken against is held until that move is accepted, and the run that
+    /// lists what the archive holds is the run that says whether it is. So the words
+    /// are here and the fact is the core's, and the question an operator answers is
+    /// the one the account in front of it called for.
+    accepts: Option<&'static str>,
     /// What it sends once it has been agreed to.
     going: Going,
 }
@@ -193,6 +134,7 @@ static OPENS_ON: Errand = Errand {
     action: "seed",
     asks: "Wire the services to each other",
     needs: Needs::Nothing,
+    accepts: None,
     going: Going::Once,
 };
 
@@ -206,6 +148,7 @@ static AFTER: &[Errand] = &[
         action: "adopt",
         asks: "Keep every value you changed",
         needs: Needs::Nothing,
+        accepts: None,
         going: Going::Once,
     },
     Errand {
@@ -214,6 +157,7 @@ static AFTER: &[Errand] = &[
         action: "backup",
         asks: "Capture the configuration of",
         needs: Needs::Service,
+        accepts: None,
         going: Going::Once,
     },
     Errand {
@@ -221,7 +165,8 @@ static AFTER: &[Errand] = &[
         about: "what somebody helping would ask for, with every credential replaced",
         action: "support",
         asks: "Write the bundle",
-        needs: Needs::Nothing,
+        needs: Needs::Bundling("How many lines of each service's log to take"),
+        accepts: None,
         going: Going::Written,
     },
     Errand {
@@ -230,6 +175,7 @@ static AFTER: &[Errand] = &[
         action: "undo",
         asks: "Put back what the last repair changed",
         needs: Needs::Nothing,
+        accepts: None,
         going: Going::Once,
     },
     Errand {
@@ -238,6 +184,7 @@ static AFTER: &[Errand] = &[
         action: "restore",
         asks: "Restore from",
         needs: Needs::Archive("Which backup, by the name it was written under"),
+        accepts: Some("re-pointing the data root to this machine's"),
         going: Going::Agreed,
     },
     Errand {
@@ -246,6 +193,7 @@ static AFTER: &[Errand] = &[
         action: "reset",
         asks: "Throw away every edit above",
         needs: Needs::Nothing,
+        accepts: None,
         going: Going::Agreed,
     },
 ];
@@ -268,7 +216,7 @@ impl Errand {
     fn would(&self, given: &Given) -> Option<Result<Command, String>> {
         match self.going {
             Going::Once => None,
-            Going::Agreed | Going::Written => Some(self.reaching(given.asked.clone())),
+            Going::Agreed | Going::Written => Some(self.reaching(given.asked())),
         }
     }
 
@@ -276,14 +224,42 @@ impl Errand {
     ///
     /// What it was given, and the careful defaults for everything else a bundle would
     /// otherwise be free to hold.
+    ///
+    /// The yes is carried as the command's own agreement on both of the two that take
+    /// one. It was not, on the bundle: the yes was spent on writing the file and the
+    /// field the command reads for consent went out false on every bundle this screen
+    /// ever wrote. Nothing about what was produced was different, because this screen
+    /// names no setting to show as it is — and that is the point. An agreement that
+    /// arrives only when it happens to matter is an agreement nothing carries.
     fn sent(&self, given: &Given) -> Result<Command, String> {
-        let mut asked = given.asked.clone();
+        let mut asked = given.asked();
         match self.going {
             Going::Once => (),
             Going::Agreed => asked.confirm = true,
-            Going::Written => asked.write = true,
+            Going::Written => {
+                asked.write = true;
+                asked.confirm = true;
+            }
         }
         self.reaching(asked)
+    }
+
+    /// Whether what the unconfirmed run reported calls for the further acceptance this
+    /// errand can carry, and the words for it where it does.
+    ///
+    /// The archive's own account of itself says which data root it was taken against,
+    /// and a difference there is the one thing a re-point is for. Read off the answer
+    /// rather than asked of the operator up front, for the reason the account is put
+    /// in front of the question at all: an effect somebody agrees to before hearing of
+    /// it is not one they agreed to.
+    fn accepting(&self, outcome: &Outcome) -> Option<&'static str> {
+        let accepts = self.accepts?;
+        match outcome {
+            Outcome::Restore(restoration) => {
+                restoration.would.relocation.is_some().then_some(accepts)
+            }
+            _ => None,
+        }
     }
 
     /// The command an errand comes to, or why it comes to none — in the words the
@@ -334,7 +310,10 @@ fn taken(
     services: &[(String, String, String)],
 ) -> Wanted {
     match errand.needs {
-        Needs::Archive(asks) => {
+        // Two errands open a line and what they do with the word differs, which is
+        // [`given`]'s answer rather than this one's: what is decided here is only
+        // that there is a line.
+        Needs::Archive(asks) | Needs::Bundling(asks) => {
             *stage = Stage::Naming {
                 errand,
                 asks,
@@ -363,11 +342,11 @@ pub(super) fn naming(
 ) -> Wanted {
     match *press {
         Press::Abandon => return Wanted::Nothing,
-        Press::Accept => return begun(stage, errand, Given::typed(typed)),
+        Press::Accept => return given(stage, errand, typed),
         Press::Rubout => {
             typed.pop();
         }
-        Press::Typed(character) => typed.push(character),
+        Press::Typed(character) => took(errand, &mut typed, character),
         Press::Back | Press::Forward => (),
     }
     *stage = Stage::Naming {
@@ -376,6 +355,37 @@ pub(super) fn naming(
         typed,
     };
     Wanted::Nothing
+}
+
+/// Take the character where this line will have it.
+///
+/// A log window is a number, so its line takes digits and no more of them than a
+/// number the argument can carry. A line that will only ever hold an answer is a line
+/// nothing has to write a refusal about: what is turned away is the keystroke, not the
+/// request, and every other line takes what it is given.
+fn took(errand: &Errand, typed: &mut String, character: char) {
+    match errand.needs {
+        Needs::Bundling(_) if !character.is_ascii_digit() || typed.len() >= MOST_DIGITS => (),
+        _ => typed.push(character),
+    }
+}
+
+/// What the line an errand was typed on comes to.
+///
+/// The name of an archive is the whole of what a restore has to be given, so it goes
+/// straight to the run that says what would be overwritten. A log window is the first
+/// of a bundle's two answers, so it opens the second.
+fn given(stage: &mut Stage, errand: &'static Errand, typed: String) -> Wanted {
+    match errand.needs {
+        // Nothing typed is the ordinary window, which is the one careful default this
+        // line can be left at — and the figure is carried rather than left out, so the
+        // question above the yes says the number the command was given.
+        Needs::Bundling(_) => {
+            *stage = bundling::over(errand, typed.parse().unwrap_or(LINES));
+            Wanted::Nothing
+        }
+        _ => begun(stage, errand, Given::typed(typed)),
+    }
 }
 
 /// Ask what the errand would do, or put the question where it has nothing to say
@@ -416,7 +426,21 @@ pub(super) fn weighing(
 }
 
 /// What the core said the errand would do, held for the operator to read and answer.
-pub(super) fn weighed(errand: &'static Errand, given: Given, would: Vec<String>) -> Stage {
+///
+/// The account is also what decides the question. A restore whose archive names
+/// another machine's data root is a re-point, and the yes under that listing is the
+/// yes to the move — so the question names it rather than leaving an operator to
+/// agree to a restore and be refused for the one thing the listing had just told them.
+pub(super) fn weighed(
+    errand: &'static Errand,
+    given: Given,
+    outcome: &Outcome,
+    would: Vec<String>,
+) -> Stage {
+    let given = match errand.accepting(outcome) {
+        Some(accepts) => given.repointing(accepts),
+        None => given,
+    };
     Stage::Agreeing {
         errand,
         given,
@@ -477,12 +501,13 @@ pub(super) fn doing(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{all, every, Errand, Given, Going, Needs, KEY};
+    use super::{all, every, Errand, Given, Going, Needs, Outcome, KEY, LINES};
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber::reaching::{ACTS, ALSO};
     use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
     use lemonfiber_core::app::restore::{Consent, Kept};
     use lemonfiber_core::app::Command;
+    use lemonfiber_core::bundle::Filenames;
 
     /// One errand naming an action no surface offers, for the paths that report a
     /// translation that came to nothing.
@@ -492,6 +517,7 @@ pub(crate) mod tests {
         action: "not an action any surface offers",
         asks: "Do the impossible",
         needs: Needs::Nothing,
+        accepts: None,
         going: Going::Once,
     };
 
@@ -598,19 +624,115 @@ pub(crate) mod tests {
         }
     }
 
-    /// A bundle asked for here is asked for with every careful default: the
-    /// ordinary window of log lines, filenames replaced, and nothing revealed. A
-    /// terminal-only way past any of those would be a surface showing what no other
-    /// surface shows.
+    /// No bundle this screen can send names a setting to show as it is.
+    ///
+    /// Over every answer the two lines in front of a bundle can be given rather than
+    /// over the one nobody typed at, because a guard that only read the default would
+    /// pass on a screen that had grown a third line. The agreement beside it is safe
+    /// to carry precisely because this holds: an agreement to publish nothing is what
+    /// every one of these carries.
     #[test]
-    fn the_bundle_this_screen_asks_for_reveals_nothing_and_replaces_filenames() {
+    fn no_bundle_this_screen_can_send_names_a_setting_to_reveal() {
+        let bundling = [
+            (Given::nothing(), LINES, Filenames::Replaced),
+            (
+                Given::bundled(LINES, Filenames::Replaced),
+                LINES,
+                Filenames::Replaced,
+            ),
+            (Given::bundled(1, Filenames::Shown), 1, Filenames::Shown),
+            (
+                Given::bundled(999_999_999, Filenames::Shown),
+                999_999_999,
+                Filenames::Shown,
+            ),
+        ];
+
+        for (given, lines, filenames) in &bundling {
+            assert_eq!(
+                sending("support").map(|errand| errand.sent(given)),
+                Some(Ok(Command::Support {
+                    write: true,
+                    wanted: lemonfiber_core::app::bundle::Wanted {
+                        lines: *lines,
+                        filenames: *filenames,
+                        reveal: Vec::new(),
+                        confirmed: true,
+                    },
+                    dest: lemonfiber_core::app::support::Destination::Kept,
+                }))
+            );
+        }
+    }
+
+    /// A restore that came back as something other than a restoration calls for no
+    /// re-point.
+    ///
+    /// A screen that read one out of the wrong shape would be putting an operator's
+    /// agreement to a move on the strength of an answer about something else — and
+    /// the shape it would have read it out of is whatever the core answered.
+    #[test]
+    fn an_answer_that_is_not_a_restoration_calls_for_no_re_point() {
+        let restoring = sending("restore");
+
+        let accepting =
+            restoring.and_then(|errand| errand.accepting(&Outcome::Version(a_version())));
+
+        assert_eq!(accepting, None);
+    }
+
+    /// A version report, which is an answer of a shape no errand ever has.
+    fn a_version() -> lemonfiber_core::model::VersionReport {
+        lemonfiber_core::model::VersionReport {
+            binary: "0.9.0".to_owned(),
+            supported_schema: vec![1],
+            stack: "1.2.3".to_owned(),
+            compose: None,
+        }
+    }
+
+    /// Asked for with nothing chosen it is asked for with every careful default, and
+    /// the yes carries the agreement the command names.
+    ///
+    /// The agreement is the half that was missing rather than the half that was
+    /// wrong: nothing about the file differs, because the reveal is empty either way
+    /// — which is exactly why nothing caught it.
+    #[test]
+    fn the_bundle_this_screen_asks_for_replaces_filenames_and_carries_the_agreement() {
         let bundle = sending("support").map(|errand| errand.sent(&Given::nothing()));
 
         assert_eq!(
             bundle,
             Some(Ok(Command::Support {
                 write: true,
-                wanted: lemonfiber_core::app::bundle::Wanted::default(),
+                wanted: lemonfiber_core::app::bundle::Wanted {
+                    confirmed: true,
+                    ..lemonfiber_core::app::bundle::Wanted::default()
+                },
+                dest: lemonfiber_core::app::support::Destination::Kept,
+            }))
+        );
+    }
+
+    /// What was chosen in front of the question is what the bundle is asked for.
+    ///
+    /// The window and the filenames both, because either carried alone would be a
+    /// screen that asked two things and sent one.
+    #[test]
+    fn a_bundle_is_asked_for_with_the_window_and_the_filenames_that_were_chosen() {
+        let bundle =
+            sending("support").map(|errand| errand.sent(&Given::bundled(20, Filenames::Shown)));
+
+        assert_eq!(
+            bundle,
+            Some(Ok(Command::Support {
+                write: true,
+                wanted: lemonfiber_core::app::bundle::Wanted {
+                    lines: 20,
+                    filenames: Filenames::Shown,
+                    reveal: Vec::new(),
+                    confirmed: true,
+                },
                 dest: lemonfiber_core::app::support::Destination::Kept,
             }))
         );

@@ -62,6 +62,7 @@
 //! the name of a process that no longer exists.
 
 mod answering;
+mod bundling;
 mod chooser;
 mod disturbing;
 mod errand;
@@ -286,6 +287,9 @@ impl Acting {
                 asks,
                 typed,
             } => errand::naming(&mut self.stage, errand, asks, typed, press),
+            Stage::Bundling { errand, chooser } => {
+                bundling::bundling(&mut self.stage, errand, chooser, press)
+            }
             Stage::Weighing { errand, given } => {
                 errand::weighing(&mut self.stage, errand, given, press)
             }
@@ -316,9 +320,14 @@ impl Acting {
                 said,
             } => lasting::keeping(&mut self.stage, lasting, named, ends, said, press),
             Stage::Deciding(chooser) => quality::deciding(&mut self.stage, chooser, press),
-            Stage::Grading { change, chooser } => {
-                quality::grading(&mut self.stage, change, chooser, press)
+            Stage::Scoping { change, chooser } => {
+                quality::scoping(&mut self.stage, change, chooser, press)
             }
+            Stage::Grading {
+                change,
+                chosen,
+                chooser,
+            } => quality::grading(&mut self.stage, change, chosen, chooser, press),
             Stage::Costing { change } => quality::costing(&mut self.stage, change, press),
             Stage::Settling {
                 change,
@@ -371,11 +380,11 @@ impl Acting {
             Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
             Stage::Typing {
                 question,
-                asks,
+                said,
                 typed,
-            } => question::typing(&mut self.stage, question, asks, typed, press),
-            Stage::Waiting { question, typed } => {
-                question::waiting(&mut self.stage, Stage::Waiting { question, typed }, press)
+            } => question::typing(&mut self.stage, question, said, typed, press),
+            Stage::Waiting { question, said } => {
+                question::waiting(&mut self.stage, Stage::Waiting { question, said }, press)
             }
             Stage::Following(question) => {
                 question::waiting(&mut self.stage, Stage::Following(question), press)
@@ -475,10 +484,14 @@ mod tests {
     // repair one is bare and the restore one is said with its module, which is the
     // way `named.rs` tells the same pair apart — a file holding both cannot leave a
     // reader to guess which `Consent::Given` a line means.
+    use lemonfiber_core::app::bundle::Wanted as Bundled;
     use lemonfiber_core::app::repair::{Consent, Report as RepairReport};
-    use lemonfiber_core::app::restore::{self, Kept};
+    use lemonfiber_core::app::restore::{self, Kept, Preview, Restoration};
+    use lemonfiber_core::app::support::{Bundle, Destination};
     use lemonfiber_core::app::{backup, Command, Outcome, QualityAction, Waiting};
-    use lemonfiber_core::backup::Scope;
+    use lemonfiber_core::audio::Format;
+    use lemonfiber_core::backup::{Manifest, Relocation, Scope, SCHEMA};
+    use lemonfiber_core::bundle::{Contents, Filenames};
     use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
     use lemonfiber_core::model::{
@@ -1976,10 +1989,7 @@ mod tests {
     fn sending(action: &str) -> (Acting, Wanted) {
         let mut acting = Acting::opened();
         acting.pressed(&Press::Typed(errand::KEY));
-        let named = errand::tests::listed(action);
-        while !showing(&acting).contains(&format!("> {named}")) {
-            acting.pressed(&Press::Forward);
-        }
+        onto(&mut acting, &errand::tests::listed(action));
         let wanted = acting.pressed(&Press::Accept);
         (acting, wanted)
     }
@@ -2409,12 +2419,22 @@ mod tests {
     fn changing(action: &str) -> (Acting, Wanted) {
         let mut acting = Acting::opened();
         acting.pressed(&Press::Typed(quality::KEY));
-        let named = quality::tests::listed(action);
-        while !showing(&acting).contains(&format!("> {named}")) {
-            acting.pressed(&Press::Forward);
-        }
+        onto(&mut acting, &quality::tests::listed(action));
         let wanted = acting.pressed(&Press::Accept);
         (acting, wanted)
+    }
+
+    /// The screen, having taken the change that records a choice and then the media
+    /// that choice is about.
+    ///
+    /// Two steps rather than one, because what a bar even is depends on the first:
+    /// music has no resolution, so its list is three audio formats where the rest are
+    /// four presets.
+    fn aiming(about: &str) -> Acting {
+        let (mut acting, _) = changing("quality-set");
+        onto(&mut acting, about);
+        acting.pressed(&Press::Accept);
+        acting
     }
 
     /// The quality in force as the read reports it, and what became of a choice.
@@ -2460,6 +2480,14 @@ mod tests {
         let (mut acting, opened) = changing("quality-set");
         assert_eq!(opened, Wanted::Nothing);
 
+        // The media a choice is about comes first, and the whole library is the row
+        // the list opens on — so an operator who presses enter twice makes the choice
+        // this screen has always made.
+        let media = showing(&acting);
+        assert!(media.contains("> everything"), "{media}");
+        assert!(media.contains("music"), "{media}");
+
+        acting.pressed(&Press::Accept);
         let listed = showing(&acting);
         assert!(listed.contains("> space-saving"), "{listed}");
         assert!(listed.contains("per hour"), "{listed}");
@@ -2467,7 +2495,7 @@ mod tests {
         acting.pressed(&Press::Forward);
         assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
         let asked = showing(&acting);
-        assert!(asked.contains("Aim for balanced?"), "{asked}");
+        assert!(asked.contains("Aim for balanced, everywhere?"), "{asked}");
 
         assert_eq!(
             acting.pressed(&Press::Typed('y')),
@@ -2524,10 +2552,8 @@ mod tests {
     /// sits under. The agreement goes on that second send and never on the first.
     #[test]
     fn a_choice_this_host_would_transcode_is_held_and_the_caution_is_read_first() {
-        let (mut acting, _) = changing("quality-set");
-        while !showing(&acting).contains("> maximum") {
-            acting.pressed(&Press::Forward);
-        }
+        let mut acting = aiming("everything");
+        onto(&mut acting, "maximum");
         acting.pressed(&Press::Accept);
         let first = acting.pressed(&Press::Typed('y'));
         assert_eq!(
@@ -2542,7 +2568,10 @@ mod tests {
         acting.came_to(Ok(Outcome::Quality(a_quality(Disposition::Held))));
 
         let said = showing(&acting);
-        let before = said.split("Aim for maximum?").next().unwrap_or_default();
+        let before = said
+            .split("Aim for maximum, everywhere?")
+            .next()
+            .unwrap_or_default();
         assert!(before.contains("transcode this in software"), "{said}");
         assert_eq!(
             acting.pressed(&Press::Typed('y')),
@@ -2559,7 +2588,7 @@ mod tests {
     /// else.
     #[test]
     fn a_choice_that_was_recorded_is_read_rather_than_asked_about_again() {
-        let (mut acting, _) = changing("quality-set");
+        let mut acting = aiming("everything");
         acting.pressed(&Press::Accept);
         acting.pressed(&Press::Typed('y'));
 
@@ -2605,6 +2634,13 @@ mod tests {
         acting.pressed(&Press::Rubout);
         assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
         assert!(showing(&acting).contains("> how good it should be"));
+
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Back);
+        acting.pressed(&Press::Rubout);
+        acting.pressed(&Press::Typed('z'));
+        assert!(showing(&acting).contains("> everything"));
 
         acting.pressed(&Press::Accept);
         acting.pressed(&Press::Forward);
@@ -2727,13 +2763,290 @@ mod tests {
         let wanted = quality::settling(
             &mut acting.stage,
             &quality::tests::UNCHOOSABLE,
-            None,
+            quality::Chosen::nothing(),
             None,
             &Press::Typed('y'),
         );
 
         assert_eq!(wanted, Wanted::Nothing);
         assert!(showing(&acting).contains("There is no action named"));
+    }
+
+    /// A quality choice is narrowed to one kind of media, which is the step in front
+    /// of the bars rather than an argument nobody can name.
+    ///
+    /// The media reaches the command as the word `--for` spells and the bar reaches it
+    /// as the preset, so what is asserted is the pair — which is what a screen that
+    /// carried only one of them would get wrong.
+    #[test]
+    fn a_quality_choice_is_narrowed_to_one_kind_of_media() {
+        let mut acting = aiming("series");
+        onto(&mut acting, "high-quality");
+        acting.pressed(&Press::Accept);
+
+        let asked = showing(&acting);
+        assert!(
+            asked.contains("Aim for high-quality, for series?"),
+            "{asked}"
+        );
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Quality(QualityAction::Set {
+                preset: Preset::HighQuality,
+                media_type: Some("tv".to_owned()),
+                confirm: false,
+            }))
+        );
+    }
+
+    /// Choosing for music offers audio formats rather than resolutions, and reaches
+    /// the command that fork ends in.
+    ///
+    /// The bars are not filtered here and no list of them is written down twice: every
+    /// preset and every format is put to the translation for this media, and what
+    /// comes back as a command is what is shown. A screen keeping its own idea of
+    /// which is which would offer a resolution for music and fail here.
+    #[test]
+    fn choosing_for_music_offers_audio_formats_and_reaches_its_own_command() {
+        let mut acting = aiming("music");
+
+        let bars = showing(&acting);
+        assert!(bars.contains("lossless"), "{bars}");
+        assert!(!bars.contains("space-saving"), "{bars}");
+        assert!(!bars.contains("maximum"), "{bars}");
+
+        onto(&mut acting, "hi-res");
+        acting.pressed(&Press::Accept);
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::QualityMusic {
+                format: Format::HiRes,
+            })
+        );
+    }
+
+    /// A trace is narrowed to one season, which is a second line under the first.
+    ///
+    /// The title stays on the screen while the season is typed, because the second
+    /// line is about the first and a box that had taken it away would be asking
+    /// somebody to remember what they were narrowing.
+    #[test]
+    fn a_trace_is_narrowed_to_one_season_on_a_second_line() {
+        let mut acting = asking("where one season of it is");
+        for character in "The Expanse".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+
+        let second = showing(&acting);
+        assert!(second.contains("Which season, as a number"), "{second}");
+        assert!(second.contains("> The Expanse"), "{second}");
+
+        acting.pressed(&Press::Typed('2'));
+        assert_eq!(
+            acting.pressed(&Press::Accept),
+            Wanted::Carry(Command::Trace {
+                term: "The Expanse".to_owned(),
+                season: Some(2),
+            })
+        );
+    }
+
+    /// Taking back at an empty second line takes back the first word, which is the
+    /// only way a question asked two of them has of correcting the first.
+    #[test]
+    fn taking_back_at_an_empty_line_takes_back_the_word_before_it() {
+        let mut acting = asking("where one season of it is");
+        for character in "Dune".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Rubout);
+
+        let back = showing(&acting);
+        assert!(back.contains("What to follow"), "{back}");
+        assert!(back.contains("> Dune"), "{back}");
+        assert!(!back.contains("Which season"), "{back}");
+    }
+
+    /// A restore onto a different data root is accepted at this screen now, and the
+    /// question that accepts it is the one under the listing that reported it.
+    ///
+    /// The listing decides the question rather than the operator being asked in
+    /// advance: whether there is anything to accept is the archive's to say.
+    #[test]
+    fn a_restore_onto_a_different_data_root_is_accepted_under_the_listing() {
+        let mut acting = naming_an_archive();
+        acting.came_to(Ok(Outcome::Restore(a_restoration(Some(Relocation {
+            was: "/srv/media".to_owned(),
+            now: "/mnt/media".to_owned(),
+        })))));
+
+        let asked = showing(&acting);
+        assert!(asked.contains("a different data root"), "{asked}");
+        assert!(
+            asked.contains("Restore from kept.tar.gz, re-pointing the data root"),
+            "{asked}"
+        );
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Restore {
+                archive: Kept::Named("kept.tar.gz".to_owned()),
+                repoint: true,
+                consent: restore::Consent::Standing,
+            })
+        );
+    }
+
+    /// An archive taken against this machine's own data root asks for no re-point and
+    /// sends none, which is what that field means on every surface.
+    #[test]
+    fn a_restore_that_moves_nothing_asks_for_no_re_point() {
+        let mut acting = naming_an_archive();
+        acting.came_to(Ok(Outcome::Restore(a_restoration(None))));
+
+        let asked = showing(&acting);
+        assert!(!asked.contains("re-pointing"), "{asked}");
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Restore {
+                archive: Kept::Named("kept.tar.gz".to_owned()),
+                repoint: false,
+                consent: restore::Consent::Standing,
+            })
+        );
+    }
+
+    /// The screen, having named an archive and sent the run that lists what it holds.
+    fn naming_an_archive() -> Acting {
+        let (mut acting, _) = sending("restore");
+        for character in "kept.tar.gz".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Accept);
+        acting
+    }
+
+    /// What an archive says about itself before anything is overwritten, moved or not.
+    fn a_restoration(relocation: Option<Relocation>) -> Restoration {
+        Restoration {
+            would: Preview {
+                manifest: Manifest {
+                    schema: SCHEMA,
+                    product_version: "0.9.0".to_owned(),
+                    created_at: "2026-08-26".to_owned(),
+                    data_root: "/srv/media".to_owned(),
+                    scope: Scope::WholeStack,
+                    sensitive: true,
+                    members: Vec::new(),
+                },
+                downgrade: false,
+                relocation,
+                agreement: "what this listing named itself".to_owned(),
+            },
+            done: None,
+        }
+    }
+
+    /// A bundle is asked what it is to hold: how much log, on a line, and what becomes
+    /// of media filenames, off a list — and both reach the command.
+    ///
+    /// Both together, because a screen that asked two things and carried one would
+    /// pass a test that read either alone.
+    #[test]
+    fn a_bundle_is_asked_how_much_log_and_what_becomes_of_filenames() {
+        let (mut acting, _) = sending("support");
+        let line = showing(&acting);
+        assert!(line.contains("How many lines"), "{line}");
+
+        for character in "50".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Accept);
+
+        let listed = showing(&acting);
+        assert!(listed.contains("> media filenames replaced"), "{listed}");
+        onto(&mut acting, "media filenames shown as they are");
+        let describing = acting.pressed(&Press::Accept);
+
+        assert_eq!(
+            describing,
+            Wanted::Carry(Command::Support {
+                write: false,
+                wanted: Bundled::asked(50, Filenames::Shown, Vec::new(), false),
+                dest: Destination::Kept,
+            })
+        );
+
+        acting.came_to(Ok(Outcome::Support(a_bundle())));
+
+        let asked = showing(&acting);
+        assert!(asked.contains("the last 50 lines"), "{asked}");
+        assert!(asked.contains("media filenames shown"), "{asked}");
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Support {
+                write: true,
+                wanted: Bundled::asked(50, Filenames::Shown, Vec::new(), true),
+                dest: Destination::Kept,
+            })
+        );
+    }
+
+    /// What a bundle would hold, as the run that writes nothing answers.
+    fn a_bundle() -> Bundle {
+        Bundle {
+            contents: Contents::default(),
+            bytes: 4096,
+            path: None,
+        }
+    }
+
+    /// The line a window is typed on takes digits and nothing else, and an empty one
+    /// is the ordinary window — so nothing here has to write a sentence about a
+    /// number that is not one.
+    #[test]
+    fn the_window_a_bundle_is_given_takes_digits_and_nothing_else() {
+        let (mut acting, _) = sending("support");
+        for character in "1e0".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+
+        let line = showing(&acting);
+        assert!(line.contains("> 10"), "{line}");
+
+        let (mut empty, _) = sending("support");
+        empty.pressed(&Press::Accept);
+        let describing = empty.pressed(&Press::Accept);
+
+        assert_eq!(
+            describing,
+            Wanted::Carry(Command::Support {
+                write: false,
+                wanted: Bundled::default(),
+                dest: Destination::Kept,
+            })
+        );
+    }
+
+    /// Backing out of the media a choice is about, and of what a bundle holds, leaves
+    /// nothing open — and a key that is neither a move nor an answer changes nothing.
+    #[test]
+    fn backing_out_of_the_two_new_lists_leaves_nothing_open() {
+        let (mut acting, _) = changing("quality-set");
+        acting.pressed(&Press::Abandon);
+        assert_eq!(showing(&acting), "");
+
+        let (mut acting, _) = sending("support");
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Back);
+        acting.pressed(&Press::Rubout);
+        acting.pressed(&Press::Typed('z'));
+        assert!(showing(&acting).contains("> media filenames replaced"));
+
+        acting.pressed(&Press::Abandon);
+        assert_eq!(showing(&acting), "");
     }
 
     /// Every request this screen reaches is one of the lists it is built from, and

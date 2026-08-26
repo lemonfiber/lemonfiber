@@ -1,0 +1,163 @@
+//! What an errand has to be given before it can be sent, and what it was given.
+//!
+//! The vocabulary of one errand's subject, apart from the list and the question that
+//! surround it. [`super`] decides which errands there are, what each says before it is
+//! agreed to and what the yes sends; this is what "what it was given" means on the way
+//! through.
+//!
+//! **One shape over four kinds of subject.** A restore takes the name a backup was
+//! written under, a capture takes one of the services the panels are showing, a bundle
+//! takes how much log and what becomes of media filenames, and three of the six take
+//! nothing at all. What follows any of them is the same path — the run that says what
+//! the errand would do, the question, and the errand itself — so what arrives at that
+//! path is one value rather than four, and the question is put in one voice rather
+//! than in four that drifted apart.
+//!
+//! **What is sent and what is said travel together.** The arguments are what the
+//! command carries and the sentence is what the operator agreed to, and they are built
+//! in the same breath from the same answer. Kept apart they would eventually disagree,
+//! and the place they would disagree is the line above the yes.
+
+use lemonfiber_api::actions::Arguments;
+use lemonfiber_core::bundle::Filenames;
+
+use super::super::offer::Taken;
+
+/// What an errand has to be given before it can be sent.
+///
+/// Two of the six take something, and which of the two shapes each takes is decided
+/// the way the questions on the other list decide it: by where the thing being named
+/// already is. An archive is written under a name nothing on this screen is holding,
+/// so it is typed. A service is on the panel this box is drawn over, so it is taken
+/// off a list — and a typed service name would be a name nothing checked before the
+/// capture ran.
+pub(crate) enum Needs {
+    /// Nothing: it is sent as it stands.
+    Nothing,
+    /// The name a backup was written under, typed on a line of its own, with what is
+    /// asked for above it.
+    Archive(&'static str),
+    /// One of the services the screen has in hand, or the whole stack.
+    Service,
+    /// What a bundle is to hold: how much of each service's log, typed on a line of
+    /// its own, and then what becomes of media filenames, taken off a list.
+    ///
+    /// Two answers and two shapes, decided the way everything else on this screen is:
+    /// a window is a number and there is no list of numbers to take one off, and what
+    /// happens to filenames is two values of an enum the command carries, which is a
+    /// list already in hand.
+    Bundling(&'static str),
+}
+
+/// What an errand was given, and what that is called where the question says it.
+///
+/// The arguments rather than the text they came from, because they come from two
+/// places — a name typed on a line and a service taken off a list — and what follows
+/// is one path over both: the run that says what the errand would do, the question,
+/// and the errand itself. Two shapes reaching that path would be two accounts of what
+/// an operator agreed to.
+pub(crate) struct Given {
+    /// What the errand is given, empty where it takes nothing.
+    asked: Arguments,
+    /// What that is called where the question has to say it, empty where the errand
+    /// takes nothing and the question is whole without a subject.
+    said: String,
+}
+
+impl Given {
+    /// An errand that takes nothing, given nothing.
+    pub(crate) fn nothing() -> Self {
+        Self {
+            asked: Arguments::default(),
+            said: String::new(),
+        }
+    }
+
+    /// The name of an archive, as it was typed.
+    ///
+    /// Nothing typed is nothing named, rather than an empty name. An empty one is a
+    /// name the core would go and fail to find, which costs a round trip to be told
+    /// what the translation already knows — the same reading a trace with nothing
+    /// typed is given.
+    pub(crate) fn typed(typed: String) -> Self {
+        Self {
+            asked: Arguments {
+                archive: (!typed.is_empty()).then(|| typed.clone()),
+                ..Arguments::default()
+            },
+            said: typed,
+        }
+    }
+
+    /// The whole of what the errand is about, where there was nothing to narrow it to.
+    ///
+    /// Said rather than left out. A capture with no service to choose between is the
+    /// whole stack, and the question it is put reads as a sentence with its subject
+    /// missing if nothing says so — which is exactly the screen an operator gets when
+    /// the container engine could not be reached.
+    pub(crate) fn whole(said: &str) -> Self {
+        Self {
+            asked: Arguments::default(),
+            said: said.to_owned(),
+        }
+    }
+
+    /// The service that was taken off the list, or the whole stack where the row
+    /// naming none was.
+    pub(crate) fn picked(taken: &Taken) -> Self {
+        Self {
+            asked: Arguments {
+                service: taken.named().into_iter().next(),
+                ..Arguments::default()
+            },
+            said: taken.name(),
+        }
+    }
+
+    /// What a bundle is to hold, once both halves have been answered.
+    ///
+    /// The window is carried as a number rather than left out, so what the question
+    /// says and what the command is given are one figure. Left out, the core would
+    /// supply its own and the sentence above the question would be this screen's
+    /// guess at what that is.
+    pub(crate) fn bundled(lines: u32, filenames: Filenames) -> Self {
+        let shown = match filenames {
+            Filenames::Replaced => "media filenames replaced",
+            Filenames::Shown => "media filenames shown as they are",
+        };
+        Self {
+            asked: Arguments {
+                logs: Some(lines),
+                filenames,
+                ..Arguments::default()
+            },
+            said: format!("with the last {lines} lines of each service's log, and {shown}"),
+        }
+    }
+
+    /// The same, having accepted the re-point the archive's own account called for.
+    ///
+    /// The acceptance goes on after the account and never before it. Whether there is
+    /// anything to accept is the core's to know — it is the archive that says which
+    /// data root it was taken against — so a question asked ahead of the listing would
+    /// be asking somebody to agree to a move that may not be happening.
+    pub(super) fn repointing(mut self, accepts: &'static str) -> Self {
+        self.asked.repoint = true;
+        self.said = format!("{}, {accepts}", self.said);
+        self
+    }
+
+    /// What the question calls it.
+    pub(crate) fn said(&self) -> &str {
+        &self.said
+    }
+
+    /// The arguments it fills, as the errand's own runs are given them.
+    ///
+    /// Handed over rather than read off a field, so what an errand is given stays here
+    /// and what is done with it — the run that only reports, the run that acts — stays
+    /// next door.
+    pub(super) fn asked(&self) -> Arguments {
+        self.asked.clone()
+    }
+}
