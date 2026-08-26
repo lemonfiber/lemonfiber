@@ -4,8 +4,26 @@ yanked = "deny"
 
 [bans]
 multiple-versions = "warn"
-# Dependencies introducing telemetry are banned (G8-R11); add offenders here.
-deny = []
+# Telemetry is refused as a dependency, not merely avoided as a habit. These are
+# stems of crate families that exist to report somewhere; the same list is swept
+# over the resolved graph by `nothing_reports_on_you.rs`, which matches a family
+# by its prefix where this matches one name at a time. Add to both or neither.
+deny = [
+  "amplitude",
+  "aptabase",
+  "bugsnag",
+  "countly",
+  "datadog",
+  "google-analytics",
+  "libhoney",
+  "mixpanel",
+  "opentelemetry",
+  "posthog",
+  "rollbar",
+  "segment",
+  "sentry",
+  "snowplow",
+]
 
 [licenses]
 version = 2
