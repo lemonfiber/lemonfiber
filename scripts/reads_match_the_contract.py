@@ -60,8 +60,12 @@ LITERAL = re.compile(r'^"([^"]+)"$')
 NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 # One entry of the block. The path only: an entry carrying `?…` says the
-# endpoint takes parameters, which is not part of the path it is served on.
-ENTRY = re.compile(r"GET (/api/[a-z0-9/-]+)")
+# endpoint takes parameters, which is not part of the path it is served on. A
+# `{…}` segment is part of it — the surface declares the route with the brace in
+# it — so it is read rather than stopped at. Stopping at the brace read
+# `/api/bundle/{name}` as `/api/bundle/`, which is served by nothing, so the page
+# and the surface were reported as disagreeing in both directions at once.
+ENTRY = re.compile(r"GET (/api/[a-z0-9{}/-]+)")
 
 # A fenced block, however the fence is labelled.
 FENCE = re.compile(r"```[a-z]*\n(.*?)```", re.DOTALL)

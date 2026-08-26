@@ -147,6 +147,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // a problem rather than as an outcome with a code on it.
         | Outcome::Backup(_)
         | Outcome::Watch(_)
+        | Outcome::Archives(_)
         | Outcome::Support(_) => ExitCode::SUCCESS,
     }
 }

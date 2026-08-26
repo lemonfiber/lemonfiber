@@ -11,17 +11,24 @@
 //! narrowed; `storage` is the group of checks the narrowing parameter also reaches.
 //! `forms`, `config` and `explain` go the other way and are one name over two
 //! commands each, because the command line spells each of them as one request that
-//! forks on whether something was named.
+//! forks on whether something was named. `backups` is the same fork read from the
+//! other side: `lemonfiber restore` with nothing named lists what there is to restore
+//! from, and this is the half of that word a browser asks for on its own, because the
+//! other half is a write and writes are asked for elsewhere. `backups` is the same fork read from the
+//! other side: `lemonfiber restore` with nothing named lists what there is to
+//! restore from, and this is the half of that word a browser asks for on its own,
+//! because the other half is a write and writes are asked for elsewhere.
 //!
 //! Only the flags that read are here. Narrowing a diagnosis is a parameter; running
 //! the checks that disturb a running system and accepting a warning both change
 //! something and belong where changes are asked for.
 //!
-//! `/api/logs` is the one read with no command below, because it reaches none: it
-//! opens a stream and renders a document per line, or hands back a name for a follow
-//! that will not end — a different shape of answer rather than a different answer. It
-//! is named here all the same, because it is asked with parameters like every other
-//! read and [`asked`] holds every read to the parameters it takes.
+//! Two reads have no command below, because they reach none. `/api/logs` opens a
+//! stream and renders a document per line, or hands back a name for a follow that
+//! will not end; `/api/bundle/{name}` answers with a file, which no envelope holds.
+//! Both are named here all the same, because both are asked at a door this table
+//! guards and [`asked`] holds every read to the parameters it takes — including the
+//! ones that take none.
 
 mod asked;
 
@@ -67,9 +74,30 @@ pub const QUALITY: &str = "/api/quality";
 /// What one of this product's words means, or every word there is to ask about.
 pub const EXPLAIN: &str = "/api/explain";
 
+/// The backup archives this machine has kept, by the names they were written under.
+///
+/// Named for what it lists rather than for the command it reaches: what these are
+/// to an operator is their backups, and what they are to the core is the archives
+/// it keeps. The listing is the half of a restore that comes before naming one — a
+/// browser has no filesystem to look in, so a name it could not be told is a name
+/// it cannot use.
+pub const BACKUPS: &str = "/api/backups";
+
 /// What the services are saying, one document a line — or, where it was asked to
 /// keep reading, a name for work that will not end and lines that arrive elsewhere.
 pub const LOGS: &str = "/api/logs";
+
+/// One support bundle this run kept, handed over whole.
+///
+/// The other read with no command below, and for a plainer reason than the logs
+/// have: what it answers with is a file rather than a value, and no envelope holds
+/// one. Which file is the core's to decide, from the name in this path and the
+/// directory it keeps bundles in.
+///
+/// The name is a path segment rather than a parameter, so a browser saving the
+/// answer reads the name off the address it asked at — and this surface never has
+/// to quote a name a request supplied into a header.
+pub const BUNDLE: &str = "/api/bundle/{name}";
 
 /// The reads a name reaches, in the order the endpoints declare them.
 ///
@@ -78,7 +106,7 @@ pub const LOGS: &str = "/api/logs";
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
     VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, TRACE, STUCK, CONFIG, QUALITY,
-    EXPLAIN,
+    EXPLAIN, BACKUPS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -165,6 +193,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // Naming an empty word is naming one this product does not explain, and is
         // refused for that by the command rather than read as having named none.
         EXPLAIN => Ok(word.map_or(Command::Glossary, |word| Command::Explain { word })),
+        BACKUPS => Ok(Command::Archives),
         _ => Err(NO_SUCH_READ),
     }
 }

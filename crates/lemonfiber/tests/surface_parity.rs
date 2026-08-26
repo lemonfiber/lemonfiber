@@ -238,15 +238,22 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         summary.len()
     );
 
-    for (number, what) in [
-        (counted.len(), "requests"),
-        (full, "reach the web in full"),
-        (partial, "reach it in part"),
-        (none, "do not reach it at all"),
-        (partial + none, "gaps"),
-        (silent, "have no terminal form"),
+    // Each figure with the words that go with it, in both numbers. A count reaching
+    // one is not a rarity to be waited out: `none` was zero the day a browser could
+    // reach everything, and the gaps have been coming down one at a time ever since.
+    // Held to the plural alone, the page would have had to say `one reach it in
+    // part` and `one gaps` to stay green — so the guard would have been enforcing
+    // prose no one would write, on the page whose whole business is being read.
+    for (number, many, one) in [
+        (counted.len(), "requests", "request"),
+        (full, "reach the web in full", "reaches the web in full"),
+        (partial, "reach it in part", "reaches it in part"),
+        (none, "do not reach it at all", "does not reach it at all"),
+        (partial + none, "gaps", "gap"),
+        (silent, "have no terminal form", "has no terminal form"),
     ] {
         let said = spelled(number);
+        let what = if number == 1 { one } else { many };
         assert!(
             summary.contains(&format!("{said} {what}")),
             "the summary says `{said} {what}` for what its rows carry ({number})"

@@ -282,9 +282,15 @@ async fn main() -> ExitCode {
         // would overwrite, and then the overwrite. Both are dispatched, so what
         // an operator is shown before it happens is the command's own answer
         // rather than this surface's rendering of one.
-        Request::Restore { archive, repoint } => {
-            return restoring(&ctx, Kept::At(archive), repoint, cli.json).await
-        }
+        //
+        // Naming no archive asks which there are, the fork `forms` and `explain`
+        // take on their own word: a surface that has to name one cannot know the
+        // names in advance, and the browser cannot look in the directory at all.
+        Request::Restore {
+            archive: Some(archive),
+            repoint,
+        } => return restoring(&ctx, Kept::At(archive), repoint, cli.json).await,
+        Request::Restore { archive: None, .. } => Command::Archives,
     };
 
     match dispatch(command, &ctx).await {

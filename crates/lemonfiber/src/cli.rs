@@ -346,9 +346,12 @@ pub enum Request {
     /// Verifies the archive and lists what it holds before anything is
     /// overwritten. A restore onto a different data root is refused until
     /// `--repoint` accepts moving it to this machine's.
+    ///
+    /// Name an archive, or name nothing and be told which backups this machine has
+    /// kept.
     Restore {
         /// The archive to restore from.
-        archive: PathBuf,
+        archive: Option<PathBuf>,
         /// Accept re-pointing to this machine's data root where it differs.
         #[arg(long)]
         repoint: bool,

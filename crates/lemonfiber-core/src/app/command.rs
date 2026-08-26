@@ -232,6 +232,14 @@ pub enum Command {
         /// Where it is written, for a run that produces one.
         dest: support::Destination,
     },
+    /// List the backup archives this machine has kept, by the names they were
+    /// written under.
+    ///
+    /// The half of a restore that comes before naming one, apart from it the way
+    /// listing forms is apart from resolving them: a surface that has to name an
+    /// archive cannot know the names in advance, and the one with no filesystem in
+    /// front of it cannot look.
+    Archives,
     /// Put a configuration back from a backup archive.
     Restore {
         /// The archive to restore from, named the way the surface can name one.

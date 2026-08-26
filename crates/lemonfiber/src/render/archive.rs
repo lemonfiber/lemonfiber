@@ -2,7 +2,9 @@
 //!
 //! The three answers about an archive, together because they share the sentence
 //! that names what one covers and because all three end by telling somebody what
-//! is now on their disk and how careful to be with it.
+//! is now on their disk and how careful to be with it. The listing of what has been
+//! kept is here for the same reason: it is what a restore is asked with, and it
+//! ends by saying how to ask.
 //!
 //! A restore's listing and what a restore did are one answer with the listing
 //! always in it, and only one of the two is worth reading at a time: before, the
@@ -11,6 +13,7 @@
 
 use std::path::Path;
 
+use lemonfiber_core::app::archives::Listing;
 use lemonfiber_core::app::backup::Report as Capture;
 use lemonfiber_core::app::restore::{Preview, Restoration};
 use lemonfiber_core::app::support::Bundle;
@@ -36,6 +39,26 @@ pub(crate) fn backup(report: &Capture) -> Lines {
     if !report.pruned.is_empty() {
         lines.put(format!("Pruned {} older backup(s).", report.pruned.len()));
     }
+    lines
+}
+
+/// Which backups this machine has kept, and how to put one back.
+///
+/// The names and nothing else, because a name is what a restore is asked for and
+/// what an archive holds is the answer to naming one. Newest first, since the
+/// archive most often wanted is the one taken last.
+pub(crate) fn kept(listing: &Listing) -> Lines {
+    let mut lines = Lines::default();
+    if listing.archives.is_empty() {
+        lines.put("No backups have been taken on this machine yet.");
+        lines.spaced("Take one with:  lemonfiber backup");
+        return lines;
+    }
+    lines.put("Backups kept on this machine, newest first:");
+    for name in &listing.archives {
+        lines.put(format!("  {name}"));
+    }
+    lines.spaced("Put one back with:  lemonfiber restore <archive>");
     lines
 }
 
@@ -175,13 +198,14 @@ fn next_steps() -> Lines {
 mod tests {
     use std::path::PathBuf;
 
+    use lemonfiber_core::app::archives::Listing;
     use lemonfiber_core::app::backup::Report as Capture;
     use lemonfiber_core::app::restore::{Preview, Report as Restored, Restoration};
     use lemonfiber_core::app::support::Bundle;
     use lemonfiber_core::backup::{Manifest, Member, Relocation, Scope, SCHEMA};
     use lemonfiber_core::bundle::{Contents, Piece, Taken, Terms};
 
-    use super::{backup, bundle, restoration};
+    use super::{backup, bundle, kept, restoration};
 
     fn manifest() -> Manifest {
         Manifest {
@@ -362,5 +386,38 @@ mod tests {
         );
         assert!(said.contains("diagnosis.txt"), "{said}");
         assert!(said.contains("Nothing has left this machine."), "{said}");
+    }
+
+    #[test]
+    fn the_backups_kept_here_are_listed_with_how_to_put_one_back() {
+        let said = kept(&Listing {
+            archives: vec![
+                "lemonfiber-full-2.tar.gz".to_owned(),
+                "lemonfiber-full-1.tar.gz".to_owned(),
+            ],
+        })
+        .text();
+        assert!(said.contains("lemonfiber-full-2.tar.gz"), "{said}");
+        assert!(said.contains("lemonfiber-full-1.tar.gz"), "{said}");
+        assert!(
+            said.contains("lemonfiber restore <archive>"),
+            "a listing says how to use what it listed: {said}"
+        );
+    }
+
+    #[test]
+    fn a_machine_that_has_kept_nothing_is_told_how_to_keep_something() {
+        // An empty list and a list of one read alike where the answer is a bare
+        // heading with nothing under it, which is the shape that reads as broken.
+        let said = kept(&Listing {
+            archives: Vec::new(),
+        })
+        .text();
+        assert!(said.contains("No backups have been taken"), "{said}");
+        assert!(said.contains("lemonfiber backup"), "{said}");
+        assert!(
+            !said.contains("lemonfiber restore <archive>"),
+            "nothing to put back is not an invitation to put one back: {said}"
+        );
     }
 }
