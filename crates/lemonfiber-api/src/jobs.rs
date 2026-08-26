@@ -55,7 +55,6 @@ use lemonfiber_core::ports::random::Random;
 use tokio::sync::Mutex;
 use tokio::task::AbortHandle;
 
-use crate::guard::hex;
 use crate::read::enveloped;
 use crate::router::Serving;
 use crate::serve::{carrying, SENTENCE};
@@ -88,7 +87,7 @@ impl Job {
     /// Through the port rather than taken directly, so a test names a job it
     /// chose instead of depending on what the machine happens to produce.
     pub fn mint(random: &dyn Random) -> Option<Self> {
-        Some(Self(hex(&random.bytes(WIDTH)?)))
+        crate::guard::minted(random, WIDTH).map(Self)
     }
 
     /// The name as it is answered with, and as it is asked about afterwards.

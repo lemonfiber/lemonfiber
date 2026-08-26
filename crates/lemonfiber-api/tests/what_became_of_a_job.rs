@@ -178,11 +178,23 @@ async fn as_the_command_renders_it(command: Command) -> Option<String> {
 
 #[test]
 fn a_job_is_the_bytes_the_machine_gave_written_as_one_word() {
-    let job = Job::mint(&Chance::exactly(Some(vec![0x00, 0x0f, 0xa5, 0xff])));
+    let job = Job::mint(&Chance::exactly(Some(vec![
+        0x00, 0x0f, 0xa5, 0xff, 0x00, 0x0f, 0xa5, 0xff,
+    ])));
     assert_eq!(
         job.map(|job| job.as_str().to_owned()),
-        Some("000fa5ff".to_owned())
+        Some("000fa5ff000fa5ff".to_owned())
     );
+}
+
+#[test]
+fn a_machine_that_answers_short_has_not_named_the_work() {
+    // A name is the whole of what a caller redeems work by, so it is a capability
+    // and its width is what makes guessing hopeless — the same reasoning the token
+    // is minted under. A short answer is invisible in the result: half a name is a
+    // name, and looks like one right up until somebody guesses it. This asked for
+    // eight bytes and was given four.
+    assert!(Job::mint(&Chance::exactly(Some(vec![0x00, 0x0f, 0xa5, 0xff]))).is_none());
 }
 
 #[test]

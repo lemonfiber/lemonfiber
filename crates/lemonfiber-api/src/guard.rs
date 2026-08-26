@@ -50,11 +50,7 @@ impl Token {
     /// short answer is invisible in the result: a narrower secret is a secret,
     /// and looks like one right up until somebody guesses it.
     pub fn mint(random: &dyn Random) -> Option<Self> {
-        let bytes = random.bytes(WIDTH)?;
-        if bytes.len() != WIDTH {
-            return None;
-        }
-        Some(Self(hex(&bytes)))
+        minted(random, WIDTH).map(Self)
     }
 
     /// The token as it is printed and as a caller must send it back.
@@ -80,6 +76,25 @@ impl Token {
                 .fold(0u8, |seen, (a, b)| seen | (a ^ b))
                 == 0
     }
+}
+
+/// The width asked for, written out as one word, or nothing.
+///
+/// A source that answers with fewer bytes than it was asked for is treated as one
+/// that would not say. The width is what makes guessing hopeless, and a short
+/// answer is invisible in the result: a narrower secret is a secret, and looks
+/// like one right up until somebody guesses it.
+///
+/// Asked for here rather than by each caller, because the token checked and the
+/// names given to work did not — and a job's name is a capability on the same
+/// terms, being the whole of what a caller redeems work by. The doc below already
+/// said the two were the same act; only one of them was treated that way.
+pub(crate) fn minted(random: &dyn Random, width: usize) -> Option<String> {
+    let bytes = random.bytes(width)?;
+    if bytes.len() != width {
+        return None;
+    }
+    Some(hex(&bytes))
 }
 
 /// Bytes written out as one word.
