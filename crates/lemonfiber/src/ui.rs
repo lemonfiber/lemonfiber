@@ -22,6 +22,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use axum::Router;
+use lemonfiber::cli::RawUi;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
@@ -56,6 +57,89 @@ pub(crate) struct Asked {
     pub browser: bool,
     /// A directory holding a built app, for a build that carries none.
     pub assets: Option<PathBuf>,
+}
+
+/// What is said to a request whose port is not a number a machine could listen on.
+///
+/// Beside the request rather than at the surface that took the word, for the reason a
+/// read's own refusals are beside the read: what a port is is a fact about `ui` and
+/// not about the screen or the shell that asked for one, and a second sentence
+/// written at a second surface is how two surfaces come to refuse the same word
+/// differently.
+pub(crate) const NOT_A_PORT: &str = "Which port to listen on must be a number from 0 to 65535.";
+
+impl Asked {
+    /// What `lemonfiber ui` is given where no flag says otherwise.
+    ///
+    /// Apart from [`Default`], which is the conservative reading of the same three: a
+    /// browser is opened only where something asked for one, and nothing has yet.
+    /// This is what the flags come to when none of them is given, and it is held to
+    /// them by a test rather than by two lists that agree today.
+    pub(crate) const fn unsaid() -> Self {
+        Self {
+            port: None,
+            browser: true,
+            assets: None,
+        }
+    }
+
+    /// The same, listening on the port a word names.
+    ///
+    /// Naming nothing is a request in its own right and not an omission: it asks for
+    /// whichever port is free, which is what naming no `--port` asks for.
+    ///
+    /// # Errors
+    ///
+    /// Returns what is said to a word that is not a port. Whether that port can be
+    /// listened on is a different question and is not answered here, because it
+    /// cannot be answered anywhere else either: a port is free until something takes
+    /// it, so the answer is [`taken`], which takes it and reports what happened.
+    pub(crate) fn on_port(&self, said: &str) -> Result<Self, &'static str> {
+        let said = said.trim();
+        let named = (!said.is_empty()).then_some(said);
+        let Ok(port) = named.map(str::parse::<u16>).transpose() else {
+            return Err(NOT_A_PORT);
+        };
+        Ok(Self {
+            port,
+            ..self.clone()
+        })
+    }
+
+    /// The same, serving the interface out of the directory a word names.
+    ///
+    /// Naming nothing is a request here too: it asks for the interface this program
+    /// was built with, which is what naming no `--assets` asks for.
+    pub(crate) fn serving_from(&self, said: &str) -> Self {
+        let said = said.trim();
+        Self {
+            assets: (!said.is_empty()).then(|| PathBuf::from(said)),
+            ..self.clone()
+        }
+    }
+
+    /// The same, with the browser turned over.
+    pub(crate) fn turned(&self) -> Self {
+        Self {
+            browser: !self.browser,
+            ..self.clone()
+        }
+    }
+}
+
+impl From<RawUi> for Asked {
+    /// What the flags come to.
+    ///
+    /// Here rather than at the command line, so the one translation from what was
+    /// typed into what this surface is given is under the coverage gate — `main.rs`
+    /// is the outermost edge and is not.
+    fn from(raw: RawUi) -> Self {
+        Self {
+            port: raw.port,
+            browser: !raw.no_browser,
+            assets: raw.assets,
+        }
+    }
 }
 
 /// The address to ask the operating system for.
@@ -354,8 +438,10 @@ mod tests {
 
     use super::{
         address, announcement, app, opener, opening, run, surface, taken, tokenless, unavailable,
-        wanted, Asked, Browser,
+        wanted, Asked, Browser, NOT_A_PORT,
     };
+    use clap::Parser as _;
+    use std::path::PathBuf;
 
     /// A run of a program that went the way the test chose.
     struct Ran(Result<Output, Failure>);
@@ -695,6 +781,119 @@ mod tests {
         let problem = tokenless();
         assert!(!problem.remedies.is_empty(), "somewhere to go");
         assert!(problem.summary.contains("token"), "{}", problem.summary);
+    }
+
+    /// What a command line comes to, or nothing where it is not a request to serve.
+    ///
+    /// Through the parser rather than by building the flags here: what these pin is
+    /// the command line's own defaults, and defaults written down a second time
+    /// agree today and drift on the day one of them changes.
+    fn asked_for(said: &[&str]) -> Option<Asked> {
+        let parsed = lemonfiber::cli::Cli::try_parse_from(said).ok()?;
+        match parsed.command {
+            Some(lemonfiber::cli::Request::Ui(raw)) => Some(Asked::from(raw)),
+            _ => None,
+        }
+    }
+
+    /// The screen and the command line start from the same place, or the two presses
+    /// that key has always taken would quietly mean something else.
+    #[test]
+    fn asking_for_nothing_is_what_the_screen_starts_from() {
+        assert_eq!(asked_for(&["lemonfiber", "ui"]), Some(Asked::unsaid()));
+    }
+
+    /// Each flag reaches the choice it names, since a flag that reaches none is a
+    /// flag that silently does nothing.
+    #[test]
+    fn each_flag_reaches_the_choice_it_names() {
+        assert_eq!(
+            asked_for(&[
+                "lemonfiber",
+                "ui",
+                "--port",
+                "7171",
+                "--no-browser",
+                "--assets",
+                "/srv/app",
+            ]),
+            Some(Asked {
+                port: Some(7171),
+                browser: false,
+                assets: Some(PathBuf::from("/srv/app")),
+            })
+        );
+    }
+
+    /// A port the command line will not read never reaches this surface at all,
+    /// which is the shell's half of the check the screen makes for itself.
+    #[test]
+    fn a_port_the_command_line_will_not_read_never_reaches_this_surface() {
+        assert_eq!(asked_for(&["lemonfiber", "ui", "--port", "seventy"]), None);
+        assert_eq!(asked_for(&["lemonfiber", "version"]), None);
+    }
+
+    /// A word is a port or it is refused, rather than rounded to something.
+    #[test]
+    fn a_word_typed_where_a_port_goes_is_one_or_it_is_refused() {
+        let asked = Asked::unsaid();
+
+        for (said, port) in [("7171", 7171), (" 7171 ", 7171), ("0", 0)] {
+            assert_eq!(
+                asked.on_port(said).map(|asked| asked.port),
+                Ok(Some(port)),
+                "{said:?}"
+            );
+        }
+        for said in ["seventy", "-1", "65536", "71.71", "7171x"] {
+            assert_eq!(
+                asked.on_port(said).map(|asked| asked.port),
+                Err(NOT_A_PORT),
+                "{said:?}"
+            );
+        }
+    }
+
+    /// Naming no port is a request rather than an omission: it asks for whichever
+    /// one is free, which is what naming no flag asks for.
+    #[test]
+    fn naming_no_port_at_a_screen_asks_for_whichever_one_is_free() {
+        for said in ["", "   "] {
+            assert_eq!(
+                Asked::unsaid().on_port(said).map(|asked| asked.port),
+                Ok(None),
+                "{said:?}"
+            );
+        }
+    }
+
+    /// Naming no directory is the interface this program was built with, which is
+    /// what naming no flag asks for.
+    #[test]
+    fn naming_no_directory_is_the_interface_built_into_this_program() {
+        for said in ["", "  "] {
+            assert!(
+                Asked::unsaid().serving_from(said).assets.is_none(),
+                "{said:?}"
+            );
+        }
+    }
+
+    /// Filling one choice leaves the other two where they were, or a screen setting
+    /// a port would be taking a browser away with it.
+    #[test]
+    fn filling_one_choice_leaves_the_other_two_alone() {
+        let asked = Asked::unsaid().serving_from("/srv/app").turned();
+
+        assert_eq!(
+            asked.on_port("7171"),
+            Ok(Asked {
+                port: Some(7171),
+                browser: false,
+                assets: Some(PathBuf::from("/srv/app")),
+            })
+        );
+        assert_eq!(asked.turned(), Asked::unsaid().serving_from("/srv/app"));
     }
 
     #[test]
