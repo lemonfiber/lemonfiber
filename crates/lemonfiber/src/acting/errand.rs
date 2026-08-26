@@ -55,7 +55,9 @@ use lemonfiber_api::actions::{named, Arguments};
 use lemonfiber_core::app::Command;
 
 use super::chooser::{Chooser, Listed};
+use super::offer::Taken;
 use super::reading::{moved, Reading};
+use super::service;
 use super::{Press, Stage, Wanted};
 
 /// The key that opens the rest of the errands.
@@ -75,6 +77,95 @@ enum Going {
     Written,
 }
 
+/// What an errand has to be given before it can be sent.
+///
+/// Two of the six take something, and which of the two shapes each takes is decided
+/// the way the questions on the other list decide it: by where the thing being named
+/// already is. An archive is written under a name nothing on this screen is holding,
+/// so it is typed. A service is on the panel this box is drawn over, so it is taken
+/// off a list — and a typed service name would be a name nothing checked before the
+/// capture ran.
+pub(crate) enum Needs {
+    /// Nothing: it is sent as it stands.
+    Nothing,
+    /// The name a backup was written under, typed on a line of its own, with what is
+    /// asked for above it.
+    Archive(&'static str),
+    /// One of the services the screen has in hand, or the whole stack.
+    Service,
+}
+
+/// What an errand was given, and what that is called where the question says it.
+///
+/// The arguments rather than the text they came from, because they come from two
+/// places — a name typed on a line and a service taken off a list — and what follows
+/// is one path over both: the run that says what the errand would do, the question,
+/// and the errand itself. Two shapes reaching that path would be two accounts of what
+/// an operator agreed to.
+pub(crate) struct Given {
+    /// What the errand is given, empty where it takes nothing.
+    asked: Arguments,
+    /// What that is called where the question has to say it, empty where the errand
+    /// takes nothing and the question is whole without a subject.
+    said: String,
+}
+
+impl Given {
+    /// An errand that takes nothing, given nothing.
+    pub(super) fn nothing() -> Self {
+        Self {
+            asked: Arguments::default(),
+            said: String::new(),
+        }
+    }
+
+    /// The name of an archive, as it was typed.
+    ///
+    /// Nothing typed is nothing named, rather than an empty name. An empty one is a
+    /// name the core would go and fail to find, which costs a round trip to be told
+    /// what the translation already knows — the same reading a trace with nothing
+    /// typed is given.
+    pub(super) fn typed(typed: String) -> Self {
+        Self {
+            asked: Arguments {
+                archive: (!typed.is_empty()).then(|| typed.clone()),
+                ..Arguments::default()
+            },
+            said: typed,
+        }
+    }
+
+    /// The whole of what the errand is about, where there was nothing to narrow it to.
+    ///
+    /// Said rather than left out. A capture with no service to choose between is the
+    /// whole stack, and the question it is put reads as a sentence with its subject
+    /// missing if nothing says so — which is exactly the screen an operator gets when
+    /// the container engine could not be reached.
+    pub(super) fn whole(said: &str) -> Self {
+        Self {
+            asked: Arguments::default(),
+            said: said.to_owned(),
+        }
+    }
+
+    /// The service that was taken off the list, or the whole stack where the row
+    /// naming none was.
+    pub(super) fn picked(taken: &Taken) -> Self {
+        Self {
+            asked: Arguments {
+                service: taken.named().into_iter().next(),
+                ..Arguments::default()
+            },
+            said: taken.name(),
+        }
+    }
+
+    /// What the question calls it.
+    pub(super) fn said(&self) -> &str {
+        &self.said
+    }
+}
+
 /// One errand this stack can be sent on.
 pub(crate) struct Errand {
     /// What it is called on the list, and on the box while it runs.
@@ -83,13 +174,10 @@ pub(crate) struct Errand {
     pub(crate) about: &'static str,
     /// The name every surface calls this action by.
     pub(crate) action: &'static str,
-    /// How the question before it begins, the name it was given completing it.
+    /// How the question before it begins, what it was given completing it.
     pub(crate) asks: &'static str,
-    /// What it has to be given first, above the line it is typed on.
-    ///
-    /// The one errand that takes anything takes the name of a backup, so what is
-    /// typed is carried as the archive to restore from.
-    pub(crate) names: Option<&'static str>,
+    /// What it has to be given first.
+    pub(crate) needs: Needs,
     /// What it sends once it has been agreed to.
     going: Going,
 }
@@ -104,7 +192,7 @@ static OPENS_ON: Errand = Errand {
     about: "connect each service to the others, leaving what you changed alone",
     action: "seed",
     asks: "Wire the services to each other",
-    names: None,
+    needs: Needs::Nothing,
     going: Going::Once,
 };
 
@@ -117,15 +205,15 @@ static AFTER: &[Errand] = &[
         about: "take every value you changed as lemonfiber's own, so a seed leaves it",
         action: "adopt",
         asks: "Keep every value you changed",
-        names: None,
+        needs: Needs::Nothing,
         going: Going::Once,
     },
     Errand {
         name: "a backup",
-        about: "capture this configuration to an archive kept on this machine",
+        about: "capture a configuration to an archive kept on this machine",
         action: "backup",
-        asks: "Capture this configuration to an archive",
-        names: None,
+        asks: "Capture the configuration of",
+        needs: Needs::Service,
         going: Going::Once,
     },
     Errand {
@@ -133,7 +221,7 @@ static AFTER: &[Errand] = &[
         about: "what somebody helping would ask for, with every credential replaced",
         action: "support",
         asks: "Write the bundle",
-        names: None,
+        needs: Needs::Nothing,
         going: Going::Written,
     },
     Errand {
@@ -141,7 +229,7 @@ static AFTER: &[Errand] = &[
         about: "reverse what the last repair changed, leaving the wiring under it alone",
         action: "undo",
         asks: "Put back what the last repair changed",
-        names: None,
+        needs: Needs::Nothing,
         going: Going::Once,
     },
     Errand {
@@ -149,7 +237,7 @@ static AFTER: &[Errand] = &[
         about: "restore one this machine took, over the configuration here now",
         action: "restore",
         asks: "Restore from",
-        names: Some("Which backup, by the name it was written under"),
+        needs: Needs::Archive("Which backup, by the name it was written under"),
         going: Going::Agreed,
     },
     Errand {
@@ -157,7 +245,7 @@ static AFTER: &[Errand] = &[
         about: "put lemonfiber's own state back over every value you changed",
         action: "reset",
         asks: "Throw away every edit above",
-        names: None,
+        needs: Needs::Nothing,
         going: Going::Agreed,
     },
 ];
@@ -177,38 +265,25 @@ impl Errand {
     ///
     /// The arguments as they stand: unconfirmed, and writing nothing. Those are the
     /// runs the command answers with what it would come to, having touched nothing.
-    fn would(&self, typed: &str) -> Option<Result<Command, String>> {
+    fn would(&self, given: &Given) -> Option<Result<Command, String>> {
         match self.going {
             Going::Once => None,
-            Going::Agreed | Going::Written => Some(self.reaching(self.given(typed))),
+            Going::Agreed | Going::Written => Some(self.reaching(given.asked.clone())),
         }
     }
 
     /// What this errand sends once the operator has agreed to it.
-    fn sent(&self, typed: &str) -> Result<Command, String> {
-        let mut given = self.given(typed);
+    ///
+    /// What it was given, and the careful defaults for everything else a bundle would
+    /// otherwise be free to hold.
+    fn sent(&self, given: &Given) -> Result<Command, String> {
+        let mut asked = given.asked.clone();
         match self.going {
             Going::Once => (),
-            Going::Agreed => given.confirm = true,
-            Going::Written => given.write = true,
+            Going::Agreed => asked.confirm = true,
+            Going::Written => asked.write = true,
         }
-        self.reaching(given)
-    }
-
-    /// What it is given: the name where it takes one, and the careful defaults for
-    /// everything else a bundle would otherwise be free to hold.
-    ///
-    /// Nothing typed is nothing named, rather than an empty name. An empty one is a
-    /// name the core would go and fail to find, which costs a round trip to be told
-    /// what the translation already knows — the same reading a trace with nothing
-    /// typed is given.
-    fn given(&self, typed: &str) -> Arguments {
-        Arguments {
-            archive: self
-                .names
-                .and_then(|_| (!typed.is_empty()).then(|| typed.to_owned())),
-            ..Arguments::default()
-        }
+        self.reaching(asked)
     }
 
     /// The command an errand comes to, or why it comes to none — in the words the
@@ -234,10 +309,11 @@ pub(super) fn sending(
     stage: &mut Stage,
     mut chooser: Chooser<&'static Errand>,
     press: &Press,
+    services: &[(String, String, String)],
 ) -> Wanted {
     match *press {
         Press::Abandon => return Wanted::Nothing,
-        Press::Accept => return taken(stage, chooser.taken()),
+        Press::Accept => return taken(stage, chooser.taken(), services),
         Press::Back => chooser.back(),
         Press::Forward => chooser.forward(),
         Press::Typed(_) | Press::Rubout => (),
@@ -246,10 +322,19 @@ pub(super) fn sending(
     Wanted::Nothing
 }
 
-/// Send the errand that was taken, or open the line it has to be named on first.
-fn taken(stage: &mut Stage, errand: &'static Errand) -> Wanted {
-    match errand.names {
-        Some(asks) => {
+/// Send the errand that was taken, or open what it has to be given first.
+///
+/// A capture with no services to choose between is sent as it stands, which is the
+/// whole stack — the request this screen has always made of it. A screen that could
+/// not reach the engine has nothing to narrow to, and a list of one row would be
+/// offering a choice that is not one.
+fn taken(
+    stage: &mut Stage,
+    errand: &'static Errand,
+    services: &[(String, String, String)],
+) -> Wanted {
+    match errand.needs {
+        Needs::Archive(asks) => {
             *stage = Stage::Naming {
                 errand,
                 asks,
@@ -257,7 +342,14 @@ fn taken(stage: &mut Stage, errand: &'static Errand) -> Wanted {
             };
             Wanted::Nothing
         }
-        None => begun(stage, errand, String::new()),
+        Needs::Service => match service::for_the_errand(errand, services) {
+            Some(inside) => {
+                *stage = inside;
+                Wanted::Nothing
+            }
+            None => begun(stage, errand, service::nothing_to_choose()),
+        },
+        Needs::Nothing => begun(stage, errand, Given::nothing()),
     }
 }
 
@@ -271,7 +363,7 @@ pub(super) fn naming(
 ) -> Wanted {
     match *press {
         Press::Abandon => return Wanted::Nothing,
-        Press::Accept => return begun(stage, errand, typed),
+        Press::Accept => return begun(stage, errand, Given::typed(typed)),
         Press::Rubout => {
             typed.pop();
         }
@@ -288,10 +380,10 @@ pub(super) fn naming(
 
 /// Ask what the errand would do, or put the question where it has nothing to say
 /// first.
-fn begun(stage: &mut Stage, errand: &'static Errand, typed: String) -> Wanted {
-    match errand.would(&typed) {
+pub(super) fn begun(stage: &mut Stage, errand: &'static Errand, given: Given) -> Wanted {
+    match errand.would(&given) {
         Some(Ok(command)) => {
-            *stage = Stage::Weighing { errand, typed };
+            *stage = Stage::Weighing { errand, given };
             Wanted::Carry(command)
         }
         Some(Err(said)) => {
@@ -301,7 +393,7 @@ fn begun(stage: &mut Stage, errand: &'static Errand, typed: String) -> Wanted {
         None => {
             *stage = Stage::Agreeing {
                 errand,
-                typed,
+                given,
                 would: None,
             };
             Wanted::Nothing
@@ -313,21 +405,21 @@ fn begun(stage: &mut Stage, errand: &'static Errand, typed: String) -> Wanted {
 pub(super) fn weighing(
     stage: &mut Stage,
     errand: &'static Errand,
-    typed: String,
+    given: Given,
     press: &Press,
 ) -> Wanted {
     if matches!(*press, Press::Abandon) {
         return Wanted::Nothing;
     }
-    *stage = Stage::Weighing { errand, typed };
+    *stage = Stage::Weighing { errand, given };
     Wanted::Nothing
 }
 
 /// What the core said the errand would do, held for the operator to read and answer.
-pub(super) fn weighed(errand: &'static Errand, typed: String, would: Vec<String>) -> Stage {
+pub(super) fn weighed(errand: &'static Errand, given: Given, would: Vec<String>) -> Stage {
     Stage::Agreeing {
         errand,
-        typed,
+        given,
         would: Some(Reading::of(would)),
     }
 }
@@ -340,7 +432,7 @@ pub(super) fn weighed(errand: &'static Errand, typed: String, would: Vec<String>
 pub(super) fn agreeing(
     stage: &mut Stage,
     errand: &'static Errand,
-    typed: String,
+    given: Given,
     mut would: Option<Reading>,
     press: &Press,
 ) -> Wanted {
@@ -348,7 +440,7 @@ pub(super) fn agreeing(
         if moved(reading, press) {
             *stage = Stage::Agreeing {
                 errand,
-                typed,
+                given,
                 would,
             };
             return Wanted::Nothing;
@@ -357,9 +449,9 @@ pub(super) fn agreeing(
     if !matches!(*press, Press::Typed('y' | 'Y')) {
         return Wanted::Nothing;
     }
-    match errand.sent(&typed) {
+    match errand.sent(&given) {
         Ok(command) => {
-            *stage = Stage::Doing { errand, typed };
+            *stage = Stage::Doing { errand, given };
             Wanted::Carry(command)
         }
         Err(said) => {
@@ -373,10 +465,10 @@ pub(super) fn agreeing(
 pub(super) fn doing(
     stage: &mut Stage,
     errand: &'static Errand,
-    typed: String,
+    given: Given,
     press: &Press,
 ) -> Wanted {
-    *stage = Stage::Doing { errand, typed };
+    *stage = Stage::Doing { errand, given };
     if super::leaving(press) {
         return Wanted::Leave;
     }
@@ -385,7 +477,7 @@ pub(super) fn doing(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{all, every, Errand, Going, KEY};
+    use super::{all, every, Errand, Given, Going, Needs, KEY};
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber::reaching::{ACTS, ALSO};
     use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
@@ -399,12 +491,18 @@ pub(crate) mod tests {
         about: "for the refusal a translation that reaches no command produces",
         action: "not an action any surface offers",
         asks: "Do the impossible",
-        names: None,
+        needs: Needs::Nothing,
         going: Going::Once,
     };
 
+    /// An errand given a name typed on a line, which is how the two that take one
+    /// were given theirs before either of them existed.
+    fn typed(name: &str) -> Given {
+        Given::typed(name.to_owned())
+    }
+
     /// The errand one action is on, for a test that wants a particular one.
-    fn sending(action: &str) -> Option<&'static Errand> {
+    pub(crate) fn sending(action: &str) -> Option<&'static Errand> {
         every().find(|errand| errand.action == action)
     }
 
@@ -495,7 +593,7 @@ pub(crate) mod tests {
     fn an_errand_whose_action_takes_an_agreement_says_what_it_would_do_first() {
         for errand in every() {
             let takes = TAKES_AGREEMENT.contains(&errand.action);
-            let says = errand.would("a-backup.tar.gz").is_some();
+            let says = errand.would(&typed("a-backup.tar.gz")).is_some();
             assert_eq!(says, takes, "{}", errand.name);
         }
     }
@@ -506,7 +604,7 @@ pub(crate) mod tests {
     /// surface shows.
     #[test]
     fn the_bundle_this_screen_asks_for_reveals_nothing_and_replaces_filenames() {
-        let bundle = sending("support").map(|errand| errand.sent(""));
+        let bundle = sending("support").map(|errand| errand.sent(&Given::nothing()));
 
         assert_eq!(
             bundle,
@@ -522,7 +620,7 @@ pub(crate) mod tests {
     /// nothing: the run that says is the run that produces no file.
     #[test]
     fn what_a_bundle_would_hold_is_asked_for_before_one_is_written() {
-        let would = sending("support").and_then(|errand| errand.would(""));
+        let would = sending("support").and_then(|errand| errand.would(&Given::nothing()));
 
         assert!(matches!(
             would,
@@ -537,7 +635,7 @@ pub(crate) mod tests {
     fn a_restore_carries_the_name_it_was_given_and_never_a_path() {
         let restoring = sending("restore");
 
-        let climbing = restoring.map(|errand| errand.sent("../../etc/shadow"));
+        let climbing = restoring.map(|errand| errand.sent(&typed("../../etc/shadow")));
         assert_eq!(
             climbing,
             Some(Ok(Command::Restore {
@@ -546,7 +644,7 @@ pub(crate) mod tests {
                 consent: Consent::Standing,
             }))
         );
-        let listing = restoring.and_then(|errand| errand.would("lemonfiber-full-1.tar.gz"));
+        let listing = restoring.and_then(|errand| errand.would(&typed("lemonfiber-full-1.tar.gz")));
         assert!(matches!(
             listing,
             Some(Ok(Command::Restore {
@@ -561,7 +659,7 @@ pub(crate) mod tests {
     #[test]
     fn a_restore_with_no_name_is_refused_in_the_words_the_other_surface_gives() {
         let said = sending("restore")
-            .and_then(|errand| errand.would("").and_then(Result::err))
+            .and_then(|errand| errand.would(&typed("")).and_then(Result::err))
             .unwrap_or_default();
 
         assert!(said.contains("restore"), "{said}");
@@ -575,11 +673,11 @@ pub(crate) mod tests {
         let errand = sending("reset");
 
         assert_eq!(
-            errand.and_then(|errand| errand.would("")),
+            errand.and_then(|errand| errand.would(&Given::nothing())),
             Some(Ok(Command::Reset { confirm: false }))
         );
         assert_eq!(
-            errand.map(|errand| errand.sent("")),
+            errand.map(|errand| errand.sent(&Given::nothing())),
             Some(Ok(Command::Reset { confirm: true }))
         );
     }
@@ -595,7 +693,7 @@ pub(crate) mod tests {
         let sent: Vec<Result<Command, String>> = ["seed", "adopt", "backup", "undo"]
             .into_iter()
             .filter_map(sending)
-            .map(|errand| errand.sent(""))
+            .map(|errand| errand.sent(&Given::nothing()))
             .collect();
 
         assert_eq!(
@@ -616,6 +714,6 @@ pub(crate) mod tests {
 
         assert_eq!(first.action, "seed");
         assert_eq!(rest.len() + 1, every().count());
-        assert!(first.names.is_none());
+        assert!(matches!(first.needs, Needs::Nothing));
     }
 }

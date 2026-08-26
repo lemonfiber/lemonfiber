@@ -106,20 +106,78 @@ pub(crate) fn for_key(key: char) -> Option<&'static Offer> {
     OFFERED.iter().find(|offer| offer.key == key)
 }
 
+/// Which of an action's own arguments a list of choices fills.
+///
+/// Named rather than assembled. What is taken off a list here goes into the field
+/// [`Arguments`] holds for it and the translation decides what command that comes
+/// to — so the fork `up` and `down` take when services are named is the table's to
+/// take rather than this screen's, and a list here can only fill an argument a
+/// browser could send.
+///
+/// Two of them fill a list and one fills a single name, which is the whole of what
+/// tells a list that marks rows from a list that takes the row under the cursor.
+/// The command line spells all three `--service` or a bare argument; which of them
+/// an action takes is [`lemonfiber_api::actions`]'s answer and not one written down
+/// twice.
+#[derive(Clone, Copy)]
+pub(crate) enum Fills {
+    /// The forms to act on.
+    Forms,
+    /// The services to act on, leaving the rest of the form alone.
+    Services,
+    /// The one service to act on instead of the whole stack.
+    Service,
+}
+
+impl Fills {
+    /// The arguments as they now stand: what was named before, with this argument
+    /// filled by the names taken.
+    ///
+    /// Beside what was named before rather than instead of it, because a service is
+    /// named *inside* what a form list already chose — and an argument that dropped
+    /// the forms would start named services in a stack nobody had narrowed.
+    fn given(self, names: Vec<String>, before: &Arguments) -> Arguments {
+        let mut given = before.clone();
+        match self {
+            Self::Forms => given.forms = names,
+            Self::Services => given.services = names,
+            Self::Service => given.service = names.into_iter().next(),
+        }
+        given
+    }
+
+    /// What one row of such a list is, where several have to be counted.
+    const fn each(self) -> &'static str {
+        match self {
+            Self::Forms => "form",
+            Self::Services | Self::Service => "service",
+        }
+    }
+
+    /// Whether a list filling this argument may have several rows marked.
+    ///
+    /// A single name cannot: an archive's scope is one scope, so a row with a box
+    /// beside it would be offering something the command has nowhere to put.
+    const fn several(self) -> bool {
+        !matches!(self, Self::Service)
+    }
+}
+
 /// Something an action can be given, and what giving it comes to.
 pub(crate) struct Choice {
-    /// What it is called, in the stack's own words where it is a form.
+    /// What it is called, in the stack's own words where it is a form or a service.
     pub(crate) name: String,
     /// What it is for, in one line.
     pub(crate) about: String,
-    /// The forms naming it names, which is empty where it is the whole stack.
+    /// What naming it names, which is empty where it is the whole of them.
     ///
     /// Kept beside the command rather than read back out of it: several of these are
     /// taken together by joining what each names, and a list assembled by taking a
     /// command apart again would be this screen deciding what a command means.
-    pub(crate) forms: Vec<String>,
-    /// Whether it is one of the several this action is about to be given.
-    pub(crate) marked: bool,
+    pub(crate) names: Vec<String>,
+    /// Whether it is one of the several this action is about to be given, or nothing
+    /// where the argument it fills takes one name.
+    pub(crate) marked: Option<bool>,
     /// The command acting on it alone comes to.
     pub(crate) command: Command,
 }
@@ -134,7 +192,7 @@ impl Listed for Choice {
     }
 
     fn marked(&self) -> Option<bool> {
-        Some(self.marked)
+        self.marked
     }
 }
 
@@ -145,10 +203,12 @@ pub(crate) struct Taken {
     pub(crate) covers: Vec<Choice>,
     /// The command acting on them comes to.
     pub(crate) command: Command,
+    /// What one of those rows is, for the sentence that has to count them.
+    pub(crate) each: &'static str,
 }
 
 impl Taken {
-    /// What it is called: the one name, or how many forms were named together.
+    /// What it is called: the one name, or how many of them were named together.
     ///
     /// A count where there are several, because this is what the footer says while
     /// the work runs and what the line on the way out says — one row, on a screen
@@ -157,16 +217,41 @@ impl Taken {
     pub(crate) fn name(&self) -> String {
         match self.covers.as_slice() {
             [only] => only.name.clone(),
-            several => format!("{} form{}", several.len(), s(several.len())),
+            several => format!("{} {}{}", several.len(), self.each, s(several.len())),
         }
+    }
+
+    /// What it names, joined, which is what a list chosen inside it is named beside.
+    pub(crate) fn named(&self) -> Vec<String> {
+        self.covers
+            .iter()
+            .flat_map(|choice| choice.names.clone())
+            .collect()
     }
 }
 
 impl Offer {
     /// What this action can be given, or the refusal where it can be given nothing.
     pub(crate) fn given(&self, report: &FormsReport) -> Result<(Choice, Vec<Choice>), String> {
-        choices(self.action, report)
+        guarding(self.action, report)
     }
+}
+
+/// The stack's own forms, as one action's list of them.
+///
+/// Takes an action rather than belonging to the five on keys, because the guard
+/// behind the key that opens what keeps going is given one of the stack's forms in
+/// exactly the same way and refuses the whole stack for exactly the same reason.
+pub(super) fn guarding(
+    action: &str,
+    report: &FormsReport,
+) -> Result<(Choice, Vec<Choice>), String> {
+    choices(
+        action,
+        Fills::Forms,
+        &Arguments::default(),
+        subjects(report),
+    )
 }
 
 /// What one action can be given, or the refusal where it can be given nothing.
@@ -181,20 +266,21 @@ impl Offer {
 /// The first choice comes back apart from the rest, so that what is handed on is a
 /// list something is already selected in. A list and a selection carried separately
 /// can disagree, and the place they would disagree is under the operator's finger.
-pub(super) fn choices(action: &str, report: &FormsReport) -> Result<(Choice, Vec<Choice>), String> {
+pub(super) fn choices(
+    action: &str,
+    fills: Fills,
+    before: &Arguments,
+    offered: Vec<(Vec<String>, String, String)>,
+) -> Result<(Choice, Vec<Choice>), String> {
     let mut choices = Vec::new();
     let mut refused = String::new();
-    for (forms, name, about) in subjects(report) {
-        let asked = Arguments {
-            forms: forms.clone(),
-            ..Arguments::default()
-        };
-        match named(action, asked) {
+    for (names, name, about) in offered {
+        match named(action, fills.given(names.clone(), before)) {
             Ok(command) => choices.push(Choice {
                 name,
                 about,
-                forms,
-                marked: false,
+                names,
+                marked: fills.several().then_some(false),
                 command,
             }),
             Err(no) => refused = no.said(),
@@ -231,12 +317,12 @@ pub(super) fn begin(asked: &mut Option<Asked>, key: char) -> Wanted {
 fn marking(chooser: &mut Chooser<Choice>) {
     let whole = chooser
         .listed()
-        .any(|(here, choice)| here && choice.forms.is_empty());
+        .any(|(here, choice)| here && choice.names.is_empty());
     for (here, choice) in chooser.each() {
         if here {
-            choice.marked = !choice.marked;
-        } else if whole || choice.forms.is_empty() {
-            choice.marked = false;
+            choice.marked = choice.marked.map(|was| !was);
+        } else if whole || choice.names.is_empty() {
+            choice.marked = choice.marked.map(|_| false);
         }
     }
 }
@@ -248,28 +334,39 @@ fn marking(chooser: &mut Chooser<Choice>) {
 /// rows name joined together — so a list the command will not carry is refused in the
 /// words a browser is refused with rather than in a sentence written here, and the
 /// screen still cannot ask for something no other surface can ask for.
-fn taking(action: &str, chooser: Chooser<Choice>) -> Result<Taken, String> {
-    if !chooser.listed().any(|(_, choice)| choice.marked) {
+fn taking(
+    action: &str,
+    fills: Fills,
+    before: &Arguments,
+    chooser: Chooser<Choice>,
+) -> Result<Taken, String> {
+    let each = fills.each();
+    if !chooser
+        .listed()
+        .any(|(_, choice)| choice.marked == Some(true))
+    {
         let chosen = chooser.taken();
         return Ok(Taken {
             command: chosen.command.clone(),
             covers: vec![chosen],
+            each,
         });
     }
     let covers: Vec<Choice> = chooser
         .all()
         .into_iter()
-        .filter(|choice| choice.marked)
+        .filter(|choice| choice.marked == Some(true))
         .collect();
-    let asked = Arguments {
-        forms: covers
-            .iter()
-            .flat_map(|choice| choice.forms.clone())
-            .collect(),
-        ..Arguments::default()
-    };
-    named(action, asked)
-        .map(|command| Taken { covers, command })
+    let names = covers
+        .iter()
+        .flat_map(|choice| choice.names.clone())
+        .collect();
+    named(action, fills.given(names, before))
+        .map(|command| Taken {
+            covers,
+            command,
+            each,
+        })
         .map_err(|no| no.said())
 }
 
@@ -306,10 +403,16 @@ pub(super) fn or_refused(stage: &mut Stage, taken: Result<Taken, String>) -> Opt
 }
 
 /// Over a list of the stack's own forms: move, mark, take, or leave it.
-pub(super) fn over(action: &str, mut chooser: Chooser<Choice>, press: &Press) -> Over {
+pub(super) fn over(
+    action: &str,
+    fills: Fills,
+    before: &Arguments,
+    mut chooser: Chooser<Choice>,
+    press: &Press,
+) -> Over {
     match *press {
         Press::Abandon => return Over::Left,
-        Press::Accept => return Over::Taken(taking(action, chooser)),
+        Press::Accept => return Over::Taken(taking(action, fills, before, chooser)),
         Press::Back => chooser.back(),
         Press::Forward => chooser.forward(),
         Press::Typed(MARKS) => marking(&mut chooser),
@@ -319,18 +422,29 @@ pub(super) fn over(action: &str, mut chooser: Chooser<Choice>, press: &Press) ->
 }
 
 /// Over the list: move, mark, take, or leave it.
+///
+/// What follows is the services inside what was named, where this action can be given
+/// some and the screen has any in hand — and the question itself where it cannot, so
+/// an action with no service to narrow to reaches the same question it always did.
 pub(super) fn choosing(
     stage: &mut Stage,
     offer: &'static Offer,
     chooser: Chooser<Choice>,
     press: &Press,
+    services: &[(String, String, String)],
 ) -> Wanted {
-    match over(offer.action, chooser, press) {
+    match over(
+        offer.action,
+        Fills::Forms,
+        &Arguments::default(),
+        chooser,
+        press,
+    ) {
         Over::Left => (),
         Over::Choosing(chooser) => *stage = Stage::Choosing { offer, chooser },
         Over::Taken(taken) => {
             if let Some(taken) = or_refused(stage, taken) {
-                *stage = Stage::Confirming { offer, taken };
+                *stage = super::service::or_the_question(offer, taken, services);
             }
         }
     }
@@ -393,8 +507,8 @@ fn subjects(report: &FormsReport) -> Vec<(Vec<String>, String, String)> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{
-        for_key, marking, or_refused, over, subjects, taking, Choice, Chooser, Command, Over,
-        Press, Stage, OFFERED, WHOLE,
+        for_key, marking, or_refused, over, subjects, taking, Choice, Chooser, Command, Fills,
+        Offer, Over, Press, Stage, Taken, OFFERED, WHOLE,
     };
     use lemonfiber_api::actions::{named, Arguments, OFFERED as WEB};
     use lemonfiber_core::model::{FormReport, FormsReport};
@@ -424,13 +538,29 @@ pub(crate) mod tests {
         FormsReport { forms: Vec::new() }
     }
 
+    /// The action one name is on, for the tests next door that want a particular one.
+    pub(crate) fn offering(action: &str) -> Option<&'static Offer> {
+        OFFERED.iter().find(|offer| offer.action == action)
+    }
+
+    /// What one action's list of forms comes to with a form taken off it, which is
+    /// what the list of services beside it is opened having already been given.
+    ///
+    /// Built through the translation the screen builds it through rather than by
+    /// hand, so the command it carries is the one that action reaches — and the row
+    /// naming no service, which goes on with exactly this, is held to something true.
+    pub(crate) fn a_form_taken(action: &str) -> Option<Taken> {
+        let (first, rest) = super::guarding(action, &a_listing()).ok()?;
+        over_forms(action, at(Chooser::over(first, rest), "Full stack")).ok()
+    }
+
     /// One form, as a row of the list holds it.
     fn a_form(id: &str) -> Choice {
         Choice {
             name: format!("{id} stack"),
             about: format!("what {id} is for"),
-            forms: vec![id.to_owned()],
-            marked: false,
+            names: vec![id.to_owned()],
+            marked: Some(false),
             command: Command::Pull {
                 forms: vec![id.to_owned()],
             },
@@ -442,8 +572,8 @@ pub(crate) mod tests {
         Choice {
             name: WHOLE.to_owned(),
             about: super::EVERY_FORM.to_owned(),
-            forms: Vec::new(),
-            marked: false,
+            names: Vec::new(),
+            marked: Some(false),
             command: Command::Up { forms: Vec::new() },
         }
     }
@@ -454,12 +584,23 @@ pub(crate) mod tests {
         Chooser::over(the_whole_stack(), vec![a_form("full"), a_form("lean")])
     }
 
+    /// The list taken, filling the forms, which is what every one of these lists is
+    /// for on this side of the screen.
+    fn over_forms(action: &str, chooser: Chooser<Choice>) -> Result<Taken, String> {
+        taking(action, Fills::Forms, &Arguments::default(), chooser)
+    }
+
+    /// A press over such a list, which fills the forms for the same reason.
+    fn pressed(action: &str, chooser: Chooser<Choice>, press: &Press) -> Over {
+        over(action, Fills::Forms, &Arguments::default(), chooser, press)
+    }
+
     /// Which rows are marked, read off the list the screen is given rather than off
     /// a field, so what is asserted is what an operator would see marked.
     fn marked(chooser: &Chooser<Choice>) -> Vec<String> {
         chooser
             .listed()
-            .filter(|(_, choice)| choice.marked)
+            .filter(|(_, choice)| choice.marked == Some(true))
             .map(|(_, choice)| choice.name.clone())
             .collect()
     }
@@ -526,7 +667,7 @@ pub(crate) mod tests {
         let mut chooser = at(chooser, "lean stack");
         marking(&mut chooser);
 
-        let taken = taking("pull", chooser).ok();
+        let taken = over_forms("pull", chooser).ok();
 
         assert_eq!(
             taken.as_ref().map(|taken| taken.command.clone()),
@@ -547,7 +688,7 @@ pub(crate) mod tests {
     /// they had before it existed.
     #[test]
     fn nothing_marked_takes_the_row_under_the_cursor() {
-        let taken = taking("pull", at(a_list(), "lean stack")).ok();
+        let taken = over_forms("pull", at(a_list(), "lean stack")).ok();
 
         assert_eq!(
             taken.as_ref().map(|taken| taken.command.clone()),
@@ -589,7 +730,7 @@ pub(crate) mod tests {
         marking(&mut chooser);
         let mut stage = Stage::Idle;
 
-        let taken = or_refused(&mut stage, taking("nonsense", chooser));
+        let taken = or_refused(&mut stage, over_forms("nonsense", chooser));
 
         assert!(taken.is_none());
         assert!(said(&stage).contains("nonsense"), "{}", said(&stage));
@@ -607,18 +748,22 @@ pub(crate) mod tests {
     /// list with nothing taken — the three things a press over this list can be.
     #[test]
     fn a_press_over_the_list_marks_takes_or_leaves_it() {
-        let marked = still_choosing(over("pull", at(a_list(), "full stack"), &Press::Typed(' ')))
-            .map(|chooser| marked(&chooser))
-            .unwrap_or_default();
+        let marked = still_choosing(pressed(
+            "pull",
+            at(a_list(), "full stack"),
+            &Press::Typed(' '),
+        ))
+        .map(|chooser| marked(&chooser))
+        .unwrap_or_default();
         assert_eq!(marked, vec!["full stack".to_owned()]);
 
         let taken = matches!(
-            over("pull", at(a_list(), "full stack"), &Press::Accept),
+            pressed("pull", at(a_list(), "full stack"), &Press::Accept),
             Over::Taken(Ok(_))
         );
         assert!(taken);
 
-        assert!(still_choosing(over("pull", a_list(), &Press::Abandon)).is_none());
+        assert!(still_choosing(pressed("pull", a_list(), &Press::Abandon)).is_none());
     }
 
     /// What one action can be given over this listing.

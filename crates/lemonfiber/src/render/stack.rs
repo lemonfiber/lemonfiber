@@ -219,26 +219,35 @@ pub(super) fn describe(condition: Condition) -> &'static str {
     }
 }
 
+/// What one service is doing, in the word an operator reads.
+///
+/// One spelling, because the screen that offers a service to act on says what it is
+/// doing beside the name — and two spellings of `crash-looping` is two accounts of
+/// the same container.
+pub(crate) fn doing(service: &Service) -> String {
+    match service.state {
+        State::Absent => "absent".to_owned(),
+        State::Stopped => "stopped".to_owned(),
+        State::Starting => "starting".to_owned(),
+        State::Running => "running".to_owned(),
+        State::Healthy => "healthy".to_owned(),
+        State::Unhealthy => "unhealthy".to_owned(),
+        State::CrashLooping => "crash-looping".to_owned(),
+        State::HostManaged => "host-managed".to_owned(),
+        // The code is the whole reason this is not simply "stopped", so it
+        // is shown rather than left for the operator to go and find.
+        State::Failed => match service.exit {
+            Some(code) => format!("failed ({code})"),
+            None => "failed".to_owned(),
+        },
+    }
+}
+
 /// What each service is doing, one per line.
 pub(super) fn show(services: &[Service]) -> Lines {
     let mut lines = Lines::default();
     for service in services {
-        let state = match service.state {
-            State::Absent => "absent".to_owned(),
-            State::Stopped => "stopped".to_owned(),
-            State::Starting => "starting".to_owned(),
-            State::Running => "running".to_owned(),
-            State::Healthy => "healthy".to_owned(),
-            State::Unhealthy => "unhealthy".to_owned(),
-            State::CrashLooping => "crash-looping".to_owned(),
-            State::HostManaged => "host-managed".to_owned(),
-            // The code is the whole reason this is not simply "stopped", so it
-            // is shown rather than left for the operator to go and find.
-            State::Failed => match service.exit {
-                Some(code) => format!("failed ({code})"),
-                None => "failed".to_owned(),
-            },
-        };
+        let state = doing(service);
         lines.put(format!("  {:<14} {state:<14} {}", service.id, service.name));
     }
     lines

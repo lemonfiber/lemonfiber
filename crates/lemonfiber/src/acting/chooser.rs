@@ -142,8 +142,8 @@ mod tests {
         Choice {
             name: name.to_owned(),
             about: format!("what {name} is for"),
-            forms: vec![name.to_owned()],
-            marked: false,
+            names: vec![name.to_owned()],
+            marked: Some(false),
             command: Command::Up {
                 forms: vec![name.to_owned()],
             },

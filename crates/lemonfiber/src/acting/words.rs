@@ -16,6 +16,7 @@
 //! screen becomes two.
 
 mod shapes;
+mod titles;
 
 use lemonfiber_core::text::plain;
 use ratatui::text::Line;
@@ -26,35 +27,18 @@ use super::lasting::{self, Begun, Lasting};
 use super::mending::{self, Agreed, Mending, Warning};
 use super::offer::{Offer, Taken, OFFERED};
 use super::quality::{self, Change};
-use super::question::{self, Question};
+use super::question;
 use super::reading::Reading;
 use super::{surface, Stage};
 use lemonfiber_core::plural::s;
 use shapes::{agreed, choosing, dimmed, elsewhere, named, read, shortened, typing, AGREEING};
+use titles::{
+    asked, changing, keeping, narrowing, righting, sending, titled, ASK, CAME, KEEPS_GOING, MORE,
+    PUT_RIGHT, QUALITY, WEB,
+};
 
 /// The keys the screen answers whatever else is open.
 const ALWAYS: &str = "q quit   r refresh   ? words";
-
-/// What the box holding a report calls itself.
-const CAME: &str = " what it came to ";
-
-/// What the box holding the questions calls itself.
-const ASK: &str = " ask ";
-
-/// What the box holding the rest of the errands calls itself.
-const MORE: &str = " more ";
-
-/// What the box holding the two that keep going calls itself.
-const KEEPS_GOING: &str = " keeps going ";
-
-/// What the box asking about the web surface calls itself.
-const WEB: &str = " web interface ";
-
-/// What the box holding the three quality changes calls itself.
-const QUALITY: &str = " quality ";
-
-/// What the box holding the list of what to do about a diagnosis is called.
-const PUT_RIGHT: &str = " put right ";
 
 /// What the box says while the core is working out what a change would cost.
 const COSTING: &str = "working out what this would cost";
@@ -113,6 +97,10 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         | Stage::Disturbing
         | Stage::Keeping { said: None, .. } => return None,
         Stage::Choosing { offer, chooser } => (titled(offer), choosing(chooser, rows, across)),
+        // Titled by what the services are being named for, which is the action or the
+        // errand the operator opened — a second title for the second list would read
+        // as a second thing being started.
+        Stage::Inside { inside, chooser } => (narrowing(inside), choosing(chooser, rows, across)),
         Stage::Confirming { offer, taken } => {
             (titled(offer), confirming(offer, taken, rows, across))
         }
@@ -160,11 +148,11 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         Stage::Weighing { errand, .. } => (sending(errand), vec![dimmed(WEIGHING, across)]),
         Stage::Agreeing {
             errand,
-            typed,
+            given,
             would,
         } => (
             sending(errand),
-            agreeing(errand, typed, would.as_ref(), rows, across),
+            agreeing(errand, given.said(), would.as_ref(), rows, across),
         ),
         Stage::Starting(chooser) => (KEEPS_GOING.to_owned(), choosing(chooser, rows, across)),
         Stage::Wording {
@@ -328,21 +316,6 @@ fn keys() -> String {
     said.join("   ")
 }
 
-/// What the box holding one action is called.
-fn titled(offer: &Offer) -> String {
-    format!(" {} ", offer.hint)
-}
-
-/// What the box holding one question's answer is called.
-fn asked(question: &Question) -> String {
-    format!(" {} ", question.name)
-}
-
-/// What the box holding one errand is called.
-fn sending(errand: &Errand) -> String {
-    format!(" {} ", errand.name)
-}
-
 /// The question before an errand, under what it would do where the errand could say.
 fn agreeing(
     errand: &Errand,
@@ -358,11 +331,6 @@ fn agreeing(
         rows,
         across,
     )
-}
-
-/// What the box holding one of the two writes about a diagnosis is called.
-fn righting(mending: &Mending) -> String {
-    format!(" {} ", mending.name)
 }
 
 /// The question over the repairs agreed to, under what each of them would do.
@@ -403,11 +371,6 @@ fn answered(
     )
 }
 
-/// What the box holding one quality change is called.
-fn changing(change: &Change) -> String {
-    format!(" {} ", change.name)
-}
-
 /// The question before a quality change, under the account where there is one.
 ///
 /// The preset completes the question where one was chosen, the way a form completes
@@ -426,11 +389,6 @@ fn settling(
         None => change.asks.to_owned(),
     };
     agreed(&asks, change.about, account, rows, across)
-}
-
-/// What the box holding one of the two that keep going is called.
-fn keeping(lasting: &Lasting) -> String {
-    format!(" {} ", lasting.name)
 }
 
 /// What one of them is called while it runs, with what it was given.
@@ -533,7 +491,11 @@ fn covering(taken: &Taken, room: usize, across: usize) -> Vec<Line<'static>> {
     let left = covers.len().saturating_sub(lines.len());
     if left > 0 {
         lines.push(dimmed(
-            &format!("{left} more form{} than this screen has room for", s(left)),
+            &format!(
+                "{left} more {}{} than this screen has room for",
+                taken.each,
+                s(left)
+            ),
             across,
         ));
     }
@@ -545,7 +507,7 @@ mod tests {
     use super::{footer, keys, pane, staying_for, Offer, Stage};
     use crate::acting::chooser::Chooser;
     use crate::acting::disturbing::{under, Widening, NAME};
-    use crate::acting::errand::{self, Errand};
+    use crate::acting::errand::{self, Errand, Given};
     use crate::acting::mending::{self, Mending};
     use crate::acting::narrowing::Subject;
     use crate::acting::offer::{Choice, Taken, OFFERED};
@@ -615,8 +577,8 @@ mod tests {
         Choice {
             name: name.to_owned(),
             about: about.to_owned(),
-            forms: vec![name.to_owned()],
-            marked: false,
+            names: vec![name.to_owned()],
+            marked: Some(false),
             command: Command::Up {
                 forms: vec![name.to_owned()],
             },
@@ -631,6 +593,7 @@ mod tests {
                 forms: vec![name.to_owned()],
             },
             covers: vec![a_choice(name, about)],
+            each: "form",
         }
     }
 
@@ -645,6 +608,7 @@ mod tests {
                 a_choice("Full stack", "everything, behind the tunnel"),
                 a_choice("Lean stack", "the download clients only"),
             ],
+            each: "form",
         }
     }
 
@@ -827,7 +791,7 @@ mod tests {
         );
 
         for (_, choice) in chooser.each() {
-            choice.marked = true;
+            choice.marked = Some(true);
         }
         let both = said(
             &Stage::Choosing {
@@ -1283,7 +1247,7 @@ mod tests {
     fn an_errand_being_weighed_says_what_it_is_waiting_for() {
         let stage = Stage::Weighing {
             errand: sent("reset"),
-            typed: String::new(),
+            given: Given::nothing(),
         };
 
         let said = said(&stage, 20, 90);
@@ -1298,7 +1262,7 @@ mod tests {
     fn what_an_errand_would_do_is_said_above_the_question_and_not_under_it() {
         let stage = Stage::Agreeing {
             errand: sent("reset"),
-            typed: String::new(),
+            given: Given::nothing(),
             would: Some(nine()),
         };
 
@@ -1320,7 +1284,7 @@ mod tests {
     fn an_errand_with_nothing_to_show_first_is_the_question_alone() {
         let stage = Stage::Agreeing {
             errand: sent("seed"),
-            typed: String::new(),
+            given: Given::nothing(),
             would: None,
         };
 
@@ -1337,7 +1301,7 @@ mod tests {
     fn the_name_an_errand_was_given_completes_its_question() {
         let stage = Stage::Agreeing {
             errand: sent("restore"),
-            typed: "lemonfiber-full-1.tar.gz".to_owned(),
+            given: Given::typed("lemonfiber-full-1.tar.gz".to_owned()),
             would: None,
         };
 
@@ -1356,7 +1320,7 @@ mod tests {
     fn a_long_report_never_pushes_the_question_off_the_box() {
         let stage = Stage::Agreeing {
             errand: sent("reset"),
-            typed: String::new(),
+            given: Given::nothing(),
             would: Some(nine()),
         };
 
@@ -1372,7 +1336,7 @@ mod tests {
     fn an_errand_under_way_says_so_on_the_footer_and_covers_nothing() {
         let stage = Stage::Doing {
             errand: sent("backup"),
-            typed: String::new(),
+            given: Given::nothing(),
         };
 
         assert!(pane(&stage, 20, 80).is_none());
@@ -1387,7 +1351,7 @@ mod tests {
     fn leaving_mid_errand_says_what_is_being_waited_on() {
         let stage = Stage::Doing {
             errand: sent("backup"),
-            typed: String::new(),
+            given: Given::nothing(),
         };
 
         let said = staying_for(&stage).unwrap_or_default();
@@ -1402,7 +1366,7 @@ mod tests {
     fn nothing_is_waited_for_where_an_errand_has_only_been_weighed() {
         let stage = Stage::Weighing {
             errand: sent("reset"),
-            typed: String::new(),
+            given: Given::nothing(),
         };
 
         assert!(staying_for(&stage).is_none());

@@ -41,7 +41,7 @@ use lemonfiber_core::app::Command;
 use lemonfiber_core::walkthrough::Line as Step;
 
 use super::chooser::{Chooser, Listed};
-use super::offer::{Choice, Over, Taken};
+use super::offer::{Choice, Fills, Over, Taken};
 use super::reading::{moved, Reading};
 use super::{Asked, Press, Stage, Wanted};
 use crate::render::walkthrough::{is_worth_saying, spoken};
@@ -236,7 +236,13 @@ pub(super) fn picking(
     chooser: Chooser<Choice>,
     press: &Press,
 ) -> Wanted {
-    match super::offer::over(lasting.action, chooser, press) {
+    match super::offer::over(
+        lasting.action,
+        Fills::Forms,
+        &Arguments::default(),
+        chooser,
+        press,
+    ) {
         Over::Left => (),
         Over::Choosing(chooser) => *stage = Stage::Picking { lasting, chooser },
         Over::Taken(taken) => {

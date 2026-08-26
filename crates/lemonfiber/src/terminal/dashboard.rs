@@ -214,6 +214,10 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
             },
             gathered = &mut refreshing => {
                 if let Ok(fresh) = gathered {
+                    // The services go to the screen's own state as well as to the
+                    // panels, because the lists that name one are built from what the
+                    // panels are already showing rather than from a read of their own.
+                    acting.gathered(&fresh.services);
                     snapshot = Some(fresh);
                 }
                 refreshing = gathering(&ctx, snapshot.as_ref(), TICK);
