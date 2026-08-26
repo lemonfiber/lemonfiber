@@ -33,7 +33,7 @@
 
 use super::chooser::Chooser;
 use super::disturbing::Widening;
-use super::errand::Errand;
+use super::errand::{Errand, Given};
 use super::lasting::{Begun, Lasting};
 use super::mending::{Agreed, Mending, Offering, Warning};
 use super::narrowing::Subject;
@@ -41,6 +41,7 @@ use super::offer::{Choice, Offer, Taken};
 use super::quality::{Change, Grade};
 use super::question::Question;
 use super::reading::Reading;
+use super::service::Inside;
 
 /// Where an action, a question or an errand stands.
 pub(super) enum Stage {
@@ -51,6 +52,17 @@ pub(super) enum Stage {
         /// The action being chosen for.
         offer: &'static Offer,
         /// What it can be given, one of them selected.
+        chooser: Chooser<Choice>,
+    },
+    /// Choosing which services inside what was named to act on.
+    ///
+    /// One stage for both flows that reach it, because they reach the same list: what
+    /// each of them goes on to is [`super::service::Inside`]'s, which is the whole of
+    /// what the two have that is not shared.
+    Inside {
+        /// What the services are being named for, and what naming them leads to.
+        inside: Inside,
+        /// The services, some of them marked.
         chooser: Chooser<Choice>,
     },
     /// Holding the question before anything is done.
@@ -129,15 +141,15 @@ pub(super) enum Stage {
     Weighing {
         /// The errand being weighed.
         errand: &'static Errand,
-        /// The name it was given, or nothing where it takes none.
-        typed: String,
+        /// What it was given, which is nothing at all where it takes nothing.
+        given: Given,
     },
     /// Holding the question, with what it would do above it where the errand can say.
     Agreeing {
         /// The errand about to be sent.
         errand: &'static Errand,
-        /// The name it was given, or nothing where it takes none.
-        typed: String,
+        /// What it was given, which is nothing at all where it takes nothing.
+        given: Given,
         /// What it would do, and where in it the box is, where it said.
         would: Option<Reading>,
     },
@@ -145,8 +157,8 @@ pub(super) enum Stage {
     Doing {
         /// The errand that is running.
         errand: &'static Errand,
-        /// The name it was given, or nothing where it takes none.
-        typed: String,
+        /// What it was given, which is nothing at all where it takes nothing.
+        given: Given,
     },
     /// Choosing which of the two that keep going to start.
     Starting(Chooser<&'static Lasting>),

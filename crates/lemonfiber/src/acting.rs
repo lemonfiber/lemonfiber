@@ -61,6 +61,7 @@
 //! otherwise would leave an operator to find out from the next command, refused in
 //! the name of a process that no longer exists.
 
+mod answering;
 mod chooser;
 mod disturbing;
 mod errand;
@@ -71,20 +72,20 @@ mod offer;
 mod quality;
 mod question;
 mod reading;
+mod service;
 mod stage;
 mod surface;
 mod words;
 
-use lemonfiber_core::app::{Command, Outcome};
-use lemonfiber_core::error::Problem;
-use lemonfiber_core::walkthrough::Line as Step;
+use lemonfiber_core::app::Command;
+use lemonfiber_core::dashboard::Panel;
+use lemonfiber_core::docker::Service;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::Line;
 
 use chooser::Chooser;
 use lasting::Lasting;
 use offer::Offer;
-use reading::{complaint, lines_of, unexpected, Reading};
 use stage::Stage;
 
 /// The key that opens the list of what this stack can be asked.
@@ -199,6 +200,13 @@ pub(crate) struct Acting {
     /// Given at the edge, where whether a run explains anything is known, rather
     /// than read here — the same division the log viewer's own state makes.
     explanations: bool,
+    /// The services the panels are showing, for the lists that name one.
+    ///
+    /// Kept from the gather rather than asked for when a key is pressed. A read is
+    /// awaited in the loop with no frame drawn between the asking and the answer,
+    /// which is why the one read this screen makes that way is a file on disk — and
+    /// what each service is doing reaches the container engine.
+    services: Vec<(String, String, String)>,
 }
 
 impl Acting {
@@ -209,7 +217,18 @@ impl Acting {
             asked: None,
             words: false,
             explanations: true,
+            services: Vec::new(),
         }
+    }
+
+    /// Take the services out of a gather that has just landed.
+    ///
+    /// Every gather rather than only the ones a list is open over: which services
+    /// there are is a fact about the stack, and a screen holding the ones it saw when
+    /// a key was first pressed would offer a service that has since been taken out of
+    /// the manifest.
+    pub(crate) fn gathered(&mut self, services: &Panel<Vec<Service>>) {
+        self.services = service::gathered(services);
     }
 
     /// The same, on a run that does not explain its words.
@@ -227,6 +246,16 @@ impl Acting {
     }
 
     /// What a press asks for.
+    /// What a press asks for.
+    ///
+    /// Routed in two, because the stages a press can arrive at are two kinds. One is
+    /// a flow that began by taking something off a list of things to *do* — an
+    /// errand, one of the two that keep going, a quality change, a repair, or the
+    /// hand-over. The other is a flow that began at a key: the five lifecycle actions
+    /// and the services inside what they named, the questions, and the readings a
+    /// press moves through. Each half claims its own and hands back what is not, so
+    /// what neither claims is the screen with nothing open — where a press belongs to
+    /// no flow at all and is the screen's own.
     pub(crate) fn pressed(&mut self, press: &Press) -> Wanted {
         // The pane of words closes on any key and takes the key with it, which is
         // what makes it dismissible without anybody having to learn how.
@@ -234,45 +263,37 @@ impl Acting {
             self.words = false;
             return Wanted::Nothing;
         }
-        match std::mem::replace(&mut self.stage, Stage::Idle) {
-            Stage::Idle => self.idle(press),
-            Stage::Choosing { offer, chooser } => {
-                offer::choosing(&mut self.stage, offer, chooser, press)
+        match self.off_a_list(press) {
+            Some(wanted) => wanted,
+            None => match self.on_a_key(press) {
+                Some(wanted) => wanted,
+                // Only one stage is neither, and it is the one with nothing open.
+                None => self.idle(press),
+            },
+        }
+    }
+
+    /// A press over a flow that began by taking something off a list of things to do,
+    /// or nothing where it began somewhere else — the stage put back as it was.
+    fn off_a_list(&mut self, press: &Press) -> Option<Wanted> {
+        Some(match std::mem::replace(&mut self.stage, Stage::Idle) {
+            Stage::Sending(chooser) => {
+                errand::sending(&mut self.stage, chooser, press, &self.services)
             }
-            Stage::Confirming { offer, taken } => {
-                offer::confirming(&mut self.stage, offer, taken, press)
-            }
-            Stage::Running { offer, taken } => offer::running(&mut self.stage, offer, taken, press),
-            Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
-            Stage::Typing {
-                question,
-                asks,
-                typed,
-            } => question::typing(&mut self.stage, question, asks, typed, press),
-            Stage::Waiting { question, typed } => {
-                question::waiting(&mut self.stage, Stage::Waiting { question, typed }, press)
-            }
-            Stage::Following(question) => {
-                question::waiting(&mut self.stage, Stage::Following(question), press)
-            }
-            Stage::Narrowing { question, chooser } => {
-                narrowing::narrowing(&mut self.stage, question, chooser, press)
-            }
-            Stage::Sending(chooser) => errand::sending(&mut self.stage, chooser, press),
             Stage::Naming {
                 errand,
                 asks,
                 typed,
             } => errand::naming(&mut self.stage, errand, asks, typed, press),
-            Stage::Weighing { errand, typed } => {
-                errand::weighing(&mut self.stage, errand, typed, press)
+            Stage::Weighing { errand, given } => {
+                errand::weighing(&mut self.stage, errand, given, press)
             }
             Stage::Agreeing {
                 errand,
-                typed,
+                given,
                 would,
-            } => errand::agreeing(&mut self.stage, errand, typed, would, press),
-            Stage::Doing { errand, typed } => errand::doing(&mut self.stage, errand, typed, press),
+            } => errand::agreeing(&mut self.stage, errand, given, would, press),
+            Stage::Doing { errand, given } => errand::doing(&mut self.stage, errand, given, press),
             Stage::Starting(chooser) => {
                 lasting::starting(&mut self.stage, &mut self.asked, chooser, press)
             }
@@ -324,6 +345,44 @@ impl Acting {
             Stage::Handing => surface::handing(&mut self.stage, press),
             // A reading moves, and any key that is not a move puts it away — the
             // way the pane of words is put away.
+            // Put back rather than carried out: a stage this does not claim is one
+            // the dispatcher below it does, and it has to be there to be taken again.
+            elsewhere => {
+                self.stage = elsewhere;
+                return None;
+            }
+        })
+    }
+
+    /// A press over a flow that began at a key, or nothing where none is open — the
+    /// stage put back as it was.
+    fn on_a_key(&mut self, press: &Press) -> Option<Wanted> {
+        Some(match std::mem::replace(&mut self.stage, Stage::Idle) {
+            Stage::Choosing { offer, chooser } => {
+                offer::choosing(&mut self.stage, offer, chooser, press, &self.services)
+            }
+            Stage::Inside { inside, chooser } => {
+                service::choosing(&mut self.stage, inside, chooser, press)
+            }
+            Stage::Confirming { offer, taken } => {
+                offer::confirming(&mut self.stage, offer, taken, press)
+            }
+            Stage::Running { offer, taken } => offer::running(&mut self.stage, offer, taken, press),
+            Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
+            Stage::Typing {
+                question,
+                asks,
+                typed,
+            } => question::typing(&mut self.stage, question, asks, typed, press),
+            Stage::Waiting { question, typed } => {
+                question::waiting(&mut self.stage, Stage::Waiting { question, typed }, press)
+            }
+            Stage::Following(question) => {
+                question::waiting(&mut self.stage, Stage::Following(question), press)
+            }
+            Stage::Narrowing { question, chooser } => {
+                narrowing::narrowing(&mut self.stage, question, chooser, press)
+            }
             Stage::Came(reading) => reading::came(&mut self.stage, reading, press),
             Stage::Answered {
                 question,
@@ -331,7 +390,13 @@ impl Acting {
                 reading,
             } => question::answered(&mut self.stage, question, widening, reading, press),
             Stage::Disturbing => disturbing::disturbing(&mut self.stage, press),
-        }
+            // Put back rather than carried out: a stage this does not claim is one
+            // the dispatcher below it does, and it has to be there to be taken again.
+            elsewhere => {
+                self.stage = elsewhere;
+                return None;
+            }
+        })
     }
 
     /// With nothing open: leave, gather afresh, explain, or begin an action.
@@ -377,129 +442,6 @@ impl Acting {
         }
     }
 
-    /// What the stack answered when it was asked what there is to act on.
-    ///
-    /// One answer and two things that may have been waiting for it: an action, and
-    /// the guard, which insists on a form the same way three of the five actions do.
-    /// Which of them was waiting is what the screen recorded when it asked.
-    pub(crate) fn told(&mut self, answer: Result<Outcome, Box<Problem>>) {
-        let Some(asked) = self.asked.take() else {
-            return;
-        };
-        let report = match answer {
-            Ok(Outcome::Forms(report)) => report,
-            Ok(_) => {
-                self.stage = Stage::Came(Reading::of(unexpected()));
-                return;
-            }
-            Err(problem) => {
-                self.stage = Stage::Came(Reading::of(complaint(&problem)));
-                return;
-            }
-        };
-        self.stage = match asked {
-            Asked::Action(offer) => match offer.given(&report) {
-                Ok((selected, rest)) => Stage::Choosing {
-                    offer,
-                    chooser: Chooser::over(selected, rest),
-                },
-                Err(refused) => Stage::Came(Reading::of(vec![refused])),
-            },
-            Asked::Guard(lasting) => match offer::choices(lasting.action, &report) {
-                Ok((selected, rest)) => Stage::Picking {
-                    lasting,
-                    chooser: Chooser::over(selected, rest),
-                },
-                Err(refused) => Stage::Came(Reading::of(vec![refused])),
-            },
-        };
-    }
-
-    /// One of a walk's steps, as the core said it.
-    ///
-    /// Handed on rather than rendered here: what a step reads as on a terminal is
-    /// [`crate::render::walkthrough`]'s, and it is the same rendering a shell is
-    /// given for the same walk.
-    pub(crate) fn stepped(&mut self, line: &Step) {
-        lasting::stepped(&mut self.stage, line);
-    }
-
-    /// What the action came to, or what the question was answered with.
-    ///
-    /// Which of the two is read off what the screen is waiting for. An answer
-    /// nobody is waiting for any more — a question backed out of while it was with
-    /// the core — leaves the screen as it stands rather than opening a box over
-    /// whatever the operator went on to do.
-    pub(crate) fn came_to(&mut self, answer: Result<Outcome, Box<Problem>>) {
-        self.stage = match std::mem::replace(&mut self.stage, Stage::Idle) {
-            Stage::Running { .. } => Stage::Came(Reading::of(match answer {
-                Ok(Outcome::Lifecycle(report)) => {
-                    lines_of(&crate::render::stack::lifecycle(&report))
-                }
-                Ok(_) => unexpected(),
-                Err(problem) => complaint(&problem),
-            })),
-            // What an errand would do is the answer the operator reads before
-            // agreeing, so it lands on the question rather than closing over it. A
-            // failure ends the errand there: there is nothing to agree to.
-            Stage::Weighing { errand, typed } => match answer {
-                Ok(outcome) => {
-                    errand::weighed(errand, typed, lines_of(&crate::render::shaped(&outcome)))
-                }
-                Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
-            },
-            // An errand and the widened diagnosis land the same way. Both were
-            // agreed to rather than asked, and nothing further is offered under
-            // either — the second is already the run that disturbs.
-            // What has to be read before a repair or an accept can be agreed to: the
-            // offer itself, or the warnings this stack is raising. Both are read
-            // before the question rather than reported after it.
-            Stage::Looking(mending) => mending::looked(mending, answer),
-            Stage::Doing { .. } | Stage::Disturbing | Stage::Putting(_) => {
-                Stage::Came(Reading::of(match answer {
-                    Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
-                    Err(problem) => complaint(&problem),
-                }))
-            }
-            // What a walk came to goes under the steps that were watched on the way,
-            // which is the order a shell shows them in. A guard has said nothing
-            // until now, so what it came to is the whole of its box.
-            Stage::Keeping { said, .. } => lasting::came_to(
-                said,
-                match answer {
-                    Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
-                    Err(problem) => complaint(&problem),
-                },
-            ),
-            // What an upgrade would cost is read before it is agreed to, so it lands
-            // on the question the way an errand's account does.
-            Stage::Costing { change } => match answer {
-                Ok(outcome) => quality::costed(change, lines_of(&crate::render::shaped(&outcome))),
-                Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
-            },
-            // A choice this host could only transcode in software comes back held
-            // rather than recorded, and the caution it comes back with is the account
-            // the question that follows sits under.
-            Stage::Applying { change, chosen } => match answer {
-                Ok(outcome) => quality::applied(
-                    change,
-                    chosen,
-                    &outcome,
-                    lines_of(&crate::render::shaped(&outcome)),
-                ),
-                Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
-            },
-            // Rendered by the same renderer the command line reaches for the same
-            // answer, so the two surfaces cannot come to say different things about
-            // one stack. A question that narrows by picking is answered with a list
-            // to take one of instead, which is the same answer read as a choice —
-            // and what one of those comes to is an answer again, whichever shape.
-            Stage::Waiting { question, typed } => narrowing::asked(question, &typed, answer),
-            Stage::Following(question) => narrowing::followed(question, answer),
-            waiting_for_nothing => waiting_for_nothing,
-        };
-    }
-
     /// The box over the screen, or nothing where the action has none open.
     pub(crate) fn pane(&self, rows: usize, across: usize) -> Option<Pane> {
         words::pane(&self.stage, rows, across)
@@ -524,10 +466,10 @@ mod tests {
     use super::chooser::Chooser;
     use super::offer::tests::{a_listing, nothing_declared};
     use super::{
-        errand, lasting, meaning, mending, quality, question, surface, Acting, Line, Press, Step,
-        Wanted,
+        errand, lasting, meaning, mending, quality, question, surface, Acting, Line, Press, Wanted,
     };
     use crate::render::fixtures::{a_lifecycle, a_plan};
+    use lemonfiber_core::walkthrough::Line as Step;
     // Two consents now, deliberately parallel: a restore's and a repair's. The
     // repair one is bare and the restore one is said with its module, which is the
     // way `named.rs` tells the same pair apart — a file holding both cannot leave a
@@ -556,6 +498,37 @@ mod tests {
         let wanted = acting.pressed(&Press::Typed(key));
         acting.told(Ok(Outcome::Forms(report)));
         (acting, wanted)
+    }
+
+    /// The same, with the services the panels are showing in hand.
+    ///
+    /// The gather lands first, because that is the order the loop puts them in: the
+    /// panels are refreshed every second and a key is pressed against whatever they
+    /// were last showing.
+    fn holding(key: char) -> Acting {
+        let mut acting = Acting::opened();
+        acting.gathered(&super::service::tests::two_services());
+        acting.pressed(&Press::Typed(key));
+        acting.told(Ok(Outcome::Forms(a_listing())));
+        acting
+    }
+
+    /// The screen, moved onto the row of this name.
+    ///
+    /// The row the cursor is on rather than the row containing the name, because a
+    /// list that takes several draws a box between the cursor and the name — and a
+    /// walk that matched anywhere would stop on the first row that merely mentioned
+    /// it.
+    fn onto(acting: &mut Acting, name: &str) {
+        for _ in 0..MOST {
+            if showing(acting)
+                .lines()
+                .any(|line| line.starts_with("> ") && line.contains(name))
+            {
+                break;
+            }
+            acting.pressed(&Press::Forward);
+        }
     }
 
     /// Everything the pane says, as one piece of text.
@@ -2010,6 +1983,169 @@ mod tests {
         (acting, wanted)
     }
 
+    /// Some of a form's services are started rather than the whole of it, which is
+    /// the argument this screen had no way to name: the form is taken off the list it
+    /// always had, the services inside it are marked on the list beside that one, and
+    /// what goes ahead is the command the command line reaches for `up --service`.
+    ///
+    /// Whether that is `Up` or `Start` is not this screen's to know. The names go to
+    /// the same translation a browser's do and whatever comes back is what is
+    /// carried, which is why the fork Compose spells two ways costs the screen no
+    /// second flow.
+    #[test]
+    fn some_of_a_forms_services_are_started_rather_than_the_whole_form() {
+        let mut acting = holding('u');
+        onto(&mut acting, "Full stack");
+        acting.pressed(&Press::Accept);
+        let inside = showing(&acting);
+        onto(&mut acting, "Sonarr");
+        acting.pressed(&Press::Typed(' '));
+        acting.pressed(&Press::Accept);
+        let question = showing(&acting);
+
+        let wanted = acting.pressed(&Press::Typed('y'));
+
+        assert!(
+            inside.contains("Sonarr") && inside.contains("healthy"),
+            "{inside}"
+        );
+        assert!(question.contains("Start Sonarr?"), "{question}");
+        assert_eq!(
+            wanted,
+            Wanted::Carry(Command::Start {
+                forms: vec!["full".to_owned()],
+                services: vec!["sonarr".to_owned()],
+            })
+        );
+    }
+
+    /// Stopping some of them is the same three presses, and reaches the command the
+    /// command line reaches for `down --service` — which is a different command
+    /// again, and still nothing this screen chose between.
+    #[test]
+    fn some_of_a_forms_services_are_stopped_rather_than_the_whole_form() {
+        let mut acting = holding('d');
+        onto(&mut acting, "Full stack");
+        acting.pressed(&Press::Accept);
+        onto(&mut acting, "Radarr");
+        acting.pressed(&Press::Accept);
+
+        let question = showing(&acting);
+
+        assert!(question.contains("Stop Radarr?"), "{question}");
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Halt {
+                forms: vec!["full".to_owned()],
+                services: vec!["radarr".to_owned()],
+            })
+        );
+    }
+
+    /// A restart names the services `--service` restarts, and keeps the forms it was
+    /// already given — which is what that command insists on.
+    #[test]
+    fn a_restart_names_the_services_it_restarts_inside_the_form_it_was_given() {
+        let mut acting = holding('t');
+        onto(&mut acting, "Full stack");
+        acting.pressed(&Press::Accept);
+        onto(&mut acting, "Sonarr");
+        acting.pressed(&Press::Accept);
+
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Restart {
+                forms: vec!["full".to_owned()],
+                services: vec!["sonarr".to_owned()],
+            })
+        );
+    }
+
+    /// An operator who wants the whole form still gets the question they always got,
+    /// named by the form rather than by a row saying every service.
+    #[test]
+    fn naming_no_service_asks_about_the_form_it_always_asked_about() {
+        let mut acting = holding('u');
+        onto(&mut acting, "Full stack");
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Accept);
+
+        let question = showing(&acting);
+
+        assert!(question.contains("Start Full stack?"), "{question}");
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Up {
+                forms: vec!["full".to_owned()],
+            })
+        );
+    }
+
+    /// The two that carry no service are not offered a list of them, so their flow is
+    /// the one they had — which is what keeps the screen from asking for something no
+    /// other surface can ask for.
+    #[test]
+    fn an_action_that_carries_no_service_goes_straight_to_its_question() {
+        let mut acting = holding('p');
+        onto(&mut acting, "Full stack");
+        acting.pressed(&Press::Accept);
+
+        let question = showing(&acting);
+
+        assert!(
+            question.contains("Fetch newer images for Full stack?"),
+            "{question}"
+        );
+    }
+
+    /// The capture names one service by taking it off the list rather than by having
+    /// it typed. A typed one would be a name nothing checked before the capture ran.
+    #[test]
+    fn a_capture_names_one_service_by_taking_it_off_the_list() {
+        let mut acting = Acting::opened();
+        acting.gathered(&super::service::tests::two_services());
+        acting.pressed(&Press::Typed(errand::KEY));
+        onto(&mut acting, &errand::tests::listed("backup"));
+        acting.pressed(&Press::Accept);
+        let inside = showing(&acting);
+        onto(&mut acting, "Sonarr");
+        acting.pressed(&Press::Accept);
+        let question = showing(&acting);
+
+        let wanted = acting.pressed(&Press::Typed('y'));
+
+        assert!(inside.contains("the whole stack"), "{inside}");
+        assert!(
+            question.contains("Capture the configuration of Sonarr?"),
+            "{question}"
+        );
+        assert_eq!(
+            wanted,
+            Wanted::Carry(Command::Backup {
+                service: Some("sonarr".to_owned()),
+            })
+        );
+    }
+
+    /// A screen that could not reach the engine has no service to narrow to, so the
+    /// capture is the whole stack it always was — no list, and no line to type a name
+    /// on either.
+    #[test]
+    fn a_capture_with_no_services_in_hand_is_the_whole_stack_it_always_was() {
+        let (mut acting, _) = sending("backup");
+
+        let question = showing(&acting);
+
+        assert!(
+            question.contains("Capture the configuration of the whole stack?"),
+            "{question}"
+        );
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Backup { service: None })
+        );
+    }
+
     /// What a reset would revert, or did.
     fn a_reset(confirmed: bool) -> ResetReport {
         ResetReport {
@@ -2258,7 +2394,7 @@ mod tests {
         let wanted = errand::agreeing(
             &mut acting.stage,
             &errand::tests::UNTRANSLATABLE,
-            String::new(),
+            errand::Given::nothing(),
             None,
             &Press::Typed('y'),
         );
