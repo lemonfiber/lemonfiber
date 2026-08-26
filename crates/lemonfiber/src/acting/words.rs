@@ -23,6 +23,7 @@ use ratatui::text::Line;
 use super::disturbing;
 use super::errand::{self, Errand};
 use super::lasting::{self, Begun, Lasting};
+use super::mending::{self, Agreed, Mending, Warning};
 use super::offer::{Offer, Taken, OFFERED};
 use super::quality::{self, Change};
 use super::question::{self, Question};
@@ -51,6 +52,9 @@ const WEB: &str = " web interface ";
 
 /// What the box holding the three quality changes calls itself.
 const QUALITY: &str = " quality ";
+
+/// What the box holding the list of what to do about a diagnosis is called.
+const PUT_RIGHT: &str = " put right ";
 
 /// What the box says while the core is working out what a change would cost.
 const COSTING: &str = "working out what this would cost";
@@ -105,6 +109,7 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         | Stage::Running { .. }
         | Stage::Doing { .. }
         | Stage::Applying { .. }
+        | Stage::Putting(_)
         | Stage::Disturbing
         | Stage::Keeping { said: None, .. } => return None,
         Stage::Choosing { offer, chooser } => (titled(offer), choosing(chooser, rows, across)),
@@ -191,6 +196,24 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
             changing(change),
             settling(change, *chosen, account.as_ref(), rows, across),
         ),
+        Stage::Righting(chooser) => (PUT_RIGHT.to_owned(), choosing(chooser, rows, across)),
+        Stage::Looking(mending) => (righting(mending), vec![dimmed(mending.waiting, across)]),
+        Stage::Marking { mending, offering } => (
+            righting(mending),
+            choosing(offering.offered(), rows, across),
+        ),
+        // The one question on this screen whose account is not a rehearsal of what is
+        // about to happen: the unconfirmed run *is* the offer, so what is above the
+        // question is the very words the repairs were offered in.
+        Stage::Consenting { mending, agreed } => {
+            (righting(mending), agreed_to(mending, agreed, rows, across))
+        }
+        Stage::Warned {
+            mending, chooser, ..
+        } => (righting(mending), choosing(chooser, rows, across)),
+        Stage::Answering { mending, warning } => {
+            (righting(mending), answered(mending, warning, rows, across))
+        }
         Stage::Handing => (WEB.to_owned(), handing(across)),
     };
     Some(Pane { title, lines })
@@ -210,6 +233,7 @@ pub(super) fn footer(stage: &Stage, across: usize) -> Line<'static> {
         Stage::Doing { errand, .. } => format!("{}   {WAITING}", errand.name),
         Stage::Applying { change, .. } => format!("{}   {WAITING}", change.name),
         Stage::Disturbing => format!("{}   {WAITING}", disturbing::NAME),
+        Stage::Putting(mending) => format!("{}   {WAITING}", mending.name),
         // The one with no ending of its own says how it is ended; the one that ends
         // by itself says what leaving does, as every other running thing here does.
         Stage::Keeping {
@@ -246,6 +270,10 @@ pub(super) fn staying_for(stage: &Stage) -> Option<String> {
         // It takes the tunnel away on purpose and puts it back. A screen left in the
         // middle of that would leave the stack without one, which is exactly the
         // failure the check itself reports when the tunnel does not come back.
+        // A repair reaches the services and proves itself by asking the check again.
+        // A screen left in the middle of that has a stack halfway between two states
+        // and nothing on it saying which.
+        Stage::Putting(mending) => waited(mending.name),
         Stage::Disturbing => waited(disturbing::NAME),
         // The one that never ends by itself is the one this cannot say "to finish"
         // about. What it will go on doing, and the one thing that ends it once the
@@ -289,6 +317,7 @@ fn keys() -> String {
         format!("{} {}", errand::KEY, errand::HINT),
         format!("{} {}", lasting::KEY, lasting::HINT),
         format!("{} {}", quality::KEY, quality::HINT),
+        format!("{} {}", mending::KEY, mending::HINT),
         format!("{} {}", surface::KEY, surface::HINT),
     ];
     said.extend(
@@ -326,6 +355,49 @@ fn agreeing(
         &format!("{} {typed}", errand.asks),
         errand.about,
         would,
+        rows,
+        across,
+    )
+}
+
+/// What the box holding one of the two writes about a diagnosis is called.
+fn righting(mending: &Mending) -> String {
+    format!(" {} ", mending.name)
+}
+
+/// The question over the repairs agreed to, under what each of them would do.
+///
+/// The count where there are several and the check itself where there is one. "The 1
+/// above" is a sentence nobody writes, and a question naming the one thing it is
+/// about is the clearer of the two anyway.
+fn agreed_to(
+    mending: &Mending,
+    consented: &Agreed,
+    rows: usize,
+    across: usize,
+) -> Vec<Line<'static>> {
+    let asks = match consented.checks.as_slice() {
+        [one] => format!("{} {one}", mending.asks),
+        many => format!("{} the {} above", mending.asks, many.len()),
+    };
+    agreed(&asks, mending.costs, Some(&consented.account), rows, across)
+}
+
+/// The question over one warning, which has no account above it.
+///
+/// There is no run that would report what accepting comes to — it records that a
+/// choice was weighed and changes nothing else — so a preamble invented here for
+/// symmetry would be this screen claiming a rehearsal happened.
+fn answered(
+    mending: &Mending,
+    warning: &Warning,
+    rows: usize,
+    across: usize,
+) -> Vec<Line<'static>> {
+    agreed(
+        &format!("{} {}", mending.asks, warning.check),
+        mending.costs,
+        None,
         rows,
         across,
     )
@@ -474,10 +546,12 @@ mod tests {
     use crate::acting::chooser::Chooser;
     use crate::acting::disturbing::{under, Widening, NAME};
     use crate::acting::errand::{self, Errand};
+    use crate::acting::mending::{self, Mending};
     use crate::acting::narrowing::Subject;
     use crate::acting::offer::{Choice, Taken, OFFERED};
     use crate::acting::question::{Narrows, Needed, Question, HINT, KEY};
     use crate::acting::reading::Reading;
+    use crate::acting::Press;
     use lemonfiber_core::app::Command;
     use ratatui::text::Line;
 
@@ -524,6 +598,11 @@ mod tests {
     /// The widened run offered under that answer.
     fn a_widening() -> Option<Widening> {
         under(&A_DIAGNOSIS, "")
+    }
+
+    /// One of the two things that can be done about a diagnosis, by its action.
+    fn a_mending(action: &str) -> &'static Mending {
+        mending::tests::doing(action)
     }
 
     /// A reading over nine numbered lines.
@@ -632,6 +711,10 @@ mod tests {
         assert!(said.contains(&format!("{KEY} {HINT}")), "{said}");
         assert!(
             said.contains(&format!("{} {}", errand::KEY, errand::HINT)),
+            "{said}"
+        );
+        assert!(
+            said.contains(&format!("{} {}", mending::KEY, mending::HINT)),
             "{said}"
         );
         for offer in OFFERED {
@@ -982,6 +1065,130 @@ mod tests {
         assert!(said.contains("Full[2Jstack"), "{said}");
     }
 
+    /// The list of what to do about a diagnosis is drawn the way every other list on
+    /// this screen is, so what an operator learned on one box carries to the next.
+    #[test]
+    fn what_to_do_about_a_diagnosis_is_listed_the_way_the_errands_are() {
+        let (first, rest) = mending::all();
+
+        let said = said(&Stage::Righting(Chooser::over(first, rest)), 20, 90);
+
+        assert!(said.contains(" put right "), "{said}");
+        assert!(said.contains("> what is wrong put right"), "{said}");
+        assert!(
+            said.contains("a warning you have already weighed"),
+            "{said}"
+        );
+        assert!(said.contains("enter goes on"), "{said}");
+    }
+
+    /// While the offer is with the core the box says what it is waiting for, rather
+    /// than going quiet under a screen that is still gathering.
+    #[test]
+    fn an_offer_being_worked_out_says_what_it_is_waiting_for() {
+        let said = said(&Stage::Looking(a_mending("repair")), 20, 90);
+
+        assert!(said.contains("what is wrong put right"), "{said}");
+        assert!(
+            said.contains("working out what could be put right"),
+            "{said}"
+        );
+    }
+
+    /// The offer is a list that takes several, so each repair is a row that can be
+    /// marked on its own — which is the whole of what makes the yes a selection.
+    #[test]
+    fn the_repairs_offered_are_a_list_that_takes_several() {
+        let said = said(&mending::tests::an_offer(), 20, 100);
+
+        assert!(said.contains("what is wrong put right"), "{said}");
+        assert!(said.contains("> [ ] vpn.port-forward-client"), "{said}");
+        assert!(said.contains("[ ] config.wiring"), "{said}");
+        assert!(said.contains("space marks"), "{said}");
+    }
+
+    /// The question sits under what the repairs marked would do, what else changes if
+    /// they do, and whether they can be put back. An effect somebody reads after
+    /// agreeing to it is not one they agreed to.
+    #[test]
+    fn the_question_over_a_repair_sits_under_what_it_would_do() {
+        let said = said(&mending::tests::an_agreement(), 20, 100);
+
+        assert!(said.contains("put vpn.port-forward-client back"), "{said}");
+        assert!(said.contains("pauses briefly"), "{said}");
+        assert!(said.contains("cannot be put back"), "{said}");
+        assert!(
+            said.contains("Put right vpn.port-forward-client?"),
+            "{said}"
+        );
+        assert!(said.contains("y goes ahead"), "{said}");
+    }
+
+    /// The warnings are a list that takes one, because an accept answers one warning.
+    #[test]
+    fn the_warnings_are_a_list_that_takes_one() {
+        let said = said(&mending::tests::warned_about(), 20, 100);
+
+        assert!(
+            said.contains("a warning you have already weighed"),
+            "{said}"
+        );
+        assert!(said.contains("> vpn.unprotected"), "{said}");
+        assert!(!said.contains("space marks"), "{said}");
+    }
+
+    /// The question over a warning names the check it answers and says what
+    /// answering it comes to, with no account above it — there is no run that would
+    /// report what accepting would do, and a preamble invented for symmetry would be
+    /// this screen claiming a rehearsal happened.
+    #[test]
+    fn the_question_over_a_warning_names_the_check_it_answers() {
+        let said = said(&mending::tests::an_answer(), 20, 100);
+
+        assert!(said.contains("Accept vpn.unprotected?"), "{said}");
+        assert!(said.contains("stops leading"), "{said}");
+        assert!(said.contains("y goes ahead"), "{said}");
+        assert!(!said.contains("up and down move"), "{said}");
+    }
+
+    /// While it runs, nothing is drawn over the panels — a repair reaches the
+    /// services and the panel that says what each one is doing is behind this box —
+    /// and the footer says what is running and what leaving would leave.
+    #[test]
+    fn a_run_that_puts_things_right_covers_nothing_and_is_named_in_the_footer() {
+        let running = Stage::Putting(a_mending("repair"));
+
+        let said = said(&running, 20, 200);
+        let footing = text(&footer(&running, 200));
+        let staying = staying_for(&running);
+
+        assert!(said.is_empty(), "{said}");
+        assert!(footing.contains("what is wrong put right"), "{footing}");
+        assert!(footing.contains("still running"), "{footing}");
+        assert_eq!(
+            staying,
+            Some(
+                "waiting for what is wrong put right to finish — leaving it now would leave \
+                 the stack claimed"
+                    .to_owned()
+            )
+        );
+    }
+
+    /// The question over several names how many rather than one of them, because
+    /// naming one of three would be naming the wrong thing about the other two.
+    #[test]
+    fn a_question_over_several_repairs_says_how_many_it_is_over() {
+        let (_, first) = mending::tests::pressed(mending::tests::an_offer(), &Press::Typed(' '));
+        let (_, moved_down) = mending::tests::pressed(first, &Press::Forward);
+        let (_, both) = mending::tests::pressed(moved_down, &Press::Typed(' '));
+        let (_, asked) = mending::tests::pressed(both, &Press::Accept);
+
+        let said = said(&asked, 20, 100);
+
+        assert!(said.contains("Put right the 2 above?"), "{said}");
+    }
+
     /// A narrow screen shortens rather than running past its edge, whichever of the
     /// boxes is open on it.
     #[test]
@@ -1023,6 +1230,10 @@ mod tests {
                 question: &A_STUCK,
                 chooser: two_listed(),
             },
+            mending::tests::an_offer(),
+            mending::tests::an_agreement(),
+            mending::tests::warned_about(),
+            mending::tests::an_answer(),
             Stage::Came(nine()),
         ];
 

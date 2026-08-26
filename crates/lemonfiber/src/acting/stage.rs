@@ -21,6 +21,11 @@
 //! The sixth key has one stage and no flow: [`super::surface`] asks whether to hand
 //! the terminal over, and a yes ends the screen rather than beginning anything here.
 //!
+//! The seventh key opens what can be done about what a diagnosis found, and its two
+//! flows are the same shape either way: something is read first, one of the things it
+//! held is chosen, and only then is the question put. What differs is what is read and
+//! how many of it can be taken — [`super::mending`] holds both.
+//!
 //! One stage is reached by no key at all. The checks that disturb a running system
 //! are offered under the diagnosis that does not, so what opens that question is an
 //! answer already on the screen — which is why [`Stage::Answered`] carries the offer
@@ -30,6 +35,7 @@ use super::chooser::Chooser;
 use super::disturbing::Widening;
 use super::errand::Errand;
 use super::lasting::{Begun, Lasting};
+use super::mending::{Agreed, Mending, Offering, Warning};
 use super::narrowing::Subject;
 use super::offer::{Choice, Offer, Taken};
 use super::quality::{Change, Grade};
@@ -209,6 +215,48 @@ pub(super) enum Stage {
         /// The preset it was given, or nothing where it takes none.
         chosen: Option<&'static str>,
     },
+    /// Choosing what to do about what a diagnosis found.
+    Righting(Chooser<&'static Mending>),
+    /// What has to be read before that question can be put is with the core.
+    ///
+    /// One stage for both, because both are the same thing to be waiting for: what
+    /// the operator has to have read before there is anything to agree to. What each
+    /// of them asked for is the entry's own, and what comes back is told apart by it.
+    Looking(&'static Mending),
+    /// Marking the repairs to agree to, out of the offer they were read in.
+    Marking {
+        /// The write being agreed to, which is what the box is titled by.
+        mending: &'static Mending,
+        /// The offer, as it named itself and as it stands on the screen.
+        offering: Offering,
+    },
+    /// Holding the question over the repairs marked, under what each would do.
+    ///
+    /// The name of the offer travels this far and no further: it goes into the
+    /// request the yes sends, so what was agreed to cannot be spent on an offer that
+    /// has moved on since it was read.
+    Consenting {
+        /// The write being agreed to.
+        mending: &'static Mending,
+        /// What was agreed to, and the words it was agreed to in.
+        agreed: Agreed,
+    },
+    /// Choosing which of the warnings this stack raises to answer.
+    Warned {
+        /// The write being chosen for.
+        mending: &'static Mending,
+        /// The warnings it raised, one of them selected.
+        chooser: Chooser<Warning>,
+    },
+    /// Holding the question before a warning is answered.
+    Answering {
+        /// The write being agreed to.
+        mending: &'static Mending,
+        /// The warning it is about to answer.
+        warning: Warning,
+    },
+    /// The putting-right is with the core.
+    Putting(&'static Mending),
     /// The checks that disturb a running system are with the core.
     ///
     /// It carries nothing, because there is nothing left to decide: what it was

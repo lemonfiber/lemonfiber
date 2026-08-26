@@ -43,7 +43,7 @@ use super::{Asked, Press, Stage, Wanted};
 /// Space, which is what marks a row on every list anybody has met that takes several.
 /// It is free on this screen: every other key here is a letter, and a list has never
 /// had anything to do with one.
-const MARKS: char = ' ';
+pub(super) const MARKS: char = ' ';
 
 /// What the whole stack is called where it is one of the choices.
 const WHOLE: &str = "everything";

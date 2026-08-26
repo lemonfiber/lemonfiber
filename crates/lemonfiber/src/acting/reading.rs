@@ -16,7 +16,7 @@
 
 use lemonfiber_core::error::Problem;
 
-use super::Press;
+use super::{Press, Stage, Wanted};
 
 /// What is said where an answer is not the shape the question had.
 const NOT_THE_ANSWER: &str = "This stack answered something other than what was asked of it.";
@@ -77,6 +77,18 @@ impl Reading {
             .saturating_sub(self.at.saturating_add(shown.len()));
         (shown, self.at, below)
     }
+}
+
+/// Over what an action came to: move through it, or put it away.
+///
+/// Beside [`moved`] rather than in the dispatch, because it is the whole of what a
+/// press over a box with nothing else in it does — and a dispatch arm carrying its
+/// own copy of that is one that can come to disagree with the reading beside it.
+pub(super) fn came(stage: &mut Stage, mut reading: Reading, press: &Press) -> Wanted {
+    if moved(&mut reading, press) {
+        *stage = Stage::Came(reading);
+    }
+    Wanted::Nothing
 }
 
 /// Move through a reading, saying whether the press was a move at all.

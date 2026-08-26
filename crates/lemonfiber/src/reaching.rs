@@ -151,18 +151,28 @@ pub const ASKS: &[Reach] = &[
 /// are read in the words the command line gives for the same run.
 pub const SHOWS: &[&str] = &["ps"];
 
-/// The requests the dashboard reaches a second way, by acting on what one of its
-/// questions answers.
+/// The requests the dashboard reaches a second way, having already reached them as a
+/// question.
 ///
-/// Two requests, four actions. `quality` is on [`ASKS`] as a read — the preset in
+/// Two requests, seven actions. `quality` is on [`ASKS`] as a read — the preset in
 /// force, what each one means and what it costs — and three of these are the writes
-/// offered beside that reading. `doctor` is on [`ASKS`] too, and the fourth is the
-/// same diagnosis widened to the checks that disturb a running system: a read that
-/// disturbed something would not be a read, so it is asked for as an action, at the
-/// door this screen asks for changes. None of the four is an entry in [`ACTS`],
-/// because both requests are already reached: [`reached`] is what the parity table's
-/// terminal column is held against in both directions, and a request named there
-/// twice would leave a reader of one row with two claims to reconcile against it.
+/// offered beside that reading. `doctor` is on [`ASKS`] too, and the other four are
+/// the whole of what can be done about what that reading reports: the same diagnosis
+/// widened to the checks that disturb a running system, the repairs it found put
+/// right, one of its warnings answered, and the last repair put back. A read that
+/// disturbed something would not be a read, and none of the other three is a read at
+/// all, so all four are asked for at the door this screen asks for changes.
+///
+/// The last of them is offered from a different place on the screen — it is on the
+/// list of errands rather than beside the other two, because it reads nothing before
+/// it acts — and it is published here all the same, because what this list is keyed
+/// by is the request, not the key that reaches it. `doctor --undo` is the `doctor`
+/// row's, as `--fix` and `--accept` are.
+///
+/// None of the seven is an entry in [`ACTS`], because both requests are already
+/// reached: [`reached`] is what the parity table's terminal column is held against in
+/// both directions, and a request named there twice would leave a reader of one row
+/// with two claims to reconcile against it.
 ///
 /// What they are published for is the other direction. Every action the screen
 /// offers is held to a name here by `acting/`'s own tests, so a write added to that
@@ -184,6 +194,18 @@ pub const ALSO: &[Reach] = &[
     Reach {
         request: "doctor",
         through: "diagnose",
+    },
+    Reach {
+        request: "doctor",
+        through: "repair",
+    },
+    Reach {
+        request: "doctor",
+        through: "accept",
+    },
+    Reach {
+        request: "doctor",
+        through: "undo",
     },
 ];
 
