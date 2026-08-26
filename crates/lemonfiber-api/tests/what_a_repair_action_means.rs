@@ -149,8 +149,13 @@ fn repairs_named_without_a_yes_are_refused_rather_than_carried_out() {
 
 #[test]
 fn including_the_checks_that_disturb_is_carried_apart_from_the_consent() {
-    // `--fix-disruptive` widens what is looked at; it agrees to nothing. Every
-    // consent can carry it, and carrying it changes no consent into another.
+    // `--fix-disruptive` widens what is looked at; it agrees to nothing. Carrying it
+    // changes no consent into another, which is what this holds still.
+    //
+    // Whether a given consent may spend it is the core's, not this translation's:
+    // an offer asked to disturb is refused there, once, so the command line's own
+    // machine-readable offer is refused by the same rule rather than by a second
+    // copy of it here.
     for (asked, consent) in [
         (repairing(false, None, &[], true), Consent::Offer),
         (repairing(true, None, &[], true), Consent::Standing),

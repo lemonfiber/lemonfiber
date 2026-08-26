@@ -103,16 +103,23 @@ pub struct Report {
 /// many surfaces call it — a generic would be copied per call site, and the copy nothing
 /// drives is a copy the coverage gate counts and no test can reach.
 ///
+/// `disruptive` belongs to the half that may act. A run that may not is the offer, and an
+/// offer is what somebody reads before deciding — so it is refused rather than widened.
+///
 /// # Errors
 ///
 /// Returns a [`Problem`] where the stack cannot be read, which is the one thing every
-/// check needs before any of this can begin.
+/// check needs before any of this can begin, and where a run that may not act was asked
+/// for the checks that disturb.
 pub async fn mend(
     ctx: &Ctx,
     stance: Stance,
     disruptive: bool,
     confirm: &dyn Confirm,
 ) -> Result<Report, Box<Problem>> {
+    if disruptive && !stance.may_act() {
+        return Err(Box::new(offer_cannot_disturb()));
+    }
     let (manifest, checks) = super::engine::assembled(ctx, disruptive).await?;
     // A second set, assembled without the disruptive ones, for proving the work. Built
     // here rather than per repair: nine checks constructed once are nine constructed once,
@@ -225,6 +232,9 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
 /// Raised when a run cannot say where lemonfiber's own files are.
 pub const NOWHERE_TO_LOOK: Code = Code::new("REPAIR-2");
 
+/// Raised when a run that may not act was asked for the checks that disturb.
+pub const OFFER_CANNOT_DISTURB: Code = Code::new("REPAIR-3");
+
 /// What putting back the last repair came to.
 ///
 /// A report rather than a bare list, because it is what an envelope carries and an
@@ -274,6 +284,38 @@ pub async fn reversing(ctx: &Ctx) -> Result<Reversal, Box<Problem>> {
     retract(ctx, &paths)
         .await
         .map(|reversed| Reversal { reversed })
+}
+
+/// The refusal for an offer that was asked to include the checks that disturb.
+///
+/// Both halves of the reason are said, because either alone reads as a rule for its
+/// own sake. The offer half of a repair is what an operator reads before deciding,
+/// and the checks that disturb prove themselves by disturbing: the killswitch test
+/// takes the default route away from the download client, and the release search
+/// spends one of the indexers' daily allowance. A run that did either to say what
+/// it *would* do has already done it.
+///
+/// And it costs the operator nothing to be refused. Neither disturbing check can be
+/// put right by lemonfiber — no repair answers either of them — so a widened offer
+/// offers exactly what the plain one does. What the operator asking for it wants is
+/// what those checks *found*, which is a diagnosis, and a diagnosis widened this way
+/// is a request this surface already serves.
+fn offer_cannot_disturb() -> Problem {
+    Problem::new(
+        OFFER_CANNOT_DISTURB,
+        Severity::Error,
+        "Saying what could be put right does not include the checks that disturb",
+        "The checks that disturb prove themselves by disturbing: the killswitch test takes \
+         the tunnel away from the download client, and the release check spends one of the \
+         indexers' daily searches. A run that only says what it would put right has agreed \
+         to neither, and neither turns up a repair to offer. Nothing was disturbed.",
+        Remedy::new("Ask for the diagnosis with those checks in it, which is what reports them")
+            .with_detail("lemonfiber doctor --disruptive"),
+    )
+    .or_try(Remedy::new(
+        "Or agree to the repairs first, and the checks that disturb run with them",
+    ))
+    .in_state(State::Guided)
 }
 
 /// The refusal for a run that cannot say where lemonfiber's own files are.
@@ -691,6 +733,26 @@ mod tests {
             .map(|report| (report.acted, report.offered.len(), report.agreement));
 
         assert_eq!(offer, Some((false, 0, crate::repair::agreement(&[]))));
+    }
+
+    /// A run that may not act is refused the checks that disturb, before anything
+    /// is assembled to run.
+    ///
+    /// The tunnel staying up is proved from `tests/`, over an engine that records
+    /// what it was asked to do. What is proved here is that the refusal comes first:
+    /// this context has no container engine behind it, so a run that reached the
+    /// checks at all would answer with something else entirely.
+    #[tokio::test]
+    async fn an_offer_asked_to_disturb_is_refused_before_a_check_is_built() {
+        let refused = putting_right(&ctx_at("repair-offer-disturbing"), &Consent::Offer, true)
+            .await
+            .err()
+            .map(|problem| (problem.code, problem.remedies.len()));
+
+        // Two remedies, because there are two different things the caller might
+        // have wanted: the checks' findings, which is a diagnosis, or the repairs
+        // carried out, which is the yes.
+        assert_eq!(refused, Some((super::OFFER_CANNOT_DISTURB, 2)));
     }
 
     /// Consent given for an offer that is not the offer that stands is refused, and

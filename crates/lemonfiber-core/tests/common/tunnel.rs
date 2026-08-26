@@ -118,6 +118,14 @@ pub struct Fake {
     pub link: Option<Link>,
     /// Whether the tunnel device is down right now.
     pub dropped: std::sync::atomic::AtomicBool,
+    /// Whether the tunnel device has been taken down at any point in this run.
+    ///
+    /// Apart from `dropped` because the two answer different questions. A check
+    /// that took the tunnel away and put it back leaves `dropped` false, so a test
+    /// asking whether anything was disturbed would read that as nothing having
+    /// happened — which is exactly the disturbance a run that may not act must not
+    /// have caused.
+    pub disturbed: std::sync::atomic::AtomicBool,
 }
 
 impl Fake {
@@ -128,6 +136,7 @@ impl Fake {
             behaviors,
             link: None,
             dropped: std::sync::atomic::AtomicBool::new(false),
+            disturbed: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -142,6 +151,11 @@ impl Fake {
     /// Whether the tunnel device is currently down.
     pub fn is_dropped(&self) -> bool {
         self.dropped.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Whether the tunnel device was ever taken down, restored or not.
+    pub fn was_dropped(&self) -> bool {
+        self.disturbed.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// How long this `ip` command takes to answer, where the test slowed it down or
@@ -185,6 +199,10 @@ impl Fake {
         }
         self.dropped
             .store(!up, std::sync::atomic::Ordering::Relaxed);
+        if !up {
+            self.disturbed
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
         ExecOutput {
             status: Some(0),
             stdout: String::new(),

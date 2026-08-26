@@ -31,12 +31,15 @@ const MUSIC: &str = "music";
 
 /// Show or change the quality preset.
 ///
-/// A rehearsal reports the choice it would record without writing it, and a choice
-/// this host would have to transcode in software is held rather than recorded
-/// unless the operator confirmed it — so `--dry-run` and the confirmation both mean
-/// here what they mean elsewhere. A reapply re-asserts the recorded preset over a
-/// Recyclarr config the operator hand-edited, the explicit consent an ordinary run
-/// withholds.
+/// A rehearsal reports the choice it would record without writing it, which is what
+/// `--dry-run` means everywhere. The confirmation is not the same shape: a choice is
+/// recorded whether or not one is given, and what the agreement answers is the one
+/// cost the choice can carry — a preset this host would have to transcode in
+/// software, which is held rather than recorded until it is agreed to, and which is
+/// no cost at all on a host that transcodes in hardware. So an unconfirmed run here
+/// is the write, not an account of one. A reapply re-asserts the recorded preset
+/// over a Recyclarr config the operator hand-edited, the explicit consent an
+/// ordinary run withholds.
 pub(super) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport, Box<Problem>> {
     let mut selection = load_selection(ctx)?;
     let playback = playback(ctx);

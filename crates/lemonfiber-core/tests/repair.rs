@@ -13,13 +13,14 @@
 mod common;
 
 use common::stack::project;
+use common::tunnel;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_core::app::repair::{mend, mending, Confirm, Consent, Report};
 use lemonfiber_core::app::{dispatch, Command, Ctx};
-use lemonfiber_core::config::Settings;
+use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::doctor::{Category, Check, Finding, Mend, Verdict};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::platform::Environment;
@@ -43,6 +44,44 @@ fn ctx(name: &str) -> Ctx {
         },
         Environment::MacOs,
     )
+}
+
+/// The same context over an engine the test keeps hold of, and a stack whose
+/// torrents the VPN category applies to.
+///
+/// The engine is handed over as an `Arc` the caller keeps, so what state a run left
+/// the tunnel in can be asked once the run is over. The transport is a silent fake
+/// because none of these tests is about what an HTTP service answers, and a suite
+/// assembled for real would otherwise reach the network.
+fn ctx_over(name: &str, engine: Arc<tunnel::Fake>) -> Ctx {
+    let dir = std::env::temp_dir().join(format!("lemonfiber-repair-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    Ctx::new(
+        Arc::new(lemonfiber_core::adapters::Local),
+        engine,
+        Arc::new(lemonfiber_core::adapters::System),
+        Arc::new(lemonfiber_core::adapters::Disk),
+        Source::External(project()),
+        Settings {
+            env_file: Some(dir.join(".env")),
+            // Torrents configured, or the VPN category does not apply and the
+            // killswitch is never reached whatever this run was asked for.
+            protocols: Protocols::both(),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_http(lemonfiber_fixtures::http::Fake::silent())
+}
+
+/// A gateway and a client, both up and both reporting the tunnel's address — the
+/// stack the killswitch test has something to prove against.
+fn contained() -> Vec<tunnel::Behavior> {
+    vec![
+        tunnel::Behavior::up("gluetun", Some("185.65.1.1")),
+        tunnel::Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ]
 }
 
 /// The check this test drives, and the repair it offers for what it finds.
@@ -386,4 +425,51 @@ async fn a_dispatched_offer_answers_under_its_own_kind_and_acts_on_none_of_it() 
     // The offer names itself on the way out, which is the whole of what consent
     // crossing a request boundary has to be able to point at.
     assert!(json.contains(r#""agreement":"#), "{json}");
+}
+
+/// A run that may not act is refused the checks that disturb, and the tunnel it
+/// would have taken away is still up.
+///
+/// The offer half of a repair is what an operator reads before deciding anything,
+/// and the killswitch test proves itself by dropping the default route out from
+/// under the download client. A run that did that to say what it *would* do has
+/// already done something — and the release search beside it has spent one of the
+/// indexers' daily allowance to say it.
+#[tokio::test]
+async fn an_offer_is_refused_the_checks_that_disturb_and_leaves_the_tunnel_up() {
+    let engine = Arc::new(tunnel::Fake::linked(contained(), tunnel::Link::holding()));
+    let context = ctx_over("offer-disruptive", Arc::clone(&engine));
+
+    let refused = mend(&context, Stance::ReportOnly, true, &Always(true)).await;
+
+    assert!(
+        !engine.was_dropped(),
+        "the tunnel was taken away to make an offer nobody had agreed to"
+    );
+    assert!(!engine.is_dropped(), "and it is still up");
+    assert_eq!(
+        refused.err().map(|problem| problem.code),
+        Some(lemonfiber_core::app::repair::OFFER_CANNOT_DISTURB)
+    );
+}
+
+/// The same request with the agreement on it is not refused, and the widening it
+/// asked for reaches the checks.
+///
+/// Which is the half of the rule that matters. What is refused is the pair, not the
+/// widening: an operator who wants the killswitch proven while their stack is put
+/// right still gets it, on the run that may act on what it finds.
+#[tokio::test]
+async fn a_run_that_may_act_still_gets_the_checks_that_disturb() {
+    let engine = Arc::new(tunnel::Fake::linked(contained(), tunnel::Link::holding()));
+    let context = ctx_over("standing-disruptive", Arc::clone(&engine));
+
+    let report = mend(&context, Stance::Unattended, true, &Always(true)).await;
+
+    assert!(report.is_ok_and(|report| report.acted), "it was allowed to");
+    assert!(
+        engine.was_dropped(),
+        "the killswitch was proven the only way it can be"
+    );
+    assert!(!engine.is_dropped(), "and the tunnel was put back");
 }

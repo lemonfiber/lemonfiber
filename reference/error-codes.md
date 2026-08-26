@@ -60,6 +60,7 @@ what to do about it, is written for operators at
 - `READ-2`
 - `REPAIR-1`
 - `REPAIR-2`
+- `REPAIR-3`
 - `RESTORE-1`
 - `RESTORE-2`
 - `RESTORE-3`
