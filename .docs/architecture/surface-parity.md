@@ -101,7 +101,9 @@ an exception has to survive being argued, and almost nothing does.
 
 Nothing is now wholly out of a browser's reach, and one request is reachable only
 in part: the diagnosis, whose checks that disturb a running system are asked for
-by changing something rather than by reading.
+by changing something rather than by reading. That is a gap to close rather than
+an exception to record, and `ui` is the only exception this table permits, in
+either column.
 
 On the other side of the table zero have no terminal form, which is where three
 stood before this slice, nine before the one ahead of that, and twenty before
@@ -109,7 +111,10 @@ the one that began it. Every request the command line accepts is now reachable
 from a screen as well, and the last three were the three that do not answer and
 stop: a walk that says each step as it becomes true, a guard with no ending of
 its own, and the web surface, which the dashboard reaches by handing the terminal
-over rather than by sending anything to the stack.
+over rather than by sending anything to the stack. What that column still loses is
+an argument at a time, on every row reading `dashboard, partial`, and those are
+gaps on the same terms as the web's — a screen that reaches a request but not one
+of its arguments has not finished reaching it.
 
 These five numbers are read back from the table above by the guard, because a
 version of this paragraph said ten and five where the rows said eleven and four,
