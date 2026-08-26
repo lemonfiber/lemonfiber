@@ -689,6 +689,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn what_a_service_said_about_a_credential_is_reported_without_the_credential() {
+        // An indexer refuses with the key it was given in hand, and setup is where that
+        // key is being entered. What the service said is reported back, and the report
+        // is serialised to a caller that may log it.
+        let paths = scratch("proof");
+        let said = format!(
+            "the indexer refused the key: apikey={} has expired",
+            withheld_value("indexer")
+        );
+        let context = proving(
+            &paths,
+            Arc::new(Saying(Validation::Rejected { detail: said })),
+        );
+        assert!(setting_up(
+            &context,
+            SetupAction::Answer(Answer::Protocols(Protocols::both()))
+        )
+        .await
+        .is_ok());
+
+        let report = walked(&context, SetupAction::Answer(an_indexer(true))).await;
+        let rendered = report
+            .as_ref()
+            .and_then(|report| serde_json::to_string(report).ok())
+            .unwrap_or_default();
+
+        assert!(
+            !rendered.contains(&withheld_value("indexer")),
+            "the key reaches a caller that may log it: {rendered}"
+        );
+        // And what the operator is deciding on survives. A refusal whose reason has
+        // been withheld says only that something went wrong.
+        assert!(
+            rendered.contains("the indexer refused the key"),
+            "and the reason it was refused does not: {rendered}"
+        );
+        assert!(rendered.contains("has expired"), "{rendered}");
+    }
+
+    #[tokio::test]
     async fn applying_before_every_question_is_answered_is_refused() {
         let paths = scratch("early");
 

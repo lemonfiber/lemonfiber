@@ -142,7 +142,7 @@ fn shown(line: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{checksum, decide, diff, Decision, Materialised};
+    use super::{checksum, decide, diff, shown, Decision, Materialised};
     use crate::config::store::REDACTED;
 
     #[test]
@@ -223,11 +223,46 @@ mod tests {
             "  ADMIN_PASSWORD: p:ss=word",
             "PROVIDER_CREDENTIAL=x",
         ] {
-            let withheld = crate::config::store::withheld(line);
+            let withheld = shown(line);
             assert!(withheld.ends_with(REDACTED), "{line} -> {withheld}");
             assert!(!withheld.contains("word"), "{line} -> {withheld}");
             assert!(!withheld.contains("a:b"), "{line} -> {withheld}");
         }
+    }
+
+    #[test]
+    fn a_credential_no_marker_word_names_is_withheld_from_a_diff() {
+        // The case a marker list cannot answer and the allow-list can: a VPN provider
+        // issues an account number, it is half of a paid login, and nothing in the name
+        // says so. `/api/config` withholds it; the diff of the same file printed it, in
+        // the same run.
+        let account = ["p", "1234567"].concat();
+        let shown = diff(
+            &format!("OPENVPN_USER={account}\n"),
+            "OPENVPN_USER=somebody\n",
+        );
+
+        assert!(!shown.contains(&account), "{shown}");
+        assert!(
+            shown.contains("OPENVPN_USER"),
+            "the operator learns which drifted: {shown}"
+        );
+        assert_eq!(shown.matches(REDACTED).count(), 2, "both sides withheld");
+    }
+
+    #[test]
+    fn an_address_in_a_diff_keeps_its_address_and_loses_its_query() {
+        // Read the way `/api/config` reads it, which is the point of one list: the
+        // address is what the operator is checking, and the key some indexers hand out
+        // inside it is not.
+        let key = ["the", "indexer", "key"].join("-");
+        let shown = diff(
+            &format!("INDEXER_URL=https://indexer.example/api?apikey={key}\n"),
+            "INDEXER_URL=https://indexer.example/api\n",
+        );
+
+        assert!(!shown.contains(&key), "{shown}");
+        assert!(shown.contains("https://indexer.example/api"), "{shown}");
     }
 
     #[test]
@@ -241,7 +276,7 @@ mod tests {
             "  # a comment",
             "",
         ] {
-            assert_eq!(crate::config::store::withheld(line), line, "{line}");
+            assert_eq!(shown(line), line, "{line}");
         }
     }
 
@@ -249,10 +284,7 @@ mod tests {
     fn a_key_that_opens_a_block_keeps_its_shape() {
         // `environment:` with nothing after it is a YAML key opening a block, not a
         // setting with a value — blanking it would corrupt what the operator is reading.
-        assert_eq!(
-            crate::config::store::withheld("    AUTH_SETTINGS:"),
-            "    AUTH_SETTINGS:"
-        );
+        assert_eq!(shown("    AUTH_SETTINGS:"), "    AUTH_SETTINGS:");
     }
 
     #[test]

@@ -243,7 +243,7 @@ fn shouts(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{in_full, without_query, SHOWN};
+    use super::{in_full, shown_in_a_file, without_query, SHOWN};
 
     #[test]
     fn a_setting_on_the_list_is_displayed_and_one_beside_it_is_not() {
@@ -270,6 +270,23 @@ mod tests {
         ] {
             assert!(!in_full(name), "{name} is displayed and nobody said why");
         }
+    }
+
+    #[test]
+    fn a_files_line_is_read_against_the_list_only_where_its_name_is_a_setting() {
+        // An environment setting shouts, and the list answers for it — including for
+        // the account number no marker word names, which is the case the list exists
+        // for and the case a diff of the same file used to print.
+        assert!(!shown_in_a_file("OPENVPN_USER"));
+        assert!(!shown_in_a_file("SONARR_API_KEY"));
+        assert!(shown_in_a_file("DATA_ROOT"));
+        assert!(shown_in_a_file("  TZ  "));
+        // Compose's own schema is lower case throughout, and no list vouches for it.
+        // The marker rule answers there, as it did before, so a diff of the lines an
+        // operator actually edits still reads as a diff.
+        assert!(shown_in_a_file("image"));
+        assert!(shown_in_a_file("network_mode"));
+        assert!(!shown_in_a_file("api_key"));
     }
 
     #[test]

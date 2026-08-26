@@ -27,8 +27,8 @@
 //! configuration wherever they appear.
 //!
 //! What a caller chooses is therefore the list, never the splitting: one line cannot be
-//! read as a setting here and as a sentence at `/api/config`, and four call sites each
-//! deciding for themselves is how three of them decided wrongly.
+//! read as a setting here and as a sentence at `/api/config`. A rule each call site
+//! decides for itself is a rule most of them will decide differently.
 
 const SECRET_MARKERS: &[&str] = &[
     "KEY",
@@ -108,8 +108,7 @@ pub fn without_query(value: &str) -> String {
 /// value. Read as one it is withheld in half, and `api_key: (set, not shown)` comes back
 /// as `api_key: (set, not shown) not shown)` on every pass after the first.
 fn already_withheld(value: &str) -> bool {
-    let value = value.trim();
-    !value.is_empty() && REDACTED.starts_with(value)
+    REDACTED.starts_with(value.trim())
 }
 
 /// Whether a name and what follows it read as a setting rather than as the front of a
@@ -294,7 +293,7 @@ pub fn withheld_text(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_secret, withheld, withheld_text, REDACTED};
+    use super::{is_secret, withheld, withheld_by, withheld_text, without_query, REDACTED};
 
     /// A stand-in for a credential, assembled rather than written out so no value
     /// that reads as one sits in this source.
@@ -432,5 +431,116 @@ mod tests {
         let shown = withheld_text(&detail);
         assert!(shown.contains("it expired"), "{shown}");
         assert!(!shown.contains(&secret), "{shown}");
+    }
+
+    #[test]
+    fn a_key_that_is_not_the_first_parameter_of_an_address_does_not_ride_out_in_it() {
+        // The live shape. `validate` builds `?t=search&apikey=…` to prove an indexer,
+        // and the services around it quote the address they failed on into the lines
+        // that become an error's detail. Read as a name, what stands in front of the
+        // first equals sign of that address is `https://indexer.example/api?t` — no
+        // marker in it, so it vouched for everything behind it, key included.
+        let secret = a_credential();
+        let line = format!(
+            "sonarr: GET https://indexer.example/api?t=search&q=foo&apikey={secret} failed"
+        );
+        let shown = withheld(&line);
+
+        assert!(!shown.contains(&secret), "{line} -> {shown}");
+        // And what the sentence was for survives: which service, which address, and
+        // that the request failed.
+        assert!(shown.contains("sonarr: GET"), "{line} -> {shown}");
+        assert!(
+            shown.contains("https://indexer.example/api?"),
+            "{line} -> {shown}"
+        );
+        assert!(shown.ends_with("failed"), "{line} -> {shown}");
+    }
+
+    #[test]
+    fn a_question_mark_with_no_parameters_after_it_is_somebody_asking_a_question() {
+        // A query string is parameters; a question mark on its own is a log line.
+        assert_eq!(
+            withheld("sonarr said: is the indexer reachable? nothing answered"),
+            "sonarr said: is the indexer reachable? nothing answered"
+        );
+    }
+
+    #[test]
+    fn a_sentence_beginning_on_a_marker_word_keeps_the_rest_of_itself() {
+        // Every service that refuses a credential answers 401, and the word most of
+        // them write in front of the reason carries a marker. Read as the name of what
+        // follows, that one word took the whole reason with it.
+        for line in [
+            "Unauthorized: the request was refused by the indexer",
+            "Token: the session had already expired",
+            "Password: the account is locked until tomorrow",
+        ] {
+            assert_eq!(withheld(line), line, "a sentence lost its words");
+        }
+    }
+
+    #[test]
+    fn a_credential_under_a_word_of_a_name_is_still_withheld() {
+        // The other side of the same rule, and why the sentence is judged on what
+        // follows the name rather than on the name alone: a value is one word.
+        let secret = a_credential();
+        for line in [
+            format!("password: {secret}"),
+            format!("api_key: {secret}"),
+            format!("token={secret}"),
+        ] {
+            let shown = withheld(&line);
+            assert!(!shown.contains(&secret), "{line} -> {shown}");
+            assert!(shown.contains(REDACTED), "{line} -> {shown}");
+        }
+    }
+
+    #[test]
+    fn text_that_has_already_been_withheld_comes_back_as_it_was() {
+        // Laundered where a service's words are read and again where the report
+        // carrying them is serialised. The marker is not a value: read as one it is
+        // withheld in half, and the line grows a tail on every pass after the first.
+        for line in [
+            "sonarr refused: api_key=(set, not shown)",
+            "sonarr refused: api_key: (set, not shown)",
+            "INDEXER_APIKEY=(set, not shown)",
+            "https://indexer.example/api?(set, not shown)",
+        ] {
+            assert_eq!(withheld(line), line, "the marker was read as a value");
+        }
+    }
+
+    #[test]
+    fn a_name_a_list_does_not_vouch_for_loses_its_value_whatever_it_is_called() {
+        // The other door. Where the text is a settings file there is a list to read
+        // names against, and a name nobody has argued for is withheld — including one
+        // no marker word names, which is the case a list exists for.
+        let account = ["p", "1234567"].concat();
+        let vouched = |name: &str| name == "DATA_ROOT";
+
+        assert_eq!(
+            withheld_by(&format!("OPENVPN_USER={account}"), &vouched),
+            format!("OPENVPN_USER= {REDACTED}")
+        );
+        assert_eq!(
+            withheld_by("DATA_ROOT=/srv/media", &vouched),
+            "DATA_ROOT=/srv/media"
+        );
+    }
+
+    #[test]
+    fn an_address_keeps_its_address_and_loses_its_query() {
+        // Assembled rather than written out, and a placeholder rather than a plausible
+        // key: what this fixture has to be is withheld, and a run of hex in source is a
+        // secret scanner's finding for as long as the commit exists.
+        let key = ["the", "indexer", "key"].join("-");
+        assert_eq!(
+            without_query("https://indexer.example/api"),
+            "https://indexer.example/api"
+        );
+        let shown = without_query(&format!("https://indexer.example/api?apikey={key}"));
+        assert!(shown.starts_with("https://indexer.example/api?"), "{shown}");
+        assert!(!shown.contains(&key), "{shown}");
     }
 }

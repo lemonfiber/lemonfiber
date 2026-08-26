@@ -325,6 +325,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn what_an_indexer_says_about_a_key_comes_back_without_the_key_in_it() {
+        // An indexer refuses in its own words, with the key it was given in hand, and
+        // those words are carried into the outcome verbatim. The outcome is serialised
+        // into the wizard's report during first-run setup — the minutes in which the
+        // key is being entered — and printed to a terminal beside it.
+        let key = ["the", "indexer", "key"].join("-");
+        let body = format!("<error code=\"100\" description=\"apikey={key} has expired\"/>");
+
+        let outcome = format!("{:?}", answering(&body).validate(&indexer()).await);
+
+        assert!(!outcome.contains(&key), "{outcome}");
+        // And the reason survives, which is the whole of what the operator is given:
+        // a refusal with its refusal withheld says only that something went wrong.
+        assert!(outcome.contains("the indexer refused the key"), "{outcome}");
+        assert!(outcome.contains("has expired"), "{outcome}");
+    }
+
+    #[tokio::test]
     async fn a_well_formed_feed_proves_the_key_and_reports_what_it_held() {
         let feed =
             "<?xml version=\"1.0\"?><rss><channel><item>a</item><item>b</item></channel></rss>";
