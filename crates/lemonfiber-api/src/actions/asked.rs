@@ -129,16 +129,45 @@ pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "w
 /// re-fetching a library that is already here, hand-edits to the stack files
 /// discarded, a configuration overwritten by an archive, a credential printed
 /// into a file people post in public, and a machine changed under an operator who
-/// only asked what was wrong with it. Unconfirmed, each of the six reports what
-/// it would cost and changes nothing, so the agreement is a fork inside the
-/// command rather than a gate in front of it.
+/// only asked what was wrong with it.
 ///
-/// A repair is the one where it is the whole of the design rather than a guard in
-/// front of it. Unconfirmed it *is* the offer — each repair with what it would do
-/// and what else changes if it does — and the yes that follows names the offer it
-/// was read in through [`TAKES_CONSENT`]. Given alone it is the standing consent
-/// the command line spells `--yes`: a decision taken before there was an offer to
-/// read, which is a different thing from skipping being told.
+/// What the six do **not** share is a shape. This is the list of actions whose
+/// command has a field for the agreement, and nothing more: "unconfirmed, it says
+/// what it would do and changes nothing" is true of four of them and false of the
+/// other two. Said here rather than left to be found, because a surface that read
+/// the list as the rule would put an account of what is about to happen in front of
+/// a run that has already happened.
+///
+/// Three of them are the fork the reading suggests. Unconfirmed, `reset`,
+/// `restore` and `quality-upgrade` each report what it would cost and change
+/// nothing, so the agreement is inside the command rather than a gate in front of
+/// it.
+///
+/// A repair is the fourth, and the one where it is the whole of the design rather
+/// than a guard in front of it. Unconfirmed it *is* the offer — each repair with
+/// what it would do and what else changes if it does — and the yes that follows
+/// names the offer it was read in through [`TAKES_CONSENT`]. Given alone it is the
+/// standing consent the command line spells `--yes`: a decision taken before there
+/// was an offer to read, which is a different thing from skipping being told. What
+/// the offer half is *not* allowed to do is disturb the stack to build itself, which
+/// is why the widening beside it belongs to the half that acts — see
+/// [`TAKES_DISRUPTION`].
+///
+/// `quality-set` is not a fork at all. Unconfirmed it records the choice; the
+/// agreement answers one particular cost inside a run that writes either way — a
+/// preset this host would have to transcode in software, which is held rather than
+/// recorded until it is agreed to, and which is not a cost at all on a machine that
+/// transcodes in hardware. So an unconfirmed run there is the choice being made,
+/// and a surface that put an account in front of it would be describing a decision
+/// already taken.
+///
+/// A bundle's agreement is the revealing and never the file. `confirm` answers
+/// `reveal`, which prints a setting as it is into a thing people post in public;
+/// whether there is a file at all is `write`'s, and that fork is already the second
+/// deliberate run — a bare run collects, redacts, scans and says what a bundle would
+/// hold. So a bundle written without an agreement has revealed nothing, which is
+/// what the agreement is for, and the two are separate fields because they are
+/// separate decisions.
 ///
 /// Four of them the command line declares a `--confirm` for, and a repair declares
 /// `--yes`, which is the same fork under the name that fits it. A restore is the one it
@@ -204,6 +233,14 @@ pub const TAKES_AGREED: &[&str] = &["repair"];
 /// It is not consent to a repair. Which checks run and which repairs are agreed to
 /// are separate decisions, and an action that took one for the other would have an
 /// operator widening the suite and finding it had also carried something out.
+///
+/// On a repair it belongs to the half that acts, and the core refuses it to the half
+/// that does not. The offer is what an operator reads before deciding anything, and
+/// these checks prove themselves by disturbing — the tunnel goes away, a live search
+/// is spent — so a run that did either to say what it *would* do has already done it.
+/// Refused rather than quietly narrowed, because neither disturbing check turns up a
+/// repair to offer: what a caller widening an offer wants is what those checks found,
+/// and that is `diagnose`, which reports them.
 ///
 /// The diagnosis this surface serves as a read takes no such argument. A check that
 /// disturbs a running system changes something, and changes are asked for here.
