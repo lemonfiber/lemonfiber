@@ -274,7 +274,7 @@ async fn a_stack_that_cannot_be_read_stops_the_follow_under_its_own_name() {
         unreachable!("a follow is answered with a name");
     };
     assert!(
-        matches!(run.settled(&job).await, Some(Standing::Failed(said))
+        matches!(run.settled(&job).await, Some(Standing::Failed(said, _))
             if said.contains(r#""kind":"error""#)),
         "the failure is the envelope every other one arrives in"
     );

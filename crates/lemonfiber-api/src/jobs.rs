@@ -129,8 +129,15 @@ pub enum Standing {
     Running,
     /// Finished, and this is the envelope it came to.
     Done(String),
-    /// Stopped on a failure, and this is the envelope saying why.
-    Failed(String),
+    /// Stopped on a failure, and this is the envelope saying why, at the status it
+    /// warrants.
+    ///
+    /// The status travels beside the envelope because the problem does not. Where
+    /// a fault lies is the one field an envelope leaves behind, so by the time a
+    /// caller asks what became of the name there is nothing left to read it off —
+    /// and a refusal cannot carry two statuses depending on which door it arrived
+    /// through.
+    Failed(String, StatusCode),
     /// Ended before it finished, and on purpose — released by name, or let go
     /// because nothing was asking about it any more. There is no outcome, because
     /// it did not reach one.
@@ -152,6 +159,11 @@ impl Standing {
             Envelope::new(kind::ERROR, problem)
                 .to_json()
                 .unwrap_or_default(),
+            // Read here, where the problem is still in hand, and by the same
+            // function the reads answer with — so a form nothing declares is a
+            // `404` whether it was named to a read or to an action that took a
+            // name to redeem it by.
+            crate::read::refusing(problem),
         )
     }
 }
@@ -373,13 +385,13 @@ fn stands(job: &str, work: &Work) -> Response {
     match &work.standing {
         Standing::Running => still(job, &work.action),
         Standing::Done(rendered) => enveloped(StatusCode::OK, Some(rendered.clone())),
-        // The status a command that could not be carried out is answered with
-        // everywhere on this surface. The body is still the envelope, because a
-        // caller that asked for something it could parse asked about the failures
-        // most of all.
-        Standing::Failed(rendered) => {
-            enveloped(StatusCode::INTERNAL_SERVER_ERROR, Some(rendered.clone()))
-        }
+        // The status the refusal itself warrants, decided where the problem was
+        // still in hand rather than again here. A form nothing declares is the same
+        // mistake whether it was named to a read or to an action redeemed by name,
+        // and answering the second `500` sends a caller on retrying what cannot
+        // succeed. The body is still the envelope, because a caller that asked for
+        // something it could parse asked about the failures most of all.
+        Standing::Failed(rendered, status) => enveloped(*status, Some(rendered.clone())),
         // The name and the action again, under the status finished work answers
         // with and the kind the start answered with. There is no outcome to give:
         // the work was ended rather than finished, and the kind is what says so.

@@ -250,7 +250,7 @@ async fn work_that_could_not_be_done_says_so_under_its_own_name() {
 
     let standing = settled(&jobs, job.as_str()).await;
     assert!(
-        matches!(&standing, Some(Standing::Failed(said))
+        matches!(&standing, Some(Standing::Failed(said, _))
             if said.contains(r#""kind":"error""#)),
         "{standing:?}"
     );
@@ -325,7 +325,7 @@ async fn work_that_stopped_is_answered_with_the_failure_it_stopped_on() {
         .await;
     let standing = settled(&jobs, job.as_str()).await;
     assert!(
-        matches!(standing, Some(Standing::Failed(_))),
+        matches!(standing, Some(Standing::Failed(..))),
         "it stopped: {standing:?}"
     );
 
@@ -515,7 +515,7 @@ async fn work_that_has_already_finished_is_not_let_go_by_a_sweep() {
         .await;
     let standing = settled(&jobs, job.as_str()).await;
     assert!(
-        matches!(standing, Some(Standing::Failed(_))),
+        matches!(standing, Some(Standing::Failed(..))),
         "{standing:?}"
     );
 
@@ -542,5 +542,86 @@ async fn sweeping_on_the_beat_lets_go_of_what_a_sweep_asked_for_would() {
     assert_eq!(
         jobs.about(job.as_str()).await.map(|work| work.standing),
         Some(Standing::Ended)
+    );
+}
+
+/// Where a refusal lies decides the status, whichever door it arrives through.
+///
+/// The same mistake reaches this surface two ways: named to a read, which answers
+/// it directly, and named to an action, which hands back a name and is asked later
+/// what became of it. A form nothing declares is the caller's mistake on both, and
+/// answering the second `500` sends a browser on retrying what cannot succeed.
+///
+/// Asserted twice: on the standing, which is the only place a problem and a status
+/// are both in hand, and through the door, which is what a caller actually meets. The
+/// first alone passes on a door that ignores what it carries — which is the shape of
+/// the defect, so a test that stopped there would be testing the wrong half.
+#[test]
+fn where_a_refusal_lies_decides_the_status_a_job_is_answered_with() {
+    use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
+
+    let refusing = |amiss| {
+        let problem = Problem::new(
+            Code::new("TEST-1"),
+            Severity::Error,
+            "the form was not declared",
+            "nothing by that name is in this stack",
+            Remedy::new("name a form the stack declares"),
+        )
+        .lies_in(amiss);
+        match Standing::failed(&problem) {
+            Standing::Failed(_, status) => Some(status.as_u16()),
+            _ => None,
+        }
+    };
+
+    assert_eq!(
+        refusing(Amiss::Naming),
+        Some(StatusCode::NOT_FOUND.as_u16()),
+        "a thing there is no such thing as"
+    );
+    assert_eq!(
+        refusing(Amiss::Asking),
+        Some(StatusCode::BAD_REQUEST.as_u16()),
+        "a request that could not be answered as it stands"
+    );
+    assert_eq!(
+        refusing(Amiss::Answering),
+        Some(StatusCode::INTERNAL_SERVER_ERROR.as_u16()),
+        "and this product's own failure, which is what every one of them said before"
+    );
+}
+
+/// And the door answers with the status the standing carries, not a constant.
+///
+/// A word the glossary has no entry for is the caller naming a thing there is no
+/// such thing as, and the glossary is a table compiled into the binary — so this
+/// reaches a `Naming` refusal without a stack to read. Asked for as a job, it is
+/// answered `404`, the same as asking `/api/explain` for that word directly.
+#[tokio::test]
+async fn a_name_nothing_answers_to_is_absent_through_the_job_door_too() {
+    let jobs = Jobs::default();
+    let job = minted();
+    jobs.start(
+        &job,
+        "explain",
+        Command::Explain {
+            word: "nothing-explains-this".to_owned(),
+        },
+        Arc::new(ctx()),
+    )
+    .await;
+
+    let standing = settled(&jobs, job.as_str()).await;
+    assert!(
+        matches!(standing, Some(Standing::Failed(..))),
+        "the word has no entry: {standing:?}"
+    );
+
+    let (status, body) = asked(jobs, job.as_str()).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND.as_u16(),
+        "a word with no entry is absent, not this product failing: {body}"
     );
 }
