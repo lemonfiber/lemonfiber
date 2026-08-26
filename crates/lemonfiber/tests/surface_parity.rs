@@ -25,15 +25,27 @@
 //! is what turns "it does not belong in the table" into something somebody wrote
 //! down rather than something nobody noticed.
 //!
-//! The terminal column is not checked. Its keys live in the one file this workspace
-//! deliberately leaves untested — a real terminal in raw mode — so the words are
-//! constrained to a vocabulary and the truth of them is a reader's job.
+//! **The terminal offers nothing unaccounted for either.** The screen's own lists
+//! live in `acting/`, which is `mod acting;` in `main.rs` and private to the binary,
+//! so this could never read them; what it reads instead is
+//! [`lemonfiber::reaching`], the projection of them the library publishes, which the
+//! screen's own tests hold to those lists in both directions. So a row claiming the
+//! dashboard reaches a request it does not fails here, and an action or a question
+//! the screen offers that no row accounts for fails here — the pair the web column
+//! has had since this table was written, and the reason twenty-six rows no longer
+//! have to be re-read by eye every slice.
+//!
+//! Three rows name a screen that is not the dashboard, and three requests the
+//! dashboard answers are its panels rather than its lists. A panel is a rendering
+//! and not a named request, so there is no list of them to hold a row against;
+//! those are declared in the projection and remain a reader's job.
 
 use std::collections::BTreeSet;
 use std::fs;
 
 use clap::CommandFactory as _;
 use lemonfiber::cli::Cli;
+use lemonfiber::reaching;
 use lemonfiber_api::actions::OFFERED;
 
 /// The table, relative to this crate.
@@ -70,6 +82,9 @@ const QUALIFIER: &str = "partial";
 
 /// A verdict that admits no company: nothing is reachable, or nothing ever will be.
 const ALONE: [&str; 2] = ["none", "intrinsic"];
+
+/// The screen a row names where the dashboard is what reaches a request.
+const DASHBOARD: &str = "dashboard";
 
 /// The routes that answer no request the command line accepts.
 ///
@@ -193,6 +208,7 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         .filter(|row| tokens(&row.web).contains(&QUALIFIER))
         .count();
     let none = counted.iter().filter(|row| row.web == "none").count();
+    let silent = counted.iter().filter(|row| row.terminal == "none").count();
     let intrinsic = counted
         .iter()
         .filter(|row| tokens(&row.web).contains(&"intrinsic"))
@@ -228,6 +244,7 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         (partial, "reach it in part"),
         (none, "do not reach it at all"),
         (partial + none, "gaps"),
+        (silent, "have no terminal form"),
     ] {
         let said = spelled(number);
         assert!(
@@ -367,6 +384,56 @@ fn every_route_the_web_serves_is_claimed_by_a_row_or_declared_as_answering_none(
         "the web serves these and no row says which request they answer — add a row \
          in .docs/architecture/surface-parity.md, or declare it in UNREQUESTED: \
          {unclaimed:?}"
+    );
+}
+
+/// Every request the dashboard reaches, as the screen itself publishes them.
+fn reaches() -> BTreeSet<String> {
+    reaching::reached().into_iter().map(str::to_owned).collect()
+}
+
+/// The requests whose row claims the dashboard reaches them.
+fn claiming_the_dashboard() -> BTreeSet<String> {
+    rows()
+        .iter()
+        .filter(|row| tokens(&row.terminal).contains(&DASHBOARD))
+        .map(|row| row.request.clone())
+        .collect()
+}
+
+/// A row claiming the dashboard names a request the dashboard actually reaches.
+///
+/// The half that catches a cell written ahead of the work — a `dashboard` typed into
+/// a column while the key it names is still nobody's.
+#[test]
+fn a_row_claiming_the_dashboard_names_a_request_it_reaches() {
+    let reaches = reaches();
+    let invented: Vec<String> = claiming_the_dashboard()
+        .into_iter()
+        .filter(|request| !reaches.contains(request))
+        .collect();
+
+    assert!(
+        invented.is_empty(),
+        "the table claims the dashboard reaches these and it offers no form of them: \
+         {invented:?}"
+    );
+}
+
+/// Every request the dashboard reaches is accounted for by a row.
+///
+/// The converse, and the one that catches the failure this column kept having: an
+/// action or a question added to the screen while the table went on saying `none`,
+/// which is invisible in review because a diff adding a key looks complete.
+#[test]
+fn every_request_the_dashboard_reaches_is_claimed_by_a_row() {
+    let claimed = claiming_the_dashboard();
+    let unclaimed: Vec<String> = reaches().difference(&claimed).cloned().collect();
+
+    assert!(
+        unclaimed.is_empty(),
+        "the dashboard reaches these and no row says so — put `dashboard` in the \
+         terminal column in .docs/architecture/surface-parity.md: {unclaimed:?}"
     );
 }
 

@@ -220,6 +220,23 @@ mod tests {
         );
     }
 
+    /// The one thing this list is checked against from outside the binary. A
+    /// question offered here with no entry there leaves the parity table's terminal
+    /// column claiming less than the screen does, and an entry there naming a read
+    /// nothing asks leaves it claiming more.
+    #[test]
+    fn every_question_this_screen_asks_is_published_for_the_parity_table() {
+        let mut asked: Vec<&str> = every().map(|question| question.read).collect();
+        let mut published: Vec<&str> = lemonfiber::reaching::ASKS
+            .iter()
+            .map(|reach| reach.through)
+            .collect();
+        asked.sort_unstable();
+        published.sort_unstable();
+
+        assert_eq!(asked, published);
+    }
+
     /// The list opens on the first question and holds every one of them.
     #[test]
     fn the_list_opens_on_the_first_question_and_holds_them_all() {

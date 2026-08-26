@@ -44,9 +44,11 @@
 //! the name of a process that no longer exists.
 
 mod chooser;
+mod errand;
 mod offer;
 mod question;
 mod reading;
+mod stage;
 mod words;
 
 use lemonfiber_core::app::{Command, Outcome};
@@ -57,7 +59,8 @@ use ratatui::text::Line;
 use chooser::Chooser;
 use offer::{Choice, Offer};
 use question::Question;
-use reading::Reading;
+use reading::{complaint, lines_of, moved, unexpected, Reading};
+use stage::Stage;
 
 /// The key that opens the list of what this stack can be asked.
 ///
@@ -66,9 +69,6 @@ use reading::Reading;
 #[cfg(test)]
 pub(crate) use question::KEY as ASK;
 pub(crate) use words::Pane;
-
-/// What is said where an answer is not the shape the question had.
-const NOT_THE_ANSWER: &str = "This stack answered something other than what was asked of it.";
 
 /// What the operator pressed.
 pub(crate) enum Press {
@@ -128,60 +128,6 @@ pub(crate) enum Wanted {
     Gather,
     /// Leave the dashboard.
     Leave,
-}
-
-/// Where an action stands.
-///
-/// Every one of these is a state a frame can be drawn in. Being asked what a stack
-/// can be acted on is not one: [`Wanted::Ask`] and [`Acting::told`] are one statement
-/// in the loop, over a read that does not await, so no frame is drawn between them —
-/// which is why the offer waiting for that answer is a field rather than a stage.
-enum Stage {
-    /// Nothing is open.
-    Idle,
-    /// Choosing what to act on.
-    Choosing {
-        /// The action being chosen for.
-        offer: &'static Offer,
-        /// What it can be given, one of them selected.
-        chooser: Chooser<Choice>,
-    },
-    /// Holding the question before anything is done.
-    Confirming {
-        /// The action about to be taken.
-        offer: &'static Offer,
-        /// What it is about to be taken on.
-        chosen: Choice,
-    },
-    /// The action is with the core.
-    Running {
-        /// The action that is running.
-        offer: &'static Offer,
-        /// What it is running on.
-        chosen: Choice,
-    },
-    /// What it came to, until it is put away.
-    Came(Reading),
-    /// Choosing what to ask this stack.
-    Wondering(Chooser<&'static Question>),
-    /// Typing the word a question has to be given.
-    Typing {
-        /// The question waiting on it.
-        question: &'static Question,
-        /// What is asked for, above the line being typed.
-        asks: &'static str,
-        /// What has been typed of it.
-        typed: String,
-    },
-    /// The question is with the core.
-    Waiting(&'static Question),
-    /// What it answered, until it is put away.
-    Answered {
-        /// The question that was asked.
-        question: &'static Question,
-        /// The answer, and where in it the box is.
-        reading: Reading,
-    },
 }
 
 /// What this screen has open, and what it is waiting for.
@@ -247,6 +193,21 @@ impl Acting {
                 typed,
             } => self.typing(question, asks, typed, press),
             Stage::Waiting(question) => self.while_waiting(question, press),
+            Stage::Sending(chooser) => errand::sending(&mut self.stage, chooser, press),
+            Stage::Naming {
+                errand,
+                asks,
+                typed,
+            } => errand::naming(&mut self.stage, errand, asks, typed, press),
+            Stage::Weighing { errand, typed } => {
+                errand::weighing(&mut self.stage, errand, typed, press)
+            }
+            Stage::Agreeing {
+                errand,
+                typed,
+                would,
+            } => errand::agreeing(&mut self.stage, errand, typed, would, press),
+            Stage::Doing { errand, typed } => errand::doing(&mut self.stage, errand, typed, press),
             // A reading moves, and any key that is not a move puts it away — the
             // way the pane of words is put away.
             Stage::Came(mut reading) => {
@@ -279,6 +240,11 @@ impl Acting {
             Press::Typed(question::KEY) => {
                 let (first, rest) = question::all();
                 self.stage = Stage::Wondering(Chooser::over(first, rest));
+                Wanted::Nothing
+            }
+            Press::Typed(errand::KEY) => {
+                let (first, rest) = errand::all();
+                self.stage = Stage::Sending(Chooser::over(first, rest));
                 Wanted::Nothing
             }
             Press::Typed(key) => self.begin(key),
@@ -466,6 +432,19 @@ impl Acting {
                 Ok(_) => unexpected(),
                 Err(problem) => complaint(&problem),
             })),
+            // What an errand would do is the answer the operator reads before
+            // agreeing, so it lands on the question rather than closing over it. A
+            // failure ends the errand there: there is nothing to agree to.
+            Stage::Weighing { errand, typed } => match answer {
+                Ok(outcome) => {
+                    errand::weighed(errand, typed, lines_of(&crate::render::shaped(&outcome)))
+                }
+                Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
+            },
+            Stage::Doing { .. } => Stage::Came(Reading::of(match answer {
+                Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
+                Err(problem) => complaint(&problem),
+            })),
             // Rendered by the same renderer the command line reaches for the same
             // answer, so the two surfaces cannot come to say different things about
             // one stack.
@@ -499,47 +478,18 @@ impl Acting {
     }
 }
 
-/// Move through a reading, saying whether the press was a move at all.
-///
-/// A press that is not a move puts the reading away, which is how the pane of words
-/// is put away too: one shape of dismissal on a screen where several boxes open.
-fn moved(reading: &mut Reading, press: &Press) -> bool {
-    match *press {
-        Press::Back => reading.back(),
-        Press::Forward => reading.forward(),
-        _ => return false,
-    }
-    true
-}
-
-/// An answer that is not the shape the question had.
-///
-/// Every command this screen sends has one shape of answer, so nothing reaches
-/// this in an ordinary run. It is said rather than shown as nothing, because a
-/// screen that went quiet would read as an action that never ran.
-fn unexpected() -> Vec<String> {
-    vec![NOT_THE_ANSWER.to_owned()]
-}
-
-/// A failure, in the words the command line gives for the same one.
-fn complaint(problem: &Problem) -> Vec<String> {
-    lines_of(&crate::exit::reported(problem, false))
-}
-
-/// A rendered answer as the rows a screen draws.
-fn lines_of(lines: &crate::render::Lines) -> Vec<String> {
-    lines.text().lines().map(str::to_owned).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::offer::tests::{a_listing, nothing_declared};
-    use super::{meaning, question, Acting, Line, Press, Wanted};
+    use super::{errand, meaning, question, Acting, Line, Press, Wanted};
     use crate::render::fixtures::{a_lifecycle, a_plan};
-    use lemonfiber_core::app::{Command, Outcome, Waiting};
+    use lemonfiber_core::app::restore::Kept;
+    use lemonfiber_core::app::{backup, Command, Outcome, Waiting};
+    use lemonfiber_core::backup::Scope;
     use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
-    use lemonfiber_core::model::{FormsReport, VersionReport};
+    use lemonfiber_core::model::{FormsReport, ResetReport, StackEdit, VersionReport};
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use std::path::PathBuf;
 
     /// The screen, having got as far as the list for one action.
     fn choosing(key: char, report: FormsReport) -> (Acting, Wanted) {
@@ -1181,5 +1131,293 @@ mod tests {
 
         assert_ne!(showing(&acting), opened);
         assert!(showing(&acting).contains("1 more line above"));
+    }
+
+    /// The screen, having taken one errand off the list the `more` key opens.
+    fn sending(action: &str) -> (Acting, Wanted) {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(errand::KEY));
+        let named = errand::tests::listed(action);
+        while !showing(&acting).contains(&format!("> {named}")) {
+            acting.pressed(&Press::Forward);
+        }
+        let wanted = acting.pressed(&Press::Accept);
+        (acting, wanted)
+    }
+
+    /// What a reset would revert, or did.
+    fn a_reset(confirmed: bool) -> ResetReport {
+        ResetReport {
+            reverted: vec![StackEdit {
+                path: "compose.yaml".to_owned(),
+                diff: "-yours\n+ours".to_owned(),
+            }],
+            reverted_connections: vec!["sonarr → sabnzbd".to_owned()],
+            confirmed,
+        }
+    }
+
+    /// What a capture produced.
+    fn a_capture() -> backup::Report {
+        backup::Report {
+            path: PathBuf::from("/data/lemonfiber/backups/lemonfiber-full-1.tar.gz"),
+            scope: Scope::WholeStack,
+            sensitive: false,
+            pruned: Vec::new(),
+        }
+    }
+
+    /// The other half of what this screen exists to prove: an errand takes the key
+    /// that opens the rest of them, a choice off that list, and an explicit yes
+    /// before anything reaches a command — and the command is one of the core's own.
+    #[test]
+    fn an_errand_takes_a_key_a_choice_and_an_answer_before_it_reaches_a_command() {
+        let (mut acting, opened) = sending("seed");
+        assert_eq!(opened, Wanted::Nothing);
+
+        let said = showing(&acting);
+        assert!(said.contains("Wire the services to each other?"), "{said}");
+
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Seed)
+        );
+    }
+
+    /// The claim the destructive errands are built around: what would be lost is on
+    /// the screen before the question is put, not after the answer is given.
+    #[test]
+    fn a_reset_says_what_it_would_throw_away_before_it_asks() {
+        let (mut acting, weighing) = sending("reset");
+        assert_eq!(weighing, Wanted::Carry(Command::Reset { confirm: false }));
+
+        acting.came_to(Ok(Outcome::Reset(a_reset(false))));
+
+        let said = showing(&acting);
+        let before = said
+            .split("Throw away every edit above?")
+            .next()
+            .unwrap_or_default();
+        assert!(before.contains("sonarr → sabnzbd"), "{said}");
+        assert!(before.contains("compose.yaml"), "{said}");
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Reset { confirm: true })
+        );
+    }
+
+    /// The same reading for a restore, which overwrites a configuration rather than
+    /// discarding edits: the archive is named, what it holds is read, and only then
+    /// is the overwrite agreed to.
+    #[test]
+    fn a_restore_is_named_read_and_only_then_agreed_to() {
+        let (mut acting, opened) = sending("restore");
+        assert_eq!(opened, Wanted::Nothing);
+        assert!(showing(&acting).contains("Which backup"));
+
+        for character in "lemonfiber-full-1.tar.gz".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        let listing = acting.pressed(&Press::Accept);
+
+        assert_eq!(
+            listing,
+            Wanted::Carry(Command::Restore {
+                archive: Kept::Named("lemonfiber-full-1.tar.gz".to_owned()),
+                repoint: false,
+                confirm: false,
+            })
+        );
+    }
+
+    /// A restore asked for with nothing typed is refused in the words the web
+    /// surface gives for the same request, rather than in a sentence written here.
+    #[test]
+    fn a_restore_with_no_name_says_what_is_missing() {
+        let (mut acting, _) = sending("restore");
+
+        assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
+
+        let said = showing(&acting);
+        assert!(said.contains("restore"), "{said}");
+        assert!(said.contains("archive"), "{said}");
+    }
+
+    /// What an errand came to is shown in the words the command line gives for the
+    /// same run, and the screen behind it goes on being the report while it runs.
+    #[test]
+    fn an_errand_under_way_covers_nothing_and_says_what_it_came_to() {
+        let (mut acting, _) = sending("backup");
+        acting.pressed(&Press::Typed('y'));
+
+        assert!(acting.pane(20, 100).is_none());
+        let footing = footing(&acting);
+        assert!(footing.contains("a backup"), "{footing}");
+        assert!(
+            acting
+                .staying_for()
+                .is_some_and(|said| said.contains("a backup")),
+            "an errand with the core is waited for"
+        );
+
+        acting.came_to(Ok(Outcome::Backup(a_capture())));
+
+        let said = showing(&acting);
+        assert!(said.contains("Backed up"), "{said}");
+    }
+
+    /// An errand that failed says so in the command line's own words, the way an
+    /// action that failed does — a screen that went quiet would read as an errand
+    /// that never ran.
+    #[test]
+    fn an_errand_that_failed_says_why_in_the_words_the_command_line_gives() {
+        let (mut acting, _) = sending("seed");
+        acting.pressed(&Press::Typed('y'));
+
+        acting.came_to(Err(Box::new(a_failure())));
+
+        let said = showing(&acting);
+        assert!(said.contains("could not be reached"), "{said}");
+    }
+
+    /// An errand with the core can be left, and leaving does not stop it — the same
+    /// reading a running action gets, because the same process holds the claim.
+    #[test]
+    fn leaving_while_an_errand_runs_leaves_the_screen_and_not_the_run() {
+        let (mut acting, _) = sending("seed");
+        acting.pressed(&Press::Typed('y'));
+
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+        assert_eq!(acting.pressed(&Press::Typed('q')), Wanted::Leave);
+    }
+
+    /// Anything that is not an explicit yes leaves the stack as it is, and the box
+    /// closes rather than staying open over a decision already taken.
+    #[test]
+    fn an_errand_answered_with_anything_else_changes_nothing() {
+        let (mut acting, _) = sending("seed");
+
+        assert_eq!(acting.pressed(&Press::Typed('n')), Wanted::Nothing);
+
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// What a reset would do moves under the arrows, and moving is not agreeing:
+    /// the question is still there afterwards and nothing has been sent.
+    #[test]
+    fn what_an_errand_would_do_moves_without_agreeing_to_it() {
+        let (mut acting, _) = sending("reset");
+        acting.came_to(Ok(Outcome::Reset(a_reset(false))));
+        let opened = showing(&acting);
+
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+
+        let moved = showing(&acting);
+        assert_ne!(moved, opened);
+        assert!(moved.contains("Throw away every edit above?"), "{moved}");
+        assert!(moved.contains("1 more line above"), "{moved}");
+    }
+
+    /// Backing out of the list, the line and the wait each leave the screen clear,
+    /// so no half-answered errand is left open behind whatever came next.
+    #[test]
+    fn backing_out_of_an_errand_leaves_the_screen_clear() {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(errand::KEY));
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        assert!(showing(&acting).is_empty());
+
+        let (mut acting, _) = sending("restore");
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        assert!(showing(&acting).is_empty());
+
+        let (mut acting, _) = sending("reset");
+        assert_eq!(acting.pressed(&Press::Forward), Wanted::Nothing);
+        assert!(showing(&acting).contains("working out what this would do"));
+        assert_eq!(acting.pressed(&Press::Abandon), Wanted::Nothing);
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// Moving over the errands and typing at them take nothing, the way moving over
+    /// an action's subjects does: a stray key over a list is not an answer to it.
+    #[test]
+    fn moving_over_the_errands_and_typing_at_them_take_nothing() {
+        let mut acting = Acting::opened();
+        acting.pressed(&Press::Typed(errand::KEY));
+
+        acting.pressed(&Press::Forward);
+        acting.pressed(&Press::Back);
+        assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
+
+        let said = showing(&acting);
+        assert!(said.contains("> wiring"), "{said}");
+    }
+
+    /// The line an errand is named on ignores a move and takes back what was typed,
+    /// the way the line a question is typed on does.
+    #[test]
+    fn the_line_an_errand_is_named_on_takes_back_what_was_typed() {
+        let (mut acting, _) = sending("restore");
+
+        acting.pressed(&Press::Typed('a'));
+        acting.pressed(&Press::Typed('b'));
+        acting.pressed(&Press::Rubout);
+        acting.pressed(&Press::Forward);
+
+        let said = showing(&acting);
+        assert!(said.contains("> a"), "{said}");
+        assert!(!said.contains("> ab"), "{said}");
+    }
+
+    /// A stack that will not say what an errand would do ends the errand there:
+    /// there is nothing to agree to, and the failure is said in the command line's
+    /// own words.
+    #[test]
+    fn an_errand_the_stack_will_not_weigh_says_why_and_asks_nothing() {
+        let (mut acting, _) = sending("reset");
+
+        acting.came_to(Err(Box::new(a_failure())));
+
+        let said = showing(&acting);
+        assert!(said.contains("could not be reached"), "{said}");
+        assert!(!said.contains("Throw away"), "{said}");
+    }
+
+    /// An errand naming an action no surface offers reaches no command and says so.
+    /// Nothing on the list is one, and that is what the guard beside the list holds;
+    /// this is the arm that would carry a name that stopped being offered.
+    #[test]
+    fn an_errand_naming_an_action_nothing_offers_says_so() {
+        let mut acting = Acting::opened();
+
+        let wanted = errand::agreeing(
+            &mut acting.stage,
+            &errand::tests::UNTRANSLATABLE,
+            String::new(),
+            None,
+            &Press::Typed('y'),
+        );
+
+        assert_eq!(wanted, Wanted::Nothing);
+        let said = showing(&acting);
+        assert!(said.contains("There is no action named"), "{said}");
+    }
+
+    /// Every request this screen reaches is one of the two lists it is built from,
+    /// and every entry on those lists is a request it reaches. What the parity
+    /// table's terminal column is held to is this list, so a screen that grew an
+    /// offer nothing published would leave that column quietly short.
+    #[test]
+    fn what_this_screen_reaches_is_what_it_publishes() {
+        let published = lemonfiber::reaching::reached();
+
+        for request in ["up", "seed", "reset", "restore", "version", "trace"] {
+            assert!(published.contains(&request), "{request} is not published");
+        }
+        assert!(
+            !published.contains(&"watch"),
+            "nothing here reaches a watch"
+        );
+        assert!(!published.contains(&"ui"), "a surface cannot start itself");
     }
 }

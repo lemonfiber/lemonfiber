@@ -232,7 +232,13 @@ pub(crate) mod tests {
     /// The four keys the screen already answers stay answered by it.
     #[test]
     fn no_action_takes_a_key_the_screen_already_uses() {
-        for taken in ['q', 'r', '?', crate::acting::question::KEY] {
+        for taken in [
+            'q',
+            'r',
+            '?',
+            crate::acting::question::KEY,
+            crate::acting::errand::KEY,
+        ] {
             assert!(for_key(taken).is_none(), "{taken:?} was already spoken for");
         }
     }
