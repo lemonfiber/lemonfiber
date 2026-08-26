@@ -115,6 +115,12 @@ pub const NO_TERM: &str = "What to follow must be named.";
 /// What is said to a request whose season is not a number.
 pub const NOT_A_SEASON: &str = "Which season to narrow to must be a number.";
 
+/// What is said to a request that named no setting to read.
+pub const NO_SETTING: &str = "Which setting to read must be named.";
+
+/// What is said to a request that named no household member to narrow to.
+pub const NO_MEMBER: &str = "Which member to narrow to must be named.";
+
 /// What is said to a request naming a group of checks that is not one.
 pub const NO_SUCH_GROUP: &str = "There is no group of checks and no check by that name.";
 
@@ -185,10 +191,10 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         SERVICES => Ok(Command::Ps { forms }),
         CHECKS => narrowed(only.as_deref()).ok_or(NO_SUCH_GROUP),
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
-        REQUESTS => Ok(Command::Household { member }),
+        REQUESTS => household(member),
         TRACE => following(term, season.as_deref()),
         STUCK => Ok(Command::Stuck),
-        CONFIG => Ok(key.map_or(Command::ConfigShow, |key| Command::ConfigGet { key })),
+        CONFIG => setting(key),
         QUALITY => Ok(Command::Quality(QualityAction::Show)),
         // Naming an empty word is naming one this product does not explain, and is
         // refused for that by the command rather than read as having named none.
@@ -216,6 +222,43 @@ fn narrowed(only: Option<&str>) -> Option<Command> {
     match only {
         None => Some(diagnosing(Narrowing::Suite)),
         Some(name) => Narrowing::parse(name).map(diagnosing),
+    }
+}
+
+/// Every setting, or the one that was named.
+///
+/// Naming none and naming an empty one are different requests here, which is why
+/// this cannot do what a restore does with a name it was given none of and read the
+/// empty one as absent: absent already means every setting, so an empty name read
+/// that way would answer a question nobody asked. It is refused instead — and
+/// refused here rather than at whichever surface supplied it, so a line typed at a
+/// screen and a query string arriving empty are answered in the same sentence.
+///
+/// Before this, an empty one reached the core as a setting to look for, matched
+/// nothing, and came back as a listing of no settings — which reads as "there is no
+/// such setting" about a setting nobody named.
+fn setting(key: Option<String>) -> Result<Command, &'static str> {
+    match key {
+        None => Ok(Command::ConfigShow),
+        Some(key) if key.is_empty() => Err(NO_SETTING),
+        Some(key) => Ok(Command::ConfigGet { key }),
+    }
+}
+
+/// What the household asked for, narrowed to one member or taken whole.
+///
+/// Empty is refused for the reason it is refused of a setting, and the answer it
+/// used to give was worse: a member nobody named matched nobody, and a report of no
+/// requests reads as "nobody has asked for anything" — which is exactly the reading
+/// [`lemonfiber_core::app`]'s own household reader refuses to produce when it cannot
+/// reach the request service.
+fn household(member: Option<String>) -> Result<Command, &'static str> {
+    match member {
+        None => Ok(Command::Household { member: None }),
+        Some(member) if member.is_empty() => Err(NO_MEMBER),
+        Some(member) => Ok(Command::Household {
+            member: Some(member),
+        }),
     }
 }
 

@@ -8,8 +8,9 @@
 //!
 //! Five flows share the list at the top and the reading at the bottom. An action on
 //! a key of its own is chosen a subject and then asked about; a question is taken off
-//! a list and then answered; an errand is taken off another list, given a name where
-//! it needs one, and shown what it would do before it is asked about; one of the
+//! a list and then answered, or answered with a list of its own and taken off that
+//! too; an errand is taken off another list, given a name where it needs one, and
+//! shown what it would do before it is asked about; one of the
 //! two that keep going is taken off a third, told what to look for or chosen a form,
 //! and then watched rather than waited for; and a quality change is taken off a
 //! fourth, chosen a preset or asked what it would cost, and then asked about. What
@@ -23,6 +24,7 @@
 use super::chooser::Chooser;
 use super::errand::Errand;
 use super::lasting::{Begun, Lasting};
+use super::narrowing::Subject;
 use super::offer::{Choice, Offer, Taken};
 use super::quality::{Change, Grade};
 use super::question::Question;
@@ -68,6 +70,20 @@ pub(super) enum Stage {
     },
     /// The question is with the core.
     Waiting(&'static Question),
+    /// One of the things the question listed is with the core.
+    ///
+    /// Apart from [`Stage::Waiting`] because what comes back is a different shape:
+    /// there it is the listing to take one of, here it is the answer about the one
+    /// taken. One stage for both would have to guess which, and it would guess wrong
+    /// exactly once per narrowing — on the answer.
+    Following(&'static Question),
+    /// Choosing which of the things a question listed it is really about.
+    Narrowing {
+        /// The question being narrowed, which is what the box is titled by.
+        question: &'static Question,
+        /// The entries it listed, one of them selected.
+        chooser: Chooser<Subject>,
+    },
     /// What it answered, until it is put away.
     Answered {
         /// The question that was asked.

@@ -112,8 +112,16 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
         Stage::Came(reading) => (CAME.to_owned(), read(reading, rows, across)),
         Stage::Wondering(chooser) => (ASK.to_owned(), choosing(chooser, rows, across)),
         Stage::Typing { asks, typed, .. } => (ASK.to_owned(), typing(asks, typed, across)),
-        Stage::Waiting(question) => (asked(question), vec![dimmed(ANSWERING, across)]),
+        Stage::Waiting(question) | Stage::Following(question) => {
+            (asked(question), vec![dimmed(ANSWERING, across)])
+        }
         Stage::Answered { question, reading } => (asked(question), read(reading, rows, across)),
+        // Titled by the question rather than by the taking, because what is on
+        // the screen is that question's answer — a list of what there is, which
+        // taking one of asks the next question about it.
+        Stage::Narrowing { question, chooser } => {
+            (asked(question), choosing(chooser, rows, across))
+        }
         Stage::Sending(chooser) => (MORE.to_owned(), choosing(chooser, rows, across)),
         Stage::Naming {
             errand,
@@ -436,8 +444,9 @@ mod tests {
     use super::{footer, keys, pane, staying_for, Offer, Stage};
     use crate::acting::chooser::Chooser;
     use crate::acting::errand::{self, Errand};
+    use crate::acting::narrowing::Subject;
     use crate::acting::offer::{Choice, Taken, OFFERED};
-    use crate::acting::question::{Needed, Question, HINT, KEY};
+    use crate::acting::question::{Narrows, Needed, Question, HINT, KEY};
     use crate::acting::reading::Reading;
     use lemonfiber_core::app::Command;
     use ratatui::text::Line;
@@ -456,7 +465,21 @@ mod tests {
         name: "where one thing is",
         about: "follow one show or film across the services",
         read: "/api/trace",
-        needs: Needed::Term("What to follow"),
+        needs: Needed::Typed {
+            asks: "What to follow",
+            narrows: Narrows::Term,
+        },
+    };
+
+    /// One question that is narrowed by taking an entry off its own listing.
+    static A_STUCK: Question = Question {
+        name: "what is stuck",
+        about: "the downloads that have stopped, each one followable",
+        read: "/api/stuck",
+        needs: Needed::Picked {
+            at: "/api/trace",
+            narrows: Narrows::Term,
+        },
     };
 
     /// A reading over nine numbered lines.
@@ -531,6 +554,23 @@ mod tests {
     }
 
     /// A chooser over two, for the list tests.
+    fn two_listed() -> Chooser<Subject> {
+        Chooser::over(
+            a_subject("Full stack", "everything, behind the tunnel"),
+            vec![a_subject("Lean stack", "the download clients only")],
+        )
+    }
+
+    /// One of the things a listing offered, the command behind it beside the point
+    /// for a test that only reads what is drawn.
+    fn a_subject(name: &str, about: &str) -> Subject {
+        Subject {
+            name: name.to_owned(),
+            about: about.to_owned(),
+            command: Command::Stuck,
+        }
+    }
+
     fn two() -> Chooser<Choice> {
         Chooser::over(
             a_choice("Full stack", "everything, behind the tunnel"),
@@ -817,6 +857,23 @@ mod tests {
         assert!(said.contains("line 0"), "{said}");
     }
 
+    /// A listing offered to be taken one of is drawn under the name of the question
+    /// that listed it, and read as a list rather than as an answer — so what is on
+    /// the screen says both what was asked and that there is something to do with it.
+    #[test]
+    fn a_listing_to_take_one_of_is_drawn_under_the_question_that_listed_it() {
+        let stage = Stage::Narrowing {
+            question: &A_STUCK,
+            chooser: two_listed(),
+        };
+
+        let said = said(&stage, 20, 80);
+
+        assert!(said.contains("what is stuck"), "{said}");
+        assert!(said.contains("> Full stack"), "{said}");
+        assert!(said.contains("enter"), "{said}");
+    }
+
     /// A control character in another service's account of a failure is an
     /// instruction to a terminal, and the screen must not carry one.
     #[test]
@@ -859,6 +916,10 @@ mod tests {
             Stage::Answered {
                 question: &A_TRACE,
                 reading: nine(),
+            },
+            Stage::Narrowing {
+                question: &A_STUCK,
+                chooser: two_listed(),
             },
             Stage::Came(nine()),
         ];

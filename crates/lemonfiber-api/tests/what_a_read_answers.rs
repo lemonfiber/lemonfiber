@@ -355,6 +355,20 @@ async fn naming_a_member_narrows_what_the_household_read_reports() {
     );
 }
 
+/// Naming none is the whole household, so an empty name cannot be read as naming
+/// none. Left to reach the core it matched nobody and answered with a household
+/// that has asked for nothing — the one reading this report is written to refuse.
+#[tokio::test]
+async fn a_member_given_and_left_empty_narrowed_to_nobody() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/requests?member=").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "Which member to narrow to must be named.".to_owned()
+        ))
+    );
+}
+
 #[tokio::test]
 async fn what_the_services_said_arrives_as_one_envelope_a_line() {
     // A stream has no last element to close a document with, so the command line
@@ -588,6 +602,44 @@ async fn naming_a_setting_reads_that_one_rather_than_all_of_them() {
             && body.contains(r#""key":"LEMONFIBER_USENET""#)
             && !body.contains("SONARR_API_KEY")),
         "a named setting is the setting reported on"
+    );
+}
+
+/// The same rule for a setting, and the answer it used to give was quieter: an
+/// empty name matched no setting and came back as a listing of none, which reads
+/// as "there is no such setting" about a setting nobody named.
+#[tokio::test]
+async fn a_setting_given_and_left_empty_named_no_setting() {
+    assert_eq!(
+        asked(configured("no-setting", &kept()), "/api/config?key=").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "Which setting to read must be named.".to_owned()
+        ))
+    );
+}
+
+/// Naming one setting is not a way past the withholding.
+///
+/// The narrowing happens after the display path rather than instead of it, so a
+/// credential asked for by name comes back withheld exactly as the listing withholds
+/// it. Worth asserting rather than assuming: a read that filtered the file and then
+/// displayed what it found would pass every other test on this page and hand over
+/// the value.
+#[tokio::test]
+async fn naming_a_credential_reads_it_withheld_as_the_listing_withholds_it() {
+    let seen = asked(
+        configured("named-credential", &kept()),
+        "/api/config?key=SONARR_API_KEY",
+    )
+    .await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && !body.contains(&a_value())
+            && body.contains(&format!(
+                r#""key":"SONARR_API_KEY","value":"{REDACTED}","secret":true"#
+            ))),
+        "a credential named on its own is withheld the way it is in the listing"
     );
 }
 

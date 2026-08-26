@@ -206,7 +206,15 @@ fn every_displayed_setting_says_why_it_is_one() {
 
 /// The module trees that draw a full screen, which is where a setting could reach
 /// a terminal without passing the display path.
-const DRAWING: [&str; 4] = ["acting", "dashboard", "pane.rs", "terminal.rs"];
+///
+/// Trees rather than files. `terminal.rs` was named here as a file and stopped being
+/// the whole of the terminal the day `terminal/` grew beside it: `dashboard.rs` and
+/// `screen.rs` moved under that directory, and neither `/src/terminal.rs` nor
+/// `/src/dashboard` matches `/src/terminal/dashboard.rs` — so the file that draws the
+/// dashboard sat outside this guard while the guard went on passing. A name that
+/// matches a directory as readily as a file is what stops that happening again, and
+/// the test below refuses to let one of these match nothing at all.
+const DRAWING: [&str; 4] = ["acting", "dashboard", "pane.rs", "terminal"];
 
 /// How the settings are read, which no screen may do for itself.
 const READING: [&str; 2] = ["config::store", "env_file"];
@@ -221,20 +229,35 @@ const READING: [&str; 2] = ["config::store", "env_file"];
 #[test]
 fn nothing_that_draws_a_screen_reads_a_setting_for_itself() {
     let mut reaching: Vec<String> = Vec::new();
+    let mut watched: Vec<&str> = Vec::new();
     for (path, text) in source_tree::sources() {
         let where_it_lives = path.to_string_lossy().replace('\\', "/");
-        let drawn = DRAWING
+        let Some(tree) = DRAWING
             .iter()
-            .any(|tree| where_it_lives.contains(&format!("/src/{tree}")));
-        if !drawn {
+            .find(|tree| where_it_lives.contains(&format!("/src/{tree}")))
+        else {
             continue;
-        }
+        };
+        watched.push(tree);
         for (number, line) in source_tree::production(&text).lines().enumerate() {
             if READING.iter().any(|how| line.contains(how)) {
                 reaching.push(format!("{where_it_lives}:{}", number + 1));
             }
         }
     }
+
+    // What this guard is actually reading, asserted before what it found. A name here
+    // that matches nothing is a tree renamed out from under it, and the failure that
+    // causes is silence: the guard goes on passing about code it can no longer see.
+    let unwatched: Vec<&&str> = DRAWING
+        .iter()
+        .filter(|tree| !watched.contains(tree))
+        .collect();
+    assert!(
+        unwatched.is_empty(),
+        "these name no source file, so this guard is watching less than it says it \
+         is — a screen has been renamed or moved: {unwatched:?}"
+    );
 
     assert!(
         reaching.is_empty(),
