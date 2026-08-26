@@ -91,15 +91,15 @@ pub(super) fn choosing<T: Listed>(
 ///
 /// Read off the entries rather than handed in, because whether a list takes several
 /// is a fact about what is on it: a question and an errand cannot be taken together
-/// and say so by having nowhere to put a mark.
+/// and say so by having nowhere to put a mark. A list none of whose entries can be
+/// marked answers nothing at all, which is what tells the line underneath which of
+/// the two things it has to say.
 fn marks<T: Listed>(chooser: &Chooser<T>) -> Option<usize> {
-    let mut marked = None;
-    for (_, entry) in chooser.listed() {
-        if let Some(here) = entry.marked() {
-            marked = Some(marked.unwrap_or(0) + usize::from(here));
-        }
-    }
-    marked
+    chooser
+        .listed()
+        .filter_map(|(_, entry)| entry.marked())
+        .map(usize::from)
+        .reduce(usize::saturating_add)
 }
 
 /// What the line under a list says, which is what enter would do.
@@ -120,39 +120,53 @@ fn hint(marked: Option<usize>) -> String {
 
 /// One entry on a list: where the cursor is, whether it is marked, and what it says.
 fn offered(here: bool, entry: &impl Listed, across: usize) -> Line<'static> {
-    let mark = match entry.marked() {
-        None => String::new(),
-        Some(true) => format!("{MARKED} "),
-        Some(false) => format!("{UNMARKED} "),
-    };
     row(
-        &format!("{}{mark}", if here { "> " } else { "  " }),
-        entry,
+        &leading(here, entry.marked()),
+        entry.name(),
+        entry.about(),
         across,
     )
 }
 
+/// What leads a row: where the cursor is, and the box where the list takes several.
+///
+/// A list that takes one has no box at all rather than an empty one, which is how it
+/// says that nothing on it could be taken with anything else.
+fn leading(here: bool, marked: Option<bool>) -> String {
+    let cursor = if here { "> " } else { "  " };
+    match marked {
+        None => cursor.to_owned(),
+        Some(true) => format!("{cursor}{MARKED} "),
+        Some(false) => format!("{cursor}{UNMARKED} "),
+    }
+}
+
 /// One entry somewhere the cursor is not, which is where several are being named.
-pub(super) fn named(entry: &impl Listed, across: usize) -> Line<'static> {
-    row("  ", entry, across)
+pub(super) fn named(name: &str, about: &str, across: usize) -> Line<'static> {
+    row("  ", name, about, across)
 }
 
 /// One row: whatever leads it, the name, and what it is for beside it.
-fn row(leading: &str, entry: &impl Listed, across: usize) -> Line<'static> {
+///
+/// Three pieces of text rather than something [`Listed`], because the entry has
+/// already been asked its two questions by then and a row is a layout — it is the
+/// same layout for a row the cursor is on and for one being named in a question,
+/// which have nothing else in common.
+fn row(leading: &str, name: &str, about: &str, across: usize) -> Line<'static> {
     // What leads the row and the two spaces after the name are taken off before the
     // name is fitted, so the row it ends up on is the width it was given rather than
     // that width plus whatever the lead cost. The whole of it is then fitted again,
     // because on a screen narrower than the lead itself the name has already been cut
     // to nothing and what is left to give back is the lead.
-    let name = shortened(
-        entry.name(),
+    let fitted = shortened(
+        name,
         across.saturating_sub(leading.chars().count().saturating_add(2)),
     );
-    let named = shortened(&format!("{leading}{name}  "), across);
+    let named = shortened(&format!("{leading}{fitted}  "), across);
     let room = across.saturating_sub(named.chars().count());
     Line::from(vec![
         Span::raw(named),
-        Span::styled(shortened(entry.about(), room), quiet()),
+        Span::styled(shortened(about, room), quiet()),
     ])
 }
 

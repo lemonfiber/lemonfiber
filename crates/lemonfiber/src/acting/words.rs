@@ -419,7 +419,7 @@ fn covering(taken: &Taken, room: usize, across: usize) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = covers
         .iter()
         .take(room)
-        .map(|choice| named(choice, across))
+        .map(|choice| named(&choice.name, &choice.about, across))
         .collect();
     let left = covers.len().saturating_sub(lines.len());
     if left > 0 {

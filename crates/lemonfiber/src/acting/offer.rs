@@ -290,6 +290,21 @@ pub(super) enum Over {
     Left,
 }
 
+/// What a taken list came to, with a refusal put where the operator is looking.
+///
+/// One place for both lists. A refusal that read differently under one key than under
+/// another would be this screen having an opinion about a translation it does not
+/// own — and it is the same box an action refused a subject already opens.
+pub(super) fn or_refused(stage: &mut Stage, taken: Result<Taken, String>) -> Option<Taken> {
+    match taken {
+        Ok(taken) => Some(taken),
+        Err(refused) => {
+            *stage = Stage::Came(Reading::of(vec![refused]));
+            None
+        }
+    }
+}
+
 /// Over a list of the stack's own forms: move, mark, take, or leave it.
 pub(super) fn over(action: &str, mut chooser: Chooser<Choice>, press: &Press) -> Over {
     match *press {
@@ -313,8 +328,11 @@ pub(super) fn choosing(
     match over(offer.action, chooser, press) {
         Over::Left => (),
         Over::Choosing(chooser) => *stage = Stage::Choosing { offer, chooser },
-        Over::Taken(Ok(taken)) => *stage = Stage::Confirming { offer, taken },
-        Over::Taken(Err(refused)) => *stage = Stage::Came(Reading::of(vec![refused])),
+        Over::Taken(taken) => {
+            if let Some(taken) = or_refused(stage, taken) {
+                *stage = Stage::Confirming { offer, taken };
+            }
+        }
     }
     Wanted::Nothing
 }
@@ -375,8 +393,8 @@ fn subjects(report: &FormsReport) -> Vec<(Vec<String>, String, String)> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{
-        for_key, marking, over, subjects, taking, Choice, Chooser, Command, Over, Press, OFFERED,
-        WHOLE,
+        for_key, marking, or_refused, over, subjects, taking, Choice, Chooser, Command, Over,
+        Press, Stage, OFFERED, WHOLE,
     };
     use lemonfiber_api::actions::{named, Arguments, OFFERED as WEB};
     use lemonfiber_core::model::{FormReport, FormsReport};
@@ -543,36 +561,64 @@ pub(crate) mod tests {
         );
     }
 
+    /// What the screen would say about a stage, as one piece of text.
+    fn said(stage: &Stage) -> String {
+        crate::acting::words::pane(stage, 20, 100).map_or_else(String::new, |pane| {
+            pane.lines
+                .iter()
+                .flat_map(|line| line.spans.iter())
+                .map(|span| span.content.as_ref())
+                .collect::<Vec<&str>>()
+                .join(" ")
+        })
+    }
+
     /// A list the translation will not carry is refused in the words the web surface
-    /// gives, rather than being swallowed on the way to a command. Nothing on this
-    /// screen can reach it — every action here is one the table knows, which the test
-    /// above this file's list already holds — and it is the second place a refusal
-    /// can arrive, so it answers the same way the first does.
+    /// gives, and those words are put where the operator is looking rather than
+    /// swallowed on the way to a command.
+    ///
+    /// Nothing this screen offers can reach it: every action here and the guard next
+    /// door are names the web's table knows, which the test at the top of this list
+    /// and its twin beside the other one both hold. So it is driven through a name
+    /// that is not — and it is one path for both lists, because a refusal that read
+    /// differently under one key than under another would be this screen having an
+    /// opinion about a translation it does not own.
     #[test]
-    fn a_list_the_translation_refuses_is_refused_in_its_own_words() {
+    fn a_list_the_translation_refuses_is_put_in_front_of_the_operator() {
         let mut chooser = at(a_list(), "full stack");
         marking(&mut chooser);
+        let mut stage = Stage::Idle;
 
-        let refused = taking("nonsense", chooser).err().unwrap_or_default();
+        let taken = or_refused(&mut stage, taking("nonsense", chooser));
 
-        assert!(refused.contains("nonsense"), "{refused}");
+        assert!(taken.is_none());
+        assert!(said(&stage).contains("nonsense"), "{}", said(&stage));
+    }
+
+    /// The list a press left behind, where it left one.
+    fn still_choosing(pressed: Over) -> Option<Chooser<Choice>> {
+        match pressed {
+            Over::Choosing(chooser) => Some(chooser),
+            Over::Taken(_) | Over::Left => None,
+        }
     }
 
     /// Space reaches the marking, enter reaches the taking, and escape leaves the
     /// list with nothing taken — the three things a press over this list can be.
     #[test]
     fn a_press_over_the_list_marks_takes_or_leaves_it() {
-        let marked = match over("pull", at(a_list(), "full stack"), &Press::Typed(' ')) {
-            Over::Choosing(chooser) => marked(&chooser),
-            Over::Taken(_) | Over::Left => Vec::new(),
-        };
+        let marked = still_choosing(over("pull", at(a_list(), "full stack"), &Press::Typed(' ')))
+            .map(|chooser| marked(&chooser))
+            .unwrap_or_default();
         assert_eq!(marked, vec!["full stack".to_owned()]);
 
-        let taken = over("pull", at(a_list(), "full stack"), &Press::Accept);
-        assert!(matches!(taken, Over::Taken(Ok(_))));
+        let taken = matches!(
+            over("pull", at(a_list(), "full stack"), &Press::Accept),
+            Over::Taken(Ok(_))
+        );
+        assert!(taken);
 
-        let left = over("pull", a_list(), &Press::Abandon);
-        assert!(matches!(left, Over::Left));
+        assert!(still_choosing(over("pull", a_list(), &Press::Abandon)).is_none());
     }
 
     /// What one action can be given over this listing.

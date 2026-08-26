@@ -239,13 +239,14 @@ pub(super) fn picking(
     match super::offer::over(lasting.action, chooser, press) {
         Over::Left => (),
         Over::Choosing(chooser) => *stage = Stage::Picking { lasting, chooser },
-        Over::Taken(Ok(taken)) => {
-            *stage = Stage::Beginning {
-                lasting,
-                begun: Begun::Chosen(taken),
-            };
+        Over::Taken(taken) => {
+            if let Some(taken) = super::offer::or_refused(stage, taken) {
+                *stage = Stage::Beginning {
+                    lasting,
+                    begun: Begun::Chosen(taken),
+                };
+            }
         }
-        Over::Taken(Err(refused)) => *stage = Stage::Came(Reading::of(vec![refused])),
     }
     Wanted::Nothing
 }
