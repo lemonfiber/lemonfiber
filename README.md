@@ -23,7 +23,7 @@
 
 ---
 
-> **Status: shipping (`0.9.0`).** The core, compose driver, CLI, setup wizard,
+> **Status: shipping (`0.9.1`).** The core, compose driver, CLI, setup wizard,
 > trust checks, seed and lifecycle work are built and released. Every request
 > reaches all three surfaces: the command line, a terminal dashboard that acts
 > rather than only watching, and a web API a browser is served from.
