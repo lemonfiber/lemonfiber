@@ -77,7 +77,7 @@ and the rest is named in **Standing**.
 | `logs` | `/api/logs` | viewer | Reachable in full. The scrollback is a read that ends, and is answered with what it read; following does not end, so it is answered with a name for the work and the lines arrive on the stream the browser already holds — one endpoint for both, because the command line spells following as a flag on this request rather than as a request of its own. The stream carries a service's own lines now, which it did not: they go down as `log`, the event name every other envelope's kind becomes, so a browser that is not following never registers for one. Nothing is dropped at the source and a browser that reads more slowly than a service speaks is let go past the window the stream carries, which is the rule already in force for every other event. `--watch` is the terminal's own rendering of the same lines, not a separate request. |
 | `config` | `config-set`, `/api/config` | dashboard, partial | Reachable in full from a browser. Writing arrived before reading, so a browser could set a value it had no way to read back; `/api/config` answers both halves of the read the way the command line spells them — naming no setting shows every one, naming one reads that one. Credentials are withheld where the settings are read rather than where they are printed, so both the endpoint and the dashboard show what `config show` prints, and a guard refuses a screen that reads the file for itself. The terminal asks for the whole listing and not for one setting by name: the answer is a box that moves through the settings, so reading one of them is scrolling to it rather than typing it exactly. Changing one is offered nowhere but the browser, like every other write. |
 | `quality` | `quality-set`, `quality-reapply`, `quality-upgrade`, `/api/quality` | dashboard, partial | Reachable in full from a browser. `/api/quality` serves the read the three writes were being made without: the preset in force, what each one means, and what it costs, which is the screen a browser is best at. The dashboard asks that read off its list of questions and offers all three writes behind a key of their own — not on the list of errands, because the agreement does not mean the same thing on these three as it does there. An errand that carries one answers, unconfirmed, with what it would do and changes nothing, which is what makes that run the account its question sits under; `quality-set` unconfirmed *records* the choice, and holds it only where this host would have to transcode the result in software, which is the one cost its agreement is for. A list whose rule is “unconfirmed says what it would do” cannot take an action for which that is false without the rule quietly becoming untrue for the ones it was written for. So what goes in front of each question is what that change really has to say, and the three do not have the same thing to say. Choosing is made off the four presets, each carrying what it means and roughly what an hour of it costs, because the run that would otherwise state the consequence is the run that records it — and a choice that comes back held rather than recorded puts the core's own caution on the screen with a second question under it, which is where the agreement goes on. Upgrading states what it would cost per media type and triggers nothing, which is the errands' own reading arriving where it fits. Re-asserting has nothing to say first and is not given a preamble for symmetry: it carries no agreement, and the core's report-only half of it is behind `--dry-run`, which is a property of a run rather than of a request, so no surface's action can ask for one. Which of the three carries an agreement is read from the same table the errands read it from. What the terminal leaves is the media type a choice applies to: the whole library is what the dashboard sets, and narrowing to television or film — or to music, which is an audio format rather than a resolution and forks inside the same action — is taken to a browser or a shell. |
-| `doctor` | `/api/checks`, `/api/storage`, `repair`, `undo`, `accept`, partial | dashboard, partial | The diagnosis is served, and so is putting it right. `repair` is the offer and the consent in one action because they are one request read twice: unconfirmed it answers with what each repair would do and what else changes if it does, and confirmed it carries out what was agreed to — named by the offer it was read in, so an answer cannot be spent on an offer that has moved on since it was read. Confirmed while naming no offer is the standing consent `--yes` spells, which is a decision taken before there was anything to read rather than a way past being told. `undo` is its own action and carries no subject at all, the core deciding which repair was last and what reversing it takes; `accept` answers a warning. What is left is a diagnosis including the checks that disturb a running system, asked for on its own: those run here while repairing and while answering a warning, and a read that disturbed something would not be a read. The dashboard shows storage and VPN facts the diagnosis also reads, without being the diagnosis. |
+| `doctor` | `/api/checks`, `/api/storage`, `diagnose`, `repair`, `undo`, `accept` | dashboard, partial | Reachable in full from a browser. The diagnosis is served, and so is putting it right. `repair` is the offer and the consent in one action because they are one request read twice: unconfirmed it answers with what each repair would do and what else changes if it does, and confirmed it carries out what was agreed to — named by the offer it was read in, so an answer cannot be spent on an offer that has moved on since it was read. Confirmed while naming no offer is the standing consent `--yes` spells, which is a decision taken before there was anything to read rather than a way past being told. `undo` is its own action and carries no subject at all, the core deciding which repair was last and what reversing it takes; `accept` answers a warning. What was left was the diagnosis including the checks that disturb a running system, asked for on its own — those ran here only while repairing and while answering a warning — and the argument that kept it out is what settled it: a read that disturbed something would not be a read, so this is not one. `diagnose` is the same request at the door changes are asked for. It is the surface that forks and not the core: `Command::Doctor` already carries the widening as a field, exactly as the command line spells it as a flag, so unlike `Halt` beside `Down` there is no second command to add — the checks are the same checks, reporting a real verdict where an ordinary run reports them unverified. What differs is the method, and it has to: a `GET` that took the tunnel away to prove the killswitch comes back would be a `GET` that stopped somebody's downloads. The widening is required rather than defaulted, because a request without it would be `/api/checks` under a second name. The narrowing `--only` takes is offered beside it, because both disturbing checks name what to run in what they tell the operator — the release search says `--only services.releases --disruptive` outright — and a browser that could only ask for all of them would have to drop the tunnel to spend one indexer search. It is answered with a job's name, which is what a run bounded by how long it may hold the tunnel away has to be answered with. The dashboard shows storage and VPN facts the diagnosis also reads, without being the diagnosis. |
 | `watch` | `watch` | dashboard, partial | Reachable in full, and it is the command with no ending of its own: it holds until the data location is lost, which on a machine where the drive stays put is never. So it is answered with a job's name like every other long action, and the name is also how it is stopped — a browser has no interruption to send, so releasing the name is its Ctrl-C, and what the container engine was already asked to do goes on exactly as it does when a terminal is closed. A tab closing stops nothing, which is the useful case. What bounds an abandoned one is that asking what became of it renews it: a guard nobody has asked about across two sweeps of half an hour is let go and says so, so one started on a Friday does not outlive the day. Nothing else is leased, because everything else ends by itself. The dashboard offers it behind the key that opens the two that keep going, and it is the one thing on that screen offered an end — which is the same answer, asked of the same table: a terminal's interruption is what a released name stands in for, and on a screen in raw mode that interruption is a keypress rather than a signal, so escape lets the guard go and says that nothing was stopped with it. Leaving the screen leaves it guarding, and the line on the way out says it will not end by itself and that Ctrl-C ends it. What the terminal leaves is naming several forms at once, its list taking one; the whole stack is not among the choices at all, because the command refuses a guard with nothing to stop and the list is built by offering each subject to that refusal. |
 | `trace` | `/api/trace` | dashboard, partial | Served on the web, and it completes a screen that half-existed: `/api/requests` reports what the household asked for, and this follows one of them. What to follow is one query parameter — the command line takes it as words so it can be typed unquoted, and a query string carries the title whole. It is the one question the dashboard has to be given something before it can ask, so taking it opens a line to type the title on, and an empty one is refused in the sentence a browser is refused with. Narrowing to one season is not offered there: it is a second thing to type for an answer that already reads season by season. |
 | `household` | `/api/requests` | dashboard, partial | Served on the web, and asked off the dashboard's own list of questions. Narrowing to one member is not offered there: the answer is grouped by whoever asked, so a household of four is four headings rather than a list to search, and naming one would be a second thing to type for a smaller version of what is already on the screen. |
@@ -94,16 +94,18 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, twenty-four reach the web in full, one reaches it in
-part, zero do not reach it at all, and one — `ui` — is an honest exception. One gap
-and one exception is the split `G1-R1` asks for, and it is deliberately lopsided:
-an exception has to survive being argued, and almost nothing does.
+Of the twenty-six requests, twenty-five reach the web in full, zero reach it in
+part, zero do not reach it at all, and one — `ui` — is an honest exception. Zero
+gaps and one exception is the split `G1-R1` asks for, and it is deliberately
+lopsided: an exception has to survive being argued, and almost nothing does.
 
-Nothing is now wholly out of a browser's reach, and one request is reachable only
-in part: the diagnosis, whose checks that disturb a running system are asked for
-by changing something rather than by reading. That is a gap to close rather than
-an exception to record, and `ui` is the only exception this table permits, in
-either column.
+**The web column is finished.** Nothing is out of a browser's reach and nothing is
+half in it: every request either arrives whole or is the one that cannot arrive at
+all. The last row to close was the diagnosis that disturbs a running system, and it
+closed by taking the argument against it seriously rather than by weakening it — a
+read that disturbed something would still not be a read, so it is asked for at the
+door changes are asked for instead. That leaves `ui` as the only exception this
+table permits, in either column.
 
 On the other side of the table zero have no terminal form, which is where three
 stood before this slice, nine before the one ahead of that, and twenty before
@@ -114,7 +116,9 @@ its own, and the web surface, which the dashboard reaches by handing the termina
 over rather than by sending anything to the stack. What that column still loses is
 an argument at a time, on every row reading `dashboard, partial`, and those are
 gaps on the same terms as the web's — a screen that reaches a request but not one
-of its arguments has not finished reaching it.
+of its arguments has not finished reaching it. Seventeen rows read that way, and
+with the web column finished they are the whole of what stands between this table
+and `G1-R1`.
 
 None of the five figures above moves as one of those arguments is closed, and this
 slice is the case in point: `quality` read `dashboard, partial` while the dashboard
@@ -134,7 +138,7 @@ dashboard and an open event stream have no command-line form, and `--json` has n
 meaning on a screen — so none of them is a row here. This table reads from the
 command line outwards.
 
-Four arguments were made and did not survive, which is worth recording so they
+Five arguments were made and did not survive, which is worth recording so they
 are not made again:
 
 **Backup, restore and support are not web exceptions.** The appeal is that a
@@ -183,6 +187,21 @@ reach: the command line read the table compiled into the binary itself. So it wa
 given one — rather than a second reader of that table beside the first, which is what
 would have made the endpoint a surface with behaviour of its own instead of a read
 like the others.
+
+**A door is not a request.** The checks that disturb a running system reached the
+web attached to the read that serves the diagnosis, and the reason they were not
+offered was true of that read: a `GET` that took the tunnel away to prove the
+killswitch would be a `GET` that stopped somebody's downloads. What did not follow
+was the conclusion. "This cannot be served here" and "this cannot be served *at
+this door*" are the same sentence with one clause removed, and only the first would
+have been an exception — the second is a door, and this surface already had the
+other one. So the checks that disturb are asked for where every other change is
+asked for, and the diagnosis that disturbs nothing is still read where reads are.
+That is not two ways to ask one thing; it is the one distinction the requirement
+turns on, which is between looking and touching. What building it took from the
+argument is that the fork belongs to the surface: the core spells this as a field
+on the command it already had, so a second command here would have been a browser
+asking for something no command line can.
 
 ## The terminal acts on eleven and asks about six
 

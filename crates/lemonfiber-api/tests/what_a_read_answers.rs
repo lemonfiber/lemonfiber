@@ -950,6 +950,23 @@ async fn the_checks_refuse_a_misspelled_narrowing_rather_than_running_the_suite(
 }
 
 #[tokio::test]
+async fn the_checks_refuse_the_widening_that_would_stop_them_being_a_read() {
+    // The disturbing checks are reachable from a browser and not from here. This
+    // endpoint answers a `GET`, and a run that took the tunnel away to prove the
+    // killswitch would be a `GET` that stopped somebody's downloads — so the word is
+    // refused at this door rather than honoured, and the action beside it is where
+    // asking for it means asking for it.
+    let seen = asked(world(running(), stack()), "/api/checks?disruptive=1").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::BAD_REQUEST
+            && body.contains(r#""code":"READ-1""#)
+            && body.contains("It takes only.")
+            && !body.contains(r#""kind":"doctor""#)),
+        "a read that disturbed something would not be a read"
+    );
+}
+
+#[tokio::test]
 async fn a_log_read_refuses_a_parameter_it_does_not_take() {
     // The one read that reaches no command still arrives at the same door.
     let seen = asked(world(running(), stack()), "/api/logs?lines=10").await;

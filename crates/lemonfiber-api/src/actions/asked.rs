@@ -57,6 +57,8 @@ pub struct Arguments {
     pub filenames: Filenames,
     /// The settings to show as they are, named as the bundle names them.
     pub reveal: Vec<String>,
+    /// The group of checks, or the one check, a diagnosis is narrowed to.
+    pub only: Option<String>,
     /// The check a warning is being answered for.
     pub check: Option<String>,
     /// Whether the checks that disturb the running system are included.
@@ -175,11 +177,17 @@ pub const TAKES_CONSENT: &[&str] = &["repair"];
 
 /// The actions whose command carries whether the disturbing checks are included.
 ///
-/// Two. The command line spells it as two flags because clap keys an argument by
+/// Three. The command line spells it as two flags because clap keys an argument by
 /// the field it sits on, so widening the suite while accepting a warning is
 /// `doctor --disruptive` and widening it while repairing is
 /// `doctor --fix --fix-disruptive`. One argument here, because what it asks for is
 /// one thing: run the checks that disturb a running system.
+///
+/// On two of the three it widens a request that is about something else. On the
+/// third it *is* the request, and there it is required rather than optional, for
+/// the reason [`TAKES_CHECK`] is required on the action it belongs to: a diagnosis
+/// that disturbs nothing is the read this surface already serves, and an action
+/// answering it would be a second way to ask one thing.
 ///
 /// It is not consent to a repair. Which checks run and which repairs are agreed to
 /// are separate decisions, and an action that took one for the other would have an
@@ -187,7 +195,22 @@ pub const TAKES_CONSENT: &[&str] = &["repair"];
 ///
 /// The diagnosis this surface serves as a read takes no such argument. A check that
 /// disturbs a running system changes something, and changes are asked for here.
-pub const TAKES_DISRUPTION: &[&str] = &["repair", "accept"];
+pub const TAKES_DISRUPTION: &[&str] = &["repair", "accept", "diagnose"];
+
+/// The action whose command carries what the run is narrowed to.
+///
+/// A diagnosis and nothing else, and it is the one argument this surface takes at
+/// both doors under one name: `/api/checks` narrows by `only` as a query parameter,
+/// and this narrows by `only` as a field, because it is the same narrowing of the
+/// same suite.
+///
+/// It matters most on the action. The checks a widened run adds are the two that
+/// cost something — the tunnel goes away for as long as the killswitch test needs
+/// it away, and a live release search spends one of the indexers' daily allowance —
+/// and each of those findings tells the operator to run *that one*. Without a
+/// narrowing here, following either instruction from a browser would mean running
+/// both.
+pub const TAKES_NARROWING: &[&str] = &["diagnose"];
 
 /// The action whose command carries the check whose warning is being answered.
 ///
@@ -279,7 +302,7 @@ pub const TAKES_ITEM: &[&str] = &["walkthrough"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 20] = [
+    let carried: [(&str, bool, &[&str]); 21] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -302,6 +325,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
             TAKES_BUNDLING,
         ),
         ("reveal", !given.reveal.is_empty(), TAKES_BUNDLING),
+        ("only", given.only.is_some(), TAKES_NARROWING),
         ("check", given.check.is_some(), TAKES_CHECK),
         ("disruptive", given.disruptive.included(), TAKES_DISRUPTION),
         ("offer", given.offer.is_some(), TAKES_CONSENT),

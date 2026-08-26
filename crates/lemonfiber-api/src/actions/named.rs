@@ -11,6 +11,12 @@
 //! stop the services when the drive under them goes, and a walk searches, grabs
 //! and imports; that both spend most of their time watching does not make either
 //! of them a question.
+//!
+//! One of them answers with a diagnosis and is here for the same reason. Widened to
+//! the checks that disturb a running system, a diagnosis takes the tunnel away to
+//! prove it comes back and spends a real search against the indexers — so it is
+//! asked for at the door changes are asked for, whatever its answer looks like. A
+//! read that disturbed something would not be a read.
 
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
@@ -22,7 +28,7 @@ use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
-use super::asked::{unwanted, Arguments};
+use super::asked::{unwanted, Arguments, Disturbing};
 use super::Refused;
 
 /// Every action this surface offers, in the order they are worth reading.
@@ -48,6 +54,7 @@ pub const OFFERED: &[&str] = &[
     "restore",
     "watch",
     "walkthrough",
+    "diagnose",
     "repair",
     "undo",
     "accept",
@@ -67,30 +74,13 @@ const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 ///
 /// Returns the [`Refused`] a caller should be answered with.
 pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
+    if let Some(refused) = beforehand(action, &given) {
+        return Err(refused);
+    }
     let needs = |argument: &str| Refused::Missing {
         action: action.to_owned(),
         argument: argument.to_owned(),
     };
-    // Naming nothing means everything for the actions that can mean it, and is a
-    // mistake for the four that cannot: switching to nothing, restarting nothing,
-    // fetching nothing and guarding nothing are each a request with nothing to act
-    // on, and the command line refuses all four the same way.
-    if NAMES_ITS_FORMS.contains(&action) && given.forms.is_empty() {
-        return Err(needs("forms"));
-    }
-    if let Some(refused) = unwanted(action, &given, OFFERED) {
-        return Err(refused);
-    }
-    // Two arguments, two requests. A teardown that waits and a stop of named
-    // services are different things to ask for, and a run given both would have to
-    // drop one of them.
-    if action == "down" && given.wait == Waiting::ForTheDownloads && !given.services.is_empty() {
-        return Err(Refused::Together {
-            action: action.to_owned(),
-            argument: "wait".to_owned(),
-            alongside: "services".to_owned(),
-        });
-    }
     let Arguments {
         forms,
         services,
@@ -106,6 +96,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         logs,
         filenames,
         reveal,
+        only,
         check,
         disruptive,
         offer,
@@ -139,6 +130,25 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "adopt" => Ok(Command::Adopt),
         "reset" => Ok(Command::Reset { confirm }),
         "backup" => Ok(Command::Backup { service }),
+        // The one diagnosis asked for here rather than served as a read. It reaches
+        // the same command `/api/checks` reaches, widened by the same word the
+        // command line widens it with — so it is not a second reading of the stack,
+        // it is the reading that changes it: the tunnel is taken away to prove the
+        // killswitch, and a live search is spent against the indexers. A read that
+        // disturbed something would not be a read, and a POST is the only door this
+        // surface has that is not one.
+        //
+        // The widening is required rather than assumed. Without it this would be
+        // the plain diagnosis, which is already served, and two ways to ask one
+        // thing is the arrangement every read on this surface is kept out of.
+        "diagnose" => match disruptive {
+            Disturbing::Included => narrowed(only).map(|narrowing| Command::Doctor {
+                narrowing,
+                disruptive: true,
+                accept: None,
+            }),
+            Disturbing::Left => Err(needs("disruptive")),
+        },
         // The offer and the yes are one action because they are one request read
         // twice: unconfirmed it says what each repair would do and what else
         // changes if it does, and confirmed it carries out what was agreed to.
@@ -194,6 +204,58 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
             name: action.to_owned(),
         }),
     }
+}
+
+/// Why a request is refused before the command it names is looked for.
+///
+/// The three refusals that are about the request as a whole rather than about
+/// something one action needs: a subject that cannot be left out, an argument the
+/// action's command has nowhere to put, and a pair that names two requests at once.
+/// None of them depends on which command is reached, so all three are settled
+/// before anything looks.
+fn beforehand(action: &str, given: &Arguments) -> Option<Refused> {
+    // Naming nothing means everything for the actions that can mean it, and is a
+    // mistake for the four that cannot: switching to nothing, restarting nothing,
+    // fetching nothing and guarding nothing are each a request with nothing to act
+    // on, and the command line refuses all four the same way.
+    if NAMES_ITS_FORMS.contains(&action) && given.forms.is_empty() {
+        return Some(Refused::Missing {
+            action: action.to_owned(),
+            argument: "forms".to_owned(),
+        });
+    }
+    if let Some(refused) = unwanted(action, given, OFFERED) {
+        return Some(refused);
+    }
+    // Two arguments, two requests. A teardown that waits and a stop of named
+    // services are different things to ask for, and a run given both would have to
+    // drop one of them.
+    (action == "down" && given.wait == Waiting::ForTheDownloads && !given.services.is_empty()).then(
+        || Refused::Together {
+            action: action.to_owned(),
+            argument: "wait".to_owned(),
+            alongside: "services".to_owned(),
+        },
+    )
+}
+
+/// What a diagnosis was narrowed to, or why the name it was given narrows to
+/// nothing.
+///
+/// Naming none is the whole suite, which is the fork the command line takes on the
+/// same flag. A name that is neither a group nor a check inside one is refused
+/// rather than run as an empty suite, because a report of nothing found reads as
+/// nothing wrong.
+fn narrowed(only: Option<String>) -> Result<Narrowing, Refused> {
+    let Some(named) = only else {
+        return Ok(Narrowing::Suite);
+    };
+    Narrowing::parse(&named).ok_or_else(|| Refused::Unrecognised {
+        argument: "only".to_owned(),
+        offered: "try a group such as vpn, or one check by the name a finding gives it, \
+                  such as vpn.killswitch"
+            .to_owned(),
+    })
 }
 
 /// What a repairing run was given consent for, or why it names none.

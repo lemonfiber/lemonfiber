@@ -18,8 +18,8 @@ use lemonfiber_api::actions;
 use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED,
     TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
-    TAKES_FORMS, TAKES_ITEM, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
-    TAKES_WAITING,
+    TAKES_FORMS, TAKES_ITEM, TAKES_NARROWING, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES,
+    TAKES_SETTING, TAKES_WAITING,
 };
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
@@ -31,6 +31,7 @@ use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::{Command, Ctx, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
@@ -506,6 +507,7 @@ fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
+        only: takes(TAKES_NARROWING).then(|| NARROWED.to_owned()),
         check: takes(TAKES_CHECK).then(|| WARNED.to_owned()),
         disruptive: takes(TAKES_DISRUPTION).into(),
         offer: takes(TAKES_CONSENT).then(|| OFFER.to_owned()),
@@ -532,6 +534,10 @@ const ITEM: &str = "Sintel";
 /// A check by the name a finding gives it — the one a warning is answered for, and
 /// the one a repair is agreed to for.
 const WARNED: &str = "vpn.unprotected";
+
+/// A check to narrow a run to. Not the one a warning is answered for, so a command
+/// carrying the narrowing cannot pass for one carrying the accepted check.
+const NARROWED: &str = "vpn.killswitch";
 
 /// An offer, as one names itself. Not one any real offer would produce, so consent
 /// carrying it can only have come from here.
@@ -789,6 +795,21 @@ fn give_check(given: &mut Arguments) {
     given.check = Some(WARNED.to_owned());
 }
 
+/// Whether the command has the narrowing it was given in it.
+fn carries_narrowing(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Doctor {
+            narrowing: Narrowing::Check(id),
+            ..
+        } if id == NARROWED
+    )
+}
+
+fn give_narrowing(given: &mut Arguments) {
+    given.only = Some(NARROWED.to_owned());
+}
+
 fn give_disruption(given: &mut Arguments) {
     given.disruptive = Disturbing::Included;
 }
@@ -814,7 +835,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 20] = [
+const SWEEPS: [Sweep; 21] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -829,6 +850,7 @@ const SWEEPS: [Sweep; 20] = [
     ("logs", give_logs, carries_logs),
     ("filenames", give_filenames, carries_filenames),
     ("reveal", give_reveal, carries_reveal),
+    ("only", give_narrowing, carries_narrowing),
     ("check", give_check, carries_check),
     ("disruptive", give_disruption, carries_disruption),
     ("offer", give_offer, carries_offer),
@@ -906,6 +928,7 @@ fn every_argument_the_carrier_holds_is_swept() {
         "logs",
         "filenames",
         "reveal",
+        "only",
         "check",
         "disruptive",
         "offer",
