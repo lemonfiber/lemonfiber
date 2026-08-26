@@ -48,6 +48,12 @@ pub struct Streaming {
     pub token: Arc<Token>,
     /// The address this server is listening on, which every request must name.
     pub bound: SocketAddr,
+    /// Who this run has let in, so a listener holding a session is heard too.
+    ///
+    /// The same register the rest of the surface reads. Two would be a run somebody
+    /// could be admitted to half of, which is the reason this shares the token
+    /// rather than minting a second one.
+    pub admitting: Arc<crate::admission::Admitting>,
     /// The one gather, and everyone already listening to it.
     pub live: Arc<Live>,
 }
@@ -69,7 +75,12 @@ pub fn routes(streaming: Arc<Streaming>) -> Router {
 /// state and can therefore be merged outside the layer that guards the rest,
 /// which is an assembly mistake that would otherwise leave it open.
 pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap) -> Response<Body> {
-    if let Err(refusal) = admitted(&headers, &streaming.token, streaming.bound) {
+    let now = std::time::SystemTime::now();
+    let known = streaming
+        .admitting
+        .carried(&headers, &streaming.token, now)
+        .await;
+    if let Err(refusal) = admitted(known, &headers, streaming.bound) {
         return refused(refusal);
     }
     let seen = headers

@@ -40,10 +40,25 @@ fn saying(pairs: &[(&str, &str)]) -> HeaderMap {
     headers
 }
 
+/// Whether the secret a request carried is this run's token.
+///
+/// The other secret a request may carry is a session, which is opened by proving a
+/// password and is [`lemonfiber_api::admission`]'s business rather than this file's.
+/// What is settled here is the shape of the decision the guard makes over whichever
+/// of the two answered.
+fn this_runs(headers: &HeaderMap, token: &Token) -> bool {
+    token.carried_by(
+        headers
+            .get(TOKEN_HEADER)
+            .and_then(|value| value.to_str().ok()),
+    )
+}
+
 /// The verdict on a request saying exactly what the test states, and nothing more.
 fn verdict(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
     Token::mint(&given()).map_or(Err(Refusal::Unknown), |token| {
-        admitted(&saying(pairs), &token, bound())
+        let headers = saying(pairs);
+        admitted(this_runs(&headers, &token), &headers, bound())
     })
 }
 
@@ -58,7 +73,8 @@ fn carrying_the_token(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
     };
     let mut every = vec![(TOKEN_HEADER, token.as_str())];
     every.extend_from_slice(pairs);
-    admitted(&saying(&every), &token, bound())
+    let headers = saying(&every);
+    admitted(this_runs(&headers, &token), &headers, bound())
 }
 
 #[test]

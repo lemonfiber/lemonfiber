@@ -83,16 +83,26 @@ FEWEST = 12
 
 
 def declared(root: pathlib.Path) -> dict[str, str]:
-    """Every path this crate declares as a constant, by the name it goes under."""
+    """Every path this crate declares as a constant, by the name it goes under.
+
+    A name declared twice is left out rather than resolved to one of them. Resolving
+    it to whichever file was read first is how a route hides behind another one's
+    path: the check then holds a path something else already serves, and the route in
+    front of it is never held to anything. A route naming a dropped constant is
+    reported as unreadable, which is what this cannot see it should be.
+    """
     here = root / DECLARING
     found: dict[str, str] = {}
+    twice: set[str] = set()
     for source in sorted(here.rglob("*.rs")):
         text = source.read_text(encoding="utf-8")
         for name, path in re.findall(
             r'const ([A-Z][A-Z0-9_]*): &str = "(/api/[^"]*)";', text
         ):
+            if name in found and found[name] != path:
+                twice.add(name)
             found[name] = path
-    return found
+    return {name: path for name, path in found.items() if name not in twice}
 
 
 def served(root: pathlib.Path) -> tuple[set[str], list[str]]:

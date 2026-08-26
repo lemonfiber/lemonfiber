@@ -230,6 +230,7 @@ fn routed() -> axum::Router {
         ctx: Arc::new(ctx()),
         token: Arc::new(token),
         bound: ([127, 0, 0, 1], 8472).into(),
+        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     })

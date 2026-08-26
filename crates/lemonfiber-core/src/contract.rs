@@ -30,7 +30,7 @@ use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind::{self, Kind},
-    ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
+    Admitted, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
     MusicReport, QualityReport, ResetReport, SetupReport, Started, StatusReport, StuckReport,
     SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
     API_VERSION,
@@ -122,10 +122,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 
 /// The shapes that belong to no command's answer.
 ///
-/// A failure, a name for work that outlives its request, and the lines a long run
-/// says while it is still running — none of which any [`Outcome`] carries, and each
-/// of which a caller still has to parse.
+/// A session, a failure, a name for work that outlives its request, and the lines a
+/// long run says while it is still running — none of which any [`Outcome`] carries,
+/// and each of which a caller still has to parse.
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
+    describing(kinds, kind::ADMISSION, schema_for!(Envelope<Admitted>));
     describing(kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
     describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
     describing(kinds, kind::JOB, schema_for!(Envelope<Started>));

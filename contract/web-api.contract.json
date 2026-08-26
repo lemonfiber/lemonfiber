@@ -1,6 +1,53 @@
 {
   "api_version": 1,
   "kinds": {
+    "admission": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Admitted"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Admitted": {
+          "description": "A session opened, and the moment it stops being one.\n\nThe ending is carried rather than left for a client to work out, because a client\nthat guessed would be a second opinion about who is admitted — and the two would\ndisagree on the day somebody's clock is wrong.",
+          "type": "object",
+          "properties": {
+            "token": {
+              "description": "The secret this session is carried by, sent in the header the per-run token is.",
+              "type": "string"
+            },
+            "until": {
+              "description": "When it stops being one, written as every other instant this product writes.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "token",
+            "until"
+          ]
+        }
+      }
+    },
     "archives": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
