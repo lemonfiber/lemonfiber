@@ -357,7 +357,7 @@ pub(super) fn doing(
     press: &Press,
 ) -> Wanted {
     *stage = Stage::Doing { errand, typed };
-    if matches!(*press, Press::Typed('q') | Press::Abandon) {
+    if super::leaving(press) {
         return Wanted::Leave;
     }
     Wanted::Nothing
@@ -432,16 +432,20 @@ pub(crate) mod tests {
         assert!(KEYED.iter().all(|offer| offer.key != KEY));
     }
 
-    /// The one thing this list is checked against from outside the binary. An
-    /// action offered here with no entry there leaves the parity table's terminal
-    /// column claiming less than the screen does, and an entry there naming an
-    /// action nothing offers leaves it claiming more.
+    /// The one thing the screen's three lists of actions are checked against from
+    /// outside the binary, and the whole of that list rather than this file's third
+    /// of it — the projection is one list, so only one place can hold it to be
+    /// exactly what the screen offers. An action offered on any of them with no entry
+    /// there leaves the parity table's terminal column claiming less than the screen
+    /// does, and an entry there naming an action nothing offers leaves it claiming
+    /// more.
     #[test]
     fn every_action_this_screen_offers_is_published_for_the_parity_table() {
         let mut offered: Vec<&str> = KEYED
             .iter()
             .map(|offer| offer.action)
             .chain(every().map(|errand| errand.action))
+            .chain(crate::acting::lasting::every().map(|lasting| lasting.action))
             .collect();
         let mut published: Vec<&str> = ACTS.iter().map(|reach| reach.through).collect();
         offered.sort_unstable();

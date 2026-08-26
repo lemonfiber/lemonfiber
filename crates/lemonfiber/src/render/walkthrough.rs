@@ -8,5 +8,5 @@
 mod live;
 mod report;
 
-pub(crate) use live::{Narrating, Quiet};
+pub(crate) use live::{is_worth_saying, spoken, Narrating, Quiet};
 pub(crate) use report::ending;

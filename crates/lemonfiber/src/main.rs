@@ -309,7 +309,7 @@ async fn main() -> ExitCode {
 /// and says so when a browser asks for one. What reads an embedded app is built
 /// and proven; what it would read is what is missing. See
 /// `.docs/architecture/embedded-stack.md` for the shape it arrives in.
-const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = None;
+pub(crate) const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = None;
 
 /// Serve the web interface until the operator stops the process.
 ///
