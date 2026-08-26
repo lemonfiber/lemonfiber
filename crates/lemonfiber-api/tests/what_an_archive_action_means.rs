@@ -27,7 +27,7 @@ use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
-use lemonfiber_core::app::restore::Kept;
+use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{bundle, Command, Ctx};
 use lemonfiber_core::bundle::Filenames;
@@ -37,6 +37,9 @@ use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 
 /// The name one of this machine's backups is written under.
 const KEPT: &str = "lemonfiber-full-1700000000.tar.gz";
+
+/// A listing, as one names itself.
+const LISTING: &str = "5c3a1d20";
 
 /// What an action came to, or nothing where it was refused.
 fn command(action: &str, given: Arguments) -> Option<Command> {
@@ -135,7 +138,46 @@ fn a_restore_names_one_of_this_machines_backups_rather_than_a_path() {
         Some(Command::Restore {
             archive: Kept::Named(KEPT.to_owned()),
             repoint: true,
-            confirm: true,
+            consent: Consent::Standing,
+        })
+    );
+}
+
+/// The listing a restore was read in travels with the yes, and both halves are
+/// carried: the listing reaches the command, and naming one without the yes is
+/// refused rather than read as either answer.
+///
+/// A browser reads the listing in one request and answers in another, and in that
+/// gap what the archive would do can move — so the yes says which listing it was
+/// given for, the way a repair's says which offer.
+#[test]
+fn a_restore_carries_the_listing_its_yes_was_read_in() {
+    let answered = Arguments {
+        offer: Some(LISTING.to_owned()),
+        ..restoring(true, true)
+    };
+    assert_eq!(
+        command("restore", answered),
+        Some(Command::Restore {
+            archive: Kept::Named(KEPT.to_owned()),
+            repoint: true,
+            consent: Consent::Given {
+                listing: LISTING.to_owned()
+            },
+        })
+    );
+
+    // A listing named without the yes is an answer to a question nobody was asked:
+    // it would restore or not restore depending on which half was believed.
+    let unanswered = Arguments {
+        offer: Some(LISTING.to_owned()),
+        ..restoring(true, false)
+    };
+    assert_eq!(
+        refusal("restore", unanswered),
+        Some(Refused::Missing {
+            action: "restore".to_owned(),
+            argument: "confirm".to_owned()
         })
     );
 }

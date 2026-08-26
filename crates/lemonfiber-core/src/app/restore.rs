@@ -26,6 +26,10 @@ use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
 
 use super::{quiesced, Ctx};
 
+mod consent;
+
+pub use consent::{Consent, MOVED_ON};
+
 /// Raised when a backup archive cannot be read to decide a restore.
 pub const CORRUPT: Code = Code::new("RESTORE-1");
 
@@ -65,6 +69,13 @@ pub struct Preview {
     pub downgrade: bool,
     /// The data-root difference, where the archive was taken against another one.
     pub relocation: Option<Relocation>,
+    /// What this listing is, so consent given for it can name which listing it read.
+    ///
+    /// Carried on every listing rather than only on the ones that would re-point
+    /// something: a surface that has to look for it is a surface that can fail to
+    /// find it, and a restore that would overwrite the same configuration in place
+    /// is still one somebody may agree to.
+    pub agreement: String,
 }
 
 /// What a restore did.
@@ -115,11 +126,12 @@ pub struct Restoration {
 
 /// Carry out a restore, or say what one would overwrite.
 ///
-/// Unconfirmed, it verifies the archive and answers with its contents, having
+/// Given no yes, it verifies the archive and answers with its contents, having
 /// changed nothing — which is the listing an operator is owed before a restore, and
-/// is the command's own answer rather than a surface's rendering of one. Confirmed,
-/// it verifies again, proves the stack is stopped, unpacks, and points the restored
-/// settings at this machine's data root where a re-point was accepted.
+/// is the command's own answer rather than a surface's rendering of one. Given one,
+/// it verifies again, proves the yes was for the listing that stands now, proves the
+/// stack is stopped, unpacks, and points the restored settings at this machine's
+/// data root where a re-point was accepted.
 ///
 /// The fork is inside the command for the reason the reset's is: a gate in front of
 /// it would be a gate each surface kept for itself, and a surface that kept none
@@ -128,14 +140,14 @@ pub struct Restoration {
 /// # Errors
 ///
 /// Returns a [`Problem`] where this run has nowhere it keeps archives, where a name
-/// names none of them, where the stack is not confirmed stopped, where the restored
-/// settings could not be re-pointed, or for any reason [`inspect`] and [`restore`]
-/// give.
+/// names none of them, where the yes was given for a listing that has since moved
+/// on, where the stack is not confirmed stopped, where the restored settings could
+/// not be re-pointed, or for any reason [`inspect`] and [`restore`] give.
 pub async fn run(
     ctx: &Ctx,
     archive: &Kept,
     repoint: bool,
-    confirm: bool,
+    consent: &Consent,
 ) -> Result<Restoration, Box<Problem>> {
     let archives = ctx.archives.as_ref().ok_or_else(|| Box::new(nowhere()))?;
     let path = match archive {
@@ -155,9 +167,13 @@ pub async fn run(
         vault,
     )
     .await?;
-    if !confirm {
+    if !consent.overwrites() {
         return Ok(Restoration { would, done: None });
     }
+    // Before anything is stopped, let alone overwritten: a yes given for a listing
+    // this run no longer offers costs nothing to refuse here, and would cost the
+    // operator a stack that was taken down for a restore they did not agree to.
+    consent.held(&would)?;
 
     quiesced::required(ctx, STILL_RUNNING, "restore").await?;
     let report = restore(
@@ -288,11 +304,64 @@ pub async fn inspect(
     };
 
     let relocation = backup::relocation(&manifest, current_root);
-    Ok(Preview {
+    Ok(listing(manifest, downgrade, relocation))
+}
+
+/// One listing, naming itself.
+///
+/// The one way a [`Preview`] is built, so that the name and the words it is over
+/// cannot come apart: a listing assembled anywhere else could carry a name for a
+/// different reading of the same archive, and a consent checked against that would
+/// be checked against nothing.
+fn listing(manifest: Manifest, downgrade: bool, relocation: Option<Relocation>) -> Preview {
+    let agreement = agreement(&manifest, downgrade, relocation.as_ref());
+    Preview {
         manifest,
         downgrade,
         relocation,
-    })
+        agreement,
+    }
+}
+
+/// What a listing was, in a form the consent given for it can name it by.
+///
+/// Every word an operator reads before agreeing: what the archive covers, what
+/// wrote it and when, whether it carries credentials, what is inside it, whether
+/// restoring it is a step backwards, and the data root it would be re-pointed from
+/// and to. Anything that would make the listing read differently makes this read
+/// differently, so consent given for one listing cannot be spent on another.
+///
+/// The re-point is the half that moves without the archive moving. It is derived
+/// each time from this machine's own settings, so two runs over the very same file
+/// list two different restores where the data root changed in between — which is
+/// the substitution an operator has no way to notice afterwards, because what comes
+/// back with a finished restore is the second listing.
+fn agreement(manifest: &Manifest, downgrade: bool, relocation: Option<&Relocation>) -> String {
+    let mut words: Vec<&str> = Vec::new();
+    match &manifest.scope {
+        Scope::WholeStack => words.push("the whole stack"),
+        Scope::Service { name } => {
+            words.push("one service");
+            words.push(name);
+        }
+    }
+    words.push(&manifest.product_version);
+    words.push(&manifest.created_at);
+    words.push(if manifest.sensitive {
+        "sensitive"
+    } else {
+        "ordinary"
+    });
+    for member in &manifest.members {
+        words.push(&member.label);
+        words.push(&member.archive_path);
+    }
+    words.push(if downgrade { "a downgrade" } else { "current" });
+    if let Some(relocation) = relocation {
+        words.push(&relocation.was);
+        words.push(&relocation.now);
+    }
+    crate::agreement::over(&words)
 }
 
 /// Restore a configuration from `archive`, unpacking it back over the install
@@ -438,8 +507,8 @@ mod tests {
     use lemonfiber_fixtures::support::Reporting;
 
     use super::{
-        inspect, restore, run, Kept, CORRUPT, INCOMPATIBLE, NEEDS_REPOINT, NOT_KEPT_HERE,
-        NOT_REPOINTED, NOT_RESTORED, NOWHERE_KEPT, STILL_RUNNING, TOO_NEW, UNSAFE,
+        inspect, restore, run, Consent, Kept, CORRUPT, INCOMPATIBLE, MOVED_ON, NEEDS_REPOINT,
+        NOT_KEPT_HERE, NOT_REPOINTED, NOT_RESTORED, NOWHERE_KEPT, STILL_RUNNING, TOO_NEW, UNSAFE,
     };
     use crate::app::fixtures::{keeping, paths, scratch, FakeArchive, CURRENT};
     use crate::app::Ctx;
@@ -659,10 +728,15 @@ mod tests {
 
     #[tokio::test]
     async fn a_run_with_nowhere_it_keeps_archives_has_none_to_read() {
-        let refusal = run(&stopped(), &Kept::Named(KEPT.to_owned()), false, false)
-            .await
-            .err()
-            .map(|problem| problem.code);
+        let refusal = run(
+            &stopped(),
+            &Kept::Named(KEPT.to_owned()),
+            false,
+            &Consent::List,
+        )
+        .await
+        .err()
+        .map(|problem| problem.code);
         assert_eq!(refusal, Some(NOWHERE_KEPT));
     }
 
@@ -673,10 +747,15 @@ mod tests {
         let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
         let ctx = a_stopped_run(&vault);
         for name in ["../../etc/passwd", "older/full.tar.gz", ""] {
-            let refusal = run(&ctx, &Kept::Named(name.to_owned()), false, true)
-                .await
-                .err()
-                .map(|problem| problem.code);
+            let refusal = run(
+                &ctx,
+                &Kept::Named(name.to_owned()),
+                false,
+                &Consent::Standing,
+            )
+            .await
+            .err()
+            .map(|problem| problem.code);
             assert_eq!(refusal, Some(NOT_KEPT_HERE), "{name}");
         }
         assert!(vault.extractions().is_empty(), "nothing was unpacked");
@@ -689,7 +768,7 @@ mod tests {
             &a_stopped_run(&vault),
             &Kept::Named(KEPT.to_owned()),
             false,
-            false,
+            &Consent::List,
         )
         .await
         .map_err(|problem| problem.code);
@@ -707,7 +786,7 @@ mod tests {
             &a_stopped_run(&vault),
             &Kept::Named(KEPT.to_owned()),
             false,
-            true,
+            &Consent::Standing,
         )
         .await
         .map_err(|problem| problem.code);
@@ -727,7 +806,7 @@ mod tests {
             &a_stopped_run(&vault),
             &Kept::At(elsewhere.clone()),
             false,
-            true,
+            &Consent::Standing,
         )
         .await
         .map_err(|problem| problem.code);
@@ -753,7 +832,7 @@ mod tests {
             &keeping(running, &vault),
             &Kept::Named(KEPT.to_owned()),
             false,
-            true,
+            &Consent::Standing,
         )
         .await
         .err()
@@ -763,8 +842,10 @@ mod tests {
     }
 
     /// A run keeping its archives in a real directory, so the re-point that follows a
-    /// restore has an environment file it can actually write.
-    fn rooted_at(dir: &Path, vault: &Arc<FakeArchive>) -> Ctx {
+    /// restore has an environment file it can actually write, whose own library is at
+    /// `root` — which is what a listing's re-point is derived from, and what moves
+    /// between one request and the next.
+    fn rooted_at(dir: &Path, root: &str, vault: &Arc<FakeArchive>) -> Ctx {
         crate::test_support::a_context()
             .engine(Arc::new(Reporting::holding(
                 &["sonarr"],
@@ -772,7 +853,7 @@ mod tests {
                 Health::None,
             )))
             .settings(Settings {
-                data_root: Some(PathBuf::from("/mnt/library")),
+                data_root: Some(PathBuf::from(root)),
                 ..Settings::default()
             })
             .build()
@@ -780,6 +861,138 @@ mod tests {
                 paths: Paths::at(dir, dir),
                 vault: Arc::clone(vault) as Arc<dyn crate::archive::Vault>,
             })
+    }
+
+    /// The archive this machine keeps, by name.
+    fn kept() -> Kept {
+        Kept::Named(KEPT.to_owned())
+    }
+
+    /// What the listing this run makes names itself, or nothing where it refused.
+    async fn as_listed(ctx: &Ctx) -> String {
+        run(ctx, &kept(), true, &Consent::List)
+            .await
+            .ok()
+            .map(|said| said.would.agreement)
+            .unwrap_or_default()
+    }
+
+    /// An archive's own account of itself, covering `scope`, carrying credentials
+    /// or not, and holding `members`.
+    fn an_archive(scope: Scope, sensitive: bool, members: Vec<Member>) -> crate::backup::Manifest {
+        crate::backup::Manifest {
+            schema: SCHEMA,
+            product_version: CURRENT.to_owned(),
+            created_at: "2026-07-30T00:00:00Z".to_owned(),
+            data_root: "/srv/media".to_owned(),
+            scope,
+            sensitive,
+            members,
+        }
+    }
+
+    /// A listing names what an operator reads in it, so an archive that would read
+    /// differently names itself differently.
+    ///
+    /// One thing at a time, each of them something the operator is shown before
+    /// deciding: what the archive covers, whether it carries credentials, what is
+    /// inside it, and whether restoring it is a step backwards. Any of these
+    /// changing between the listing and the yes is a different restore being agreed
+    /// to under the same name.
+    #[test]
+    fn a_listing_names_what_an_operator_reads_in_it() {
+        let whole = an_archive(Scope::WholeStack, true, Vec::new());
+        let name = super::agreement(&whole, false, None);
+
+        for (differing, said) in [
+            (
+                an_archive(
+                    Scope::Service {
+                        name: "sonarr".to_owned(),
+                    },
+                    true,
+                    Vec::new(),
+                ),
+                "what it covers",
+            ),
+            (
+                an_archive(Scope::WholeStack, false, Vec::new()),
+                "whether it carries credentials",
+            ),
+            (
+                an_archive(
+                    Scope::WholeStack,
+                    true,
+                    vec![Member {
+                        archive_path: "config/sonarr".to_owned(),
+                        label: "Sonarr's configuration".to_owned(),
+                    }],
+                ),
+                "what is inside it",
+            ),
+        ] {
+            assert_ne!(super::agreement(&differing, false, None), name, "{said}");
+        }
+        assert_ne!(
+            super::agreement(&whole, true, None),
+            name,
+            "whether it is a step backwards"
+        );
+    }
+
+    /// A yes is spent on the listing it was read in, and on no other.
+    ///
+    /// The sequence a browser makes, which a shell cannot: the archive is listed, the
+    /// operator reads that restoring it would re-point their library onto
+    /// `/mnt/library` and agrees to that, and between the two requests this machine's
+    /// data root moves. The second request is the same request in every field — the
+    /// same archive, the same acceptance of a re-point — and the re-point it would
+    /// now carry out is to somewhere the operator has never seen. Nothing in the
+    /// answer would say so afterwards, because the listing that comes back with a
+    /// finished restore is the second one.
+    ///
+    /// All three legs are asserted, because a refusal on its own proves only that
+    /// something failed: the listing really did move, the yes given for the old one
+    /// is refused, and the very same request naming the listing that stands now is
+    /// carried out.
+    #[tokio::test]
+    async fn a_yes_is_not_spent_on_a_listing_that_moved_between_the_two_requests() {
+        let dir = scratch("restore-moved-on");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            std::fs::create_dir_all(&dir).is_ok(),
+            "the scratch was made"
+        );
+        let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
+
+        let read = as_listed(&rooted_at(&dir, "/mnt/library", &vault)).await;
+        let moved = rooted_at(&dir, "/mnt/elsewhere", &vault);
+        let stands = as_listed(&moved).await;
+        assert_ne!(read, stands, "the same archive now re-points elsewhere");
+
+        let refusal = run(
+            &moved,
+            &kept(),
+            true,
+            &Consent::Given {
+                listing: read.clone(),
+            },
+        )
+        .await
+        .err()
+        .map(|problem| problem.code);
+        assert_eq!(refusal, Some(MOVED_ON));
+        assert!(vault.extractions().is_empty(), "nothing was unpacked");
+
+        let carried = run(&moved, &kept(), true, &Consent::Given { listing: stands })
+            .await
+            .map_err(|problem| problem.code)
+            .map(|said| said.done.and_then(|done| done.relocated).map(|to| to.now));
+        assert_eq!(
+            carried,
+            Ok(Some("/mnt/elsewhere".to_owned())),
+            "and it is the comparison that refused, not the guard refusing everything"
+        );
     }
 
     #[tokio::test]
@@ -793,10 +1006,10 @@ mod tests {
 
         let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
         let restoration = run(
-            &rooted_at(&dir, &vault),
+            &rooted_at(&dir, "/mnt/library", &vault),
             &Kept::Named(KEPT.to_owned()),
             true,
-            true,
+            &Consent::Standing,
         )
         .await
         .map_err(|problem| problem.code);
@@ -819,10 +1032,10 @@ mod tests {
 
         let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
         let refusal = run(
-            &rooted_at(&dir, &vault),
+            &rooted_at(&dir, "/mnt/library", &vault),
             &Kept::Named(KEPT.to_owned()),
             true,
-            true,
+            &Consent::Standing,
         )
         .await
         .err()

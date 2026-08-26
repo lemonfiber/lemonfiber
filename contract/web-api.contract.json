@@ -3812,6 +3812,10 @@
           "description": "What a restore would do, shown before anything is overwritten.",
           "type": "object",
           "properties": {
+            "agreement": {
+              "description": "What this listing is, so consent given for it can name which listing it read.\n\nCarried on every listing rather than only on the ones that would re-point\nsomething: a surface that has to look for it is a surface that can fail to\nfind it, and a restore that would overwrite the same configuration in place\nis still one somebody may agree to.",
+              "type": "string"
+            },
             "downgrade": {
               "description": "Whether the archive is old enough that a compatibility warning applies.",
               "type": "boolean"
@@ -3834,7 +3838,8 @@
           },
           "required": [
             "manifest",
-            "downgrade"
+            "downgrade",
+            "agreement"
           ]
         },
         "Relocation": {
@@ -5216,11 +5221,16 @@
                     "string",
                     "null"
                   ]
+                },
+                "wrote": {
+                  "description": "What lemonfiber put there, which has to still be there for putting the\nold value back to be putting anything back.\n\nCarried so that a reversal can ask whether it is undoing its own work.\nWithout it a reversal knows only what it would like the setting to say,\nand a setting the operator has since chosen for themselves reads exactly\nlike one nobody has touched.",
+                  "type": "string"
                 }
               },
               "required": [
                 "does",
-                "key"
+                "key",
+                "wrote"
               ]
             },
             {

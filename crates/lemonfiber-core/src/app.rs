@@ -302,8 +302,8 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Restore {
             archive,
             repoint,
-            confirm,
-        } => restore::run(ctx, &archive, repoint, confirm)
+            consent,
+        } => restore::run(ctx, &archive, repoint, &consent)
             .await
             .map(Outcome::Restore),
     }
@@ -377,7 +377,7 @@ mod tests {
             Command::Restore {
                 archive: crate::app::restore::Kept::Named("lemonfiber-full-1.tar.gz".to_owned()),
                 repoint: false,
-                confirm: false,
+                consent: crate::app::restore::Consent::List,
             },
             &keeping_archives(&vault),
         )

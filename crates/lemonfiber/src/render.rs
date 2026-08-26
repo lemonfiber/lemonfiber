@@ -687,6 +687,7 @@ mod tests {
                     manifest: an_archive(),
                     downgrade: false,
                     relocation: None,
+                    agreement: "5c3a1d20".to_owned(),
                 },
                 done: None,
             }),

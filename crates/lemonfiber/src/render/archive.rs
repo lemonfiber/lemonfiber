@@ -266,6 +266,7 @@ mod tests {
                 manifest: manifest(),
                 downgrade: true,
                 relocation: Some(moved()),
+                agreement: "5c3a1d20".to_owned(),
             },
             done: None,
         })
@@ -286,6 +287,7 @@ mod tests {
                 manifest: manifest(),
                 downgrade: false,
                 relocation: Some(moved()),
+                agreement: "5c3a1d20".to_owned(),
             },
             done: Some(Restored {
                 scope: Scope::WholeStack,
@@ -307,6 +309,7 @@ mod tests {
                 manifest: manifest(),
                 downgrade: false,
                 relocation: None,
+                agreement: "5c3a1d20".to_owned(),
             },
             done: Some(Restored {
                 scope: Scope::WholeStack,

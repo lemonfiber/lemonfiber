@@ -63,7 +63,8 @@ pub struct Arguments {
     pub check: Option<String>,
     /// Whether the checks that disturb the running system are included.
     pub disruptive: Disturbing,
-    /// The offer the repairs agreed to were read in, as it named itself.
+    /// What was read before answering — the offer a repair's yes was read in, the
+    /// listing a restore's was — as it named itself.
     pub offer: Option<String>,
     /// The checks whose repairs were agreed to, as that offer names them.
     pub agreed: Vec<String>,
@@ -163,17 +164,28 @@ pub const TAKES_AGREEMENT: &[&str] = &[
     "support",
 ];
 
-/// The actions whose command carries the operator's consent to *this* offer.
+/// The actions whose command carries what the operator read before answering.
 ///
-/// A repair and nothing else. The two are one group because neither means anything
-/// without the other: repairs are agreed to out of an offer, and an offer with no
-/// repair agreed to out of it is consent that has lost its subject. Together with
-/// the agreement beside them they are the whole of what a consent that crossed a
-/// request boundary has to say — which offer, and which of it.
+/// The two that show the operator something and then act on what they answered. A
+/// repair is offered and then carried out; a restore is listed and then overwrites.
+/// Both are two requests with a decision in the gap, and in that gap the thing that
+/// was read can move — a repair's effects rewritten by a fresh diagnosis, a
+/// restore's re-point derived again from a data root that has changed. So the
+/// answer names what it was given for, and the run that acts builds that name again
+/// and compares.
 ///
 /// No other action needs one, because no other action shows the operator something
 /// and then acts on what they answered. Everywhere else the reply is the answer.
-pub const TAKES_CONSENT: &[&str] = &["repair"];
+pub const TAKES_CONSENT: &[&str] = &["repair", "restore"];
+
+/// The action whose command carries *which* of what it read was agreed to.
+///
+/// A repair and nothing else, and it is apart from [`TAKES_CONSENT`] because it is
+/// a different half of the same answer. An offer holds several repairs and the
+/// operator picks from them, so an offer with none of it agreed to is consent that
+/// has lost its subject. A restore has one archive and nothing to pick out of it,
+/// so a list of what was agreed to would name nothing there.
+pub const TAKES_AGREED: &[&str] = &["repair"];
 
 /// The actions whose command carries whether the disturbing checks are included.
 ///
@@ -329,7 +341,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("check", given.check.is_some(), TAKES_CHECK),
         ("disruptive", given.disruptive.included(), TAKES_DISRUPTION),
         ("offer", given.offer.is_some(), TAKES_CONSENT),
-        ("agreed", !given.agreed.is_empty(), TAKES_CONSENT),
+        ("agreed", !given.agreed.is_empty(), TAKES_AGREED),
         ("confirm", given.confirm, TAKES_AGREEMENT),
         ("item", given.item.is_some(), TAKES_ITEM),
     ];

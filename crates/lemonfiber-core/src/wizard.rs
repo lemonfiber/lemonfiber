@@ -906,13 +906,15 @@ mod tests {
         }
     }
 
-    /// The reversal of writing a fresh `.env` key: remove it again.
-    fn removed(key: &str) -> Undo {
+    /// The reversal of writing a fresh `.env` key: remove it again, where `wrote` is
+    /// what the apply put there.
+    fn removed(key: &str, wrote: &str) -> Undo {
         Undo {
             target: ".env".to_owned(),
             action: Action::Restore {
                 key: key.to_owned(),
                 value: None,
+                wrote: wrote.to_owned(),
             },
         }
     }
@@ -1062,7 +1064,10 @@ mod tests {
         let journal = partial_apply();
         assert_eq!(
             Recovery::of(&journal).resolve(Choice::RollBack),
-            Resolution::RollBack(vec![removed("USENET"), removed("DATA_ROOT")]),
+            Resolution::RollBack(vec![
+                removed("USENET", "on"),
+                removed("DATA_ROOT", "/srv/media")
+            ]),
         );
     }
 
@@ -1074,7 +1079,10 @@ mod tests {
         let journal = partial_apply();
         assert_eq!(
             Recovery::of(&journal).resolve(Choice::StartOver),
-            Resolution::StartOver(vec![removed("USENET"), removed("DATA_ROOT")]),
+            Resolution::StartOver(vec![
+                removed("USENET", "on"),
+                removed("DATA_ROOT", "/srv/media")
+            ]),
         );
     }
 

@@ -269,6 +269,11 @@ async fn a_dispatched_reversal_answers_under_its_own_kind_and_says_what_went_bac
             },
         }],
     );
+    // And the setting as that repair left it: a reversal puts back what it wrote
+    // over, so a machine that never held the repair's value has nothing to reverse.
+    let set =
+        lemonfiber_core::config::store::set(&paths(&root).env_file(), "QBITTORRENT_PORT", "51413");
+    assert!(set.is_ok(), "the repair's own value was written");
 
     let json = dispatch(Command::Undo, &ctx(&root, Fake::silent()))
         .await

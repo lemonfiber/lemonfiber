@@ -369,7 +369,7 @@ pub(crate) mod tests {
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber::reaching::{ACTS, ALSO};
     use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
-    use lemonfiber_core::app::restore::Kept;
+    use lemonfiber_core::app::restore::{Consent, Kept};
     use lemonfiber_core::app::Command;
 
     /// One errand naming an action no surface offers, for the paths that report a
@@ -522,13 +522,16 @@ pub(crate) mod tests {
             Some(Ok(Command::Restore {
                 archive: Kept::Named("../../etc/shadow".to_owned()),
                 repoint: false,
-                confirm: true,
+                consent: Consent::Standing,
             }))
         );
         let listing = restoring.and_then(|errand| errand.would("lemonfiber-full-1.tar.gz"));
         assert!(matches!(
             listing,
-            Some(Ok(Command::Restore { confirm: false, .. }))
+            Some(Ok(Command::Restore {
+                consent: Consent::List,
+                ..
+            }))
         ));
     }
 
