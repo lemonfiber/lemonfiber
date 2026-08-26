@@ -107,9 +107,10 @@ read that disturbed something would still not be a read, so it is asked for at t
 door changes are asked for instead. That leaves `ui` as the only exception this
 table permits, in either column.
 
-On the other side of the table zero have no terminal form, which is where three
-stood before this slice, nine before the one ahead of that, and twenty before
-the one that began it. Every request the command line accepts is now reachable
+On the other side of the table nine reach the terminal in full, seventeen reach
+the terminal in part, and zero have no terminal form — which is where three stood
+before the slice ahead of this one, nine before the one ahead of that, and twenty
+before the one that began it. Every request the command line accepts is now reachable
 from a screen as well, and the last three were the three that do not answer and
 stop: a walk that says each step as it becomes true, a guard with no ending of
 its own, and the web surface, which the dashboard reaches by handing the terminal
@@ -127,11 +128,14 @@ because the media type a choice applies to is left to a browser. What changed is
 the row. That is the shape of the rest of this column's work — the count says how
 many requests are reached, and the rows say how much of each.
 
-These five numbers are read back from the table above by the guard, because a
+These eight numbers are read back from the table above by the guard, because a
 version of this paragraph said ten and five where the rows said eleven and four,
 and a summary nobody checks is how a page that exists to be counted stops being
-countable. The terminal count is read back the same way now, and so is the column
-it counts.
+countable. Both columns are counted the same three ways now. The terminal column
+had only the figure saying how many requests reach no screen at all, and that
+figure reached zero — so a column with seventeen rows still losing an argument
+each read as finished, and every slice closing one of them moved a number nothing
+was reading.
 
 The other three exceptions the spec names run the other way — a live-refreshing
 dashboard and an open event stream have no command-line form, and `--json` has no
