@@ -30,6 +30,7 @@ Commands:
   explain      Say what one of this product's words means
   stuck        List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   front-door   Name the one address to send somebody who lives here
+  outbound     List everything that leaves this machine, and what refusing each of it costs
   seed         Wire the stack's services to each other, idempotently
   adopt        Adopt your current edits as lemonfiber's expected state
   reset        Put the stack back to lemonfiber's own state, reverting every edit you made
@@ -923,6 +924,32 @@ Name the one address to send somebody who lives here.
 The stack publishes several things to your network and only one of them is somewhere to begin. This says which, why the others are not, and — where this stack runs nothing anybody could begin at — that there is no address to send rather than naming the nearest thing that would open.
 
 Usage: lemonfiber front-door [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber outbound`
+
+```text
+List everything that leaves this machine, and what refusing each of it costs.
+
+lemonfiber's own requests first — where each goes, why, exactly what travels, whether it is on, the setting that switches it off and what stops working when it is — then the requests the stack's own services make, which are theirs rather than lemonfiber's.
+
+Usage: lemonfiber outbound [OPTIONS]
 
 Options:
       --json

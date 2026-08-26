@@ -249,6 +249,13 @@ pub enum Request {
     /// stack runs nothing anybody could begin at — that there is no address to send
     /// rather than naming the nearest thing that would open.
     FrontDoor,
+    /// List everything that leaves this machine, and what refusing each of it costs.
+    ///
+    /// lemonfiber's own requests first — where each goes, why, exactly what travels,
+    /// whether it is on, the setting that switches it off and what stops working
+    /// when it is — then the requests the stack's own services make, which are
+    /// theirs rather than lemonfiber's.
+    Outbound,
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.

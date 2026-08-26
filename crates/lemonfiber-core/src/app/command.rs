@@ -188,6 +188,14 @@ pub enum Command {
     /// resolving them: a surface that has to name a word cannot know the names in
     /// advance, and asking is what keeps it from carrying its own copy of the table.
     Glossary,
+    /// List everything that leaves this machine: what lemonfiber asks of the world
+    /// on its own account, and what the stack's own services ask of it.
+    ///
+    /// A read with no arguments. What it answers depends on this machine's settings
+    /// and on the stack the manifest declares, so there is nothing for a caller to
+    /// narrow it by — and an enumeration a surface could narrow would be one an
+    /// operator could be shown half of.
+    Outbound,
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///

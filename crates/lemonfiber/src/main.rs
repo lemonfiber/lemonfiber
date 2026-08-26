@@ -273,6 +273,7 @@ async fn main() -> ExitCode {
         Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
+        Request::Outbound => Command::Outbound,
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },

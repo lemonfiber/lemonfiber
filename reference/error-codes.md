@@ -47,6 +47,7 @@ what to do about it, is written for operators at
 - `LIFE-1`
 - `LIFE-2`
 - `LIFE-3`
+- `LIFE-4`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`

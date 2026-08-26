@@ -35,6 +35,7 @@ use crate::model::{
     StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
     WizardReport, API_VERSION,
 };
+use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
 use crate::stack::closure::Plan;
@@ -105,6 +106,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<LifecycleReport>),
     );
     describing(kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
+    describing(kinds, kind::OUTBOUND, schema_for!(Envelope<Leaving>));
     describing(kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
     describing(kinds, kind::QUALITY, schema_for!(Envelope<QualityReport>));
     describing(kinds, kind::REPAIR, schema_for!(Envelope<RepairReport>));

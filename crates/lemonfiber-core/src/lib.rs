@@ -72,6 +72,7 @@ pub mod logs;
 pub mod materialised;
 pub mod model;
 pub mod notify;
+pub mod outbound;
 pub mod platform;
 pub mod plural;
 pub mod prerequisites;

@@ -128,6 +128,10 @@ pub const ASKS: &[Reach] = &[
         request: "stuck",
         through: "/api/stuck",
     },
+    Reach {
+        request: "outbound",
+        through: "/api/outbound",
+    },
 ];
 
 /// The requests the dashboard's panels show without being asked.

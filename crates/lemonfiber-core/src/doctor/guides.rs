@@ -22,25 +22,27 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::Remedy;
+use crate::outbound::GUIDE_SOURCE;
 use crate::ports::http::{Http, Method, Request};
-
-/// The upstream repository Recyclarr syncs the community quality guides from,
-/// probed for reachability rather than fetched. A hand-maintained literal, not
-/// derived from Recyclarr's own configuration — it must be updated by hand if the
-/// upstream ever moves, or the probe checks a source unrelated to what syncs.
-const GUIDE_SOURCE: &str = "https://github.com/TRaSH-Guides/Guides";
 
 /// Probes the quality guide source, so a sync whose currency cannot be confirmed is
 /// surfaced rather than silently assumed fine.
 pub struct GuidesCheck {
     http: Arc<dyn Http>,
+    allowed: bool,
 }
 
 impl GuidesCheck {
-    /// A check that probes the guide source over `http`.
+    /// A check that probes the guide source over `http`, where the operator allows
+    /// this machine to reach it.
+    ///
+    /// Refused is `skipped` rather than `unverified`, and the difference is the whole
+    /// point of having both: unverified says nobody could find out, which sends
+    /// somebody to look at their own network. This check did not apply, because the
+    /// operator said so.
     #[must_use]
-    pub fn new(http: Arc<dyn Http>) -> Self {
-        Self { http }
+    pub fn new(http: Arc<dyn Http>, allowed: bool) -> Self {
+        Self { http, allowed }
     }
 }
 
@@ -51,6 +53,20 @@ impl Check for GuidesCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
+        if !self.allowed {
+            return vec![Finding::in_category(
+                Category::Services,
+                "services.quality-guides",
+                "Quality guide source",
+                Verdict::Skipped {
+                    reason: format!(
+                        "reaching the quality guide source is switched off in {}, so it was \
+                         not asked; the profiles already in place are unaffected",
+                        crate::config::REACH_GUIDES_KEY
+                    ),
+                },
+            )];
+        }
         let request = Request {
             method: Method::Get,
             url: GUIDE_SOURCE.to_owned(),
@@ -103,7 +119,7 @@ mod tests {
 
     /// The single verdict the check produces for a given answer.
     async fn verdict(answer: Arc<Fake>) -> Option<Verdict> {
-        GuidesCheck::new(answer)
+        GuidesCheck::new(answer, true)
             .run()
             .await
             .into_iter()
@@ -143,10 +159,30 @@ mod tests {
         assert!(matches!(unverified, Some(Verdict::Unverified { .. })));
     }
 
+    /// The transport is handed in and must not be touched: a check that asked
+    /// anyway and then discarded the answer would pass this if it only read the
+    /// verdict.
+    #[tokio::test]
+    async fn a_source_the_operator_refuses_is_skipped_and_never_asked() {
+        let answer = answering(200);
+        let refused = GuidesCheck::new(answer.clone(), false)
+            .run()
+            .await
+            .into_iter()
+            .next()
+            .map(|finding| finding.verdict);
+        assert!(
+            matches!(&refused, Some(Verdict::Skipped { reason })
+                if reason.contains(crate::config::REACH_GUIDES_KEY)),
+            "{refused:?}"
+        );
+        assert!(answer.requests().is_empty(), "the source was asked anyway");
+    }
+
     #[test]
     fn the_check_is_a_services_check() {
         assert_eq!(
-            GuidesCheck::new(answering(200)).category(),
+            GuidesCheck::new(answering(200), true).category(),
             Category::Services
         );
     }

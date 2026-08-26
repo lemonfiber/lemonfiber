@@ -13,12 +13,28 @@
 pub mod display;
 pub mod env;
 pub mod paths;
+pub mod reaching;
+mod reading;
 pub mod store;
+
+// Re-exported rather than reached for through the module they now live in: what a
+// recorded value comes to is this module's business, and moving the reading of one
+// would otherwise be a change at every call site that asks.
+pub use reading::{
+    data_root_from_env, front_door_from_env, household_host_from_env, indexer_from_env,
+    ip_echo_from_env, port_forward_from_env, provider_host_from_env, reads_as_off, reads_as_on,
+    service_user_from_env, PortForward,
+};
 
 use std::path::PathBuf;
 
 use lemonfiber_manifest::Protocol;
 use serde::{Deserialize, Serialize};
+
+pub use reaching::{
+    offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_INDEXER_KEY, REACH_REGISTRY_KEY,
+    REACH_USENET_KEY, SWITCHES,
+};
 
 /// Which download protocols the operator actually has accounts for.
 ///
@@ -195,6 +211,11 @@ pub const SETTINGS: &[&str] = &[
     USENET_KEY,
     TORRENT_KEY,
     IP_ECHO_KEY,
+    OFFLINE_KEY,
+    REACH_REGISTRY_KEY,
+    REACH_GUIDES_KEY,
+    REACH_INDEXER_KEY,
+    REACH_USENET_KEY,
     EXPLANATIONS_KEY,
     DATA_ROOT_KEY,
     PUID_KEY,
@@ -215,176 +236,6 @@ pub const SETTINGS: &[&str] = &[
     JELLYFIN_ADMIN_PASSWORD_KEY,
     FRONT_DOOR_KEY,
 ];
-
-/// A recorded value with the whitespace and surrounding quotes a person might
-/// add stripped, its case left alone — so a hand-edited `"https://IP.example"`
-/// keeps its path but loses the quotes that would otherwise reach the reader.
-fn unquoted(value: &str) -> String {
-    value
-        .trim()
-        .trim_matches(|c| c == '"' || c == '\'')
-        .trim()
-        .to_owned()
-}
-
-/// The same, folded to lower case, so `"on"` and ` on ` both read as `on`.
-fn bare(value: &str) -> String {
-    unquoted(value).to_ascii_lowercase()
-}
-
-/// Whether a recorded setting reads as switched on.
-///
-/// Generous about spelling because this is a file people edit by hand, and a
-/// setting that silently means "no" because it says `yes` rather than `on`
-/// would be indistinguishable from lemonfiber ignoring it.
-#[must_use]
-pub fn reads_as_on(value: &str) -> bool {
-    matches!(bare(value).as_str(), "on" | "true" | "yes" | "1")
-}
-
-/// Whether a recorded setting reads as switched off.
-///
-/// The counterpart to [`reads_as_on`] for a setting that also accepts a value:
-/// an explicit off switches the feature off, where absence or an affirmative
-/// would leave it on.
-#[must_use]
-pub fn reads_as_off(value: &str) -> bool {
-    matches!(bare(value).as_str(), "off" | "false" | "no" | "0" | "")
-}
-
-/// The IP-echo service to verify egress against, or `None` where the operator
-/// has switched leak detection off.
-///
-/// Absent or affirmative leaves the default in place; an explicit off disables
-/// it, at the stated cost of losing leak detection; any other value replaces the
-/// default with the operator's own endpoint — so the one third-party dependency
-/// the check has is replaceable as well as disableable.
-#[must_use]
-pub fn ip_echo_from_env(file: &env::EnvFile) -> Vec<String> {
-    let defaults = || vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()];
-    match file.get(IP_ECHO_KEY) {
-        None => defaults(),
-        Some(value) if reads_as_on(value) => defaults(),
-        Some(value) if reads_as_off(value) => Vec::new(),
-        // Several, comma-separated, so an operator who wants their own sources can
-        // still have more than one — the point of asking two is lost if naming one
-        // silently drops back to trusting a single stranger.
-        Some(value) => unquoted(value)
-            .split(',')
-            .map(str::trim)
-            .filter(|source| !source.is_empty())
-            .map(str::to_owned)
-            .collect(),
-    }
-}
-
-/// Where the operator chose to keep downloads and media, if they have chosen.
-///
-/// Absent until setup writes it, and an empty value is read as absent rather
-/// than as the current directory — a data root of nothing is a mistake, never an
-/// intent, and probing the working directory in its place would test the wrong
-/// filesystem.
-#[must_use]
-pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
-    file.get(DATA_ROOT_KEY)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-}
-
-/// The address the operator recorded for the household's links, if they have.
-///
-/// An empty value is read as absent rather than as an address of nothing, the same
-/// reading the data root gets and for the same reason: a blank is a mistake, never
-/// an intent.
-#[must_use]
-pub fn household_host_from_env(file: &env::EnvFile) -> Option<String> {
-    file.get(HOUSEHOLD_HOST_KEY)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned)
-}
-
-/// The service the operator named as the front door, if they have named one.
-///
-/// An empty value is read as absent rather than as a service named nothing, the
-/// same reading the household address gets and for the same reason: a blank is a
-/// mistake, never an intent. Whether the name is one this stack may send a
-/// household to is decided where the door is, not here — a setting that vetted
-/// itself would be a second opinion about the household tier.
-#[must_use]
-pub fn front_door_from_env(file: &env::EnvFile) -> Option<String> {
-    file.get(FRONT_DOOR_KEY)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned)
-}
-
-/// The indexer the operator configured, where both its URL and key are present.
-///
-/// Only a complete pair is an indexer to re-prove; a half-written one — a URL
-/// with no key — is treated as none rather than a credential to test.
-#[must_use]
-pub fn indexer_from_env(file: &env::EnvFile) -> Option<Indexer> {
-    let present = |key| {
-        file.get(key)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_owned)
-    };
-    Some(Indexer {
-        url: present(INDEXER_URL_KEY)?,
-        key: present(INDEXER_APIKEY_KEY)?,
-    })
-}
-
-/// The user and group the service containers run as, where both are configured.
-///
-/// Both or neither: deciding whether that user can write a directory needs the
-/// pair, and one half without the other cannot answer the question, so a
-/// half-configured file is treated as unconfigured rather than guessed at.
-#[must_use]
-pub fn service_user_from_env(file: &env::EnvFile) -> Option<(u32, u32)> {
-    let uid = file.get(PUID_KEY)?.trim().parse().ok()?;
-    let gid = file.get(PGID_KEY)?.trim().parse().ok()?;
-    Some((uid, gid))
-}
-
-/// What the operator recorded about VPN port forwarding: whether they asked for
-/// it, and which provider is meant to grant it.
-///
-/// Port forwarding is a per-provider capability — only some VPNs offer it — so
-/// the provider name travels with the switch. The name is consulted not to decide
-/// whether the tunnel works, but to name a provider's known trap when the switch
-/// is on and no port arrives.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct PortForward {
-    /// Whether `VPN_PORT_FORWARDING` reads as switched on.
-    pub enabled: bool,
-    /// The provider name, lower-cased, where one is recorded.
-    ///
-    /// Carried even when the switch is off, but only read when it is on.
-    pub provider: Option<String>,
-}
-
-/// What the operator recorded about port forwarding.
-///
-/// Absent or off leaves it disabled, in which case there is no forwarded port to
-/// verify and the check does not apply. A blank provider is read as absent rather
-/// than as a provider named the empty string.
-#[must_use]
-pub fn port_forward_from_env(file: &env::EnvFile) -> PortForward {
-    PortForward {
-        enabled: file.get(VPN_PORT_FORWARDING_KEY).is_some_and(reads_as_on),
-        // `bare`, not a plain trim: the switch is de-quoted the same way, and a
-        // provider left quoted would otherwise miss its known trap — the very
-        // guidance the check exists to give — and read as an unknown provider.
-        provider: file
-            .get(VPN_PROVIDER_KEY)
-            .map(bare)
-            .filter(|value| !value.is_empty()),
-    }
-}
 
 impl Protocols {
     /// Neither protocol configured — what a fresh install looks like.
@@ -505,6 +356,16 @@ pub struct Settings {
     /// On unless switched off. The words are a wall to somebody meeting them, and
     /// the operator who wants them gone is the one who knows to go and look.
     pub explanations: bool,
+    /// Which requests lemonfiber may make on its own account.
+    ///
+    /// Every one allowed unless the operator said otherwise, and what each of them
+    /// costs to refuse is stated where the list is built rather than here.
+    pub reaching: Reaching,
+    /// The Usenet provider's hostname, where one was configured.
+    ///
+    /// The host alone and never the account beside it: what reads this is the list
+    /// of where this machine's requests go, and where is a hostname.
+    pub provider_host: Option<String>,
 }
 
 /// An indexer credential as configuration holds it: where it is, and the key.
@@ -534,6 +395,8 @@ impl Default for Settings {
             household_host: None,
             front_door: None,
             explanations: true,
+            reaching: Reaching::default(),
+            provider_host: None,
         }
     }
 }
@@ -542,7 +405,8 @@ impl Default for Settings {
 mod tests {
     use super::{
         env, front_door_from_env, household_host_from_env, indexer_from_env, ip_echo_from_env,
-        Indexer, Protocol, Protocols, Settings, DEFAULT_IP_ECHO, SECOND_IP_ECHO,
+        provider_host_from_env, Indexer, Protocol, Protocols, Settings, DEFAULT_IP_ECHO,
+        OFFLINE_KEY, SECOND_IP_ECHO,
     };
 
     #[test]
@@ -699,6 +563,35 @@ mod tests {
             assert!(
                 ip_echo_from_env(&file).is_empty(),
                 "{off:?} should disable it"
+            );
+        }
+    }
+
+    /// The one setting here that names a thing as well as answering yes or no, so
+    /// the blanket switch has to be read where it is read rather than beside the
+    /// four that only answer.
+    #[test]
+    fn the_blanket_switch_stops_the_leak_check_even_where_a_source_is_named() {
+        let file = env::EnvFile::parse(&format!(
+            "{OFFLINE_KEY}=on\nLEMONFIBER_IP_ECHO=https://ip.example\n"
+        ));
+        assert!(ip_echo_from_env(&file).is_empty());
+    }
+
+    /// Where the requests that leave this machine are listed, the Usenet provider is
+    /// named by its host — so the host is read back out of the file, and the account
+    /// beside it never is.
+    #[test]
+    fn a_usenet_host_is_read_back_and_a_blank_one_is_absent() {
+        assert_eq!(
+            provider_host_from_env(&env::EnvFile::parse("USENET_HOST= news.example.net \n")),
+            Some("news.example.net".to_owned())
+        );
+        for blank in ["USENET_HOST=\n", "USENET_HOST=   \n", "PUID=1000\n"] {
+            assert_eq!(
+                provider_host_from_env(&env::EnvFile::parse(blank)),
+                None,
+                "{blank:?}"
             );
         }
     }

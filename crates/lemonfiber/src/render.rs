@@ -19,6 +19,7 @@ mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
+mod outbound;
 mod quality;
 pub(crate) mod repair;
 mod seed;
@@ -214,6 +215,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
+        Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Lifecycle(report) => stack::lifecycle(report),
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),

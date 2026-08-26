@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::archive::Archiving;
-use crate::config::Settings;
+use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
 use crate::ports::docker::Engine;
 use crate::ports::filesystem::Volume;
@@ -104,15 +104,20 @@ pub struct Ctx {
 }
 
 /// A validator proving credentials against the real services, over `http` and over
-/// a real NNTP dialer.
+/// a real NNTP dialer — and only where this machine's settings allow the request.
 ///
-/// Both halves, because setup proves a Usenet login as well as an indexer key, and
-/// a validator with no transport for one reports it unreachable rather than
-/// pretending it was proven.
-fn live(http: &Arc<dyn Http>) -> Arc<dyn Validator> {
-    Arc::new(Live::with_nntp(
-        Arc::clone(http),
-        Arc::new(crate::adapters::Dialer::new()),
+/// Both transports, because setup proves a Usenet login as well as an indexer key,
+/// and a validator with no transport for one reports it unreachable rather than
+/// pretending it was proven. Wrapped in what the operator permits, so a credential
+/// whose proof would leave this machine against their settings is recorded unproven
+/// instead of being proven anyway.
+fn live(http: &Arc<dyn Http>, reaching: Reaching) -> Arc<dyn Validator> {
+    Arc::new(crate::validate::Allowed::new(
+        Arc::new(Live::with_nntp(
+            Arc::clone(http),
+            Arc::new(crate::adapters::Dialer::new()),
+        )),
+        reaching,
     ))
 }
 
@@ -152,7 +157,7 @@ impl Ctx {
             // command that asks is asking about this machine's drives, and a test
             // that means something else says so by name.
             volume: Arc::new(crate::adapters::Disk),
-            validator: live(&http),
+            validator: live(&http, settings.reaching.clone()),
             http,
             random: Arc::new(crate::adapters::Os),
             site,
@@ -198,7 +203,7 @@ impl Ctx {
     /// themselves says so with [`Self::proving`], afterwards.
     #[must_use]
     pub fn with_http(mut self, http: Arc<dyn Http>) -> Self {
-        self.validator = live(&http);
+        self.validator = live(&http, self.settings.reaching.clone());
         self.http = http;
         self
     }

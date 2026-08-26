@@ -32,8 +32,8 @@
 //! that flow decides belongs beside the list it decides over.
 
 use lemonfiber_api::reads::{
-    named, Wanted as Asking, CHECKS, CONFIG, FORMS, FRONT_DOOR, QUALITY, REQUESTS, STUCK, TRACE,
-    VERSION,
+    named, Wanted as Asking, CHECKS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND, QUALITY, REQUESTS, STUCK,
+    TRACE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -318,6 +318,12 @@ static AFTER: &[Question] = &[
         name: "where the household begins",
         about: "the one address to send somebody who lives here, and why nothing else is",
         read: FRONT_DOOR,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what leaves this machine",
+        about: "every request lemonfiber makes, what it sends, and how to stop each one",
+        read: OUTBOUND,
         needs: Needed::Nothing,
     },
     Question {

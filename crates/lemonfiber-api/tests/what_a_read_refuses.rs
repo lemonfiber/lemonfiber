@@ -334,3 +334,15 @@ async fn a_line_count_at_the_ceiling_is_still_asked_for() {
     let seen = asked(world(running(), stack()), "/api/logs?tail=10000").await;
     assert_eq!(seen.map(|(status, _)| status), Some(StatusCode::OK));
 }
+
+#[tokio::test]
+async fn the_enumeration_takes_nothing_and_refuses_a_parameter() {
+    // An enumeration a caller could narrow is one an operator could be shown half
+    // of, and half of everything that leaves this machine reads as the whole of it.
+    let refused = reads::wanted(reads::OUTBOUND, Some("reach=registry"));
+
+    assert_eq!(
+        refused.err().map(|problem| problem.code.as_str()),
+        Some("READ-1")
+    );
+}
