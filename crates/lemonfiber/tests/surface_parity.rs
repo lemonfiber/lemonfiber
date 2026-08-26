@@ -502,14 +502,49 @@ fn every_route_declared_as_answering_none_is_one_the_web_still_serves() {
 /// A route is declared either with its path written out or with the constant that
 /// holds it, so both are read. Only the literals matter in the end — a constant is
 /// resolved against the same text, which is the only place a path can be written.
+///
+/// A route this cannot read is **reported**, never skipped. Dropped quietly it
+/// would leave the tests below passing about a route they cannot see, which is the
+/// one way this whole file could be green and wrong; the Python gate over the same
+/// declarations refuses one for the same reason, and this agrees with it rather
+/// than being the softer of the two.
 fn served() -> BTreeSet<String> {
+    let (paths, unreadable) = routing();
+    assert!(
+        unreadable.is_empty(),
+        "these route calls declare a path this cannot read, so nothing below holds \
+         them to anything — write the path out, or hold it in a `const` in the same \
+         crate: {unreadable:?}"
+    );
+    paths
+}
+
+/// The paths, and the route calls whose path could not be read.
+fn routing() -> (BTreeSet<String>, Vec<String>) {
     let source = api();
-    source
-        .split(".route(")
-        .skip(1)
-        .filter_map(|rest| rest.split_once(','))
-        .filter_map(|(argument, _)| path_of(argument.trim(), &source))
-        .collect()
+    let mut paths = BTreeSet::new();
+    let mut unreadable = Vec::new();
+    for rest in source.split(".route(").skip(1) {
+        let Some((argument, _)) = rest.split_once(',') else {
+            unreadable.push(named(rest));
+            continue;
+        };
+        match path_of(argument.trim(), &source) {
+            Some(path) => {
+                paths.insert(path);
+            }
+            None => unreadable.push(named(argument)),
+        }
+    }
+    (paths, unreadable)
+}
+
+/// As much of a route call as names it in a failure.
+fn named(rest: &str) -> String {
+    rest.split_whitespace()
+        .take(3)
+        .collect::<Vec<&str>>()
+        .join(" ")
 }
 
 /// The path one route call names, written out or held in a constant.

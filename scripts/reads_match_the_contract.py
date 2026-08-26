@@ -73,7 +73,13 @@ FENCE = re.compile(r"```[a-z]*\n(.*?)```", re.DOTALL)
 # Below this a reading has found the wrong text rather than a smaller surface.
 # This surface has never offered fewer, and the failure that matters is a sweep
 # that matched nothing and reported agreement.
-FEWEST = 5
+#
+# It is a floor under the *reading*, not a count of the reads, so it trails the
+# real number deliberately — a read genuinely retired should not have to argue
+# with this. But it trailed by ten, which is a floor that would sit still while
+# two thirds of the surface vanished from both artefacts at once. Kept a little
+# under, so it holds without being a second place to remember the total.
+FEWEST = 12
 
 
 def declared(root: pathlib.Path) -> dict[str, str]:
