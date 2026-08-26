@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use lemonfiber::cli::RawUi;
+use lemonfiber_api::admission::Admitting;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
@@ -410,14 +411,26 @@ async fn serving(ctx: Ctx, asked: Asked, embedded: Option<Source>, until: Until)
     // about it, so a guard whose browser went away is let go rather than left
     // polling a drive until this process stops.
     tokio::spawn(jobs.clone().sweeping(LEASE));
+    // One register, shared by the door, the guard over everything else and the
+    // stream: two would be a run somebody could be admitted to half of.
+    let admitting = Arc::new(Admitting {
+        kept: ctx.settings.admission.clone(),
+        ..Admitting::default()
+    });
     let serving = Serving {
         ctx: Arc::clone(&ctx),
         token: Arc::clone(&token),
         bound,
         jobs,
+        admitting: Arc::clone(&admitting),
         live: Arc::clone(&live),
     };
-    let streaming = Arc::new(Streaming { token, bound, live });
+    let streaming = Arc::new(Streaming {
+        token,
+        bound,
+        admitting,
+        live,
+    });
     let surface = surface(serving, streaming, app(embedded, asked.assets));
     // Whatever ends the loop, the surface has stopped, and that is the whole of
     // what there is to report. A fault from accepting on a socket this process
@@ -479,6 +492,7 @@ mod tests {
     use axum::extract::Request;
     use axum::http::{HeaderValue, StatusCode};
     use axum::Router;
+    use lemonfiber_api::admission::Admitting;
     use lemonfiber_api::events::live::Live;
     use lemonfiber_api::events::Streaming;
     use lemonfiber_api::guard::Token;
@@ -1129,16 +1143,19 @@ mod tests {
         let live = Arc::new(Live::opening(
             lemonfiber_fixtures::ports::Stopped::at(0).as_ref(),
         ));
+        let admitting = Arc::new(Admitting::default());
         let serving = Serving {
             ctx: Arc::new(ctx(Some(enough()))),
             token: Arc::clone(&token),
             bound: bound(),
             jobs: Jobs::default(),
+            admitting: Arc::clone(&admitting),
             live: Arc::clone(&live),
         };
         let streaming = Arc::new(Streaming {
             token,
             bound: bound(),
+            admitting,
             live,
         });
         Some(surface(serving, streaming, None))

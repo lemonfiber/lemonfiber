@@ -113,10 +113,17 @@ const DASHBOARD: &str = "dashboard";
 /// nothing prints. The action path is how every action is asked for, and the rows
 /// name the actions rather than the path they arrive on. The job path is the other
 /// end of the name a long-running action is answered with, and being answered with
-/// a name is itself the web's own arrangement.
+/// a name is itself the web's own arrangement. The door a password is exchanged at
+/// is the same kind of thing: a command line is already sitting at the machine that
+/// printed this run's token, so there is nothing for it to log in to.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 3] = ["/api/events", "/api/actions/{action}", "/api/jobs/{job}"];
+const UNREQUESTED: [&str; 4] = [
+    "/api/events",
+    "/api/actions/{action}",
+    "/api/jobs/{job}",
+    "/api/session",
+];
 
 /// One row of the parity table.
 struct Row {
@@ -584,11 +591,16 @@ fn path_of(argument: &str, source: &str) -> Option<String> {
     if let Some(quoted) = argument.strip_prefix('"') {
         return quoted.split_once('"').map(|(path, _)| path.to_owned());
     }
+    // A name declared twice is a name this cannot resolve, and resolving it to
+    // whichever declaration comes first is how a route hides behind another one's
+    // path: the check then holds a path something else already serves, and the route
+    // in front of it is never held to anything. Two modules calling their own path
+    // `PATH` did exactly that.
     let declared = format!("const {argument}: &str = \"");
-    source
-        .split_once(&declared)
-        .and_then(|(_, rest)| rest.split_once('"'))
-        .map(|(path, _)| path.to_owned())
+    let mut found = source.split(&declared).skip(1);
+    let first = found.next()?;
+    found.next().is_none().then_some(first)?;
+    first.split_once('"').map(|(path, _)| path.to_owned())
 }
 
 /// Every cell says one of the things a cell may say, and says why where it must.

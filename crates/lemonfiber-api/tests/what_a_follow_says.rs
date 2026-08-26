@@ -81,6 +81,7 @@ impl Run {
                 ctx: Arc::new(ctx),
                 token: Arc::new(Token::mint(&given())?),
                 bound: ([127, 0, 0, 1], 8471).into(),
+                admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
                 jobs: Jobs::default(),
                 live: Arc::clone(&live),
             },

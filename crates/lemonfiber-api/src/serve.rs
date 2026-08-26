@@ -14,12 +14,13 @@ use std::net::SocketAddr;
 use axum::body::Body;
 use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 
-use crate::guard::{host_is_here, origin_is_here, Token, TOKEN_HEADER};
+use crate::admission::here;
+use crate::guard::TOKEN_HEADER;
 
 /// Why a request was not answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Refusal {
-    /// It carried no token, or not this run's.
+    /// It carried no secret this run admits.
     Unknown,
     /// It said it came from somewhere this server is not.
     Elsewhere,
@@ -39,7 +40,7 @@ impl Refusal {
     #[must_use]
     pub const fn said(self) -> &'static str {
         match self {
-            Self::Unknown => "This request carried no token, or not this run's.",
+            Self::Unknown => "This request carried no token or session this run admits.",
             Self::Elsewhere => "This request said it came from somewhere this server is not.",
         }
     }
@@ -47,24 +48,25 @@ impl Refusal {
 
 /// Whether a request may be answered at all.
 ///
-/// Both checks hold or neither does. The token is what a cross-site request
-/// cannot read and therefore cannot send; the address check closes the window a
-/// rebound name would open, and neither alone is enough.
+/// Both checks hold or neither does. A secret is what a cross-site request cannot
+/// read and therefore cannot send; the address check closes the window a rebound
+/// name would open, and neither alone is enough.
+///
+/// Whether the secret is one this run admits is settled before this is called,
+/// because there are now two that answer — the token printed at start and a session
+/// opened by proving the password — and asking which of them it was is
+/// [`crate::admission::Admitting`]'s business rather than this one's. What is left
+/// here is the shape of the decision: a secret this run knows, and a request that
+/// says it came from where this server is.
 ///
 /// # Errors
 ///
 /// Returns the refusal a caller should answer with.
-pub fn admitted(headers: &HeaderMap, token: &Token, bound: SocketAddr) -> Result<(), Refusal> {
-    // Looking a header up by name is case-insensitive, so the header may be
-    // written here the way the contract prints it.
-    let said = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
-
-    if !token.carried_by(said(TOKEN_HEADER)) {
+pub fn admitted(known: bool, headers: &HeaderMap, bound: SocketAddr) -> Result<(), Refusal> {
+    if !known {
         return Err(Refusal::Unknown);
     }
-    if !host_is_here(said(header::HOST.as_str()), bound)
-        || !origin_is_here(said(header::ORIGIN.as_str()), bound)
-    {
+    if !here(headers, bound) {
         return Err(Refusal::Elsewhere);
     }
     Ok(())
