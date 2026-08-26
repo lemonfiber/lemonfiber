@@ -630,7 +630,24 @@ fn check(
         wrong.push(format!("{request}: the {column} column says nothing"));
         return;
     }
-    for token in &said {
+    vocabulary(request, column, &said, allowed, quoting, wrong);
+    qualified(request, column, &said, wrong);
+    unaccompanied(request, column, &said, wrong);
+}
+
+/// Every word in the cell is one this column may say.
+///
+/// A quoted word is a name — an action, a route — and is the cell's own to choose
+/// where the column allows one, so it is passed over rather than looked up.
+fn vocabulary(
+    request: &str,
+    column: &str,
+    said: &[&str],
+    allowed: &[&str],
+    quoting: bool,
+    wrong: &mut Vec<String>,
+) {
+    for token in said {
         let quoted = token.starts_with('`') && token.ends_with('`');
         if quoted && quoting {
             continue;
@@ -639,6 +656,13 @@ fn check(
             wrong.push(format!("{request}: the {column} column says `{token}`"));
         }
     }
+}
+
+/// A word that qualifies something names the something it qualifies.
+///
+/// `partial` alone says a request is partly reachable and not by what, which is the
+/// shape of a row that stopped being maintained rather than one that was written.
+fn qualified(request: &str, column: &str, said: &[&str], wrong: &mut Vec<String>) {
     for qualifier in QUALIFIERS {
         if said.contains(&qualifier) && said.len() == 1 {
             wrong.push(format!(
@@ -647,6 +671,14 @@ fn check(
             ));
         }
     }
+}
+
+/// A verdict that stands for the whole cell stands in it alone.
+///
+/// `none` and `intrinsic` are answers about the request entire, so a cell pairing one
+/// with a surface would be claiming both that nothing reaches it and that something
+/// does.
+fn unaccompanied(request: &str, column: &str, said: &[&str], wrong: &mut Vec<String>) {
     for verdict in ALONE {
         if said.contains(&verdict) && said.len() > 1 {
             wrong.push(format!(
