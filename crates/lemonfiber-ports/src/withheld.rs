@@ -10,19 +10,25 @@
 //! the model is what carries a service's own words outward, and it cannot reach up into a
 //! layer above it to have them cleaned.
 //!
-//! Two shapes arrive here and they are told apart by shape rather than by caller. A
-//! settings line is a name, a separator and a value, and its name is a name: one word,
-//! no spaces. A sentence has a colon in it because English does. Reading the front of a
-//! sentence as the name of what follows is how "the indexer refused the key: your
-//! subscription has expired" became "the indexer refused the key: (set, not shown)" — a
-//! diagnosis with its diagnosis removed, on every such error, every time.
+//! Two shapes arrive here and they are told apart by shape. A settings line is a name, a
+//! separator and a value, and its name is a name: one word, no spaces, with a value after
+//! it rather than a clause. A sentence has a colon in it because English does. Reading the
+//! front of a sentence as the name of what follows is how "the indexer refused the key:
+//! your subscription has expired" became "the indexer refused the key: (set, not shown)" —
+//! a diagnosis with its diagnosis removed, on every such error, every time — and how
+//! "Unauthorized: the request was refused" lost its reason to its own first word.
 //!
 //! So the two directions are balanced differently on purpose. Where there is a name to
 //! read, the name decides and withholding is the default — that is the settings surface,
-//! and the allow-list in `lemonfiber-core`'s `config::display` is what answers it. Where there is no name,
-//! there is no list to consult and every rule is a guess about somebody else's words: a
-//! guess that fires wrongly destroys the one sentence the operator needed, so here the
-//! rules are the narrow ones that read as configuration wherever they appear.
+//! and the allow-list in `lemonfiber-core`'s `config::display` is what answers it, through
+//! [`withheld_by`]. Where there is no name, there is no list to consult and every rule is a
+//! guess about somebody else's words: a guess that fires wrongly destroys the one sentence
+//! the operator needed, so [`withheld`] fires only the narrow rules that read as
+//! configuration wherever they appear.
+//!
+//! What a caller chooses is therefore the list, never the splitting: one line cannot be
+//! read as a setting here and as a sentence at `/api/config`, and four call sites each
+//! deciding for themselves is how three of them decided wrongly.
 
 const SECRET_MARKERS: &[&str] = &[
     "KEY",
@@ -74,27 +80,92 @@ fn names_a_field(word: &str) -> bool {
         .all(|(at, character)| character.is_alphabetic() && (at == 0 || character.is_lowercase()))
 }
 
-/// One line as it is safe to show: a setting whose name reads as a credential keeps
-/// its name and loses its value.
+/// A value with anything after its question mark withheld.
 ///
-/// Wherever text that might carry a credential reaches a person — a diff of a file
-/// they edited, the technical detail under an error, a log line quoted back — it
-/// comes through here. A terminal, its scrollback and any bug report pasted out of
-/// it are all the same place as far as a key is concerned: somewhere it now has to
-/// be rotated from.
+/// The shape that catches people out, and the one a name rule cannot see: an indexer's
+/// address is worth showing and the key riding in its query string is not, and the two
+/// arrive as one value. Which parameter holds it is not a question answerable from here
+/// — a parameter's name belongs to whoever wrote the service, and `apikey` was only ever
+/// caught by the accident of its holding `KEY`, while the `r=` a Newznab-family indexer
+/// authenticates by and a `sid=` session were not caught at all.
+///
+/// So the query goes wholesale wherever the value turns up: on the settings surface, in
+/// the URL a transport failure keeps, and inside a sentence that quotes one. A query
+/// nobody reads is a smaller loss than a key everybody can.
+#[must_use]
+pub fn without_query(value: &str) -> String {
+    match value.split_once('?') {
+        None => value.to_owned(),
+        Some((address, _)) => format!("{address}?{REDACTED}"),
+    }
+}
+
+/// Whether what stands after a separator is the marker itself, left by an earlier pass
+/// over the same text.
+///
+/// Text arrives here more than once — a service's words are laundered where they are
+/// read and again where the report carrying them is serialised — and the marker is not a
+/// value. Read as one it is withheld in half, and `api_key: (set, not shown)` comes back
+/// as `api_key: (set, not shown) not shown)` on every pass after the first.
+fn already_withheld(value: &str) -> bool {
+    let value = value.trim();
+    !value.is_empty() && REDACTED.starts_with(value)
+}
+
+/// Whether a name and what follows it read as a setting rather than as the front of a
+/// sentence.
+///
+/// A name spelled like a field is a field wherever it appears. A name spelled like a
+/// word — `Unauthorized`, `Authentication` — is one only where what follows is a value
+/// rather than a clause, and a clause is several words: English introduces one with a
+/// colon, and the marker words are ordinary English. Without the second half of this,
+/// `Unauthorized: the request was refused by the indexer` came back as
+/// `Unauthorized: (set, not shown)` — a sentence eaten by its own first word, and every
+/// service that answers `401` writes that word.
+///
+/// Both halves are load-bearing. A credential is written under a lower-case name often
+/// enough — `password: …`, `api_key: …` — that the first alone would print one, and a
+/// value with a space in it is a value still, so the second alone would print whatever
+/// part of it did not sit next to the separator.
+fn reads_as_setting(name: &str, value: &str) -> bool {
+    names_a_field(name) || value.split_whitespace().count() == 1
+}
+
+/// One line of prose as it is safe to show, with the marker rule answering about names.
+///
+/// The door for text no allow-list can answer for: the technical detail under an error,
+/// a condition, a log line quoted back. A terminal, its scrollback and any bug report
+/// pasted out of it are all the same place as far as a key is concerned — somewhere it
+/// now has to be rotated from.
+#[must_use]
+pub fn withheld(line: &str) -> String {
+    withheld_by(line, &|name| !is_secret(name))
+}
+
+/// One line as it is safe to show: a setting whose name is not vouched for keeps its
+/// name and loses its value.
 ///
 /// The separator is whichever of `:` or `=` comes **first**, because either can
 /// appear inside the other's value — a password containing a colon, a key containing
 /// an equals — and splitting on the later one would leave part of the value in the
 /// name and print it.
 ///
-/// What stands before that separator is taken as a name only where it *is* one. Text
-/// arriving here is as often a sentence as a setting, and a sentence's first colon is
-/// punctuation: taking the clause in front of it as the name of what follows withholds
-/// the message instead of the credential, and the message is what the operator came
-/// for. A sentence goes to [`withheld_within`] instead.
+/// What stands before that separator is taken as a name only where it *is* one, and
+/// only where what follows it is a value rather than a clause. Text arriving here is as
+/// often a sentence as a setting, and a sentence's first colon is punctuation: taking
+/// the clause in front of it as the name of what follows withholds the message instead
+/// of the credential, and the message is what the operator came for. A sentence goes to
+/// [`withheld_within`] instead.
+///
+/// Which names keep their values is the one question this cannot answer for itself, so
+/// `vouched_for` answers it, and the surface decides which answer it gets. A settings
+/// file is read against the allow-list in `lemonfiber-core`'s `config::display`, where a
+/// name nobody has argued for is withheld — including a name that does not exist yet.
+/// Prose is read against the marker rule by [`withheld`], because there is no list to
+/// consult about somebody else's sentence. Two surfaces, one splitter: a line cannot be
+/// withheld one way here and another way at `/api/config`.
 #[must_use]
-pub fn withheld(line: &str) -> String {
+pub fn withheld_by(line: &str, vouched_for: &dyn Fn(&str) -> bool) -> String {
     let Some((at, separator)) = line
         .char_indices()
         .find(|(_, character)| *character == ':' || *character == '=')
@@ -104,13 +175,16 @@ pub fn withheld(line: &str) -> String {
     let (name, rest) = line.split_at(at);
     let value = rest.get(separator.len_utf8()..).unwrap_or_default();
     // A name with nothing after it opens a block rather than setting a value: there
-    // is nothing to withhold, and blanking it would corrupt the shape.
-    if value.trim().is_empty() {
+    // is nothing to withhold, and blanking it would corrupt the shape. Nor is there
+    // anything left to do where an earlier pass already withheld the value.
+    if value.trim().is_empty() || already_withheld(value) {
         return line.to_owned();
     }
-    if !reads_as_name(name.trim()) || !is_secret(name) {
-        // Not a setting line, but prose can still carry one: a service that fails
-        // while authenticating says so with the credential in hand, and that
+    let named = name.trim();
+    if !reads_as_name(named) || !reads_as_setting(named, value) || vouched_for(named) {
+        // Not a setting line, or a setting whose value is vouched for — but prose can
+        // still carry a credential, and so can a value that is an address: a service
+        // that fails while authenticating says so with the credential in hand, and that
         // sentence becomes an error detail, a condition, and a push notification.
         return withheld_within(line);
     }
@@ -119,17 +193,19 @@ pub fn withheld(line: &str) -> String {
 
 /// A line of prose, with any credential embedded in it withheld.
 ///
-/// Scans for the shapes a credential takes when a service quotes one back —
-/// `api_key=abc123`, `api_key:abc123`, `api_key: abc123` — rather than treating the
-/// whole line as one setting.
+/// Scans for the shapes a credential takes when a service quotes one back — a query
+/// string, `api_key=abc123`, `api_key:abc123`, `api_key: abc123` — rather than treating
+/// the whole line as one setting.
 ///
-/// Each of those is a *field* written out mid-sentence, and that is what the rules
-/// look for. The two joined shapes need nothing more: prose does not put an equals
-/// sign or an internal colon inside a word, so finding one is already finding a
-/// setting. The spaced shape does need more, because a word followed by a colon is
-/// how English introduces a clause, and the marker words are ordinary English —
-/// `key`, `password`, `auth`. So there the marker has to be spelled like a field's
-/// name rather than like a word, and a clause keeps its sentence.
+/// A query string is taken wholesale, because that is where the key nobody spotted
+/// actually lives, riding inside something that reads as an address. The rest are a
+/// *field* written out mid-sentence, and that is what those rules look for. The two
+/// joined shapes need nothing more: prose does not put an equals sign or an internal
+/// colon inside a word, so finding one is already finding a setting. The spaced shape
+/// does need more, because a word followed by a colon is how English introduces a
+/// clause, and the marker words are ordinary English — `key`, `password`, `auth`. So
+/// there the marker has to be spelled like a field's name rather than like a word, and
+/// a clause keeps its sentence.
 ///
 /// The balance is struck the other way here than on the settings surface, and for a
 /// reason that is not a preference: there, a name is read against a list, and a value
@@ -142,10 +218,10 @@ fn withheld_within(line: &str) -> String {
     for token in line.split_whitespace() {
         if redact_next {
             redact_next = false;
-            safe.push(REDACTED.to_owned());
+            safe.push(marked(token));
             continue;
         }
-        if let Some(named) = joined(token) {
+        if let Some(named) = joined(token).or_else(|| queried(token)) {
             safe.push(named);
             continue;
         }
@@ -166,6 +242,16 @@ fn withheld_within(line: &str) -> String {
     }
 }
 
+/// The value standing where one was announced, withheld — or left as it is where an
+/// earlier pass already withheld it and this one is reading the marker back.
+fn marked(token: &str) -> String {
+    if already_withheld(token) {
+        token.to_owned()
+    } else {
+        REDACTED.to_owned()
+    }
+}
+
 /// One token that is a whole setting — `api_key=abc123` or `api_key:abc123` — with its
 /// value withheld, or nothing where the token is not one.
 ///
@@ -179,7 +265,25 @@ fn joined(token: &str) -> Option<String> {
         (None, Some((name, value))) => (name, value, ':'),
         (None, None) => return None,
     };
-    (is_secret(name) && !value.is_empty()).then(|| format!("{name}{separator}{REDACTED}"))
+    (is_secret(name) && !value.is_empty() && !already_withheld(value))
+        .then(|| format!("{name}{separator}{REDACTED}"))
+}
+
+/// One token carrying a query string, with the query withheld wholesale — or nothing
+/// where the token carries none.
+///
+/// Asked after [`joined`] and answering what it cannot: a key is reached by name only
+/// where it is the first parameter, because the name read out of
+/// `https://indexer.example/api?t=search&apikey=…` is `https://indexer.example/api?t`,
+/// which holds no marker and vouches for everything after it. lemonfiber builds that
+/// exact address to prove an indexer, and the services around it log the address they
+/// failed on.
+///
+/// Parameters and not a question mark on its own: a question mark with nothing that
+/// reads as a parameter after it is somebody asking a question in a log line.
+fn queried(token: &str) -> Option<String> {
+    let (_, query) = token.split_once('?')?;
+    query.contains('=').then(|| without_query(token))
 }
 
 /// Every line of `text`, each withheld where it carries a credential.

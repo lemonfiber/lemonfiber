@@ -121,12 +121,23 @@ pub fn diff(yours: &str, ours: &str) -> String {
     let our_middle = ours.get(head..ours.len() - tail).unwrap_or_default();
     let mut out = String::new();
     for line in your_middle {
-        let _ = writeln!(out, "- {}", crate::config::store::withheld(line));
+        let _ = writeln!(out, "- {}", shown(line));
     }
     for line in our_middle {
-        let _ = writeln!(out, "+ {}", crate::config::store::withheld(line));
+        let _ = writeln!(out, "+ {}", shown(line));
     }
     out
+}
+
+/// One line of a stack file as it is safe to show.
+///
+/// Through the allow-list, which is the same list `/api/config` reads the operator's
+/// settings against — so a value withheld there is withheld here, and a run cannot
+/// print in its diff what it withheld in its listing. A marker list cannot do that: it
+/// knows `APIKEY` and not `OPENVPN_USER`, where a provider's account number is half of
+/// a paid login.
+fn shown(line: &str) -> String {
+    crate::config::store::withheld_by(line, &crate::config::display::shown_in_a_file)
 }
 
 #[cfg(test)]
