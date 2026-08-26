@@ -135,6 +135,12 @@ const MINTING: &[(&str, &str)] = &[
          authenticate with them, and sent to those services on this machine and nowhere else",
     ),
     (
+        "crates/lemonfiber-core/src/admission/credential.rs",
+        "the salt one stored password is hashed with. Deliberately different for every record \
+         and never sent anywhere: it is what stops two machines writing down the same password \
+         the same way, which is the opposite of a value anything could be recognised by",
+    ),
+    (
         "crates/lemonfiber-core/src/bundle/allowed.rs",
         "the salt a support bundle's redaction marks are derived from. Made for one bundle and \
          discarded with it, so the same withheld value carries a different mark in the next \

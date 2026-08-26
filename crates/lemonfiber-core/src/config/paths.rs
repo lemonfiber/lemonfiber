@@ -126,6 +126,19 @@ impl Paths {
         self.config.join("accepted.json")
     }
 
+    /// The password the web surface asks for, as the verifier that proves it.
+    ///
+    /// Kept with configuration rather than beside the stack, for the reason the
+    /// baseline is: two projects sharing one stack directory are two installations,
+    /// and who may open one of them is not who may open the other. A backup carries
+    /// it, which is what an operator restoring onto a new machine wants — a restore
+    /// that silently dropped the password would put a surface back with nothing in
+    /// front of it.
+    #[must_use]
+    pub fn admission(&self) -> PathBuf {
+        self.config.join("admission.json")
+    }
+
     /// The materialised stack — compose files written where Compose can read
     /// them.
     #[must_use]
@@ -210,6 +223,7 @@ mod tests {
             paths.quality(),
             paths.notifications(),
             paths.accepted(),
+            paths.admission(),
         ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),
@@ -301,6 +315,7 @@ mod tests {
             paths.baseline(),
             paths.materialised(),
             paths.quality(),
+            paths.admission(),
             paths.stack(),
             paths.service_config(),
             paths.backups(),

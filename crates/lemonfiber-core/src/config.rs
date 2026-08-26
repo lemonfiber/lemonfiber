@@ -433,6 +433,14 @@ pub struct Settings {
     /// The indexer the operator gave at setup — its URL and key — so a diagnosis
     /// can re-prove it live. Absent where none was configured.
     pub indexer: Option<Indexer>,
+    /// Where the password the web surface asks for is kept, as the verifier that
+    /// proves it.
+    ///
+    /// Absent where the surface could not find the platform's configuration
+    /// directory, which is the same absence every other location here handles — and
+    /// which reads as no authentication configured, because a credential nothing can
+    /// find is a credential nothing can check.
+    pub admission: Option<PathBuf>,
     /// Whether this product explains the words it uses.
     ///
     /// On unless switched off. The words are a wall to somebody meeting them, and
@@ -463,6 +471,7 @@ impl Default for Settings {
             service_user: None,
             port_forward: PortForward::default(),
             indexer: None,
+            admission: None,
             explanations: true,
         }
     }

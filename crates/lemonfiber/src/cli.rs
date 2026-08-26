@@ -434,6 +434,13 @@ pub struct RawUi {
     /// with an empty page.
     #[arg(long, value_name = "PATH")]
     pub assets: Option<PathBuf>,
+    /// Set the password this surface asks for, before it starts.
+    ///
+    /// Asked for at the keyboard and never on this line: a password typed as an
+    /// argument is a password in your shell's history and in the list of processes
+    /// this machine is running.
+    #[arg(long)]
+    pub set_password: bool,
 }
 
 /// What a support bundle was asked for.

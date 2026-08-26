@@ -101,9 +101,12 @@ pub(super) async fn shown(ctx: Ctx) -> ExitCode {
 /// the ones this run started with would be answering out of a file that is no longer
 /// on the disk.
 ///
-/// The three choices `lemonfiber ui` offers were made at the screen that has just
+/// The four choices `lemonfiber ui` offers were made at the screen that has just
 /// closed, since afterwards there is nowhere to make them — so they are carried
-/// here rather than decided here, which is where they would be untested.
+/// here rather than decided here, which is where they would be untested. The
+/// password one is answered on this terminal rather than at that screen, for the
+/// reason a port typed there is bound here: reading a secret is the one thing a
+/// screen drawing every typed line into a box cannot do.
 async fn serving(again: Rebuilding, asked: crate::ui::Asked) -> ExitCode {
     let stack = match again.stack {
         Source::External(path) => Some(path.to_path_buf()),
@@ -113,6 +116,7 @@ async fn serving(again: Rebuilding, asked: crate::ui::Asked) -> ExitCode {
     crate::ui::run(
         ctx,
         asked,
+        &crate::keyboard::Keyboard,
         crate::EMBEDDED_APP,
         Box::pin(std::future::pending()),
     )
