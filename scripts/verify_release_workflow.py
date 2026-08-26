@@ -168,6 +168,31 @@ def claim_token(workflow: dict, _cargo: dict) -> list[str]:
             f"the token that can write a release is held by {sorted(holders)} and "
             f"used by {sorted(releasing)}"
         )
+
+    # And that the token it is created with is one that can. `contents: write` is a
+    # request the default workflow permission refuses here, so the declaration alone
+    # leaves `gh release create` answering 403 at the last step of a release — after
+    # every artefact is built, against a tag that cannot be moved. 0.9.0 is where
+    # that was found.
+    for job, step in steps(workflow):
+        if not creates_a_release(step):
+            continue
+        with_token = (step.get("env") or {}).get("GH_TOKEN", "")
+        if "steps.token.outputs.token" not in str(with_token):
+            problems.append(
+                f"{job} creates the release with {with_token!r}, which is the token "
+                "the default workflow permission caps at read"
+            )
+        minting = [
+            one
+            for _, one in steps(workflow)
+            if "create-github-app-token" in str(one.get("uses", ""))
+        ]
+        if not minting:
+            problems.append(
+                "nothing mints a token an App speaks with, so there is none to create "
+                "a release with"
+            )
     return problems
 
 
@@ -193,6 +218,7 @@ CLAIMS = {
     "installers": claim_installers,
     "pins": claim_pins,
     "token": claim_token,
+    "token-can-write": claim_token,
     "allow-dirty": claim_allow_dirty,
 }
 
@@ -206,6 +232,10 @@ BREAKS = {
     ),
     "pins": lambda w, c: (unpinned(w), c),
     "token": lambda w, c: (w.replace(permissions.HOST_SCOPED, permissions.HOST), c),
+    "token-can-write": lambda w, c: (
+        w.replace(permissions.CREATES_WITH_TOKEN, permissions.CREATES),
+        c,
+    ),
     "allow-dirty": lambda w, c: (w, c.replace('allow-dirty = ["ci"]\n', "")),
 }
 
