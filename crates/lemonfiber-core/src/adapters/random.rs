@@ -8,7 +8,7 @@ pub struct Os;
 impl Random for Os {
     fn bytes(&self, n: usize) -> Option<Vec<u8>> {
         let mut buffer = vec![0u8; n];
-        getrandom::getrandom(&mut buffer).ok().map(|()| buffer)
+        getrandom::fill(&mut buffer).ok().map(|()| buffer)
     }
 }
 
