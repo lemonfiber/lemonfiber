@@ -74,6 +74,13 @@ pub const QUALITY: &str = "/api/quality";
 /// What one of this product's words means, or every word there is to ask about.
 pub const EXPLAIN: &str = "/api/explain";
 
+/// Everything that leaves this machine, and what refusing each of it costs.
+///
+/// Named for what it lists rather than for the direction of any one request: what
+/// an operator wants from this page is the whole of what goes out, lemonfiber's own
+/// and the stack's, told apart.
+pub const OUTBOUND: &str = "/api/outbound";
+
 /// The backup archives this machine has kept, by the names they were written under.
 ///
 /// Named for what it lists rather than for the command it reaches: what these are
@@ -106,7 +113,7 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
     VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, TRACE, STUCK, CONFIG, QUALITY,
-    EXPLAIN, BACKUPS,
+    EXPLAIN, BACKUPS, OUTBOUND,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -200,6 +207,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // refused for that by the command rather than read as having named none.
         EXPLAIN => Ok(word.map_or(Command::Glossary, |word| Command::Explain { word })),
         BACKUPS => Ok(Command::Archives),
+        OUTBOUND => Ok(Command::Outbound),
         _ => Err(NO_SUCH_READ),
     }
 }

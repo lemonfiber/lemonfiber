@@ -83,6 +83,7 @@ and the rest is named in **Standing**.
 | `household` | `/api/requests` | dashboard | Served on the web, and asked off the dashboard's own list of questions. Narrowing to one member is offered there now, as a second entry on the same list: taking it opens the line a trace is typed on, and what is typed fills the member a query string carries. Typed rather than taken off a list of the household, because the list it would be taken off is the answer the narrowing exists to avoid asking for — which is the difference between this and the two that are picked. An empty name is refused in the sentence a browser is refused with, which it also was not before: it matched nobody and came back as a household that has asked for nothing, the one reading this report is written to refuse. |
 | `walkthrough` | `walkthrough` | dashboard | Reachable in full, on the surface it was designed for: a first-time operator is likelier to be in a browser than in a shell. It is a job plus the stream — the report at the end is what the name is redeemed for, and each step goes down the stream the moment it is true, because a walk read back afterwards is a report and the operator would have learned what happened rather than watched it happen. The step goes down whole rather than as a sentence: the words are the core's own, and rendering them into a line for the browser would be a second copy of the walk's prose beside the one the terminal draws. Naming nothing is a request rather than an omission, and is offered as one. Reachable in full from the dashboard too, behind the same key: what to look for is typed on a line of its own and naming nothing there is the same request it is everywhere else, and the steps arrive in the box as they become true. They are drawn by the renderer a shell reaches for the same step, so there is one account of a walk on this surface and not two — and what it came to goes under the steps that were watched, which is the order a shell shows them in. It ends by itself, so the screen offers no end for it and leaving waits for it, as leaving waits for every other action. |
 | `explain` | `/api/explain` | glossary | Reachable in full, and the one read that needs neither a stack nor a daemon: the words are a table compiled into the binary, so a browser meeting one in a failure can ask what it means while the thing that failed is still down. One endpoint over two commands, the way `forms` is: naming a word explains that one, naming none lists what there is to ask about — which a caller that has never met this vocabulary needs before it can name anything. Served rather than shipped; a second copy of the table in the web app would be a surface explaining a word its own way. The terminal offers it on `?`, over the words on the screen. |
+| `outbound` | `/api/outbound` | dashboard | Reachable in full from all three, and the read with the least a surface could add of its own: it takes no arguments, because what it answers is read from this machine's settings and from the stack the manifest declares. An enumeration a caller could narrow would be one an operator could be shown half of, and half of *everything that leaves this machine* is the wrong half whichever half it is. The terminal asks it off the list one key opens, beside the other questions that take nothing. What the browser gets is the same list the shell prints and not a second copy of it: which requests exist, where each goes as this machine stands, exactly what travels, whether it is on, the setting that switches it off and what stops working once it is — plus the stack's own requests, headed as the services' rather than as lemonfiber's. |
 | `stuck` | `/api/stuck` | dashboard | Served on the web, which is where the dashboard's own "N stuck" figure lands: each entry is named the way `/api/trace` is asked, so the count leads somewhere. The terminal reaches it as a question now and follows one the same way the web's list does: taking the question asks that read, and the entries it comes back with are offered as a list to take one of, which asks `/api/trace` by that entry's own title. Taken rather than typed, because the title is on the screen already and retyping it is a spelling test. The panel stays and is not this: it renders the queue-health gather, which counts what has stopped and names the cause where several items share one, rather than naming each item the way a trace is asked for — two readings of one worry, and it was the second the screen could not reach. |
 | `seed` | `seed` | dashboard | Reachable from all three. It is the first of the six errands the dashboard keeps behind one key, and the one with nothing to leave out: the command takes no arguments, so the question names what wiring the services to each other comes to and an explicit yes is the whole of what it needs. |
 | `adopt` | `adopt` | dashboard | As above, and the pair it makes with `reset` is what the errands are ordered by. Keeping what an operator changed sits near the top of that list and throwing it away sits at the bottom of it, so nobody lands on the destructive one by pressing enter at a list they have only just opened. |
@@ -94,7 +95,7 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the twenty-six requests, twenty-five reach the web in full, zero reach it in
+Of the twenty-seven requests, twenty-six reach the web in full, zero reach it in
 part, zero do not reach it at all, and one — `ui` — is an honest exception. Zero
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
@@ -107,7 +108,7 @@ read that disturbed something would still not be a read, so it is asked for at t
 door changes are asked for instead. That leaves `ui` as the only exception this
 table permits, in either column.
 
-On the other side of the table twenty-five reach the terminal in full, zero reach
+On the other side of the table twenty-six reach the terminal in full, zero reach
 the terminal in part, one reaches the terminal but for an exception, and zero have
 no terminal form — which is where three stood six slices ago, nine before the one
 ahead of that, and twenty before the one that began it. Every request the command
@@ -362,7 +363,7 @@ doing.
 
 **Six questions, one key — and six errands behind another.** The screen already
 answered `q`, `r`, `?` and five actions, and a key per request does not survive being
-done twice: twenty-six requests will not fit on one row of a footer, let alone in
+done twice: twenty-seven requests will not fit on one row of a footer, let alone in
 anybody's memory. So one key opens the list of what this stack can be asked, and one
 more opens the rest of what it can be told to do — the same list, the same movement
 and the same enter an action's own subjects are chosen with. A seventh of either goes

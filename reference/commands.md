@@ -29,6 +29,7 @@ Commands:
   walkthrough  Add one thing, end to end, and watch every step of it happen
   explain      Say what one of this product's words means
   stuck        List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
+  outbound     List everything that leaves this machine, and what refusing each of it costs
   seed         Wire the stack's services to each other, idempotently
   adopt        Adopt your current edits as lemonfiber's expected state
   reset        Put the stack back to lemonfiber's own state, reverting every edit you made
@@ -912,6 +913,32 @@ Options:
 
   -h, --help
           Print help
+```
+
+## `lemonfiber outbound`
+
+```text
+List everything that leaves this machine, and what refusing each of it costs.
+
+lemonfiber's own requests first — where each goes, why, exactly what travels, whether it is on, the setting that switches it off and what stops working when it is — then the requests the stack's own services make, which are theirs rather than lemonfiber's.
+
+Usage: lemonfiber outbound [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```
 
 ## `lemonfiber seed`

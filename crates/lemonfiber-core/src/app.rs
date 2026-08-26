@@ -9,7 +9,7 @@
 //! Whether this is a rehearsal is a property of the [`Ctx`], not a second code
 //! path, so there is no parallel implementation to fall out of step.
 
-use crate::error::{Code, Problem};
+use crate::error::{Code, Diagnose, Problem};
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind, ConfigReport, DoctorReport, Envelope, FormsReport, HouseholdReport, LifecycleReport,
@@ -106,6 +106,8 @@ pub enum Outcome {
     Word(Term),
     /// Every word this product explains.
     Glossary(Vocabulary),
+    /// Everything that leaves this machine, and what refusing each of them costs.
+    Outbound(crate::outbound::Leaving),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -152,6 +154,7 @@ impl Outcome {
             Self::Stuck(_) => kind::STUCK,
             Self::Word(_) => kind::WORD,
             Self::Glossary(_) => kind::GLOSSARY,
+            Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Repair(_) => kind::REPAIR,
@@ -186,6 +189,7 @@ impl serde::Serialize for Outcome {
             Self::Stuck(report) => report.serialize(serializer),
             Self::Word(term) => term.serialize(serializer),
             Self::Glossary(report) => report.serialize(serializer),
+            Self::Outbound(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Repair(report) => report.serialize(serializer),
@@ -211,6 +215,9 @@ pub const STILL_NEEDED: Code = Code::new("LIFE-2");
 
 /// Another run is already working on this stack.
 pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
+
+/// Fetching images is switched off, so there was nothing to fetch with.
+pub const REGISTRY_REFUSED: Code = Code::new("LIFE-4");
 
 /// Carry out a command.
 ///
@@ -254,6 +261,19 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .map(|term| Outcome::Word(*term))
             .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
+        Command::Outbound => {
+            // The stack has to be readable, because half the answer is about it: a
+            // manifest that could not be read would leave the services' own requests
+            // reading as none at all, which is a claim rather than a gap.
+            let manifest = ctx
+                .stack
+                .manifest()
+                .map_err(|err| Box::new(err.problem()))?;
+            Ok(Outcome::Outbound(crate::outbound::leaving(
+                &ctx.settings,
+                &manifest.services,
+            )))
+        }
         Command::QualityUpgrade { confirm } => {
             upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
         }
@@ -581,6 +601,34 @@ mod tests {
         );
     }
 
+    /// The whole of what leaves this machine, asked for here as well as from the
+    /// integration test beside it — the arm is reached from two compilations of this
+    /// file and has to run in both.
+    #[tokio::test]
+    async fn a_dispatched_enumeration_serialises_under_its_own_kind() {
+        let json = dispatch(Command::Outbound, &ctx(Ok(spoke(""))))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+
+        assert!(json.contains("\"kind\":\"outbound\""), "{json}");
+        assert!(json.contains("\"reach\":\"registry\""), "{json}");
+    }
+
+    /// And the refusal, because half an enumeration reads as the whole of it: a stack
+    /// that will not read cannot say what its services reach.
+    #[tokio::test]
+    async fn an_enumeration_over_a_stack_that_will_not_read_is_refused() {
+        let nowhere = a_context()
+            .over(crate::test_support::nowhere())
+            .runner(Arc::new(Scripted(Ok(spoke("")))))
+            .engine(Arc::new(Reporting::default()))
+            .build();
+
+        assert!(dispatch(Command::Outbound, &nowhere).await.is_err());
+    }
+
     /// The words need no stack and no engine, so this is the one command that runs
     /// through dispatch, envelope and serialise against a context that has nothing.
     #[tokio::test]
@@ -875,6 +923,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Outbound(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -912,6 +961,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Outbound(_)
                 | Outcome::Status(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)
@@ -1729,6 +1779,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Outbound(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -2720,6 +2771,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Outbound(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)

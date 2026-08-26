@@ -61,6 +61,29 @@ pub const SHOWN: &[(&str, &str)] = &[
         "whether the plain-language explanations are on, which is a display choice",
     ),
     (
+        super::OFFLINE_KEY,
+        "whether anything at all may leave this machine, which an operator who set it \
+         has every reason to be able to confirm from here",
+    ),
+    (
+        super::REACH_REGISTRY_KEY,
+        "whether service images may be fetched, which explains a start that will not pull",
+    ),
+    (
+        super::REACH_GUIDES_KEY,
+        "whether the quality-guide source may be probed, which explains a check that reports \
+         it did not look",
+    ),
+    (
+        super::REACH_INDEXER_KEY,
+        "whether an indexer key may be proven against the indexer, which explains a \
+         credential recorded unverified",
+    ),
+    (
+        super::REACH_USENET_KEY,
+        "whether a Usenet login may be proven against the provider, for the same reason",
+    ),
+    (
         super::JELLYFIN_MODE_KEY,
         "whether the media server runs in a container or on the host machine",
     ),

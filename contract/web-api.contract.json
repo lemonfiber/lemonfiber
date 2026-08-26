@@ -3094,6 +3094,158 @@
         }
       }
     },
+    "outbound": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Leaving"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Elsewhere": {
+          "description": "A request one of the stack's services makes, which is not lemonfiber's.",
+          "type": "object",
+          "properties": {
+            "destination": {
+              "description": "Where its requests go, in the terms an operator would recognise.",
+              "type": "string"
+            },
+            "purpose": {
+              "description": "What it asks for.",
+              "type": "string"
+            },
+            "service": {
+              "description": "The service, by the id the stack declares it under.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "destination",
+            "purpose"
+          ]
+        },
+        "Leaving": {
+          "description": "Everything that leaves this machine: lemonfiber's own requests, and the stack's.",
+          "type": "object",
+          "properties": {
+            "ours": {
+              "description": "Every request lemonfiber makes on its own account, in a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Outbound"
+              }
+            },
+            "theirs": {
+              "description": "The requests made by services this stack runs, attributed to them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Elsewhere"
+              }
+            }
+          },
+          "required": [
+            "ours",
+            "theirs"
+          ]
+        },
+        "Outbound": {
+          "description": "One request lemonfiber makes, where it goes, and what refusing it costs.",
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "description": "Whether this machine's settings allow it.",
+              "type": "boolean"
+            },
+            "cost": {
+              "description": "What stops working once it is off.",
+              "type": "string"
+            },
+            "destination": {
+              "description": "Where it goes as this machine is configured. Empty where nothing is\nconfigured to reach, which is not the same as switched off.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "purpose": {
+              "description": "Why lemonfiber asks.",
+              "type": "string"
+            },
+            "reach": {
+              "description": "Which request this is.",
+              "$ref": "#/$defs/Reach"
+            },
+            "sends": {
+              "description": "Exactly what travels in the request.",
+              "type": "string"
+            },
+            "switch": {
+              "description": "The setting that switches it off.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reach",
+            "destination",
+            "purpose",
+            "sends",
+            "allowed",
+            "switch",
+            "cost"
+          ]
+        },
+        "Reach": {
+          "description": "One of the requests lemonfiber makes on its own account.\n\nFive, and the closed set is the claim. A sixth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.",
+          "oneOf": [
+            {
+              "description": "Fetching the service images the stack runs.",
+              "type": "string",
+              "const": "registry"
+            },
+            {
+              "description": "Probing the source the community quality guides are synced from.",
+              "type": "string",
+              "const": "guides"
+            },
+            {
+              "description": "Asking what public address this machine's traffic comes out of.",
+              "type": "string",
+              "const": "echo"
+            },
+            {
+              "description": "Proving an indexer key against the indexer.",
+              "type": "string",
+              "const": "indexer"
+            },
+            {
+              "description": "Proving a Usenet login against the provider.",
+              "type": "string",
+              "const": "usenet"
+            }
+          ]
+        }
+      }
+    },
     "preview": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

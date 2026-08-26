@@ -13,12 +13,18 @@
 pub mod display;
 pub mod env;
 pub mod paths;
+pub mod reaching;
 pub mod store;
 
 use std::path::PathBuf;
 
 use lemonfiber_manifest::Protocol;
 use serde::{Deserialize, Serialize};
+
+pub use reaching::{
+    offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_INDEXER_KEY, REACH_REGISTRY_KEY,
+    REACH_USENET_KEY, SWITCHES,
+};
 
 /// Which download protocols the operator actually has accounts for.
 ///
@@ -178,6 +184,11 @@ pub const SETTINGS: &[&str] = &[
     USENET_KEY,
     TORRENT_KEY,
     IP_ECHO_KEY,
+    OFFLINE_KEY,
+    REACH_REGISTRY_KEY,
+    REACH_GUIDES_KEY,
+    REACH_INDEXER_KEY,
+    REACH_USENET_KEY,
     EXPLANATIONS_KEY,
     DATA_ROOT_KEY,
     PUID_KEY,
@@ -241,9 +252,16 @@ pub fn reads_as_off(value: &str) -> bool {
 /// it, at the stated cost of losing leak detection; any other value replaces the
 /// default with the operator's own endpoint — so the one third-party dependency
 /// the check has is replaceable as well as disableable.
+///
+/// The blanket switch is read here rather than beside the other four, because this
+/// setting names a source as well as answering yes or no: a source named under
+/// `offline` is a source nothing may ask.
 #[must_use]
 pub fn ip_echo_from_env(file: &env::EnvFile) -> Vec<String> {
     let defaults = || vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()];
+    if offline(file) {
+        return Vec::new();
+    }
     match file.get(IP_ECHO_KEY) {
         None => defaults(),
         Some(value) if reads_as_on(value) => defaults(),
@@ -258,6 +276,18 @@ pub fn ip_echo_from_env(file: &env::EnvFile) -> Vec<String> {
             .map(str::to_owned)
             .collect(),
     }
+}
+
+/// The Usenet provider's hostname, where one is recorded.
+///
+/// Blank is absent rather than a provider named the empty string, the way every
+/// half-written setting here is read.
+#[must_use]
+pub fn provider_host_from_env(file: &env::EnvFile) -> Option<String> {
+    file.get(PROVIDER_HOST_KEY)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
 }
 
 /// Where the operator chose to keep downloads and media, if they have chosen.
@@ -438,6 +468,16 @@ pub struct Settings {
     /// On unless switched off. The words are a wall to somebody meeting them, and
     /// the operator who wants them gone is the one who knows to go and look.
     pub explanations: bool,
+    /// Which requests lemonfiber may make on its own account.
+    ///
+    /// Every one allowed unless the operator said otherwise, and what each of them
+    /// costs to refuse is stated where the list is built rather than here.
+    pub reaching: Reaching,
+    /// The Usenet provider's hostname, where one was configured.
+    ///
+    /// The host alone and never the account beside it: what reads this is the list
+    /// of where this machine's requests go, and where is a hostname.
+    pub provider_host: Option<String>,
 }
 
 /// An indexer credential as configuration holds it: where it is, and the key.
@@ -464,6 +504,8 @@ impl Default for Settings {
             port_forward: PortForward::default(),
             indexer: None,
             explanations: true,
+            reaching: Reaching::default(),
+            provider_host: None,
         }
     }
 }
@@ -471,8 +513,8 @@ impl Default for Settings {
 #[cfg(test)]
 mod tests {
     use super::{
-        env, indexer_from_env, ip_echo_from_env, Indexer, Protocol, Protocols, Settings,
-        DEFAULT_IP_ECHO, SECOND_IP_ECHO,
+        env, indexer_from_env, ip_echo_from_env, provider_host_from_env, Indexer, Protocol,
+        Protocols, Settings, DEFAULT_IP_ECHO, OFFLINE_KEY, SECOND_IP_ECHO,
     };
 
     #[test]
@@ -603,6 +645,35 @@ mod tests {
             assert!(
                 ip_echo_from_env(&file).is_empty(),
                 "{off:?} should disable it"
+            );
+        }
+    }
+
+    /// The one setting here that names a thing as well as answering yes or no, so
+    /// the blanket switch has to be read where it is read rather than beside the
+    /// four that only answer.
+    #[test]
+    fn the_blanket_switch_stops_the_leak_check_even_where_a_source_is_named() {
+        let file = env::EnvFile::parse(&format!(
+            "{OFFLINE_KEY}=on\nLEMONFIBER_IP_ECHO=https://ip.example\n"
+        ));
+        assert!(ip_echo_from_env(&file).is_empty());
+    }
+
+    /// Where the requests that leave this machine are listed, the Usenet provider is
+    /// named by its host — so the host is read back out of the file, and the account
+    /// beside it never is.
+    #[test]
+    fn a_usenet_host_is_read_back_and_a_blank_one_is_absent() {
+        assert_eq!(
+            provider_host_from_env(&env::EnvFile::parse("USENET_HOST= news.example.net \n")),
+            Some("news.example.net".to_owned())
+        );
+        for blank in ["USENET_HOST=\n", "USENET_HOST=   \n", "PUID=1000\n"] {
+            assert_eq!(
+                provider_host_from_env(&env::EnvFile::parse(blank)),
+                None,
+                "{blank:?}"
             );
         }
     }

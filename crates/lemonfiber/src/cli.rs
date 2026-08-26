@@ -295,6 +295,13 @@ pub enum Request {
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,
+    /// List everything that leaves this machine, and what refusing each of it costs.
+    ///
+    /// lemonfiber's own requests first — where each goes, why, exactly what travels,
+    /// whether it is on, the setting that switches it off and what stops working
+    /// when it is — then the requests the stack's own services make, which are
+    /// theirs rather than lemonfiber's.
+    Outbound,
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.

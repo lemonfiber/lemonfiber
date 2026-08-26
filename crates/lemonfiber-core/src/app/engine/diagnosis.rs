@@ -245,13 +245,21 @@ pub(crate) async fn assembled(
     // first proven — the shared validator over the same HTTP seam — so a key that
     // has since rotted is a finding rather than an empty search weeks on.
     let indexer = IndexerCheck::new(
-        Arc::new(crate::validate::Live::new(ctx.http.clone())),
+        Arc::new(crate::validate::Allowed::new(
+            Arc::new(crate::validate::Live::new(ctx.http.clone())),
+            ctx.settings.reaching.clone(),
+        )),
         ctx.settings.indexer.clone(),
     );
     // Whether the upstream quality guides can be reached, so a sync that would come
     // back empty — leaving the profiles in place stale rather than unconfigured — is
     // reported rather than silently missed.
-    let guides = GuidesCheck::new(ctx.http.clone());
+    let guides = GuidesCheck::new(
+        ctx.http.clone(),
+        ctx.settings
+            .reaching
+            .allows(crate::config::REACH_GUIDES_KEY),
+    );
     // Whether the disk can plausibly hold a library at the chosen quality, projected
     // against the free space so an implausible choice is caught before it fills the
     // disk. The hungriest preset in force is the basis — the one that stresses the

@@ -370,6 +370,43 @@ fn every_host_written_down_says_what_it_is_for() {
     );
 }
 
+/// The hosts this product asks for something are exactly the ones it tells the
+/// operator about.
+///
+/// The sweep above reads source text and the enumeration is what an operator can
+/// list, and until they are held to each other neither is worth much: a host could
+/// be written down here and left out of the list somebody reads, or listed and
+/// reached from nowhere. Held with the settings as they arrive and no stack
+/// materialised, which is what leaves exactly the destinations that are constants —
+/// the registries come from whichever images a stack declares, and the indexer and
+/// the provider are wherever this operator pointed them.
+#[test]
+fn what_the_source_asks_for_is_what_the_operator_is_told_about() {
+    let asked: BTreeSet<&str> = NAMED
+        .iter()
+        .filter(|(_, reach, _)| *reach == Reach::Asked)
+        .map(|(host, _, _)| *host)
+        .collect();
+    let listed: BTreeSet<String> =
+        lemonfiber_core::outbound::leaving(&lemonfiber_core::config::Settings::default(), &[])
+            .ours
+            .into_iter()
+            .flat_map(|entry| entry.destination)
+            .filter_map(|where_to| host_of(&where_to))
+            .collect();
+    assert!(
+        !listed.is_empty(),
+        "the enumeration names nowhere at all, so this is holding the sweep to nothing"
+    );
+    assert_eq!(
+        listed,
+        asked.iter().map(|host| (*host).to_owned()).collect(),
+        "the shipped source asks somewhere the operator is not told about, or the list \
+         names somewhere nothing asks — the enumeration is what an operator acts on, so \
+         the two cannot differ"
+    );
+}
+
 /// Nothing mints a value this installation could be recognised by.
 ///
 /// There is one source of unpredictable bytes in this workspace and it is behind a

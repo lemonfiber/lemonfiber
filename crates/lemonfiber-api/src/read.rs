@@ -1,4 +1,4 @@
-//! The fifteen reads: one endpoint per question a command already answers, plus the
+//! The sixteen reads: one endpoint per question a command already answers, plus the
 //! two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -26,6 +26,7 @@ mod chosen;
 mod diagnosis;
 mod glossary;
 mod items;
+mod outbound;
 mod stack;
 
 use axum::body::Body;
@@ -58,6 +59,7 @@ pub fn routes() -> Router<Serving> {
         .merge(chosen::routes())
         .merge(glossary::routes())
         .merge(archives::routes())
+        .merge(outbound::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.
