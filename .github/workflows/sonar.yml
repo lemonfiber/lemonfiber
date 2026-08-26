@@ -33,10 +33,47 @@ jobs:
       - name: Which lines the gate missed
         if: failure()
         run: cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --show-missing-lines
+      # A Dependabot run reads secrets from the Dependabot store rather than the
+      # Actions store, and `SONAR_TOKEN` is only in the second. The scanner was
+      # handed an empty string, died with "Not authorized or project not found",
+      # and failed a required check on a step with nothing to do with the bump —
+      # so no dependency update in this repository has ever been able to merge.
+      #
+      # Skipped rather than allowed to fail: a scan that cannot authenticate has
+      # no verdict to give, and a red tick that means "the runner had no
+      # credential" is worth less than a step that says so. The coverage gate
+      # above needs no token and still runs, so what `Q-R61` measures is
+      # unchanged on these pull requests.
+      #
+      # Keyed on who opened the pull request, which is what selects the secret
+      # store, and which `spec_check.py` already keys `Q-R55` on because it is the
+      # one identifier the opener cannot write. Not `github.triggering_actor`,
+      # which becomes whoever pressed re-run — this step would come back on the
+      # re-run of a Dependabot pull request and fail it again.
+      #
+      # The event is named as well as the author. A push to main carries no pull
+      # request, so the author field is null there, and what a null compares equal
+      # to is a rule this workflow should not be resting on: SonarCloud's analysis
+      # of main is what every pull request is measured against, and a comparison
+      # that quietly went the other way would turn it off with nothing to notice.
       - name: SonarQube Cloud scan
+        if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # Runs in exactly the case the scan does not. A step missing from a log
+      # reads the same as a step that ran and found nothing, and this repository
+      # has been caught by that reading more than once, so the skip appears under
+      # its own name with its reason and the identifier it was decided on.
+      - name: Why the scan was skipped
+        if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          said="The SonarCloud scan was skipped: ${AUTHOR} opened this pull request, and a Dependabot run reads secrets from the Dependabot store rather than the Actions store, so SONAR_TOKEN is empty here and the scanner could only fail on it. Coverage ran above and still had to reach 100% (Q-R61). No analysis was produced, so nothing on this run enforced Q-R64."
+          echo "::notice::${said}"
+          printf '### SonarCloud scan skipped\n\n%s\n' "$said" >> "$GITHUB_STEP_SUMMARY"
 
   # Open SonarCloud issues must be zero (Q-R64), and the free plan's own quality
   # gate cannot be configured to that standard (Q-R63). The shared reusable in spec
@@ -50,6 +87,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@61f5205b9db1699ba58dc007b23924a7e566de76 # main
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@0dda512352aea96a486df3933ae08354993ef67c # main
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
