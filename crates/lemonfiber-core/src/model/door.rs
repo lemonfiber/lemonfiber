@@ -6,7 +6,7 @@
 
 use serde::Serialize;
 
-use crate::door::Facing;
+use crate::door::{Address, Facing};
 
 /// Where the household's one front door stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -48,6 +48,10 @@ pub struct FrontDoorReport {
     /// The service the household begins at, by the name it shows itself under.
     /// Absent where this stack publishes nothing they could begin at.
     pub service: Option<String>,
+    /// The address to hand them, read from this machine at the moment of asking
+    /// rather than remembered. Absent where there is no door, and where there is
+    /// one on a machine that will say neither what it is called nor where it is.
+    pub address: Option<Address>,
     /// What that service is to them. Absent for the same reason.
     pub facing: Option<Facing>,
     /// What this comes to, in the words an operator would say it in — including,

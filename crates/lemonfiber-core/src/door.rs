@@ -13,9 +13,13 @@
 //! to the household — and one nobody has written down is not offered, for the reason
 //! [`crate::config::display`] withholds a setting nobody vouched for.
 
+mod address;
+
 use serde::Serialize;
 
 use lemonfiber_manifest::{ApiKind, Bind, Service};
+
+pub use address::{address, publishes_a_name, Address};
 
 /// What a service published to the local network is to the people in the house.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]

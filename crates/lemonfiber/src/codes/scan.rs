@@ -753,7 +753,8 @@ pub const REAL: Code = Code::new(\"VPN-11\");
 
     /// A workspace of one file, written for the reader to fail on.
     fn scratch(name: &str, source: &str) -> PathBuf {
-        let root = std::env::temp_dir().join(format!("lemonfiber-codes-{name}"));
+        let root =
+            std::env::temp_dir().join(format!("lemonfiber-codes-{}-{name}", std::process::id()));
         let src = root.join("crates").join("probe").join("src");
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::create_dir_all(&src);

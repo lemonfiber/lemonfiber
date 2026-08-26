@@ -144,8 +144,8 @@ pub const SHOWN: &[(&str, &str)] = &[
         "the addresses the dashboard answers for, and a wrong one is why it refuses",
     ),
     (
-        "HOMEPAGE_VAR_LAN_HOST",
-        "the address the dashboard's household links point at",
+        super::HOUSEHOLD_HOST_KEY,
+        "the address the household's own links point at, which is where the front door is",
     ),
     (
         "HOMEPAGE_VAR_QBITTORRENT_USER",

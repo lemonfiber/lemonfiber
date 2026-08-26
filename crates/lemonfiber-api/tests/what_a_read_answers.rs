@@ -23,7 +23,7 @@ use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
-use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
+use lemonfiber_fixtures::ports::{Chance, Idle, Renamed, Stopped};
 use lemonfiber_fixtures::support::Reporting;
 use tower::ServiceExt as _;
 
@@ -573,12 +573,17 @@ async fn the_one_address_for_the_household_is_answered_under_its_own_kind() {
         Lifecycle::Running,
         Health::Healthy,
     );
-    let seen = asked(world(household, stack()), "/api/front-door").await;
+    // The machine is scripted: what this one is called differs on every machine the
+    // tests run on.
+    let here = world(household, stack()).with_site(Renamed::called(Some("kitchen-nas")));
+    let seen = asked(here, "/api/front-door").await;
     assert!(
         seen.is_some_and(|(status, body)| status == StatusCode::OK
             && body.starts_with(r#"{"api_version":1,"kind":"front-door","data":{"#)
             && body.contains(r#""standing":"established""#)
-            && body.contains(r#""service":"Seerr","facing":"asking""#)
+            && body.contains(r#""service":"Seerr""#)
+            && body.contains(r#""url":"http://kitchen-nas.local:5055","caution":null"#)
+            && body.contains(r#""facing":"asking""#)
             && body.contains(r#""service":"Homepage","facing":"operators""#)),
         "the front door is answered in the front-door envelope"
     );

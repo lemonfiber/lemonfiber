@@ -17,6 +17,7 @@ use crate::ports::docker::Engine;
 use crate::ports::filesystem::Volume;
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
+use crate::ports::network::Site;
 use crate::ports::random::Random;
 use crate::ports::{Clock, FileSystem, Narrator, Runner};
 use crate::stack::Source;
@@ -48,6 +49,14 @@ pub struct Ctx {
     /// Where unpredictable bytes come from, for the one credential seeding mints
     /// itself.
     pub random: Arc<dyn Random>,
+    /// How this machine is asked where it is, for the one answer that is an
+    /// address rather than a state: what to hand somebody who lives here.
+    ///
+    /// A port because both halves of that answer — what this machine is called and
+    /// which address a device in the same house reaches it at — are facts about
+    /// one particular machine, so a test written against the real ones would pass
+    /// where it was written and nowhere else.
+    pub site: Arc<dyn Site>,
     /// How a credential is proven against the service it authenticates to.
     ///
     /// A port because setup proves one the moment it is entered, on every surface:
@@ -129,6 +138,9 @@ impl Ctx {
         let http: Arc<dyn Http> = Arc::new(crate::adapters::Retrying::around(
             crate::adapters::Web::new(),
         ));
+        // Built before the runner is handed over, since it is asked through the
+        // same one every other program goes through.
+        let site: Arc<dyn Site> = Arc::new(crate::adapters::Here::over(Arc::clone(&runner)));
         Self {
             dry_run: false,
             force: false,
@@ -143,6 +155,7 @@ impl Ctx {
             validator: live(&http),
             http,
             random: Arc::new(crate::adapters::Os),
+            site,
             // Nobody, until a surface says otherwise. A context is built before the
             // thing that would listen exists in both surfaces, and a default that
             // said something would have to guess where.
@@ -208,6 +221,17 @@ impl Ctx {
     #[must_use]
     pub fn with_random(mut self, random: Arc<dyn Random>) -> Self {
         self.random = random;
+        self
+    }
+
+    /// The same context, asking the given seam where this machine is.
+    ///
+    /// Lets the address a household is handed be asserted, which the real one
+    /// cannot be: what this machine is called and which address it answers on are
+    /// different on every machine that runs the tests.
+    #[must_use]
+    pub fn with_site(mut self, site: Arc<dyn Site>) -> Self {
+        self.site = site;
         self
     }
 

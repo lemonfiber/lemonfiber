@@ -660,6 +660,7 @@ mod tests {
             Outcome::FrontDoor(FrontDoorReport {
                 standing: Standing::Absent,
                 service: None,
+                address: None,
                 facing: None,
                 meaning: "there is none".to_owned(),
                 beside: Vec::new(),
