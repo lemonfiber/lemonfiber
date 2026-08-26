@@ -15,7 +15,23 @@ use super::Lines;
 /// is what the trace searches by, and a link that no longer matches how the trace matches
 /// would send an operator to a search that finds nothing.
 pub(super) fn trace_link(title: &str) -> String {
-    format!("      → {PRODUCT} trace \"{title}\"")
+    format!("      → {PRODUCT} trace {}", one_argument(title))
+}
+
+/// A title written so a shell hands the whole of it to the trace as one argument.
+///
+/// This line is not a label, it is a command an operator copies and runs, and the title
+/// in it came from an indexer or an \*arr. In double quotes a title carrying one closes
+/// the quote early, and everything after it is read as further arguments — or, where the
+/// title carries `$` or a backtick, as something to expand.
+///
+/// Single quotes rather than double because inside them a shell reads nothing at all: an
+/// apostrophe is the only character with any meaning left, and `'\''` closes the quoting,
+/// writes a literal apostrophe and opens it again. Double quotes would still leave `$`,
+/// a backtick and — in an interactive shell, which is where this line is pasted — the `!`
+/// of `Airplane!` to be dealt with one at a time.
+pub(super) fn one_argument(title: &str) -> String {
+    format!("'{}'", title.replace('\'', r"'\''"))
 }
 
 /// What the household asked for, grouped by whoever asked.
@@ -241,7 +257,53 @@ mod tests {
 
     #[test]
     fn a_trace_link_names_the_term_the_trace_searches_by() {
-        assert!(trace_link("The Expanse").contains(r#"trace "The Expanse""#));
+        assert!(trace_link("The Expanse").contains("trace 'The Expanse'"));
+    }
+
+    /// This line is a command an operator copies, and the title in it is an \*arr's or
+    /// Overseerr's rather than ours.
+    ///
+    /// A title carrying the quote the line was built with closed it early, and everything
+    /// after that was read by the shell as further arguments. What follows the quote is
+    /// the operator's own shell, so the failure is not that the trace finds nothing.
+    #[test]
+    fn a_title_cannot_close_the_quoting_the_command_is_written_with() {
+        for title in [
+            r#"Say "Anything""#,
+            "It's Always Sunny",
+            "Airplane! (1980)",
+            "$HOME `whoami`",
+            r"Back\Slash",
+            "The Expanse",
+        ] {
+            let quoted = one_argument(title);
+            let link = trace_link(title);
+            assert_eq!(
+                link.split_once("trace ").map(|(_, said)| said),
+                Some(quoted.as_str()),
+                "{link}"
+            );
+            assert_eq!(unquoted(&quoted), title, "{link}");
+        }
+    }
+
+    /// What a shell hands over, given one single-quoted word.
+    ///
+    /// Read back rather than compared against a written-out expectation: the claim is
+    /// that the trace is given the title, and an expectation spelled by hand would be
+    /// this test agreeing with whatever the quoting happened to produce.
+    fn unquoted(said: &str) -> String {
+        let mut term = String::new();
+        let mut quoting = false;
+        let mut marks = said.chars();
+        while let Some(mark) = marks.next() {
+            match mark {
+                '\'' => quoting = !quoting,
+                '\\' if !quoting => term.extend(marks.next()),
+                other => term.push(other),
+            }
+        }
+        term
     }
 
     #[test]
@@ -440,7 +502,7 @@ mod tests {
         let text = household(&report).text();
         assert!(text.contains("Alex"));
         assert!(text.contains("The Expanse   here"));
-        assert!(text.contains(r#"trace "The Expanse""#));
+        assert!(text.contains("trace 'The Expanse'"));
         assert!(text.contains("a film   waiting for approval"));
         assert!(text.contains("something   the request service reports a state"));
         assert!(text.contains("1 member(s), 3 request(s)."));
@@ -481,7 +543,7 @@ mod tests {
         let text = stuck(&report).text();
         assert!(text.contains("1 item(s) stuck"));
         assert!(text.contains("stuck at downloading"));
-        assert!(text.contains(r#"trace "The Expanse""#));
+        assert!(text.contains("trace 'The Expanse'"));
         assert!(text.contains("may be incomplete"));
         // Nothing stuck is said plainly.
         let clear = StuckReport {

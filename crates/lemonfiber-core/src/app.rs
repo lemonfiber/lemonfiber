@@ -1054,6 +1054,106 @@ mod tests {
         );
     }
 
+    /// A stand-in for a credential a service quotes back at itself, assembled rather
+    /// than written out so no value that reads as one sits in this source.
+    fn a_credential() -> String {
+        ["abcdef", "1234", "567890"].concat()
+    }
+
+    /// What a service said is somebody else's text, and a service that fails while
+    /// authenticating says so with the credential in hand.
+    ///
+    /// Withheld where the field is built rather than where it is drawn, which is what
+    /// this asserts: `said` is served on `/api/checks` as well as printed, so a report
+    /// that looked clean would still have been publishing the key.
+    #[tokio::test]
+    async fn what_a_service_said_reaches_a_finding_with_no_credential_in_it() {
+        let secret = a_credential();
+        let ctx = watching(
+            Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+                .saying(
+                    "jellyfin",
+                    &format!("startup: api_key={secret} was rejected"),
+                )
+                .saying("jellyfin", &format!("INDEXER_APIKEY={secret}")),
+        );
+
+        let said = what_it_said(&ctx).await;
+        assert!(!said.contains(&secret), "{said}");
+        // The sentence around it, still whole. A redactor that took the credential by
+        // taking the line with it would leave a finding with no evidence under it, which
+        // is the failure this path is here to prevent.
+        assert!(said.contains("startup:"), "{said}");
+        assert!(said.contains("was rejected"), "{said}");
+        assert!(said.contains("INDEXER_APIKEY"), "{said}");
+    }
+
+    /// A container quoting an outbound URL back at itself, with the key not the first
+    /// parameter in it.
+    ///
+    /// The shape this product builds its own indexer request in — `t=search` first and
+    /// the key last — and the \*arrs log an outbound URL whenever one is refused. What a
+    /// container writes is the input this field is made of, so a rule that reads a URL
+    /// only as far as its first `=` leaves the key in the evidence.
+    #[tokio::test]
+    async fn a_url_a_container_quotes_back_arrives_with_no_key_in_it() {
+        let secret = a_credential();
+        let ctx = watching(
+            Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy).saying(
+                "jellyfin",
+                &format!("GET https://indexer.example/api?t=search&apikey={secret} returned 401"),
+            ),
+        );
+
+        let said = what_it_said(&ctx).await;
+        assert!(!said.contains(&secret), "{said}");
+        assert!(said.contains("https://indexer.example/api"), "{said}");
+        assert!(said.contains("returned 401"), "{said}");
+    }
+
+    /// A log line opening on one word, which is how most of them open.
+    ///
+    /// `ERROR:`, `WARN:`, `Unauthorized:` — a single word and a colon, which is the exact
+    /// shape of a setting whose value follows it. Every word this reads as a marker is
+    /// ordinary English, so a line opening on one loses the sentence it introduced, and
+    /// the sentence is the whole of what the finding was gathering.
+    #[tokio::test]
+    async fn a_line_opening_on_one_word_keeps_the_sentence_after_it() {
+        let refused = "the request was refused by the indexer";
+        let ctx = watching(
+            Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+                .saying("jellyfin", &format!("Unauthorized: {refused}")),
+        );
+
+        let said = what_it_said(&ctx).await;
+        assert!(said.contains(refused), "{said}");
+    }
+
+    /// What one troubled service's finding carries, for the tests that are about the
+    /// text rather than about which findings get one.
+    async fn what_it_said(ctx: &Ctx) -> String {
+        super::engine::quoted(
+            ctx,
+            vec![crate::doctor::Finding::in_category(
+                Category::Services,
+                "services.jellyfin",
+                "Jellyfin answers",
+                crate::doctor::Verdict::Fail(crate::error::Problem::new(
+                    crate::error::Code::new("TEST-1"),
+                    crate::error::Severity::Error,
+                    "it is not answering",
+                    "it means what it says",
+                    crate::error::Remedy::new("put it right"),
+                )),
+            )
+            .about("jellyfin")],
+        )
+        .await
+        .first()
+        .and_then(|finding| finding.said.clone())
+        .unwrap_or_default()
+    }
+
     /// Evidence for something that works is noise, and on a healthy run it would be
     /// the bulk of the output.
     #[tokio::test]

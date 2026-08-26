@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use reqwest::header::HeaderValue;
 use reqwest::Url;
 
-use crate::config::display::without_query;
+use crate::config::display::without_credentials;
 use crate::config::store::REDACTED;
 use crate::ports::http::{Http, Method, Request, Response, Unreachable};
 
@@ -93,7 +93,7 @@ impl Http for Web {
         // on the failure and out of the reason read from the error.
         let query = query_of(&request.url);
         let unreachable = |error: &reqwest::Error| Unreachable {
-            url: without_query(&request.url),
+            url: without_credentials(&request.url),
             reason: withheld_query(&error.to_string(), query),
             attempts: 1,
         };
@@ -117,7 +117,7 @@ impl Http for Web {
 /// the `r=` a Newznab-family indexer authenticates by nor a `sid=` session — guessing at
 /// somebody else's vocabulary, and wrong wherever they chose a word nobody here listed.
 ///
-/// So the answer is the one [`without_query`] already gives on the same value on the
+/// So the answer is the one [`without_credentials`] already gives on the same value on the
 /// settings surface: a query nobody reads is a smaller loss than a key everybody can.
 fn query_of(url: &str) -> Option<&str> {
     url.split_once('?')

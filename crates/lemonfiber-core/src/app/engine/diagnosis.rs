@@ -126,6 +126,17 @@ pub(crate) async fn examined(
 /// One request for all of them rather than one each: the engine is asked for the
 /// services in trouble together, and the lines are dealt back out by the service that
 /// wrote them.
+///
+/// Withheld as they are gathered rather than as they are drawn. A service that fails
+/// while authenticating says so with the credential in hand, and this is the one field
+/// that carries such a sentence to three places at once: a report on a terminal, a
+/// screen, and `said` on a finding served over HTTP. Redacting at a renderer would
+/// leave the last of those untouched, and a bug report is pasted out of the first.
+///
+/// The same rule the same lines already take when they become an error's detail, so a
+/// diagnosis and the failure beside it cannot answer differently about the same output.
+/// It reads each line on its own and decides by that line's shape: one written as a
+/// setting loses its value, and one written as a sentence keeps every word it has.
 pub(crate) async fn quoted(ctx: &Ctx, findings: Vec<Finding>) -> Vec<Finding> {
     let troubled: Vec<String> = findings
         .iter()
@@ -149,7 +160,7 @@ pub(crate) async fn quoted(ctx: &Ctx, findings: Vec<Finding>) -> Vec<Finding> {
                     lines.iter().filter(|line| line.service == service).fold(
                         String::new(),
                         |mut said, line| {
-                            said.push_str(&line.line);
+                            said.push_str(&crate::config::store::withheld_text(&line.line));
                             said.push('\n');
                             said
                         },

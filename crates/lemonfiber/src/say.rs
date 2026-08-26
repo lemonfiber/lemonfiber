@@ -65,8 +65,30 @@ pub(crate) fn unicode(locale: Option<&str>) -> bool {
 /// Reachable from outside because not everything that reaches a terminal does so
 /// through this module: reading a secret hands the prompt to a crate that writes it
 /// itself, and that prompt has to arrive folded like every other line.
+///
+/// Made plain as well as folded, and here rather than at the call sites. A report
+/// built out of `Lines` is made plain as each line goes in, but a stream has no
+/// report to build: Compose's own output and a walkthrough's narration are
+/// printed the moment they arrive, and both of those are somebody else's text.
+/// Neither had been, so `\x1b[2J` in a release title cleared the operator's terminal
+/// midway through a walkthrough. A rule that has to be remembered at each of thirty
+/// call sites is a rule that will be forgotten at one, so it is applied at the one
+/// place they all pass through.
 pub(crate) fn rendered(line: &str) -> String {
-    shown(line, *ASCII_ONLY.get().unwrap_or(&false))
+    shown(&drawable(line), *ASCII_ONLY.get().unwrap_or(&false))
+}
+
+/// Every line of what one call prints, with anything a terminal would obey removed.
+///
+/// Line by line, because the breaks are ours and the rest of it is not. A caller
+/// asks for a blank line before its heading by writing one into the text, and
+/// `plain` — which is built for one line of a report — would take it away along
+/// with the escape it is really there to remove.
+fn drawable(text: &str) -> String {
+    text.split('\n')
+        .map(lemonfiber_core::text::plain)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// The line as a terminal of this kind can render it.
@@ -199,9 +221,44 @@ pub(crate) use {complain, emit, say};
 #[cfg(test)]
 mod tests {
     use super::{
-        asked, complained, emitted, folded, for_a_parser, refused, said, settle, settle_audience,
-        shown, unicode,
+        asked, complained, emitted, folded, for_a_parser, refused, rendered, said, settle,
+        settle_audience, shown, unicode,
     };
+
+    /// Everything printed for a person is made plain here, and not by whoever asked.
+    ///
+    /// Two callers had no report to build and so passed nothing through `Lines::put`:
+    /// Compose's own stdout, printed line by line as an image pulls or a stack starts,
+    /// and the walkthrough's live narration, whose detail is a catalogue's title. Both
+    /// are somebody else's text, and `\x1b[2J` in either clears the operator's terminal.
+    #[test]
+    fn somebody_elses_text_is_made_plain_on_its_way_out() {
+        // Compose's own line, as `engine::emit_line` indents it.
+        let composed = rendered("  sonarr Pulling fs layer\u{1b}[2J");
+        assert!(!composed.contains('\u{1b}'), "{composed:?}");
+        assert!(composed.contains("Pulling fs layer"), "{composed:?}");
+        // And the shapes a terminal obeys without being a control character at all.
+        for hidden in ['\u{202e}', '\u{200b}', '\u{feff}'] {
+            let name = rendered(&format!("  Some{hidden}Release"));
+            assert_eq!(name, "  SomeRelease", "U+{:04X}", u32::from(hidden));
+        }
+    }
+
+    /// The breaks a caller writes into one call are ours and survive.
+    ///
+    /// A line feed is the first thing a plain-text rule takes, and half the questions
+    /// setup asks are written with a blank line in front of them. Made plain line by
+    /// line, so the spacing somebody wrote stays and the escape somebody else sent goes.
+    #[test]
+    fn the_blank_line_a_caller_asked_for_is_still_there() {
+        assert_eq!(
+            rendered("\nWhat would you like to do?"),
+            "\nWhat would you like to do?"
+        );
+        assert_eq!(rendered("first\n\nthird"), "first\n\nthird");
+        assert_eq!(rendered("trailing\n"), "trailing\n");
+        assert_eq!(rendered("a\u{1b}[2Jb\nc\rd"), "a[2Jb\ncd");
+    }
 
     /// A locale that names a charset has told us what it can do; one that is unset
     /// has told us nothing, and the requirement asks for a fallback where Unicode

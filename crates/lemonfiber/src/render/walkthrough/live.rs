@@ -88,6 +88,23 @@ mod tests {
         assert!(said.contains("Sintel (2010)"));
     }
 
+    /// The detail on these lines is a catalogue's title, and a title is written by
+    /// whoever named the release.
+    ///
+    /// Narrated the moment it is true, so there is no report to build and nothing here
+    /// passes `Lines::put` — for a while that made this the one surface drawing somebody
+    /// else's text raw, and `\x1b[2J` in a title cleared the operator's screen halfway
+    /// through their first walkthrough. The line is made plain at the one way out, which
+    /// is what this drives.
+    #[test]
+    fn a_title_that_would_clear_the_screen_no_longer_can() {
+        let named = "Sintel\u{1b}[2J (2010)";
+        let said = crate::say::rendered(&spoken(&Line::saying(Step::Available, named)));
+        assert!(!said.contains('\u{1b}'), "{said:?}");
+        assert!(said.contains("Sintel"), "{said:?}");
+        assert!(said.contains("(2010)"), "{said:?}");
+    }
+
     #[test]
     fn the_choosing_line_is_kept_for_the_report_and_not_said_aloud() {
         // The operator has just typed it; saying it back is the product filling silence.

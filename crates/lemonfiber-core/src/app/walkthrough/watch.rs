@@ -190,6 +190,16 @@ const fn past_patience(furthest: Step) -> Landed {
 /// operator who has to go and find it has been handed a fault report rather than a
 /// diagnosis. Lines mentioning the item come first; where none does, the most recent are
 /// shown, because something is better than a silent failure.
+///
+/// Withheld as they are gathered, the same rule the same output takes when it becomes an
+/// error's detail: these reach a terminal under "What sonarr was saying" and a browser as
+/// a stopped walkthrough's `logs`, and a fix at either would leave the other quoting a key.
+///
+/// Withheld *before* the service's name is put in front, which is not an ordering anybody
+/// gets to choose freely. What arrives is a name, a colon and the rest, which is the exact
+/// shape of a setting — so a stack running a service called `authelia` or `keycloak` would
+/// have had every line of its output replaced by a redaction, the marker word in its name
+/// eating the sentence it introduced.
 pub(super) async fn what_was_said(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
@@ -218,7 +228,11 @@ pub(super) async fn what_was_said(
     let needle = first_word(title).to_lowercase();
     let (mut about_it, mut recent) = (Vec::new(), Vec::new());
     while let Some(line) = lines.recv().await {
-        let said = format!("{}: {}", line.service, line.line);
+        let said = format!(
+            "{}: {}",
+            line.service,
+            crate::config::store::withheld_text(&line.line)
+        );
         if said.to_lowercase().contains(&needle) {
             about_it.push(said);
         } else {
@@ -393,6 +407,37 @@ mod tests {
             said,
             vec!["sonarr: Sintel: no files are eligible for import"]
         );
+    }
+
+    /// A stopped walkthrough quotes the \*arr's own output, and a \*arr that fails while
+    /// authenticating quotes the credential it failed with.
+    ///
+    /// These lines are printed under "What sonarr was saying" and served as a stopped
+    /// walkthrough's `logs`, so the withholding is where they are gathered — a fix at
+    /// either surface would leave the other one publishing the key.
+    #[tokio::test]
+    async fn what_a_service_was_saying_is_quoted_with_no_credential_in_it() {
+        // Assembled rather than written out, so no value that reads as one sits here.
+        let secret = ["abcdef", "1234", "567890"].concat();
+        let mut ctx = ctx_with(&Fake::default());
+        ctx.engine = Arc::new(
+            Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy).saying(
+                "sonarr",
+                &format!("Sintel: import refused, api_key={secret} was rejected"),
+            ),
+        );
+        let said = what_was_said(&ctx, &services(&ctx), "Sintel")
+            .await
+            .join("");
+        assert!(!said.contains(&secret), "{said}");
+        // What is left has to still be the diagnosis: the service that wrote it, the
+        // item it is about, and the reason. A rule that ate the sentence would leave an
+        // operator a stop with nothing under it.
+        assert!(
+            said.starts_with("sonarr: Sintel: import refused,"),
+            "{said}"
+        );
+        assert!(said.ends_with("was rejected"), "{said}");
     }
 
     #[tokio::test]
