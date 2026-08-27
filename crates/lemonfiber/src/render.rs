@@ -62,9 +62,15 @@ impl Lines {
     /// person's terminal can show, and there is no person here — and both of them
     /// damage this: the fold writes a curly quote as `"`, which inside a JSON string
     /// is not a character but the end of it, so a release name containing one would
-    /// arrive as something that will not parse at all. Serialising has already made
-    /// the text safe in the way that matters, since JSON escapes every control
-    /// character rather than carrying it.
+    /// arrive as something that will not parse at all.
+    ///
+    /// What made it safe was said to be the serialising, on the grounds that JSON
+    /// escapes every control character. It escapes the ones below a space. The C1
+    /// controls, the line separators, the bidirectional overrides and the zero-widths
+    /// are carried raw, and each of those is an instruction to the terminal these
+    /// lines are commonly printed to — so [`say::emitted`](crate::say) writes them
+    /// out on the way through, which changes what a terminal reads and not what a
+    /// parser does.
     pub(crate) fn for_a_parser() -> Self {
         Self {
             said: Vec::new(),

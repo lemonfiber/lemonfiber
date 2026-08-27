@@ -163,16 +163,16 @@ pub(crate) fn for_a_parser() -> bool {
     *FOR_A_PARSER.get().unwrap_or(&false)
 }
 
-/// Put a refusal out exactly as it is, for something that will parse it.
+/// Put a refusal out for something that will parse it.
 ///
 /// The error stream's half of the parser's door. A refusal is output like any
 /// other, and a script that asked for something it could parse asked about the
 /// failures too — they are the answers it most needs to act on.
 pub(crate) fn refused(line: &str) {
-    eprintln!("{line}");
+    eprintln!("{}", written(line));
 }
 
-/// Put a line out exactly as it is, for something that will parse it.
+/// Put a line out for something that will parse it.
 ///
 /// The other door of the same funnel, and the reason it exists is that folding is
 /// wrong here. Folding decides what a person's terminal can draw, and there is no
@@ -182,7 +182,27 @@ pub(crate) fn refused(line: &str) {
 /// something that will not parse. `--json` is for scripts, and a script is exactly
 /// where `LC_ALL=C` is set.
 pub(crate) fn emitted(line: &str) {
-    println!("{line}");
+    println!("{}", written(line));
+}
+
+/// The document as it goes out, with nothing in it a terminal would obey.
+///
+/// Both halves of the parser's door pass through here, for the reason both halves
+/// of the person's door pass through [`rendered`]: a rule remembered at each call
+/// site is a rule forgotten at one.
+///
+/// Making it plain is what the other door does and is the wrong answer here — a
+/// script asked for a value it could match against what the service holds, and a
+/// name with a character taken out of it no longer does. Written out as a `\uXXXX`
+/// it is the same string to anything that reads JSON, and six ASCII characters to
+/// the terminal the document is being printed to.
+///
+/// This door had nothing at all, on the stated grounds that serialising had already
+/// made the text safe. It has, below a space; above it `serde_json` carries the
+/// character raw, so a release title holding a right-to-left override reached a
+/// terminal through `--json` while every other way out disarmed it.
+fn written(line: &str) -> String {
+    lemonfiber_core::text::escaped(line)
 }
 
 /// Put a question out and leave the cursor beside it, for an answer on the same line.
