@@ -358,9 +358,28 @@ fn the_policy_names_each_tier_on_both_families() {
 fn the_web_surface_can_be_asked_for_nothing_that_names_an_address() {
     let declared: BTreeSet<&str> = ASKED.iter().map(|(flag, _)| *flag).collect();
     let shipped = shipped();
-    let Some(parsing) = shipped.get("crates/lemonfiber/src/cli.rs").cloned() else {
-        unreachable!("the command line this binary parses lives in the tree this crawl reads")
-    };
+    // Found by the type's own name rather than at a path. The declaration moved out
+    // of `cli.rs` into a module beside it the day the file reached its length cap,
+    // and a guard reading a path reads whatever that path holds afterwards — here,
+    // no fields at all, which is a red for the wrong reason and would have been a
+    // green for the wrong reason had the assertion been an `is_empty`.
+    let declaring: Vec<&String> = shipped
+        .iter()
+        .filter(|(_, ships)| ships.contains("pub struct RawUi {"))
+        .map(|(path, _)| path)
+        .collect();
+    assert_eq!(
+        declaring.len(),
+        1,
+        "the flags the surface takes are declared in {} files, so this reads one of \
+         them and says nothing about the rest: {declaring:?}",
+        declaring.len()
+    );
+    let parsing = declaring
+        .first()
+        .and_then(|path| shipped.get(*path))
+        .cloned()
+        .unwrap_or_default();
     assert_eq!(
         fields_of(&parsing, "RawUi"),
         declared,

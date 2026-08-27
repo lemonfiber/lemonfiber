@@ -4,11 +4,21 @@
 //! dispatcher that routes them and the translation that turns them into the core's
 //! own commands. A flag is added here; what it does is added next door.
 
+mod repair;
+mod serving;
+mod setup;
+
 use std::path::PathBuf;
 
-use clap::{Args, CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use include_dir::{include_dir, Dir};
-use lemonfiber_core::app::bundle::LINES;
+
+// Re-exported rather than reached for through the module they now live in: where a
+// flag is declared is this file's business and nobody else's, and moving one would
+// otherwise be a change at every call site that names it.
+pub use repair::{Fixing, Mending};
+pub use serving::{Asked, RawUi};
+pub use setup::RawSetup;
 
 /// The stack this binary carries.
 ///
@@ -16,69 +26,6 @@ use lemonfiber_core::app::bundle::LINES;
 /// two, and `build.rs` has already refused to produce this binary if the
 /// manifest is one it could not read.
 pub static STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
-
-/// The setup flags exactly as the command line gives them, before they are typed
-/// and checked — a plain carrier so the parse is one argument, not a dozen.
-///
-/// This is also the command line's own declaration of them, flattened into the
-/// subcommand: one list of flags rather than a definition here and a copy there,
-/// which is a copy that only ever falls out of step in one direction.
-#[derive(Debug, Default, clap::Args)]
-pub struct RawSetup {
-    /// Report where setup stands and ask nothing. Takes precedence over the
-    /// answers below, so a run that asks where it is never also answers.
-    #[arg(long)]
-    pub status: bool,
-    /// Apply without a prompt to confirm — required for an unattended run.
-    #[arg(long)]
-    pub yes: bool,
-    /// How to fetch content: `both`, `usenet`, `torrent`, or `none`.
-    #[arg(long, value_name = "PROTOCOLS")]
-    pub protocols: Option<String>,
-    /// Where the library and downloads live.
-    #[arg(long, value_name = "PATH")]
-    pub data_location: Option<PathBuf>,
-    /// An indexer's API base URL.
-    #[arg(long, value_name = "URL")]
-    pub indexer_url: Option<String>,
-    /// The indexer's API key.
-    #[arg(long, value_name = "KEY")]
-    pub indexer_key: Option<String>,
-    /// The Usenet provider's hostname.
-    #[arg(long, value_name = "HOST")]
-    pub usenet_host: Option<String>,
-    /// The port the Usenet provider answers on (defaults to 563).
-    #[arg(long, value_name = "PORT")]
-    pub usenet_port: Option<u16>,
-    /// The Usenet account username.
-    #[arg(long, value_name = "USER")]
-    pub usenet_user: Option<String>,
-    /// The Usenet account password.
-    #[arg(long, value_name = "PASS")]
-    pub usenet_pass: Option<String>,
-    /// Whether the Usenet connection uses TLS (defaults to yes).
-    #[arg(long, value_name = "BOOL")]
-    pub usenet_tls: Option<bool>,
-    /// How to serve the library: `docker`, `native`, or `none`.
-    #[arg(long, value_name = "MODE")]
-    pub library: Option<String>,
-    /// The container user, as `UID:GID`.
-    #[arg(long, value_name = "UID:GID")]
-    pub service_user: Option<String>,
-    /// Whether a VPN carries the torrent traffic. Where torrents are chosen and
-    /// this is absent, the run proceeds unprotected and records that it did.
-    #[arg(long, value_name = "BOOL")]
-    pub vpn: Option<bool>,
-    /// Whether others in the home will use it.
-    #[arg(long, value_name = "BOOL")]
-    pub household: Option<bool>,
-    /// What to be told about: `problems`, `completions`, or `everything`.
-    #[arg(long, value_name = "APPETITE")]
-    pub notifications: Option<String>,
-    /// Whether to start the stack when the machine boots.
-    #[arg(long, value_name = "BOOL")]
-    pub autostart: Option<bool>,
-}
 
 /// Set up and run your media stack.
 #[derive(Debug, Parser)]
@@ -363,129 +310,6 @@ pub enum Request {
         #[arg(long)]
         repoint: bool,
     },
-}
-
-/// What `doctor` was asked to put right.
-///
-/// Declared here beside the subcommand rather than in the surface that reads them, as every
-/// other set of flags is — a flag added to one list and not the other is a flag that
-/// silently does nothing.
-#[derive(Debug, Args)]
-pub struct Mending {
-    /// Changing things forward, and what was agreed to first.
-    #[command(flatten)]
-    pub fixing: Fixing,
-    /// Put back what the last repair changed.
-    ///
-    /// Asked for the same way a repair is, because it is the same errand read
-    /// backwards. It reverses that one repair and nothing else: the wiring lemonfiber
-    /// seeded and the choices your first run wrote are left where they are.
-    #[arg(long, conflicts_with = "fix")]
-    pub undo: bool,
-}
-
-impl Mending {
-    /// Whether this run was asked to change anything at all, forwards or back.
-    ///
-    /// Asked as one question so the caller deciding between looking and acting does not
-    /// have to know which combination of flags amounts to acting.
-    #[must_use]
-    pub fn acts(&self) -> bool {
-        self.fixing.fix || self.undo
-    }
-}
-
-/// How much of the putting-right was agreed to in advance.
-///
-/// Apart from `--undo` because these are two errands rather than four settings: the three
-/// here describe one run that changes things forward, and each is meaningless without the
-/// first of them.
-#[derive(Debug, Args)]
-pub struct Fixing {
-    /// Offer to put right what lemonfiber can, asking about each first.
-    ///
-    /// A plain run only looks. This one says what each repair would do and what else
-    /// changes if it does, and waits to be told.
-    #[arg(long)]
-    pub fix: bool,
-    /// Carry the repairs out without asking, having decided in advance.
-    #[arg(long, requires = "fix")]
-    pub yes: bool,
-    /// Include the checks that disturb the running system while repairing.
-    ///
-    /// Named apart from the field it sits beside: `doctor` already has a `--disruptive`,
-    /// and clap keys an argument by the field name unless told otherwise — so two flags
-    /// that read differently on the command line would be one argument underneath.
-    #[arg(id = "fix-disruptive", long = "fix-disruptive", requires = "fix")]
-    pub disruptive: bool,
-}
-
-/// What the web interface was asked for.
-///
-/// Declared as one thing rather than as three loose values on a variant, for the
-/// same reason the bundle's flags are: the same three would otherwise be written
-/// out again by whoever passes them on.
-#[derive(Debug, Args)]
-pub struct RawUi {
-    /// The port to listen on. Without it, whichever one is free is used and the
-    /// whole address is printed.
-    #[arg(long, value_name = "PORT")]
-    pub port: Option<u16>,
-    /// Do not ask this desktop to open a browser.
-    #[arg(long)]
-    pub no_browser: bool,
-    /// Serve the interface from this directory rather than from the binary.
-    ///
-    /// No build carries a web app of its own yet, so this is the only way to
-    /// serve one. A build asked without it says as much rather than answering
-    /// with an empty page.
-    #[arg(long, value_name = "PATH")]
-    pub assets: Option<PathBuf>,
-    /// Offer this to your network, rather than to this machine only.
-    ///
-    /// Refused unless a password has been set. This surface can start, stop and
-    /// reconfigure everything and reaches every password the system holds, so it is
-    /// not offered to a network with nothing in front of it.
-    #[arg(long)]
-    pub lan: bool,
-    /// Set the password this surface asks for, before it starts.
-    ///
-    /// Asked for at the keyboard and never on this line: a password typed as an
-    /// argument is a password in your shell's history and in the list of processes
-    /// this machine is running.
-    #[arg(long)]
-    pub set_password: bool,
-}
-
-/// What a support bundle was asked for.
-///
-/// Declared as one thing rather than as six loose values on a variant, because the same
-/// six would otherwise be written out again by whoever passes them on — and a flag added
-/// to one list and not the other is a flag that silently does nothing.
-#[derive(Debug, Args)]
-pub struct Asked {
-    /// Produce the bundle, having seen what it would hold.
-    #[arg(long)]
-    pub write: bool,
-    /// Where to write it, instead of into this directory.
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-    /// How many log lines to take from each service.
-    #[arg(long, value_name = "LINES", default_value_t = LINES)]
-    pub logs: u32,
-    /// Include media filenames, which are replaced by default.
-    #[arg(long)]
-    pub filenames: bool,
-    /// Show one setting as it is, named exactly as the bundle names it.
-    ///
-    /// Repeatable, and refused without `--confirm` on the same run: a flag that
-    /// publishes a credential is not one to honour because it turned up on a
-    /// command line somebody copied.
-    #[arg(long, value_name = "SETTING")]
-    pub reveal: Vec<String>,
-    /// Confirm showing the settings named by `--reveal`.
-    #[arg(long)]
-    pub confirm: bool,
 }
 
 /// What to do with settings.
