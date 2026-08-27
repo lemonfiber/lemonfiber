@@ -44,7 +44,7 @@ release-tag VERSION:
     fi
     git tag -s "v{{VERSION}}" -m "lemonfiber v{{VERSION}}"
     git push origin "v{{VERSION}}"
-    @echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
+    echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
 
 # Everything CI runs, and the hooks turned on if they are not already — this is
 # the command run before a push, which is when the pre-push hook matters.
