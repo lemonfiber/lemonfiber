@@ -18,6 +18,7 @@ pub mod network;
 pub mod nntp;
 pub mod process;
 pub mod random;
+pub mod recording;
 pub mod retrying;
 pub mod time;
 

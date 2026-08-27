@@ -68,6 +68,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::admission,
     },
     Entry {
+        accessor: "outbound",
+        what: "the record of what left this machine",
+        why: "When each outbound request went, what kind it was, and where it went — so what \
+              the enumeration says would be sent can be checked against what was. It carries no \
+              header, no body and no query, which is the whole of why it is safe to keep.",
+        secret: false,
+        at: Paths::outbound,
+    },
+    Entry {
         accessor: "journal",
         what: "the change journal",
         why: "What the last run wrote, so a repair can be put back. The fields that changed and \

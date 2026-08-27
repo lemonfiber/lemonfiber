@@ -96,6 +96,20 @@ pub trait Http: Send + Sync {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable>;
 }
 
+/// A shared handle to a transport is a transport.
+///
+/// Needed wherever something wraps what is already being shared — a decorator that
+/// records or retries takes what it wraps, and by the time one is built the
+/// transport is usually behind a handle already. Stated here rather than worked
+/// around at each wrapping, because it is a fact about the port and not about any
+/// one adapter.
+#[async_trait]
+impl Http for std::sync::Arc<dyn Http> {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        (**self).send(request).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Method, Request, Response, Unreachable};

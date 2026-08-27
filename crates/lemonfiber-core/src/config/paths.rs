@@ -75,6 +75,13 @@ impl Paths {
         self.config.join(JOURNAL)
     }
 
+    /// What left this machine, so the operator can check what was sent rather than
+    /// only what the enumeration says would be.
+    #[must_use]
+    pub fn outbound(&self) -> PathBuf {
+        self.config.join("outbound.log")
+    }
+
     /// The setup wizard's saved progress, so quitting mid-setup resumes rather
     /// than restarts. The one thing setup writes before the operator confirms.
     #[must_use]

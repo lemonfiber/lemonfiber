@@ -243,6 +243,27 @@ impl Ctx {
     /// Lets a test script the bytes a generated secret is rendered from, so the
     /// value it produces is known rather than unpredictable.
     #[must_use]
+    /// The same context, writing down what leaves this machine.
+    ///
+    /// Given a path rather than finding one: where this machine keeps its files is
+    /// the edge's question, and a core that answered it would be a core that knows
+    /// what an operating system is.
+    ///
+    /// Wrapped **outside** whatever is already there, so what is written down is
+    /// what actually left rather than what a caller asked for — three attempts at
+    /// one request are three things that went, and an operator checking what was
+    /// sent is owed all three.
+    pub fn recording_at(self, at: std::path::PathBuf) -> Self {
+        let http: Arc<dyn Http> = Arc::new(crate::adapters::recording::Recording::around(
+            Arc::clone(&self.http),
+            Some(at),
+            Arc::clone(&self.clock),
+        ));
+        self.with_http(http)
+    }
+
+    /// The same context, taking its randomness from the given seam.
+    #[must_use]
     pub fn with_random(mut self, random: Arc<dyn Random>) -> Self {
         self.random = random;
         self

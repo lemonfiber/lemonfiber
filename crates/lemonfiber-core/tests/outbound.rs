@@ -311,3 +311,55 @@ fn stays_here(url: &str) -> bool {
         .unwrap_or_default();
     host == "localhost" || !host.contains('.') || host.starts_with("127.")
 }
+
+/// What was sent is written down where the enumeration says it would be.
+///
+/// The enumeration next door is a description of the program: which requests exist
+/// and what each carries. This is the other half asked for — the record an
+/// operator checks it against, made as the request went rather than reconstructed
+/// afterwards from what somebody believes the program does.
+///
+/// Driven through the real transport decorator rather than by calling the writer,
+/// because the claim is that a request *passing through* leaves a trace: a recorder
+/// nothing is wrapped in records nothing, and would pass a test of the writer.
+#[tokio::test]
+async fn a_request_that_went_is_written_down_where_the_operator_can_read_it() {
+    let at = std::env::temp_dir().join(format!(
+        "lemonfiber-outbound-{}-{}.log",
+        std::process::id(),
+        line!()
+    ));
+    let _ = std::fs::remove_file(&at);
+
+    let answering: Arc<dyn lemonfiber_core::ports::http::Http> =
+        lemonfiber_fixtures::http::Fake::always(lemonfiber_fixtures::http::Answer::Reply(
+            204,
+            String::new(),
+        ));
+    let held = ctx(Source::External(project()), Settings::default())
+        .with_http(answering)
+        .recording_at(at.clone());
+    let transport = Arc::clone(&held.http);
+
+    let asked = lemonfiber_core::ports::http::Request {
+        method: lemonfiber_core::ports::http::Method::Get,
+        url: "https://indexer.example/api?apikey=the-indexer-key".to_owned(),
+        headers: vec![("X-Api-Key".to_owned(), "the-indexer-key".to_owned())],
+        body: None,
+    };
+    let answered = transport.send(&asked).await;
+
+    let written = std::fs::read_to_string(&at).unwrap_or_default();
+    let _ = std::fs::remove_file(&at);
+
+    assert!(answered.is_ok(), "the request still happened");
+    assert!(
+        written.contains("indexer.example"),
+        "where it went is written down: {written:?}"
+    );
+    assert!(written.contains("204"), "and what came back: {written:?}");
+    assert!(
+        !written.contains("the-indexer-key"),
+        "and the credential is not, in the URL or the header: {written:?}"
+    );
+}
