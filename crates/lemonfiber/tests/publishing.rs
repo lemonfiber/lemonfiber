@@ -15,9 +15,11 @@
 //! repository's gates. This one runs wherever this binary is built.
 
 use std::collections::BTreeSet;
+use std::net::IpAddr;
 
 use include_dir::Dir;
 use lemonfiber::cli::STACK;
+use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_manifest::{Bind, Manifest, Service};
 
 /// The address a service reachable only from the host machine is published on.
@@ -32,6 +34,15 @@ const LOOPBACK: &str = "127.0.0.1";
 /// every household mapping has to be written through, so narrowing it narrows all of
 /// them at once.
 const LAN_BIND: &str = "${LAN_BIND";
+
+/// The file the stack ships its settings in, which an operator's own starts from.
+const SETTINGS_FILE: &str = ".env.example";
+
+/// The setting itself, as that file names it.
+///
+/// Without the shape a mapping wraps it in, because what is read there is a value
+/// rather than an expansion.
+const SETTING: &str = "LAN_BIND";
 
 /// The services published beyond loopback, and why each one is.
 ///
@@ -191,6 +202,20 @@ fn mapping(spec: &str) -> Option<(u16, String)> {
 /// Whether a word is a number, having any characters at all.
 fn numeric(word: &str) -> bool {
     !word.is_empty() && word.chars().all(|digit| digit.is_ascii_digit())
+}
+
+/// The address a mapping written through the knob falls back to.
+///
+/// `${LAN_BIND:-0.0.0.0}` is Compose's own form for *this unless the operator's file
+/// says otherwise*, and what follows `:-` is the unless. A mapping written through
+/// the knob with no fallback at all has none: Compose expands an unset variable to
+/// nothing, which happens to publish on every interface, and a default arrived at by
+/// an expansion nobody wrote down is not one anybody argued for.
+fn falls_back_to(address: &str) -> Option<&str> {
+    address
+        .strip_prefix(LAN_BIND)?
+        .strip_suffix('}')?
+        .strip_prefix(":-")
 }
 
 /// The manifest the embedded stack declares itself with.
@@ -368,5 +393,68 @@ fn every_household_service_is_published_through_the_one_setting_that_narrows_the
         wrong.is_empty(),
         "the stack calls these household services and publishes them somewhere the one \
          setting that narrows the household tier does not reach: {wrong:?}"
+    );
+}
+
+/// What the one setting comes to where nobody has touched it reaches the network.
+///
+/// The rule above says every household mapping is written through the knob. This says
+/// what the knob comes to, and the two are not the same claim: a knob defaulting to
+/// `127.0.0.1` would leave every household service answering this machine alone, and
+/// every check on this page would stay green while the television could not reach the
+/// library. Being reachable is the whole of what the tier is for, so the default is
+/// the requirement rather than an implementation detail of it.
+///
+/// Both places the default is written are read, because either one alone would be a
+/// default the other could contradict: the fallback inside each mapping, which is what
+/// applies where the operator's file names nothing, and the value the stack's own
+/// settings file ships, which is what that file starts from.
+#[test]
+fn the_one_setting_that_narrows_the_household_tier_reaches_the_network_until_it_is_narrowed() {
+    let services = declared();
+    let household = household_in(&services);
+    let ports: BTreeSet<u16> = services
+        .iter()
+        .filter(|service| household.contains(service.id.as_str()))
+        .filter_map(|service| service.port)
+        .collect();
+    let mut defaults: Vec<(String, String)> = publications()
+        .into_iter()
+        .filter(|published| ports.contains(&published.port))
+        .map(|published| {
+            let written = falls_back_to(&published.address).unwrap_or_default();
+            (
+                format!("{}: {}", published.file, published.address),
+                written.to_owned(),
+            )
+        })
+        .collect();
+    let example = STACK
+        .get_file(SETTINGS_FILE)
+        .and_then(include_dir::File::contents_utf8)
+        .map(EnvFile::parse);
+    let shipped = example
+        .as_ref()
+        .and_then(|settings| settings.get(SETTING))
+        .unwrap_or_default();
+    defaults.push((format!("{SETTINGS_FILE}: {SETTING}"), shipped.to_owned()));
+    assert!(
+        defaults.len() > household.len(),
+        "fewer defaults were found than there are household services, so this is reading \
+         the wrong thing: {defaults:?}"
+    );
+    let narrow: Vec<&(String, String)> = defaults
+        .iter()
+        .filter(|(_, written)| {
+            written
+                .parse::<IpAddr>()
+                .ok()
+                .is_none_or(|address| address.is_loopback())
+        })
+        .collect();
+    assert!(
+        narrow.is_empty(),
+        "the household tier defaults to somewhere a television cannot reach, so the \
+         services whose whole purpose is being reachable are not: {narrow:?}"
     );
 }
