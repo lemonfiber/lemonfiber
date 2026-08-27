@@ -231,6 +231,7 @@ impl Engine for Fake {
                     Lifecycle::Exited
                 },
                 health: Health::None,
+                published: Vec::new(),
                 exit: None,
             })
             .collect())

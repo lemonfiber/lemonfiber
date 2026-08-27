@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::guides::GuidesCheck;
@@ -297,8 +298,18 @@ pub(crate) async fn assembled(
         crate::app::seed::managed_wirings(ctx, &manifest.services, project.as_deref()).await,
         ctx.stamp(),
     );
+    // Where the stack is actually listening, asked of the container engine rather
+    // than read out of the files that asked for it: a mapping edited by hand and
+    // applied, or an image whose defaults changed under an upgrade, is a service
+    // answering somewhere nothing on disk says it does.
+    let bindings = BindingsCheck::new(
+        ctx.engine.clone(),
+        ctx.settings.project.clone(),
+        &manifest.services,
+    );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
+        Box::new(bindings),
         Box::new(storage),
         Box::new(vpn),
         Box::new(credentials),

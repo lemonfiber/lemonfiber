@@ -23,6 +23,16 @@ use lemonfiber_manifest::{Bind, Manifest, Service};
 /// The address a service reachable only from the host machine is published on.
 const LOOPBACK: &str = "127.0.0.1";
 
+/// The one setting that decides which interface the household tier is published on.
+///
+/// A knob rather than an address, because the stack has no way to learn which of a
+/// host's addresses is the LAN one: that varies by machine, changes with DHCP, and is
+/// different again on a laptop that moves. So the default is every interface and the
+/// operator is told so, which is the honest half of the trade — and this is the word
+/// every household mapping has to be written through, so narrowing it narrows all of
+/// them at once.
+const LAN_BIND: &str = "${LAN_BIND";
+
 /// The services published beyond loopback, and why each one is.
 ///
 /// Everything else in the stack is an admin surface, opened from the machine
@@ -308,5 +318,55 @@ fn every_household_service_says_why_it_is_one() {
     assert!(
         silent.is_empty(),
         "these are published to the network and the list does not say what for: {silent:?}"
+    );
+}
+
+/// Every household service is published on the LAN knob, and none on loopback.
+///
+/// The other direction from the rule above, and it is not the same claim. That one
+/// says nothing is on the network without a reason; this one says the services whose
+/// whole purpose is being reachable from a television actually are — a household
+/// service quietly pinned to loopback is a library nobody can watch, and it would pass
+/// every check on this page that only looks for things reaching too far.
+///
+/// Held through the knob rather than through the address it defaults to, because what
+/// makes this configurable is that every one of them is written the same way: a
+/// mapping that spelled an address out would be one the operator's own setting does
+/// not reach.
+#[test]
+fn every_household_service_is_published_through_the_one_setting_that_narrows_them() {
+    let services = declared();
+    let household = household_in(&services);
+    assert!(
+        !household.is_empty(),
+        "the manifest calls no service a household one, so this checks nothing"
+    );
+    let published = publications();
+    let mut wrong: Vec<String> = Vec::new();
+    for service in &services {
+        let Some(port) = service.port else { continue };
+        if !household.contains(service.id.as_str()) {
+            continue;
+        }
+        let mut mapped = published
+            .iter()
+            .filter(|found| found.port == port)
+            .peekable();
+        assert!(
+            mapped.peek().is_some(),
+            "the manifest calls {} a household service on port {port} and no Compose file \
+             publishes it",
+            service.id
+        );
+        wrong.extend(
+            mapped
+                .filter(|found| !found.address.starts_with(LAN_BIND))
+                .map(|found| format!("{}: {} on {:?}", found.file, service.id, found.address)),
+        );
+    }
+    assert!(
+        wrong.is_empty(),
+        "the stack calls these household services and publishes them somewhere the one \
+         setting that narrows the household tier does not reach: {wrong:?}"
     );
 }

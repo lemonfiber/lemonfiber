@@ -18,6 +18,7 @@ what to do about it, is written for operators at
 - `BACKUP-5`
 - `BACKUP-6`
 - `BACKUP-7`
+- `BIND-1`
 - `BUNDLE-1`
 - `BUNDLE-2`
 - `BUNDLE-3`
