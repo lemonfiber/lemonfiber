@@ -153,6 +153,14 @@ pub const ASKS: &[Reach] = &[
 /// not be established all render as the same number in a panel. So the panels stay,
 /// and the diagnosis is reached as a question, where its verdicts and its remedies
 /// are read in the words the command line gives for the same run.
+///
+/// `front-door` arrived the other way round and settles in the same place. It was a
+/// question first and is a panel as well now, because the operator who needs the
+/// address is not the one who thought to ask for it — they have just been asked what
+/// to open by somebody in the next room. The panel carries the address and the phrase
+/// beside it; the question carries what else is on the network and why none of it is
+/// the door. So it stays on [`ASKS`], where the fuller answer is, rather than being
+/// named twice for one screen.
 pub const SHOWS: &[&str] = &["ps"];
 
 /// The requests the dashboard reaches a second way, having already reached them as a

@@ -12,14 +12,21 @@
 //! rest speak no API lemonfiber knows, so each is written down below with what it is
 //! to the household — and one nobody has written down is not offered, for the reason
 //! [`crate::config::display`] withholds a setting nobody vouched for.
+//!
+//! All of which is a default rather than a decree. An operator who disagrees about
+//! their own stack names the service they want, and [`chosen`] is where that name
+//! meets the one bound on it: a setting may pick between the places this stack
+//! already publishes to the household, and may not turn into a way past the tiers.
 
 mod address;
+mod chosen;
 
 use serde::Serialize;
 
 use lemonfiber_manifest::{ApiKind, Bind, Service};
 
 pub use address::{address, publishes_a_name, Address};
+pub use chosen::{chosen, Chosen, Refusal, KEPT};
 
 /// What a service published to the local network is to the people in the house.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]

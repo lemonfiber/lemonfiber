@@ -6,7 +6,7 @@
 
 use serde::Serialize;
 
-use crate::door::{Address, Facing};
+use crate::door::{Address, Chosen, Facing};
 
 /// Where the household's one front door stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -18,7 +18,20 @@ pub enum Standing {
     /// nothing here to ask for.
     LibraryOnly,
     /// There is a door and it is not answering.
+    ///
+    /// The service's own state. What fixes it is starting the service.
     Unreachable,
+    /// There is a door, it is answering, and nothing here can say where another
+    /// device would reach it.
+    ///
+    /// The other way a door is unreachable, and a different thing to do about it:
+    /// the service is fine and the way to it is what is missing. Told apart from
+    /// [`Standing::Unreachable`] because the two are fixed at opposite ends — one
+    /// by starting a service, the other by giving this machine an address the
+    /// household's devices can use — and a household member who cannot arrive
+    /// needs to know which of the two they are looking at before they start
+    /// blaming their own device.
+    Stranded,
     /// Nothing at all is published to the household: an operator-only configuration.
     #[serde(rename = "none")]
     Absent,
@@ -45,6 +58,13 @@ pub struct Beside {
 pub struct FrontDoorReport {
     /// Where the front door stands.
     pub standing: Standing,
+    /// How this came to be the door: worked out from what the stack declares, named
+    /// by the operator, or named by them and refused.
+    ///
+    /// Carried as a state rather than left to the sentence beneath it, for the reason
+    /// the standing is: an operator whose setting was refused reads the sentence, and
+    /// a browser, a script or a dashboard reads this.
+    pub chosen: Chosen,
     /// The service the household begins at, by the name it shows itself under.
     /// Absent where this stack publishes nothing they could begin at.
     pub service: Option<String>,

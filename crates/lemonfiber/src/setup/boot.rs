@@ -15,7 +15,7 @@ use crate::exit::{complain, settled, PREFLIGHT};
 use crate::render::render;
 
 use super::first_content;
-use super::Surface;
+use super::{door, Surface};
 use crate::say::{complain, say};
 
 /// The form setup brings up once the answers are applied.
@@ -64,14 +64,8 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
     match dispatch(Command::Up { forms }, ctx).await {
         Ok(outcome) => {
             render(&outcome, false);
-            // Said here and nowhere else: setup is the moment this stack was
-            // decided, and a stack that forwards no port is not broken — nothing
-            // would come of repeating it on every run except an operator who
-            // skims.
-            if let Some(cost) =
-                seeding::at_setup(ctx.settings.protocols, &ctx.settings.port_forward)
-            {
-                say!("\n{cost}");
+            for line in afterwards(ctx).await {
+                say!("{line}");
             }
             // The offer is the last thing setup does, and it needs to know what the stack
             // actually settled to — which is right here, and nowhere else afterwards.
@@ -79,6 +73,26 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// What setup says once the stack it started is up, in the order it says it.
+///
+/// Assembled rather than said as it goes, so what a first run leaves an operator
+/// with is one value that can be read back rather than two calls nothing watches.
+///
+/// The forwarded-port cost is said here and nowhere else: setup is the moment this
+/// stack was decided, and a stack that forwards no port is not broken — nothing
+/// would come of repeating it on every run except an operator who skims. The
+/// address comes after it, because a caveat about what this stack cannot do is
+/// worth less than the answer they are about to be asked for by somebody in the
+/// next room, and the last thing on the screen is the thing that gets read.
+async fn afterwards(ctx: &Ctx) -> Vec<String> {
+    let mut lines = Vec::new();
+    if let Some(cost) = seeding::at_setup(ctx.settings.protocols, &ctx.settings.port_forward) {
+        lines.push(format!("\n{cost}"));
+    }
+    lines.extend(door::handed(ctx).await);
+    lines
 }
 
 /// What the stack settled to, where the outcome is one a lifecycle produced.
@@ -91,7 +105,7 @@ fn condition(outcome: &Outcome) -> Option<Condition> {
 
 #[cfg(test)]
 mod tests {
-    use super::{condition, preflight, start};
+    use super::{afterwards, condition, preflight, start};
     use crate::exit::{shown, success};
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::config::Protocols;
@@ -143,6 +157,27 @@ mod tests {
             compose: None,
         };
         assert_eq!(condition(&Outcome::Version(report)), None);
+    }
+
+    #[tokio::test]
+    async fn a_first_run_ends_by_saying_what_to_send_the_people_who_live_here() {
+        // The whole of what setup adds once the stack is up, read back as one value:
+        // the cost this stack was decided at, and then the address, which is the
+        // question setup is about to be asked and the one nothing above it answers.
+        let mut ctx = working_ctx();
+        ctx.engine = std::sync::Arc::new(FakeEngine::quiet());
+        ctx.settings.protocols = Protocols::both();
+
+        let said = afterwards(&ctx).await.join("\n");
+
+        assert!(said.contains("No port is forwarded"), "{said}");
+        assert!(said.contains("front door"), "{said}");
+        let cost = said.find("No port is forwarded");
+        let door = said.find("front door");
+        assert!(
+            cost.is_some_and(|cost| door.is_some_and(|door| door > cost)),
+            "the address is the last thing on the screen: {said}"
+        );
     }
 
     #[tokio::test]

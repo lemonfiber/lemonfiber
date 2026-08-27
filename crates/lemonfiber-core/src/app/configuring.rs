@@ -29,11 +29,15 @@ pub(super) fn configuration(
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };
 
+    // Whether this call actually writes. A rehearsal has decided nothing and a read
+    // is not a decision, so neither has a consequence to state.
+    let written = key.is_some() && value.is_some() && !ctx.dry_run;
+
     // What was forwarding before, read only where a write is about to change it:
     // a consequence is the difference a change made, and where nothing is being
     // written there is no difference to state. A read that fails says nothing —
     // the write that follows reports the failure itself, in its own words.
-    let before = (key.is_some() && value.is_some() && !ctx.dry_run)
+    let before = written
         .then(|| store::read(path).ok())
         .flatten()
         .map(|file| port_forward_from_env(&file));
@@ -52,12 +56,7 @@ pub(super) fn configuration(
         Ok(file) => file,
         Err(err) => return Err(Box::new(err.problem())),
     };
-    // Nothing where the stack does not torrent: a forwarded port buys it nothing,
-    // so the sentence would be about a problem this operator cannot have.
-    let consequence = before
-        .and_then(|before| super::seeding::on_change(&before, &port_forward_from_env(&file)))
-        .filter(|_| ctx.settings.protocols.torrent)
-        .map(str::to_owned);
+    let consequence = stated(ctx, key, written, before.as_ref(), &file);
     let settings = store::shown(&file)
         .into_iter()
         .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
@@ -72,11 +71,44 @@ pub(super) fn configuration(
     }))
 }
 
+/// What the change just made costs, where it costs anything.
+///
+/// One sentence rather than a list, because one call writes one setting: the change
+/// either has a cost worth stating or it has none.
+///
+/// Naming a front door is the one change whose consequence does not depend on what
+/// the setting was before. Every other answer this product gives about the door is
+/// worked out afresh, so a stack that changes is answered about as it is; a named
+/// one is answered about as it was decided, and saying so belongs at the moment it
+/// is decided.
+///
+/// The forwarded port is nothing where the stack does not torrent: a forwarded port
+/// buys it nothing, so the sentence would be about a problem this operator cannot
+/// have.
+fn stated(
+    ctx: &Ctx,
+    key: Option<&str>,
+    written: bool,
+    before: Option<&crate::config::PortForward>,
+    file: &crate::config::env::EnvFile,
+) -> Option<String> {
+    if !written {
+        return None;
+    }
+    if key == Some(crate::config::FRONT_DOOR_KEY) {
+        return Some(crate::door::KEPT.to_owned());
+    }
+    before
+        .and_then(|before| super::seeding::on_change(before, &port_forward_from_env(file)))
+        .filter(|_| ctx.settings.protocols.torrent)
+        .map(str::to_owned)
+}
+
 #[cfg(test)]
 mod tests {
     use super::configuration;
     use crate::app::Outcome;
-    use crate::config::VPN_PORT_FORWARDING_KEY;
+    use crate::config::{FRONT_DOOR_KEY, VPN_PORT_FORWARDING_KEY};
     use crate::test_support::a_context;
 
     /// A scratch environment file holding the given settings.
@@ -134,6 +166,36 @@ mod tests {
         let ctx = ctx(env_at("unrelated", "VPN_PORT_FORWARDING=off\n"));
         let said = consequence(configuration(&ctx, Some("LEMONFIBER_USENET"), Some("on")));
         assert_eq!(said, None);
+    }
+
+    #[test]
+    fn naming_a_front_door_says_what_naming_one_costs() {
+        // The operator is choosing to stop lemonfiber keeping this answer right, and
+        // the moment they choose it is the only moment they are weighing it.
+        let ctx = ctx(env_at("door", ""));
+        let said = consequence(configuration(&ctx, Some(FRONT_DOOR_KEY), Some("jellyfin")));
+        assert_eq!(said.as_deref(), Some(crate::door::KEPT));
+    }
+
+    #[test]
+    fn reading_the_named_front_door_back_costs_nothing_to_say() {
+        // Reading is not deciding, and a rehearsal has decided nothing either.
+        let ctx = ctx(env_at("door-read", "LEMONFIBER_FRONT_DOOR=jellyfin\n"));
+        assert_eq!(
+            consequence(configuration(&ctx, Some(FRONT_DOOR_KEY), None)),
+            None
+        );
+
+        let mut rehearsing = ctx;
+        rehearsing.dry_run = true;
+        assert_eq!(
+            consequence(configuration(
+                &rehearsing,
+                Some(FRONT_DOOR_KEY),
+                Some("jellyfin")
+            )),
+            None
+        );
     }
 
     #[test]

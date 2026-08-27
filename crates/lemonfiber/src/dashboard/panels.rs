@@ -24,6 +24,7 @@
 //! tell two of them apart both survive.
 
 use crate::pane::quiet;
+use crate::render::door::standing;
 use crate::render::downloads::protocol;
 use lemonfiber_core::alert::Alert;
 use lemonfiber_core::dashboard::{
@@ -31,6 +32,7 @@ use lemonfiber_core::dashboard::{
 };
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;
+use lemonfiber_core::model::FrontDoorReport;
 use lemonfiber_core::queue::Stuck;
 use lemonfiber_core::text::{fitted, plain};
 use lemonfiber_core::walkthrough::{size, spell_out};
@@ -355,6 +357,45 @@ fn width(line: &Line<'static>) -> usize {
         .sum()
 }
 
+/// The front door: the one address to hand somebody who lives here.
+///
+/// On the screen rather than behind a question, because the operator who needs it is
+/// not the one who thought to ask — they have just been asked "what do I open?" by
+/// somebody in the next room, and a screen that already has the answer should not
+/// make them go and fetch it.
+///
+/// The address is its own line and the whole of it is shown, because an address is
+/// only worth having if it can be read out; the name and the phrase beside it share
+/// the line above, which is where the room is spent when there is not enough.
+pub(super) fn front_door(panel: &Panel<FrontDoorReport>, room: usize) -> Vec<Line<'static>> {
+    let report = match panel {
+        Panel::Ready(report) => report,
+        Panel::Unavailable { reason } => return unavailable(reason, room),
+    };
+    let phrase = standing(report.standing);
+    let mut lines = vec![match &report.service {
+        Some(service) => Line::from(vec![
+            Span::raw(shortened(
+                service,
+                room.saturating_sub(phrase.chars().count() + 2),
+            )),
+            Span::raw("  "),
+            Span::styled(phrase.to_owned(), quiet()),
+        ]),
+        None => Line::styled(phrase.to_owned(), quiet()),
+    }];
+    if let Some(address) = &report.address {
+        lines.push(Line::raw(shortened(&address.url, room)));
+    }
+    // What the operator's own file did to this answer, where it did anything. A
+    // refused setting that only appeared in the long answer would be one an operator
+    // watching this screen never learned about.
+    if let Some(said) = report.chosen.said() {
+        lines.push(Line::styled(shortened(&said, room), quiet()));
+    }
+    lines
+}
+
 /// Whether any panel in this snapshot could not be filled.
 ///
 /// What the header reads to say the screen is degraded rather than live — and it
@@ -364,19 +405,23 @@ pub(super) fn any_panel_down(snapshot: &Snapshot) -> bool {
         || !snapshot.queue.is_available()
         || !snapshot.storage.is_available()
         || !snapshot.services.is_available()
+        || !snapshot.door.is_available()
         || snapshot.vpn.as_ref().is_some_and(|vpn| !vpn.is_available())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        alerts, any_panel_down, header, queues, services, storage, stuck, transfers, vpn, SHOWN,
+        alerts, any_panel_down, front_door, header, queues, services, storage, stuck, transfers,
+        vpn, SHOWN,
     };
     use lemonfiber_core::alert::Alert;
     use lemonfiber_core::dashboard::{
         Hardlink, Panel, Protocol, Queue, Reading, Storage, Telemetry, Transfer, Vpn,
     };
+    use lemonfiber_core::door::{Address, Chosen, Facing, Refusal};
     use lemonfiber_core::health::{Reach, Summary};
+    use lemonfiber_core::model::{FrontDoorReport, Standing};
     use lemonfiber_core::queue::Stuck;
 
     /// A panel with more room than anything here is testing the edge of.
@@ -664,6 +709,121 @@ mod tests {
         assert!(!any_panel_down(&snapshot));
         snapshot.storage = Panel::unavailable("no data location is configured");
         assert!(any_panel_down(&snapshot));
+    }
+
+    /// The answer a stack with a working door gives.
+    fn door(chosen: Chosen, address: Option<Address>) -> FrontDoorReport {
+        FrontDoorReport {
+            standing: Standing::Established,
+            chosen,
+            service: Some("Seerr".to_owned()),
+            address,
+            facing: Some(Facing::Asking),
+            meaning: "a sentence far too long for a panel".to_owned(),
+            beside: Vec::new(),
+        }
+    }
+
+    /// The address a machine that says what it is called is reached at.
+    fn reachable() -> Address {
+        Address {
+            url: "http://kitchen-nas.local:5055".to_owned(),
+            caution: None,
+        }
+    }
+
+    #[test]
+    fn the_screen_carries_the_address_to_hand_the_household() {
+        // The whole point of the panel: the operator asked "what do I open?" by
+        // somebody in the next room reads it off the screen they already have open.
+        let lines = said(&front_door(
+            &Panel::Ready(door(Chosen::Derived, Some(reachable()))),
+            WIDE,
+        ));
+        assert_eq!(
+            lines,
+            vec![
+                "Seerr  the front door".to_owned(),
+                "http://kitchen-nas.local:5055".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_door_with_no_address_shows_the_standing_and_no_line_to_read_out() {
+        let lines = said(&front_door(
+            &Panel::Ready(FrontDoorReport {
+                standing: Standing::Stranded,
+                address: None,
+                ..door(Chosen::Derived, None)
+            }),
+            WIDE,
+        ));
+        assert_eq!(
+            lines,
+            vec!["Seerr  the front door, and there is no address to arrive at".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_stack_with_no_door_says_so_rather_than_showing_an_empty_panel() {
+        let lines = said(&front_door(
+            &Panel::Ready(FrontDoorReport {
+                standing: Standing::Absent,
+                service: None,
+                facing: None,
+                ..door(Chosen::Derived, None)
+            }),
+            WIDE,
+        ));
+        assert_eq!(lines, vec!["There is no front door.".to_owned()]);
+    }
+
+    #[test]
+    fn a_setting_that_was_refused_is_on_the_screen_rather_than_only_in_the_answer() {
+        // An operator watching this screen never asks the long question, so a
+        // refusal that only appeared there is one they would never learn about.
+        let lines = said(&front_door(
+            &Panel::Ready(door(
+                Chosen::Refused(Refusal {
+                    named: "sonarr".to_owned(),
+                    because: "it answers this machine alone".to_owned(),
+                }),
+                Some(reachable()),
+            )),
+            WIDE,
+        ));
+        assert_eq!(
+            lines.last().map(String::as_str),
+            Some("`sonarr` was named as the front door and cannot be one")
+        );
+    }
+
+    #[test]
+    fn a_door_the_operator_named_says_that_it_was_named() {
+        let lines = said(&front_door(
+            &Panel::Ready(door(
+                Chosen::Named("jellyfin".to_owned()),
+                Some(reachable()),
+            )),
+            WIDE,
+        ));
+        assert_eq!(
+            lines.last().map(String::as_str),
+            Some("named rather than worked out")
+        );
+    }
+
+    #[test]
+    fn a_door_panel_that_could_not_be_filled_says_why_and_marks_the_screen() {
+        let mut snapshot = crate::dashboard::tests::a_snapshot();
+        snapshot.door = Panel::unavailable("the stack could not be read");
+        assert!(any_panel_down(&snapshot));
+        let lines = said(&front_door(&snapshot.door, WIDE));
+        assert_eq!(
+            lines,
+            vec!["unavailable — the stack could not be read".to_owned()]
+        );
     }
 
     #[test]

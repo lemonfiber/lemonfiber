@@ -23,6 +23,7 @@ use crate::docker::{survey, Service};
 use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
 use crate::health::{observed, Egress, Reach, Summary};
+use crate::model::FrontDoorReport;
 
 use super::queue::Answered;
 use super::screen::Screen;
@@ -87,6 +88,7 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
         Ok(services) => Panel::Ready(services),
         Err(reason) => Panel::unavailable(reason),
     };
+    let door = front_door(ctx, manifest.as_ref(), &services).await;
 
     // Storage's exhaustion projection needs the rate downloads are landing on the
     // disk at, so the transfers are gathered first and their speeds carried into it.
@@ -133,7 +135,42 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
         alerts,
         storage,
         services,
+        door,
     }
+}
+
+/// The one address to hand somebody who lives here, from the reading the panels
+/// beside it are built from.
+///
+/// Assembled here rather than left to whichever surface draws it, so the screen and
+/// `lemonfiber front-door` cannot come to name different doors — and asked afresh on
+/// every gather, because a machine renamed since the last one answers as it is now
+/// and there is nothing remembered to go stale.
+///
+/// A panel rather than a value, because it has the same two sources every other
+/// panel has: a stack that will not read and an engine that will not answer both
+/// leave it unfillable, and each says which in its own words.
+async fn front_door(
+    ctx: &Ctx,
+    manifest: Result<&Manifest, &String>,
+    services: &Panel<Vec<Service>>,
+) -> Panel<FrontDoorReport> {
+    let manifest = match manifest {
+        Ok(manifest) => manifest,
+        Err(reason) => return Panel::unavailable(reason.clone()),
+    };
+    let running = match services {
+        Panel::Ready(running) => running,
+        Panel::Unavailable { reason } => return Panel::unavailable(reason.clone()),
+    };
+    Panel::Ready(super::door::assembled(
+        &manifest.services,
+        running,
+        ctx.site.name().await.as_deref(),
+        ctx.settings.household_host.as_deref(),
+        ctx.settings.front_door.as_deref(),
+        ctx.environment,
+    ))
 }
 
 /// How many alerts the screen carries. Enough to see what happened, few enough
@@ -471,6 +508,7 @@ mod tests {
         downloads, QBIT_TORRENTS, SAB_KEY_INI, SAB_NO_KEY_INI, SAB_QUEUE,
     };
     use lemonfiber_fixtures::http::{Answer, Fake};
+    use lemonfiber_fixtures::ports::Renamed;
 
     /// A transport answering every request with this body at 200 — the queue as JSON for
     /// the happy path, or something unreadable to stand in for a service that will not
@@ -599,6 +637,75 @@ mod tests {
             !snapshot.transfers.is_available(),
             "nor any download client to ask for its transfers"
         );
+    }
+
+    /// The door a gather filled, or nothing where its panel could not be filled.
+    const fn filled(door: &Panel<super::FrontDoorReport>) -> Option<&super::FrontDoorReport> {
+        match door {
+            Panel::Ready(door) => Some(door),
+            Panel::Unavailable { .. } => None,
+        }
+    }
+
+    /// The address a gathered door came out with, at whichever step it is missing.
+    fn addressed(door: &Panel<super::FrontDoorReport>) -> Option<String> {
+        filled(door)
+            .and_then(|door| door.address.as_ref())
+            .map(|address| address.url.clone())
+    }
+
+    #[tokio::test]
+    async fn the_screen_gathers_the_address_to_hand_the_household() {
+        // On the screen without being asked, because the operator who needs it has
+        // just been asked what to open by somebody in the next room. Built from the
+        // same reading the panels beside it are, so the screen and the question
+        // cannot name different doors.
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let watching = ctx(engine).with_site(Renamed::called(Some("kitchen-nas")));
+        let door = gather(&watching, None).await.door;
+
+        assert_eq!(
+            filled(&door).and_then(|door| door.service.clone()),
+            Some("Seerr".to_owned())
+        );
+        assert_eq!(
+            addressed(&door),
+            Some("http://kitchen-nas.local:5055".to_owned())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_machine_renamed_between_refreshes_is_addressed_as_it_is_now() {
+        // Nothing is remembered, so the second gather is the second answer rather
+        // than the first — which is the whole of how a changed address is noticed on
+        // a screen that is open all day.
+        let renamed = Renamed::called(Some("kitchen-nas")).then(Some("cupboard-nas"));
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let watching = ctx(engine).with_site(Arc::clone(&renamed) as Arc<dyn crate::ports::Site>);
+
+        let first = addressed(&gather(&watching, None).await.door);
+        let again = addressed(&gather(&watching, None).await.door);
+
+        assert_eq!(first, Some("http://kitchen-nas.local:5055".to_owned()));
+        assert_eq!(again, Some("http://cupboard-nas.local:5055".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_leaves_the_door_panel_saying_why() {
+        let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+        let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+        let unreadable = a_context().engine(Arc::new(engine)).over(nowhere).build();
+        let door = gather(&unreadable, None).await.door;
+        assert_eq!(filled(&door), None, "{door:?}");
+    }
+
+    #[tokio::test]
+    async fn an_engine_that_will_not_answer_leaves_the_door_panel_saying_why() {
+        // The other source a door panel has, and it is the services panel's own
+        // reason rather than a second account of the same silence.
+        let snapshot = gather(&ctx(Reporting::absent()), None).await;
+        assert_eq!(addressed(&snapshot.door), None, "{:?}", snapshot.door);
+        assert!(!snapshot.services.is_available());
     }
 
     /// A context configured with a fake filesystem and transport, over the stack
@@ -1304,6 +1411,7 @@ mod tests {
             alerts: Vec::new(),
             storage: Panel::unavailable("not read here"),
             services: Panel::Ready(Vec::new()),
+            door: Panel::unavailable("not read here"),
         };
         assert_eq!(
             super::last_speed(Some(&before), "download"),

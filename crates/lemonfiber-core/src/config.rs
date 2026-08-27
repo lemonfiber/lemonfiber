@@ -115,6 +115,15 @@ pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 /// the wrong address to hand anybody.
 pub const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
 
+/// The service the operator chose to send the household to, by the id the stack
+/// declares it under.
+///
+/// lemonfiber's own answer rather than the stack's, so it carries lemonfiber's
+/// prefix. What a name here may be is [`crate::door`]'s to decide and not this
+/// module's: the question is which tier a service is published on, and the answer
+/// belongs where the rest of that reasoning already lives.
+pub const FRONT_DOOR_KEY: &str = "LEMONFIBER_FRONT_DOOR";
+
 /// The base URL of the indexer the operator gave at setup.
 pub const INDEXER_URL_KEY: &str = "INDEXER_URL";
 
@@ -204,6 +213,7 @@ pub const SETTINGS: &[&str] = &[
     PROVIDER_VALIDATED_KEY,
     QBITTORRENT_PASSWORD_KEY,
     JELLYFIN_ADMIN_PASSWORD_KEY,
+    FRONT_DOOR_KEY,
 ];
 
 /// A recorded value with the whitespace and surrounding quotes a person might
@@ -290,6 +300,21 @@ pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
 #[must_use]
 pub fn household_host_from_env(file: &env::EnvFile) -> Option<String> {
     file.get(HOUSEHOLD_HOST_KEY)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+}
+
+/// The service the operator named as the front door, if they have named one.
+///
+/// An empty value is read as absent rather than as a service named nothing, the
+/// same reading the household address gets and for the same reason: a blank is a
+/// mistake, never an intent. Whether the name is one this stack may send a
+/// household to is decided where the door is, not here — a setting that vetted
+/// itself would be a second opinion about the household tier.
+#[must_use]
+pub fn front_door_from_env(file: &env::EnvFile) -> Option<String> {
+    file.get(FRONT_DOOR_KEY)
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_owned)
@@ -468,6 +493,13 @@ pub struct Settings {
     /// machine whose own name is not published on the network. Absent until they
     /// record one, which is the state a fresh install is in.
     pub household_host: Option<String>,
+    /// The service the operator named as the front door, where they named one.
+    ///
+    /// Absent until they do, which is the state a fresh install is in and the one
+    /// where the door is worked out from what the stack declares. A name here is
+    /// what they asked for rather than what they get: one this stack does not
+    /// publish to the household is refused and said, not obeyed.
+    pub front_door: Option<String>,
     /// Whether this product explains the words it uses.
     ///
     /// On unless switched off. The words are a wall to somebody meeting them, and
@@ -500,6 +532,7 @@ impl Default for Settings {
             indexer: None,
             admission: None,
             household_host: None,
+            front_door: None,
             explanations: true,
         }
     }
@@ -508,8 +541,8 @@ impl Default for Settings {
 #[cfg(test)]
 mod tests {
     use super::{
-        env, household_host_from_env, indexer_from_env, ip_echo_from_env, Indexer, Protocol,
-        Protocols, Settings, DEFAULT_IP_ECHO, SECOND_IP_ECHO,
+        env, front_door_from_env, household_host_from_env, indexer_from_env, ip_echo_from_env,
+        Indexer, Protocol, Protocols, Settings, DEFAULT_IP_ECHO, SECOND_IP_ECHO,
     };
 
     #[test]
@@ -558,6 +591,18 @@ mod tests {
         let blank = env::EnvFile::parse("HOMEPAGE_VAR_LAN_HOST=\n");
         assert_eq!(household_host_from_env(&blank), None);
         assert_eq!(household_host_from_env(&env::EnvFile::parse("")), None);
+    }
+
+    #[test]
+    fn the_named_front_door_is_read_and_a_blank_one_is_absent() {
+        // The same reading and the same reason: a blank is a mistake, never an
+        // intent, and a door named nothing would refuse on every run.
+        let written = env::EnvFile::parse("LEMONFIBER_FRONT_DOOR= jellyfin \n");
+        assert_eq!(front_door_from_env(&written), Some("jellyfin".to_owned()));
+        let blank = env::EnvFile::parse("LEMONFIBER_FRONT_DOOR=\n");
+        assert_eq!(front_door_from_env(&blank), None);
+        assert_eq!(front_door_from_env(&env::EnvFile::parse("")), None);
+        assert_eq!(Settings::default().front_door, None);
     }
 
     #[test]
