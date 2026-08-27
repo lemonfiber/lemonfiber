@@ -10,6 +10,7 @@
 //! must carry to be answered is stated here rather than assumed.
 
 pub mod actions;
+pub mod admission;
 pub mod events;
 mod following;
 pub mod frontend;

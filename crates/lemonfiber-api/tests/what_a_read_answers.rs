@@ -4,7 +4,6 @@
 //! what a caller can reach is the thing worth holding still — and because the
 //! guard every endpoint sits behind is part of what an endpoint answers.
 
-use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -12,7 +11,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
-use lemonfiber_api::guard::{Token, TOKEN_HEADER};
+use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::read::enveloped;
 use lemonfiber_api::reads;
@@ -42,9 +41,9 @@ fn written() -> Option<String> {
     Token::mint(&given()).map(|token| token.as_str().to_owned())
 }
 
-/// Built rather than parsed: an address made of numbers cannot fail to be one.
-fn bound() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], 8471))
+/// Serving this machine and nowhere else, at the port these tests name.
+fn bound() -> Binding {
+    Binding::here(8471)
 }
 
 /// The stack this repository carries, read from disk.
@@ -133,10 +132,12 @@ async fn answered(ctx: Ctx, path: &str, said: &[(&str, &str)]) -> Option<(Status
             ctx: Arc::new(ctx),
             token: Arc::clone(&token),
             bound: bound(),
+            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             jobs: Jobs::default(),
             live: Arc::clone(&live),
         },
         Arc::new(Streaming {
+            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             token,
             bound: bound(),
             live,
@@ -855,7 +856,7 @@ async fn a_request_carrying_no_token_never_reaches_a_read() {
         .await,
         Some((
             StatusCode::FORBIDDEN,
-            "This request carried no token, or not this run's.".to_owned()
+            "This request carried no token or session this run admits.".to_owned()
         ))
     );
 }

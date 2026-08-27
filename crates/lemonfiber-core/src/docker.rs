@@ -311,6 +311,7 @@ mod tests {
             service: service.to_owned(),
             lifecycle,
             health,
+            published: Vec::new(),
             exit: None,
         }
     }

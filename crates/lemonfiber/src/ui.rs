@@ -14,36 +14,42 @@
 //! The words are here and the printing is at the edge, so what an operator is
 //! told is proven rather than demonstrated.
 
+#[cfg(test)]
+pub(crate) mod fixtures;
+pub(crate) mod password;
+pub(crate) mod reach;
+pub(crate) mod said;
+
 use std::future::Future;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Router;
 use lemonfiber::cli::RawUi;
+use lemonfiber_api::admission::Admitting;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::frontend as serving;
-use lemonfiber_api::guard::Token;
+use lemonfiber_api::guard::{Binding, Token};
 use lemonfiber_api::jobs::{Jobs, LEASE};
 use lemonfiber_api::router::{self, Serving};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity, State as Standing};
 use lemonfiber_core::frontend::Source;
-use lemonfiber_core::platform::{HostOs, HOST_OS};
-use lemonfiber_core::ports::process::Runner;
+use lemonfiber_core::platform::HOST_OS;
 use lemonfiber_core::PRODUCT;
 use tokio::net::TcpListener;
 
 use crate::exit::complain;
 use crate::say::say;
-
-/// Raised when the address the surface was asked to serve on cannot be taken.
-const ADDRESS_TAKEN: Code = Code::new("SERVE-1");
+use crate::ui::reach::{address, held, permitted, unauthenticated, Offered, Reach};
+use crate::ui::said::{announcement, opening, reverted, Browser};
 
 /// Raised when this machine will not supply the randomness a token is made of.
 const NO_TOKEN: Code = Code::new("SERVE-2");
@@ -57,6 +63,10 @@ pub(crate) struct Asked {
     pub browser: bool,
     /// A directory holding a built app, for a build that carries none.
     pub assets: Option<PathBuf>,
+    /// Whether to ask for a password for this surface before starting it.
+    pub password: bool,
+    /// How far this surface was asked to be reachable.
+    pub reach: Reach,
 }
 
 /// What is said to a request whose port is not a number a machine could listen on.
@@ -80,6 +90,8 @@ impl Asked {
             port: None,
             browser: true,
             assets: None,
+            password: false,
+            reach: Reach::Machine,
         }
     }
 
@@ -125,6 +137,25 @@ impl Asked {
             ..self.clone()
         }
     }
+
+    /// The same, with the question about a password turned over.
+    pub(crate) fn asking(&self) -> Self {
+        Self {
+            password: !self.password,
+            ..self.clone()
+        }
+    }
+
+    /// The same, with how far it may be reached turned over.
+    pub(crate) fn reaching(&self) -> Self {
+        Self {
+            reach: match self.reach {
+                Reach::Machine => Reach::Network,
+                Reach::Network => Reach::Machine,
+            },
+            ..self.clone()
+        }
+    }
 }
 
 impl From<RawUi> for Asked {
@@ -138,135 +169,14 @@ impl From<RawUi> for Asked {
             port: raw.port,
             browser: !raw.no_browser,
             assets: raw.assets,
+            password: raw.set_password,
+            reach: if raw.lan {
+                Reach::Network
+            } else {
+                Reach::Machine
+            },
         }
     }
-}
-
-/// The address to ask the operating system for.
-///
-/// Loopback, and only loopback. This surface can start, stop and reconfigure the
-/// whole stack and reaches every credential the system holds, so it is the one
-/// thing in the product that is never offered to the network by default.
-///
-/// There is no default port. A port this product chose would be the same port on
-/// every machine running it, and a port nobody chose is one something else may
-/// already hold — so zero is asked for, which means any free one, and whatever
-/// was given is printed in full.
-pub(crate) const fn wanted(port: Option<u16>) -> SocketAddr {
-    SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::LOCALHOST),
-        match port {
-            Some(port) => port,
-            None => 0,
-        },
-    )
-}
-
-/// Take the socket, and say which one was given.
-///
-/// The address comes back from the socket rather than from what was asked for,
-/// because asking for any free port means not knowing which until it is held.
-///
-/// # Errors
-///
-/// Returns the [`Problem`] to report when the address cannot be taken. Boxed
-/// because a problem carries what happened, what it means and what to do about
-/// it, and a result that carries all of that inline on the way that succeeds is
-/// paying for the failure on every call.
-pub(crate) async fn taken(wanted: SocketAddr) -> Result<(TcpListener, SocketAddr), Box<Problem>> {
-    // Bound and named in one step, so there is one way for this to fail rather
-    // than two, only one of which anything could provoke — and so the way it
-    // cannot fail leaves behind no arm a test would have to reach.
-    let bound = TcpListener::bind(wanted).await;
-    let held = bound.and_then(|listener| listener.local_addr().map(|bound| (listener, bound)));
-    match held {
-        Ok(held) => Ok(held),
-        Err(err) => Err(Box::new(unavailable(wanted, &err.to_string()))),
-    }
-}
-
-/// The address as it is printed, and as it is typed into a browser.
-pub(crate) fn address(bound: SocketAddr) -> String {
-    format!("http://{bound}")
-}
-
-/// What asking this desktop to open a browser came to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Browser {
-    /// One opened.
-    Opened,
-    /// None opened, which is not this command's failure.
-    Unopened,
-    /// None was asked for.
-    Unasked,
-}
-
-/// The program this desktop opens an address with.
-///
-/// Which of the three it is comes from the one module allowed to know what this
-/// machine is, rather than being asked here.
-pub(crate) fn opener(host: HostOs, url: &str) -> Vec<String> {
-    let argv: &[&str] = match host {
-        HostOs::MacOs => &["open"],
-        // An empty first argument, which `start` reads as the window title it is
-        // not being given. Without it the address becomes the title and nothing
-        // opens.
-        HostOs::Windows => &["cmd", "/c", "start", ""],
-        HostOs::Linux | HostOs::Other => &["xdg-open"],
-    };
-    argv.iter()
-        .map(|word| (*word).to_owned())
-        .chain(std::iter::once(url.to_owned()))
-        .collect()
-}
-
-/// Ask this desktop to open the address, and say what came of it.
-///
-/// Every way of not opening one is the same answer. A desktop with no browser, a
-/// machine with no desktop and a program that exited badly all leave the operator
-/// with an address to open themselves, and none of them is a reason for the
-/// command to have failed.
-pub(crate) async fn opening(runner: &dyn Runner, host: HostOs, url: &str) -> Browser {
-    let ran = runner.run(&opener(host, url)).await;
-    if ran.is_ok_and(|output| output.succeeded()) {
-        Browser::Opened
-    } else {
-        Browser::Unopened
-    }
-}
-
-/// What starting the surface says, in order.
-///
-/// The transport is stated as a sentence rather than left to the scheme in the
-/// address. `http` in front of a name is a fact an operator has no reason to be
-/// able to read, and what it costs them is the thing worth saying out loud.
-pub(crate) fn announcement(bound: SocketAddr, token: &str, browser: Browser) -> Vec<String> {
-    let mut lines = vec![
-        format!("{PRODUCT} is serving at {}", address(bound)),
-        String::new(),
-        "This connection is not encrypted. Anything else running on this machine can read \
-         what passes over it."
-            .to_owned(),
-        "Nothing on your network can reach it — it listens on this machine and nowhere else."
-            .to_owned(),
-        String::new(),
-        "The token for this run, which the page will ask you for:".to_owned(),
-        format!("  {token}"),
-        "It is kept in memory, written down nowhere, and gone when this stops.".to_owned(),
-        String::new(),
-    ];
-    lines.push(
-        match browser {
-            Browser::Opened => "A browser has been opened at that address.",
-            Browser::Unopened => {
-                "A browser could not be opened here. Open the address above yourself."
-            }
-            Browser::Unasked => "Open the address above in a browser.",
-        }
-        .to_owned(),
-    );
-    lines.push(format!("Stop {PRODUCT} with Ctrl-C when you are finished."));
-    lines
 }
 
 /// Where the app being served comes from, or nothing where there is none.
@@ -313,25 +223,83 @@ pub(crate) type Until = Pin<Box<dyn Future<Output = ()> + Send>>;
 pub(crate) async fn run(
     ctx: Ctx,
     asked: Asked,
+    answers: &dyn crate::prompt::Answers,
     embedded: Option<Source>,
     until: Until,
 ) -> ExitCode {
-    let (listener, bound) = match taken(wanted(asked.port)).await {
-        Ok(held) => held,
-        Err(problem) => return complain(&problem),
-    };
+    // Before the socket rather than after it. A run asked for a password and given
+    // one it could not keep has not been given what it asked for, and serving anyway
+    // would put the surface up under the arrangement the operator was trying to
+    // change.
+    //
+    // Kept out of the serving loop rather than folded into it, because a person at a
+    // keyboard is not something a task sent to another thread may hold — and the
+    // loop below is spawned. So the asking finishes before the loop begins, which is
+    // also the order an operator reads it in.
+    match asked.password.then(|| asking(&ctx, answers)).flatten() {
+        Some(code) => code,
+        None => serving(ctx, asked, embedded, until, LOOK).await,
+    }
+}
+
+/// Set the password, and say what to exit with where it could not be set.
+///
+/// Nothing where it was set, because there is nothing to exit with yet: the surface
+/// still has to be served, and the words said here are the ones an operator reads
+/// above the announcement.
+fn asking(ctx: &Ctx, answers: &dyn crate::prompt::Answers) -> Option<ExitCode> {
+    match password::set(
+        answers,
+        ctx.random.as_ref(),
+        ctx.settings.admission.as_deref(),
+    ) {
+        Ok(lines) => {
+            for line in lines {
+                say!("{line}");
+            }
+            say!("");
+            None
+        }
+        Err(problem) => Some(complain(&problem)),
+    }
+}
+
+/// How often a surface offered to a network looks again at whether it may still be.
+///
+/// Five seconds. What it costs is a look at one small file; what it buys is that a
+/// password removed while this is running is a socket given up in the time it takes
+/// to notice, rather than at the next restart. It is not what makes the removal
+/// immediate — nothing on the network is admitted from the moment the password goes,
+/// because every session was opened against it — it is what makes the *binding*
+/// follow the authority rather than outliving it.
+const LOOK: Duration = Duration::from_secs(5);
+
+/// What ended a run of the serving loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ending {
+    /// The signal the operator sends.
+    Stopped,
+    /// The password this binding rested on went away.
+    Revoked,
+}
+
+/// Serve, and go on serving until the operator stops it or the policy turns.
+///
+/// The policy is read once before a socket exists and again while one is held, and it
+/// is the same reading both times. What differs is what a `no` means: before, there is
+/// nothing to fall back to, so the request is refused; after, refusing outright would
+/// take the surface away from the operator too, so it falls back to the address it
+/// would have been given and says why.
+async fn serving(
+    ctx: Ctx,
+    asked: Asked,
+    embedded: Option<Source>,
+    mut until: Until,
+    look: Duration,
+) -> ExitCode {
     let Some(token) = Token::mint(ctx.random.as_ref()) else {
         return complain(&tokenless());
     };
-    let browser = if asked.browser {
-        opening(ctx.runner.as_ref(), HOST_OS, &address(bound)).await
-    } else {
-        Browser::Unasked
-    };
-    for line in announcement(bound, token.as_str(), browser) {
-        say!("{line}");
-    }
-
     // The one gather every listener hears, made before the context so that the
     // waits a command runs into have somewhere to say what they are waiting for:
     // a browser is told the name of the work and nothing else, and everything it
@@ -356,46 +324,122 @@ pub(crate) async fn run(
     // about it, so a guard whose browser went away is let go rather than left
     // polling a drive until this process stops.
     tokio::spawn(jobs.clone().sweeping(LEASE));
-    let serving = Serving {
-        ctx: Arc::clone(&ctx),
-        token: Arc::clone(&token),
-        bound,
-        jobs,
-        live: Arc::clone(&live),
-    };
-    let streaming = Arc::new(Streaming { token, bound, live });
-    let surface = surface(serving, streaming, app(embedded, asked.assets));
-    // Whatever ends the loop, the surface has stopped, and that is the whole of
-    // what there is to report. A fault from accepting on a socket this process
-    // already holds means the process is going down around it, and a second
-    // message about one event helps nobody.
-    let _ = axum::serve(listener, surface)
-        .with_graceful_shutdown(until)
-        .await;
-    ExitCode::SUCCESS
+    // One register, shared by the door, the guard over everything else and the
+    // stream: two would be a run somebody could be admitted to half of. It reads the
+    // password afresh every time it is asked, which is what lets the loop below ask
+    // again without anything having to tell it.
+    let admitting = Arc::new(Admitting {
+        kept: ctx.settings.admission.clone(),
+        ..Admitting::default()
+    });
+    let app = app(embedded, asked.assets.clone());
+
+    let mut reach = asked.reach;
+    let mut browsing = asked.browser;
+    loop {
+        let offered = permitted(reach, admitting.credential().is_some());
+        if offered == Offered::Refused {
+            return complain(&Box::new(unauthenticated()));
+        }
+        let sockets = match held(offered, asked.port).await {
+            Ok(sockets) => sockets,
+            Err(problem) => return complain(&problem),
+        };
+        let at: Vec<SocketAddr> = sockets.iter().map(|(_, bound)| *bound).collect();
+        let bound = Binding {
+            port: at.first().map_or(0, SocketAddr::port),
+            beyond: offered == Offered::Network,
+        };
+        let browser = match (browsing, at.first()) {
+            (true, Some(first)) => opening(ctx.runner.as_ref(), HOST_OS, &address(*first)).await,
+            _ => Browser::Unasked,
+        };
+        // Only ever the first time round: an operator whose binding reverted is
+        // already looking at the terminal that said so, and a second window is not
+        // what they asked for.
+        browsing = false;
+        for line in announcement(&at, offered, token.as_str(), browser) {
+            say!("{line}");
+        }
+        let serving = Serving {
+            ctx: Arc::clone(&ctx),
+            token: Arc::clone(&token),
+            bound,
+            jobs: jobs.clone(),
+            admitting: Arc::clone(&admitting),
+            live: Arc::clone(&live),
+        };
+        let streaming = Arc::new(Streaming {
+            token: Arc::clone(&token),
+            bound,
+            admitting: Arc::clone(&admitting),
+            live: Arc::clone(&live),
+        });
+        let surface = surface(serving, streaming, app);
+        match holding(sockets, surface, &admitting, offered, &mut until, look).await {
+            Ending::Stopped => return ExitCode::SUCCESS,
+            Ending::Revoked => {
+                for line in reverted() {
+                    say!("{line}");
+                }
+                reach = Reach::Machine;
+            }
+        }
+    }
 }
 
-/// The address could not be taken.
-fn unavailable(wanted: SocketAddr, reason: &str) -> Problem {
-    let asked = if wanted.port() == 0 {
-        "no free port could be taken on this machine".to_owned()
-    } else {
-        format!("{wanted} could not be taken")
+/// Hold every socket that was taken until one of the two endings arrives.
+///
+/// Whatever ends it, the sockets are given up before this returns, so the next time
+/// round the loop is not asking for a port this run is still holding. A fault from
+/// accepting on a socket this process already holds means the process is going down
+/// around it, and a second message about one event helps nobody.
+async fn holding(
+    sockets: Vec<(TcpListener, SocketAddr)>,
+    surface: Router,
+    admitting: &Arc<Admitting>,
+    offered: Offered,
+    until: &mut Until,
+    look: Duration,
+) -> Ending {
+    let (stopping, stopped) = tokio::sync::watch::channel(false);
+    let mut running = Vec::new();
+    for (listener, _) in sockets {
+        let mut leaving = stopped.clone();
+        let held = surface.clone();
+        running.push(tokio::spawn(async move {
+            let _ = axum::serve(listener, held)
+                .with_graceful_shutdown(async move {
+                    let _ = leaving.changed().await;
+                })
+                .await;
+        }));
+    }
+    let ending = tokio::select! {
+        () = &mut *until => Ending::Stopped,
+        () = revoked(Arc::clone(admitting), offered, look) => Ending::Revoked,
     };
-    Problem::new(
-        ADDRESS_TAKEN,
-        Severity::Error,
-        format!("{PRODUCT} could not start serving: {asked}"),
-        "Usually something else on this machine is already listening there. Whatever the \
-         reason, there is nowhere for a browser to connect, and the words below are the \
-         operating system's own.",
-        Remedy::new("Ask for a different port").with_detail(format!("{PRODUCT} ui --port 7171")),
-    )
-    .or_try(Remedy::new(
-        "Or name no port and be given whichever one is free",
-    ))
-    .in_state(Standing::Guided)
-    .with_detail(reason.to_owned())
+    let _ = stopping.send(true);
+    for server in running {
+        let _ = server.await;
+    }
+    ending
+}
+
+/// Wait until the password this binding rests on is gone.
+///
+/// Never, where it rests on none: a surface answering this machine alone is offered
+/// to nobody a password would have kept out, so there is nothing for its going to
+/// take away.
+async fn revoked(admitting: Arc<Admitting>, offered: Offered, look: Duration) {
+    match offered {
+        Offered::Machine | Offered::Refused => std::future::pending().await,
+        Offered::Network => {
+            while admitting.credential().is_some() {
+                tokio::time::sleep(look).await;
+            }
+        }
+    }
 }
 
 /// The token could not be minted.
@@ -416,351 +460,38 @@ fn tokenless() -> Problem {
 
 #[cfg(test)]
 mod tests {
-    use std::net::SocketAddr;
     use std::process::ExitCode;
     use std::sync::Arc;
+    use std::time::Duration;
 
-    use async_trait::async_trait;
     use axum::body::Body;
     use axum::extract::Request;
     use axum::http::{HeaderValue, StatusCode};
     use axum::Router;
+    use lemonfiber_api::admission::Admitting;
     use lemonfiber_api::events::live::Live;
     use lemonfiber_api::events::Streaming;
+    use lemonfiber_api::guard::Binding;
     use lemonfiber_api::guard::Token;
     use lemonfiber_api::jobs::Jobs;
     use lemonfiber_api::router::Serving;
     use lemonfiber_core::app::Ctx;
     use lemonfiber_core::config::Settings;
     use lemonfiber_core::platform::{Environment, HostOs};
-    use lemonfiber_core::ports::process::{Failure, Output, Runner};
+    use lemonfiber_core::ports::process::Runner;
     use lemonfiber_fixtures::ports::{Chance, Idle};
 
-    use super::{
-        address, announcement, app, opener, opening, run, surface, taken, tokenless, unavailable,
-        wanted, Asked, Browser, NOT_A_PORT,
-    };
+    use super::fixtures::{bound, exited, missing};
+    use super::reach::{held, Offered, Reach};
+    use super::said::opening;
+    use super::LOOK;
+    use super::{address, app, run, serving, surface, tokenless, Asked, Browser, NOT_A_PORT};
     use clap::Parser as _;
+    use lemonfiber_core::admission::credential;
+    use lemonfiber_fixtures::support::a_password;
     use std::path::PathBuf;
 
-    /// A run of a program that went the way the test chose.
-    struct Ran(Result<Output, Failure>);
-
-    #[async_trait]
-    impl Runner for Ran {
-        async fn run(&self, _: &[String]) -> Result<Output, Failure> {
-            match &self.0 {
-                Ok(output) => Ok(output.clone()),
-                Err(_) => Err(Failure::NotFound {
-                    program: "xdg-open".to_owned(),
-                }),
-            }
-        }
-    }
-
-    /// A program that ran and exited with this status.
-    fn exited(status: i32) -> Ran {
-        Ran(Ok(Output {
-            status: Some(status),
-            stdout: String::new(),
-            stderr: String::new(),
-        }))
-    }
-
-    /// A program that is not installed.
-    fn missing() -> Ran {
-        Ran(Err(Failure::NotFound {
-            program: "xdg-open".to_owned(),
-        }))
-    }
-
-    /// An address of numbers, which cannot fail to be one.
-    fn bound() -> SocketAddr {
-        SocketAddr::from(([127, 0, 0, 1], 8471))
-    }
-
-    /// Everything a starting surface says, as one block of text.
-    fn said(browser: Browser) -> String {
-        announcement(bound(), "000fa5ff", browser).join("\n")
-    }
-
-    /// The word the claim about the transport turns on. A rewording that drops it
-    /// has changed the claim rather than the wording.
-    const ENCRYPTION: &str = "encrypt";
-
-    /// How a sentence says there is none of something.
-    ///
-    /// The closed set English denies with, rather than a list of ways to phrase this
-    /// particular sentence: a reword is free to say it however it likes, so long as
-    /// it still says *not*.
-    const DENIAL: &[&str] = &[
-        "not",
-        "no",
-        "none",
-        "nothing",
-        "never",
-        "without",
-        "unencrypted",
-    ];
-
-    /// What an unencrypted connection lets somebody do.
-    const READING: &[&str] = &["read", "see"];
-
-    /// Who it lets do it, which is somebody who is not the operator.
-    const SOMEBODY_ELSE: &[&str] = &["else", "other"];
-
-    /// What a starting surface says about the connection, as sentences, with the
-    /// address taken out of them.
-    ///
-    /// The address goes first because `http` in front of it is not this product
-    /// saying anything. A guard that read the scheme would pass a run that had
-    /// deleted every word about the transport and left the address to speak for
-    /// itself, which is the failure this is here for.
-    fn about_the_connection(browser: Browser) -> Vec<String> {
-        said(browser)
-            .replace(&address(bound()), " ")
-            .to_lowercase()
-            .split(['.', ';', '\n', '\u{2014}'])
-            .map(|sentence| sentence.trim().to_owned())
-            .filter(|sentence| !sentence.is_empty())
-            .collect()
-    }
-
-    /// Whether a sentence says there is none of what it is about.
-    fn denies(sentence: &str) -> bool {
-        sentence
-            .split_whitespace()
-            .map(|word| word.trim_matches(|mark: char| !mark.is_alphanumeric()))
-            .any(|word| DENIAL.contains(&word))
-    }
-
-    #[test]
-    fn naming_no_port_asks_for_whichever_one_is_free() {
-        assert_eq!(wanted(None).port(), 0);
-    }
-
-    #[test]
-    fn naming_a_port_asks_for_that_one() {
-        assert_eq!(wanted(Some(7171)).port(), 7171);
-    }
-
-    #[test]
-    fn whichever_port_it_is_the_address_is_this_machine() {
-        for port in [None, Some(7171)] {
-            assert!(wanted(port).ip().is_loopback(), "{port:?}");
-        }
-    }
-
-    #[tokio::test]
-    async fn a_free_port_is_taken_and_named_in_full() {
-        // Asserted as one value rather than through a branch on the way in: this
-        // module's tests are under the same coverage gate as the code, and an arm
-        // for a bind that never fails is a line nothing could ever run.
-        let held = taken(wanted(None)).await.ok();
-        assert_eq!(
-            held.map(|(_, bound)| (bound.ip().is_loopback(), bound.port() != 0)),
-            Some((true, true)),
-            "a free port on this machine, named in full"
-        );
-    }
-
-    #[tokio::test]
-    async fn an_address_that_cannot_be_taken_is_reported_rather_than_swapped() {
-        // Reserved for documentation and never assigned to an interface, so
-        // asking for it fails the same way on every machine.
-        let elsewhere = SocketAddr::from(([192, 0, 2, 1], 8471));
-        let refusal = taken(elsewhere).await.err().map(|problem| problem.summary);
-        assert_eq!(
-            refusal
-                .as_deref()
-                .map(|said| said.contains("could not be taken")),
-            Some(true),
-            "got: {refusal:?}"
-        );
-    }
-
-    #[test]
-    fn a_machine_with_no_free_port_at_all_says_that_instead() {
-        // The other half of the same fault: asking for any port and being given
-        // none says something different from being refused a named one.
-        let any = unavailable(wanted(None), "denied").summary;
-        let named = unavailable(wanted(Some(7171)), "denied").summary;
-        assert!(any.contains("no free port"), "{any}");
-        assert!(named.contains("127.0.0.1:7171"), "{named}");
-    }
-
-    #[test]
-    fn a_refusal_to_take_an_address_offers_both_ways_out() {
-        // Ask for another port, or stop asking for one in particular.
-        let problem = unavailable(wanted(Some(7171)), "address in use");
-        assert_eq!(problem.remedies.len(), 2);
-        assert_eq!(problem.detail.as_deref(), Some("address in use"));
-    }
-
-    #[test]
-    fn the_address_is_printed_whole() {
-        assert_eq!(address(bound()), "http://127.0.0.1:8471");
-    }
-
-    #[test]
-    fn each_desktop_is_opened_the_way_that_desktop_opens_things() {
-        assert_eq!(
-            opener(HostOs::MacOs, "http://127.0.0.1:8471"),
-            vec!["open".to_owned(), "http://127.0.0.1:8471".to_owned()]
-        );
-        assert_eq!(
-            opener(HostOs::Linux, "http://127.0.0.1:8471")
-                .first()
-                .map(String::as_str),
-            Some("xdg-open")
-        );
-        assert_eq!(
-            opener(HostOs::Other, "http://127.0.0.1:8471")
-                .first()
-                .map(String::as_str),
-            Some("xdg-open")
-        );
-        let windows = opener(HostOs::Windows, "http://127.0.0.1:8471");
-        assert_eq!(
-            windows.len(),
-            5,
-            "the title it is not being given: {windows:?}"
-        );
-        assert_eq!(
-            windows.last().map(String::as_str),
-            Some("http://127.0.0.1:8471")
-        );
-    }
-
-    #[tokio::test]
-    async fn a_browser_that_opens_is_reported_as_opened() {
-        assert_eq!(
-            opening(&exited(0), HostOs::MacOs, "http://127.0.0.1:8471").await,
-            Browser::Opened
-        );
-    }
-
-    #[test]
-    fn a_browser_that_will_not_open_leaves_the_address_to_open_by_hand() {
-        let said = said(Browser::Unopened);
-        assert!(said.contains("could not be opened"), "{said}");
-        assert!(said.contains("Open the address above yourself"), "{said}");
-        assert!(said.contains("http://127.0.0.1:8471"), "{said}");
-    }
-
-    #[tokio::test]
-    async fn whatever_the_browser_did_the_address_is_the_first_thing_said() {
-        // The outcomes come from runners rather than being named, so these are the
-        // three a run reaches: one that opened, one that would not, and one that was
-        // never asked for. Line 0, because an operator whose browser did not open has
-        // to find the address, and one printed below an apology is one they scroll for.
-        let url = address(bound());
-        let reached = [
-            Browser::Unasked,
-            opening(&exited(0), HostOs::Linux, &url).await,
-            opening(&exited(1), HostOs::Linux, &url).await,
-            opening(&missing(), HostOs::Linux, &url).await,
-        ];
-        for outcome in [Browser::Opened, Browser::Unopened, Browser::Unasked] {
-            assert!(
-                reached.contains(&outcome),
-                "{outcome:?} is not among {reached:?}, so this proves less than it reads as"
-            );
-        }
-        for browser in reached {
-            assert_eq!(
-                announcement(bound(), "000fa5ff", browser)
-                    .first()
-                    .map(|line| line.contains(&url)),
-                Some(true),
-                "{browser:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn the_transport_is_stated_in_words_rather_than_left_to_the_scheme() {
-        // Every outcome, because what is said about the browser is the only part of
-        // this that changes and the transport is not one of the things it changes.
-        for browser in [Browser::Opened, Browser::Unopened, Browser::Unasked] {
-            let about = about_the_connection(browser);
-            let mentioned: Vec<&String> = about
-                .iter()
-                .filter(|sentence| sentence.contains(ENCRYPTION))
-                .collect();
-            assert!(
-                !mentioned.is_empty(),
-                "{browser:?} leaves the transport to the scheme: {about:?}"
-            );
-            assert!(
-                mentioned.iter().all(|sentence| denies(sentence)),
-                "{browser:?} says the connection is protected: {mentioned:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn what_being_unencrypted_costs_is_said_as_well_as_that_it_is() {
-        // A fact about a protocol is not a warning. What makes it one is who it lets
-        // in, and an operator told only the fact has been told nothing they can act on.
-        let about = about_the_connection(Browser::Unasked);
-        assert!(
-            about.iter().any(|sentence| {
-                READING.iter().any(|verb| sentence.contains(verb))
-                    && SOMEBODY_ELSE.iter().any(|who| sentence.contains(who))
-            }),
-            "nothing here says what being unencrypted lets anybody do: {about:?}"
-        );
-    }
-
-    #[tokio::test]
-    async fn the_words_are_about_the_connection_a_run_actually_takes() {
-        // The address is one really taken, through the same call a run makes, so the
-        // claim is held against the connection rather than against a number written
-        // down beside it. A surface that one day serves over TLS prints a different
-        // scheme here, and the sentence above it has to change with it.
-        let held = taken(wanted(None)).await.ok();
-        let checked = held.map(|(_listener, bound)| {
-            let said = announcement(bound, "000fa5ff", Browser::Unasked).join("\n");
-            (
-                address(bound).starts_with("http://"),
-                bound.ip().is_loopback(),
-                said.contains(&address(bound)),
-            )
-        });
-        assert_eq!(
-            checked,
-            Some((true, true, true)),
-            "unencrypted, reachable from nowhere else, and printed in full — the three \
-             things these words claim"
-        );
-    }
-
-    #[test]
-    fn it_says_it_is_reachable_from_nowhere_else() {
-        assert!(said(Browser::Unasked).contains("Nothing on your network can reach it"));
-    }
-
-    #[test]
-    fn the_token_is_printed_and_said_to_be_the_only_copy() {
-        let said = said(Browser::Opened);
-        assert!(said.contains("000fa5ff"), "the token itself: {said}");
-        assert!(said.contains("written down nowhere"), "{said}");
-    }
-
-    #[test]
-    fn it_says_how_to_stop() {
-        // It holds the terminal until it is stopped, so how to stop it is part
-        // of what starting it has to say.
-        assert!(said(Browser::Opened).contains("Ctrl-C"));
-    }
-
-    #[test]
-    fn a_browser_that_opened_says_so_rather_than_asking_twice() {
-        let said = said(Browser::Opened);
-        assert!(said.contains("has been opened"), "{said}");
-        assert!(!said.contains("could not be opened"), "{said}");
-    }
+    use crate::prompt::fixtures::Script;
 
     #[test]
     fn a_named_directory_is_the_app_instead_of_the_embedded_one() {
@@ -816,11 +547,15 @@ mod tests {
                 "--no-browser",
                 "--assets",
                 "/srv/app",
+                "--set-password",
+                "--lan",
             ]),
             Some(Asked {
                 port: Some(7171),
                 browser: false,
                 assets: Some(PathBuf::from("/srv/app")),
+                password: true,
+                reach: Reach::Network,
             })
         );
     }
@@ -879,11 +614,15 @@ mod tests {
         }
     }
 
-    /// Filling one choice leaves the other two where they were, or a screen setting
+    /// Filling one choice leaves the other four where they were, or a screen setting
     /// a port would be taking a browser away with it.
     #[test]
-    fn filling_one_choice_leaves_the_other_two_alone() {
-        let asked = Asked::unsaid().serving_from("/srv/app").turned();
+    fn filling_one_choice_leaves_the_other_four_alone() {
+        let asked = Asked::unsaid()
+            .serving_from("/srv/app")
+            .turned()
+            .asking()
+            .reaching();
 
         assert_eq!(
             asked.on_port("7171"),
@@ -891,9 +630,14 @@ mod tests {
                 port: Some(7171),
                 browser: false,
                 assets: Some(PathBuf::from("/srv/app")),
+                password: true,
+                reach: Reach::Network,
             })
         );
-        assert_eq!(asked.turned(), Asked::unsaid().serving_from("/srv/app"));
+        assert_eq!(
+            asked.turned().asking().reaching(),
+            Asked::unsaid().serving_from("/srv/app")
+        );
     }
 
     #[test]
@@ -911,14 +655,14 @@ mod tests {
 
     /// A context over the stack this binary ships, with the randomness a test
     /// chose and the runner it wants every program answered by.
-    fn running(runner: Arc<dyn Runner>, bytes: Option<Vec<u8>>) -> Ctx {
+    fn running(runner: Arc<dyn Runner>, bytes: Option<Vec<u8>>, settings: Settings) -> Ctx {
         Ctx::new(
             runner,
             Arc::new(lemonfiber_core::adapters::Daemon::local()),
             Arc::new(lemonfiber_core::adapters::System),
             Arc::new(lemonfiber_core::adapters::Disk),
             lemonfiber_core::stack::Source::Embedded(&lemonfiber::cli::STACK),
-            Settings::default(),
+            settings,
             Environment::MacOs,
         )
         .with_random(Arc::new(Chance::exactly(bytes)))
@@ -926,7 +670,27 @@ mod tests {
 
     /// The same, over a runner that spawns nothing.
     fn ctx(bytes: Option<Vec<u8>>) -> Ctx {
-        running(Arc::new(Idle), bytes)
+        running(Arc::new(Idle), bytes, Settings::default())
+    }
+
+    /// The same, keeping a password wherever a test says.
+    fn keeping(admission: Option<PathBuf>) -> Ctx {
+        running(
+            Arc::new(Idle),
+            Some(enough()),
+            Settings {
+                admission,
+                ..Settings::default()
+            },
+        )
+    }
+
+    /// A directory of this test's own, emptied first so a rerun starts fresh.
+    fn a_directory(named: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-ui-{named}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
     }
 
     /// Bytes enough to mint a token from.
@@ -942,19 +706,20 @@ mod tests {
     /// Start the surface, stop it at once, and say what it exited with.
     async fn started(ctx: Ctx, asked: Asked) -> String {
         let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-        let serving = tokio::spawn(run(
+        let running = tokio::spawn(serving(
             ctx,
             asked,
             None,
             Box::pin(async move {
                 let _ = stopped.await;
             }),
+            LOOK,
         ));
         // Let the loop reach the socket before it is asked to leave it, so this
         // proves a surface that started rather than one that never did.
         tokio::task::yield_now().await;
         let _ = stop.send(());
-        serving.await.map(crate::exit::shown).unwrap_or_default()
+        running.await.map(crate::exit::shown).unwrap_or_default()
     }
 
     #[tokio::test]
@@ -982,7 +747,11 @@ mod tests {
                 Browser::Unopened
             );
             assert_eq!(
-                started(running(Arc::new(runner), Some(enough())), asked.clone()).await,
+                started(
+                    running(Arc::new(runner), Some(enough()), Settings::default()),
+                    asked.clone()
+                )
+                .await,
                 crate::exit::shown(ExitCode::SUCCESS)
             );
         }
@@ -994,34 +763,39 @@ mod tests {
         // first take had failed the port would be absent and the run would
         // succeed, which this would then report — a wrong answer either way is
         // an assertion that fails, never a branch nothing runs.
-        let held = taken(wanted(None)).await.ok();
+        let taken = held(Offered::Machine, None).await.ok();
         let asked = Asked {
-            port: held.as_ref().map(|(_, bound)| bound.port()),
+            port: taken
+                .as_ref()
+                .and_then(|taken| taken.first())
+                .map(|(_, bound)| bound.port()),
             ..Asked::default()
         };
-        let code = run(
+        let code = serving(
             ctx(Some(enough())),
             asked,
             None,
             Box::pin(std::future::ready(())),
+            LOOK,
         )
         .await;
         assert_ne!(
             crate::exit::shown(code),
             crate::exit::shown(ExitCode::SUCCESS)
         );
-        drop(held);
+        drop(taken);
     }
 
     #[tokio::test]
     async fn a_machine_that_will_not_supply_randomness_serves_nothing() {
         // A surface whose token could not be minted would be one every request
         // reached, so there is nothing here to fall back to.
-        let code = run(
+        let code = serving(
             ctx(None),
             Asked::default(),
             None,
             Box::pin(std::future::ready(())),
+            LOOK,
         )
         .await;
         assert_ne!(
@@ -1041,16 +815,19 @@ mod tests {
         let live = Arc::new(Live::opening(
             lemonfiber_fixtures::ports::Stopped::at(0).as_ref(),
         ));
+        let admitting = Arc::new(Admitting::default());
         let serving = Serving {
             ctx: Arc::new(ctx(Some(enough()))),
             token: Arc::clone(&token),
-            bound: bound(),
+            bound: Binding::here(bound().port()),
             jobs: Jobs::default(),
+            admitting: Arc::clone(&admitting),
             live: Arc::clone(&live),
         };
         let streaming = Arc::new(Streaming {
             token,
-            bound: bound(),
+            bound: Binding::here(bound().port()),
+            admitting,
             live,
         });
         Some(surface(serving, streaming, None))
@@ -1178,5 +955,198 @@ mod tests {
             Some(StatusCode::FORBIDDEN.as_u16()),
             "while a path that has one is refused"
         );
+    }
+
+    // ── The password this surface asks for ────────────────────────────────────
+
+    /// A run asked for a password sets one, says so, and goes on to serve.
+    #[tokio::test]
+    async fn a_run_asked_for_a_password_sets_one_and_then_serves() {
+        let dir = a_directory("kept");
+        let path = dir.join("admission.json");
+        let chosen = a_password();
+        let answers = Script::of(&[&chosen, &chosen]);
+
+        let code = run(
+            keeping(Some(path.clone())),
+            Asked {
+                password: true,
+                ..Asked::default()
+            },
+            &answers,
+            None,
+            Box::pin(std::future::ready(())),
+        )
+        .await;
+
+        assert_eq!(
+            crate::exit::shown(code),
+            crate::exit::shown(ExitCode::SUCCESS)
+        );
+        assert!(credential::at(&path).is_some_and(|held| held.verifies(&chosen)));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Every way of not getting a password serves nothing, because a run asked for
+    /// one and given none has not been given what it asked for — and serving anyway
+    /// would put the surface up under exactly the arrangement the operator was
+    /// changing.
+    #[tokio::test]
+    async fn a_password_that_could_not_be_set_stops_the_run_rather_than_serving() {
+        let dir = a_directory("refused");
+        let path = dir.join("admission.json");
+        let chosen = a_password();
+        let short: String = chosen.chars().take(3).collect();
+        let asked = Asked {
+            password: true,
+            ..Asked::default()
+        };
+
+        // Nowhere to keep one; the two answers differed; the password is too short;
+        // and the file cannot be written because a directory is in its place.
+        assert!(std::fs::create_dir_all(dir.join("taken.json")).is_ok());
+        let ways: Vec<(Option<PathBuf>, Vec<String>)> = vec![
+            (None, vec![chosen.clone(), chosen.clone()]),
+            (
+                Some(path.clone()),
+                vec![chosen.clone(), chosen.to_uppercase()],
+            ),
+            (Some(path.clone()), vec![short.clone(), short]),
+            (
+                Some(dir.join("taken.json")),
+                vec![chosen.clone(), chosen.clone()],
+            ),
+        ];
+        for (kept, said) in ways {
+            let lines: Vec<&str> = said.iter().map(String::as_str).collect();
+            let answers = Script::of(&lines);
+            let code = run(
+                keeping(kept.clone()),
+                asked.clone(),
+                &answers,
+                None,
+                Box::pin(std::future::ready(())),
+            )
+            .await;
+            assert_ne!(
+                crate::exit::shown(code),
+                crate::exit::shown(ExitCode::SUCCESS),
+                "{kept:?}"
+            );
+        }
+        assert_eq!(credential::at(&path), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── How far it is offered, and what has to be true first ──────────────────
+
+    /// A password kept where a test can take it away again.
+    fn a_password_at(path: &std::path::Path) {
+        let held =
+            lemonfiber_core::admission::Credential::set(&a_password(), &Chance::cycling()).ok();
+        assert!(held
+            .as_ref()
+            .is_some_and(|held| credential::keep(path, held).is_ok()));
+    }
+
+    /// One request over a real connection, and the status it was answered with.
+    ///
+    /// Written by hand rather than through a client, because what is being proven is
+    /// which requests this surface answers and a client would be a second opinion
+    /// about what was sent.
+    async fn over_tcp(port: u16, host: &str, token: &str) -> Option<u16> {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .ok()?;
+        let request = format!(
+            "GET /api/explain?word=indexer HTTP/1.1\r\nHost: {host}\r\n\
+             X-Lemonfiber-Token: {token}\r\nConnection: close\r\n\r\n"
+        );
+        stream.write_all(request.as_bytes()).await.ok()?;
+        let mut said = Vec::new();
+        stream.read_to_end(&mut said).await.ok()?;
+        String::from_utf8_lossy(&said)
+            .split_whitespace()
+            .nth(1)?
+            .parse()
+            .ok()
+    }
+
+    /// Asking for the network without a password is refused, not warned about and not
+    /// quietly served on this machine instead.
+    #[tokio::test]
+    async fn the_network_without_a_password_is_refused_rather_than_served_narrower() {
+        let dir = a_directory("unpassworded");
+        let code = serving(
+            keeping(Some(dir.join("admission.json"))),
+            Asked {
+                reach: Reach::Network,
+                ..Asked::default()
+            },
+            None,
+            Box::pin(std::future::ready(())),
+            LOOK,
+        )
+        .await;
+        assert_ne!(
+            crate::exit::shown(code),
+            crate::exit::shown(ExitCode::SUCCESS)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// And the password taken away while it is on the network gives the network up.
+    ///
+    /// Proven over a real connection rather than by reading the code back: what
+    /// changes is which requests are answered, and the request that tells the two
+    /// apart is one naming an address this machine is not — accepted while it is
+    /// offered to a network, refused the moment it is not.
+    #[tokio::test]
+    async fn a_password_taken_away_gives_up_the_network_and_keeps_this_machine() {
+        let dir = a_directory("reverted");
+        let path = dir.join("admission.json");
+        a_password_at(&path);
+        let free = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.ok();
+        let port = free
+            .as_ref()
+            .and_then(|held| held.local_addr().ok())
+            .map_or(0, |bound| bound.port());
+        assert_ne!(port, 0, "a free port can be taken on this machine");
+        drop(free);
+
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let running = tokio::spawn(serving(
+            keeping(Some(path.clone())),
+            Asked {
+                port: Some(port),
+                reach: Reach::Network,
+                ..Asked::default()
+            },
+            None,
+            Box::pin(async move {
+                let _ = stopped.await;
+            }),
+            Duration::from_millis(10),
+        ));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Offered to a network, a request naming an address this machine answers on
+        // is answered — which is the whole of what being offered to a network means.
+        let elsewhere = format!("203.0.113.7:{port}");
+        let admitted = over_tcp(port, &elsewhere, &written()).await;
+        let _ = std::fs::remove_file(&path);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let refused = over_tcp(port, &elsewhere, &written()).await;
+        let here = over_tcp(port, &format!("127.0.0.1:{port}"), &written()).await;
+
+        let _ = stop.send(());
+        let ended = running.await.map(crate::exit::shown).unwrap_or_default();
+
+        assert_eq!(admitted, Some(200), "a network binding answers an address");
+        assert_eq!(refused, Some(403), "and stops the moment the password goes");
+        assert_eq!(here, Some(200), "while this machine still reaches it");
+        assert_eq!(ended, crate::exit::shown(ExitCode::SUCCESS));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

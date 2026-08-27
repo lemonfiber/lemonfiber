@@ -47,6 +47,25 @@ pub enum Health {
     None,
 }
 
+/// One port a container actually answers on, as the engine reports it.
+///
+/// The engine's own account of what it published, not the file that asked for it.
+/// A mapping edited by hand and applied, an image whose defaults changed under an
+/// upgrade, a container started outside Compose — all of them arrive here and none
+/// of them arrives in a compose file, which is the whole reason a check reads this
+/// rather than that.
+///
+/// One entry per address, so a port published on both families is two of these and a
+/// policy can be read on each of them separately. A port a container exposes and
+/// nothing published has no host address at all and is not one of these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Published {
+    /// The host address it answers on.
+    pub address: std::net::IpAddr,
+    /// The port on the host, which is the one an operator types.
+    pub port: u16,
+}
+
 /// One container, correlated back to the service that declared it.
 ///
 /// Correlation uses Compose's own labels, which the Engine API exposes, rather
@@ -63,6 +82,11 @@ pub struct Container {
     pub lifecycle: Lifecycle,
     /// What its own probe says.
     pub health: Health,
+    /// Every host address and port it actually answers on.
+    ///
+    /// Read from the engine rather than from what asked for it, so a check about
+    /// where things listen is asking what is listening.
+    pub published: Vec<Published>,
     /// How it exited, where it has exited and the engine still remembers.
     ///
     /// Present because stopping on purpose and falling over are the same
@@ -242,8 +266,8 @@ pub trait Engine: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::{
-        Container, Diagnose, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Stats,
-        Stream,
+        Container, Diagnose, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Published,
+        Stats, Stream,
     };
 
     #[test]
@@ -275,6 +299,10 @@ mod tests {
     fn observations_carry_the_service_they_describe() {
         let container = Container {
             id: "abc123".to_owned(),
+            published: vec![Published {
+                address: std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+                port: 8989,
+            }],
             project: "lemonfiber".to_owned(),
             service: "sonarr".to_owned(),
             lifecycle: Lifecycle::Running,
@@ -283,6 +311,10 @@ mod tests {
         };
         assert_eq!(container.clone(), container);
         assert_eq!(container.service, "sonarr");
+        assert!(container
+            .published
+            .iter()
+            .all(|published| published.address.is_loopback()));
 
         let line = LogLine {
             service: "sonarr".to_owned(),

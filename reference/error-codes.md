@@ -8,6 +8,9 @@ what to do about it, is written for operators at
 <https://docs.lemonfiber.app/fixing/every-error-by-code/>.
 
 - `ACK-1`
+- `ADMIT-1`
+- `ADMIT-2`
+- `ADMIT-3`
 - `BACKUP-1`
 - `BACKUP-2`
 - `BACKUP-3`
@@ -15,6 +18,7 @@ what to do about it, is written for operators at
 - `BACKUP-5`
 - `BACKUP-6`
 - `BACKUP-7`
+- `BIND-1`
 - `BUNDLE-1`
 - `BUNDLE-2`
 - `BUNDLE-3`
@@ -78,6 +82,7 @@ what to do about it, is written for operators at
 - `SEED-4`
 - `SERVE-1`
 - `SERVE-2`
+- `SERVE-3`
 - `SETUP-1`
 - `SETUP-2`
 - `SETUP-3`

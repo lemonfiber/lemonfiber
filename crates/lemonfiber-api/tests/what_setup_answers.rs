@@ -9,7 +9,6 @@
 //! Driven through the router rather than by calling a handler, because what a
 //! caller can reach is the thing worth holding still.
 
-use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -17,7 +16,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
-use lemonfiber_api::guard::{Token, TOKEN_HEADER};
+use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::Ctx;
@@ -30,9 +29,9 @@ use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 use lemonfiber_fixtures::support::Reporting;
 use tower::ServiceExt as _;
 
-/// Built rather than parsed: an address made of numbers cannot fail to be one.
-fn bound() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], 8471))
+/// Serving this machine and nowhere else, at the port these tests name.
+fn bound() -> Binding {
+    Binding::here(8471)
 }
 
 /// A scratch layout unique to this process and case, cleared first.
@@ -70,6 +69,7 @@ fn serving(paths: &Paths) -> Option<Serving> {
         ctx: Arc::new(world(paths)),
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
+        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     })
@@ -93,6 +93,7 @@ fn homeless() -> Option<axum::Router> {
         ),
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
+        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     };
@@ -471,6 +472,7 @@ async fn no_setup_endpoint_is_reachable_without_this_run_s_token() {
         unreachable!("cycling letters always supply bytes")
     };
     let streaming = Arc::new(Streaming {
+        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         token: Arc::clone(&serving.token),
         bound: bound(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
@@ -514,6 +516,7 @@ async fn a_token_from_this_run_is_admitted() {
     };
     let carried = serving.token.as_str().to_owned();
     let streaming = Arc::new(Streaming {
+        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         token: Arc::clone(&serving.token),
         bound: bound(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),

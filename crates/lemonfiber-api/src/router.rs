@@ -8,7 +8,6 @@
 //! What each part of the surface answers is declared beside that part. This only
 //! assembles them, and holds the one thing all of them are handed.
 
-use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::{Request, State};
@@ -17,9 +16,10 @@ use axum::response::Response;
 use axum::Router;
 use lemonfiber_core::app::Ctx;
 
+use crate::admission::Admitting;
 use crate::events::live::Live;
 use crate::events::Streaming;
-use crate::guard::Token;
+use crate::guard::{Binding, Token};
 use crate::jobs::Jobs;
 use crate::serve::{admitted, refused};
 
@@ -34,11 +34,16 @@ pub struct Serving {
     pub ctx: Arc<Ctx>,
     /// The secret minted for this run, which every request must carry.
     pub token: Arc<Token>,
-    /// The address this server is listening on, which a request must name.
-    pub bound: SocketAddr,
+    /// Where this server is listening, as much of it as a request must name.
+    pub bound: Binding,
     /// The work this run started, which the actions that take minutes are named
     /// and left to run under.
     pub jobs: Jobs,
+    /// Who this run has let in, and what it counts against whoever is guessing.
+    ///
+    /// Shared with the stream and with the one door that opens without a token, so
+    /// there is one register of who is admitted rather than one per tree.
+    pub admitting: Arc<Admitting>,
     /// The one stream, for the work whose output arrives while it runs.
     ///
     /// The same stream the events route serves from its own state, shared rather
@@ -69,12 +74,23 @@ pub struct Serving {
 /// layer, even though it carries its own state and checks admission itself. Its
 /// own check is what makes it safe today; being inside the layer is what makes
 /// the next route added beside it guarded by having been added.
+///
+/// **One path is let through the token half of that layer**, and it is the door a
+/// password is exchanged at: a caller with a password and nothing else carries no
+/// token by definition, so demanding one would close the only way in that does not
+/// begin at this machine's own terminal. It is named here rather than merged outside
+/// the layer, because a second tree merged beside this one takes the fallback with
+/// it — and this tree's fallback is what refuses a path under `/api/` that nothing
+/// serves, so an unauthenticated caller cannot map the surface by watching a status
+/// change. The other half of the guard still applies to it, and a test holds the
+/// whole surface to exactly one path being reachable without a token.
 pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
     let endpoints = Router::new()
         .merge(crate::read::routes())
         .merge(crate::actions::routes())
         .merge(crate::jobs::routes())
         .merge(crate::setup::routes())
+        .merge(crate::admission::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming));
     endpoints.layer(middleware::from_fn_with_state(serving, guarded))
@@ -82,7 +98,17 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
 
 /// Let a request through, or turn it away before a handler runs.
 async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -> Response {
-    match admitted(request.headers(), &serving.token, serving.bound) {
+    let now = serving.ctx.clock.now();
+    // The one path that opens without a token, because a caller holding a password
+    // and nothing else carries none by definition. The other half of the guard still
+    // applies to it below, which is what stops a page the operator happens to be
+    // visiting from posting guesses at it.
+    let known = request.uri().path() == crate::admission::SESSION
+        || serving
+            .admitting
+            .carried(request.headers(), &serving.token, now)
+            .await;
+    match admitted(known, request.headers(), serving.bound) {
         Ok(()) => next.run(request).await,
         Err(refusal) => refused(refusal),
     }

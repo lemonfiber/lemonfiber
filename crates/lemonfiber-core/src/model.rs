@@ -11,6 +11,7 @@
 /// as features are added. Removing or retyping a field increments it.
 pub const API_VERSION: u32 = 1;
 
+mod admission;
 mod checking;
 mod envelope;
 mod household;
@@ -24,6 +25,7 @@ mod trace;
 mod upgrade;
 mod walkthrough;
 
+pub use admission::*;
 pub use checking::*;
 pub use envelope::*;
 pub use household::*;

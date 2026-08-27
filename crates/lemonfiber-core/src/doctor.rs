@@ -15,6 +15,7 @@
 //! See `.docs/architecture/module-layout.md`.
 
 pub mod acknowledged;
+pub mod bindings;
 pub mod credentials;
 pub mod environment;
 pub mod guides;

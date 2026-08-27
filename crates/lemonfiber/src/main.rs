@@ -324,6 +324,7 @@ async fn serving(ctx: Ctx, asked: RawUi) -> ExitCode {
     ui::run(
         ctx,
         asked.into(),
+        &crate::keyboard::Keyboard,
         EMBEDDED_APP,
         Box::pin(std::future::pending()),
     )
