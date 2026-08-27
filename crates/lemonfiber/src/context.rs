@@ -70,10 +70,15 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     // absence every other reader of `here` handles.
     let ctx = match here() {
         None => ctx,
-        Some(paths) => ctx.keeping(Archiving {
-            paths,
-            vault: Arc::new(crate::archive::Tar),
-        }),
+        Some(paths) => ctx
+            // What left this machine is written down where this machine keeps its
+            // files, which only the edge knows. A run that cannot be told where
+            // that is records nothing rather than guessing at a directory.
+            .recording_at(paths.outbound())
+            .keeping(Archiving {
+                paths,
+                vault: Arc::new(crate::archive::Tar),
+            }),
     };
 
     // A rehearsal takes nothing, so the two never both apply — but a rehearsal that
