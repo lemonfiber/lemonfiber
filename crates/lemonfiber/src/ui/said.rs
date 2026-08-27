@@ -150,13 +150,26 @@ pub(super) fn transport(offered: Offered) -> Vec<String> {
 ///
 /// Said rather than left to be noticed: an operator whose devices stop reaching this
 /// would otherwise go looking at their network, and what changed was here.
+///
+/// **Both halves, because they happen at different moments.** Nothing on the network
+/// is admitted from the instant the password goes — every request is checked against
+/// the credential as it stands now, so that half is immediate and needs no interval.
+/// The socket is a different thing: it is given up at the next look, which is up to
+/// five seconds later. An operator told only the end state has been told the truth
+/// and not the whole of it, and the difference is exactly what somebody asking "was
+/// it really immediate?" needs.
 pub(crate) fn reverted() -> Vec<String> {
     vec![
         String::new(),
         format!("The password for {PRODUCT}'s web interface is gone, so this is no longer offered to your network."),
-        "Nothing on the network was let in after it went, and this is now listening on this \
-         machine only."
+        "Nothing on the network was let in from the moment it went — every request is \
+         checked against the password as it stands, and there is none."
             .to_owned(),
+        format!(
+            "The socket itself is given up at the next check, within {} seconds, after which \
+             this listens on this machine only.",
+            super::LOOK.as_secs()
+        ),
     ]
 }
 
@@ -168,7 +181,7 @@ mod tests {
 
     use super::super::fixtures::{bound, exited, missing};
     use super::super::reach::{address, held, Offered};
-    use super::{announcement, opener, opening, Browser};
+    use super::{announcement, opener, opening, reverted, Browser};
 
     /// Everything a starting surface says, as one block of text.
     fn said(browser: Browser) -> String {
@@ -386,5 +399,30 @@ mod tests {
         let said = said(Browser::Opened);
         assert!(said.contains("has been opened"), "{said}");
         assert!(!said.contains("could not be opened"), "{said}");
+    }
+
+    /// Giving up the network says both halves, and says which is which.
+    ///
+    /// The two happen at different moments and are fixed by different things, so an
+    /// operator told only the end state has been told the truth and not the whole of
+    /// it. The interval is read from the constant that decides it rather than
+    /// written out here: a sentence naming five seconds beside a loop that looked
+    /// every thirty would be worse than one naming none.
+    #[test]
+    fn giving_up_the_network_says_what_went_at_once_and_what_went_after() {
+        let said = reverted().join(" ");
+
+        assert!(
+            said.contains("from the moment it went"),
+            "the authority goes at once: {said}"
+        );
+        assert!(
+            said.contains(&format!("within {} seconds", crate::ui::LOOK.as_secs())),
+            "and the socket goes at the next look, whose interval is said: {said}"
+        );
+        assert!(
+            said.contains("this machine only"),
+            "and where it ends up: {said}"
+        );
     }
 }
