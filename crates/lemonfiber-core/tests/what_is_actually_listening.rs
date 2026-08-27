@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use lemonfiber_core::doctor::bindings::BindingsCheck;
 use lemonfiber_core::doctor::{Category, Check, Verdict};
+use lemonfiber_core::platform::Environment;
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_manifest::{Bind, Manifest, Service};
 
@@ -43,8 +44,17 @@ fn service(id: &str, bind: Bind) -> Service {
 }
 
 /// What the check found, as the verdict on its one finding.
+///
+/// Asked as a platform whose engine is behind a virtual machine, so what the
+/// existing cases are about — where a service is listening — is not mixed up with
+/// the one that is about how a published port is reached.
 async fn found(engine: Reporting, services: &[Service]) -> Vec<Verdict> {
-    BindingsCheck::new(Arc::new(engine), PROJECT.to_owned(), services)
+    on(engine, services, Environment::MacOs).await
+}
+
+/// The same, on a platform the test names.
+async fn on(engine: Reporting, services: &[Service], environment: Environment) -> Vec<Verdict> {
+    BindingsCheck::new(Arc::new(engine), PROJECT.to_owned(), services, environment)
         .run()
         .await
         .into_iter()
@@ -238,6 +248,96 @@ async fn an_engine_that_will_not_say_leaves_this_unestablished() {
 /// to it.
 #[test]
 fn it_belongs_to_the_family_a_run_can_be_narrowed_to() {
-    let check = BindingsCheck::new(Arc::new(Reporting::absent()), PROJECT.to_owned(), &[]);
+    let check = BindingsCheck::new(
+        Arc::new(Reporting::absent()),
+        PROJECT.to_owned(),
+        &[],
+        Environment::MacOs,
+    );
     assert_eq!(check.category(), Category::Network);
+}
+
+/// A published port is said to be reached around this machine's own rules, where it is.
+///
+/// The engine running directly on this machine writes its forwarding rules ahead of
+/// the ones a person adds, so a rule written to close one of these ports is not what
+/// decides whether it answers. Nothing here reads a firewall — that would be a guess
+/// about which of several tools the operator uses — so what is said is the
+/// arrangement, and the address is named so an operator can tell which port it is
+/// about.
+#[tokio::test]
+async fn a_published_port_is_said_to_be_reached_around_this_machines_own_rules() {
+    let verdicts = on(
+        engine(&["jellyfin"], &[("jellyfin", "0.0.0.0", 8096)]),
+        &[service("jellyfin", Bind::Lan)],
+        Environment::LinuxNative,
+    )
+    .await;
+
+    let warned: Vec<&Verdict> = verdicts
+        .iter()
+        .filter(|verdict| matches!(verdict, Verdict::Warn(_)))
+        .collect();
+    assert_eq!(warned.len(), 1, "{verdicts:?}");
+    let said = match warned.first() {
+        Some(Verdict::Warn(problem)) => format!("{problem:?}"),
+        _ => String::new(),
+    };
+    assert!(said.contains("jellyfin"), "it names the service: {said}");
+    assert!(
+        said.contains("every interface"),
+        "and what the address means: {said}"
+    );
+    assert!(
+        said.contains("LAN_BIND"),
+        "and what does decide, which is the only thing to do about it: {said}"
+    );
+}
+
+/// It is not said where the arrangement does not hold.
+///
+/// Docker Desktop puts the engine behind a virtual machine and forwards from a
+/// process the host's firewall does see, so macOS, Windows and Desktop-on-Linux are
+/// not this case. A warning that fired on every platform would be one nobody could
+/// act on, and the three that are not warned are named rather than left to the one
+/// that is.
+#[tokio::test]
+async fn it_is_not_said_where_the_engine_is_behind_a_virtual_machine() {
+    for elsewhere in [
+        Environment::MacOs,
+        Environment::Windows,
+        Environment::LinuxDesktop,
+    ] {
+        let verdicts = on(
+            engine(&["jellyfin"], &[("jellyfin", "0.0.0.0", 8096)]),
+            &[service("jellyfin", Bind::Lan)],
+            elsewhere,
+        )
+        .await;
+        assert!(
+            !verdicts
+                .iter()
+                .any(|verdict| matches!(verdict, Verdict::Warn(_))),
+            "{elsewhere:?}: {verdicts:?}"
+        );
+    }
+}
+
+/// And not where nothing is published past this machine.
+///
+/// A stack whose every port answers loopback alone has nothing a firewall rule would
+/// have been written about, so there is nothing to say — the warning is about ports
+/// somebody might believe are shut, not about the engine being what it is.
+#[tokio::test]
+async fn it_is_not_said_where_everything_answers_this_machine_alone() {
+    let verdicts = on(
+        engine(&["sonarr"], &[("sonarr", "127.0.0.1", 8989)]),
+        &[service("sonarr", Bind::Loopback)],
+        Environment::LinuxNative,
+    )
+    .await;
+    assert!(
+        matches!(verdicts.as_slice(), [Verdict::Pass { .. }]),
+        "{verdicts:?}"
+    );
 }

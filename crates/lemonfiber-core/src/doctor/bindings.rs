@@ -31,10 +31,15 @@ use lemonfiber_manifest::{Bind, Service};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::platform::Environment;
 use crate::ports::docker::{Container, Engine};
 
 /// Raised when a service the stack calls admin answers somewhere off this machine.
 pub const BEYOND_LOOPBACK: Code = Code::new("BIND-1");
+
+/// Raised where a published port is reached without the host's own firewall rules
+/// being consulted.
+pub const AROUND_THE_FIREWALL: Code = Code::new("BIND-2");
 
 /// The name this check's findings are given.
 const CHECK: &str = "network.bindings";
@@ -50,16 +55,25 @@ pub struct BindingsCheck {
     project: String,
     /// What the stack declares each service's tier to be.
     services: Vec<Service>,
+    /// What this machine runs the engine as, which decides whether a published port
+    /// is reached through the host's own firewall or around it.
+    environment: Environment,
 }
 
 impl BindingsCheck {
     /// A check over one project's containers, against one manifest's tiers.
     #[must_use]
-    pub fn new(engine: Arc<dyn Engine>, project: String, services: &[Service]) -> Self {
+    pub fn new(
+        engine: Arc<dyn Engine>,
+        project: String,
+        services: &[Service],
+        environment: Environment,
+    ) -> Self {
         Self {
             engine,
             project,
             services: services.to_vec(),
+            environment,
         }
     }
 
@@ -128,11 +142,74 @@ impl Check for BindingsCheck {
                     .map(|where_| violation(&container.service, &where_))
             })
             .collect();
-        if wrong.is_empty() {
-            return vec![kept(running.len())];
-        }
-        wrong
+        let mut found = if wrong.is_empty() {
+            vec![kept(running.len())]
+        } else {
+            wrong
+        };
+        found.extend(around_the_firewall(self.environment, &running));
+        found
     }
+}
+
+/// Where a published port is reached without the host's firewall being consulted.
+///
+/// Nothing here inspects a firewall. It cannot: the rules belong to whichever of
+/// several tools the operator uses, and reading them would be a guess about which.
+/// What it knows is the arrangement — the engine running directly on this machine
+/// writes its own forwarding rules ahead of the ones a person adds, so a rule
+/// written to close a port does not decide whether a published one answers.
+///
+/// That is a fact about the platform rather than about this machine's rules, so it
+/// is said as one and only where it is true. Docker Desktop puts the engine behind
+/// a virtual machine and forwards from a process the host's firewall does see, so
+/// macOS, Windows and Desktop-on-Linux are not this case and are not warned about —
+/// a warning that fired everywhere would be one nobody could act on.
+fn around_the_firewall(environment: Environment, running: &[&Container]) -> Option<Finding> {
+    if environment != Environment::LinuxNative {
+        return None;
+    }
+    let mut reached: Vec<String> = running
+        .iter()
+        .flat_map(|container| {
+            container
+                .published
+                .iter()
+                .filter(|published| !published.address.is_loopback())
+                .map(|published| format!("{} on {}", container.service, wide(published.address)))
+        })
+        .collect();
+    if reached.is_empty() {
+        return None;
+    }
+    reached.sort_unstable();
+    reached.dedup();
+    Some(bypassed(&reached))
+}
+
+/// What is said where a published port is answered around the host's own rules.
+fn bypassed(reached: &[String]) -> Finding {
+    let problem = Problem::new(
+        AROUND_THE_FIREWALL,
+        Severity::Warning,
+        "A firewall rule on this machine may not apply to these".to_owned(),
+        "The container engine runs directly on this machine here, and it writes its own \
+         forwarding rules ahead of the ones you add. A rule you wrote to close one of these \
+         ports is not what decides whether it answers, so a port you believe is shut may not \
+         be. This is how publishing is meant to work and nothing is broken; it is worth \
+         knowing because the thing you would reach for does not reach it.",
+        Remedy::new("Narrow what the household tier is published on, which is what does decide")
+            .with_detail(
+                "LAN_BIND in your settings — set it to this machine's own address on \
+                          your network rather than leaving it at every interface",
+            ),
+    )
+    .or_try(Remedy::new(
+        "Or leave it, if every device on this network is one you would let in anyway",
+    ))
+    .in_state(State::Guided)
+    .with_detail(reached.join(", "));
+    Finding::in_category(Category::Network, CHECK, TITLE, Verdict::Warn(problem))
 }
 
 /// One service answering somewhere its tier does not allow.
