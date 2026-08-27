@@ -1,3 +1,6 @@
 [submodule "assets/media-stack"]
 	path = assets/media-stack
 	url = https://github.com/lemonfiber/lemonfiber-media-stack.git
+[submodule "assets/web"]
+	path = assets/web
+	url = https://github.com/lemonfiber/lemonfiber-web.git
