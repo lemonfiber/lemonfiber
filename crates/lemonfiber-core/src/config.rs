@@ -21,9 +21,9 @@ pub mod store;
 // recorded value comes to is this module's business, and moving the reading of one
 // would otherwise be a change at every call site that asks.
 pub use reading::{
-    data_root_from_env, front_door_from_env, household_host_from_env, indexer_from_env,
-    ip_echo_from_env, port_forward_from_env, provider_host_from_env, reads_as_off, reads_as_on,
-    service_user_from_env, PortForward,
+    data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
+    indexer_from_env, ip_echo_from_env, port_forward_from_env, provider_host_from_env,
+    reads_as_off, reads_as_on, service_user_from_env, PortForward,
 };
 
 use std::path::PathBuf;
@@ -89,6 +89,20 @@ pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 /// look for, and somebody who finds the explanations patronising knows exactly what
 /// they want to stop.
 pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
+
+/// The admin services the operator has said out loud they meant to expose.
+///
+/// The diagnosis offers to stop reporting an exposed admin surface "if you meant
+/// it", and until this existed there was nowhere to say so — a remedy offering an
+/// action nobody could take. This is where it is taken.
+///
+/// A name and a reason, because a name on its own records that somebody clicked
+/// past a warning and nothing about why. The reason is what a person reading this
+/// file in a year, or reading a support bundle, is actually served by, and it is the
+/// same standard the displayed-settings register is held to.
+///
+/// `sonarr=it is behind the reverse proxy I already run,radarr=the same`
+pub const EXPOSED_KEY: &str = "LEMONFIBER_EXPOSED";
 
 /// The setting naming where downloads and the library are kept.
 ///
@@ -217,6 +231,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_INDEXER_KEY,
     REACH_USENET_KEY,
     EXPLANATIONS_KEY,
+    EXPOSED_KEY,
     DATA_ROOT_KEY,
     PUID_KEY,
     PGID_KEY,
@@ -344,6 +359,9 @@ pub struct Settings {
     /// machine whose own name is not published on the network. Absent until they
     /// record one, which is the state a fresh install is in.
     pub household_host: Option<String>,
+    /// The admin services the operator wrote down as deliberately exposed, each
+    /// with the reason they gave.
+    pub exposed: Vec<(String, String)>,
     /// The service the operator named as the front door, where they named one.
     ///
     /// Absent until they do, which is the state a fresh install is in and the one
@@ -393,6 +411,7 @@ impl Default for Settings {
             indexer: None,
             admission: None,
             household_host: None,
+            exposed: Vec::new(),
             front_door: None,
             explanations: true,
             reaching: Reaching::default(),

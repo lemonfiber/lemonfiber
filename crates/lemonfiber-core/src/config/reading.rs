@@ -14,9 +14,9 @@ use super::env;
 use super::reaching::offline;
 use super::Indexer;
 use super::{
-    DATA_ROOT_KEY, DEFAULT_IP_ECHO, FRONT_DOOR_KEY, HOUSEHOLD_HOST_KEY, INDEXER_APIKEY_KEY,
-    INDEXER_URL_KEY, IP_ECHO_KEY, PGID_KEY, PROVIDER_HOST_KEY, PUID_KEY, SECOND_IP_ECHO,
-    VPN_PORT_FORWARDING_KEY, VPN_PROVIDER_KEY,
+    DATA_ROOT_KEY, DEFAULT_IP_ECHO, EXPOSED_KEY, FRONT_DOOR_KEY, HOUSEHOLD_HOST_KEY,
+    INDEXER_APIKEY_KEY, INDEXER_URL_KEY, IP_ECHO_KEY, PGID_KEY, PROVIDER_HOST_KEY, PUID_KEY,
+    SECOND_IP_ECHO, VPN_PORT_FORWARDING_KEY, VPN_PROVIDER_KEY,
 };
 
 /// A recorded value with the whitespace and surrounding quotes a person might
@@ -206,4 +206,30 @@ pub fn port_forward_from_env(file: &env::EnvFile) -> PortForward {
             .map(bare)
             .filter(|value| !value.is_empty()),
     }
+}
+
+/// The fewest words that are a reason rather than a shrug.
+///
+/// The same floor the displayed-settings register is held to, for the same reason:
+/// "yes" and "ok" record that somebody clicked past a warning, and a sentence
+/// records what they knew when they did. Whoever reads this next is usually not the
+/// person who wrote it.
+const A_REASON: usize = 4;
+
+/// The admin services deliberately exposed, each with why.
+///
+/// Pairs of `service=reason`, comma-separated. An entry naming no reason, or one too
+/// short to be one, is **not** an acknowledgement and is dropped — so the exposure it
+/// would have excused goes on being reported. Failing that way round is the point: a
+/// malformed acknowledgement that silenced the warning would be the one arrangement
+/// worse than no acknowledgement at all.
+#[must_use]
+pub fn exposed_from_env(file: &env::EnvFile) -> Vec<(String, String)> {
+    file.get(EXPOSED_KEY)
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|entry| entry.split_once('='))
+        .map(|(service, why)| (service.trim().to_owned(), why.trim().to_owned()))
+        .filter(|(service, why)| !service.is_empty() && why.split_whitespace().count() >= A_REASON)
+        .collect()
 }

@@ -54,12 +54,18 @@ async fn found(engine: Reporting, services: &[Service]) -> Vec<Verdict> {
 
 /// The same, on a platform the test names.
 async fn on(engine: Reporting, services: &[Service], environment: Environment) -> Vec<Verdict> {
-    BindingsCheck::new(Arc::new(engine), PROJECT.to_owned(), services, environment)
-        .run()
-        .await
-        .into_iter()
-        .map(|finding| finding.verdict)
-        .collect()
+    BindingsCheck::new(
+        Arc::new(engine),
+        PROJECT.to_owned(),
+        services,
+        environment,
+        &[],
+    )
+    .run()
+    .await
+    .into_iter()
+    .map(|finding| finding.verdict)
+    .collect()
 }
 
 /// An engine holding these services, publishing these addresses.
@@ -253,6 +259,7 @@ fn it_belongs_to_the_family_a_run_can_be_narrowed_to() {
         PROJECT.to_owned(),
         &[],
         Environment::MacOs,
+        &[],
     );
     assert_eq!(check.category(), Category::Network);
 }
@@ -340,4 +347,107 @@ async fn it_is_not_said_where_everything_answers_this_machine_alone() {
         matches!(verdicts.as_slice(), [Verdict::Pass { .. }]),
         "{verdicts:?}"
     );
+}
+
+/// An exposure the operator wrote down stops being a failure and stays reported.
+///
+/// The two halves of what an acknowledgement is for: it is no longer this product
+/// telling somebody they got it wrong, and it is still on the report — because the
+/// exposure is real and does not stop being real for having been agreed to. Their
+/// own words come back with it, so a diagnosis somebody sends on carries why.
+#[tokio::test]
+async fn an_exposure_the_operator_wrote_down_is_reported_as_theirs() {
+    let said = [(
+        "sonarr".to_owned(),
+        "it is behind the reverse proxy I already run".to_owned(),
+    )];
+    let verdicts = BindingsCheck::new(
+        Arc::new(engine(&["sonarr"], &[("sonarr", "0.0.0.0", 8989)])),
+        PROJECT.to_owned(),
+        &[service("sonarr", Bind::Loopback)],
+        Environment::MacOs,
+        &said,
+    )
+    .run()
+    .await
+    .into_iter()
+    .map(|finding| finding.verdict)
+    .collect::<Vec<_>>();
+
+    let told = match verdicts.as_slice() {
+        [Verdict::Warn(problem)] => format!("{problem:?}"),
+        other => unreachable!("an acknowledged exposure is a warning, not {other:?}"),
+    };
+    assert!(told.contains("sonarr"), "{told}");
+    assert!(
+        told.contains("reverse proxy I already run"),
+        "their own words come back: {told}"
+    );
+}
+
+/// An acknowledgement that gives no reason is not one.
+///
+/// A name on its own records that somebody clicked past a warning and nothing about
+/// why, and the one arrangement worse than no acknowledgement is a malformed one
+/// that silences the warning anyway. So a short reason, an empty one and a missing
+/// one each leave the exposure reported as a failure.
+#[test]
+fn an_acknowledgement_that_says_nothing_is_not_one() {
+    use lemonfiber_core::config::{env::EnvFile, exposed_from_env, EXPOSED_KEY};
+
+    for written in [
+        "sonarr",
+        "sonarr=",
+        "sonarr=yes",
+        "sonarr=ok fine",
+        "=a good long reason",
+    ] {
+        let file = EnvFile::parse(&format!("{EXPOSED_KEY}={written}\n"));
+        assert!(
+            exposed_from_env(&file).is_empty(),
+            "{written:?} is not an acknowledgement"
+        );
+    }
+
+    let file = EnvFile::parse(&format!(
+        "{EXPOSED_KEY}=sonarr=it is behind the proxy I run,radarr=the same is true of this one\n"
+    ));
+    assert_eq!(exposed_from_env(&file).len(), 2, "and two of them are two");
+}
+
+/// A reason given for one service does not excuse another.
+#[tokio::test]
+async fn saying_so_about_one_service_says_nothing_about_the_next() {
+    let said = [(
+        "sonarr".to_owned(),
+        "it is behind the proxy I run".to_owned(),
+    )];
+    let verdicts = BindingsCheck::new(
+        Arc::new(engine(
+            &["sonarr", "radarr"],
+            &[("sonarr", "0.0.0.0", 8989), ("radarr", "0.0.0.0", 7878)],
+        )),
+        PROJECT.to_owned(),
+        &[
+            service("sonarr", Bind::Loopback),
+            service("radarr", Bind::Loopback),
+        ],
+        Environment::MacOs,
+        &said,
+    )
+    .run()
+    .await
+    .into_iter()
+    .map(|finding| finding.verdict)
+    .collect::<Vec<_>>();
+
+    let failed = verdicts
+        .iter()
+        .filter(|verdict| matches!(verdict, Verdict::Fail(_)))
+        .count();
+    let warned = verdicts
+        .iter()
+        .filter(|verdict| matches!(verdict, Verdict::Warn(_)))
+        .count();
+    assert_eq!((failed, warned), (1, 1), "{verdicts:?}");
 }
