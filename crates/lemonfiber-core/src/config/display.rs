@@ -65,6 +65,12 @@ pub const SHOWN: &[(&str, &str)] = &[
         "whether the media server runs in a container or on the host machine",
     ),
     (
+        super::FRONT_DOOR_KEY,
+        "which service the household is sent to — and, because it is named rather than \
+         worked out, the one thing lemonfiber stops keeping right: a stack that later gains \
+         a request surface still sends them to what this names",
+    ),
+    (
         super::INDEXER_URL_KEY,
         "where searches are sent, and the first thing to check when none come back",
     ),
@@ -317,6 +323,24 @@ mod tests {
         assert!(!behind.contains(&key), "{behind}");
         assert!(behind.starts_with("https://operator:"), "{behind}");
         assert!(behind.ends_with("@indexer.example/api"), "{behind}");
+    }
+
+    #[test]
+    fn the_named_front_door_is_displayed_with_what_naming_one_costs() {
+        // The one setting whose reason has a second job. Naming a door is safe to
+        // display and that is not the interesting half: what an operator has to be
+        // told where they set it is what it costs them, which is that lemonfiber
+        // stops keeping the answer right. A reason saying only what the setting is
+        // would leave them to find that out by growing a request surface later and
+        // wondering why nobody is being sent to it.
+        let reason = SHOWN
+            .iter()
+            .find(|(name, _)| *name == super::super::FRONT_DOOR_KEY)
+            .map(|(_, reason)| *reason);
+        assert!(
+            reason.is_some_and(|reason| reason.contains("stops keeping right")),
+            "{reason:?}"
+        );
     }
 
     #[test]

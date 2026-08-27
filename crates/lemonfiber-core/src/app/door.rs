@@ -6,7 +6,7 @@
 //! so the two cannot grade one service differently.
 
 use super::Ctx;
-use crate::door::{address, begins_at, facing, Address, Facing};
+use crate::door::{address, facing, Address, Chosen, Facing, Refusal};
 use crate::error::{Diagnose, Problem};
 use crate::model::{Beside, FrontDoorReport, Standing};
 use crate::platform::Environment;
@@ -36,6 +36,7 @@ pub(super) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         &running,
         named.as_deref(),
         ctx.settings.household_host.as_deref(),
+        ctx.settings.front_door.as_deref(),
         ctx.environment,
     ))
 }
@@ -45,20 +46,23 @@ pub(super) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
 /// Apart from the reading above so that the stacks worth asking about — one that
 /// publishes nothing to the household at all — can be put to it, which no stack this
 /// repository carries is.
-fn assembled(
+pub(super) fn assembled(
     declared: &[lemonfiber_manifest::Service],
     running: &[crate::docker::Service],
     named: Option<&str>,
     recorded: Option<&str>,
+    chose: Option<&str>,
     environment: Environment,
 ) -> FrontDoorReport {
-    let Some((chosen, service)) = begins_at(declared) else {
+    let (chosen, door) = crate::door::chosen(declared, chose);
+    let Some((faces, service)) = door else {
         return FrontDoorReport {
             standing: Standing::Absent,
             service: None,
             address: None,
             facing: None,
-            meaning: NOWHERE.to_owned(),
+            meaning: meaning(Standing::Absent, "", &chosen),
+            chosen,
             beside: beside(declared, None),
         };
     };
@@ -68,12 +72,13 @@ fn assembled(
         .find(|running| running.id == service.id)
         .is_some_and(|running| answering(running.state));
     let reached = reached(service, named, recorded, environment);
-    let standing = standing(chosen, answering, reached.is_some());
+    let standing = standing(faces, answering, reached.is_some());
     FrontDoorReport {
         standing,
         service: Some(service.name.clone()),
-        facing: Some(chosen),
-        meaning: meaning(standing, &service.name),
+        facing: Some(faces),
+        meaning: meaning(standing, &service.name, &chosen),
+        chosen,
         address: reached,
         beside: beside(declared, Some(service.id.as_str())),
     }
@@ -121,14 +126,14 @@ const NOWHERE: &str = "There is no front door. Nothing this stack runs for the h
 /// reachable — for a door that was answering on a machine with no address to
 /// arrive at, and say the rest in prose. Every consumer that reads the state
 /// rather than the sentence was told the door was fine.
-const fn standing(chosen: Facing, answering: bool, addressed: bool) -> Standing {
+const fn standing(faces: Facing, answering: bool, addressed: bool) -> Standing {
     if !answering {
         return Standing::Unreachable;
     }
     if !addressed {
         return Standing::Stranded;
     }
-    match chosen {
+    match faces {
         Facing::Watching => Standing::LibraryOnly,
         _ => Standing::Established,
     }
@@ -147,9 +152,32 @@ const UNADDRESSED: &str = " Nothing here can work out an address for this machin
 ///
 /// The address is no longer a caveat bolted to whatever else was said: a door
 /// nobody can reach has a standing of its own, and that standing's own sentence
-/// carries what to do about it.
-fn meaning(standing: Standing, name: &str) -> String {
-    said(standing, name)
+/// carries what to do about it. How the door was chosen is the one thing still said
+/// after the standing, because it is about the operator's file rather than about
+/// their stack.
+fn meaning(standing: Standing, name: &str, chosen: &Chosen) -> String {
+    let mut said = said(standing, name);
+    let after = match chosen {
+        Chosen::Derived => return said,
+        Chosen::Named(_) => crate::door::KEPT.to_owned(),
+        Chosen::Refused(refusal) => refused(refusal),
+    };
+    said.push(' ');
+    said.push_str(&after);
+    said
+}
+
+/// What is said about a named door this stack will not send a household to.
+///
+/// The name is quoted back as it was written so the operator can find the line, and
+/// the reason is the one the refusal came with rather than a second account of it.
+fn refused(refusal: &Refusal) -> String {
+    format!(
+        "`{}` is named as the front door and it cannot be one: {}. What is said above is \
+         what this stack's own shape settles on, and it stands until the setting names \
+         something that can be a door.",
+        refusal.named, refusal.because
+    )
 }
 
 /// What the standing itself comes to, before anything is said about the address.
@@ -196,7 +224,7 @@ fn beside(services: &[lemonfiber_manifest::Service], door: Option<&str>) -> Vec<
 mod tests {
     use super::{answering, assembled, front_door, meaning, NOWHERE, UNADDRESSED};
     use crate::door::fixtures::{asking, service, watching};
-    use crate::door::Facing;
+    use crate::door::{Chosen, Facing, Refusal, KEPT};
     use crate::model::Standing;
     use crate::platform::Environment;
     use crate::ports::docker::{Health, Lifecycle};
@@ -364,9 +392,14 @@ mod tests {
     fn a_door_with_no_address_says_so_and_a_stack_with_no_door_does_not() {
         // The two absences are different: one has somewhere to send people and no
         // way to say where, and the other has nowhere to send them at all.
-        assert!(meaning(Standing::Stranded, "Seerr").contains(UNADDRESSED.trim()));
-        assert!(!meaning(Standing::Established, "Seerr").contains(UNADDRESSED.trim()));
-        assert_eq!(meaning(Standing::Absent, "Seerr"), NOWHERE);
+        assert!(meaning(Standing::Stranded, "Seerr", &Chosen::Derived).contains(UNADDRESSED.trim()));
+        assert!(
+            !meaning(Standing::Established, "Seerr", &Chosen::Derived).contains(UNADDRESSED.trim())
+        );
+        assert_eq!(
+            meaning(Standing::Absent, "Seerr", &Chosen::Derived),
+            NOWHERE
+        );
     }
 
     #[tokio::test]
@@ -410,6 +443,7 @@ mod tests {
             &[up("sonarr", crate::docker::State::Healthy)],
             Some("kitchen-nas"),
             None,
+            None,
             Environment::MacOs,
         );
         assert_eq!(report.standing, Standing::Absent);
@@ -426,6 +460,7 @@ mod tests {
             &declared,
             &[up("jellyfin", crate::docker::State::Healthy)],
             Some("kitchen-nas"),
+            None,
             None,
             Environment::MacOs,
         );
@@ -444,6 +479,7 @@ mod tests {
             &[up("jellyfin", crate::docker::State::HostManaged)],
             Some("kitchen-nas"),
             None,
+            None,
             Environment::MacOs,
         );
         assert_eq!(report.standing, Standing::LibraryOnly);
@@ -459,6 +495,7 @@ mod tests {
             &declared,
             &[up("seerr", crate::docker::State::Starting)],
             Some("kitchen-nas"),
+            None,
             None,
             Environment::MacOs,
         );
@@ -540,20 +577,124 @@ mod tests {
 
     #[test]
     fn nothing_stands_in_for_a_door_that_is_not_answering() {
-        let said = meaning(Standing::Unreachable, "Seerr");
+        let said = meaning(Standing::Unreachable, "Seerr", &Chosen::Derived);
         assert!(said.contains("Seerr"));
         assert!(said.contains("stand-in"));
     }
 
     #[test]
     fn a_library_only_stack_is_told_there_is_nowhere_to_ask() {
-        let said = meaning(Standing::LibraryOnly, "Jellyfin");
+        let said = meaning(Standing::LibraryOnly, "Jellyfin", &Chosen::Derived);
         assert!(said.contains("nowhere to ask"));
+    }
+
+    #[tokio::test]
+    async fn the_door_the_operator_named_is_the_one_that_is_given() {
+        // Their stack, their call. This one has somewhere to ask and its operator
+        // would rather the household simply landed in the library.
+        let chose = crate::config::Settings {
+            front_door: Some("jellyfin".to_owned()),
+            ..crate::config::Settings::default()
+        };
+        let household = a_context()
+            .engine(std::sync::Arc::new(Reporting::holding(
+                &["seerr", "jellyfin"],
+                Lifecycle::Running,
+                Health::Healthy,
+            )))
+            .settings(chose)
+            .build()
+            .with_site(Renamed::called(Some("kitchen-nas")));
+        let report = front_door(&household).await.ok();
+
+        assert_eq!(
+            report.as_ref().and_then(|report| report.service.clone()),
+            Some("Jellyfin".to_owned())
+        );
+        assert_eq!(
+            report.as_ref().map(|report| report.chosen.clone()),
+            Some(Chosen::Named("jellyfin".to_owned()))
+        );
+        assert_eq!(
+            report.as_ref().map(|report| report.standing),
+            Some(Standing::LibraryOnly)
+        );
+        // And what it costs is said in the answer, not only beside the setting.
+        assert!(report.is_some_and(|report| report.meaning.contains(KEPT)));
+    }
+
+    #[tokio::test]
+    async fn a_named_door_the_household_tier_does_not_publish_is_refused_and_said() {
+        // The refusal the setting is bounded by. Obeying it would publish an address
+        // for a service that answers this machine alone — and a household member who
+        // arrived there could change what everybody else gets.
+        let chose = crate::config::Settings {
+            front_door: Some("sonarr".to_owned()),
+            ..crate::config::Settings::default()
+        };
+        let household = a_context()
+            .engine(std::sync::Arc::new(Reporting::holding(
+                &["seerr"],
+                Lifecycle::Running,
+                Health::Healthy,
+            )))
+            .settings(chose)
+            .build()
+            .with_site(Renamed::called(Some("kitchen-nas")));
+        let report = front_door(&household).await.ok();
+
+        let refused = report.as_ref().map(|report| report.chosen.clone());
+        assert!(
+            matches!(refused, Some(Chosen::Refused(Refusal { ref named, .. })) if named == "sonarr"),
+            "{refused:?}"
+        );
+        assert_eq!(
+            report.as_ref().and_then(|report| report.service.clone()),
+            Some("Seerr".to_owned()),
+            "the door this stack's own shape settles on still stands"
+        );
+        let said = report.map(|report| report.meaning).unwrap_or_default();
+        assert!(said.contains("`sonarr`"), "{said}");
+        assert!(said.contains("cannot be one"), "{said}");
+    }
+
+    #[test]
+    fn a_door_nobody_named_says_nothing_about_having_been_named() {
+        // The sentence is the cost of a decision, and a stack whose operator made no
+        // decision has not paid it.
+        let derived = meaning(Standing::Established, "Seerr", &Chosen::Derived);
+        assert!(!derived.contains(KEPT));
+        assert!(!derived.contains("cannot be one"));
+    }
+
+    #[test]
+    fn a_refusal_is_said_even_where_there_was_no_door_to_fall_back_to() {
+        // Two absences at once: nothing to send anybody to, and a setting that named
+        // something that could not have been it either.
+        let declared = [service(
+            "sonarr",
+            Some(lemonfiber_manifest::Bind::Loopback),
+            Some(lemonfiber_manifest::ApiKind::Servarr),
+        )];
+        let report = assembled(
+            &declared,
+            &[up("sonarr", crate::docker::State::Healthy)],
+            Some("kitchen-nas"),
+            None,
+            Some("sonarr"),
+            Environment::MacOs,
+        );
+        assert_eq!(report.standing, Standing::Absent);
+        assert!(report.meaning.starts_with(NOWHERE));
+        assert!(report.meaning.contains("`sonarr`"), "{}", report.meaning);
     }
 
     #[test]
     fn no_door_at_all_says_so_rather_than_naming_the_nearest_thing() {
-        assert_eq!(meaning(Standing::Absent, "Homepage"), NOWHERE);
+        assert_eq!(
+            meaning(Standing::Absent, "Homepage", &Chosen::Derived),
+            NOWHERE
+        );
         assert!(!NOWHERE.contains("Homepage"));
     }
 }

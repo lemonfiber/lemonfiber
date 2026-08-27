@@ -41,7 +41,11 @@ pub(super) fn front_door(report: &FrontDoorReport) -> Lines {
 }
 
 /// Where the door stands, in one phrase.
-const fn standing(standing: Standing) -> &'static str {
+///
+/// Shared with the dashboard's own panel, which has room for a phrase and none for
+/// the answer's sentence: two renderings of one screenful is two things to keep in
+/// step, and the one nobody is looking at is the one that stops being true.
+pub(crate) const fn standing(standing: Standing) -> &'static str {
     match standing {
         Standing::Established => "the front door",
         Standing::LibraryOnly => "the front door, and there is nothing here to ask for",
@@ -61,6 +65,7 @@ mod tests {
     fn report(standing: Standing, service: Option<&str>) -> FrontDoorReport {
         FrontDoorReport {
             standing,
+            chosen: lemonfiber_core::door::Chosen::Derived,
             service: service.map(str::to_owned),
             address: service.map(|_| Address {
                 url: "http://kitchen-nas.local:5055".to_owned(),

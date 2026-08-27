@@ -462,6 +462,26 @@
         "data"
       ],
       "$defs": {
+        "Address": {
+          "description": "Where the front door is reached, and what is worth knowing about the address.",
+          "type": "object",
+          "properties": {
+            "caution": {
+              "description": "What is worth knowing about the address itself, where anything is. Absent\nfor one that keeps working on its own.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "url": {
+              "description": "The whole address, as it would be typed or followed.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        },
         "Affected": {
           "description": "One thing that is wrong, as the expanded summary lists it.",
           "type": "object",
@@ -550,6 +570,81 @@
             "affected"
           ]
         },
+        "Beside": {
+          "description": "A service the household can reach that is not the front door, and why it is not.\n\nCarried rather than left out, because the decision is the useful part: an operator\nwho can see that the index over every service was considered and refused has been\ntold something, where one shown a single name has only been given an answer.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why it is not somewhere to begin.",
+              "type": "string"
+            },
+            "facing": {
+              "description": "What it is to the household.",
+              "$ref": "#/$defs/Facing"
+            },
+            "service": {
+              "description": "The service, by the name it shows itself under.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "facing",
+            "because"
+          ]
+        },
+        "Chosen": {
+          "description": "How the front door came to be the one it is.",
+          "oneOf": [
+            {
+              "description": "Worked out from what the stack declares, which is what a stack whose\noperator has named nothing answers.",
+              "type": "object",
+              "properties": {
+                "chosen": {
+                  "type": "string",
+                  "const": "derived"
+                }
+              },
+              "required": [
+                "chosen"
+              ]
+            },
+            {
+              "description": "Named by the operator, by the id the stack declares it under, and it is the\ndoor.",
+              "type": "object",
+              "properties": {
+                "chosen": {
+                  "type": "string",
+                  "const": "named"
+                },
+                "door": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "chosen",
+                "door"
+              ]
+            },
+            {
+              "description": "Named by the operator and refused. The worked-out door stands, and this\ncarries what was named and why it is not it.",
+              "type": "object",
+              "properties": {
+                "chosen": {
+                  "type": "string",
+                  "const": "refused"
+                },
+                "door": {
+                  "$ref": "#/$defs/Refusal"
+                }
+              },
+              "required": [
+                "chosen",
+                "door"
+              ]
+            }
+          ]
+        },
         "Criticality": {
           "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
           "oneOf": [
@@ -597,6 +692,101 @@
           "required": [
             "secs",
             "nanos"
+          ]
+        },
+        "Facing": {
+          "description": "What a service published to the local network is to the people in the house.",
+          "oneOf": [
+            {
+              "description": "Where asking for something begins, and where what was asked for is followed.\nIt links onward to the library, which is what makes it a place to start\nrather than one more address to be sent.",
+              "type": "string",
+              "const": "asking"
+            },
+            {
+              "description": "The library, where what arrived is watched. A place to start only where there\nis nothing to ask for, because somebody sent there has no way to ask.",
+              "type": "string",
+              "const": "watching"
+            },
+            {
+              "description": "One kind of media and no other, reached from the library rather than instead\nof it.",
+              "type": "string",
+              "const": "shelf"
+            },
+            {
+              "description": "An index over every service, including the ones nobody in the house should\nlearn exist.",
+              "type": "string",
+              "const": "operators"
+            },
+            {
+              "description": "How the others are reached, rather than one of them.",
+              "type": "string",
+              "const": "carriage"
+            },
+            {
+              "description": "Published to the household, and nothing here says what it is to them.",
+              "type": "string",
+              "const": "unstated"
+            }
+          ]
+        },
+        "FrontDoorReport": {
+          "description": "The household's one front door: which service it is, where it stands, and what\nelse they can reach that is not it.",
+          "type": "object",
+          "properties": {
+            "address": {
+              "description": "The address to hand them, read from this machine at the moment of asking\nrather than remembered. Absent where there is no door, and where there is\none on a machine that will say neither what it is called nor where it is.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Address"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "beside": {
+              "description": "Everything else the household can reach, and why none of it is the door.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Beside"
+              }
+            },
+            "chosen": {
+              "description": "How this came to be the door: worked out from what the stack declares, named\nby the operator, or named by them and refused.\n\nCarried as a state rather than left to the sentence beneath it, for the reason\nthe standing is: an operator whose setting was refused reads the sentence, and\na browser, a script or a dashboard reads this.",
+              "$ref": "#/$defs/Chosen"
+            },
+            "facing": {
+              "description": "What that service is to them. Absent for the same reason.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Facing"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "meaning": {
+              "description": "What this comes to, in the words an operator would say it in — including,\nwhere there is no door, that there is none.",
+              "type": "string"
+            },
+            "service": {
+              "description": "The service the household begins at, by the name it shows itself under.\nAbsent where this stack publishes nothing they could begin at.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "standing": {
+              "description": "Where the front door stands.",
+              "$ref": "#/$defs/Standing2"
+            }
+          },
+          "required": [
+            "standing",
+            "chosen",
+            "meaning",
+            "beside"
           ]
         },
         "Hardlink": {
@@ -883,6 +1073,54 @@
             }
           ]
         },
+        "Panel6": {
+          "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+          "oneOf": [
+            {
+              "description": "The source answered; here is the panel.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/FrontDoorReport"
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            },
+            {
+              "description": "The source could not be reached, for this stated reason.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "description": "Why the panel could not be filled, in the operator's terms.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ]
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "unavailable"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            }
+          ]
+        },
         "Protocol": {
           "description": "Which protocol a transfer is moving over, since the same download reads\ndifferently on each — a Usenet download has no peers, a torrent has no server.",
           "oneOf": [
@@ -981,6 +1219,24 @@
             }
           ]
         },
+        "Refusal": {
+          "description": "A named front door that is not one, and why it is not.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why this stack will not send a household there.",
+              "type": "string"
+            },
+            "named": {
+              "description": "What the operator recorded, as they wrote it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "named",
+            "because"
+          ]
+        },
         "Service": {
           "description": "One service, as it stands.",
           "type": "object",
@@ -1066,6 +1322,10 @@
                 "$ref": "#/$defs/Alert"
               }
             },
+            "door": {
+              "description": "The one address to hand somebody who lives here.\n\nOn the screen rather than only behind a question, because the operator who\nneeds it is not the one who thought to ask: they have just been asked \"what\ndo I open?\" by somebody in the next room. Built from the same reading as the\npanels beside it, so the screen and `front-door` cannot name different doors.",
+              "$ref": "#/$defs/Panel6"
+            },
             "health": {
               "description": "The one-line health summary — the same computation every other surface\nuses, so no two of them can grade the same stack differently.\n\nAlways present, unlike the panels: a stack that could not be reached has a\nsummary, and it says `unknown`. An absent summary would leave the operator\nto infer health from a blank space, which is the one reading this must never\nbe open to.",
               "$ref": "#/$defs/Summary"
@@ -1117,7 +1377,8 @@
             "stuck",
             "alerts",
             "storage",
-            "services"
+            "services",
+            "door"
           ]
         },
         "Stall": {
@@ -1202,6 +1463,36 @@
               "description": "It could not be established. Never reported as healthy.",
               "type": "string",
               "const": "unknown"
+            }
+          ]
+        },
+        "Standing2": {
+          "description": "Where the household's one front door stands.",
+          "oneOf": [
+            {
+              "description": "The door is the request surface, and it is running.",
+              "type": "string",
+              "const": "established"
+            },
+            {
+              "description": "This stack has no request surface, so the library is the door — there is\nnothing here to ask for.",
+              "type": "string",
+              "const": "library-only"
+            },
+            {
+              "description": "There is a door and it is not answering.\n\nThe service's own state. What fixes it is starting the service.",
+              "type": "string",
+              "const": "unreachable"
+            },
+            {
+              "description": "There is a door, it is answering, and nothing here can say where another\ndevice would reach it.\n\nThe other way a door is unreachable, and a different thing to do about it:\nthe service is fine and the way to it is what is missing. Told apart from\n[`Standing::Unreachable`] because the two are fixed at opposite ends — one\nby starting a service, the other by giving this machine an address the\nhousehold's devices can use — and a household member who cannot arrive\nneeds to know which of the two they are looking at before they start\nblaming their own device.",
+              "type": "string",
+              "const": "stranded"
+            },
+            {
+              "description": "Nothing at all is published to the household: an operator-only configuration.",
+              "type": "string",
+              "const": "none"
             }
           ]
         },
@@ -2281,6 +2572,58 @@
             "because"
           ]
         },
+        "Chosen": {
+          "description": "How the front door came to be the one it is.",
+          "oneOf": [
+            {
+              "description": "Worked out from what the stack declares, which is what a stack whose\noperator has named nothing answers.",
+              "type": "object",
+              "properties": {
+                "chosen": {
+                  "type": "string",
+                  "const": "derived"
+                }
+              },
+              "required": [
+                "chosen"
+              ]
+            },
+            {
+              "description": "Named by the operator, by the id the stack declares it under, and it is the\ndoor.",
+              "type": "object",
+              "properties": {
+                "chosen": {
+                  "type": "string",
+                  "const": "named"
+                },
+                "door": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "chosen",
+                "door"
+              ]
+            },
+            {
+              "description": "Named by the operator and refused. The worked-out door stands, and this\ncarries what was named and why it is not it.",
+              "type": "object",
+              "properties": {
+                "chosen": {
+                  "type": "string",
+                  "const": "refused"
+                },
+                "door": {
+                  "$ref": "#/$defs/Refusal"
+                }
+              },
+              "required": [
+                "chosen",
+                "door"
+              ]
+            }
+          ]
+        },
         "Facing": {
           "description": "What a service published to the local network is to the people in the house.",
           "oneOf": [
@@ -2338,6 +2681,10 @@
                 "$ref": "#/$defs/Beside"
               }
             },
+            "chosen": {
+              "description": "How this came to be the door: worked out from what the stack declares, named\nby the operator, or named by them and refused.\n\nCarried as a state rather than left to the sentence beneath it, for the reason\nthe standing is: an operator whose setting was refused reads the sentence, and\na browser, a script or a dashboard reads this.",
+              "$ref": "#/$defs/Chosen"
+            },
             "facing": {
               "description": "What that service is to them. Absent for the same reason.",
               "anyOf": [
@@ -2367,8 +2714,27 @@
           },
           "required": [
             "standing",
+            "chosen",
             "meaning",
             "beside"
+          ]
+        },
+        "Refusal": {
+          "description": "A named front door that is not one, and why it is not.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why this stack will not send a household there.",
+              "type": "string"
+            },
+            "named": {
+              "description": "What the operator recorded, as they wrote it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "named",
+            "because"
           ]
         },
         "Standing": {

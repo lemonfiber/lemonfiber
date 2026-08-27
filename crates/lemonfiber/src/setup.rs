@@ -22,6 +22,7 @@ use lemonfiber_core::wizard::{offer_setup, Progress, Status, Wizard};
 use lemonfiber_core::PRODUCT;
 
 mod boot;
+mod door;
 mod first_content;
 mod interrupted;
 
