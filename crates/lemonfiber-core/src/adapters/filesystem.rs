@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 
 use crate::ports::filesystem::{
-    Fault, FileSystem, Identity, Mount, Ownership, Presence, StorageFacts, Volume,
+    Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, StorageFacts, Volume,
 };
 
 /// The filesystem on this machine, reached through the standard library.
@@ -98,6 +98,17 @@ impl FileSystem for Disk {
             })
             .collect();
         crate::ports::filesystem::pick(&mounts, path)
+    }
+}
+
+#[async_trait]
+impl Eraser for Disk {
+    async fn erase(&self, path: &Path) -> Result<(), Fault> {
+        match std::fs::remove_dir_all(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(fault(&error)),
+        }
     }
 }
 
@@ -197,7 +208,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use super::{Disk, FileSystem, Volume};
+    use super::{Disk, Eraser, FileSystem, Volume};
 
     /// A fresh, empty directory of its own, so tests cannot collide over a file
     /// name. Built from the process id and a counter rather than a random name,
@@ -284,6 +295,39 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A directory and everything under it, and the second run over the same path.
+    ///
+    /// Already gone is already removed: running this twice is a reasonable thing to
+    /// do, and the second run has nothing to complain about. A caller told otherwise
+    /// would report a machine as not clean when it is.
+    #[tokio::test]
+    async fn a_whole_tree_goes_and_a_second_removal_of_it_is_not_a_failure() {
+        let dir = scratch();
+        let inside = dir.join("nested");
+        let file = inside.join("kept");
+        let _ = std::fs::create_dir_all(&inside);
+        assert!(Disk.touch(&file).await.is_ok());
+
+        assert!(Disk.erase(&dir).await.is_ok());
+        assert!(!dir.exists());
+        assert!(Disk.erase(&dir).await.is_ok());
+    }
+
+    /// A path that is not a directory is the platform's own refusal, carried
+    /// verbatim — it is what the operator needs in order to finish by hand.
+    #[tokio::test]
+    async fn a_tree_that_will_not_go_comes_back_in_the_platforms_own_words() {
+        let dir = scratch();
+        let file = dir.join("not-a-directory");
+        assert!(Disk.touch(&file).await.is_ok());
+
+        let refused = Disk.erase(&file).await;
+        assert!(
+            refused.is_err_and(|fault| !fault.message.is_empty()),
+            "the platform said nothing about refusing"
+        );
     }
 
     #[tokio::test]

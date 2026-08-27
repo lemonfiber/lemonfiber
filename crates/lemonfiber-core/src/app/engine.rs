@@ -14,6 +14,7 @@ use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
 
 mod diagnosis;
+mod fetching;
 mod inflight;
 mod lock;
 mod stopping;
@@ -243,6 +244,9 @@ fn carries_quality(action: &Action) -> bool {
 /// unreadable manifest, a form that resolves to nothing, a stack that cannot be
 /// written — read the same wherever they surface.
 fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box<Problem>> {
+    if fetching::refused(ctx, action) {
+        return Err(Box::new(fetching::refusal()));
+    }
     let (manifest, plan) = resolved(ctx, forms)?;
     let record = ctx
         .settings

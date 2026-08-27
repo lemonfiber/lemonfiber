@@ -100,6 +100,11 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // are pending reverts, so either one left unconfirmed is a non-zero result.
         // Confirmed, or with nothing to revert, it succeeded.
         Outcome::Reset(report) => reset_exit(report),
+        // A listing is a question and asking is never a failure. A removal that was
+        // not confirmed is waiting on the operator's say-so, and one that could not
+        // take a directory left something behind — a script that read either as
+        // success would carry on as though the machine were clean.
+        Outcome::Stored(report) => forgetting(&report.removal),
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.
@@ -141,6 +146,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Status(_)
         | Outcome::Word(_)
         | Outcome::Glossary(_)
+        | Outcome::Outbound(_)
         | Outcome::Wizard(_)
         // Putting back what the last repair changed either happened or came back as
         // a problem; there is no third answer for a code to distinguish.
@@ -152,6 +158,16 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Watch(_)
         | Outcome::Archives(_)
         | Outcome::Support(_) => ExitCode::SUCCESS,
+    }
+}
+
+/// The exit code a run over what this machine keeps earns.
+fn forgetting(removal: &lemonfiber_core::stored::Removal) -> ExitCode {
+    match removal {
+        lemonfiber_core::stored::Removal::NotAsked => ExitCode::SUCCESS,
+        lemonfiber_core::stored::Removal::Unconfirmed => ExitCode::from(VALIDATION),
+        lemonfiber_core::stored::Removal::Done { left, .. } if left.is_empty() => ExitCode::SUCCESS,
+        lemonfiber_core::stored::Removal::Done { .. } => ExitCode::from(FAILURE),
     }
 }
 
@@ -352,7 +368,11 @@ mod tests {
     use lemonfiber_core::seed::{
         Assessment, Report as SeedReport, Severity as SeedSeverity, State as SeedState, Wiring,
     };
+    use lemonfiber_core::stored::{stored, Left, Removal};
     use lemonfiber_core::walkthrough::{Shape, State as WalkState};
+
+    use lemonfiber_core::config::paths::Paths;
+    use std::path::Path;
 
     use super::{
         complain, exit_code, no_config_home, settled, shown, success, FAILURE, NEVER_SETTLED,
@@ -505,6 +525,37 @@ mod tests {
         };
         assert_ne!(
             format!("{:?}", settled(&Outcome::Upgrade(refused))),
+            success()
+        );
+    }
+
+    /// Four answers over one shape, and each is a different thing for a script to do.
+    /// A listing is a question; an unconfirmed removal is waiting to be told to go
+    /// ahead; a removal that took everything is done; and one that left a directory
+    /// behind has left the machine not clean, which is the case a script reading
+    /// success would carry on past.
+    #[test]
+    fn what_this_machine_keeps_answers_four_ways_and_only_one_of_them_is_success() {
+        let layout = Paths::rooted(Path::new("/scratch/config"), Path::new("/scratch/data"));
+        let asked = |removal| format!("{:?}", settled(&Outcome::Stored(stored(&layout, removal))));
+
+        assert_eq!(asked(Removal::NotAsked), success());
+        assert_ne!(asked(Removal::Unconfirmed), success());
+        assert_eq!(
+            asked(Removal::Done {
+                gone: vec!["/scratch/config/lemonfiber".to_owned()],
+                left: Vec::new(),
+            }),
+            success()
+        );
+        assert_ne!(
+            asked(Removal::Done {
+                gone: Vec::new(),
+                left: vec![Left {
+                    at: "/scratch/data/lemonfiber".to_owned(),
+                    why: "permission denied".to_owned(),
+                }],
+            }),
             success()
         );
     }

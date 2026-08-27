@@ -273,8 +273,10 @@ impl Live {
     }
 }
 
+mod allowed;
 mod reading;
 
+pub use allowed::Allowed;
 use reading::{interpret_indexer, interpret_service, interpret_usenet, persisting};
 
 #[async_trait]

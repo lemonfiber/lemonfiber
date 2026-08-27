@@ -249,6 +249,30 @@ pub enum Request {
     /// stack runs nothing anybody could begin at — that there is no address to send
     /// rather than naming the nearest thing that would open.
     FrontDoor,
+    /// List everything that leaves this machine, and what refusing each of it costs.
+    ///
+    /// lemonfiber's own requests first — where each goes, why, exactly what travels,
+    /// whether it is on, the setting that switches it off and what stops working
+    /// when it is — then the requests the stack's own services make, which are
+    /// theirs rather than lemonfiber's.
+    Outbound,
+    /// List what lemonfiber keeps on this machine, where it is, and why.
+    ///
+    /// Everything it writes sits under two directories. This names each thing under
+    /// them, says what it is for, and marks the ones holding a credential — and it
+    /// names what is *not* lemonfiber's, because your library being absent from the
+    /// list is the part worth being sure about.
+    Stored,
+    /// Remove everything lemonfiber keeps on this machine.
+    ///
+    /// The two directories and everything under them. Your library, your downloads
+    /// and the containers are not lemonfiber's and are never touched. Because it
+    /// throws work away it lists what would go and does nothing until `--confirm`.
+    Forget {
+        /// Go ahead and remove it, having seen what would go.
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.

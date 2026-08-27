@@ -49,6 +49,7 @@ pub const OFFERED: &[&str] = &[
     "seed",
     "adopt",
     "reset",
+    "forget",
     "backup",
     "support",
     "restore",
@@ -129,6 +130,9 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "seed" => Ok(Command::Seed),
         "adopt" => Ok(Command::Adopt),
         "reset" => Ok(Command::Reset { confirm }),
+        // Unconfirmed it lists what would go, which is the same listing `/api/stored`
+        // answers with — so what a browser agrees to is what it was shown.
+        "forget" => Ok(Command::Forget { confirm }),
         "backup" => Ok(Command::Backup { service }),
         // The one diagnosis asked for here rather than served as a read. It reaches
         // the same command `/api/checks` reaches, widened by the same word the

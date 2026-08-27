@@ -72,6 +72,7 @@ pub mod logs;
 pub mod materialised;
 pub mod model;
 pub mod notify;
+pub mod outbound;
 pub mod platform;
 pub mod plural;
 pub mod prerequisites;
@@ -90,6 +91,7 @@ pub mod seerr;
 pub mod servarr;
 pub mod stack;
 pub mod storage;
+pub mod stored;
 #[cfg(test)]
 mod test_support;
 pub mod text;

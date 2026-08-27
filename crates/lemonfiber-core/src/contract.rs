@@ -35,9 +35,11 @@ use crate::model::{
     StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
     WizardReport, API_VERSION,
 };
+use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
 use crate::stack::closure::Plan;
+use crate::stored::Stored;
 use crate::walkthrough::Line;
 
 /// Where the generated artefact is kept, relative to the workspace root.
@@ -105,6 +107,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<LifecycleReport>),
     );
     describing(kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
+    describing(kinds, kind::OUTBOUND, schema_for!(Envelope<Leaving>));
     describing(kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
     describing(kinds, kind::QUALITY, schema_for!(Envelope<QualityReport>));
     describing(kinds, kind::REPAIR, schema_for!(Envelope<RepairReport>));
@@ -116,6 +119,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<crate::seed::Report>),
     );
     describing(kinds, kind::STATUS, schema_for!(Envelope<StatusReport>));
+    describing(kinds, kind::STORED, schema_for!(Envelope<Stored>));
     describing(kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
     describing(kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
     describing(kinds, kind::UNDO, schema_for!(Envelope<Reversal>));

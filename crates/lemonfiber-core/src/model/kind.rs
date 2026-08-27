@@ -68,6 +68,8 @@ pub const LIFECYCLE: Kind = Kind("lifecycle");
 pub const LOG: Kind = Kind("log");
 /// The music format chosen, and what became of applying it.
 pub const MUSIC: Kind = Kind("music");
+/// Everything that leaves this machine, and what the stack's own services reach.
+pub const OUTBOUND: Kind = Kind("outbound");
 /// What starting or stopping would do, before it is done.
 pub const PREVIEW: Kind = Kind("preview");
 /// One line the container engine wrote while pulling images.
@@ -91,6 +93,8 @@ pub const START: Kind = Kind("start");
 pub const STATUS: Kind = Kind("status");
 /// One step of a walkthrough, said the moment it is true.
 pub const STEP: Kind = Kind("step");
+/// Everything lemonfiber keeps on this machine, and what became of it.
+pub const STORED: Kind = Kind("stored");
 /// The items whose downloads are stuck.
 pub const STUCK: Kind = Kind("stuck");
 /// Where one item is in the pipeline.
@@ -128,6 +132,7 @@ pub const ALL: &[Kind] = &[
     LIFECYCLE,
     LOG,
     MUSIC,
+    OUTBOUND,
     PREVIEW,
     PULL,
     QUALITY,
@@ -139,6 +144,7 @@ pub const ALL: &[Kind] = &[
     START,
     STATUS,
     STEP,
+    STORED,
     STUCK,
     TRACE,
     UNDO,

@@ -365,3 +365,41 @@ async fn a_listing_asked_for_with_a_parameter_is_refused_the_same_way() {
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16(), "{said}");
     assert!(said.contains("READ-1"), "{said}");
 }
+
+/// What this machine keeps of lemonfiber's, served to a browser that has no
+/// filesystem in front of it and no other way of finding out.
+///
+/// The paths come from the layout this run was given, so the answer names where the
+/// files are on the host rather than where they would be on some other machine — and
+/// what holds a credential says so, which is what decides how carefully somebody
+/// treats a copy of it.
+#[tokio::test]
+async fn what_is_kept_on_this_machine_is_served_with_where_each_thing_is() {
+    let dir = scratch("stored");
+    let (status, _, body) = got(ctx(&dir, Kept::holding(&[])), "/api/stored").await;
+    let said = String::from_utf8(body).unwrap_or_default();
+
+    assert_eq!(status, StatusCode::OK.as_u16(), "{said}");
+    assert!(said.contains(r#""kind":"stored""#), "{said}");
+    assert!(said.contains(r#""what":"the settings file""#), "{said}");
+    assert!(said.contains(r#""secret":true"#), "{said}");
+    assert!(said.contains(r#""state":"not-asked""#), "{said}");
+    assert!(
+        said.contains(&dir.display().to_string()),
+        "the answer names where the files are on this host: {said}"
+    );
+}
+
+/// And what is not lemonfiber's, in the same answer. A browser about to ask for all
+/// of it removed is owed the reason the library is absent from the list.
+#[tokio::test]
+async fn what_is_not_lemonfibers_is_served_beside_what_is() {
+    let dir = scratch("stored-beside");
+    let (_, _, body) = got(ctx(&dir, Kept::holding(&[])), "/api/stored").await;
+    let said = String::from_utf8(body).unwrap_or_default();
+
+    assert!(
+        said.contains(r#""beside":[{"what":"your library"#),
+        "{said}"
+    );
+}

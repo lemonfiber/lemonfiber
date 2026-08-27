@@ -334,3 +334,30 @@ async fn a_line_count_at_the_ceiling_is_still_asked_for() {
     let seen = asked(world(running(), stack()), "/api/logs?tail=10000").await;
     assert_eq!(seen.map(|(status, _)| status), Some(StatusCode::OK));
 }
+
+#[tokio::test]
+async fn the_enumeration_takes_nothing_and_refuses_a_parameter() {
+    // An enumeration a caller could narrow is one an operator could be shown half
+    // of, and half of everything that leaves this machine reads as the whole of it.
+    let refused = reads::wanted(reads::OUTBOUND, Some("reach=registry"));
+
+    assert_eq!(
+        refused.err().map(|problem| problem.code.as_str()),
+        Some("READ-1")
+    );
+}
+
+#[tokio::test]
+async fn a_run_that_cannot_say_where_its_files_are_refuses_to_list_them() {
+    // Not a guess at the usual place. A machine whose configuration home could not
+    // be resolved is one whose files are somewhere this run cannot name, and
+    // answering with the ordinary path would point a browser at a directory that may
+    // be somebody else's.
+    let seen = asked(world(running(), stack()), reads::STORED).await;
+
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::INTERNAL_SERVER_ERROR
+            && body.contains(r#""code":"KEPT-1""#)),
+        "a run with nowhere to look answered anyway"
+    );
+}

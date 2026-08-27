@@ -659,3 +659,33 @@ async fn a_word_given_and_left_empty_named_a_word_rather_than_none() {
         "an empty word is refused rather than listed"
     );
 }
+
+#[tokio::test]
+async fn what_leaves_this_machine_is_the_envelope_the_command_renders() {
+    // The read a browser has the most reason to want and the least ability to
+    // answer for itself: a page sees the requests it makes, and nothing at all of
+    // what the process behind it does.
+    let expected = as_the_command_renders_it(&world(running(), stack()), Command::Outbound).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), reads::OUTBOUND).await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn what_leaves_this_machine_carries_the_switch_beside_each_request() {
+    // Written out rather than derived, so a second serialisation could not pass
+    // this by agreeing with itself. The switch is the field that makes the list
+    // something an operator can act on rather than something they can only read.
+    let seen = asked(world(running(), stack()), reads::OUTBOUND).await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"outbound","data":{"ours":["#)
+            && body.contains(r#""reach":"registry""#)
+            && body.contains(r#""switch":"LEMONFIBER_REACH_REGISTRY""#)
+            && body.contains(r#""theirs":[{"service":"prowlarr""#)),
+        "the list a browser is served"
+    );
+}

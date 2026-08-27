@@ -185,6 +185,7 @@ pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "w
 /// picking an audio format is not a choice this host has to transcode for. The
 /// command line drops it there too.
 pub const TAKES_AGREEMENT: &[&str] = &[
+    "forget",
     "quality-set",
     "quality-upgrade",
     "repair",

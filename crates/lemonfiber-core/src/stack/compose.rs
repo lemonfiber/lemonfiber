@@ -55,10 +55,24 @@ impl Action {
     }
 
     /// The Compose subcommand and its own arguments.
-    pub(crate) fn argv(&self) -> Vec<String> {
+    ///
+    /// `registry` is whether this operator allows images to be fetched. Where they
+    /// do not, a start is told never to pull rather than being left to Compose's
+    /// default of fetching whatever is missing — the setting has to reach the one
+    /// command that would otherwise do it silently, or it is a setting that means
+    /// nothing.
+    pub(crate) fn argv(&self, registry: bool) -> Vec<String> {
+        let starting = || {
+            let mut argv = vec!["up".to_owned(), "--detach".to_owned()];
+            if !registry {
+                argv.push("--pull".to_owned());
+                argv.push("never".to_owned());
+            }
+            argv
+        };
         match self {
-            Self::Up => vec!["up".to_owned(), "--detach".to_owned()],
-            Self::Start(services) => fenced(vec!["up".to_owned(), "--detach".to_owned()], services),
+            Self::Up => starting(),
+            Self::Start(services) => fenced(starting(), services),
             Self::Down => vec!["down".to_owned()],
             Self::Stop(services) => fenced(vec!["stop".to_owned()], services),
             Self::Restart(services) => fenced(vec!["restart".to_owned()], services),
@@ -133,7 +147,7 @@ pub fn build(
         argv.push(profile.clone());
     }
 
-    argv.extend(action.argv());
+    argv.extend(action.argv(settings.reaching.allows(crate::config::REACH_REGISTRY_KEY)));
     argv
 }
 
@@ -177,6 +191,51 @@ mod tests {
                 "--profile media up --detach"
             ))
         );
+    }
+
+    /// The other half of switching image fetching off. A fetch asked for on its own
+    /// is refused before it reaches here; a start would fetch whatever is missing
+    /// without being told not to, and a setting that only stopped the first would be
+    /// a setting that means half of what it says.
+    #[test]
+    fn a_start_is_told_never_to_pull_where_fetching_is_switched_off() {
+        let refusing = Settings {
+            reaching: crate::config::Reaching::without(crate::config::REACH_REGISTRY_KEY),
+            ..Settings::default()
+        };
+        let said = line(&["library"], &Action::Up, &refusing);
+        assert_eq!(
+            said.as_deref()
+                .map(|command| command.ends_with("up --detach --pull never")),
+            Some(true),
+            "{said:?}"
+        );
+        let narrowed = line(
+            &["library"],
+            &Action::Start(vec!["jellyfin".to_owned()]),
+            &refusing,
+        );
+        assert_eq!(
+            narrowed
+                .as_deref()
+                .map(|command| command.ends_with("up --detach --pull never -- jellyfin")),
+            Some(true),
+            "{narrowed:?}"
+        );
+    }
+
+    /// And a machine that allows fetching says nothing about pulling at all, so
+    /// Compose keeps its own default of fetching what is missing.
+    #[test]
+    fn a_start_that_may_fetch_is_told_nothing_about_pulling() {
+        for action in [Action::Up, Action::Start(vec!["jellyfin".to_owned()])] {
+            let said = line(&["library"], &action, &Settings::default());
+            assert_eq!(
+                said.as_deref().map(|command| command.contains("--pull")),
+                Some(false),
+                "{said:?}"
+            );
+        }
     }
 
     #[test]
@@ -287,7 +346,7 @@ mod tests {
         ] {
             assert_eq!(action.name(), name);
             assert_eq!(
-                action.argv().first().map(String::as_str),
+                action.argv(true).first().map(String::as_str),
                 Some(name),
                 "the name and the subcommand must not drift apart"
             );

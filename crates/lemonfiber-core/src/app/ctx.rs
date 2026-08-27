@@ -11,10 +11,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::archive::Archiving;
-use crate::config::Settings;
+use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
 use crate::ports::docker::Engine;
-use crate::ports::filesystem::Volume;
+use crate::ports::filesystem::{Eraser, Volume};
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
@@ -43,6 +43,12 @@ pub struct Ctx {
     /// Apart from the filesystem because the question is apart: a guard asks this
     /// and nothing else, and every other check asks the rest and never this.
     pub volume: Arc<dyn Volume>,
+    /// How a directory and everything beneath it is removed.
+    ///
+    /// Apart from the filesystem for the reason the volume is: the one command that
+    /// asks needs nothing else of a filesystem, and this is the one operation here
+    /// that cannot be undone.
+    pub eraser: Arc<dyn Eraser>,
     /// How services are reached over HTTP, for the checks and seeding that ask
     /// one what it is or wire it to another.
     pub http: Arc<dyn Http>,
@@ -104,15 +110,20 @@ pub struct Ctx {
 }
 
 /// A validator proving credentials against the real services, over `http` and over
-/// a real NNTP dialer.
+/// a real NNTP dialer — and only where this machine's settings allow the request.
 ///
-/// Both halves, because setup proves a Usenet login as well as an indexer key, and
-/// a validator with no transport for one reports it unreachable rather than
-/// pretending it was proven.
-fn live(http: &Arc<dyn Http>) -> Arc<dyn Validator> {
-    Arc::new(Live::with_nntp(
-        Arc::clone(http),
-        Arc::new(crate::adapters::Dialer::new()),
+/// Both transports, because setup proves a Usenet login as well as an indexer key,
+/// and a validator with no transport for one reports it unreachable rather than
+/// pretending it was proven. Wrapped in what the operator permits, so a credential
+/// whose proof would leave this machine against their settings is recorded unproven
+/// instead of being proven anyway.
+fn live(http: &Arc<dyn Http>, reaching: Reaching) -> Arc<dyn Validator> {
+    Arc::new(crate::validate::Allowed::new(
+        Arc::new(Live::with_nntp(
+            Arc::clone(http),
+            Arc::new(crate::adapters::Dialer::new()),
+        )),
+        reaching,
     ))
 }
 
@@ -152,7 +163,10 @@ impl Ctx {
             // command that asks is asking about this machine's drives, and a test
             // that means something else says so by name.
             volume: Arc::new(crate::adapters::Disk),
-            validator: live(&http),
+            // And the real eraser, for the same reason: a run asked to remove what
+            // this machine keeps is asking about this machine.
+            eraser: Arc::new(crate::adapters::Disk),
+            validator: live(&http, settings.reaching.clone()),
             http,
             random: Arc::new(crate::adapters::Os),
             site,
@@ -186,6 +200,16 @@ impl Ctx {
         self
     }
 
+    /// The same context, removing through the given eraser.
+    ///
+    /// The one seam a test cannot let out into a real filesystem and still be a
+    /// test: what it removes does not come back.
+    #[must_use]
+    pub fn erasing(mut self, eraser: Arc<dyn Eraser>) -> Self {
+        self.eraser = eraser;
+        self
+    }
+
     /// The same context, reaching services over the given transport.
     ///
     /// The seam seeding is driven through in a test: a fake here answers as a
@@ -198,7 +222,7 @@ impl Ctx {
     /// themselves says so with [`Self::proving`], afterwards.
     #[must_use]
     pub fn with_http(mut self, http: Arc<dyn Http>) -> Self {
-        self.validator = live(&http);
+        self.validator = live(&http, self.settings.reaching.clone());
         self.http = http;
         self
     }
