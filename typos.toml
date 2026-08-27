@@ -7,3 +7,9 @@ ratatui = "ratatui"
 Ratatui = "Ratatui"
 lemonfiber = "lemonfiber"
 Servarr = "Servarr"
+
+[files]
+# The embedded app is lemonfiber-web's built output: minified JavaScript whose
+# identifiers are generated, not written. Its prose is spell-checked in the repo
+# that authors it, before it is built.
+extend-exclude = ["assets/web"]
