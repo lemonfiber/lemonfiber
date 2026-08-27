@@ -287,12 +287,26 @@ async fn wrong_answers_are_free_for_a_while_and_then_made_to_wait() {
     let _ = fs::remove_dir_all(a_directory("counted"));
 }
 
+/// Guessing at the door is what earns the wait, rather than a count a test set.
+///
+/// The counting is a function, and a function the door does not call counts nothing:
+/// a limit reached only from a test is a limit an attacker never meets. So the wrong
+/// answers here are wrong answers *sent*, and each is checked to have been taken as
+/// one before the limit is asked about — a request refused for some other reason
+/// would leave this green having proved the opposite of what it says.
 #[tokio::test]
 async fn somebody_made_to_wait_is_told_how_long_and_is_told_it_twice() {
     let path = keeping("waiting");
-    let (router, _, admitting) = door(Some(path.clone()), Chance::cycling());
-    for _ in 0..6u8 {
-        admitting.attempts.wrong(moment()).await;
+    let (router, _, _) = door(Some(path.clone()), Chance::cycling());
+    let wrong = offering(&chosen().to_uppercase());
+
+    // Three are free and the fourth is the one that costs, so four sent wrong answers
+    // is the first moment a fifth request meets a wait. Each is refused as an answer
+    // rather than counted, which is what makes the wait below the door's own doing.
+    for attempt in 0..4u8 {
+        let refused = asked(router.clone(), "POST", SESSION, &from_here(), &wrong).await;
+        assert_eq!(refused.status, StatusCode::UNAUTHORIZED, "{attempt}");
+        assert!(refused.left.is_none(), "{attempt}");
     }
 
     // The right password, and it is not even looked at: the wait is what is answered.
