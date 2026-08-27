@@ -107,6 +107,14 @@ pub const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 /// where the operator runs no media server at all.
 pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 
+/// The address the household's own links are pointed at.
+///
+/// The stack's, and the one thing in it that says where this machine is reached
+/// from another device in the house. It ships pointed at this machine and nowhere
+/// else, which is the right default for a machine nobody has told where it is and
+/// the wrong address to hand anybody.
+pub const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
+
 /// The base URL of the indexer the operator gave at setup.
 pub const INDEXER_URL_KEY: &str = "INDEXER_URL";
 
@@ -272,6 +280,19 @@ pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
+}
+
+/// The address the operator recorded for the household's links, if they have.
+///
+/// An empty value is read as absent rather than as an address of nothing, the same
+/// reading the data root gets and for the same reason: a blank is a mistake, never
+/// an intent.
+#[must_use]
+pub fn household_host_from_env(file: &env::EnvFile) -> Option<String> {
+    file.get(HOUSEHOLD_HOST_KEY)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
 }
 
 /// The indexer the operator configured, where both its URL and key are present.
@@ -441,6 +462,12 @@ pub struct Settings {
     /// which reads as no authentication configured, because a credential nothing can
     /// find is a credential nothing can check.
     pub admission: Option<PathBuf>,
+    /// The address the operator recorded for the household's own links.
+    ///
+    /// Where the front door is reached from another device in the house, on a
+    /// machine whose own name is not published on the network. Absent until they
+    /// record one, which is the state a fresh install is in.
+    pub household_host: Option<String>,
     /// Whether this product explains the words it uses.
     ///
     /// On unless switched off. The words are a wall to somebody meeting them, and
@@ -472,6 +499,7 @@ impl Default for Settings {
             port_forward: PortForward::default(),
             indexer: None,
             admission: None,
+            household_host: None,
             explanations: true,
         }
     }
@@ -480,8 +508,8 @@ impl Default for Settings {
 #[cfg(test)]
 mod tests {
     use super::{
-        env, indexer_from_env, ip_echo_from_env, Indexer, Protocol, Protocols, Settings,
-        DEFAULT_IP_ECHO, SECOND_IP_ECHO,
+        env, household_host_from_env, indexer_from_env, ip_echo_from_env, Indexer, Protocol,
+        Protocols, Settings, DEFAULT_IP_ECHO, SECOND_IP_ECHO,
     };
 
     #[test]
@@ -516,6 +544,20 @@ mod tests {
 
         // Nothing configured at all.
         assert_eq!(indexer_from_env(&env::EnvFile::parse("")), None);
+    }
+
+    #[test]
+    fn the_household_address_is_read_and_a_blank_one_is_absent() {
+        // A blank is a mistake, never an intent — and an address of nothing is the
+        // one thing worse to hand somebody than no address at all.
+        let written = env::EnvFile::parse("HOMEPAGE_VAR_LAN_HOST= 192.168.1.10 \n");
+        assert_eq!(
+            household_host_from_env(&written),
+            Some("192.168.1.10".to_owned())
+        );
+        let blank = env::EnvFile::parse("HOMEPAGE_VAR_LAN_HOST=\n");
+        assert_eq!(household_host_from_env(&blank), None);
+        assert_eq!(household_host_from_env(&env::EnvFile::parse("")), None);
     }
 
     #[test]

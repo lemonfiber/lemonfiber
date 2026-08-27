@@ -170,6 +170,10 @@ pub enum Command {
     /// List the items whose downloads are stuck, each named so it links to its own
     /// trace — the landing point for "N items stuck".
     Stuck,
+    /// Name the one address to hand somebody who lives here, and say where it
+    /// stands — including that there is none, where this stack runs nothing they
+    /// could begin at.
+    FrontDoor,
     /// Say what one of this product's words means, at length.
     ///
     /// Answered from a table compiled into the binary, so it needs neither a stack

@@ -9,10 +9,12 @@
 //! twice is two places for the semantics to drift, and the drift is invisible until a test
 //! passes against one copy and would have failed against the other.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use lemonfiber_ports::network::Site;
 use lemonfiber_ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_ports::random::Random;
 use lemonfiber_ports::time::Clock;
@@ -91,5 +93,61 @@ impl Random for Chance {
                     .collect(),
             ),
         }
+    }
+}
+
+/// A machine that says what it is called, and can be made to say something else
+/// next time.
+///
+/// The name varies with the machine, so a test written against the real one would
+/// pass where it was written and nowhere else. The second answer is what makes a
+/// renamed machine testable: a reader that remembered the first would go on giving
+/// it after this one has changed.
+pub struct Renamed {
+    /// The answers, in the order they are given. The last is repeated once the rest
+    /// have been handed out, so a caller asking a third time is not answered with an
+    /// absence nobody scripted.
+    answers: Vec<Option<String>>,
+    /// How many have been asked for.
+    asked: AtomicUsize,
+}
+
+impl Renamed {
+    /// A machine that answers the same way however often it is asked.
+    #[must_use]
+    pub fn called(name: Option<&str>) -> Arc<Self> {
+        Arc::new(Self {
+            answers: vec![name.map(str::to_owned)],
+            asked: AtomicUsize::new(0),
+        })
+    }
+
+    /// A machine that answers this way once and that way afterwards.
+    #[must_use]
+    pub fn then(self: &Arc<Self>, name: Option<&str>) -> Arc<Self> {
+        let mut answers = self.answers.clone();
+        answers.push(name.map(str::to_owned));
+        Arc::new(Self {
+            answers,
+            asked: AtomicUsize::new(0),
+        })
+    }
+
+    /// How many times it has been asked.
+    #[must_use]
+    pub fn times(&self) -> usize {
+        self.asked.load(Ordering::Relaxed)
+    }
+}
+
+#[async_trait]
+impl Site for Renamed {
+    async fn name(&self) -> Option<String> {
+        let asked = self.asked.fetch_add(1, Ordering::Relaxed);
+        // The last answer stands once the rest have been handed out, so a caller
+        // asking once more than a test scripted is not answered with an absence
+        // nobody chose.
+        let last = self.answers.len().saturating_sub(1);
+        self.answers.get(asked.min(last)).cloned().flatten()
     }
 }

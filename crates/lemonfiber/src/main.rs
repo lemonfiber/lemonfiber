@@ -272,6 +272,7 @@ async fn main() -> ExitCode {
         Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
         Request::Household { member } => Command::Household { member },
         Request::Stuck => Command::Stuck,
+        Request::FrontDoor => Command::FrontDoor,
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },
