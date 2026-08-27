@@ -32,7 +32,6 @@
 pub mod attempts;
 pub mod sessions;
 
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -47,7 +46,7 @@ use lemonfiber_core::admission::{credential, Credential};
 use lemonfiber_core::model::{kind, Envelope};
 use serde::Deserialize;
 
-use crate::guard::{host_is_here, origin_is_here, Token, TOKEN_HEADER};
+use crate::guard::{host_is_here, origin_is_here, Binding, Token, TOKEN_HEADER};
 use crate::read::enveloped;
 use crate::router::Serving;
 use crate::serve::{carrying, SENTENCE};
@@ -147,10 +146,10 @@ pub fn routes() -> Router<Serving> {
 
 /// Whether a request says it came from where this server is listening.
 #[must_use]
-pub fn here(headers: &HeaderMap, bound: SocketAddr) -> bool {
+pub fn here(headers: &HeaderMap, at: Binding) -> bool {
     let said = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
-    host_is_here(said(header::HOST.as_str()), bound)
-        && origin_is_here(said(header::ORIGIN.as_str()), bound)
+    host_is_here(said(header::HOST.as_str()), at)
+        && origin_is_here(said(header::ORIGIN.as_str()), at)
 }
 
 /// Exchange a password for a session.
