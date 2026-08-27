@@ -67,13 +67,13 @@ fn assembled(
         .iter()
         .find(|running| running.id == service.id)
         .is_some_and(|running| answering(running.state));
-    let standing = standing(chosen, answering);
     let reached = reached(service, named, recorded, environment);
+    let standing = standing(chosen, answering, reached.is_some());
     FrontDoorReport {
         standing,
         service: Some(service.name.clone()),
         facing: Some(chosen),
-        meaning: meaning(standing, &service.name, reached.is_none()),
+        meaning: meaning(standing, &service.name),
         address: reached,
         beside: beside(declared, Some(service.id.as_str())),
     }
@@ -113,10 +113,20 @@ const NOWHERE: &str = "There is no front door. Nothing this stack runs for the h
                        one thing worse than saying so would be handing over an address that \
                        leads somewhere they cannot use.";
 
-/// Where the door stands, from what it is and whether it is answering.
-const fn standing(chosen: Facing, answering: bool) -> Standing {
+/// Where the door stands, from what it is, whether it is answering, and whether
+/// anything here can say where it would be reached.
+///
+/// The address is part of the answer rather than a caveat appended to it. This
+/// used to report `established` — which the feature defines as running *and*
+/// reachable — for a door that was answering on a machine with no address to
+/// arrive at, and say the rest in prose. Every consumer that reads the state
+/// rather than the sentence was told the door was fine.
+const fn standing(chosen: Facing, answering: bool, addressed: bool) -> Standing {
     if !answering {
         return Standing::Unreachable;
+    }
+    if !addressed {
+        return Standing::Stranded;
     }
     match chosen {
         Facing::Watching => Standing::LibraryOnly,
@@ -134,12 +144,12 @@ const fn standing(chosen: Facing, answering: bool) -> Standing {
 const UNADDRESSED: &str = " Nothing here can work out an address for this machine that another                            device would reach: it does not publish its own name, and the                            address the household's links point at is still the one that means                            this machine and nowhere else. Set `HOMEPAGE_VAR_LAN_HOST` to this                            machine's address on your network and it will be the address given                            here.";
 
 /// What this comes to, in the words an operator would say it in.
-fn meaning(standing: Standing, name: &str, unaddressed: bool) -> String {
-    let said = said(standing, name);
-    if unaddressed && standing != Standing::Absent {
-        return format!("{said}{UNADDRESSED}");
-    }
-    said
+///
+/// The address is no longer a caveat bolted to whatever else was said: a door
+/// nobody can reach has a standing of its own, and that standing's own sentence
+/// carries what to do about it.
+fn meaning(standing: Standing, name: &str) -> String {
+    said(standing, name)
 }
 
 /// What the standing itself comes to, before anything is said about the address.
@@ -157,6 +167,7 @@ fn said(standing: Standing, name: &str) -> String {
             "{name} is the front door and it is not answering, so there is nowhere to send \
              anybody yet. Nothing else here is a stand-in for it."
         ),
+        Standing::Stranded => format!("{name} is the front door and it is answering.{UNADDRESSED}"),
         Standing::Absent => NOWHERE.to_owned(),
     }
 }
@@ -192,7 +203,14 @@ mod tests {
     use crate::test_support::{a_context, Reporting};
     use lemonfiber_fixtures::ports::Renamed;
 
-    /// The stack this repository carries, with the named services running and well.
+    /// The stack this repository carries, with the named services running and well,
+    /// on a machine that says what it is called.
+    ///
+    /// The name is part of the fixture rather than left out, because a door with no
+    /// address is a *different* standing now — and a test that meant to be about
+    /// which service the door is would otherwise be about that instead. It was:
+    /// this fixture answered nothing, and the assertion beneath it said
+    /// `Established` for a door nobody could arrive at.
     fn ctx(up: &[&str]) -> crate::app::Ctx {
         a_context()
             .engine(std::sync::Arc::new(Reporting::holding(
@@ -201,6 +219,7 @@ mod tests {
                 Health::Healthy,
             )))
             .build()
+            .with_site(Renamed::called(Some("kitchen-nas")))
     }
 
     #[tokio::test]
@@ -345,9 +364,9 @@ mod tests {
     fn a_door_with_no_address_says_so_and_a_stack_with_no_door_does_not() {
         // The two absences are different: one has somewhere to send people and no
         // way to say where, and the other has nowhere to send them at all.
-        assert!(meaning(Standing::Established, "Seerr", true).contains(UNADDRESSED.trim()));
-        assert!(!meaning(Standing::Established, "Seerr", false).contains(UNADDRESSED.trim()));
-        assert_eq!(meaning(Standing::Absent, "Seerr", true), NOWHERE);
+        assert!(meaning(Standing::Stranded, "Seerr").contains(UNADDRESSED.trim()));
+        assert!(!meaning(Standing::Established, "Seerr").contains(UNADDRESSED.trim()));
+        assert_eq!(meaning(Standing::Absent, "Seerr"), NOWHERE);
     }
 
     #[tokio::test]
@@ -446,22 +465,95 @@ mod tests {
         assert_eq!(report.standing, Standing::Unreachable);
     }
 
+    /// The two ways a door is unreachable are two answers, not one with a caveat.
+    ///
+    /// One is fixed by starting a service and the other by giving this machine an
+    /// address, so a household member who cannot arrive is told which end the
+    /// problem is at before they start blaming their own device. Asserted on the
+    /// standing rather than on the sentence: the sentence already distinguished
+    /// them and the field every other surface reads did not, which is the whole of
+    /// what was wrong.
+    #[tokio::test]
+    async fn a_service_that_is_down_and_a_machine_with_no_address_are_two_answers() {
+        let down = a_context()
+            .engine(std::sync::Arc::new(Reporting::holding(
+                &["jellyfin"],
+                Lifecycle::Exited,
+                Health::None,
+            )))
+            .build()
+            .with_site(Renamed::called(Some("kitchen-nas")));
+        let stranded = a_context()
+            .engine(std::sync::Arc::new(Reporting::holding(
+                &["seerr"],
+                Lifecycle::Running,
+                Health::Healthy,
+            )))
+            .environment(Environment::LinuxNative)
+            .build()
+            .with_site(Renamed::called(None));
+
+        let down = front_door(&down).await.ok().map(|report| report.standing);
+        let stranded = front_door(&stranded)
+            .await
+            .ok()
+            .map(|report| report.standing);
+
+        assert_eq!(down, Some(Standing::Unreachable), "the service is not up");
+        assert_eq!(
+            stranded,
+            Some(Standing::Stranded),
+            "the service is up and there is no way to it"
+        );
+        assert_ne!(down, stranded, "and they are not the same answer");
+    }
+
+    /// A door nobody can arrive at is not established.
+    ///
+    /// The feature defines `established` as running **and reachable**. This
+    /// reported it for a door answering on a machine with no address, and said the
+    /// rest in prose — so a browser, a script or a dashboard reading the state was
+    /// told the door was fine while the sentence beneath it said otherwise.
+    #[tokio::test]
+    async fn a_door_with_no_address_is_not_reported_as_established() {
+        let household = a_context()
+            .engine(std::sync::Arc::new(Reporting::holding(
+                &["seerr"],
+                Lifecycle::Running,
+                Health::Healthy,
+            )))
+            .environment(Environment::LinuxNative)
+            .build()
+            .with_site(Renamed::called(None));
+        let report = front_door(&household).await.ok();
+
+        assert_eq!(
+            report.as_ref().map(|report| report.standing),
+            Some(Standing::Stranded)
+        );
+        assert_eq!(report.as_ref().and_then(|r| r.address.clone()), None);
+        // And what is said still carries the one thing that fixes it.
+        assert!(report
+            .as_ref()
+            .is_some_and(|report| report.meaning.contains("HOMEPAGE_VAR_LAN_HOST")));
+    }
+
     #[test]
     fn nothing_stands_in_for_a_door_that_is_not_answering() {
-        let said = meaning(Standing::Unreachable, "Seerr", false);
+        let said = meaning(Standing::Unreachable, "Seerr");
         assert!(said.contains("Seerr"));
         assert!(said.contains("stand-in"));
     }
 
     #[test]
     fn a_library_only_stack_is_told_there_is_nowhere_to_ask() {
-        let said = meaning(Standing::LibraryOnly, "Jellyfin", false);
+        let said = meaning(Standing::LibraryOnly, "Jellyfin");
         assert!(said.contains("nowhere to ask"));
     }
 
     #[test]
     fn no_door_at_all_says_so_rather_than_naming_the_nearest_thing() {
-        assert_eq!(meaning(Standing::Absent, "Homepage", false), NOWHERE);
+        assert_eq!(meaning(Standing::Absent, "Homepage"), NOWHERE);
         assert!(!NOWHERE.contains("Homepage"));
     }
 }
