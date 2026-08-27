@@ -196,6 +196,24 @@ pub enum Command {
     /// narrow it by — and an enumeration a surface could narrow would be one an
     /// operator could be shown half of.
     Outbound,
+    /// List what lemonfiber keeps on this machine: what each thing is, where it is,
+    /// and why it is kept.
+    ///
+    /// A read with no arguments. What it answers is the layout this build carries
+    /// against the directories this machine resolved, and there is nothing to narrow
+    /// it by — a disclosure a surface could ask for half of is one an operator could
+    /// be shown half of.
+    Stored,
+    /// Remove everything lemonfiber keeps on this machine.
+    ///
+    /// The whole of it: every location the layout names sits under one of two
+    /// directories, and both go. What is not lemonfiber's — the library, the
+    /// containers — is named in the answer and never touched.
+    Forget {
+        /// Whether the operator confirmed the loss; without it, what would go is
+        /// listed and nothing is removed.
+        confirm: bool,
+    },
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///

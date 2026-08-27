@@ -613,6 +613,7 @@ fn carries_agreement(command: &Command) -> bool {
         Command::Quality(QualityAction::Set { confirm: true, .. })
             | Command::QualityUpgrade { confirm: true }
             | Command::Reset { confirm: true }
+            | Command::Forget { confirm: true }
             | Command::Restore {
                 consent: RestoreConsent::Given { .. } | RestoreConsent::Standing,
                 ..

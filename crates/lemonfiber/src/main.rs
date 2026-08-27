@@ -8,7 +8,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 use lemonfiber_core::doctor::Narrowing;
@@ -143,6 +143,19 @@ fn locale() -> Option<String> {
         .find_map(|name| std::env::var(name).ok().filter(|said| !said.is_empty()))
 }
 
+/// A repairing run, which ends here rather than going through dispatch.
+///
+/// It looks, offers, acts and looks again, rendering what became of each — not one
+/// value an envelope holds — so it answers for itself. With nowhere to keep its own
+/// files there is nothing to repair against, which is the one thing it cannot work
+/// around.
+async fn repairing(ctx: Ctx, mending: Mending, json: bool) -> ExitCode {
+    let Some(paths) = here() else {
+        return no_config_home();
+    };
+    repair::run(ctx, paths, mending, &Keyboard, json).await
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -234,19 +247,15 @@ async fn main() -> ExitCode {
             // renders what became of each — not one value from dispatch. A plain run falls
             // through to the diagnosis below and changes nothing.
             if mending.acts() {
-                let Some(paths) = here() else {
-                    return no_config_home();
-                };
-                return repair::run(ctx, paths, mending, &Keyboard, cli.json).await;
+                return repairing(ctx, mending, cli.json).await;
             }
-            let narrowing = match narrowed(only.as_deref()) {
-                Ok(narrowing) => narrowing,
+            match narrowed(only.as_deref()) {
+                Ok(narrowing) => Command::Doctor {
+                    narrowing,
+                    disruptive,
+                    accept,
+                },
                 Err(code) => return code,
-            };
-            Command::Doctor {
-                narrowing,
-                disruptive,
-                accept,
             }
         }
         // The term is taken as words so it can be typed unquoted; joined back into the
@@ -274,6 +283,8 @@ async fn main() -> ExitCode {
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
         Request::Outbound => Command::Outbound,
+        Request::Stored => Command::Stored,
+        Request::Forget { confirm } => Command::Forget { confirm },
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },

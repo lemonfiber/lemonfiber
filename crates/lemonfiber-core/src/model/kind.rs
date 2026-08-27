@@ -93,6 +93,8 @@ pub const START: Kind = Kind("start");
 pub const STATUS: Kind = Kind("status");
 /// One step of a walkthrough, said the moment it is true.
 pub const STEP: Kind = Kind("step");
+/// Everything lemonfiber keeps on this machine, and what became of it.
+pub const STORED: Kind = Kind("stored");
 /// The items whose downloads are stuck.
 pub const STUCK: Kind = Kind("stuck");
 /// Where one item is in the pipeline.
@@ -142,6 +144,7 @@ pub const ALL: &[Kind] = &[
     START,
     STATUS,
     STEP,
+    STORED,
     STUCK,
     TRACE,
     UNDO,

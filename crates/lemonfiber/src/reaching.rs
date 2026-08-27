@@ -76,6 +76,10 @@ pub const ACTS: &[Reach] = &[
         through: "restore",
     },
     Reach {
+        request: "forget",
+        through: "forget",
+    },
+    Reach {
         request: "reset",
         through: "reset",
     },
@@ -131,6 +135,10 @@ pub const ASKS: &[Reach] = &[
     Reach {
         request: "outbound",
         through: "/api/outbound",
+    },
+    Reach {
+        request: "stored",
+        through: "/api/stored",
     },
 ];
 

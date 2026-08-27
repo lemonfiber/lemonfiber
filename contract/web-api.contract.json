@@ -5429,6 +5429,214 @@
         }
       }
     },
+    "stored": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Stored"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Beside": {
+          "description": "Something on this machine that lemonfiber neither keeps nor removes.",
+          "type": "object",
+          "properties": {
+            "what": {
+              "description": "What it is.",
+              "type": "string"
+            },
+            "why": {
+              "description": "Whose it is, and why it is not lemonfiber's to take away.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "why"
+          ]
+        },
+        "Kept": {
+          "description": "One thing lemonfiber keeps on this machine.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "Where it is, in full.",
+              "type": "string"
+            },
+            "secret": {
+              "description": "Whether it holds a credential, which is what decides how carefully a copy of\nit has to be treated.",
+              "type": "boolean"
+            },
+            "what": {
+              "description": "What it is, in the operator's words.",
+              "type": "string"
+            },
+            "why": {
+              "description": "Why it is kept.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "at",
+            "why",
+            "secret"
+          ]
+        },
+        "Left": {
+          "description": "Something a removal could not take away.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "The path that is still there.",
+              "type": "string"
+            },
+            "why": {
+              "description": "What the machine said about it, so it can be finished by hand.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "why"
+          ]
+        },
+        "Removal": {
+          "description": "Whether anything was removed on this run, and what became of it.",
+          "oneOf": [
+            {
+              "description": "Nobody asked. This is a listing.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "not-asked"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Asked for without the agreement it takes, so nothing was touched.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "unconfirmed"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Carried out.",
+              "type": "object",
+              "properties": {
+                "gone": {
+                  "description": "The directories that are gone.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "left": {
+                  "description": "What could not be removed, each with the reason.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Left"
+                  }
+                },
+                "state": {
+                  "type": "string",
+                  "const": "done"
+                }
+              },
+              "required": [
+                "state",
+                "gone",
+                "left"
+              ]
+            }
+          ]
+        },
+        "Root": {
+          "description": "A directory everything lemonfiber keeps sits under.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "The directory itself.",
+              "type": "string"
+            },
+            "what": {
+              "description": "What lives under it, and what losing it would cost.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "what"
+          ]
+        },
+        "Stored": {
+          "description": "Everything lemonfiber keeps on this machine, and what became of it.",
+          "type": "object",
+          "properties": {
+            "beside": {
+              "description": "What is on this machine that is not lemonfiber's to keep or remove.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Beside"
+              }
+            },
+            "kept": {
+              "description": "Each thing kept, configuration first and then what can be made again.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Kept"
+              }
+            },
+            "removal": {
+              "description": "Whether this run removed any of it.",
+              "$ref": "#/$defs/Removal"
+            },
+            "roots": {
+              "description": "The two directories all of it lives under.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Root"
+              }
+            }
+          },
+          "required": [
+            "roots",
+            "kept",
+            "beside",
+            "removal"
+          ]
+        }
+      }
+    },
     "stuck": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

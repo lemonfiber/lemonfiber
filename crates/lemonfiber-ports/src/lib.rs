@@ -38,7 +38,7 @@ pub mod trace;
 pub mod withheld;
 
 pub use docker::Engine;
-pub use filesystem::{FileSystem, Volume};
+pub use filesystem::{Eraser, FileSystem, Volume};
 pub use http::Http;
 pub use narration::Narrator;
 pub use network::Site;

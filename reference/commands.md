@@ -31,6 +31,8 @@ Commands:
   stuck        List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   front-door   Name the one address to send somebody who lives here
   outbound     List everything that leaves this machine, and what refusing each of it costs
+  stored       List what lemonfiber keeps on this machine, where it is, and why
+  forget       Remove everything lemonfiber keeps on this machine
   seed         Wire the stack's services to each other, idempotently
   adopt        Adopt your current edits as lemonfiber's expected state
   reset        Put the stack back to lemonfiber's own state, reverting every edit you made
@@ -952,6 +954,61 @@ lemonfiber's own requests first — where each goes, why, exactly what travels, 
 Usage: lemonfiber outbound [OPTIONS]
 
 Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber stored`
+
+```text
+List what lemonfiber keeps on this machine, where it is, and why.
+
+Everything it writes sits under two directories. This names each thing under them, says what it is for, and marks the ones holding a credential — and it names what is *not* lemonfiber's, because your library being absent from the list is the part worth being sure about.
+
+Usage: lemonfiber stored [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber forget`
+
+```text
+Remove everything lemonfiber keeps on this machine.
+
+The two directories and everything under them. Your library, your downloads and the containers are not lemonfiber's and are never touched. Because it throws work away it lists what would go and does nothing until `--confirm`.
+
+Usage: lemonfiber forget [OPTIONS]
+
+Options:
+      --confirm
+          Go ahead and remove it, having seen what would go
+
       --json
           Print machine-readable output
 

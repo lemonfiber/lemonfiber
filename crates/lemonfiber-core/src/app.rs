@@ -54,6 +54,7 @@ mod screen;
 mod seed;
 pub mod seeding;
 pub mod setup;
+mod stored;
 pub mod support;
 mod targets;
 mod trace;
@@ -111,6 +112,8 @@ pub enum Outcome {
     Glossary(Vocabulary),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
+    /// Everything this machine keeps of lemonfiber's, and what became of it.
+    Stored(crate::stored::Stored),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -159,6 +162,7 @@ impl Outcome {
             Self::Word(_) => kind::WORD,
             Self::Glossary(_) => kind::GLOSSARY,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
+            Self::Stored(_) => crate::model::kind::STORED,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Repair(_) => kind::REPAIR,
@@ -195,6 +199,7 @@ impl serde::Serialize for Outcome {
             Self::Word(term) => term.serialize(serializer),
             Self::Glossary(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
+            Self::Stored(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Repair(report) => report.serialize(serializer),
@@ -299,6 +304,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .await
             .map(Outcome::Repair),
         Command::Undo => repair::reversing(ctx).await.map(Outcome::Undo),
+        Command::Stored => stored::listing(ctx).map(Outcome::Stored),
+        // The one write here, and it is the same answer twice: unconfirmed it lists
+        // what would go, confirmed it goes.
+        Command::Forget { confirm } => stored::forgetting(ctx, confirm).await.map(Outcome::Stored),
         // Held open until the location is lost, which is what a guard is. The
         // interval is this command's own rather than the caller's: a surface that
         // could choose it could choose one that misses the moment it exists for.
@@ -377,6 +386,41 @@ mod tests {
             })
             .build();
         crate::app::fixtures::keeping(stopped, vault)
+    }
+
+    /// What this machine keeps, asked for here as well as from the integration test
+    /// beside it — the arms are reached from two compilations of this file and have
+    /// to run in both.
+    #[tokio::test]
+    async fn a_dispatched_disclosure_serialises_under_its_own_kind() {
+        let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
+        let json = dispatch(Command::Stored, &keeping_archives(&vault))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+
+        assert!(json.contains("\"kind\":\"stored\""), "{json}");
+        assert!(json.contains("\"state\":\"not-asked\""), "{json}");
+    }
+
+    /// And the other half of the same answer. An unconfirmed removal lists what
+    /// would go and takes none of it, so this reaches the arm without a filesystem
+    /// being anywhere near it.
+    #[tokio::test]
+    async fn an_unconfirmed_removal_answers_with_what_would_go() {
+        let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
+        let json = dispatch(
+            Command::Forget { confirm: false },
+            &keeping_archives(&vault),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+
+        assert!(json.contains("\"kind\":\"stored\""), "{json}");
+        assert!(json.contains("\"state\":\"unconfirmed\""), "{json}");
     }
 
     #[tokio::test]
@@ -954,6 +998,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Outbound(_)
+                | Outcome::Stored(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -993,6 +1038,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Outbound(_)
+                | Outcome::Stored(_)
                 | Outcome::Status(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)
@@ -1812,6 +1858,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Outbound(_)
+                | Outcome::Stored(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -2805,6 +2852,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Outbound(_)
+                | Outcome::Stored(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)

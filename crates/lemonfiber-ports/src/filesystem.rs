@@ -343,6 +343,28 @@ pub trait Volume: Send + Sync {
     async fn presence(&self, path: &Path) -> Presence;
 }
 
+/// Removing a directory and everything beneath it.
+///
+/// A trait of its own rather than another method on [`FileSystem`], for the reason
+/// [`Volume`] is one: the command that needs it needs nothing else of a filesystem,
+/// and every other implementation of the wider trait would gain a method it never
+/// calls. It is also the one operation here that cannot be undone, which is a
+/// smaller thing to be sure about behind a seam of its own.
+#[async_trait]
+pub trait Eraser: Send + Sync {
+    /// Remove `path` and everything beneath it.
+    ///
+    /// A path that is not there is already removed, and is not a fault: running this
+    /// twice is a reasonable thing to do and the second run has nothing to complain
+    /// about.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where the tree could not be removed, in the platform's own
+    /// words — which is what the operator needs in order to finish it by hand.
+    async fn erase(&self, path: &Path) -> Result<(), Fault>;
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};

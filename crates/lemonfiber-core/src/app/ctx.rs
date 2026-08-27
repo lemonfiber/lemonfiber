@@ -14,7 +14,7 @@ use crate::archive::Archiving;
 use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
 use crate::ports::docker::Engine;
-use crate::ports::filesystem::Volume;
+use crate::ports::filesystem::{Eraser, Volume};
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
@@ -43,6 +43,12 @@ pub struct Ctx {
     /// Apart from the filesystem because the question is apart: a guard asks this
     /// and nothing else, and every other check asks the rest and never this.
     pub volume: Arc<dyn Volume>,
+    /// How a directory and everything beneath it is removed.
+    ///
+    /// Apart from the filesystem for the reason the volume is: the one command that
+    /// asks needs nothing else of a filesystem, and this is the one operation here
+    /// that cannot be undone.
+    pub eraser: Arc<dyn Eraser>,
     /// How services are reached over HTTP, for the checks and seeding that ask
     /// one what it is or wire it to another.
     pub http: Arc<dyn Http>,
@@ -157,6 +163,9 @@ impl Ctx {
             // command that asks is asking about this machine's drives, and a test
             // that means something else says so by name.
             volume: Arc::new(crate::adapters::Disk),
+            // And the real eraser, for the same reason: a run asked to remove what
+            // this machine keeps is asking about this machine.
+            eraser: Arc::new(crate::adapters::Disk),
             validator: live(&http, settings.reaching.clone()),
             http,
             random: Arc::new(crate::adapters::Os),
@@ -188,6 +197,16 @@ impl Ctx {
     #[must_use]
     pub fn keeping(mut self, archives: Archiving) -> Self {
         self.archives = Some(archives);
+        self
+    }
+
+    /// The same context, removing through the given eraser.
+    ///
+    /// The one seam a test cannot let out into a real filesystem and still be a
+    /// test: what it removes does not come back.
+    #[must_use]
+    pub fn erasing(mut self, eraser: Arc<dyn Eraser>) -> Self {
+        self.eraser = eraser;
         self
     }
 

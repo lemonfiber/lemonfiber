@@ -1,10 +1,10 @@
 //! What the dashboard can be asked, and what each question comes to.
 //!
-//! Nine reads behind one key, rather than nine keys. The screen already answers
+//! Ten reads behind one key, rather than ten keys. The screen already answers
 //! `q`, `r`, `?` and five actions, and a key per request does not survive being
 //! done twice — so what a person opens is the list of what this stack can be
-//! asked, and the list is where a tenth read would go without costing anybody a
-//! letter to remember. Fourteen questions sit over those nine, because four of the
+//! asked, and the list is where an eleventh read would go without costing anybody a
+//! letter to remember. Fifteen questions sit over those ten, because four of the
 //! reads are asked both whole and narrowed and each of those pairs is two entries
 //! on the list and one request in the parity table either way — and one of them is
 //! narrowed twice over, a trace being asked for a show and then for one season of
@@ -32,8 +32,8 @@
 //! that flow decides belongs beside the list it decides over.
 
 use lemonfiber_api::reads::{
-    named, Wanted as Asking, CHECKS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND, QUALITY, REQUESTS, STUCK,
-    TRACE, VERSION,
+    named, Wanted as Asking, CHECKS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND, QUALITY, REQUESTS,
+    STORED, STUCK, TRACE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -318,6 +318,12 @@ static AFTER: &[Question] = &[
         name: "where the household begins",
         about: "the one address to send somebody who lives here, and why nothing else is",
         read: FRONT_DOOR,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what is kept on this machine",
+        about: "every file lemonfiber writes, where it is, and why it is kept",
+        read: STORED,
         needs: Needed::Nothing,
     },
     Question {

@@ -24,6 +24,7 @@
 //! under test rather than a service standing in for another.
 
 pub mod downloads;
+pub mod erasing;
 pub mod files;
 pub mod http;
 pub mod ports;

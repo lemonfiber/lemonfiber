@@ -1,15 +1,15 @@
 //! The rest of what this stack can be told to do, and what becomes of one.
 //!
-//! Seven errands behind one key. The screen already answers `q`, `r`, `?`, the key
+//! Eight errands behind one key. The screen already answers `q`, `r`, `?`, the key
 //! that opens the questions and five actions of its own, and there is no letter
 //! left that anybody would guess — so this is the arrangement [`super::question`]
 //! already made for the reads, made again for the writes that are not the lifecycle
-//! five. An eighth errand goes on the list without costing anybody a letter to
+//! five. A ninth errand goes on the list without costing anybody a letter to
 //! learn.
 //!
 //! The key promises only that there is more. A wiring, a capture, a bundle, an
 //! archive put back and a revert have no one word between them that is not vaguer
-//! than the seven names on the list, and a key claiming something the list does not
+//! than the eight names on the list, and a key claiming something the list does not
 //! hold is worse than one claiming nothing — so what each errand is is said on the
 //! row, where there is room to say it.
 //!
@@ -192,6 +192,15 @@ static AFTER: &[Errand] = &[
         about: "put lemonfiber's own state back over every value you changed",
         action: "reset",
         asks: "Throw away every edit above",
+        needs: Needs::Nothing,
+        accepts: None,
+        going: Going::Agreed,
+    },
+    Errand {
+        name: "everything lemonfiber keeps removed",
+        about: "take every file lemonfiber wrote off this machine; your library is not one",
+        action: "forget",
+        asks: "Remove everything listed above",
         needs: Needs::Nothing,
         accepts: None,
         going: Going::Agreed,

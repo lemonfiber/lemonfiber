@@ -82,6 +82,12 @@ pub const EXPLAIN: &str = "/api/explain";
 /// and the stack's, told apart.
 pub const OUTBOUND: &str = "/api/outbound";
 
+/// Everything lemonfiber keeps on this machine, where each thing is and why.
+///
+/// The read a browser is least able to answer for itself: a page has no filesystem
+/// in front of it and cannot see the host at all.
+pub const STORED: &str = "/api/stored";
+
 /// The backup archives this machine has kept, by the names they were written under.
 ///
 /// Named for what it lists rather than for the command it reaches: what these are
@@ -114,7 +120,7 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
     VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, FRONT_DOOR, TRACE, STUCK, CONFIG,
-    QUALITY, EXPLAIN, BACKUPS, OUTBOUND,
+    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -210,6 +216,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         EXPLAIN => Ok(word.map_or(Command::Glossary, |word| Command::Explain { word })),
         BACKUPS => Ok(Command::Archives),
         OUTBOUND => Ok(Command::Outbound),
+        STORED => Ok(Command::Stored),
         _ => Err(NO_SUCH_READ),
     }
 }
