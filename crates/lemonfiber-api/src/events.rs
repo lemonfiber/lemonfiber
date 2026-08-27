@@ -18,7 +18,6 @@ pub mod stepping;
 pub mod wire;
 
 use std::convert::Infallible;
-use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -27,7 +26,7 @@ use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::get;
 use axum::Router;
 
-use crate::guard::Token;
+use crate::guard::{Binding, Token};
 use crate::serve::{admitted, carrying, refused, STREAM};
 
 use self::live::{Listening, Live};
@@ -46,8 +45,8 @@ pub struct Streaming {
     /// minted again: two secrets for one run would be a run a client could be
     /// admitted to half of.
     pub token: Arc<Token>,
-    /// The address this server is listening on, which every request must name.
-    pub bound: SocketAddr,
+    /// Where this server is listening, as much of it as every request must name.
+    pub bound: Binding,
     /// Who this run has let in, so a listener holding a session is heard too.
     ///
     /// The same register the rest of the surface reads. Two would be a run somebody

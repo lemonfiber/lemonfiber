@@ -9,13 +9,11 @@
 //! rendering answers the command line, so the two cannot say different things
 //! about the same state.
 
-use std::net::SocketAddr;
-
 use axum::body::Body;
 use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 
 use crate::admission::here;
-use crate::guard::TOKEN_HEADER;
+use crate::guard::{Binding, TOKEN_HEADER};
 
 /// Why a request was not answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,11 +60,11 @@ impl Refusal {
 /// # Errors
 ///
 /// Returns the refusal a caller should answer with.
-pub fn admitted(known: bool, headers: &HeaderMap, bound: SocketAddr) -> Result<(), Refusal> {
+pub fn admitted(known: bool, headers: &HeaderMap, at: Binding) -> Result<(), Refusal> {
     if !known {
         return Err(Refusal::Unknown);
     }
-    if !here(headers, bound) {
+    if !here(headers, at) {
         return Err(Refusal::Elsewhere);
     }
     Ok(())

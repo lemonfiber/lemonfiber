@@ -80,7 +80,7 @@ impl Run {
             serving: Serving {
                 ctx: Arc::new(ctx),
                 token: Arc::new(Token::mint(&given())?),
-                bound: ([127, 0, 0, 1], 8471).into(),
+                bound: lemonfiber_api::guard::Binding::here(8471),
                 admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
                 jobs: Jobs::default(),
                 live: Arc::clone(&live),

@@ -20,10 +20,10 @@
 //! dashboard, and an operator who reached for the wrong letter should not lose the
 //! screen they were reading.
 //!
-//! **The four choices are made here, because afterwards there is no screen to make
+//! **The five choices are made here, because afterwards there is no screen to make
 //! them on.** `lemonfiber ui` takes a port, whether to open a browser, a
-//! directory to serve the interface from, and whether to set the password this
-//! surface asks for, and this key left them all at their
+//! directory to serve the interface from, whether to set the password this surface
+//! asks for, and how far it may be reached, and this key left them all at their
 //! defaults — so a screen reached the request and not its arguments, which is the
 //! same gap every other partial row on the parity table records. They are made under
 //! the question rather than before it: what the surface is about to be given is on
@@ -31,7 +31,7 @@
 //! shown.
 //!
 //! **They are offered on enter rather than on a key of their own.** This screen
-//! answers thirteen letters already, and the four are settings on one request
+//! answers thirteen letters already, and the five are settings on one request
 //! rather than alternatives to choose between — so a list opened before the
 //! question would be asking which of them to serve with. Enter is what every list
 //! here is taken with and the one key this question had no use for, so the two
@@ -74,6 +74,7 @@
 //! with `--assets` a moment earlier. What is served out of it is read-only and is
 //! held inside it by [`lemonfiber_core::within`], as it is for `--assets`.
 
+use crate::ui::reach::Reach;
 use crate::ui::Asked;
 
 use super::chooser::{Chooser, Listed};
@@ -97,6 +98,12 @@ const ASKED_FOR: &str = "you are asked for one before it starts";
 
 /// What it says where the password is left as it stands.
 const LEFT: &str = "left as it is";
+
+/// What the reach row says where the network is asked for.
+const NETWORK: &str = "your network, which needs a password set";
+
+/// What it says where it is not.
+const MACHINE: &str = "this machine only";
 
 /// What the port row says where no port was named.
 const WHICHEVER: &str = "whichever one is free";
@@ -150,6 +157,8 @@ pub(super) enum Turns {
     Browser,
     /// Whether a password is asked for before it starts.
     Password,
+    /// How far it may be reached.
+    Reach,
 }
 
 impl Turns {
@@ -158,6 +167,7 @@ impl Turns {
         match *self {
             Self::Browser => asked.turned(),
             Self::Password => asked.asking(),
+            Self::Reach => asked.reaching(),
         }
     }
 }
@@ -181,7 +191,7 @@ enum Takes {
     Turned(Turns),
 }
 
-/// One of the four choices, and what it is set to.
+/// One of the five choices, and what it is set to.
 pub(super) struct Chosen {
     /// What it is called on the row.
     name: &'static str,
@@ -201,7 +211,7 @@ impl Listed for Chosen {
     }
 }
 
-/// The four as they stand, the one the list opens on apart from the rest.
+/// The five as they stand, the one the list opens on apart from the rest.
 ///
 /// Built from what the surface is about to be given rather than held beside it, so
 /// the row an operator reads and the value the surface is started with cannot come
@@ -240,6 +250,15 @@ pub(super) fn choices(asked: &Asked) -> (Chosen, Vec<Chosen>) {
                 about: if asked.password { ASKED_FOR } else { LEFT }.to_owned(),
                 takes: Takes::Turned(Turns::Password),
             },
+            Chosen {
+                name: "reach",
+                about: match asked.reach {
+                    Reach::Network => NETWORK,
+                    Reach::Machine => MACHINE,
+                }
+                .to_owned(),
+                takes: Takes::Turned(Turns::Reach),
+            },
         ],
     )
 }
@@ -256,11 +275,11 @@ pub(super) enum Open {
         /// Why the last word typed was not taken, where it was not.
         refused: Option<&'static str>,
     },
-    /// The four choices, one of them selected.
+    /// The five choices, one of them selected.
     Choosing(Chooser<Chosen>),
     /// The line one of their values is typed on.
     Typing {
-        /// Which of the four the word being typed fills.
+        /// Which of the five the word being typed fills.
         fills: Fills,
         /// What is asked for, above the line being typed.
         asks: &'static str,
@@ -286,7 +305,7 @@ pub(super) fn handing(stage: &mut Stage, asked: Asked, open: Open, press: &Press
     }
 }
 
-/// At the question: go ahead, open the four choices, or leave it.
+/// At the question: go ahead, open the five choices, or leave it.
 ///
 /// Only an explicit yes goes ahead, and what it goes ahead with is what the question
 /// showed — including a choice that was refused, which the question says so about
@@ -306,7 +325,7 @@ fn agreeing(stage: &mut Stage, asked: Asked, press: &Press) -> Wanted {
     }
 }
 
-/// Over the four: move, take one, or leave it.
+/// Over the five: move, take one, or leave it.
 fn choosing(
     stage: &mut Stage,
     asked: Asked,
@@ -399,8 +418,11 @@ fn typing(
 
 #[cfg(test)]
 mod tests {
-    use super::{ABOUT, ASKED_FOR, ASKS, BUILT_IN, KEY, LEFT, UNOPENED, WHICHEVER};
+    use super::{
+        ABOUT, ASKED_FOR, ASKS, BUILT_IN, KEY, LEFT, MACHINE, NETWORK, UNOPENED, WHICHEVER,
+    };
     use crate::acting::{Acting, Press, Wanted};
+    use crate::ui::reach::Reach;
     use crate::ui::{Asked, NOT_A_PORT};
     use lemonfiber::reaching::OPENS;
 
@@ -619,6 +641,40 @@ mod tests {
                 ..Asked::unsaid()
             })
         );
+    }
+
+    /// How far it may be reached is a row too, and asking for the network is what the
+    /// surface then has to be allowed to do.
+    #[test]
+    fn the_reach_row_says_which_of_the_two_it_is_asked_for() {
+        let mut acting = changing();
+        down(&mut acting, 4);
+        acting.pressed(&Press::Accept);
+
+        let said = showing(&acting);
+        assert!(said.contains(NETWORK), "{said}");
+        assert_eq!(
+            started(&mut acting),
+            Some(Asked {
+                reach: Reach::Network,
+                ..Asked::unsaid()
+            })
+        );
+    }
+
+    /// And the way back, which is the same row again.
+    #[test]
+    fn asking_for_the_network_and_then_not_is_this_machine_again() {
+        let mut acting = changing();
+        down(&mut acting, 4);
+        acting.pressed(&Press::Accept);
+        acting.pressed(&Press::Accept);
+        down(&mut acting, 4);
+        acting.pressed(&Press::Accept);
+
+        let said = showing(&acting);
+        assert!(said.contains(MACHINE), "{said}");
+        assert_eq!(started(&mut acting), Some(Asked::unsaid()));
     }
 
     /// Turning it back is the same row again, and taking the surface at its defaults

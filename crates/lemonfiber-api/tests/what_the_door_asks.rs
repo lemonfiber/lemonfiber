@@ -14,7 +14,7 @@ use axum::http::{header, Request, StatusCode};
 use lemonfiber_api::admission::{Admitting, RETRY_AFTER, SESSION};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
-use lemonfiber_api::guard::{Token, TOKEN_HEADER};
+use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::{routes, Serving};
 use lemonfiber_core::admission::{credential, Credential};
@@ -30,14 +30,17 @@ use tower::ServiceExt as _;
 /// The second the stopped clock reads.
 const NOW: u64 = 1_700_000_000;
 
-/// The address this surface says it is listening on.
-fn bound() -> std::net::SocketAddr {
-    ([127, 0, 0, 1], 8471).into()
+/// The port this surface says it is listening on.
+const PORT: u16 = 8471;
+
+/// Serving this machine and nowhere else.
+fn bound() -> Binding {
+    Binding::here(PORT)
 }
 
 /// What a request has to say to have come from here.
 fn from_here() -> Vec<(&'static str, String)> {
-    vec![("host", format!("127.0.0.1:{}", bound().port()))]
+    vec![("host", format!("127.0.0.1:{PORT}"))]
 }
 
 /// The moment every one of these runs at.

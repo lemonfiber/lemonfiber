@@ -3,11 +3,9 @@
 //! Driven from outside the crate, because what a caller can reach is the thing
 //! worth holding still.
 
-use std::net::SocketAddr;
-
 use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
-use lemonfiber_api::guard::{Token, TOKEN_HEADER};
+use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 use lemonfiber_api::read::enveloped;
 use lemonfiber_api::serve::{admitted, answered, refused, token_header, Refusal};
 use lemonfiber_fixtures::ports::Chance;
@@ -21,8 +19,8 @@ fn given() -> Chance {
     Chance::cycling()
 }
 
-fn bound() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], 8471))
+fn bound() -> Binding {
+    Binding::here(8471)
 }
 
 /// A request saying what a browser on this machine would say.

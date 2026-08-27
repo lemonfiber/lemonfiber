@@ -1330,6 +1330,7 @@ mod tests {
                 browser: false,
                 assets: Some(std::path::PathBuf::from("/srv/app")),
                 password: true,
+                reach: crate::ui::reach::Reach::Network,
             },
             open: Open::Nothing { refused: None },
         };

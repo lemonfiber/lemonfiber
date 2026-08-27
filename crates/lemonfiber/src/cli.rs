@@ -434,6 +434,13 @@ pub struct RawUi {
     /// with an empty page.
     #[arg(long, value_name = "PATH")]
     pub assets: Option<PathBuf>,
+    /// Offer this to your network, rather than to this machine only.
+    ///
+    /// Refused unless a password has been set. This surface can start, stop and
+    /// reconfigure everything and reaches every password the system holds, so it is
+    /// not offered to a network with nothing in front of it.
+    #[arg(long)]
+    pub lan: bool,
     /// Set the password this surface asks for, before it starts.
     ///
     /// Asked for at the keyboard and never on this line: a password typed as an

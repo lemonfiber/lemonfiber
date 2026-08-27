@@ -84,7 +84,7 @@ impl Serving {
             Arc::new(Streaming {
                 admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
                 token: Arc::new(token),
-                bound: ([127, 0, 0, 1], 8471).into(),
+                bound: lemonfiber_api::guard::Binding::here(8471),
                 live: Arc::clone(&live),
             })
         });

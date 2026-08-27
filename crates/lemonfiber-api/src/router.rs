@@ -8,7 +8,6 @@
 //! What each part of the surface answers is declared beside that part. This only
 //! assembles them, and holds the one thing all of them are handed.
 
-use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::{Request, State};
@@ -20,7 +19,7 @@ use lemonfiber_core::app::Ctx;
 use crate::admission::Admitting;
 use crate::events::live::Live;
 use crate::events::Streaming;
-use crate::guard::Token;
+use crate::guard::{Binding, Token};
 use crate::jobs::Jobs;
 use crate::serve::{admitted, refused};
 
@@ -35,8 +34,8 @@ pub struct Serving {
     pub ctx: Arc<Ctx>,
     /// The secret minted for this run, which every request must carry.
     pub token: Arc<Token>,
-    /// The address this server is listening on, which a request must name.
-    pub bound: SocketAddr,
+    /// Where this server is listening, as much of it as a request must name.
+    pub bound: Binding,
     /// The work this run started, which the actions that take minutes are named
     /// and left to run under.
     pub jobs: Jobs,
