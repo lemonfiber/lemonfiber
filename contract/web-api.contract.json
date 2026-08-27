@@ -2385,9 +2385,14 @@
               "const": "library-only"
             },
             {
-              "description": "There is a door and it is not answering.",
+              "description": "There is a door and it is not answering.\n\nThe service's own state. What fixes it is starting the service.",
               "type": "string",
               "const": "unreachable"
+            },
+            {
+              "description": "There is a door, it is answering, and nothing here can say where another\ndevice would reach it.\n\nThe other way a door is unreachable, and a different thing to do about it:\nthe service is fine and the way to it is what is missing. Told apart from\n[`Standing::Unreachable`] because the two are fixed at opposite ends — one\nby starting a service, the other by giving this machine an address the\nhousehold's devices can use — and a household member who cannot arrive\nneeds to know which of the two they are looking at before they start\nblaming their own device.",
+              "type": "string",
+              "const": "stranded"
             },
             {
               "description": "Nothing at all is published to the household: an operator-only configuration.",

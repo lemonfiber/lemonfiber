@@ -18,7 +18,20 @@ pub enum Standing {
     /// nothing here to ask for.
     LibraryOnly,
     /// There is a door and it is not answering.
+    ///
+    /// The service's own state. What fixes it is starting the service.
     Unreachable,
+    /// There is a door, it is answering, and nothing here can say where another
+    /// device would reach it.
+    ///
+    /// The other way a door is unreachable, and a different thing to do about it:
+    /// the service is fine and the way to it is what is missing. Told apart from
+    /// [`Standing::Unreachable`] because the two are fixed at opposite ends — one
+    /// by starting a service, the other by giving this machine an address the
+    /// household's devices can use — and a household member who cannot arrive
+    /// needs to know which of the two they are looking at before they start
+    /// blaming their own device.
+    Stranded,
     /// Nothing at all is published to the household: an operator-only configuration.
     #[serde(rename = "none")]
     Absent,

@@ -46,6 +46,7 @@ const fn standing(standing: Standing) -> &'static str {
         Standing::Established => "the front door",
         Standing::LibraryOnly => "the front door, and there is nothing here to ask for",
         Standing::Unreachable => "the front door, and it is not answering",
+        Standing::Stranded => "the front door, and there is no address to arrive at",
         Standing::Absent => "There is no front door.",
     }
 }
@@ -102,6 +103,30 @@ mod tests {
             .lines()
             .position(|line| line.contains("it can stop working"));
         assert!(at.is_some_and(|at| warned.is_some_and(|warned| warned > at)));
+    }
+
+    /// A door with no way to it reads as a different thing from one that is down.
+    ///
+    /// The two are fixed at opposite ends — one by starting a service, the other by
+    /// giving this machine an address — so the phrase on the screen has to tell them
+    /// apart as plainly as the state does. Both are asserted here rather than one,
+    /// because a phrase is only distinguishing if the other phrase is not it.
+    #[test]
+    fn a_door_with_no_way_to_it_reads_differently_from_one_that_is_down() {
+        let mut stranded = report(Standing::Stranded, Some("Seerr"));
+        stranded.address = None;
+        let said = front_door(&stranded).text();
+        assert_eq!(
+            said.lines().next(),
+            Some("Seerr   the front door, and there is no address to arrive at")
+        );
+
+        let down = front_door(&report(Standing::Unreachable, Some("Seerr"))).text();
+        assert_eq!(
+            down.lines().next(),
+            Some("Seerr   the front door, and it is not answering")
+        );
+        assert_ne!(said.lines().next(), down.lines().next());
     }
 
     #[test]
