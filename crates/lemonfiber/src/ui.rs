@@ -272,7 +272,7 @@ fn asking(ctx: &Ctx, answers: &dyn crate::prompt::Answers) -> Option<ExitCode> {
 /// immediate — nothing on the network is admitted from the moment the password goes,
 /// because every session was opened against it — it is what makes the *binding*
 /// follow the authority rather than outliving it.
-const LOOK: Duration = Duration::from_secs(5);
+pub(crate) const LOOK: Duration = Duration::from_secs(5);
 
 /// What ended a run of the serving loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

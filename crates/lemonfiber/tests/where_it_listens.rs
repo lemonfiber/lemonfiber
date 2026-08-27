@@ -416,26 +416,48 @@ fn the_web_surface_can_be_asked_for_nothing_that_names_an_address() {
 /// one. The day that changes, this is the line that has to be argued away.
 #[test]
 fn nothing_that_serves_can_turn_on_a_certificate_of_its_own() {
-    let read = fs::read_to_string("Cargo.toml").unwrap_or_default();
-    // The declarations, not the prose about them: this manifest explains why several
-    // of its dependencies are the ones they are, and one of those explanations names
-    // a TLS library that is somebody else's dependency.
-    let manifest: String = read
-        .lines()
-        .filter(|line| !line.trim_start().starts_with('#'))
-        .collect::<Vec<&str>>()
-        .join("\n");
-    assert!(
-        manifest.contains("[dependencies]"),
-        "read no manifest for the crate that takes the socket, so this checks nothing"
+    // Both crates, not the one that happens to hold the listener today. The binary
+    // takes the socket and the API crate builds what answers on it, and a certificate
+    // put in front of this surface could be reached for from either — a rule read out
+    // of one manifest is a rule the other is not held to, which reads as enforced.
+    //
+    // `lemonfiber-core` is deliberately not here: it carries a TLS library for the
+    // Usenet client, which is a connection this product *makes* rather than one it
+    // answers. A guard that refused that would be refusing the wrong thing.
+    let serving = ["Cargo.toml", "../lemonfiber-api/Cargo.toml"];
+    let mut carried: Vec<String> = Vec::new();
+    let mut read = 0_usize;
+    for path in serving {
+        let text = fs::read_to_string(path).unwrap_or_default();
+        // The declarations, not the prose about them: a manifest explains why several
+        // of its dependencies are the ones they are, and one of those explanations
+        // names a TLS library that is somebody else's dependency.
+        let manifest: String = text
+            .lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+            .collect::<Vec<&str>>()
+            .join("\n");
+        if !manifest.contains("[dependencies]") {
+            continue;
+        }
+        read += 1;
+        carried.extend(
+            TLS.iter()
+                .filter(|named| manifest.contains(**named))
+                .map(|named| format!("{path}: {named}")),
+        );
+    }
+    // What was read, before what was found. A path that names no manifest leaves this
+    // passing about a crate it never opened.
+    assert_eq!(
+        read,
+        serving.len(),
+        "read {read} of the {} manifests that serve, so this checks less than it says",
+        serving.len()
     );
-    let carried: Vec<&&str> = TLS
-        .iter()
-        .filter(|named| manifest.contains(**named))
-        .collect();
     assert!(
         carried.is_empty(),
-        "the crate that serves carries what it would take to put a certificate in front \
+        "a crate that serves carries what it would take to put a certificate in front \
          of this surface: {carried:?}"
     );
 }
