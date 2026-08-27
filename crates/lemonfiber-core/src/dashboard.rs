@@ -278,6 +278,13 @@ pub struct Snapshot {
     pub storage: Panel<Storage>,
     /// Every service and what it is doing.
     pub services: Panel<Vec<Service>>,
+    /// The one address to hand somebody who lives here.
+    ///
+    /// On the screen rather than only behind a question, because the operator who
+    /// needs it is not the one who thought to ask: they have just been asked "what
+    /// do I open?" by somebody in the next room. Built from the same reading as the
+    /// panels beside it, so the screen and `front-door` cannot name different doors.
+    pub door: Panel<crate::model::FrontDoorReport>,
 }
 
 /// The time to move `remaining` bytes at `speed` bytes per second.
@@ -506,6 +513,18 @@ mod tests {
                 hardlink: Hardlink::Linking,
             }),
             services: Panel::Ready(vec![service("sonarr", State::Healthy)]),
+            door: Panel::Ready(crate::model::FrontDoorReport {
+                standing: crate::model::Standing::Established,
+                chosen: crate::door::Chosen::Derived,
+                service: Some("Seerr".to_owned()),
+                address: Some(crate::door::Address {
+                    url: "http://kitchen-nas.local:5055".to_owned(),
+                    caution: None,
+                }),
+                facing: Some(crate::door::Facing::Asking),
+                meaning: "send them there".to_owned(),
+                beside: Vec::new(),
+            }),
         };
 
         let json = serde_json::to_string(&snapshot).unwrap_or_default();
@@ -515,6 +534,7 @@ mod tests {
             "torrent",
             "linking",
             "sonarr did not answer",
+            "http://kitchen-nas.local:5055",
         ] {
             assert!(json.contains(expected), "missing {expected} in {json}");
         }

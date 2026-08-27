@@ -16,7 +16,7 @@ pub(crate) mod fixtures;
 
 mod archive;
 mod doctor;
-mod door;
+pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
 mod quality;
@@ -659,6 +659,7 @@ mod tests {
             }),
             Outcome::FrontDoor(FrontDoorReport {
                 standing: Standing::Absent,
+                chosen: lemonfiber_core::door::Chosen::Derived,
                 service: None,
                 address: None,
                 facing: None,

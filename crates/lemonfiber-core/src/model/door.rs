@@ -6,7 +6,7 @@
 
 use serde::Serialize;
 
-use crate::door::{Address, Facing};
+use crate::door::{Address, Chosen, Facing};
 
 /// Where the household's one front door stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -58,6 +58,13 @@ pub struct Beside {
 pub struct FrontDoorReport {
     /// Where the front door stands.
     pub standing: Standing,
+    /// How this came to be the door: worked out from what the stack declares, named
+    /// by the operator, or named by them and refused.
+    ///
+    /// Carried as a state rather than left to the sentence beneath it, for the reason
+    /// the standing is: an operator whose setting was refused reads the sentence, and
+    /// a browser, a script or a dashboard reads this.
+    pub chosen: Chosen,
     /// The service the household begins at, by the name it shows itself under.
     /// Absent where this stack publishes nothing they could begin at.
     pub service: Option<String>,

@@ -155,6 +155,7 @@ fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line
     let services = panels::services(&snapshot.services, room());
     let stuck = panels::stuck(&snapshot.stuck, room());
     let alerts = panels::alerts(&snapshot.alerts, room());
+    let door = panels::front_door(&snapshot.door, room());
     vec![
         ("VPN", vpn),
         ("Transfers", transfers),
@@ -163,10 +164,11 @@ fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line
         ("Services", services),
         ("Stuck", stuck),
         ("Alerts", alerts),
+        ("Front door", door),
     ]
 }
 
-/// Where the five panels go in the space there is.
+/// Where the eight panels go in the space there is.
 ///
 /// Two columns where the terminal is wide enough for both, one where it is not.
 /// Every panel gets a place in either case: dropping one would leave an operator
@@ -177,15 +179,15 @@ fn places(body: Rect) -> Vec<Rect> {
         .constraints([Constraint::Ratio(1, 4); 4])
         .split(body);
     if body.width < TWO_COLUMNS {
-        // One column: the same seven panels, stacked, each narrower and taller.
+        // One column: the same eight panels, stacked, each narrower and taller.
         return Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Ratio(1, 7); 7])
+            .constraints([Constraint::Ratio(1, 8); 8])
             .split(body)
             .to_vec();
     }
     let mut places = Vec::new();
-    for (row, count) in rows.iter().zip([2usize, 2, 2, 1]) {
+    for (row, count) in rows.iter().zip([2usize, 2, 2, 2]) {
         places.extend(
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -241,6 +243,18 @@ pub(crate) mod tests {
                 hardlink: Hardlink::Linking,
             }),
             services: Panel::Ready(Vec::new()),
+            door: Panel::Ready(lemonfiber_core::model::FrontDoorReport {
+                standing: lemonfiber_core::model::Standing::Established,
+                chosen: lemonfiber_core::door::Chosen::Derived,
+                service: Some("Seerr".to_owned()),
+                address: Some(lemonfiber_core::door::Address {
+                    url: "http://kitchen-nas.local:5055".to_owned(),
+                    caution: None,
+                }),
+                facing: Some(lemonfiber_core::door::Facing::Asking),
+                meaning: "send them there".to_owned(),
+                beside: Vec::new(),
+            }),
         }
     }
 
@@ -316,6 +330,18 @@ pub(crate) mod tests {
         }
         assert!(text.contains("lemonfiber"), "{text}");
         assert!(text.contains("q quit"), "{text}");
+    }
+
+    #[test]
+    fn the_screen_carries_the_address_to_hand_the_household() {
+        // Asserted as the address itself rather than as a heading, because a title
+        // over an empty box would satisfy a count of panels and hand nobody
+        // anything — and the address is the whole of what this panel is for.
+        for (width, height) in [(120, 40), (60, 90)] {
+            let text = drawn(&a_snapshot(), width, height);
+            assert!(text.contains("Front door"), "{text}");
+            assert!(text.contains("http://kitchen-nas.local:5055"), "{text}");
+        }
     }
 
     #[test]
