@@ -319,14 +319,14 @@ async fn main() -> ExitCode {
     }
 }
 
-/// The app compiled into this binary, and there is not one yet.
+/// The app this binary serves a browser.
 ///
-/// The app arrives as a pinned submodule at `assets/web`, embedded exactly as the
-/// stack beside it is. That submodule does not exist, so this build carries no app
-/// and says so when a browser asks for one. What reads an embedded app is built
-/// and proven; what it would read is what is missing. See
+/// Declared beside the stack in `cli`, so both embedded trees are named in one
+/// place and a test outside this binary can read what it carries. See
 /// `.docs/architecture/embedded-stack.md` for the shape it arrives in.
-pub(crate) const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = None;
+pub(crate) const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = Some(
+    lemonfiber_core::frontend::Source::Embedded(&lemonfiber::cli::APP),
+);
 
 /// Serve the web interface until the operator stops the process.
 ///
