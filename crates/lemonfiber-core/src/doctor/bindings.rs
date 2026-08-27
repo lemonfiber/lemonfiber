@@ -41,6 +41,10 @@ pub const BEYOND_LOOPBACK: Code = Code::new("BIND-1");
 /// being consulted.
 pub const AROUND_THE_FIREWALL: Code = Code::new("BIND-2");
 
+/// Raised where an admin service answers off this machine and the operator has
+/// written down that they meant it to.
+pub const DELIBERATE: Code = Code::new("BIND-3");
+
 /// The name this check's findings are given.
 const CHECK: &str = "network.bindings";
 
@@ -58,6 +62,8 @@ pub struct BindingsCheck {
     /// What this machine runs the engine as, which decides whether a published port
     /// is reached through the host's own firewall or around it.
     environment: Environment,
+    /// The admin services the operator has said they meant to expose, each with why.
+    exposed: Vec<(String, String)>,
 }
 
 impl BindingsCheck {
@@ -68,13 +74,23 @@ impl BindingsCheck {
         project: String,
         services: &[Service],
         environment: Environment,
+        exposed: &[(String, String)],
     ) -> Self {
         Self {
             engine,
             project,
             services: services.to_vec(),
             environment,
+            exposed: exposed.to_vec(),
         }
+    }
+
+    /// Why the operator said this service is exposed, where they said so.
+    fn said_so(&self, service: &str) -> Option<&str> {
+        self.exposed
+            .iter()
+            .find(|(named, _)| named == service)
+            .map(|(_, why)| why.as_str())
     }
 
     /// The tier the stack declares for a service, where it declares one.
@@ -139,7 +155,10 @@ impl Check for BindingsCheck {
             .flat_map(|container| {
                 beyond(container, self.tier(&container.service))
                     .into_iter()
-                    .map(|where_| violation(&container.service, &where_))
+                    .map(|where_| match self.said_so(&container.service) {
+                        Some(why) => acknowledged(&container.service, &where_, why),
+                        None => violation(&container.service, &where_),
+                    })
             })
             .collect();
         let mut found = if wrong.is_empty() {
@@ -225,12 +244,44 @@ fn violation(service: &str, published: &str) -> Finding {
         Remedy::new("Publish it on this machine only, and apply the change")
             .with_detail(format!("127.0.0.1:{published}")),
     )
-    .or_try(Remedy::new(
-        "Or, if you meant to expose it, say so once so this stops reporting it",
-    ))
+    .or_try(
+        Remedy::new("Or, if you meant to expose it, say so once and say why").with_detail(format!(
+            "{}={service}=<why> in your settings — the reason is what a diagnosis you send \
+                 on will carry, and an entry without one is not read as an answer",
+            crate::config::EXPOSED_KEY
+        )),
+    )
     .in_state(State::Guided)
     .with_detail(format!("it answers on {published}"));
     Finding::in_category(Category::Network, CHECK, TITLE, Verdict::Fail(problem)).about(service)
+}
+
+/// One service answering off this machine, which the operator said they meant.
+///
+/// Still reported, and no longer a failure. The exposure is real and does not stop
+/// being real for having been agreed to — what changes is whose decision it is, and
+/// a report that went silent would take the operator's own words out of the one
+/// place anybody looking for them would find them. So their reason is quoted back:
+/// a diagnosis somebody sends on carries why this was chosen, rather than an absence
+/// the next reader has to guess about.
+fn acknowledged(service: &str, published: &str, why: &str) -> Finding {
+    let problem = Problem::new(
+        DELIBERATE,
+        Severity::Warning,
+        format!("{service} is reachable from your network, and you said so"),
+        format!(
+            "The stack calls this one an admin service, so it is reported wherever it answers \
+             off this machine. You have written down that this one is deliberate, and what you \
+             said is: {why}"
+        ),
+        Remedy::new("Nothing, if that is still true"),
+    )
+    .or_try(Remedy::new(
+        "Or take it out of the exposed list and publish it on this machine only",
+    ))
+    .in_state(State::Guided)
+    .with_detail(format!("it answers on {published}"));
+    Finding::in_category(Category::Network, CHECK, TITLE, Verdict::Warn(problem)).about(service)
 }
 
 /// Everything running answers where its tier allows.

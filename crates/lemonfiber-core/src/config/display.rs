@@ -84,6 +84,11 @@ pub const SHOWN: &[(&str, &str)] = &[
         "whether a Usenet login may be proven against the provider, for the same reason",
     ),
     (
+        super::EXPOSED_KEY,
+        "which admin services the operator wrote down as deliberately reachable, and why — \
+         a record whose whole worth is that somebody can read it back",
+    ),
+    (
         super::JELLYFIN_MODE_KEY,
         "whether the media server runs in a container or on the host machine",
     ),

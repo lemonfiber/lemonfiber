@@ -20,6 +20,7 @@ what to do about it, is written for operators at
 - `BACKUP-7`
 - `BIND-1`
 - `BIND-2`
+- `BIND-3`
 - `BUNDLE-1`
 - `BUNDLE-2`
 - `BUNDLE-3`

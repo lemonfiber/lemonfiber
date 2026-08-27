@@ -315,6 +315,7 @@ pub(crate) async fn assembled(
         ctx.settings.project.clone(),
         &manifest.services,
         ctx.environment,
+        &ctx.settings.exposed,
     );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
