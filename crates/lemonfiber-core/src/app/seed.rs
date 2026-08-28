@@ -1749,6 +1749,56 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// A telling the operator set before lemonfiber ever ran is taken on, not flagged.
+    ///
+    /// The baseline is empty and the service holds something, so there is no
+    /// expectation to have drifted from — adopting it is what stops an existing setup
+    /// being reported as wholesale drift on the first pass.
+    #[tokio::test]
+    async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/System/Info/Public",
+                vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
+            ),
+            (
+                "/settings/notifications/webpush",
+                vec![Answer::reply(200, r#"{"enabled":true,"types":8}"#)],
+            ),
+            ("", vec![Answer::reply(200, r#"{"initialized":true}"#)]),
+        ]);
+        let env = config_scratch("telling-theirs");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = store::set(
+            &env,
+            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(http.clone());
+
+        let (wirings, records) = super::seed_jellyfin_identity(
+            &ctx,
+            &[jellyfin_svc(), seerr_svc()],
+            &crate::baseline::Baseline::new(),
+        )
+        .await;
+
+        assert_eq!(
+            wirings.get(1).map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Unmanaged),
+            "a pre-existing value was not read as the operator's own"
+        );
+        let taken = records.entry("seerr", crate::seed::TELLING);
+        assert!(
+            taken.is_some_and(|record| record.origin.is_adopted()),
+            "their value was not adopted as the baseline, so the next pass reports it \
+             as drift from an expectation nobody formed"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
     /// An operator who switched it off switched it off.
     ///
     /// The case the three-way comparison exists for. Two values could only say the
