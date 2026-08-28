@@ -58,6 +58,8 @@ pub const FORMS: Kind = Kind("forms");
 pub const FRONT_DOOR: Kind = Kind("front-door");
 /// Every word this product explains.
 pub const GLOSSARY: Kind = Kind("glossary");
+/// Which app to use on which device.
+pub const CLIENTS: Kind = Kind("clients");
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
 /// The name given to work that outlives the request that started it.
@@ -127,6 +129,7 @@ pub const ALL: &[Kind] = &[
     FORMS,
     FRONT_DOOR,
     GLOSSARY,
+    CLIENTS,
     HOUSEHOLD,
     JOB,
     LIFECYCLE,

@@ -88,6 +88,14 @@ pub const OUTBOUND: &str = "/api/outbound";
 /// in front of it and cannot see the host at all.
 pub const STORED: &str = "/api/stored";
 
+/// Which app to watch on, for each kind of device somebody in the house has.
+///
+/// The same answer on every machine — the client landscape belongs to the
+/// platforms rather than to this stack — which is why it takes nothing and reads
+/// nothing. A browser wants it because the person deciding is often the one
+/// already looking at a screen.
+pub const CLIENTS: &str = "/api/clients";
+
 /// The backup archives this machine has kept, by the names they were written under.
 ///
 /// Named for what it lists rather than for the command it reaches: what these are
@@ -120,7 +128,7 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
     VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, FRONT_DOOR, TRACE, STUCK, CONFIG,
-    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED,
+    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, CLIENTS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -217,6 +225,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         BACKUPS => Ok(Command::Archives),
         OUTBOUND => Ok(Command::Outbound),
         STORED => Ok(Command::Stored),
+        CLIENTS => Ok(Command::Clients),
         _ => Err(NO_SUCH_READ),
     }
 }

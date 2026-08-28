@@ -146,6 +146,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Status(_)
         | Outcome::Word(_)
         | Outcome::Glossary(_)
+        | Outcome::Clients(_)
         | Outcome::Outbound(_)
         | Outcome::Wizard(_)
         // Putting back what the last repair changed either happened or came back as

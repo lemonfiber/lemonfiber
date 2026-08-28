@@ -275,6 +275,14 @@ pub enum Request {
     /// names what is *not* lemonfiber's, because your library being absent from the
     /// list is the part worth being sure about.
     Stored,
+    /// Say which app to watch on, for each kind of device somebody in the house has.
+    ///
+    /// The client landscape is uneven and it matters which app is used: some devices
+    /// have an official one that works, and a smart television may have nothing worth
+    /// using. This says which is which, names a browser as the answer that always
+    /// works and needs no installation, and where a device is badly served says what
+    /// to do instead rather than leaving somebody to find out by failing.
+    Clients,
     /// Remove everything lemonfiber keeps on this machine.
     ///
     /// The two directories and everything under them. Your library, your downloads

@@ -188,6 +188,13 @@ pub enum Command {
     /// resolving them: a surface that has to name a word cannot know the names in
     /// advance, and asking is what keeps it from carrying its own copy of the table.
     Glossary,
+    /// Say which app to use on which device, and where the honest answer is to use
+    /// something else.
+    ///
+    /// A read with no arguments. What it answers is the same for every machine —
+    /// the client landscape belongs to the platforms rather than to this stack — so
+    /// nothing is asked of the engine and nothing is read from disk.
+    Clients,
     /// List everything that leaves this machine: what lemonfiber asks of the world
     /// on its own account, and what the stack's own services ask of it.
     ///
