@@ -4,11 +4,111 @@
 //! and the media server made the identity source for requests — each a one-off shape
 //! rather than a variation on wiring a client.
 
+use super::drift::{intent, reconcile, Intent, Observed};
 use super::{
     observe_or_skip, same_base_url, unreached, wire_one, AppSync, Application, Journal,
     MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
 };
+use crate::baseline::Record;
+use crate::ports::service::Telling;
 use crate::secret;
+use crate::seerr::OCCASIONS;
+
+/// The field lemonfiber records what it set the household's telling to under.
+pub(crate) const TELLING: &str = "notifications.household";
+
+/// What lemonfiber would have the request service tell the household.
+#[must_use]
+pub(crate) const fn wanted_telling() -> Telling {
+    Telling {
+        enabled: true,
+        occasions: OCCASIONS,
+    }
+}
+
+/// A telling written down, so the three-way comparison has one shape to read.
+///
+/// The occasions are a set and the baseline holds strings, so the set is written out
+/// rather than the number alone — a record that said only `222` would be a number
+/// nobody reading the file could place.
+#[must_use]
+pub(crate) fn said(telling: Telling) -> String {
+    let sending = if telling.enabled { "on" } else { "off" };
+    format!("{sending}:{}", telling.occasions)
+}
+
+/// Make sure the request service will tell the household what became of what they
+/// asked for, and say which way it was left.
+///
+/// **Its own step**, rather than part of pointing the service at the media server:
+/// that one stops at a service already initialised, which is every install after the
+/// first — exactly the ones this would otherwise never reach.
+///
+/// Its own connection in the report too, named for what it does rather than for the
+/// agent it does it through: an operator reading the pass wants to know whether the
+/// people in the house will hear back, not which of the service's notifiers carries
+/// it. Hands back what the service holds as well as the state, because a value the
+/// operator set before lemonfiber ever ran is theirs to adopt and the caller needs it
+/// to write the baseline down.
+pub async fn wire_household_telling(
+    seerr: &dyn Requests,
+    recorded: Option<&Record>,
+) -> (Wiring, Telling) {
+    let (state, held) = tell_the_household(seerr, recorded).await;
+    (
+        Wiring::settled("What the household is told".to_owned(), state),
+        held,
+    )
+}
+
+/// The comparison and the write, apart from the reporting shape around them.
+pub(crate) async fn tell_the_household(
+    seerr: &dyn Requests,
+    recorded: Option<&Record>,
+) -> (State, Telling) {
+    let held = match seerr.telling().await {
+        Ok(held) => held,
+        Err(failure) => return (unreached(&failure), Telling::default()),
+    };
+    let want = wanted_telling();
+    let holding = said(held);
+
+    // A setting is always *there*, so there is no absent value the way an unregistered
+    // download client is absent. The nearest thing is the service's untouched default
+    // with nothing recorded against it: nobody has set this, lemonfiber included. An
+    // operator who turned it off after lemonfiber turned it on has a baseline, so this
+    // reads as their edit rather than as never-configured.
+    let observed = if recorded.is_none() && held == Telling::default() {
+        Observed::Absent
+    } else {
+        reconcile(recorded, Some(holding.as_str()), &said(want))
+    };
+
+    let state = match intent(observed) {
+        Intent::Wire => match seerr.tell(&want).await {
+            Ok(()) => State::Wired,
+            Err(failure) => unreached(&failure),
+        },
+        Intent::Leave => State::AlreadyWired,
+        // Theirs. Said, and no more than said — somebody who turned this off turned it
+        // off, and a household that stopped being told is a thing to report rather
+        // than a thing to correct.
+        Intent::Preserve => State::Drifted,
+        Intent::Update => State::Stale,
+        Intent::Ask => State::Conflicted {
+            yours: Some(holding),
+            ours: said(want),
+        },
+        Intent::Keep => State::Adopted,
+        Intent::Adopt => State::Unmanaged,
+        // No prerequisite to be waiting on: unreachability is the error above, and a
+        // service that answered has an answer to compare.
+        Intent::Skip => State::Skipped {
+            reason: "the request service was not read".to_owned(),
+        },
+    };
+    (state, held)
+}
 
 /// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave
 /// the ones it already has, and record each write as a change.

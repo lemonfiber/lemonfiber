@@ -9,7 +9,7 @@ use common::service::*;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::service::{Failure, HouseholdRequest, MediaServer, Requests};
+use lemonfiber_core::ports::service::{Failure, HouseholdRequest, MediaServer, Requests, Telling};
 use lemonfiber_core::seed::{wire_jellyfin_identity, State};
 
 // ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
@@ -81,6 +81,9 @@ struct FakeReq {
     readback: Init,
     configure: Configure,
     calls: Mutex<u32>,
+    /// What the service is holding for what the household gets told, which `tell`
+    /// overwrites so a test can read back what would have reached it.
+    told: Mutex<Telling>,
 }
 
 impl FakeReq {
@@ -90,6 +93,7 @@ impl FakeReq {
             readback,
             configure,
             calls: Mutex::new(0),
+            told: Mutex::new(Telling::default()),
         }
     }
 
@@ -134,6 +138,30 @@ impl Requests for FakeReq {
     /// driven from its own tests.
     async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure> {
         Ok(Vec::new())
+    }
+
+    /// What this fake was told to say the service is telling the household.
+    async fn telling(&self) -> Result<Telling, Failure> {
+        match self.gate {
+            Init::Down => Err(down("seerr")),
+            Init::Fresh | Init::Done => Ok(*self
+                .told
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)),
+        }
+    }
+
+    /// Records what was asked for, so a test reads what would reach the service.
+    async fn tell(&self, telling: &Telling) -> Result<(), Failure> {
+        match self.gate {
+            Init::Down => Err(down("seerr")),
+            Init::Fresh | Init::Done => {
+                if let Ok(mut told) = self.told.lock() {
+                    *told = *telling;
+                }
+                Ok(())
+            }
+        }
     }
 
     async fn configure_identity(
