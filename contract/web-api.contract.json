@@ -926,6 +926,87 @@
             }
           ]
         },
+        "HouseholdMember": {
+          "description": "One household member and everything they have asked for.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "The member, by the name the request service shows them under.",
+              "type": "string"
+            },
+            "requests": {
+              "description": "What they asked for, newest first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MemberRequest"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "requests"
+          ]
+        },
+        "HouseholdReport": {
+          "description": "What the household has asked for, member by member — the simplified view of the same\npipeline a trace reports in the services' own terms.",
+          "type": "object",
+          "properties": {
+            "available": {
+              "description": "Whether the requests were read at all. A false here is why the list is empty, and\nkeeps an unread record from being mistaken for a household that has asked for\nnothing — the same honesty a trace keeps about a silence it did not hear.",
+              "type": "boolean"
+            },
+            "findings": {
+              "description": "What could not be read, and anything else worth the operator's attention.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "members": {
+              "description": "The members who have asked for something, in name order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HouseholdMember"
+              }
+            }
+          },
+          "required": [
+            "members",
+            "available",
+            "findings"
+          ]
+        },
+        "MemberRequest": {
+          "description": "One thing a household member asked for, and where it stands in their words.",
+          "type": "object",
+          "properties": {
+            "media": {
+              "description": "What kind of thing it is — a series, a film — in the household's own words.\nAbsent where the request service names a kind this build does not know.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "state": {
+              "description": "Where the request stands, or absent where the request service reports a status\nthis build does not know rather than guessing it into the nearest word.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/State2"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": {
+              "description": "What it is called, where the service filing it has been told about it and its\nlibrary could be read. Absent for a request no service holds yet — one still\nawaiting approval has been handed to nobody, so there is no title to find.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
         "Moment": {
           "description": "Which way a condition went.\n\nBoth directions are worth saying and neither is worth saying twice. An operator\ntold a disk filled up and never told it was resolved goes on believing it — so\nresolution is an alert in its own right rather than the absence of one.",
           "oneOf": [
@@ -1238,6 +1319,54 @@
             }
           ]
         },
+        "Panel7": {
+          "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+          "oneOf": [
+            {
+              "description": "The source answered; here is the panel.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/HouseholdReport"
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            },
+            {
+              "description": "The source could not be reached, for this stated reason.",
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "description": "Why the panel could not be filled, in the operator's terms.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ]
+                },
+                "panel": {
+                  "type": "string",
+                  "const": "unavailable"
+                }
+              },
+              "required": [
+                "panel",
+                "data"
+              ]
+            }
+          ]
+        },
         "Protocol": {
           "description": "Which protocol a transfer is moving over, since the same download reads\ndifferently on each — a Usenet download has no peers, a torrent has no server.",
           "oneOf": [
@@ -1447,6 +1576,10 @@
               "description": "The one-line health summary — the same computation every other surface\nuses, so no two of them can grade the same stack differently.\n\nAlways present, unlike the panels: a stack that could not be reached has a\nsummary, and it says `unknown`. An absent summary would leave the operator\nto infer health from a blank space, which is the one reading this must never\nbe open to.",
               "$ref": "#/$defs/Summary"
             },
+            "household": {
+              "description": "What the household has asked for that is not moving.\n\nOn the screen rather than only behind a question, for the reason the door\nbeside it is: a request waiting on a decision or failed after one is waiting\non the operator, and an operator who has to think to ask is one who finds out\nwhen somebody comes to complain.",
+              "$ref": "#/$defs/Panel7"
+            },
             "queue": {
               "description": "The per-service queues.",
               "$ref": "#/$defs/Panel3"
@@ -1495,7 +1628,8 @@
             "alerts",
             "storage",
             "services",
-            "door"
+            "door",
+            "household"
           ]
         },
         "Stall": {
@@ -1660,6 +1794,46 @@
               "description": "The operating system owns this one, not lemonfiber.",
               "type": "string",
               "const": "host-managed"
+            }
+          ]
+        },
+        "State2": {
+          "description": "Where one request stands, in the words the person who made it would use.\n\nDeliberately coarser than a [`crate::trace::Stage`]: a member does not need to know\nthat a release was grabbed but not imported, only that it is on its way. The trace is\nwhere that detail stays, and a request names the item so it can be asked for.",
+          "oneOf": [
+            {
+              "description": "Asked for, and nobody has approved or refused it yet.",
+              "type": "string",
+              "const": "waiting-for-approval"
+            },
+            {
+              "description": "Turned down — it will not be fetched.",
+              "type": "string",
+              "const": "declined"
+            },
+            {
+              "description": "Approved, but the attempt to fetch it failed.",
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "description": "Approved and on its way — being searched for, downloaded or imported.",
+              "type": "string",
+              "const": "getting"
+            },
+            {
+              "description": "Some of it is here: a series with only some of its episodes.",
+              "type": "string",
+              "const": "partly-here"
+            },
+            {
+              "description": "Here, and playable.",
+              "type": "string",
+              "const": "here"
+            },
+            {
+              "description": "It was here and has since been removed.",
+              "type": "string",
+              "const": "gone"
             }
           ]
         },

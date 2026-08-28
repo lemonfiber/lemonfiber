@@ -89,6 +89,7 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
         Err(reason) => Panel::unavailable(reason),
     };
     let door = front_door(ctx, manifest.as_ref(), &services).await;
+    let household = waiting_on(ctx).await;
 
     // Storage's exhaustion projection needs the rate downloads are landing on the
     // disk at, so the transfers are gathered first and their speeds carried into it.
@@ -136,6 +137,7 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
         storage,
         services,
         door,
+        household,
     }
 }
 
@@ -150,6 +152,19 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
 /// A panel rather than a value, because it has the same two sources every other
 /// panel has: a stack that will not read and an engine that will not answer both
 /// leave it unfillable, and each says which in its own words.
+/// What the household has asked for, for the panel beside the door.
+///
+/// The same reading `household` answers with, so the screen and the question cannot
+/// report different requests. A failure is carried as an unavailable panel rather
+/// than emptying the screen: a request service that is down is a thing to say, not a
+/// household that has asked for nothing.
+async fn waiting_on(ctx: &Ctx) -> Panel<crate::model::HouseholdReport> {
+    match super::household::household(ctx, None).await {
+        Ok(report) => Panel::Ready(report),
+        Err(problem) => Panel::unavailable(problem.summary.clone()),
+    }
+}
+
 async fn front_door(
     ctx: &Ctx,
     manifest: Result<&Manifest, &String>,
@@ -1412,6 +1427,7 @@ mod tests {
             storage: Panel::unavailable("not read here"),
             services: Panel::Ready(Vec::new()),
             door: Panel::unavailable("not read here"),
+            household: Panel::unavailable("not read here"),
         };
         assert_eq!(
             super::last_speed(Some(&before), "download"),

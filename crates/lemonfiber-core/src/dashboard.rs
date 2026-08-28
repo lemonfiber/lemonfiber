@@ -285,6 +285,13 @@ pub struct Snapshot {
     /// do I open?" by somebody in the next room. Built from the same reading as the
     /// panels beside it, so the screen and `front-door` cannot name different doors.
     pub door: Panel<crate::model::FrontDoorReport>,
+    /// What the household has asked for that is not moving.
+    ///
+    /// On the screen rather than only behind a question, for the reason the door
+    /// beside it is: a request waiting on a decision or failed after one is waiting
+    /// on the operator, and an operator who has to think to ask is one who finds out
+    /// when somebody comes to complain.
+    pub household: Panel<crate::model::HouseholdReport>,
 }
 
 /// The time to move `remaining` bytes at `speed` bytes per second.
@@ -524,6 +531,11 @@ mod tests {
                 facing: Some(crate::door::Facing::Asking),
                 meaning: "send them there".to_owned(),
                 beside: Vec::new(),
+            }),
+            household: Panel::Ready(crate::model::HouseholdReport {
+                members: Vec::new(),
+                available: true,
+                findings: Vec::new(),
             }),
         };
 

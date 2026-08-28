@@ -32,7 +32,8 @@ use lemonfiber_core::dashboard::{
 };
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;
-use lemonfiber_core::model::FrontDoorReport;
+use lemonfiber_core::household::State;
+use lemonfiber_core::model::{FrontDoorReport, HouseholdReport};
 use lemonfiber_core::queue::Stuck;
 use lemonfiber_core::text::{fitted, plain};
 use lemonfiber_core::walkthrough::{size, spell_out};
@@ -396,6 +397,62 @@ pub(super) fn front_door(panel: &Panel<FrontDoorReport>, room: usize) -> Vec<Lin
     lines
 }
 
+/// The household panel: what somebody has asked for that is not moving.
+///
+/// Only the two states an operator can act on — waiting for a decision, and failed
+/// after approval. A request that is being fetched or is already here needs nobody,
+/// and listing it would push the ones that do off a panel this size.
+pub(super) fn household(panel: &Panel<HouseholdReport>, room: usize) -> Vec<Line<'static>> {
+    let report = match panel {
+        Panel::Ready(report) => report,
+        Panel::Unavailable { reason } => return unavailable(reason, room),
+    };
+    if !report.available {
+        return vec![Line::styled("the request service was not read", quiet())];
+    }
+    let waiting: Vec<Line<'static>> = report
+        .members
+        .iter()
+        .flat_map(|member| {
+            member
+                .requests
+                .iter()
+                .filter(|request| wants_the_operator(request.state))
+                .map(|request| line(&member.name, request.title.as_deref(), request.state, room))
+        })
+        .collect();
+    if waiting.is_empty() {
+        return vec![Line::styled("nothing is waiting on you", quiet())];
+    }
+    let total = waiting.len();
+    let mut lines: Vec<Line<'static>> = waiting.into_iter().take(SHOWN).collect();
+    lines.extend(rest(total, "request"));
+    lines
+}
+
+/// Whether a request is one the operator has to do something about.
+const fn wants_the_operator(state: Option<State>) -> bool {
+    matches!(state, Some(State::WaitingForApproval | State::Failed))
+}
+
+/// One request: who asked, what for, and where it stands.
+fn line(who: &str, title: Option<&str>, state: Option<State>, room: usize) -> Line<'static> {
+    let standing = match state {
+        Some(State::Failed) => "failed",
+        _ => "waiting",
+    };
+    let asked = title.unwrap_or("not named yet");
+    let said = format!("{who}: {asked}");
+    Line::from(vec![
+        Span::raw(shortened(
+            &said,
+            room.saturating_sub(standing.chars().count() + 2),
+        )),
+        Span::raw("  "),
+        Span::styled(standing.to_owned(), quiet()),
+    ])
+}
+
 /// Whether any panel in this snapshot could not be filled.
 ///
 /// What the header reads to say the screen is degraded rather than live — and it
@@ -406,14 +463,15 @@ pub(super) fn any_panel_down(snapshot: &Snapshot) -> bool {
         || !snapshot.storage.is_available()
         || !snapshot.services.is_available()
         || !snapshot.door.is_available()
+        || !snapshot.household.is_available()
         || snapshot.vpn.as_ref().is_some_and(|vpn| !vpn.is_available())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        alerts, any_panel_down, front_door, header, queues, services, storage, stuck, transfers,
-        vpn, SHOWN,
+        alerts, any_panel_down, front_door, header, household, queues, services, storage, stuck,
+        transfers, vpn, SHOWN,
     };
     use lemonfiber_core::alert::Alert;
     use lemonfiber_core::dashboard::{
@@ -421,7 +479,10 @@ mod tests {
     };
     use lemonfiber_core::door::{Address, Chosen, Facing, Refusal};
     use lemonfiber_core::health::{Reach, Summary};
-    use lemonfiber_core::model::{FrontDoorReport, Standing};
+    use lemonfiber_core::household::State;
+    use lemonfiber_core::model::{
+        FrontDoorReport, HouseholdMember, HouseholdReport, MemberRequest, Standing,
+    };
     use lemonfiber_core::queue::Stuck;
 
     /// A panel with more room than anything here is testing the edge of.
@@ -438,6 +499,97 @@ mod tests {
                     .collect::<String>()
             })
             .collect()
+    }
+
+    /// A household with one request in each state, for the panel to choose from.
+    fn asked(states: &[Option<State>]) -> Panel<HouseholdReport> {
+        Panel::Ready(HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "Ana".to_owned(),
+                requests: states
+                    .iter()
+                    .enumerate()
+                    .map(|(at, state)| MemberRequest {
+                        title: Some(format!("A film {at}")),
+                        media: Some("film".to_owned()),
+                        state: *state,
+                    })
+                    .collect(),
+            }],
+            available: true,
+            findings: Vec::new(),
+        })
+    }
+
+    /// Only the two states an operator can act on reach the panel.
+    ///
+    /// A request being fetched or already here needs nobody. Listing it would push
+    /// the ones that do off a panel this size, which is the panel being worse than
+    /// empty.
+    #[test]
+    fn the_household_panel_shows_only_what_is_waiting_on_the_operator() {
+        let lines = household(
+            &asked(&[
+                Some(State::WaitingForApproval),
+                Some(State::Getting),
+                Some(State::Here),
+                Some(State::Failed),
+            ]),
+            WIDE,
+        );
+        let said = said(&lines);
+
+        assert_eq!(said.len(), 2, "{said:?}");
+        assert!(said.iter().any(|line| line.contains("waiting")), "{said:?}");
+        assert!(said.iter().any(|line| line.contains("failed")), "{said:?}");
+        assert!(
+            !said.iter().any(|line| line.contains("A film 1")),
+            "a request being fetched reached the panel: {said:?}"
+        );
+    }
+
+    /// A household with nothing outstanding says so rather than drawing nothing.
+    #[test]
+    fn a_household_waiting_on_nothing_says_so() {
+        let said = said(&household(&asked(&[Some(State::Here)]), WIDE));
+
+        assert_eq!(said, vec!["nothing is waiting on you".to_owned()]);
+    }
+
+    /// A panel that could not be filled says why, as every other panel does.
+    ///
+    /// Distinct from the case below: this is the reading failing before Seerr is
+    /// reached at all — an unreadable stack — where that one is Seerr reached and
+    /// not answering. Both leave an empty list and they are not the same thing.
+    #[test]
+    fn a_household_panel_that_could_not_be_filled_says_why() {
+        let said = said(&household(
+            &Panel::unavailable("the stack could not be read"),
+            WIDE,
+        ));
+
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(
+            said.first()
+                .is_some_and(|line| line.contains("the stack could not be read")),
+            "{said:?}"
+        );
+    }
+
+    /// A request service that could not be read is said to be unread.
+    ///
+    /// Distinct from a household that has asked for nothing: the same distinction
+    /// the report itself keeps, carried onto the screen rather than flattened there.
+    #[test]
+    fn a_request_service_that_was_not_read_says_so_rather_than_looking_empty() {
+        let unread = Panel::Ready(HouseholdReport {
+            members: Vec::new(),
+            available: false,
+            findings: vec!["seerr did not answer".to_owned()],
+        });
+        let said = said(&household(&unread, WIDE));
+
+        assert_eq!(said, vec!["the request service was not read".to_owned()]);
     }
 
     /// One transfer, however it is going.
@@ -709,6 +861,12 @@ mod tests {
         assert!(!any_panel_down(&snapshot));
         snapshot.storage = Panel::unavailable("no data location is configured");
         assert!(any_panel_down(&snapshot));
+
+        // Each panel on its own, so one left out of the check is caught here rather
+        // than by a screen that reads live while a panel of it is not.
+        let mut one = crate::dashboard::tests::a_snapshot();
+        one.household = Panel::unavailable("the request service did not answer");
+        assert!(any_panel_down(&one));
     }
 
     /// The answer a stack with a working door gives.
