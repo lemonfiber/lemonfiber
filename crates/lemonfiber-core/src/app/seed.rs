@@ -139,7 +139,10 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // Jellyfin as Seerr's identity source: one household account, not two.
     // Jellyfin has no key to read, so its admin password is minted and recorded
     // like qBittorrent's, then Seerr is pointed at it.
-    wirings.extend(seed_jellyfin_identity(ctx, &manifest.services).await);
+    let (identity_wirings, identity_records) =
+        seed_jellyfin_identity(ctx, &manifest.services, &baseline).await;
+    wirings.extend(identity_wirings);
+    baseline.merge(&identity_records);
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the
@@ -1633,6 +1636,15 @@ mod tests {
             ("/Startup/", vec![Answer::reply(200, "")]),
             ("/auth/jellyfin", vec![Answer::reply(200, "")]),
             ("/settings/initialize", vec![Answer::reply(200, "")]),
+            // Untouched by anybody: what a service that has never had the agent
+            // configured answers, which is the case the telling must write into.
+            (
+                "/settings/notifications/webpush",
+                vec![
+                    Answer::reply(200, r#"{"enabled":false,"types":0}"#),
+                    Answer::reply(200, ""),
+                ],
+            ),
             ("", initialised),
         ])
     }
@@ -1642,12 +1654,17 @@ mod tests {
         let ctx = seed_ctx(None, true, Vec::new(), None, None);
         // Seerr present but no Jellyfin, and the other way round: either alone is
         // nothing to wire.
-        assert!(super::seed_jellyfin_identity(&ctx, &[seerr_svc()])
+        let base = crate::baseline::Baseline::new();
+        assert!(super::seed_jellyfin_identity(&ctx, &[seerr_svc()], &base)
             .await
+            .0
             .is_empty());
-        assert!(super::seed_jellyfin_identity(&ctx, &[jellyfin_svc()])
-            .await
-            .is_empty());
+        assert!(
+            super::seed_jellyfin_identity(&ctx, &[jellyfin_svc()], &base)
+                .await
+                .0
+                .is_empty()
+        );
     }
 
     #[tokio::test]
@@ -1666,8 +1683,13 @@ mod tests {
         let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
             .with_http(household(true, true));
 
-        let wirings = super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()]).await;
-        assert_eq!(wirings.len(), 1);
+        let (wirings, _records) = super::seed_jellyfin_identity(
+            &ctx,
+            &[jellyfin_svc(), seerr_svc()],
+            &crate::baseline::Baseline::new(),
+        )
+        .await;
+        assert_eq!(wirings.len(), 2);
         assert_eq!(
             wirings.first().map(|wiring| &wiring.state),
             Some(&crate::seed::State::AlreadyWired)
@@ -1691,17 +1713,152 @@ mod tests {
         )
         .with_http(household(false, false));
 
-        let wirings = super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()]).await;
-        assert_eq!(wirings.len(), 1);
+        let (wirings, records) = super::seed_jellyfin_identity(
+            &ctx,
+            &[jellyfin_svc(), seerr_svc()],
+            &crate::baseline::Baseline::new(),
+        )
+        .await;
+        assert_eq!(wirings.len(), 2);
         assert_eq!(
             wirings.first().map(|wiring| &wiring.state),
             Some(&crate::seed::State::Wired),
             "a fresh household is minted, signed in, and confirmed"
         );
+        // A service nobody has configured is one nobody in the house hears from, so
+        // the telling is written rather than left at the untouched default — and the
+        // baseline records what was written, or the next run reads this as the
+        // operator's own value and preserves an absence.
+        assert_eq!(
+            wirings.get(1).map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Wired),
+            "a household that has never been told anything is set up to be told"
+        );
+        assert_eq!(
+            records
+                .entry("seerr", crate::seed::TELLING)
+                .map(|record| record.value.as_str()),
+            Some(crate::seed::said(crate::seed::wanted_telling()).as_str()),
+            "what was written down is not what was written to the service"
+        );
         let written = std::fs::read_to_string(&env).unwrap_or_default();
         assert!(
             written.contains("JELLYFIN_ADMIN_PASSWORD="),
             "the minted password is recorded: {written}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A telling the operator set before lemonfiber ever ran is taken on, not flagged.
+    ///
+    /// The baseline is empty and the service holds something, so there is no
+    /// expectation to have drifted from — adopting it is what stops an existing setup
+    /// being reported as wholesale drift on the first pass.
+    #[tokio::test]
+    async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/System/Info/Public",
+                vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
+            ),
+            (
+                "/settings/notifications/webpush",
+                vec![Answer::reply(200, r#"{"enabled":true,"types":8}"#)],
+            ),
+            ("", vec![Answer::reply(200, r#"{"initialized":true}"#)]),
+        ]);
+        let env = config_scratch("telling-theirs");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = store::set(
+            &env,
+            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(http.clone());
+
+        let (wirings, records) = super::seed_jellyfin_identity(
+            &ctx,
+            &[jellyfin_svc(), seerr_svc()],
+            &crate::baseline::Baseline::new(),
+        )
+        .await;
+
+        assert_eq!(
+            wirings.get(1).map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Unmanaged),
+            "a pre-existing value was not read as the operator's own"
+        );
+        let taken = records.entry("seerr", crate::seed::TELLING);
+        assert!(
+            taken.is_some_and(|record| record.origin.is_adopted()),
+            "their value was not adopted as the baseline, so the next pass reports it \
+             as drift from an expectation nobody formed"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// An operator who switched it off switched it off.
+    ///
+    /// The case the three-way comparison exists for. Two values could only say the
+    /// service differs from what lemonfiber wants, and reverting on that would take
+    /// back a decision somebody made on purpose. The third — what lemonfiber last
+    /// recorded — is what says the change was theirs. Asserted by what the service
+    /// was asked to do, not only by the state reported: a pass that wrote over them
+    /// and then called it drift would satisfy the state alone.
+    #[tokio::test]
+    async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled() {
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/System/Info/Public",
+                vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
+            ),
+            (
+                "/settings/notifications/webpush",
+                vec![Answer::reply(200, r#"{"enabled":false,"types":0}"#)],
+            ),
+            ("", vec![Answer::reply(200, r#"{"initialized":true}"#)]),
+        ]);
+        let env = config_scratch("telling-off");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = store::set(
+            &env,
+            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(http.clone());
+
+        // lemonfiber recorded that it set the telling on; the service now says off.
+        let mut baseline = crate::baseline::Baseline::new();
+        baseline.record(
+            "seerr",
+            crate::seed::TELLING,
+            &crate::seed::said(crate::seed::wanted_telling()),
+            "2026-08-28T00:00:00Z",
+        );
+
+        let (wirings, records) =
+            super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()], &baseline).await;
+
+        assert_eq!(
+            wirings.get(1).map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Drifted),
+            "their setting was not read as theirs"
+        );
+        let wrote_to_them = http.requests().iter().any(|asked| {
+            asked.url.contains("notifications/webpush") && asked.method == Method::Post
+        });
+        assert!(
+            !wrote_to_them,
+            "the service was written to, so their setting was overruled"
+        );
+        assert!(
+            records.entry("seerr", crate::seed::TELLING).is_none(),
+            "a preserved edit re-recorded lemonfiber's own value, so the next run \
+             would read it as agreement and stop reporting it"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }

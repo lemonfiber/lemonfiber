@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::{Failure, HouseholdRequest, Requests};
+use crate::ports::service::{Failure, HouseholdRequest, Requests, Telling};
 use crate::recyclarr::Kind;
 
 /// The address a fresh Seerr owner is filed under. Seerr requires an address on
@@ -25,6 +25,34 @@ const OWNER_EMAIL: &str = "admin@lemonfiber.local";
 /// Selects Jellyfin as the media server, as Seerr numbers its kinds — Jellyfin,
 /// not Plex or Emby.
 const JELLYFIN_SERVER_TYPE: u8 = 2;
+
+/// The occasions the household is told about, as Seerr numbers them.
+///
+/// A request was received, a decision was made either way, it arrived, or it could
+/// not be got. Each is one bit of the field Seerr keeps the set in, named here rather
+/// than written as one number so what is being asked for can be read.
+///
+/// **The one easy to leave out is `AUTO_APPROVED`.** A household whose policy
+/// approves automatically never has a *pending* request, so a set built from
+/// `PENDING` alone tells that household nothing at the moment they asked — which is
+/// exactly the household that most expects the loop to close by itself.
+const RECEIVED: u32 = 2;
+const DECIDED_YES: u32 = 4;
+const ARRIVED: u32 = 8;
+const COULD_NOT: u32 = 16;
+const DECIDED_NO: u32 = 64;
+const APPROVED_BY_POLICY: u32 = 128;
+
+/// Everything the household is told about, taken together.
+pub const OCCASIONS: u32 =
+    RECEIVED | DECIDED_YES | ARRIVED | COULD_NOT | DECIDED_NO | APPROVED_BY_POLICY;
+
+/// Where the one agent that needs no account of its own is configured.
+///
+/// Every other agent Seerr offers wants a service to sign in to — a mail server, a
+/// chat workspace, a push provider's key. This one is the browser's own, so a
+/// household that has done nothing but visit the page can be reached.
+const WEBPUSH: &str = "/settings/notifications/webpush";
 
 /// A client for one Seerr's identity setup.
 pub struct Seerr {
@@ -55,6 +83,19 @@ impl Seerr {
 struct PublicSettings {
     #[serde(default)]
     initialized: bool,
+}
+
+/// What Seerr holds for the browser-push agent, in its own words.
+///
+/// `types` is the bit field of occasions. Both default rather than being required,
+/// because a Seerr that has never had the agent touched answers with the fields it
+/// happens to have and a missing one means off, not unreadable.
+#[derive(Deserialize)]
+struct WebPush {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default)]
+    types: u32,
 }
 
 #[async_trait]
@@ -136,6 +177,33 @@ impl Requests for Seerr {
             skip += REQUEST_PAGE;
         }
         Ok(requests)
+    }
+
+    async fn telling(&self) -> Result<Telling, Failure> {
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, WEBPUSH, None))
+            .await?;
+        let held: WebPush = self
+            .endpoint
+            .decode(&response, "what the household is told could not be read")?;
+        Ok(Telling {
+            enabled: held.enabled,
+            occasions: held.types,
+        })
+    }
+
+    async fn tell(&self, telling: &Telling) -> Result<(), Failure> {
+        let body = serde_json::json!({
+            "enabled": telling.enabled,
+            "types": telling.occasions,
+        })
+        .to_string();
+        let written = self
+            .endpoint
+            .send(&self.request(Method::Post, WEBPUSH, Some(body)))
+            .await?;
+        self.endpoint.expect_success(&written)
     }
 }
 

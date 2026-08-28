@@ -250,6 +250,34 @@ pub trait Requests: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure>;
+
+    /// What the request service will tell the household about, as it stands.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn telling(&self) -> Result<Telling, Failure>;
+
+    /// Set what it tells them about.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn tell(&self, telling: &Telling) -> Result<(), Failure>;
+}
+
+/// Whether the request service reaches the household, and about what.
+///
+/// The occasions are a set, carried as the bit field the service keeps them in. It
+/// is a number here rather than a list of named events because that is the shape the
+/// service reads and writes, and translating it twice — once out, once back — would
+/// be two places for the set to lose a member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Telling {
+    /// Whether it will send anything at all.
+    pub enabled: bool,
+    /// Which occasions it sends on.
+    pub occasions: u32,
 }
 
 /// Asking a Servarr-shape service to run one of its background commands — the

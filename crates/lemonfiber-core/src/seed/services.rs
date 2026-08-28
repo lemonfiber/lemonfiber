@@ -4,11 +4,110 @@
 //! and the media server made the identity source for requests — each a one-off shape
 //! rather than a variation on wiring a client.
 
+use super::drift::{reconcile, Observed};
 use super::{
     observe_or_skip, same_base_url, unreached, wire_one, AppSync, Application, Journal,
     MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
 };
+use crate::baseline::Record;
+use crate::ports::service::Telling;
 use crate::secret;
+use crate::seerr::OCCASIONS;
+
+/// The field lemonfiber records what it set the household's telling to under.
+pub(crate) const TELLING: &str = "notifications.household";
+
+/// What lemonfiber would have the request service tell the household.
+#[must_use]
+pub(crate) const fn wanted_telling() -> Telling {
+    Telling {
+        enabled: true,
+        occasions: OCCASIONS,
+    }
+}
+
+/// A telling written down, so the three-way comparison has one shape to read.
+///
+/// The occasions are a set and the baseline holds strings, so the set is written out
+/// rather than the number alone — a record that said only `222` would be a number
+/// nobody reading the file could place.
+#[must_use]
+pub(crate) fn said(telling: Telling) -> String {
+    let sending = if telling.enabled { "on" } else { "off" };
+    format!("{sending}:{}", telling.occasions)
+}
+
+/// Make sure the request service will tell the household what became of what they
+/// asked for, and say which way it was left.
+///
+/// **Its own step**, rather than part of pointing the service at the media server:
+/// that one stops at a service already initialised, which is every install after the
+/// first — exactly the ones this would otherwise never reach.
+///
+/// Its own connection in the report too, named for what it does rather than for the
+/// agent it does it through: an operator reading the pass wants to know whether the
+/// people in the house will hear back, not which of the service's notifiers carries
+/// it. Hands back what the service holds as well as the state, because a value the
+/// operator set before lemonfiber ever ran is theirs to adopt and the caller needs it
+/// to write the baseline down.
+pub async fn wire_household_telling(
+    seerr: &dyn Requests,
+    recorded: Option<&Record>,
+) -> (Wiring, Telling) {
+    let (state, held) = tell_the_household(seerr, recorded).await;
+    (
+        Wiring::settled("What the household is told".to_owned(), state),
+        held,
+    )
+}
+
+/// The comparison and the write, apart from the reporting shape around them.
+pub(crate) async fn tell_the_household(
+    seerr: &dyn Requests,
+    recorded: Option<&Record>,
+) -> (State, Telling) {
+    let held = match seerr.telling().await {
+        Ok(held) => held,
+        Err(failure) => return (unreached(&failure), Telling::default()),
+    };
+    let want = wanted_telling();
+    let holding = said(held);
+
+    // A setting is always *there*, so there is no absent value the way an unregistered
+    // download client is absent. The nearest thing is the service's untouched default
+    // with nothing recorded against it: nobody has set this, lemonfiber included. An
+    // operator who turned it off after lemonfiber turned it on has a baseline, so this
+    // reads as their edit rather than as never-configured.
+    let observed = if recorded.is_none() && held == Telling::default() {
+        Observed::Absent
+    } else {
+        reconcile(recorded, Some(holding.as_str()), &said(want))
+    };
+
+    let state = match observed {
+        // `Unavailable` cannot arrive here — it is what a pass says about a service
+        // that would not answer, and one that would not answer returned above with
+        // its own words. Grouped the way the wiring check groups it, rather than
+        // given an arm that nothing can reach.
+        Observed::Absent | Observed::Unavailable => match seerr.tell(&want).await {
+            Ok(()) => State::Wired,
+            Err(failure) => unreached(&failure),
+        },
+        Observed::Present => State::AlreadyWired,
+        // Theirs. Said, and no more than said — somebody who turned this off turned it
+        // off, and a household that stopped being told is a thing to report rather
+        // than a thing to correct.
+        Observed::Drifted => State::Drifted,
+        Observed::Stale => State::Stale,
+        Observed::Conflicted => State::Conflicted {
+            yours: Some(holding),
+            ours: said(want),
+        },
+        Observed::Adopted => State::Adopted,
+        Observed::Unmanaged => State::Unmanaged,
+    };
+    (state, held)
+}
 
 /// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave
 /// the ones it already has, and record each write as a change.
@@ -187,5 +286,171 @@ async fn configure_seerr(seerr: &dyn Requests, password: &str, server_url: &str)
             detail: "Seerr accepted the sign-in but did not report itself initialised".to_owned(),
         },
         Err(failure) => unreached(&failure),
+    }
+}
+
+#[cfg(test)]
+mod telling_tests {
+    use super::{said, tell_the_household, wanted_telling, TELLING};
+    use crate::baseline::Baseline;
+    use crate::seed::drift::{intent, Intent, Observed};
+    use crate::seed::State;
+    use crate::seerr::Seerr;
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    use std::sync::Arc;
+
+    /// A telling that is on, but not for the occasions lemonfiber would choose.
+    const SOME: &str = r#"{"enabled":true,"types":8}"#;
+
+    /// The real client over a scripted service, so these read the request this
+    /// product actually sends rather than a second description of it.
+    fn service(answers: Vec<Answer>) -> (Seerr, Arc<Fake>) {
+        let http = Fake::by_path_in_turn(vec![("/settings/notifications/webpush", answers)]);
+        (Seerr::new(http.clone(), "http://seerr:5055", "seerr"), http)
+    }
+
+    /// A baseline holding one value for the telling.
+    fn recorded(value: &str, adopted: bool) -> Baseline {
+        let mut baseline = Baseline::new();
+        if adopted {
+            baseline.adopt("seerr", TELLING, value, "2026-08-28T00:00:00Z");
+        } else {
+            baseline.record("seerr", TELLING, value, "2026-08-28T00:00:00Z");
+        }
+        baseline
+    }
+
+    async fn against(seerr: &Seerr, baseline: &Baseline) -> State {
+        tell_the_household(seerr, baseline.entry("seerr", TELLING))
+            .await
+            .0
+    }
+
+    /// Whether the service was asked to change anything.
+    fn written_to(http: &Fake) -> bool {
+        http.requests()
+            .iter()
+            .any(|asked| asked.method == crate::ports::http::Method::Post)
+    }
+
+    #[tokio::test]
+    async fn a_service_holding_what_was_wanted_is_left_exactly_as_it_is() {
+        let held = format!(
+            r#"{{"enabled":true,"types":{}}}"#,
+            wanted_telling().occasions
+        );
+        let (seerr, http) = service(vec![Answer::reply(200, held)]);
+
+        let state = against(&seerr, &recorded(&said(wanted_telling()), false)).await;
+
+        assert_eq!(state, State::AlreadyWired);
+        assert!(!written_to(&http), "a correct value was written again");
+    }
+
+    #[tokio::test]
+    async fn lemonfibers_own_value_behind_its_intent_is_reported_rather_than_rewritten() {
+        // The baseline and the service agree; it is lemonfiber that has moved on.
+        let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+
+        let state = against(&seerr, &recorded("on:8", false)).await;
+
+        assert_eq!(state, State::Stale);
+        assert!(!written_to(&http), "a value nobody edited was overwritten");
+    }
+
+    #[tokio::test]
+    async fn both_sides_moved_is_put_to_the_operator_rather_than_settled() {
+        // The baseline matches neither what the service holds nor what is wanted.
+        let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+
+        let state = against(&seerr, &recorded("on:2", false)).await;
+
+        assert!(
+            matches!(&state, State::Conflicted { yours, ours }
+                if yours.as_deref() == Some("on:8") && ours == &said(wanted_telling())),
+            "{state:?}"
+        );
+        assert!(!written_to(&http), "a conflict was resolved by writing");
+    }
+
+    #[tokio::test]
+    async fn a_value_the_operator_had_adopted_stays_theirs() {
+        let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+
+        let state = against(&seerr, &recorded("on:8", true)).await;
+
+        assert_eq!(state, State::Adopted);
+        assert!(!written_to(&http));
+    }
+
+    #[tokio::test]
+    async fn a_value_set_before_lemonfiber_ever_ran_is_taken_on_rather_than_flagged() {
+        // Something is set, and lemonfiber never wrote it: theirs, pre-existing.
+        let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+
+        let state = against(&seerr, &Baseline::new()).await;
+
+        assert_eq!(state, State::Unmanaged);
+        assert!(!written_to(&http), "a pre-existing value was overwritten");
+    }
+
+    #[tokio::test]
+    async fn a_service_that_will_not_answer_is_reported_rather_than_guessed_at() {
+        let (seerr, http) = service(vec![Answer::Silent]);
+
+        let state = against(&seerr, &Baseline::new()).await;
+
+        assert!(matches!(state, State::Skipped { .. }), "{state:?}");
+        assert!(
+            !written_to(&http),
+            "a service that would not answer was written to anyway"
+        );
+    }
+
+    /// A write that does not land is reported, not assumed.
+    ///
+    /// The household hears nothing either way; the difference is whether the operator
+    /// is told. A pass that reported `Wired` on a refused write would leave them
+    /// believing the loop closes.
+    #[tokio::test]
+    async fn a_write_the_service_refuses_is_reported_in_its_own_words() {
+        let (seerr, _) = service(vec![
+            Answer::reply(200, r#"{"enabled":false,"types":0}"#),
+            Answer::reply(500, "no"),
+        ]);
+
+        let state = against(&seerr, &Baseline::new()).await;
+
+        assert!(
+            matches!(state, State::Failed { .. } | State::Skipped { .. }),
+            "a refused write was not reported: {state:?}"
+        );
+    }
+
+    /// The states above are the shared policy, not a second opinion about it.
+    ///
+    /// This maps the observation straight to a state rather than going through
+    /// `intent`, because one of `intent`'s outcomes cannot arise here and an arm
+    /// nothing reaches is an arm nothing checks. The correspondence is asserted
+    /// instead, so the two cannot drift apart in silence.
+    #[test]
+    fn every_state_here_is_the_one_the_shared_policy_asks_for() {
+        let paired = [
+            (Observed::Absent, Intent::Wire),
+            (Observed::Present, Intent::Leave),
+            (Observed::Drifted, Intent::Preserve),
+            (Observed::Stale, Intent::Update),
+            (Observed::Conflicted, Intent::Ask),
+            (Observed::Adopted, Intent::Keep),
+            (Observed::Unmanaged, Intent::Adopt),
+        ];
+        for (observed, expected) in paired {
+            assert_eq!(
+                intent(observed),
+                expected,
+                "the telling treats {observed:?} as {expected:?}, and the shared policy \
+                 no longer agrees"
+            );
+        }
     }
 }
