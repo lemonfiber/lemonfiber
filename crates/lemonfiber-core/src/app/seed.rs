@@ -175,6 +175,30 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 /// Nothing where the baseline could not be read. A record that is there but unreadable
 /// cannot tell an operator's edit from lemonfiber's own value, and reporting drift against
 /// a baseline that is not there would call every wiring in the stack an edit.
+/// The request service to ask about the household's telling, and what lemonfiber
+/// last recorded setting it to.
+///
+/// Both or neither: a stack with no request service has nothing to ask, and a
+/// baseline that was never formed leaves the recorded value absent — which the check
+/// reads as nobody having set this rather than as a value to have drifted from.
+pub(super) fn managed_telling(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> (
+    Option<std::sync::Arc<dyn crate::ports::service::Requests>>,
+    Option<crate::baseline::Record>,
+) {
+    let seerr = identity::seerr_service(services).map(|base| {
+        std::sync::Arc::new(crate::seerr::Seerr::new(ctx.http.clone(), &base, "seerr"))
+            as std::sync::Arc<dyn crate::ports::service::Requests>
+    });
+    let recorded = match load_baseline(ctx) {
+        Loaded::Formed(baseline) => baseline.entry("seerr", crate::seed::TELLING).cloned(),
+        Loaded::Fresh | Loaded::Lost => None,
+    };
+    (seerr, recorded)
+}
+
 pub(super) async fn managed_wirings(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],

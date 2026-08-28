@@ -61,6 +61,28 @@ pub async fn wire_household_telling(
     )
 }
 
+/// What lemonfiber sees for the telling, read from the three values.
+///
+/// Shared with the diagnosis that reads the same field without writing it, so the
+/// two cannot come to different opinions about whose value is on the service — the
+/// division `observe_client` makes for a download client, for the same reason.
+///
+/// A setting is always *there*, so there is no absent value the way an unregistered
+/// download client is absent. The nearest thing is the service's untouched default
+/// with nothing recorded against it: nobody has set this, lemonfiber included.
+/// Without that, a service nobody has configured reads as the operator's own
+/// pre-existing choice, and a diagnosis would tell them they had switched off
+/// something they had never been offered. An operator who turned it off *after*
+/// lemonfiber turned it on has a baseline, so that still reads as their edit.
+#[must_use]
+pub(crate) fn observed_telling(recorded: Option<&Record>, held: Telling) -> Observed {
+    if recorded.is_none() && held == Telling::default() {
+        Observed::Absent
+    } else {
+        reconcile(recorded, Some(said(held).as_str()), &said(wanted_telling()))
+    }
+}
+
 /// The comparison and the write, apart from the reporting shape around them.
 pub(crate) async fn tell_the_household(
     seerr: &dyn Requests,
@@ -72,17 +94,7 @@ pub(crate) async fn tell_the_household(
     };
     let want = wanted_telling();
     let holding = said(held);
-
-    // A setting is always *there*, so there is no absent value the way an unregistered
-    // download client is absent. The nearest thing is the service's untouched default
-    // with nothing recorded against it: nobody has set this, lemonfiber included. An
-    // operator who turned it off after lemonfiber turned it on has a baseline, so this
-    // reads as their edit rather than as never-configured.
-    let observed = if recorded.is_none() && held == Telling::default() {
-        Observed::Absent
-    } else {
-        reconcile(recorded, Some(holding.as_str()), &said(want))
-    };
+    let observed = observed_telling(recorded, held);
 
     let state = match observed {
         // `Unavailable` cannot arrive here — it is what a pass says about a service

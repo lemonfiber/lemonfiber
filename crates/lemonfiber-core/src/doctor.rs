@@ -25,6 +25,7 @@ pub mod narrowing;
 pub mod providers;
 pub mod releases;
 pub mod storage;
+pub mod telling;
 pub mod vpn;
 pub mod wiring;
 

@@ -108,6 +108,7 @@ what to do about it, is written for operators at
 - `STORAGE-4`
 - `STORAGE-5`
 - `STORAGE-6`
+- `TELLING-1`
 - `TUI-1`
 - `VPN-1`
 - `VPN-2`

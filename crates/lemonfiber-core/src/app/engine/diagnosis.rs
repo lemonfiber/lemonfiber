@@ -20,6 +20,7 @@ use crate::doctor::indexer::IndexerCheck;
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::storage::StorageCheck;
+use crate::doctor::telling::TellingCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::wiring::WiringCheck;
 use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
@@ -179,6 +180,32 @@ pub(crate) async fn quoted(ctx: &Ctx, findings: Vec<Finding>) -> Vec<Finding> {
         .collect()
 }
 
+/// Whether the indexer the operator gave at setup still answers.
+///
+/// Re-proven the same way it was first proven — the shared validator over the same
+/// HTTP seam — so a key that has since rotted is a finding rather than an empty
+/// search weeks on.
+fn indexer_still_answers(ctx: &Ctx) -> IndexerCheck {
+    IndexerCheck::new(
+        Arc::new(crate::validate::Allowed::new(
+            Arc::new(crate::validate::Live::new(ctx.http.clone())),
+            ctx.settings.reaching.clone(),
+        )),
+        ctx.settings.indexer.clone(),
+    )
+}
+
+/// Whether the people in the house will hear back about what they asked for.
+///
+/// The read-only half of the seeding step that switches it on, so a household that
+/// quietly stopped being notified is reported rather than discovered by somebody
+/// coming to complain. Built here rather than inline because the assembly it joins
+/// is already at the length a reader can hold.
+fn household_telling(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> TellingCheck {
+    let (requests, recorded) = crate::app::seed::managed_telling(ctx, services);
+    TellingCheck::new(requests, recorded)
+}
+
 /// The checks this stack is examined by, built and ready to run.
 ///
 /// Assembled apart from the running of them because a repair has to ask the very same
@@ -242,16 +269,7 @@ pub(crate) async fn assembled(
         ctx.filesystem.clone(),
         servarr_targets(&manifest.services, project.as_deref()),
     );
-    // The indexer the operator gave at setup is re-proven the same way it was
-    // first proven — the shared validator over the same HTTP seam — so a key that
-    // has since rotted is a finding rather than an empty search weeks on.
-    let indexer = IndexerCheck::new(
-        Arc::new(crate::validate::Allowed::new(
-            Arc::new(crate::validate::Live::new(ctx.http.clone())),
-            ctx.settings.reaching.clone(),
-        )),
-        ctx.settings.indexer.clone(),
-    );
+    let indexer = indexer_still_answers(ctx);
     // Whether the upstream quality guides can be reached, so a sync that would come
     // back empty — leaving the profiles in place stale rather than unconfigured — is
     // reported rather than silently missed.
@@ -317,6 +335,7 @@ pub(crate) async fn assembled(
         ctx.environment,
         &ctx.settings.exposed,
     );
+    let telling = household_telling(ctx, &manifest.services);
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(bindings),
@@ -329,6 +348,7 @@ pub(crate) async fn assembled(
         Box::new(headroom),
         Box::new(releases),
         Box::new(wiring),
+        Box::new(telling),
     ];
     Ok((manifest, checks))
 }
