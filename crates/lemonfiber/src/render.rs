@@ -15,6 +15,7 @@
 pub(crate) mod fixtures;
 
 mod archive;
+mod clients;
 mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
@@ -216,6 +217,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
+        Outcome::Clients(all) => clients::guidance(all),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::Lifecycle(report) => stack::lifecycle(report),
@@ -505,6 +507,10 @@ mod tests {
         lines.print();
         render(&Outcome::Version(a_version()), false);
         render(&Outcome::Watch(a_watch()), false);
+        render(
+            &Outcome::Clients(lemonfiber_core::clients::guidance()),
+            false,
+        );
     }
 
     /// The id first, because that is what gets typed. A form that cannot be combined

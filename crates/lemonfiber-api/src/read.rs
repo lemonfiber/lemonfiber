@@ -1,4 +1,4 @@
-//! The eighteen reads: one endpoint per question a command already answers, plus the
+//! The nineteen reads: one endpoint per question a command already answers, plus the
 //! two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -23,6 +23,7 @@
 
 mod archives;
 mod chosen;
+mod clients;
 mod diagnosis;
 mod door;
 mod glossary;
@@ -62,6 +63,7 @@ pub fn routes() -> Router<Serving> {
         .merge(chosen::routes())
         .merge(glossary::routes())
         .merge(archives::routes())
+        .merge(clients::routes())
         .merge(outbound::routes())
         .merge(stored::routes())
 }

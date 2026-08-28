@@ -26,6 +26,7 @@ use crate::app::backup::Report as BackupReport;
 use crate::app::repair::{Report as RepairReport, Reversal};
 use crate::app::restore::Restoration;
 use crate::app::support::Bundle;
+use crate::clients::Guidance;
 use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
@@ -96,6 +97,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<FrontDoorReport>),
     );
     describing(kinds, kind::GLOSSARY, schema_for!(Envelope<Vocabulary>));
+    describing(kinds, kind::CLIENTS, schema_for!(Envelope<Guidance>));
     describing(
         kinds,
         kind::HOUSEHOLD,

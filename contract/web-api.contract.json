@@ -350,6 +350,123 @@
         }
       }
     },
+    "clients": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Guidance"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Device": {
+          "description": "A kind of device somebody in the house might watch on.",
+          "type": "object",
+          "properties": {
+            "caution": {
+              "description": "What is worth knowing before starting, where anything is.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "client": {
+              "description": "What to use on it.",
+              "type": "string"
+            },
+            "device": {
+              "description": "What somebody would call the device they are holding.",
+              "type": "string"
+            },
+            "instead": {
+              "description": "What to do instead where this is a bad device to be stuck with.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "support": {
+              "description": "How well served it is.",
+              "$ref": "#/$defs/Support"
+            }
+          },
+          "required": [
+            "device",
+            "support",
+            "client"
+          ]
+        },
+        "Guidance": {
+          "description": "The guidance in full, for a surface that shows all of it.",
+          "type": "object",
+          "properties": {
+            "devices": {
+              "description": "Every device, in the order somebody is likely to be holding one.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Device"
+              }
+            },
+            "nothing_is_installed": {
+              "description": "What this will not do for them.",
+              "type": "string"
+            },
+            "only_at_home": {
+              "description": "True of every device, said once.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "devices",
+            "only_at_home",
+            "nothing_is_installed"
+          ]
+        },
+        "Support": {
+          "description": "How well a device is served.",
+          "oneOf": [
+            {
+              "description": "An official app that works. Most people, most of the time.",
+              "type": "string",
+              "const": "good"
+            },
+            {
+              "description": "It works, with something worth knowing before starting.",
+              "type": "string",
+              "const": "workable"
+            },
+            {
+              "description": "Poorly served. Said plainly, with somewhere else to go.",
+              "type": "string",
+              "const": "poor"
+            },
+            {
+              "description": "No installation, works anywhere, and is never unavailable.",
+              "type": "string",
+              "const": "fallback"
+            }
+          ]
+        }
+      }
+    },
     "config": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

@@ -32,8 +32,8 @@
 //! that flow decides belongs beside the list it decides over.
 
 use lemonfiber_api::reads::{
-    named, Wanted as Asking, CHECKS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND, QUALITY, REQUESTS,
-    STORED, STUCK, TRACE, VERSION,
+    named, Wanted as Asking, CHECKS, CLIENTS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND, QUALITY,
+    REQUESTS, STORED, STUCK, TRACE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -324,6 +324,12 @@ static AFTER: &[Question] = &[
         name: "what is kept on this machine",
         about: "every file lemonfiber writes, where it is, and why it is kept",
         read: STORED,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what to watch on",
+        about: "which app to use on each kind of device, and where to use something else",
+        read: CLIENTS,
         needs: Needed::Nothing,
     },
     Question {

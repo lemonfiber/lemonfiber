@@ -110,6 +110,8 @@ pub enum Outcome {
     Word(Term),
     /// Every word this product explains.
     Glossary(Vocabulary),
+    /// Which app to use on which device.
+    Clients(crate::clients::Guidance),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
@@ -161,6 +163,7 @@ impl Outcome {
             Self::Stuck(_) => kind::STUCK,
             Self::Word(_) => kind::WORD,
             Self::Glossary(_) => kind::GLOSSARY,
+            Self::Clients(_) => kind::CLIENTS,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Stored(_) => crate::model::kind::STORED,
             Self::Status(_) => crate::model::kind::STATUS,
@@ -198,6 +201,7 @@ impl serde::Serialize for Outcome {
             Self::Stuck(report) => report.serialize(serializer),
             Self::Word(term) => term.serialize(serializer),
             Self::Glossary(report) => report.serialize(serializer),
+            Self::Clients(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
@@ -272,6 +276,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .map(|term| Outcome::Word(*term))
             .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
+        Command::Clients => Ok(Outcome::Clients(crate::clients::guidance())),
         Command::Outbound => {
             // The stack has to be readable, because half the answer is about it: a
             // manifest that could not be read would leave the services' own requests
@@ -730,6 +735,24 @@ mod tests {
         assert!(listed.contains("\"words\":[{"), "{listed}");
     }
 
+    /// Which app to watch on needs no stack and no engine either, for the same
+    /// reason: the client landscape belongs to the platforms rather than to this
+    /// machine, so it answers before anything is set up.
+    #[tokio::test]
+    async fn which_app_to_watch_on_answers_against_a_context_that_has_nothing() {
+        let ctx = ctx(Ok(spoke("")));
+
+        let said = dispatch(Command::Clients, &ctx)
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+
+        assert!(said.contains("\"kind\":\"clients\""), "{said}");
+        assert!(said.contains("\"devices\":[{"), "{said}");
+        assert!(said.contains("\"only_at_home\""), "{said}");
+    }
+
     /// Answering "it means nothing" for a word this product never explains would be a
     /// wrong answer where an absent one was wanted.
     #[tokio::test]
@@ -997,6 +1020,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Clients(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -1037,6 +1061,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Clients(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -1857,6 +1882,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Clients(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -2851,6 +2877,7 @@ mod tests {
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
+                | Outcome::Clients(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Doctor(_)

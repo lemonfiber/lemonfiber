@@ -140,6 +140,10 @@ pub const ASKS: &[Reach] = &[
         request: "stored",
         through: "/api/stored",
     },
+    Reach {
+        request: "clients",
+        through: "/api/clients",
+    },
 ];
 
 /// The requests the dashboard's panels show without being asked.

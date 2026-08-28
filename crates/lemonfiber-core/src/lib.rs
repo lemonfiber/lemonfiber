@@ -52,6 +52,7 @@ pub mod backup;
 pub mod baseline;
 pub mod bundle;
 pub mod bytes;
+pub mod clients;
 pub mod condition;
 pub mod config;
 pub mod contract;
