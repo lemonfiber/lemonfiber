@@ -40,7 +40,7 @@
 //! outside only through the port, so it too runs against a fake.
 
 mod clients;
-mod drift;
+pub(crate) mod drift;
 mod report;
 mod roots;
 mod services;
@@ -52,7 +52,7 @@ pub use drift::{intent, reconcile, same_endpoint, wholesale_drift, Intent, Obser
 use report::{observe_or_skip, record_outcome, unreached};
 pub use report::{Assessment, Report, Severity, State, Wiring};
 pub use roots::{contested_roots, wire_root_folders};
-pub(crate) use services::{said, wanted_telling, TELLING};
+pub(crate) use services::{observed_telling, said, wanted_telling, TELLING};
 pub use services::{
     wire_applications, wire_household_telling, wire_jellyfin_identity, wire_qbittorrent_password,
 };
