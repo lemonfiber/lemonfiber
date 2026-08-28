@@ -10,7 +10,8 @@
 
 use lemonfiber_core::model::{FrontDoorReport, Standing};
 
-use super::Lines;
+use super::{qr, Lines};
+use crate::say;
 
 /// What the household begins at, and what stands beside it that is not it.
 pub(super) fn front_door(report: &FrontDoorReport) -> Lines {
@@ -35,6 +36,20 @@ pub(super) fn front_door(report: &FrontDoorReport) -> Lines {
         lines.spaced("Also on your network, and none of them a way in:");
         for beside in &report.beside {
             lines.put(format!("  {}   {}", beside.service, beside.because));
+        }
+    }
+
+    // Last, under everything. An operator who wanted the address to send has it in
+    // the second line, and a picture put between that and the working would push
+    // the working off the screen for the reader who wanted that instead.
+    if let Some(drawn) = report
+        .address
+        .as_ref()
+        .and_then(|address| qr::rows(&address.url, say::folding()))
+    {
+        lines.spaced("Or point a phone's camera at this:");
+        for row in drawn {
+            lines.put(format!("  {row}"));
         }
     }
     lines
@@ -93,6 +108,25 @@ mod tests {
     fn the_address_is_the_line_under_the_name() {
         let said = front_door(&report(Standing::Established, Some("Seerr"))).text();
         assert_eq!(said.lines().nth(1), Some("  http://kitchen-nas.local:5055"));
+    }
+
+    /// The picture is *as well as* the text, and under it.
+    ///
+    /// Both halves are asserted. That a code was drawn at all is half the
+    /// requirement; that the address is still readable above it is the other, and a
+    /// drawing put between the name and the address would satisfy the first while
+    /// taking away the thing an operator opened this to copy.
+    #[test]
+    fn the_address_is_drawn_for_a_camera_as_well_as_written_out() {
+        let said = front_door(&report(Standing::Established, Some("Seerr"))).text();
+        let written = said.lines().position(|line| line.contains("kitchen-nas"));
+        let drawn = said.lines().position(|line| line.contains('\u{2588}'));
+
+        assert!(
+            written.is_some_and(|written| drawn.is_some_and(|drawn| drawn > written)),
+            "the address is written at {written:?} and drawn at {drawn:?}; it needs \
+             to be both, in that order"
+        );
     }
 
     #[test]
