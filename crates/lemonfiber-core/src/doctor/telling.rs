@@ -202,12 +202,10 @@ mod tests {
     async fn a_stack_with_no_request_service_has_nothing_to_ask() {
         let check = TellingCheck::new(None, None);
         let found = check.run().await;
+        let verdict = found.first().map(|finding| &finding.verdict);
 
         assert!(
-            matches!(
-                found.first().map(|f| &f.verdict),
-                Some(Verdict::Skipped { .. })
-            ),
+            matches!(verdict, Some(Verdict::Skipped { .. })),
             "{found:?}"
         );
     }
