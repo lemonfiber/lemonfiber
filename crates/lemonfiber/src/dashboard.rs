@@ -156,6 +156,7 @@ fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line
     let stuck = panels::stuck(&snapshot.stuck, room());
     let alerts = panels::alerts(&snapshot.alerts, room());
     let door = panels::front_door(&snapshot.door, room());
+    let household = panels::household(&snapshot.household, room());
     vec![
         ("VPN", vpn),
         ("Transfers", transfers),
@@ -165,10 +166,11 @@ fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line
         ("Stuck", stuck),
         ("Alerts", alerts),
         ("Front door", door),
+        ("Waiting on you", household),
     ]
 }
 
-/// Where the eight panels go in the space there is.
+/// Where the nine panels go in the space there is.
 ///
 /// Two columns where the terminal is wide enough for both, one where it is not.
 /// Every panel gets a place in either case: dropping one would leave an operator
@@ -176,18 +178,18 @@ fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line
 fn places(body: Rect) -> Vec<Rect> {
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Ratio(1, 4); 4])
+        .constraints([Constraint::Ratio(1, 5); 5])
         .split(body);
     if body.width < TWO_COLUMNS {
-        // One column: the same eight panels, stacked, each narrower and taller.
+        // One column: the same nine panels, stacked, each narrower and taller.
         return Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Ratio(1, 8); 8])
+            .constraints([Constraint::Ratio(1, 9); 9])
             .split(body)
             .to_vec();
     }
     let mut places = Vec::new();
-    for (row, count) in rows.iter().zip([2usize, 2, 2, 2]) {
+    for (row, count) in rows.iter().zip([2usize, 2, 2, 2, 1]) {
         places.extend(
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -254,6 +256,11 @@ pub(crate) mod tests {
                 facing: Some(lemonfiber_core::door::Facing::Asking),
                 meaning: "send them there".to_owned(),
                 beside: Vec::new(),
+            }),
+            household: Panel::Ready(lemonfiber_core::model::HouseholdReport {
+                members: Vec::new(),
+                available: true,
+                findings: Vec::new(),
             }),
         }
     }
