@@ -11,7 +11,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 use lemonfiber_core::jellyfin::Jellyfin;
-use lemonfiber_core::ports::http::Http;
+use lemonfiber_core::ports::http::{Http, Method};
 use lemonfiber_core::ports::service::{Failure, Library, MediaServer};
 use lemonfiber_core::recyclarr::Kind;
 
@@ -86,42 +86,79 @@ async fn an_unreachable_jellyfin_is_unavailable() {
     ));
 }
 
+/// The account is read before it is written, and setup is finished last.
+///
+/// The read is not decoration. Jellyfin's write **updates the first account it
+/// holds** rather than creating one, and a server nobody has set up holds none — so
+/// the write alone fails on an empty sequence and no administrator is ever made.
+/// Asserted as a sequence of methods rather than of paths, because the read and the
+/// write are the same path and only the method tells them apart.
 #[tokio::test]
-async fn creating_the_admin_posts_the_account_then_completes_setup() {
-    let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(200, "")]);
+async fn the_account_is_read_into_being_before_it_is_written() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, r#"{"Name":"root"}"#),
+        Answer::reply(204, ""),
+        Answer::reply(204, ""),
+    ]);
     assert!(jellyfin(&fake)
         .create_admin("admin", "secret")
         .await
         .is_ok());
 
     let requests = fake.requests();
-    let first = requests.first();
-    assert!(first.is_some_and(|request| request.url.ends_with("/Startup/User")));
-    let body = first
+    let steps: Vec<(Method, &str)> = requests
+        .iter()
+        .map(|request| {
+            let path = request
+                .url
+                .rsplit_once("/api")
+                .map_or(request.url.as_str(), |(_, rest)| rest);
+            (request.method, path)
+        })
+        .collect();
+    assert!(
+        matches!(
+            steps.as_slice(),
+            [
+                (Method::Get, first),
+                (Method::Post, second),
+                (Method::Post, third)
+            ] if first.ends_with("/Startup/User")
+                && second.ends_with("/Startup/User")
+                && third.ends_with("/Startup/Complete")
+        ),
+        "the account was not read before it was written: {steps:?}"
+    );
+
+    let written = requests
+        .get(1)
         .and_then(|request| request.body.clone())
         .unwrap_or_default();
-    assert!(body.contains(r#""Name":"admin""#), "{body}");
-    assert!(body.contains(r#""Password":"secret""#), "{body}");
-    // Setup is finished only after the account is made.
-    assert!(requests
-        .get(1)
-        .is_some_and(|request| request.url.ends_with("/Startup/Complete")));
+    assert!(written.contains(r#""Name":"admin""#), "{written}");
+    assert!(written.contains(r#""Password":"secret""#), "{written}");
 }
 
 #[tokio::test]
 async fn a_rejected_admin_creation_is_refused_and_setup_is_not_finished() {
-    let fake = Fake::in_turn(vec![Answer::reply(400, "user already exists")]);
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, r#"{"Name":"root"}"#),
+        Answer::reply(400, "user already exists"),
+    ]);
     assert!(matches!(
         jellyfin(&fake).create_admin("admin", "secret").await,
         Err(Failure::Refused { .. })
     ));
-    // Only the failed create was attempted; completion was never reached.
-    assert_eq!(fake.requests().len(), 1);
+    // The read and the failed write; completion was never reached.
+    assert_eq!(fake.requests().len(), 2);
 }
 
 #[tokio::test]
 async fn a_rejected_completion_is_refused() {
-    let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(500, "boom")]);
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, r#"{"Name":"root"}"#),
+        Answer::reply(204, ""),
+        Answer::reply(500, "boom"),
+    ]);
     assert!(matches!(
         jellyfin(&fake).create_admin("admin", "secret").await,
         Err(Failure::Refused { .. })

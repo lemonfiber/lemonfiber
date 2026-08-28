@@ -34,6 +34,17 @@ impl MediaServer for Jellyfin {
     }
 
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure> {
+        // Read the account before writing it. The write **updates the first account
+        // Jellyfin holds** rather than creating one, and a server nobody has set up
+        // holds none — so without this the write fails on an empty sequence, and the
+        // administrator is never made. The read is what brings the default account
+        // into being for the write to find.
+        let waiting = self
+            .endpoint
+            .send(&self.request(Method::Get, "/Startup/User", None))
+            .await?;
+        self.endpoint.expect_success(&waiting)?;
+
         let body = serde_json::json!({ "Name": name, "Password": password }).to_string();
         let created = self
             .endpoint
