@@ -377,6 +377,29 @@
         "data"
       ],
       "$defs": {
+        "Cause": {
+          "description": "One thing that could be behind a symptom, and how to tell it from the others.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "What is wrong.",
+              "type": "string"
+            },
+            "fix": {
+              "description": "What to do about it.",
+              "type": "string"
+            },
+            "tell": {
+              "description": "How to tell this cause from the others under the same symptom.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "because",
+            "tell",
+            "fix"
+          ]
+        },
         "Device": {
           "description": "A kind of device somebody in the house might watch on.",
           "type": "object",
@@ -432,10 +455,18 @@
             "only_at_home": {
               "description": "True of every device, said once.",
               "type": "string"
+            },
+            "trouble": {
+              "description": "What to do when it does not work, keyed by the symptom.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Trouble"
+              }
             }
           },
           "required": [
             "devices",
+            "trouble",
             "only_at_home",
             "nothing_is_installed"
           ]
@@ -463,6 +494,27 @@
               "type": "string",
               "const": "fallback"
             }
+          ]
+        },
+        "Trouble": {
+          "description": "Something somebody reports, and what is likely behind it.\n\nKeyed by the symptom rather than the cause: the person asking has the symptom,\nand which cause it is is the thing they cannot yet say.",
+          "type": "object",
+          "properties": {
+            "causes": {
+              "description": "What is likely behind it, most likely first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Cause"
+              }
+            },
+            "symptom": {
+              "description": "What somebody says is happening, in their words.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "symptom",
+            "causes"
           ]
         }
       }
