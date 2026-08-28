@@ -41,6 +41,20 @@ pub(crate) fn settle(locale: Option<&str>) -> bool {
     *ASCII_ONLY.get_or_init(|| !unicode(locale))
 }
 
+/// What was settled, for a surface that must pick a shape rather than a character.
+///
+/// The fold rewrites a line after it is built, which is enough for everything that
+/// differs by a mark. A drawing does not work that way: two half-height blocks are
+/// one row of cells and the ASCII standing in for them is two, so the choice is made
+/// before there is a line to fold rather than after.
+///
+/// Reads rather than settles. Asking a question here must not decide the answer for
+/// the run — that is the edge's to make, once, and a reader that latched would let
+/// whichever surface happened to draw first quietly overrule it.
+pub(crate) fn folding() -> bool {
+    *ASCII_ONLY.get().unwrap_or(&false)
+}
+
 /// Whether a terminal described this way can show more than ASCII.
 ///
 /// Read from the charset a locale names. `C` and `POSIX` are the two that say

@@ -37,6 +37,12 @@ async-trait = { workspace = true }
 # Reading a secret without echoing it needs raw-terminal control, which this
 # workspace forbids doing directly (`unsafe_code = "forbid"`); rpassword wraps it.
 rpassword = "7"
+# Turning the front door's address into something a phone camera reads. Chosen over
+# the alternatives for having no optional dependencies at all — `qrcode` can pull in
+# `image` and `fast_qr` can pull in `resvg`, and a QR code is a grid of bits that
+# needs neither. It hands back exactly that grid, one module at a time, and leaves
+# every decision about how to draw it here where the terminal is known.
+qrcodegen = "1.8"
 # A backup archive is a gzip-compressed tar: `tar` packs and reads the directory
 # trees, `flate2` compresses them. flate2's default `miniz_oxide` backend is pure
 # Rust, so the static musl release stays free of a system zlib the way rustls keeps

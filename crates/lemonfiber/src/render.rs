@@ -21,6 +21,7 @@ pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
 mod outbound;
+mod qr;
 mod quality;
 pub(crate) mod repair;
 mod seed;
