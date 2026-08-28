@@ -97,6 +97,61 @@ pub struct ClientProbe {
     pub detail: Option<String>,
 }
 
+/// One of the quality profiles a service holds, as the request service needs to
+/// name it.
+///
+/// Both halves are carried because the request service wants both: the identifier
+/// it will send, and the name it will show. Reading the name back rather than
+/// assuming it means an operator who renamed a profile still sees their own word.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QualityProfile {
+    /// The identifier the service assigned.
+    pub id: u32,
+    /// What the operator calls it.
+    pub name: String,
+}
+
+/// An \*arr the request service should hand a request to.
+///
+/// Everything the request service needs to reach it and to file what it fetches:
+/// where it is, how to authenticate, and which profile and folder to use. The
+/// media it fulfils is intrinsic to which \*arr it is rather than a field here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FulfilmentTarget {
+    /// The name the operator will see in the request service's own interface.
+    pub name: String,
+    /// The host the request service should reach it on.
+    pub host: String,
+    /// The port it listens on.
+    pub port: u16,
+    /// The key the request service authenticates with.
+    pub key: String,
+    /// Whether it fetches television rather than film — which of the request
+    /// service's two target lists this belongs in.
+    pub television: bool,
+    /// The quality profile requests are fetched at.
+    pub profile: QualityProfile,
+    /// Where what it fetches is filed.
+    pub folder: String,
+}
+
+/// An \*arr the request service already holds, with the identifier it gave it.
+///
+/// Read back so one already registered can be told from an absent one — matched by
+/// the endpoint it reaches rather than by its label, the way a download client is,
+/// so an operator who renamed it is not handed a duplicate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegisteredTarget {
+    /// The identifier the request service assigned.
+    pub id: String,
+    /// The host it is reached on.
+    pub host: String,
+    /// The port it listens on.
+    pub port: u16,
+    /// Whether it is the television list rather than the film one.
+    pub television: bool,
+}
+
 /// Where a service should file the media it imports.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootFolder {

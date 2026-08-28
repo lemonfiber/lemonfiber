@@ -188,6 +188,18 @@ impl Client for FakeService {
             .map_or_else(|| Err(down("sonarr")), Ok)
     }
 
+    /// One profile, so a caller that must name one has one to name. The seeding
+    /// this fake drives does not read profiles; the fulfilment tests script their
+    /// own service for that.
+    async fn quality_profiles(
+        &self,
+    ) -> Result<Vec<lemonfiber_core::ports::service::QualityProfile>, Failure> {
+        Ok(vec![lemonfiber_core::ports::service::QualityProfile {
+            id: 1,
+            name: "Any".to_owned(),
+        }])
+    }
+
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
         let count = match self.reads.lock() {
             Ok(mut reads) => {

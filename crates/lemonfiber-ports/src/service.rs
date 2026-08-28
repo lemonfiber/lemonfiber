@@ -22,8 +22,9 @@ mod trace;
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
-    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, Queue, QueueDepth,
-    Queued, Queues, RegisteredClient, RegisteredFolder, RootFolder, Transfers,
+    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, FulfilmentTarget,
+    QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient, RegisteredFolder,
+    RegisteredTarget, RootFolder, Transfers,
 };
 pub use failure::{
     Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
@@ -146,6 +147,18 @@ pub trait Client: Send + Sync {
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure>;
+
+    /// The quality profiles the service holds.
+    ///
+    /// Read rather than assumed, because the request service must name one when it
+    /// hands over a request and the operator may have renamed or replaced the
+    /// defaults. A service with none is not an error here — it is a service nothing
+    /// can be fetched at, which the caller decides what to do about.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn quality_profiles(&self) -> Result<Vec<QualityProfile>, Failure>;
 }
 
 /// A media server's first-run setup — Jellyfin, the one service lemonfiber
@@ -264,6 +277,20 @@ pub trait Requests: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn tell(&self, telling: &Telling) -> Result<(), Failure>;
+
+    /// The \*arrs it already hands requests to, by the endpoint each reaches.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn fulfilment_targets(&self) -> Result<Vec<RegisteredTarget>, Failure>;
+
+    /// Hand it an \*arr to fulfil requests through.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure>;
 }
 
 /// Whether the request service reaches the household, and about what.

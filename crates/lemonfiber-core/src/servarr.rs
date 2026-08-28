@@ -24,7 +24,7 @@ use serde::Deserialize;
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
-    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity,
+    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity, QualityProfile,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 
@@ -249,6 +249,26 @@ impl Client for Servarr {
             .map(|folder| RegisteredFolder {
                 id: folder.id.to_string(),
                 path: folder.path,
+            })
+            .collect())
+    }
+
+    async fn quality_profiles(&self) -> Result<Vec<QualityProfile>, Failure> {
+        let held: Vec<crate::servarr::catalogue::ProfileResource> =
+            self.read("/qualityprofile", "the quality profiles").await?;
+        // A profile with no usable id is one nothing could be fetched at, and a
+        // nameless one is one the request service would show a blank beside. Both
+        // are passed over rather than carried as a half-answer.
+        Ok(held
+            .into_iter()
+            .filter_map(|profile| {
+                u32::try_from(profile.id)
+                    .ok()
+                    .filter(|_| !profile.name.is_empty())
+                    .map(|id| QualityProfile {
+                        id,
+                        name: profile.name,
+                    })
             })
             .collect())
     }
