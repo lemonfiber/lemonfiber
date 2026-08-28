@@ -14,7 +14,9 @@ use serde::Deserialize;
 
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::{Failure, HouseholdRequest, Requests, Telling};
+use crate::ports::service::{
+    Failure, FulfilmentTarget, HouseholdRequest, RegisteredTarget, Requests, Telling,
+};
 use crate::recyclarr::Kind;
 
 /// The address a fresh Seerr owner is filed under. Seerr requires an address on
@@ -46,6 +48,21 @@ const APPROVED_BY_POLICY: u32 = 128;
 /// Everything the household is told about, taken together.
 pub const OCCASIONS: u32 =
     RECEIVED | DECIDED_YES | ARRIVED | COULD_NOT | DECIDED_NO | APPROVED_BY_POLICY;
+
+/// Where the \*arrs that fetch what the household asks for are registered.
+///
+/// Two lists, not one: the request service keeps film and television apart because
+/// they are fetched by different services, and which list a target belongs in is
+/// intrinsic to which \*arr it is.
+const FILM: &str = "/settings/radarr";
+const TELEVISION: &str = "/settings/sonarr";
+
+/// How available a film must be before it is fetched.
+///
+/// The service's own vocabulary. Released is the one that matches what a household
+/// means by asking for something: in cinemas is not something anybody can watch at
+/// home, and announced is not something that exists yet.
+const WHEN_RELEASED: &str = "released";
 
 /// Where the one agent that needs no account of its own is configured.
 ///
@@ -83,6 +100,32 @@ impl Seerr {
 struct PublicSettings {
     #[serde(default)]
     initialized: bool,
+}
+
+/// An \*arr the request service holds, in its own words.
+///
+/// Matched on afterwards by host and port rather than by `name`, so an operator who
+/// renamed one is not handed a duplicate of it.
+#[derive(Deserialize)]
+struct TargetResource {
+    #[serde(default)]
+    id: i64,
+    #[serde(default)]
+    hostname: String,
+    #[serde(default)]
+    port: u16,
+}
+
+impl TargetResource {
+    /// The same target in this product's own words.
+    fn registered(self, television: bool) -> RegisteredTarget {
+        RegisteredTarget {
+            id: self.id.to_string(),
+            host: self.hostname,
+            port: self.port,
+            television,
+        }
+    }
 }
 
 /// What Seerr holds for the browser-push agent, in its own words.
@@ -177,6 +220,49 @@ impl Requests for Seerr {
             skip += REQUEST_PAGE;
         }
         Ok(requests)
+    }
+
+    async fn fulfilment_targets(&self) -> Result<Vec<RegisteredTarget>, Failure> {
+        let mut held = Vec::new();
+        for (path, television) in [(FILM, false), (TELEVISION, true)] {
+            let response = self
+                .endpoint
+                .send(&self.request(Method::Get, path, None))
+                .await?;
+            let listed: Vec<TargetResource> = self.endpoint.decode(
+                &response,
+                "the request service's fulfilment targets could not be read",
+            )?;
+            held.extend(
+                listed
+                    .into_iter()
+                    .map(|target| target.registered(television)),
+            );
+        }
+        Ok(held)
+    }
+
+    async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure> {
+        let body = serde_json::json!({
+            "name": target.name,
+            "hostname": target.host,
+            "port": target.port,
+            "apiKey": target.key,
+            "useSsl": false,
+            "activeProfileId": target.profile.id,
+            "activeProfileName": target.profile.name,
+            "activeDirectory": target.folder,
+            "is4k": false,
+            "isDefault": true,
+            "minimumAvailability": WHEN_RELEASED,
+        })
+        .to_string();
+        let path = if target.television { TELEVISION } else { FILM };
+        let written = self
+            .endpoint
+            .send(&self.request(Method::Post, path, Some(body)))
+            .await?;
+        self.endpoint.expect_success(&written)
     }
 
     async fn telling(&self) -> Result<Telling, Failure> {

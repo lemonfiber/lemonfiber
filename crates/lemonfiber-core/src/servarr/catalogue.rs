@@ -116,7 +116,7 @@ impl Catalogue for Servarr {
 impl Servarr {
     /// Read a list from `path`, saying `what` where it cannot be read — the same shape
     /// three of the four catalogue requests have.
-    async fn read<T: serde::de::DeserializeOwned>(
+    pub(super) async fn read<T: serde::de::DeserializeOwned>(
         &self,
         path: &str,
         what: &str,
@@ -170,11 +170,14 @@ struct RootFolderResource {
     path: String,
 }
 
-/// The one field of a quality profile that matters: its id, which an add refers to.
+/// A quality profile as the service reports it: the id an add refers to, and the
+/// name the request service shows beside it.
 #[derive(Deserialize)]
-struct ProfileResource {
+pub(super) struct ProfileResource {
     #[serde(default)]
-    id: i64,
+    pub(super) id: i64,
+    #[serde(default)]
+    pub(super) name: String,
 }
 
 /// The two fields of an indexer that say whether it would ever be searched.

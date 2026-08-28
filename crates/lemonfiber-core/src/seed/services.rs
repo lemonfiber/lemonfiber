@@ -10,7 +10,7 @@ use super::{
     MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
 };
 use crate::baseline::Record;
-use crate::ports::service::Telling;
+use crate::ports::service::{FulfilmentTarget, RegisteredTarget, Telling};
 use crate::secret;
 use crate::seerr::OCCASIONS;
 
@@ -119,6 +119,75 @@ pub(crate) async fn tell_the_household(
         Observed::Unmanaged => State::Unmanaged,
     };
     (state, held)
+}
+
+/// Hand the request service the \*arrs that fulfil what the household asks for.
+///
+/// Until it is told, the request service knows of no \*arr: a request is accepted
+/// and no downloader ever hears about it. It does not discover them.
+///
+/// Only the \*arrs actually in the stack are offered, and that is the half worth
+/// stating — the request service offers what its targets can deliver, so television
+/// is not offered where Sonarr is not running. An \*arr that is absent is simply
+/// never handed over; one the operator registered themselves is left exactly as it
+/// is, never rewritten, the same way an application already present is.
+pub async fn wire_fulfilment_targets(
+    seerr: &dyn Requests,
+    wanted: &[FulfilmentTarget],
+    journal: &mut Journal,
+    at: &str,
+) -> Vec<Wiring> {
+    let existing = match observe_or_skip(seerr.fulfilment_targets().await, wanted, describe_target)
+    {
+        Ok(existing) => existing,
+        Err(skipped) => return skipped,
+    };
+
+    let mut wirings = Vec::new();
+    for target in wanted {
+        let state = if holds(&existing, target) {
+            State::AlreadyWired
+        } else {
+            wire_one(
+                seerr.add_fulfilment_target(target),
+                seerr.fulfilment_targets(),
+                |rows| holding(rows, target).map(|have| have.id.clone()),
+                Naming {
+                    service: "seerr",
+                    resource: "fulfilment target",
+                    noun: "request target",
+                },
+                journal,
+                at,
+            )
+            .await
+        };
+        wirings.push(Wiring::settled(describe_target(target), state));
+    }
+    wirings
+}
+
+/// The one the request service holds at this target's endpoint, if it holds one.
+///
+/// By host, port and which list it is in — never by name, so an operator who
+/// renamed it is not handed a second copy of the same service.
+fn holding<'a>(
+    held: &'a [RegisteredTarget],
+    want: &FulfilmentTarget,
+) -> Option<&'a RegisteredTarget> {
+    held.iter().find(|have| {
+        have.host == want.host && have.port == want.port && have.television == want.television
+    })
+}
+
+/// Whether the request service already reaches this \*arr.
+fn holds(held: &[RegisteredTarget], want: &FulfilmentTarget) -> bool {
+    holding(held, want).is_some()
+}
+
+/// A fulfilment target's description for the report.
+fn describe_target(target: &FulfilmentTarget) -> String {
+    format!("{} as a request target", target.name)
 }
 
 /// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave

@@ -140,6 +140,20 @@ impl Requests for FakeReq {
         Ok(Vec::new())
     }
 
+    /// This fake drives the identity wiring, which asks about no fulfilment target.
+    async fn fulfilment_targets(
+        &self,
+    ) -> Result<Vec<lemonfiber_core::ports::service::RegisteredTarget>, Failure> {
+        Ok(Vec::new())
+    }
+
+    async fn add_fulfilment_target(
+        &self,
+        _target: &lemonfiber_core::ports::service::FulfilmentTarget,
+    ) -> Result<(), Failure> {
+        Ok(())
+    }
+
     /// What this fake was told to say the service is telling the household.
     async fn telling(&self) -> Result<Telling, Failure> {
         match self.gate {
