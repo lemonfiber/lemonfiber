@@ -3340,6 +3340,79 @@
         }
       }
     },
+    "invitation": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Invitation"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Invitation": {
+          "description": "One invitation, as it was just made.\n\nCarries what the operator has to pass on and nothing else — a name to sign in\nwith, one address, and how long it stands. The address is the media server's,\nbecause setting a first password happens there.",
+          "type": "object",
+          "properties": {
+            "address": {
+              "description": "The one address to send them.\n\nWhere a *person* reaches the media server: built from what this machine is\ncalled on the network, not from either of the hosts the stack wires itself\nwith — those resolve only on this machine or inside the stack, and an\ninvitation carrying one sends somebody an address that cannot open.",
+              "type": "string"
+            },
+            "caution": {
+              "description": "What is worth knowing about the address itself, where anything is.\n\nAn address that is a number is one a router can hand elsewhere, so a bookmark\nmade from it stops working with nothing here having changed. Carried on the\ninvitation because that is the copy somebody keeps.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hours": {
+              "description": "How many hours it stands before it is withdrawn.",
+              "type": "integer",
+              "format": "int64"
+            },
+            "name": {
+              "description": "The name they sign in as.",
+              "type": "string"
+            },
+            "rehearsed": {
+              "description": "Whether the account was made, or only described.\n\nA rehearsal can say the whole answer without writing any of it — the name is\nthe one asked for, the address is the stack's, and what has run out has just\nbeen read — so the only thing separating it from the real run is this.",
+              "type": "boolean"
+            },
+            "withdrawn": {
+              "description": "Invitations nobody claimed in time, taken back on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone. On a rehearsal these are the ones that *would* be taken back.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "address",
+            "hours",
+            "withdrawn",
+            "rehearsed"
+          ]
+        }
+      }
+    },
     "job": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

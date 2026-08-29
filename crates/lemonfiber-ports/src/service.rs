@@ -186,6 +186,73 @@ pub trait MediaServer: Send + Sync {
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
 }
 
+/// Making and withdrawing the accounts a household signs in with.
+///
+/// Apart from the media server's setup because it is a different errand entirely:
+/// setup runs once and never again, while this is what an operator reaches for every
+/// time somebody new moves in.
+#[async_trait]
+pub trait Household: Send + Sync {
+    /// Everybody the media server holds an account for, and whether each has
+    /// claimed it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn household(&self) -> Result<Vec<Member>, Failure>;
+
+    /// Make an account somebody can claim by setting a password on it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn invite(&self, name: &str) -> Result<Member, Failure>;
+
+    /// Take an account away again.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn withdraw(&self, id: &str) -> Result<(), Failure>;
+
+    /// When each account was made, for those made since `since`.
+    ///
+    /// Read from what the server records happening rather than from the accounts
+    /// themselves, because an account carries no date — see the media server's own
+    /// activity record. `since` bounds the read rather than filtering it
+    /// afterwards, so a long-lived server is not walked to answer a question about
+    /// the last two days.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn when_invited(&self, since: &str) -> Result<Vec<Invited>, Failure>;
+}
+
+/// Somebody the media server holds an account for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Member {
+    /// The identifier the server assigned.
+    pub id: String,
+    /// What they are called.
+    pub name: String,
+    /// Whether they have set a password.
+    ///
+    /// An account nobody has set one on is an invitation nobody has taken up: the
+    /// whole of what makes it an invitation rather than an account, and the reason
+    /// nothing needs to be written down about it here.
+    pub claimed: bool,
+}
+
+/// When one account was made, as the media server recorded it happening.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Invited {
+    /// The account it is about, matching a [`Member::id`].
+    pub member: String,
+    /// When it was made, as the server timestamps it.
+    pub at: String,
+}
+
 /// One thing a household member asked for, as the request service records it.
 ///
 /// The two statuses are carried as the service's own numbers rather than folded here:

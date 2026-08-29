@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use lemonfiber_core::jellyfin::Jellyfin;
 use lemonfiber_core::ports::http::{Http, Method};
-use lemonfiber_core::ports::service::{Failure, Library, MediaServer};
+use lemonfiber_core::ports::service::{Failure, Household, Library, MediaServer};
 use lemonfiber_core::recyclarr::Kind;
 
 fn jellyfin(fake: &Arc<Fake>) -> Jellyfin {
@@ -267,6 +267,123 @@ async fn an_unreachable_media_server_is_unavailable_for_a_library_read() {
     let fake = Fake::silent();
     assert!(matches!(
         reader(&fake).has_item(Kind::Sonarr, "expanse").await,
+        Err(Failure::Unavailable { .. })
+    ));
+}
+
+// ---- The accounts a household signs in with, and the ones nobody has claimed. ----
+
+/// Two accounts: one somebody has claimed, one nobody has.
+const HOUSEHOLD: &str = r#"[
+    {"Id":"1","Name":"ana","HasPassword":false},
+    {"Id":"2","Name":"bo","HasPassword":true}
+]"#;
+
+/// An account with no password on it is an invitation; one with a password is a member.
+///
+/// The whole distinction the feature rests on, read off the field the server already
+/// keeps rather than out of anything written down here.
+#[tokio::test]
+async fn an_account_without_a_password_reads_as_unclaimed() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, HOUSEHOLD),
+    ]);
+
+    let held = reader(&fake).household().await.unwrap_or_default();
+
+    assert_eq!(
+        held.iter()
+            .map(|member| (member.name.as_str(), member.claimed))
+            .collect::<Vec<_>>(),
+        [("ana", false), ("bo", true)],
+        "claimed and unclaimed were not told apart"
+    );
+}
+
+/// Offering an account sends no password, which is what makes it an invitation.
+#[tokio::test]
+async fn offering_an_account_sends_no_password() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, r#"{"Id":"1","Name":"ana","HasPassword":false}"#),
+    ]);
+
+    let made = reader(&fake).invite("ana").await;
+
+    assert!(made.is_ok_and(|member| member.name == "ana" && !member.claimed));
+    let sent = fake
+        .requests()
+        .into_iter()
+        .find(|asked| asked.url.ends_with("/Users/New"))
+        .and_then(|asked| asked.body)
+        .unwrap_or_default();
+    assert!(
+        sent.contains(r#""Name":"ana""#) && !sent.to_lowercase().contains("password"),
+        "a password was sent with an invitation: {sent}"
+    );
+}
+
+/// Taking an account back asks the server to remove it.
+#[tokio::test]
+async fn withdrawing_an_invitation_removes_the_account() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN), Answer::reply(204, "")]);
+
+    assert!(reader(&fake).withdraw("1").await.is_ok());
+    assert!(
+        fake.requests()
+            .iter()
+            .any(|asked| asked.method == Method::Delete && asked.url.ends_with("/Users/1")),
+        "the account was not asked to be removed: {:?}",
+        fake.requests()
+    );
+}
+
+/// When an account was made comes from what the server recorded happening.
+///
+/// The account itself carries no date at all, so this reads the record instead — and
+/// keeps only the entries about an account being made, since the same record holds
+/// every sign-in and every password change too.
+#[tokio::test]
+async fn when_an_account_was_made_is_read_from_what_the_server_recorded() {
+    let recorded = r#"{"Items":[
+        {"Type":"UserCreated","Date":"2026-08-29T09:00:00Z","UserId":"1"},
+        {"Type":"AuthenticationSucceeded","Date":"2026-08-29T10:00:00Z","UserId":"2"},
+        {"Type":"UserCreated","Date":"2026-08-29T11:00:00Z","UserId":""}
+    ]}"#;
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, recorded),
+    ]);
+
+    let made = reader(&fake)
+        .when_invited("2026-08-27T09:00:00Z")
+        .await
+        .unwrap_or_default();
+
+    assert_eq!(
+        made.iter()
+            .map(|entry| (entry.member.as_str(), entry.at.as_str()))
+            .collect::<Vec<_>>(),
+        [("1", "2026-08-29T09:00:00Z")],
+        "something other than an account being made was carried through"
+    );
+    assert!(
+        fake.requests().iter().any(
+            |asked| asked.url.contains("minDate=2026-08-27T09%3A00%3A00Z")
+                || asked.url.contains("minDate=2026-08-27T09:00:00Z")
+        ),
+        "the read was not bounded by the date asked for: {:?}",
+        fake.requests()
+    );
+}
+
+/// A media server that will not answer is unavailable, not an empty household.
+#[tokio::test]
+async fn a_media_server_that_will_not_answer_is_unavailable_for_the_household() {
+    let fake = Fake::silent();
+    assert!(matches!(
+        reader(&fake).household().await,
         Err(Failure::Unavailable { .. })
     ));
 }

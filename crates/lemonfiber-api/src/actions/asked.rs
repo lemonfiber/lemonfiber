@@ -37,6 +37,8 @@ pub struct Arguments {
     pub wait: Waiting,
     /// The one service to act on instead of the whole stack.
     pub service: Option<String>,
+    /// Who an invitation is for, as they will sign in.
+    pub name: Option<String>,
     /// The setting to change.
     pub key: Option<String>,
     /// What to change it to.
@@ -329,6 +331,9 @@ pub const TAKES_PRESET: &[&str] = &["quality-set"];
 /// but here.
 pub const TAKES_ARCHIVE: &[&str] = &["restore"];
 
+/// The one action that is about a person rather than a form, a file or a service.
+pub const TAKES_NAME: &[&str] = &["invite"];
+
 /// The action whose command carries what goes in a bundle.
 ///
 /// A support run and nothing else. All four decide what the file holds — whether
@@ -352,7 +357,7 @@ pub const TAKES_ITEM: &[&str] = &["walkthrough"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 21] = [
+    let carried: [(&str, bool, &[&str]); 22] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -366,6 +371,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("preset", given.preset.is_some(), TAKES_PRESET),
         ("media_type", given.media_type.is_some(), TAKES_PRESET),
         ("archive", given.archive.is_some(), TAKES_ARCHIVE),
+        ("name", given.name.is_some(), TAKES_NAME),
         ("repoint", given.repoint, TAKES_ARCHIVE),
         ("write", given.write, TAKES_BUNDLING),
         ("logs", given.logs.is_some(), TAKES_BUNDLING),

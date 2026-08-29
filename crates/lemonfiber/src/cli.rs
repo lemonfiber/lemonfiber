@@ -283,6 +283,15 @@ pub enum Request {
     /// works and needs no installation, and where a device is badly served says what
     /// to do instead rather than leaving somebody to find out by failing.
     Clients,
+    /// Offer somebody in the house an account they can claim.
+    ///
+    /// Makes them an account on the media server with no password on it, and prints
+    /// the one address to send them. Whoever sets the first password claims it; an
+    /// invitation nobody takes up is withdrawn.
+    Invite {
+        /// What they will sign in as.
+        name: String,
+    },
     /// Remove everything lemonfiber keeps on this machine.
     ///
     /// The two directories and everything under them. Your library, your downloads

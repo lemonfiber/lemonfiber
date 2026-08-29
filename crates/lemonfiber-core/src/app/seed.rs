@@ -17,7 +17,7 @@ mod baseline;
 mod clients;
 mod fulfilment;
 use fulfilment::seed_fulfilment_targets;
-mod identity;
+pub(super) mod identity;
 mod reset;
 
 use applications::{seed_applications, skipped};

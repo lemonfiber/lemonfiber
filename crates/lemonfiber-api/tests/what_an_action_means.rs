@@ -18,8 +18,8 @@ use lemonfiber_api::actions;
 use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED, TAKES_AGREED,
     TAKES_AGREEMENT, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
-    TAKES_FORMS, TAKES_ITEM, TAKES_NARROWING, TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES,
-    TAKES_SETTING, TAKES_WAITING,
+    TAKES_FORMS, TAKES_ITEM, TAKES_NAME, TAKES_NARROWING, TAKES_PRESET, TAKES_SERVICE,
+    TAKES_SERVICES, TAKES_SETTING, TAKES_WAITING,
 };
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
@@ -498,6 +498,7 @@ fn exactly_what(action: &str) -> Arguments {
         preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
         media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),
         archive: takes(TAKES_ARCHIVE).then(|| ARCHIVE.to_owned()),
+        name: takes(TAKES_NAME).then(|| "ana".to_owned()),
         repoint: takes(TAKES_ARCHIVE),
         write: takes(TAKES_BUNDLING),
         logs: takes(TAKES_BUNDLING).then_some(LOGS),

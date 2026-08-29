@@ -39,6 +39,12 @@ pub(crate) enum Needs {
     Archive(&'static str),
     /// One of the services the screen has in hand, or the whole stack.
     Service,
+    /// Somebody's name, typed on a line of its own.
+    ///
+    /// Typed rather than taken, and for the opposite reason a service is taken: the
+    /// person being invited is not on this screen yet. That is the whole point of
+    /// inviting them.
+    Named(&'static str),
     /// What a bundle is to hold: how much of each service's log, typed on a line of
     /// its own, and then what becomes of media filenames, taken off a list.
     ///
@@ -83,6 +89,21 @@ impl Given {
         Self {
             asked: Arguments {
                 archive: (!typed.is_empty()).then(|| typed.clone()),
+                ..Arguments::default()
+            },
+            said: typed,
+        }
+    }
+
+    /// Somebody's name, for an errand that is about a person rather than a file.
+    ///
+    /// The same line and the same emptiness rule as [`Given::typed`]; what differs is
+    /// only which argument the word fills, which is the errand's business rather than
+    /// the line's.
+    pub(crate) fn named(typed: String) -> Self {
+        Self {
+            asked: Arguments {
+                name: (!typed.is_empty()).then(|| typed.clone()),
                 ..Arguments::default()
             },
             said: typed,

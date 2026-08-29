@@ -126,6 +126,12 @@ pub(crate) struct ServiceAddr {
     pub loopback: String,
     /// Where another container reaches it across the stack network: `http://{id}:{port}`.
     pub network_url: String,
+    /// The port the host publishes it on.
+    ///
+    /// Kept because neither URL above is one to hand a person: both name a host only
+    /// this machine or this stack can resolve. An address for the household is built
+    /// from what the *machine* is called, and that needs the port on its own.
+    pub port: u16,
 }
 
 /// The address of the one service of a given api kind, or nothing where the stack has
@@ -146,6 +152,7 @@ pub(crate) fn service_addr(
             id: service.id.clone(),
             loopback: format!("http://127.0.0.1:{port}"),
             network_url: format!("http://{}:{port}", service.id),
+            port,
         })
     })
 }

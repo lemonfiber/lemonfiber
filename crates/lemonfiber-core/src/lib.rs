@@ -66,6 +66,7 @@ pub mod glossary;
 pub mod health;
 pub mod household;
 mod instant;
+pub mod invitation;
 pub mod jellyfin;
 pub mod journal;
 pub mod lidarr;

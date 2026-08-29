@@ -92,7 +92,7 @@ pub(super) fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option
 /// Jellyfin's addresses, if the stack has it. Jellyfin's kind carries no key source of
 /// the usual sort: it is the one service lemonfiber sets an account on rather than reading
 /// a key from, so its password is generated.
-pub(super) fn jellyfin_service(
+pub(in crate::app) fn jellyfin_service(
     services: &[lemonfiber_manifest::Service],
 ) -> Option<crate::app::targets::ServiceAddr> {
     crate::app::targets::service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)
@@ -100,7 +100,7 @@ pub(super) fn jellyfin_service(
 
 /// The Jellyfin admin password recorded on the run that minted it, so a later run
 /// can point Seerr at Jellyfin without minting again.
-pub(super) fn recorded_jellyfin_password(ctx: &Ctx) -> Option<String> {
+pub(in crate::app) fn recorded_jellyfin_password(ctx: &Ctx) -> Option<String> {
     crate::app::targets::recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
 }
 

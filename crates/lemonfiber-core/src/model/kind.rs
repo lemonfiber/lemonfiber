@@ -60,8 +60,11 @@ pub const FRONT_DOOR: Kind = Kind("front-door");
 pub const GLOSSARY: Kind = Kind("glossary");
 /// Which app to use on which device.
 pub const CLIENTS: Kind = Kind("clients");
+
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
+/// An account offered to somebody in the house.
+pub const INVITATION: Kind = Kind("invitation");
 /// The name given to work that outlives the request that started it.
 pub const JOB: Kind = Kind("job");
 /// What a lifecycle command did, or would have done.
@@ -131,6 +134,7 @@ pub const ALL: &[Kind] = &[
     GLOSSARY,
     CLIENTS,
     HOUSEHOLD,
+    INVITATION,
     JOB,
     LIFECYCLE,
     LOG,

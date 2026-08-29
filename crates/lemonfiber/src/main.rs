@@ -285,6 +285,7 @@ async fn main() -> ExitCode {
         Request::Outbound => Command::Outbound,
         Request::Stored => Command::Stored,
         Request::Clients => Command::Clients,
+        Request::Invite { name } => Command::Invite { name },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
