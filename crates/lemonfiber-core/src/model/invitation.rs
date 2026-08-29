@@ -20,6 +20,12 @@ pub struct Invitation {
     ///
     /// Reported rather than done quietly: an operator who invited somebody last
     /// week and hears nothing would otherwise have no way to learn the account is
-    /// gone.
+    /// gone. On a rehearsal these are the ones that *would* be taken back.
     pub withdrawn: Vec<String>,
+    /// Whether the account was made, or only described.
+    ///
+    /// A rehearsal can say the whole answer without writing any of it — the name is
+    /// the one asked for, the address is the stack's, and what has run out has just
+    /// been read — so the only thing separating it from the real run is this.
+    pub rehearsed: bool,
 }

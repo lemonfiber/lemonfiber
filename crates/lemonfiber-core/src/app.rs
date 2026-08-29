@@ -544,6 +544,87 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// A rehearsal makes no account and takes none back.
+    ///
+    /// Both halves of this command change the household, and the half that removes
+    /// accounts is the one nobody would want rehearsed by doing it. Asserted by what
+    /// left the machine rather than by what came back, because an answer that reads
+    /// like a rehearsal is exactly what a run that wrote anyway would also print.
+    #[tokio::test]
+    async fn a_rehearsed_invitation_writes_nothing_to_the_media_server() {
+        let env = recorded_admin("rehearsal");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in,
+                ],
+            ),
+            (
+                "/System/ActivityLog",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
+                )],
+            ),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users/7", vec![Answer::reply(204, "")]),
+            (
+                "/Users",
+                vec![Answer::reply(
+                    200,
+                    r#"[{"Id":"7","Name":"bo","HasPassword":false}]"#,
+                )],
+            ),
+        ]);
+        let recorded = std::sync::Arc::clone(&http);
+        let mut context = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build();
+        context.dry_run = true;
+        let ctx = context.with_http(http);
+
+        let made = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        let written: Vec<String> = recorded
+            .requests()
+            .into_iter()
+            .filter(|request| !matches!(request.method, crate::ports::http::Method::Get))
+            .map(|request| format!("{:?} {}", request.method, request.url))
+            .filter(|line| !line.contains("/Users/AuthenticateByName"))
+            .collect();
+
+        assert!(
+            written.is_empty(),
+            "a rehearsal changed the household: {written:?}"
+        );
+        assert!(
+            invited(&made)
+                .is_some_and(|report| report.rehearsed && report.withdrawn == ["bo".to_owned()]),
+            "a rehearsal must still say what it would do: {made:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
     /// The record is read from further back than the window it is judged against.
     ///
     /// The server answers with what happened *since* the moment it is given, and the

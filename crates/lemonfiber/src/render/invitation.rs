@@ -17,6 +17,10 @@ use crate::say;
 /// What an operator is told after offering somebody an account.
 pub(super) fn invitation(report: &Invitation) -> Lines {
     let mut lines = Lines::default();
+    if report.rehearsed {
+        // First, because everything under it reads as an account that exists.
+        lines.put("Nothing was made. This is what the invitation would say:".to_owned());
+    }
     lines.put(format!(
         "{} can sign in — unclaimed until they set a password, and it lapses in {} hours",
         report.name, report.hours
@@ -42,7 +46,11 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     lines.put(WATCHED.to_owned());
 
     if !report.withdrawn.is_empty() {
-        lines.spaced("Nobody claimed these in time, so they have been withdrawn:");
+        lines.spaced(if report.rehearsed {
+            "Nobody claimed these in time, so they would be withdrawn:"
+        } else {
+            "Nobody claimed these in time, so they have been withdrawn:"
+        });
         for name in &report.withdrawn {
             lines.put(format!("  {name}"));
         }
@@ -78,6 +86,15 @@ mod tests {
             address: "http://192.168.1.20:8096".to_owned(),
             hours: 48,
             withdrawn,
+            rehearsed: false,
+        }
+    }
+
+    /// The same invitation, said by a run that wrote nothing.
+    fn rehearsed(withdrawn: Vec<String>) -> Invitation {
+        Invitation {
+            rehearsed: true,
+            ..offered(withdrawn)
         }
     }
 
@@ -180,6 +197,34 @@ mod tests {
         assert!(
             said.contains("bo"),
             "the one taken back was not named: {said}"
+        );
+    }
+
+    /// A rehearsal says so before anything that reads as an account that exists.
+    #[test]
+    fn a_rehearsal_says_nothing_was_made_before_it_says_anything_else() {
+        let said = invitation(&rehearsed(Vec::new())).text();
+
+        assert!(
+            said.lines()
+                .next()
+                .is_some_and(|first| first.contains("Nothing was made")),
+            "a run that wrote nothing opened as though it had: {said}"
+        );
+    }
+
+    /// What a rehearsal would take back is said as *would*, not as done.
+    ///
+    /// The same list under the same heading is the difference between telling an
+    /// operator an account is gone and telling them it is about to be.
+    #[test]
+    fn a_rehearsal_says_what_would_be_withdrawn_rather_than_what_was() {
+        let said = invitation(&rehearsed(vec!["bo".to_owned()])).text();
+
+        assert!(said.contains("would be withdrawn"), "{said}");
+        assert!(
+            !said.contains("have been withdrawn"),
+            "a rehearsal reported taking an account back: {said}"
         );
     }
 

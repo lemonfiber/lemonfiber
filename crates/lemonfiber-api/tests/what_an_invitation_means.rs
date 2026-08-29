@@ -60,6 +60,7 @@ fn an_invitation_reaches_a_browser_under_its_own_name() {
         address: "http://192.168.1.20:8096".to_owned(),
         hours: 48,
         withdrawn: vec!["bo".to_owned()],
+        rehearsed: false,
     });
 
     let json = made.envelope().to_json().unwrap_or_default();

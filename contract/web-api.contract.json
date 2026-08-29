@@ -3384,8 +3384,12 @@
               "description": "The name they sign in as.",
               "type": "string"
             },
+            "rehearsed": {
+              "description": "Whether the account was made, or only described.\n\nA rehearsal can say the whole answer without writing any of it — the name is\nthe one asked for, the address is the stack's, and what has run out has just\nbeen read — so the only thing separating it from the real run is this.",
+              "type": "boolean"
+            },
             "withdrawn": {
-              "description": "Invitations nobody claimed in time, taken back on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone.",
+              "description": "Invitations nobody claimed in time, taken back on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone. On a rehearsal these are the ones that *would* be taken back.",
               "type": "array",
               "items": {
                 "type": "string"
@@ -3396,7 +3400,8 @@
             "name",
             "address",
             "hours",
-            "withdrawn"
+            "withdrawn",
+            "rehearsed"
           ]
         }
       }

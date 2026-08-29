@@ -12,7 +12,7 @@
 //! account nobody has claimed, reachable only by somebody who was told about it.
 
 use crate::app::Ctx;
-use crate::invitation::{offered, run_out, HOURS_OF_RECORD, HOURS_TO_CLAIM};
+use crate::invitation::{offered, run_out, Offered, HOURS_OF_RECORD, HOURS_TO_CLAIM};
 use crate::model::Invitation;
 use crate::ports::service::Household as _;
 
@@ -44,7 +44,25 @@ pub(super) async fn offer(
         &password,
     );
 
-    let withdrawn = sweep(ctx, &server).await;
+    let spent = run_out_now(ctx, &server).await;
+
+    // A rehearsal makes no account and takes none back. Both halves of this command
+    // change the household, and the one that removes accounts is the half nobody
+    // would want rehearsed by doing it. What it can still do is say exactly what
+    // would happen, because every part of the answer is known before anything is
+    // written: the name is the one asked for, the address is the stack's, and what
+    // has run out has just been read.
+    if ctx.dry_run {
+        return Ok(Invitation {
+            name,
+            address: jellyfin.network_url,
+            hours: HOURS_TO_CLAIM,
+            withdrawn: spent.into_iter().map(|it| it.member.name).collect(),
+            rehearsed: true,
+        });
+    }
+
+    let withdrawn = take_back(&server, &spent).await;
     let member = server
         .invite(&name)
         .await
@@ -55,14 +73,20 @@ pub(super) async fn offer(
         address: jellyfin.network_url,
         hours: HOURS_TO_CLAIM,
         withdrawn,
+        rehearsed: false,
     })
 }
 
-/// Take back the invitations nobody claimed in time.
+/// The invitations nobody claimed in time, as the media server holds them now.
 ///
-/// Best-effort: a media server that will not answer the sweep is not a reason to
-/// refuse the invitation the operator asked for. The sweep runs again next time.
-async fn sweep(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Vec<String> {
+/// Best-effort: a media server that will not answer is not a reason to refuse the
+/// invitation the operator asked for. The sweep runs again next time.
+///
+/// **Reading and acting are separate** so that a rehearsal can do the first without
+/// the second — the whole of what `--dry-run` promises is that the second does not
+/// happen, and a sweep that removed accounts on the way to saying what it would do
+/// would be the flag doing the damage it exists to prevent.
+async fn run_out_now(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Vec<Offered> {
     let cutoff = ctx.hours_ago(HOURS_TO_CLAIM);
     let since = ctx.hours_ago(HOURS_OF_RECORD);
     let (Ok(household), Ok(records)) =
@@ -71,9 +95,16 @@ async fn sweep(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Vec<String> {
         return Vec::new();
     };
     let waiting = offered(household, &records);
+    run_out(&waiting, &cutoff).into_iter().cloned().collect()
+}
 
+/// Take back the invitations that have run out, naming the ones actually taken.
+///
+/// A server that refuses one is not reported as having given it back: the operator
+/// reads this list as what is gone.
+async fn take_back(server: &crate::jellyfin::Jellyfin, spent: &[Offered]) -> Vec<String> {
     let mut taken = Vec::new();
-    for invitation in run_out(&waiting, &cutoff) {
+    for invitation in spent {
         if server.withdraw(&invitation.member.id).await.is_ok() {
             taken.push(invitation.member.name.clone());
         }
