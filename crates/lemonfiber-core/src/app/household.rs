@@ -45,11 +45,7 @@ pub(super) async fn household(
 
     if access
         .seerr
-        .sign_in(
-            crate::config::JELLYFIN_ADMIN_USER,
-            &access.password,
-            &access.server_url,
-        )
+        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
         .await
         .is_err()
     {

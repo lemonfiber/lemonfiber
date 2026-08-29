@@ -88,10 +88,6 @@ pub(crate) async fn open_servarrs(
 pub(crate) struct HouseholdAccess {
     /// The request service, reached on the host.
     pub seerr: Seerr,
-    /// Where the request service reaches the media server, across the stack's own
-    /// network — the sign-in names the server it authenticates against, and Seerr is the
-    /// one doing the reaching, so this is its address for it rather than the host's.
-    pub server_url: String,
     /// The media-server admin password lemonfiber minted and recorded.
     pub password: String,
 }
@@ -108,11 +104,14 @@ pub(crate) fn seerr_reader(
     services: &[lemonfiber_manifest::Service],
 ) -> Option<HouseholdAccess> {
     let seerr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
-    let jellyfin = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
+    // A stack with no media server has nothing for the request service to authenticate
+    // against, so there is nobody to ask on behalf of. Where it is is not needed — the
+    // request service was pointed at it when it was set up, and asking it to be pointed
+    // somewhere again is what it refuses.
+    service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
     let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
     Some(HouseholdAccess {
         seerr: Seerr::new(ctx.http.clone(), seerr.loopback, "seerr"),
-        server_url: jellyfin.network_url,
         password,
     })
 }

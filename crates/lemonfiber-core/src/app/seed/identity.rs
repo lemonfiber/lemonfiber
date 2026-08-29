@@ -43,6 +43,23 @@ pub(super) async fn seed_jellyfin_identity(
     // What the household is told is its own managed field, reconciled whether or not
     // the identity above was wired this run: the identity step stops at a service
     // already initialised, and that is every install after the first.
+    //
+    // Which is exactly why the session is opened here. The telling is read and
+    // written as the owner, and the step above only signs in on the run that
+    // initialises the service — so on every run after that one, this read had no
+    // session and the request service refused it. Signing in opens that session
+    // without finishing anybody's setup. A failure is left to the telling to report:
+    // it is about to say the same thing in its own words, and saying it twice would
+    // be two failures where the operator has one problem.
+    if let Some(password) = minted.as_deref().or(recorded.as_deref()) {
+        let _ = crate::ports::service::Requests::sign_in(
+            &seerr_client,
+            crate::config::JELLYFIN_ADMIN_USER,
+            password,
+        )
+        .await;
+    }
+
     let (told, held) = crate::seed::wire_household_telling(
         &seerr_client,
         expected.entry(SEERR, crate::seed::TELLING),
