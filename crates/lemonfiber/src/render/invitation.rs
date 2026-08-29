@@ -9,7 +9,7 @@
 //! and then a password on a phone keyboard is exactly the friction that makes
 //! people give up before they start.
 
-use lemonfiber_core::model::Invitation;
+use lemonfiber_core::model::{Invitation, InvitationStanding};
 
 use super::{qr, Lines};
 use crate::say;
@@ -21,14 +21,28 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
         // First, because everything under it reads as an account that exists.
         lines.put("Nothing was made. This is what the invitation would say:".to_owned());
     }
-    lines.put(format!(
-        "{} can sign in — unclaimed until they set a password, and it lapses in {} hours",
-        report.name, report.hours
-    ));
+    lines.put(match report.standing {
+        InvitationStanding::Made => format!(
+            "{} can sign in — unclaimed until they set a password, and it lapses in {} hours",
+            report.name, report.hours
+        ),
+        InvitationStanding::Waiting => format!(
+            "{} was already invited and it still stands, so here is that message again",
+            report.name
+        ),
+        InvitationStanding::Joined => format!("{} is already in the house", report.name),
+    });
     lines.put(format!("  {}", report.address));
     lines.put(HOME_ONLY.to_owned());
     if let Some(caution) = &report.caution {
         lines.put(format!("  {caution}"));
+    }
+
+    // Nothing to claim, so nothing to point a camera at. The address stands because
+    // it is still where they sign in, but a code and an instruction about setting a
+    // first password would be telling somebody to do again what they have done.
+    if report.standing == InvitationStanding::Joined {
+        return withdrawals(lines, report);
     }
 
     if let Some(drawn) = qr::rows(&report.address, say::folding()) {
@@ -48,6 +62,11 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     // machine somebody else administers.
     lines.put(WATCHED.to_owned());
 
+    withdrawals(lines, report)
+}
+
+/// What the sweep took back on the way past, where it took anything.
+fn withdrawals(mut lines: Lines, report: &Invitation) -> Lines {
     if !report.withdrawn.is_empty() {
         lines.spaced(if report.rehearsed {
             "Nobody claimed these in time, so they would be withdrawn:"
@@ -81,7 +100,7 @@ const WATCHED: &str = "  Tell them too: whoever runs this server can see what th
 #[cfg(test)]
 mod tests {
     use super::invitation;
-    use lemonfiber_core::model::Invitation;
+    use lemonfiber_core::model::{Invitation, InvitationStanding};
 
     fn offered(withdrawn: Vec<String>) -> Invitation {
         Invitation {
@@ -91,6 +110,7 @@ mod tests {
             hours: 48,
             withdrawn,
             rehearsed: false,
+            standing: InvitationStanding::Made,
         }
     }
 
@@ -112,6 +132,75 @@ mod tests {
             rehearsed: true,
             ..offered(withdrawn)
         }
+    }
+
+    /// The same person, whose invitation was already out and still stands.
+    fn waiting() -> Invitation {
+        Invitation {
+            standing: InvitationStanding::Waiting,
+            ..offered(Vec::new())
+        }
+    }
+
+    /// The same person, who has already set a password.
+    fn joined() -> Invitation {
+        Invitation {
+            standing: InvitationStanding::Joined,
+            ..offered(Vec::new())
+        }
+    }
+
+    /// An invitation still standing is that message again, not a refusal.
+    ///
+    /// Offering somebody twice is a thing operators do — the first message went
+    /// unanswered, or they forgot — and what they want is the thing to send, which is
+    /// exactly what was true the first time.
+    #[test]
+    fn an_invitation_still_standing_is_handed_over_again() {
+        let said = invitation(&waiting()).text();
+
+        assert!(said.contains("still stands"), "{said}");
+        assert!(said.contains("http://192.168.1.20:8096"), "{said}");
+        assert!(
+            said.contains('\u{2588}'),
+            "the message to send again lost the code that makes it easy: {said}"
+        );
+    }
+
+    /// Somebody already in the house is told so, and asked for nothing.
+    ///
+    /// A code to scan and an instruction to set a first password are both telling
+    /// somebody to do again what they have already done.
+    #[test]
+    fn somebody_already_in_the_house_is_asked_to_claim_nothing() {
+        let said = invitation(&joined()).text();
+
+        assert!(said.contains("already in the house"), "{said}");
+        assert!(
+            !said.contains("set a password"),
+            "somebody already in was told to claim an account: {said}"
+        );
+        assert!(
+            !said.contains('\u{2588}'),
+            "a code was drawn for somebody with nothing to claim: {said}"
+        );
+    }
+
+    /// What the sweep took back is said whatever was found under the name asked for.
+    ///
+    /// The withdrawals are other people's, and an operator who invited somebody last
+    /// week is owed them regardless of whose invitation this run was about.
+    #[test]
+    fn withdrawals_are_named_even_where_the_person_was_already_in() {
+        let already_in = Invitation {
+            withdrawn: vec!["bo".to_owned()],
+            ..joined()
+        };
+
+        let said = invitation(&already_in).text();
+
+        assert!(said.contains("withdrawn"), "{said}");
+        assert!(said.contains("bo"), "{said}");
     }
 
     /// The answer first: who, then the one address to send.

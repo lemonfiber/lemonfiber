@@ -368,6 +368,7 @@ mod tests {
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
     use crate::doctor::Category;
+    use crate::model::InvitationStanding;
     use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
     use crate::ports::process::{Failure, Output, Progress};
     use crate::quality::Preset;
@@ -528,6 +529,194 @@ mod tests {
         assert!(
             asked.is_empty(),
             "an account was made on a stack with nowhere to send anybody: {asked:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A media server holding one account, and answering every call this makes.
+    ///
+    /// `Users` is what the household read returns, and `log` what the record of
+    /// account-making returns — the two halves that decide what is already here.
+    fn holding(log: &'static str, users: &'static str) -> std::sync::Arc<Fake> {
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in,
+                ],
+            ),
+            ("/System/ActivityLog", vec![Answer::reply(200, log)]),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users/7", vec![Answer::reply(204, "")]),
+            ("/Users", vec![Answer::reply(200, users)]),
+        ])
+    }
+
+    /// Offer an account on a stack answering with `http`, and hand back both.
+    async fn offering(
+        env: &std::path::Path,
+        http: std::sync::Arc<Fake>,
+        name: &str,
+    ) -> Result<Outcome, Box<super::Problem>> {
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+        dispatch(
+            Command::Invite {
+                name: name.to_owned(),
+            },
+            &ctx,
+        )
+        .await
+    }
+
+    /// An account already here is offered again rather than made a second time.
+    ///
+    /// The media server refuses a name that differs from one it holds only in case,
+    /// and the refusal it gives is `400` — so a match missed here reaches the
+    /// operator as the server's own word for a thing they did on purpose. The name
+    /// reported is the account's, not the one typed, because that is what somebody
+    /// signs in as.
+    #[tokio::test]
+    async fn an_account_already_here_is_offered_again_rather_than_made_twice() {
+        let env = recorded_admin("already");
+        let http = holding(
+            r#"{"Items":[]}"#,
+            r#"[{"Id":"7","Name":"Ana","HasPassword":false}]"#,
+        );
+        let recorded = std::sync::Arc::clone(&http);
+
+        let made = offering(&env, http, "ana").await;
+
+        assert!(
+            invited(&made).is_some_and(
+                |report| report.standing == InvitationStanding::Waiting && report.name == "Ana"
+            ),
+            "{made:?}"
+        );
+        assert!(
+            !recorded.asked_for("/Users/New"),
+            "a second account was made for somebody already here"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// Somebody who has already set a password is in the house, not invited.
+    #[tokio::test]
+    async fn somebody_who_has_already_claimed_an_account_is_reported_as_in() {
+        let env = recorded_admin("joined");
+        let http = holding(
+            r#"{"Items":[]}"#,
+            r#"[{"Id":"7","Name":"ana","HasPassword":true}]"#,
+        );
+        let recorded = std::sync::Arc::clone(&http);
+
+        let made = offering(&env, http, "ana").await;
+
+        assert!(
+            invited(&made).is_some_and(|report| report.standing == InvitationStanding::Joined),
+            "{made:?}"
+        );
+        assert!(
+            !recorded.asked_for("/Users/New"),
+            "a second account was made for somebody already in the house"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// An invitation that has run out is offered again, under the same name.
+    ///
+    /// The account it was is taken back on the way past, so what is already here no
+    /// longer holds that name and a fresh one is made. Without that, an invitation
+    /// nobody took up would make the name unusable for the person it was for.
+    #[tokio::test]
+    async fn an_invitation_that_ran_out_is_offered_again_rather_than_blocking_the_name() {
+        let env = recorded_admin("reissue");
+        let http = holding(
+            r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
+            r#"[{"Id":"7","Name":"ana","HasPassword":false}]"#,
+        );
+        let recorded = std::sync::Arc::clone(&http);
+
+        let made = offering(&env, http, "ana").await;
+
+        assert!(
+            invited(&made).is_some_and(|report| report.standing == InvitationStanding::Made
+                && report.withdrawn == ["ana".to_owned()]),
+            "{made:?}"
+        );
+        assert!(
+            recorded.asked_for("/Users/New"),
+            "the name stayed taken by an invitation nobody took up"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A name that is only spaces is refused here rather than by the media server.
+    ///
+    /// The server refuses it too, in its own words, which are `400` and a link to
+    /// the specification of that status. Nothing is asked of it: the refusal is
+    /// about the name, and it is known before anything is opened.
+    #[tokio::test]
+    async fn an_invitation_for_nobody_is_refused_before_the_server_is_asked() {
+        let env = recorded_admin("blank");
+        let http = holding(r#"{"Items":[]}"#, "[]");
+        let recorded = std::sync::Arc::clone(&http);
+
+        let made = offering(&env, http, "   ").await;
+
+        assert!(
+            made.as_ref()
+                .err()
+                .is_some_and(|problem| problem.code.as_str() == "INVITE-4"),
+            "{made:?}"
+        );
+        let asked = recorded.requests();
+        assert!(
+            asked.is_empty(),
+            "the server was asked about nobody: {asked:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A name typed with spaces around it is the same person, not a second one.
+    ///
+    /// The media server keeps the spaces and treats the result as somebody else, so
+    /// an untrimmed name makes a second account that reads identically in any list
+    /// the two of them appear in.
+    #[tokio::test]
+    async fn a_name_typed_with_spaces_around_it_is_the_person_of_that_name() {
+        let env = recorded_admin("trimmed");
+        let http = holding(
+            r#"{"Items":[]}"#,
+            r#"[{"Id":"7","Name":"ana","HasPassword":false}]"#,
+        );
+        let recorded = std::sync::Arc::clone(&http);
+
+        let made = offering(&env, http, "  ana  ").await;
+
+        assert!(
+            invited(&made).is_some_and(|report| report.standing == InvitationStanding::Waiting),
+            "{made:?}"
+        );
+        assert!(
+            !recorded.asked_for("/Users/New"),
+            "a second account was made for the same person with spaces round the name"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }

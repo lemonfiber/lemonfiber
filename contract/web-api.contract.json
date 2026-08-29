@@ -3395,6 +3395,10 @@
               "description": "Whether the account was made, or only described.\n\nA rehearsal can say the whole answer without writing any of it — the name is\nthe one asked for, the address is the stack's, and what has run out has just\nbeen read — so the only thing separating it from the real run is this.",
               "type": "boolean"
             },
+            "standing": {
+              "description": "What was found where this was going.",
+              "$ref": "#/$defs/InvitationStanding"
+            },
             "withdrawn": {
               "description": "Invitations nobody claimed in time, taken back on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone. On a rehearsal these are the ones that *would* be taken back.",
               "type": "array",
@@ -3408,7 +3412,28 @@
             "address",
             "hours",
             "withdrawn",
-            "rehearsed"
+            "rehearsed",
+            "standing"
+          ]
+        },
+        "InvitationStanding": {
+          "description": "What was found where the invitation was going.\n\nOffering somebody an account twice is a thing operators do — they forget, or the\nfirst message went unanswered — and it is not a mistake to be refused. Each of\nthese is an answer, and which one it is decides what there is to say rather than\nwhether anything worked.",
+          "oneOf": [
+            {
+              "description": "The account did not exist, and was made.",
+              "type": "string",
+              "const": "made"
+            },
+            {
+              "description": "An invitation was already out for them, and it still stands.\n\nThe same account, offered again: nothing is made, and the message to send is\nthe one that was already true.",
+              "type": "string",
+              "const": "waiting"
+            },
+            {
+              "description": "They have set a password, so they are already in the house.\n\nNothing to claim and nothing to send. An account is not made, because the one\nthey have is theirs and a second under a nearly identical name is how a\nhousehold ends up with two of somebody.",
+              "type": "string",
+              "const": "joined"
+            }
           ]
         }
       }

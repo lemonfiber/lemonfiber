@@ -13,8 +13,8 @@
 
 use crate::app::Ctx;
 use crate::invitation::{offered, run_out, Offered, HOURS_OF_RECORD, HOURS_TO_CLAIM};
-use crate::model::Invitation;
-use crate::ports::service::Household as _;
+use crate::model::{Invitation, InvitationStanding};
+use crate::ports::service::{Household as _, Member};
 
 /// Offer somebody an account, and withdraw any nobody claimed in time.
 ///
@@ -26,6 +26,13 @@ pub(super) async fn offer(
     ctx: &Ctx,
     name: String,
 ) -> Result<Invitation, Box<crate::error::Problem>> {
+    // Trimmed, because the media server keeps the spaces and treats the result as a
+    // different person: offering `ana ` beside `ana` makes a second account that
+    // reads identically in every list either of them appears in.
+    let name = name.trim().to_owned();
+    if name.is_empty() {
+        return Err(Box::new(nobody_named()));
+    }
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -61,39 +68,87 @@ pub(super) async fn offer(
         &password,
     );
 
-    let spent = run_out_now(ctx, &server).await;
+    let held = held(ctx, &server).await;
+    let already = already_here(&held, &name).cloned();
+    let standing = standing_of(already.as_ref());
 
     // A rehearsal makes no account and takes none back. Both halves of this command
     // change the household, and the one that removes accounts is the half nobody
     // would want rehearsed by doing it. What it can still do is say exactly what
     // would happen, because every part of the answer is known before anything is
-    // written: the name is the one asked for, the address is the stack's, and what
-    // has run out has just been read.
+    // written: who it is for, the address, what has run out, and what is already
+    // there under that name.
     if ctx.dry_run {
         return Ok(Invitation {
-            name,
+            name: already.map_or(name, |member| member.name),
             address: reachable.url,
             caution: reachable.caution,
             hours: HOURS_TO_CLAIM,
-            withdrawn: spent.into_iter().map(|it| it.member.name).collect(),
+            withdrawn: held.spent.into_iter().map(|it| it.member.name).collect(),
             rehearsed: true,
+            standing,
         });
     }
 
-    let withdrawn = take_back(&server, &spent).await;
-    let member = server
-        .invite(&name)
-        .await
-        .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?;
+    let withdrawn = take_back(&server, &held.spent).await;
+
+    // The name comes back from whichever account this is about, so the operator is
+    // told the one somebody signs in as rather than the one they typed — those
+    // differ by case whenever an account was already here.
+    let name = if let Some(member) = already {
+        member.name
+    } else {
+        server
+            .invite(&name)
+            .await
+            .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?
+            .name
+    };
 
     Ok(Invitation {
-        name: member.name,
+        name,
         address: reachable.url,
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn,
         rehearsed: false,
+        standing,
     })
+}
+
+/// What was found where the invitation was going.
+fn standing_of(already: Option<&Member>) -> InvitationStanding {
+    match already {
+        Some(member) if member.claimed => InvitationStanding::Joined,
+        Some(_) => InvitationStanding::Waiting,
+        None => InvitationStanding::Made,
+    }
+}
+
+/// The account this invitation is for, where the household already holds one.
+///
+/// **Matched without regard to case**, because the media server refuses a second
+/// account whose name differs from an existing one only in case — so a match missed
+/// here walks straight into the refusal this exists to prevent, and the operator is
+/// handed the server's own word for it, which is `400`.
+///
+/// The ones about to be taken back are not counted. An invitation that has run out
+/// is one this run is replacing, and treating it as already here would make an
+/// expired invitation impossible to offer again.
+fn already_here<'a>(held: &'a Held, name: &str) -> Option<&'a Member> {
+    let asked = name.to_lowercase();
+    held.household.iter().find(|member| {
+        member.name.to_lowercase() == asked
+            && !held.spent.iter().any(|gone| gone.member.id == member.id)
+    })
+}
+
+/// What the media server holds right now, as this command needs to see it.
+struct Held {
+    /// Every account it has, claimed or not.
+    household: Vec<Member>,
+    /// The invitations among them that have run out.
+    spent: Vec<Offered>,
 }
 
 /// The invitations nobody claimed in time, as the media server holds them now.
@@ -105,16 +160,22 @@ pub(super) async fn offer(
 /// the second — the whole of what `--dry-run` promises is that the second does not
 /// happen, and a sweep that removed accounts on the way to saying what it would do
 /// would be the flag doing the damage it exists to prevent.
-async fn run_out_now(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Vec<Offered> {
+async fn held(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Held {
     let cutoff = ctx.hours_ago(HOURS_TO_CLAIM);
     let since = ctx.hours_ago(HOURS_OF_RECORD);
     let (Ok(household), Ok(records)) =
         (server.household().await, server.when_invited(&since).await)
     else {
-        return Vec::new();
+        return Held {
+            household: Vec::new(),
+            spent: Vec::new(),
+        };
     };
-    let waiting = offered(household, &records);
-    run_out(&waiting, &cutoff).into_iter().cloned().collect()
+    let waiting = offered(household.clone(), &records);
+    Held {
+        household,
+        spent: run_out(&waiting, &cutoff).into_iter().cloned().collect(),
+    }
 }
 
 /// Take back the invitations that have run out, naming the ones actually taken.
@@ -140,6 +201,23 @@ fn no_media_server() -> crate::error::Problem {
         "An invitation is an account on the media server; without one there is nothing \
          for somebody to sign in to",
         crate::error::Remedy::new("Add a media server to the stack and run setup"),
+    )
+}
+
+/// Said where the invitation is for nobody: the name is blank, or only spaces.
+///
+/// The media server refuses this too, in its own words, which are `400` and a link
+/// to the specification of that status. The operator asked for something reasonable
+/// and mistyped it, and is owed a sentence about the name rather than about HTTP.
+fn nobody_named() -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::Code::new("INVITE-4"),
+        crate::error::Severity::Error,
+        "an invitation needs somebody to be for",
+        "The name is what they will sign in as, so a blank one is an account nobody \
+         could use",
+        crate::error::Remedy::new("Give the name they will sign in as")
+            .with_detail("lemonfiber invite ana"),
     )
 }
 
