@@ -11,7 +11,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 use lemonfiber_core::ports::http::Http;
-use lemonfiber_core::ports::service::{Failure, Requests};
+use lemonfiber_core::ports::service::{Failure, FulfilmentTarget, QualityProfile, Requests};
 use lemonfiber_core::seerr::Seerr;
 
 fn seerr(fake: &Arc<Fake>) -> Seerr {
@@ -104,6 +104,88 @@ async fn opening_a_session_names_no_media_server() {
             !body.contains(named),
             "a session-only sign-in named {named}, which the service refuses: {body}"
         );
+    }
+}
+
+/// An \*arr as the request service is told about it.
+fn target(television: bool) -> FulfilmentTarget {
+    FulfilmentTarget {
+        name: if television { "Sonarr" } else { "Radarr" }.to_owned(),
+        host: if television { "sonarr" } else { "radarr" }.to_owned(),
+        port: if television { 8989 } else { 7878 },
+        key: ["ke", "y"].concat(),
+        television,
+        profile: QualityProfile {
+            id: 1,
+            name: "HD".to_owned(),
+        },
+        folder: "/data/media".to_owned(),
+    }
+}
+
+/// Register `target` through the fake, and hand back the body that went out.
+async fn registration(television: bool) -> String {
+    let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
+    let _ = seerr(&fake)
+        .add_fulfilment_target(&target(television))
+        .await;
+    fake.requests()
+        .first()
+        .and_then(|request| request.body.clone())
+        .unwrap_or_default()
+}
+
+/// The two lists want one field each, and it is not the same field.
+///
+/// Television is filed in folders per season; a film has a point before which there is
+/// nothing to fetch. Neither is a field the other ignores — the service refuses a
+/// registration that omits the one its own list requires, so sending one body for both
+/// registers only half a stack.
+#[tokio::test]
+async fn each_kind_of_target_carries_the_field_its_own_list_requires() {
+    let television = registration(true).await;
+    assert!(
+        television.contains(r#""enableSeasonFolders":true"#),
+        "{television}"
+    );
+    assert!(
+        !television.contains("minimumAvailability"),
+        "television carried a film's field: {television}"
+    );
+
+    let film = registration(false).await;
+    assert!(
+        film.contains(r#""minimumAvailability":"released""#),
+        "{film}"
+    );
+    assert!(
+        !film.contains("enableSeasonFolders"),
+        "film carried television's field: {film}"
+    );
+}
+
+/// Everything both lists require is sent, whichever list it is.
+#[tokio::test]
+async fn a_registration_carries_everything_the_service_requires_of_it() {
+    for television in [true, false] {
+        let body = registration(television).await;
+        for required in [
+            "name",
+            "hostname",
+            "port",
+            "apiKey",
+            "useSsl",
+            "activeProfileId",
+            "activeProfileName",
+            "activeDirectory",
+            "is4k",
+            "isDefault",
+        ] {
+            assert!(
+                body.contains(required),
+                "a registration left out {required}, which the service requires: {body}"
+            );
+        }
     }
 }
 

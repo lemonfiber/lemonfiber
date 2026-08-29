@@ -1735,6 +1735,99 @@ mod tests {
         );
     }
 
+    /// A scratch settings file holding the media server's recorded password, so a
+    /// client built from it can sign in.
+    fn recorded_admin(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-seed-{}-{name}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let env = dir.join(".env");
+        let _ = crate::config::store::set(
+            &env,
+            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        env
+    }
+
+    /// The registration is made by a client that has signed in.
+    ///
+    /// Every call the request service takes here is an authenticated one, and nothing
+    /// but signing in opens a session — so a client handed over unsigned makes every
+    /// registration come back as a refusal about a credential, which is what this did
+    /// for as long as it existed. Asserted by the call that went out, because a
+    /// registration attempted without one looks the same from the outside as one that
+    /// was refused for any other reason.
+    #[tokio::test]
+    async fn the_request_service_is_signed_in_to_before_it_is_handed_anything() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("targets");
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/qualityprofile",
+                vec![Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#)],
+            ),
+            (
+                "/rootfolder",
+                vec![Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#)],
+            ),
+            ("/auth/jellyfin", vec![Answer::reply(200, "")]),
+            ("/settings/radarr", vec![Answer::reply(200, "[]")]),
+            (
+                "/settings/sonarr",
+                vec![
+                    Answer::reply(200, "[]"),
+                    Answer::reply(201, ""),
+                    Answer::reply(200, r#"[{"id":1,"hostname":"sonarr","port":8989}]"#),
+                ],
+            ),
+        ]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http.clone())
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        let _ = super::seed_fulfilment_targets(
+            &ctx,
+            &[arr("sonarr", 8989, "tv"), seerr_svc()],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        )
+        .await;
+
+        let asked = http.requests();
+        let signed_in = asked
+            .iter()
+            .position(|request| request.url.contains("/auth/jellyfin"));
+        let registered = asked
+            .iter()
+            .position(|request| request.url.contains("/settings/sonarr"));
+        assert!(
+            signed_in.is_some_and(|opened| registered.is_some_and(|told| opened < told)),
+            "signed in at {signed_in:?}, registered at {registered:?}: the session has to come first"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A stack with no request service is asked nothing at all.
+    ///
+    /// There is nobody to hand an \*arr to, and finding that out first is what keeps
+    /// this from asking every \*arr in the stack what it holds for no reason.
+    #[tokio::test]
+    async fn a_stack_with_no_request_service_is_handed_nothing() {
+        let http = Fake::silent();
+        let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(http.clone());
+
+        let wirings = super::seed_fulfilment_targets(
+            &ctx,
+            &[arr("sonarr", 8989, "tv")],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        )
+        .await;
+
+        assert!(wirings.is_empty(), "{wirings:?}");
+        let asked = http.requests();
+        assert!(asked.is_empty(), "the \\*arrs were asked anyway: {asked:?}");
+    }
+
     /// An \*arr with nowhere to file, or that will not say, is left out.
     ///
     /// The request service must name a folder when it hands a request over. One that
