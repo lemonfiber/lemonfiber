@@ -27,6 +27,9 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     ));
     lines.put(format!("  {}", report.address));
     lines.put(HOME_ONLY.to_owned());
+    if let Some(caution) = &report.caution {
+        lines.put(format!("  {caution}"));
+    }
 
     if let Some(drawn) = qr::rows(&report.address, say::folding()) {
         lines.spaced("Or point their phone's camera at this:");
@@ -84,9 +87,22 @@ mod tests {
         Invitation {
             name: "ana".to_owned(),
             address: "http://192.168.1.20:8096".to_owned(),
+            caution: None,
             hours: 48,
             withdrawn,
             rehearsed: false,
+        }
+    }
+
+    /// An invitation whose address is a number, which a router can hand elsewhere.
+    fn numbered() -> Invitation {
+        Invitation {
+            caution: Some(
+                "That address is a number, and routers hand out different \
+                           ones — so it can stop working."
+                    .to_owned(),
+            ),
+            ..offered(Vec::new())
         }
     }
 
@@ -197,6 +213,24 @@ mod tests {
         assert!(
             said.contains("bo"),
             "the one taken back was not named: {said}"
+        );
+    }
+
+    /// What is worth knowing about the address travels with the address.
+    ///
+    /// This is the copy somebody keeps. A bookmark made from a number stops working
+    /// when the router hands it elsewhere, and the person it stops working for is
+    /// not the one who could find out why.
+    #[test]
+    fn an_address_that_is_a_number_carries_its_warning() {
+        let said = invitation(&numbered()).text();
+
+        assert!(said.contains("routers hand out different"), "{said}");
+        assert!(
+            !invitation(&offered(Vec::new()))
+                .text()
+                .contains("routers hand out different"),
+            "an address that is a name was warned about anyway"
         );
     }
 

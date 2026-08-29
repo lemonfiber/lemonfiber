@@ -457,6 +457,54 @@ mod tests {
         let ctx = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let made = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        let address = invited(&made).map(|report| report.address.clone());
+
+        assert!(
+            invited(&made).is_some_and(|report| report.name == "ana"),
+            "{made:?}"
+        );
+        // The address has to be one somebody else can open. Both URLs the stack
+        // carries for a service name a host that resolves only on this machine or
+        // inside the stack, so "not empty" is satisfied by an address that opens
+        // nothing — and the operator would learn it failed from whoever they invited.
+        assert!(
+            address
+                .as_deref()
+                .is_some_and(|url| url.contains("192.168.1.20")),
+            "the invitation carried an address the household cannot reach: {address:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A machine nobody can arrive at is said to be one, rather than guessed around.
+    ///
+    /// An invitation is an address somebody else types. Building one from a default
+    /// would send a link that opens nothing, and the operator would learn it had
+    /// failed from whoever they invited — so this refuses instead, and says what to
+    /// record. Nothing is asked of the media server on the way: the account must not
+    /// be made when there is no way to tell anybody about it.
+    #[tokio::test]
+    async fn a_machine_with_no_address_makes_no_account_and_says_so() {
+        let env = recorded_admin("nowhere");
+        let http = Fake::silent();
+        let recorded = std::sync::Arc::clone(&http);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
                 ..Settings::default()
             })
             .build()
@@ -471,9 +519,15 @@ mod tests {
         .await;
 
         assert!(
-            invited(&made)
-                .is_some_and(|report| { report.name == "ana" && !report.address.is_empty() }),
+            made.as_ref()
+                .err()
+                .is_some_and(|problem| problem.code.as_str() == "INVITE-3"),
             "{made:?}"
+        );
+        let asked = recorded.requests();
+        assert!(
+            asked.is_empty(),
+            "an account was made on a stack with nowhere to send anybody: {asked:?}"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
@@ -524,6 +578,7 @@ mod tests {
         let ctx = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
             .build()
@@ -591,6 +646,7 @@ mod tests {
         let mut context = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
             .build();
@@ -667,6 +723,7 @@ mod tests {
         let ctx = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
             .build()
@@ -729,6 +786,7 @@ mod tests {
         let ctx = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
             .build()
@@ -817,6 +875,7 @@ mod tests {
         let ctx = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
             .build()
@@ -860,6 +919,7 @@ mod tests {
         let ctx = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
             .build()
@@ -907,6 +967,7 @@ mod tests {
         let ctx = a_context()
             .settings(Settings {
                 env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
             .build()

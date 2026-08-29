@@ -36,6 +36,23 @@ pub(super) async fn offer(
     let Some(password) = super::seed::identity::recorded_jellyfin_password(ctx) else {
         return Err(Box::new(no_credential()));
     };
+    // Where a *person* reaches the media server, which is neither of the URLs the
+    // stack wires itself with: those name a host only this machine or this stack can
+    // resolve, and an invitation carrying one sends somebody an address that cannot
+    // open. Asked now rather than remembered, so a machine renamed since the last
+    // look answers as it is. Where there is no name and nothing recorded there is no
+    // address rather than a guess — an invented one is the one thing that gets sent
+    // on, and what gets sent on has to be true.
+    let named = ctx.site.name().await;
+    let Some(reachable) = crate::door::address(
+        named.as_deref(),
+        ctx.settings.household_host.as_deref(),
+        ctx.environment,
+        jellyfin.port,
+    ) else {
+        return Err(Box::new(nowhere_to_send()));
+    };
+
     let server = crate::jellyfin::Jellyfin::authenticated(
         ctx.http.clone(),
         &jellyfin.loopback,
@@ -55,7 +72,8 @@ pub(super) async fn offer(
     if ctx.dry_run {
         return Ok(Invitation {
             name,
-            address: jellyfin.network_url,
+            address: reachable.url,
+            caution: reachable.caution,
             hours: HOURS_TO_CLAIM,
             withdrawn: spent.into_iter().map(|it| it.member.name).collect(),
             rehearsed: true,
@@ -70,7 +88,8 @@ pub(super) async fn offer(
 
     Ok(Invitation {
         name: member.name,
-        address: jellyfin.network_url,
+        address: reachable.url,
+        caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn,
         rehearsed: false,
@@ -121,6 +140,23 @@ fn no_media_server() -> crate::error::Problem {
         "An invitation is an account on the media server; without one there is nothing \
          for somebody to sign in to",
         crate::error::Remedy::new("Add a media server to the stack and run setup"),
+    )
+}
+
+/// Said where this machine has no address the household could arrive at.
+///
+/// An invitation is an address somebody else types. Sending one built from a default
+/// would be sending a link that opens nothing, which is worse than saying there is
+/// none: the operator would learn it had failed from whoever they invited.
+fn nowhere_to_send() -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::Code::new("INVITE-3"),
+        crate::error::Severity::Error,
+        "this machine has no address the household could arrive at",
+        "An invitation is an address somebody else opens, and this machine answers to \
+         no name on the network and has none written down",
+        crate::error::Remedy::new("Record the address the household should use")
+            .with_detail("lemonfiber config set HOUSEHOLD_HOST <address>"),
     )
 }
 

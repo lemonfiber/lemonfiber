@@ -13,7 +13,18 @@ pub struct Invitation {
     /// The name they sign in as.
     pub name: String,
     /// The one address to send them.
+    ///
+    /// Where a *person* reaches the media server: built from what this machine is
+    /// called on the network, not from either of the hosts the stack wires itself
+    /// with — those resolve only on this machine or inside the stack, and an
+    /// invitation carrying one sends somebody an address that cannot open.
     pub address: String,
+    /// What is worth knowing about the address itself, where anything is.
+    ///
+    /// An address that is a number is one a router can hand elsewhere, so a bookmark
+    /// made from it stops working with nothing here having changed. Carried on the
+    /// invitation because that is the copy somebody keeps.
+    pub caution: Option<String>,
     /// How many hours it stands before it is withdrawn.
     pub hours: i64,
     /// Invitations nobody claimed in time, taken back on the way past.

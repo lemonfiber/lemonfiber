@@ -3372,8 +3372,15 @@
           "type": "object",
           "properties": {
             "address": {
-              "description": "The one address to send them.",
+              "description": "The one address to send them.\n\nWhere a *person* reaches the media server: built from what this machine is\ncalled on the network, not from either of the hosts the stack wires itself\nwith — those resolve only on this machine or inside the stack, and an\ninvitation carrying one sends somebody an address that cannot open.",
               "type": "string"
+            },
+            "caution": {
+              "description": "What is worth knowing about the address itself, where anything is.\n\nAn address that is a number is one a router can hand elsewhere, so a bookmark\nmade from it stops working with nothing here having changed. Carried on the\ninvitation because that is the copy somebody keeps.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "hours": {
               "description": "How many hours it stands before it is withdrawn.",

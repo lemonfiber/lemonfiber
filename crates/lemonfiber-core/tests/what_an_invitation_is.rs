@@ -80,6 +80,9 @@ fn context(env: &std::path::Path) -> Ctx {
         stack(),
         Settings {
             env_file: Some(env.to_path_buf()),
+            // Where the household reaches this machine. Without one there is no
+            // address to send anybody, which is a refusal rather than an invitation.
+            household_host: Some("192.168.1.20".to_owned()),
             ..Settings::default()
         },
         Environment::MacOs,

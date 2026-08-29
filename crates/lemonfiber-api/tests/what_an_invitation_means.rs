@@ -58,6 +58,7 @@ fn an_invitation_reaches_a_browser_under_its_own_name() {
     let made = Outcome::Invited(Invitation {
         name: "ana".to_owned(),
         address: "http://192.168.1.20:8096".to_owned(),
+        caution: None,
         hours: 48,
         withdrawn: vec!["bo".to_owned()],
         rehearsed: false,
