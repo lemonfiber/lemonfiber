@@ -81,6 +81,32 @@ pub(crate) async fn open_servarrs(
     open
 }
 
+/// The request service, already signed in as the owner.
+///
+/// **Every authenticated call it takes needs a session**, and nothing but signing in
+/// opens one — so a client handed out unsigned is one whose every use comes back as a
+/// refusal about a credential, which is what registering the \*arrs did for as long as
+/// it existed. Built in one place so that cannot be forgotten again.
+///
+/// **Takes the address rather than finding it**, so it always hands a client back and
+/// the caller keeps the one place that decides there is nobody to talk to. A stack
+/// with no credential to sign in with, or a sign-in that fails, still gets a client:
+/// whatever is about to use it reports what went wrong in its own words, and handing
+/// back nothing would leave the operator with no line at all about work that was
+/// attempted and failed — worse than a failure they can read.
+pub(crate) async fn seerr_as_owner(ctx: &Ctx, base: String) -> Seerr {
+    let seerr = Seerr::new(ctx.http.clone(), base, "seerr");
+    if let Some(password) = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY) {
+        let _ = crate::ports::service::Requests::sign_in(
+            &seerr,
+            crate::config::JELLYFIN_ADMIN_USER,
+            &password,
+        )
+        .await;
+    }
+    seerr
+}
+
 /// What reading the household's requests needs: the request service, and the media-server
 /// credential the sign-in is made with. Seerr authenticates its household against Jellyfin,
 /// so the account lemonfiber holds a password for is how it asks — as the owner, whose

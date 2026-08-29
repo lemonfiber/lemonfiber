@@ -134,6 +134,8 @@ pub(super) async fn seed_fulfilment_targets(
     services: &[Service],
     project: Option<&Path>,
 ) -> Vec<crate::seed::Wiring> {
+    // Asked before anything else, because what follows asks every \*arr what it holds
+    // and there is no sense doing that with nobody to tell about it.
     let Some(base) = super::identity::seerr_service(services) else {
         return Vec::new();
     };
@@ -141,7 +143,10 @@ pub(super) async fn seed_fulfilment_targets(
     if wanted.is_empty() {
         return Vec::new();
     }
-    let seerr = crate::seerr::Seerr::new(ctx.http.clone(), &base, "seerr");
+    // Signed in, because every call that follows is an authenticated one: registering
+    // a target reads what the service already holds and then writes. Unsigned, all of
+    // it comes back as a refusal about a credential.
+    let seerr = super::super::targets::seerr_as_owner(ctx, base).await;
     let mut journal = crate::journal::Journal::new();
     crate::seed::wire_fulfilment_targets(&seerr, &wanted, &mut journal, &ctx.stamp()).await
 }

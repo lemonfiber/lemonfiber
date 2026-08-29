@@ -337,7 +337,7 @@ impl Requests for Seerr {
     }
 
     async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure> {
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "name": target.name,
             "hostname": target.host,
             "port": target.port,
@@ -348,9 +348,23 @@ impl Requests for Seerr {
             "activeDirectory": target.folder,
             "is4k": false,
             "isDefault": true,
-            "minimumAvailability": WHEN_RELEASED,
-        })
-        .to_string();
+        });
+
+        // The last field is the one the two lists do not share, and each requires its
+        // own: television is filed in folders per season, and a film has a point before
+        // which there is nothing to fetch. Sending the wrong one is not a field ignored
+        // — the service refuses the registration for the one that is missing.
+        if let Some(fields) = body.as_object_mut() {
+            let (name, value) = if target.television {
+                // Seasons in folders of their own, because that is how the media server
+                // reads a series and how anybody browsing one expects to find it.
+                ("enableSeasonFolders", serde_json::json!(true))
+            } else {
+                ("minimumAvailability", serde_json::json!(WHEN_RELEASED))
+            };
+            fields.insert(name.to_owned(), value);
+        }
+        let body = body.to_string();
         let path = if target.television { TELEVISION } else { FILM };
         let written = self
             .endpoint
