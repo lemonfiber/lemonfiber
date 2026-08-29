@@ -486,11 +486,11 @@ mod tests {
         // Written, not reported as an edit: this is lemonfiber's own choice landing.
         assert!(edits.is_empty());
         let written = read(&into.join("config/recyclarr/recyclarr.yml"));
-        // The 4K templates are in force, and the Balanced ones the fixture shipped
+        // The 4K includes are in force, and the Balanced ones the fixture shipped
         // with are gone.
-        assert!(written.contains("sonarr-v4-quality-profile-web-2160p"));
-        assert!(written.contains("radarr-quality-profile-uhd-bluray-web"));
-        assert!(!written.contains("sonarr-v4-quality-profile-web-1080p"));
+        assert!(written.contains("sonarr-web-2160p.yml"));
+        assert!(written.contains("radarr-uhd-bluray-web.yml"));
+        assert!(!written.contains("sonarr-web-1080p.yml"));
     }
 
     #[test]
@@ -542,7 +542,7 @@ mod tests {
             Some(&Selection::everywhere(Preset::Maximum)),
         );
         let recyclarr = into.join("config/recyclarr/recyclarr.yml");
-        assert!(read(&recyclarr).contains("sonarr-v4-quality-profile-web-2160p"));
+        assert!(read(&recyclarr).contains("sonarr-web-2160p.yml"));
 
         // A later command carrying no choice leaves the applied preset exactly as it
         // is — not written back to the shipped default.
@@ -553,7 +553,7 @@ mod tests {
             None,
         );
         assert!(
-            read(&recyclarr).contains("sonarr-v4-quality-profile-web-2160p"),
+            read(&recyclarr).contains("sonarr-web-2160p.yml"),
             "the applied preset is not reverted",
         );
     }
@@ -609,7 +609,7 @@ mod tests {
         )
         .unwrap_or(false);
         assert!(overwrote, "an edit was overwritten");
-        assert!(read(&recyclarr).contains("sonarr-v4-quality-profile-web-2160p"));
+        assert!(read(&recyclarr).contains("sonarr-web-2160p.yml"));
         // Recorded as lemonfiber's own again: no longer customised.
         assert!(!recyclarr_customised(Some(&into), Some(&record)));
     }

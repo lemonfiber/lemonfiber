@@ -59,7 +59,7 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
         } else {
             Reporting::absent()
         }),
-        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
+        lemonfiber_fixtures::ports::Stopped::today(),
         configuration.map_or_else(Files::empty, Files::anywhere),
         stack,
         Settings {
@@ -102,9 +102,11 @@ async fn a_bundle_holds_what_could_be_read_and_says_where_it_came_from() {
         .iter()
         .any(|piece| piece.name == "services.txt" && piece.body.contains("sonarr")));
 
-    // Provenance, so a bundle read next week is not mistaken for this week's.
+    // Provenance, so a bundle read next week is not mistaken for this week's. The
+    // moment is the clock's own — `Stopped::today()` — rather than any value the
+    // bundle invented, which is what makes it provenance rather than decoration.
     assert_eq!(contents.taken.lemonfiber, LEMONFIBER);
-    assert_eq!(contents.taken.at, "2026-08-17T12:00:00");
+    assert_eq!(contents.taken.at, "2026-10-01T00:00:00");
     assert_ne!(contents.taken.stack, "unknown");
 
     // Redacted on the way in, not on the way out.

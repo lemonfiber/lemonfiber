@@ -28,7 +28,7 @@ fn ctx(up: &[&str]) -> Ctx {
     Ctx::new(
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::holding(up, Lifecycle::Running, Health::Healthy)),
-        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
+        lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_fixtures::files::Files::empty(),
         Source::External(project()),
         Settings {
@@ -160,7 +160,7 @@ async fn a_real_switch_stops_then_starts_then_waits() {
             Lifecycle::Running,
             Health::Healthy,
         )),
-        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
+        lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_fixtures::files::Files::empty(),
         Source::External(project()),
         Settings {

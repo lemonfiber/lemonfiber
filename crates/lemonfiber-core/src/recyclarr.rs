@@ -1,111 +1,86 @@
-//! Carrying a quality preset out, as Recyclarr template names.
+//! Carrying a quality preset out, as the file the sync tool reads it from.
 //!
 //! [`crate::quality`] holds the operator's question — how good, how much disk — in
 //! their own words. This holds the answer in the tool's words: the TRaSH-guide
-//! templates, maintained upstream by the community, that a preset maps to.
-//! Keeping the two apart is the point of the feature: a preset never learns what a
-//! custom format is, and the scoring that rots stays upstream where it is tended.
+//! quality definition, profile and format groups that a preset maps to. Keeping the
+//! two apart is the point of the feature: a preset never learns what a custom
+//! format is, and the scoring that rots stays upstream where it is tended.
 //!
-//! A preset resolves, per service, to three template names — the quality
-//! definition, the quality profile, and the custom formats that match it — which
-//! are exactly the three entries a service's `include:` list carries in
-//! `recyclarr.yml`. Applying a selection is therefore rewriting those lists and
-//! nothing else: [`rewrite`] leaves every comment, address and key untouched, and
-//! Recyclarr syncs the change on its own schedule. This module is pure — it maps
-//! and it rewrites text; it never reaches Recyclarr or a disk.
+//! **A preset resolves to one file the stack carries**, named by a service's
+//! `include:` list in `recyclarr.yml` as a `- config:` entry. Applying a selection
+//! is rewriting that entry and nothing else: [`rewrite`] leaves every comment,
+//! address and key untouched, and the tool syncs the change on its own schedule.
+//! This module is pure — it maps and it rewrites text; it never reaches the tool or
+//! a disk.
 //!
-//! The template names below were read from the Recyclarr `config-templates`
-//! registry, not guessed — but they remain specific to a Recyclarr version.
-//! Confirm them against a pinned version with
-//! `docker compose run --rm recyclarr list templates` before trusting them, the
-//! same caveat `recyclarr.yml` itself carries.
+//! It used to name three templates per service that the tool fetched for itself,
+//! from a registry upstream has since withdrawn — its templates are whole
+//! configurations to be copied now, which is not something a stack can include. So
+//! what each preset asks for is carried in the stack beside the file naming it, and
+//! nothing is fetched while a sync runs. An unpinned repository cloned on every run
+//! is a pinned image somebody else can break, which is how that went.
+//!
+//! A `- template:` entry, if an operator adds one, is theirs: this touches only the
+//! `- config:` entries it put there.
 
 pub use lemonfiber_ports::media::Kind;
 
 use crate::quality::{Preset, Selection};
 
-/// The three TRaSH-guide templates that carry a preset out for one service: the
-/// quality definition that sets the size limits, the quality profile that ranks
-/// releases, and the custom formats the profile scores by — the exact three
-/// entries a service's `include:` list holds.
+/// The file a preset's guidance is shipped in, as `recyclarr.yml` names it.
+///
+/// One include per preset, holding the quality definition, the profile and the
+/// format groups that preset asks the guides for. It used to be three entries
+/// naming templates the sync tool fetched; upstream withdrew the registry those
+/// were reachable through, so the stack carries them and this names the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Templates {
-    /// The quality-definition template — the size limits per quality.
-    pub quality_definition: &'static str,
-    /// The quality-profile template — how releases are ranked.
-    pub quality_profile: &'static str,
-    /// The custom-formats template — what the profile scores by.
-    pub custom_formats: &'static str,
-}
+pub struct Guidance(&'static str);
 
-impl Templates {
-    /// The template names in the order `recyclarr.yml` lists them: definition,
-    /// then profile, then custom formats.
+impl Guidance {
+    /// Where the file sits, as the sync tool reads it from inside its container.
     #[must_use]
-    pub const fn names(self) -> [&'static str; 3] {
-        [
-            self.quality_definition,
-            self.quality_profile,
-            self.custom_formats,
-        ]
+    pub const fn path(self) -> &'static str {
+        self.0
     }
 }
 
-/// The community-maintained templates a preset maps to for one service.
+/// What a preset asks the guides for, for one service.
 ///
 /// Television has fewer meaningful tiers than film: the guides offer series only a
 /// WEB-1080p and a WEB-2160p profile, so the three 1080p presets resolve to the
-/// same television templates — a series in Bluray remux is impractical, and
+/// same television guidance — a series in Bluray remux is impractical, and
 /// presenting a distinction the upstream guides do not draw would be dishonest.
 /// Film has the full range, from a streaming-sized profile through Bluray to 4K.
-/// Where two presets land on the same templates for a service, [`same_profile`]
-/// lets a surface collapse them rather than present a choice that changes nothing.
+/// Where two presets land on the same file for a service, [`same_profile`] lets a
+/// surface collapse them rather than present a choice that changes nothing.
 #[must_use]
-pub const fn templates(kind: Kind, preset: Preset) -> Templates {
+pub const fn guidance(kind: Kind, preset: Preset) -> Guidance {
     match (kind, preset) {
         // Television: only WEB-1080p and WEB-2160p exist, so the 1080p presets
         // are one and the same.
-        (Kind::Sonarr, Preset::SpaceSaving | Preset::Balanced | Preset::HighQuality) => Templates {
-            quality_definition: "sonarr-quality-definition-series",
-            quality_profile: "sonarr-v4-quality-profile-web-1080p",
-            custom_formats: "sonarr-v4-custom-formats-web-1080p",
-        },
-        (Kind::Sonarr, Preset::Maximum) => Templates {
-            quality_definition: "sonarr-quality-definition-series",
-            quality_profile: "sonarr-v4-quality-profile-web-2160p",
-            custom_formats: "sonarr-v4-custom-formats-web-2160p",
-        },
+        (Kind::Sonarr, Preset::SpaceSaving | Preset::Balanced | Preset::HighQuality) => {
+            Guidance("/config/includes/sonarr-web-1080p.yml")
+        }
+        (Kind::Sonarr, Preset::Maximum) => Guidance("/config/includes/sonarr-web-2160p.yml"),
         // Film: a streaming-sized profile, the Bluray+WEB default, a 1080p remux,
         // then 4K Bluray+WEB.
-        (Kind::Radarr, Preset::SpaceSaving) => Templates {
-            quality_definition: "radarr-quality-definition-sqp-streaming",
-            quality_profile: "radarr-quality-profile-sqp-1-web-1080p",
-            custom_formats: "radarr-custom-formats-sqp-1-web-1080p",
-        },
-        (Kind::Radarr, Preset::Balanced) => Templates {
-            quality_definition: "radarr-quality-definition-movie",
-            quality_profile: "radarr-quality-profile-hd-bluray-web",
-            custom_formats: "radarr-custom-formats-hd-bluray-web",
-        },
-        (Kind::Radarr, Preset::HighQuality) => Templates {
-            quality_definition: "radarr-quality-definition-movie",
-            quality_profile: "radarr-quality-profile-remux-web-1080p",
-            custom_formats: "radarr-custom-formats-remux-web-1080p",
-        },
-        (Kind::Radarr, Preset::Maximum) => Templates {
-            quality_definition: "radarr-quality-definition-movie",
-            quality_profile: "radarr-quality-profile-uhd-bluray-web",
-            custom_formats: "radarr-custom-formats-uhd-bluray-web",
-        },
+        (Kind::Radarr, Preset::SpaceSaving) => {
+            Guidance("/config/includes/radarr-sqp-1-web-1080p.yml")
+        }
+        (Kind::Radarr, Preset::Balanced) => Guidance("/config/includes/radarr-hd-bluray-web.yml"),
+        (Kind::Radarr, Preset::HighQuality) => {
+            Guidance("/config/includes/radarr-remux-web-1080p.yml")
+        }
+        (Kind::Radarr, Preset::Maximum) => Guidance("/config/includes/radarr-uhd-bluray-web.yml"),
     }
 }
 
-/// Whether two presets resolve to the same templates for a service, so a surface
+/// Whether two presets ask for the same guidance for a service, so a surface
 /// can collapse a distinction without a difference rather than offer both — the
 /// three 1080p television presets being the case that arises in practice.
 #[must_use]
 pub fn same_profile(kind: Kind, first: Preset, second: Preset) -> bool {
-    templates(kind, first) == templates(kind, second)
+    guidance(kind, first) == guidance(kind, second)
 }
 
 /// The indent two levels below a service — where `- template:` entries sit —
@@ -144,11 +119,15 @@ fn include_indent(line: &str) -> Option<&str> {
     (without_comment(body).trim_end() == "include:").then(|| &line[..line.len() - body.len()])
 }
 
-/// The leading whitespace of `line` where it is a `- template:` entry, so an
-/// entry can be recognised and replaced wherever it sits in the block.
+/// The leading whitespace of `line` where it is a `- config:` entry, so an entry
+/// can be recognised and replaced wherever it sits in the block.
+///
+/// Only this kind is touched. An include block may hold others — a `- template:`
+/// naming something the sync tool fetches for itself — and those are the
+/// operator's, left exactly where they are.
 fn template_indent(line: &str) -> Option<&str> {
     let body = line.trim_start();
-    body.starts_with("- template:")
+    body.starts_with("- config:")
         .then(|| &line[..line.len() - body.len()])
 }
 
@@ -221,12 +200,12 @@ fn rewrite_include_block<'a>(
         .iter()
         .find_map(|line| template_indent(line))
         .map_or_else(|| deeper_indent(include_indent), str::to_owned);
-    let names = templates(kind, selection.for_type(kind.media_type())).names();
+    let asked = guidance(kind, selection.for_type(kind.media_type()));
     let mut written = false;
     for line in &block {
         if template_indent(line).is_some() {
             if !written {
-                push_templates(out, &entry_indent, names);
+                push_include(out, &entry_indent, asked);
                 written = true;
             }
         } else {
@@ -234,15 +213,13 @@ fn rewrite_include_block<'a>(
         }
     }
     if !written {
-        push_templates(out, &entry_indent, names);
+        push_include(out, &entry_indent, asked);
     }
 }
 
-/// Write each template as a `- template:` entry at `indent`.
-fn push_templates(out: &mut String, indent: &str, names: [&str; 3]) {
-    for name in names {
-        push_line(out, &format!("{indent}- template: {name}"));
-    }
+/// Write the preset's guidance as the block's one `- config:` entry at `indent`.
+fn push_include(out: &mut String, indent: &str, asked: Guidance) {
+    push_line(out, &format!("{indent}- config: {}", asked.path()));
 }
 
 /// Append `line` and the newline `str::lines` stripped.
@@ -255,7 +232,7 @@ fn push_line(out: &mut String, line: &str) {
 mod tests {
     use std::collections::BTreeSet;
 
-    use super::{rewrite, same_profile, templates, Kind};
+    use super::{guidance, rewrite, same_profile, Kind};
     use crate::quality::{Preset, Selection};
 
     /// The `recyclarr.yml` that ships in the stack — its defaults are the Balanced
@@ -265,25 +242,46 @@ mod tests {
         "/../../assets/media-stack/config/recyclarr/recyclarr.yml"
     ));
 
+    /// Every preset names a file the stack actually ships, for the right service.
+    ///
+    /// The guidance is carried here rather than fetched, so a name that is right in
+    /// spelling and wrong in fact is a sync that reports nothing and exits `0` —
+    /// indistinguishable from a stack with nothing to sync. Checked against the
+    /// directory itself, not a list written beside the test.
     #[test]
-    fn every_preset_maps_each_service_to_three_distinct_named_templates() {
+    fn every_preset_names_an_include_the_stack_ships_for_that_service() {
         for kind in Kind::ALL {
             for preset in Preset::ALL {
-                let names = templates(kind, preset).names();
-                for name in names {
-                    assert!(
-                        name.starts_with(kind.section()),
-                        "{name} is not a {kind:?} template"
-                    );
-                }
-                // Definition, profile and custom formats are three separate
-                // templates — never the same name filling two roles.
-                assert_eq!(
-                    names.iter().collect::<BTreeSet<_>>().len(),
-                    3,
-                    "{names:?} repeats a template across roles"
+                let path = guidance(kind, preset).path();
+                let file = path.rsplit('/').next().unwrap_or_default();
+                assert!(
+                    file.starts_with(kind.section()),
+                    "{path} is not a {kind:?} include"
                 );
+                let shipped = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../assets/media-stack/config/recyclarr/includes")
+                    .join(file);
+                assert!(shipped.is_file(), "{path} is named but not shipped");
             }
+        }
+    }
+
+    /// The presets that differ do so by pointing somewhere else.
+    ///
+    /// Television offers two profiles and film four, so some presets share a file;
+    /// what must not happen is every preset resolving to the same one, which would
+    /// make the whole choice cosmetic.
+    #[test]
+    fn the_presets_that_differ_name_different_includes() {
+        for kind in Kind::ALL {
+            let paths: BTreeSet<_> = Preset::ALL
+                .iter()
+                .map(|preset| guidance(kind, *preset).path())
+                .collect();
+            assert!(
+                paths.len() > 1,
+                "{kind:?} resolves every preset to the same include: {paths:?}"
+            );
         }
     }
 
@@ -378,12 +376,12 @@ mod tests {
         for preset in Preset::ALL {
             let config = rewrite(SHIPPED, &Selection::everywhere(preset));
             for kind in Kind::ALL {
-                let templates = config.lines().filter(|line| {
-                    line.trim().starts_with("- template:") && line.contains(kind.section())
+                let included = config.lines().filter(|line| {
+                    line.trim().starts_with("- config:") && line.contains(kind.section())
                 });
                 assert_eq!(
-                    templates.count(),
-                    3,
+                    included.count(),
+                    1,
                     "{preset:?} left {kind:?} misconfigured"
                 );
             }
@@ -393,12 +391,12 @@ mod tests {
     #[test]
     fn maximum_swaps_both_services_to_their_4k_templates() {
         let rewritten = rewrite(SHIPPED, &Selection::everywhere(Preset::Maximum));
-        assert!(rewritten.contains("sonarr-v4-quality-profile-web-2160p"));
-        assert!(rewritten.contains("radarr-quality-profile-uhd-bluray-web"));
-        // The Balanced templates the shipped file carried are gone. `uhd-bluray-web`
-        // ends in `hd-bluray-web`, so the check is against the full profile name.
-        assert!(!rewritten.contains("sonarr-v4-quality-profile-web-1080p"));
-        assert!(!rewritten.contains("radarr-quality-profile-hd-bluray-web"));
+        assert!(rewritten.contains("sonarr-web-2160p.yml"));
+        assert!(rewritten.contains("radarr-uhd-bluray-web.yml"));
+        // The Balanced includes the shipped file carried are gone. `uhd-bluray-web`
+        // ends in `hd-bluray-web`, so the check is against the whole file name.
+        assert!(!rewritten.contains("sonarr-web-1080p.yml"));
+        assert!(!rewritten.contains("/radarr-hd-bluray-web.yml"));
     }
 
     #[test]
@@ -406,9 +404,9 @@ mod tests {
         let mut selection = Selection::everywhere(Preset::Balanced);
         selection.set_type("movies", Preset::Maximum);
         let rewritten = rewrite(SHIPPED, &selection);
-        // Film moved to 4K; television kept the Balanced 1080p templates.
-        assert!(rewritten.contains("radarr-quality-profile-uhd-bluray-web"));
-        assert!(rewritten.contains("sonarr-v4-quality-profile-web-1080p"));
+        // Film moved to 4K; television kept the Balanced 1080p include.
+        assert!(rewritten.contains("radarr-uhd-bluray-web.yml"));
+        assert!(rewritten.contains("sonarr-web-1080p.yml"));
     }
 
     #[test]
@@ -453,49 +451,50 @@ sonarr:
 radarr:
 ";
         let rewritten = rewrite(config, &Selection::everywhere(Preset::Balanced));
-        assert!(rewritten.contains("      - template: sonarr-quality-definition-series"));
+        assert!(rewritten.contains("      - config: /config/includes/sonarr-web-1080p.yml"));
     }
 
     #[test]
-    fn no_stale_template_survives_a_reshaped_include_block() {
+    fn no_stale_include_survives_a_reshaped_include_block() {
         // The block-of-interest case: an operator has put a blank line and a
-        // comment among the entries. Every old `- template:` must still be
-        // replaced — wherever it sits — so no previous-preset entry lingers.
+        // comment among the entries, and an older preset left more than one. Every
+        // `- config:` must still be replaced — wherever it sits — so no
+        // previous-preset entry lingers.
         let config = "\
 radarr:
   main:
     include:
 
-      - template: radarr-quality-definition-movie
+      - config: /config/includes/radarr-hd-bluray-web.yml
       # the one I keep meaning to revisit
-      - template: radarr-quality-profile-hd-bluray-web
-      - template: radarr-custom-formats-hd-bluray-web
+      - config: /config/includes/radarr-sqp-1-web-1080p.yml
 ";
         let rewritten = rewrite(config, &Selection::everywhere(Preset::Maximum));
-        // The new 4K templates are present, and not one Balanced entry remains.
-        assert!(rewritten.contains("radarr-quality-profile-uhd-bluray-web"));
-        assert!(!rewritten.contains("radarr-quality-profile-hd-bluray-web"));
-        assert!(!rewritten.contains("radarr-custom-formats-hd-bluray-web"));
+        // The 4K include is present, and not one older entry remains.
+        assert!(rewritten.contains("radarr-uhd-bluray-web.yml"));
+        assert!(!rewritten.contains("/radarr-hd-bluray-web.yml"));
+        assert!(!rewritten.contains("radarr-sqp-1-web-1080p.yml"));
         // The blank line and the operator's comment are untouched.
         assert!(rewritten.contains("\n\n"));
         assert!(rewritten.contains("# the one I keep meaning to revisit"));
     }
 
     #[test]
-    fn a_non_template_include_entry_is_kept_across_a_rewrite() {
-        // A local `- config:` include is a real Recyclarr feature, not a template;
-        // it must survive while the templates around it are replaced.
+    fn an_entry_this_does_not_manage_is_kept_across_a_rewrite() {
+        // A `- template:` names something the sync tool fetches for itself. It is
+        // the operator's, not this product's, and must survive while the include
+        // beside it is replaced.
         let config = "\
 sonarr:
   main:
     include:
-      - config: my-local-tweaks.yml
-      - template: sonarr-v4-quality-profile-web-1080p
+      - template: something-of-my-own
+      - config: /config/includes/sonarr-web-1080p.yml
 ";
         let rewritten = rewrite(config, &Selection::everywhere(Preset::Maximum));
-        assert!(rewritten.contains("- config: my-local-tweaks.yml"));
-        assert!(rewritten.contains("sonarr-v4-quality-profile-web-2160p"));
-        assert!(!rewritten.contains("web-1080p"));
+        assert!(rewritten.contains("- template: something-of-my-own"));
+        assert!(rewritten.contains("sonarr-web-2160p.yml"));
+        assert!(!rewritten.contains("sonarr-web-1080p.yml"));
     }
 
     #[test]
@@ -506,10 +505,10 @@ sonarr:
 sonarr: # primary television instance
   main:
     include: # profiles
-      - template: sonarr-v4-quality-profile-web-1080p
+      - config: /config/includes/sonarr-web-1080p.yml
 ";
         let rewritten = rewrite(config, &Selection::everywhere(Preset::Maximum));
-        assert!(rewritten.contains("sonarr-v4-quality-profile-web-2160p"));
+        assert!(rewritten.contains("sonarr-web-2160p.yml"));
         // The commented key line itself is preserved verbatim.
         assert!(rewritten.contains("sonarr: # primary television instance"));
     }
