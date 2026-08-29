@@ -2,6 +2,30 @@
 
 use serde::Serialize;
 
+/// What was found where the invitation was going.
+///
+/// Offering somebody an account twice is a thing operators do — they forget, or the
+/// first message went unanswered — and it is not a mistake to be refused. Each of
+/// these is an answer, and which one it is decides what there is to say rather than
+/// whether anything worked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum InvitationStanding {
+    /// The account did not exist, and was made.
+    Made,
+    /// An invitation was already out for them, and it still stands.
+    ///
+    /// The same account, offered again: nothing is made, and the message to send is
+    /// the one that was already true.
+    Waiting,
+    /// They have set a password, so they are already in the house.
+    ///
+    /// Nothing to claim and nothing to send. An account is not made, because the one
+    /// they have is theirs and a second under a nearly identical name is how a
+    /// household ends up with two of somebody.
+    Joined,
+}
+
 /// One invitation, as it was just made.
 ///
 /// Carries what the operator has to pass on and nothing else — a name to sign in
@@ -39,4 +63,6 @@ pub struct Invitation {
     /// the one asked for, the address is the stack's, and what has run out has just
     /// been read — so the only thing separating it from the real run is this.
     pub rehearsed: bool,
+    /// What was found where this was going.
+    pub standing: InvitationStanding,
 }
