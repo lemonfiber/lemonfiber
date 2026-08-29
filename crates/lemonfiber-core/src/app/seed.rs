@@ -16,6 +16,7 @@ mod arrs;
 mod baseline;
 mod clients;
 mod fulfilment;
+mod published;
 use fulfilment::seed_fulfilment_targets;
 pub(super) mod identity;
 mod reset;
@@ -142,6 +143,20 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // can ask and nothing downstream ever hears, and with it the request surface
     // offers only what the stack can actually deliver.
     wirings.extend(seed_fulfilment_targets(ctx, &manifest.services, project.as_deref()).await);
+
+    // The keys the stack's own services read out of the environment. Three of them
+    // are configured that way and by no other means — the quality sync, the archive
+    // extractor and the dashboard — so without this they run with nothing, and the
+    // quality sync refuses its whole configuration over a single undefined name.
+    wirings.push(
+        published::publish_keys(
+            ctx,
+            &manifest.services,
+            project.as_deref(),
+            sabnzbd_key.as_deref(),
+        )
+        .await,
+    );
 
     // Jellyfin as Seerr's identity source: one household account, not two.
     // Jellyfin has no key to read, so its admin password is minted and recorded
@@ -1733,6 +1748,67 @@ mod tests {
             sent.contains("\"hostname\":\"sonarr\"") && sent.contains("HD-1080p"),
             "the request service was told where to reach it and what to fetch at: {sent}"
         );
+    }
+
+    /// Each service's key is published where the stack's own services read it.
+    ///
+    /// Three of them are configured by the environment and by nothing else — there is
+    /// no endpoint to tell them anything — so a key that is read and not written down
+    /// is one the quality sync, the archive extractor and the dashboard all run
+    /// without. Asserted on the file, because that is the whole of the mechanism.
+    #[tokio::test]
+    async fn each_services_key_is_published_where_the_stack_reads_it() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("published");
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        let wiring = super::published::publish_keys(
+            &ctx,
+            &[arr("sonarr", 8989, "tv")],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            Some("sab-key"),
+        )
+        .await;
+
+        assert_eq!(wiring.state, crate::seed::State::Wired, "{wiring:?}");
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            written.contains("SONARR_API_KEY=the-key"),
+            "the *arr's key was read and never written down: {written}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A stack whose services have written no key yet is skipped, not failed.
+    ///
+    /// An empty value is worse than an absent one here: the quality sync refuses its
+    /// whole configuration over a single defined-but-empty name, so publishing
+    /// nothing leaves it working on the run after the keys exist.
+    #[tokio::test]
+    async fn nothing_is_published_where_no_service_has_written_a_key() {
+        let env = recorded_admin("unpublished");
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+
+        let wiring = super::published::publish_keys(
+            &ctx,
+            &[arr("sonarr", 8989, "tv")],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            None,
+        )
+        .await;
+
+        assert!(
+            matches!(wiring.state, crate::seed::State::Skipped { .. }),
+            "{wiring:?}"
+        );
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            !written.contains("SONARR_API_KEY"),
+            "a name was published with nothing behind it: {written}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
     /// A scratch settings file holding the media server's recorded password, so a
