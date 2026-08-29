@@ -22,6 +22,7 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
         report.name, report.hours
     ));
     lines.put(format!("  {}", report.address));
+    lines.put(HOME_ONLY.to_owned());
 
     if let Some(drawn) = qr::rows(&report.address, say::folding()) {
         lines.spaced("Or point their phone's camera at this:");
@@ -48,6 +49,14 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     }
     lines
 }
+
+/// Where the address works, said beside the address rather than under it.
+///
+/// The stack is published to the home network and nowhere else. An address that
+/// opens nothing from a phone on mobile data is not broken — it is being asked
+/// from the wrong place, and somebody who was not told that reads a working
+/// invitation as a dead link and gives up without saying so.
+const HOME_ONLY: &str = "  It opens on the home network only, not from outside the house.";
 
 /// What the household is owed before they accept.
 ///
@@ -99,6 +108,22 @@ mod tests {
         assert!(
             said.contains("can see what they watch"),
             "the household is not told the operator can see what they watch: {said}"
+        );
+    }
+
+    /// Where the address works is said beside it, not left to be discovered.
+    ///
+    /// Somebody who tries it from mobile data and is told nothing reads a working
+    /// invitation as a dead link.
+    #[test]
+    fn the_invitation_says_the_address_works_at_home_only() {
+        let said = invitation(&offered(Vec::new())).text();
+        let address = said.lines().position(|line| line.contains("192.168.1.20"));
+        let where_it_works = said.lines().position(|line| line.contains("home network"));
+
+        assert!(
+            where_it_works.is_some_and(|note| address.is_some_and(|at| note == at + 1)),
+            "where the address works must sit beside it: address {address:?}, note {where_it_works:?}"
         );
     }
 
