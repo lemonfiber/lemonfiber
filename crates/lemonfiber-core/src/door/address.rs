@@ -110,13 +110,25 @@ pub fn address(
 
 /// A machine's name as another device on the network asks for it.
 ///
-/// A name carrying a dot is left as it is: it is already qualified, and putting a
-/// second suffix on the end of one would ask for a machine that does not exist.
+/// Always the `.local` form, because this is only reached where a responder answers
+/// to it — that is what [`publishes_a_name`] establishes, and it is the one name
+/// this can promise resolves.
+///
+/// **A domain already on the name is dropped rather than kept.** What the machine
+/// reports about itself carries whatever suffix the router handed out with the
+/// lease, and a router that hands out a domain does not necessarily answer for it:
+/// `hostname` on a Mac behind a common home router reads
+/// `machine.fritz.box`, which resolves nowhere, while `machine.local` answers. A
+/// name that fails is worse than a number, because it fails without looking wrong.
+///
+/// An operator whose network really does resolve a qualified name is not losing it
+/// — they write it down, and [`address`] takes a recorded name at its word.
 fn reachable(name: &str) -> String {
-    if name.contains('.') {
+    if name.ends_with(LOCAL) {
         return name.to_owned();
     }
-    format!("{name}{LOCAL}")
+    let itself = name.split_once('.').map_or(name, |(before, _)| before);
+    format!("{itself}{LOCAL}")
 }
 
 #[cfg(test)]
@@ -140,12 +152,40 @@ mod tests {
         );
     }
 
+    /// The router's domain is dropped, because the responder is what answers.
+    ///
+    /// A machine reports itself with whatever suffix came with the lease, and a
+    /// router that hands out a domain does not necessarily answer for it. Measured
+    /// against a common home router: `machine.fritz.box` does not resolve at all,
+    /// while `machine.local` answers — so keeping the domain publishes an address
+    /// that opens nothing, and does it without looking wrong.
     #[test]
-    fn an_already_qualified_name_is_asked_for_as_it_stands() {
-        // A second suffix on the end of one would ask for a machine nobody has.
+    fn the_domain_a_router_handed_out_is_dropped_for_the_one_that_answers() {
         assert_eq!(
-            address(Some("nas.lan"), None, Environment::Windows, 8096).map(|address| address.url),
-            Some("http://nas.lan:8096".to_owned())
+            address(Some("nas.lan"), None, Environment::Windows, 8096).map(|url| url.url),
+            Some("http://nas.local:8096".to_owned())
+        );
+        assert_eq!(
+            address(
+                Some("kitchen-nas.fritz.box"),
+                None,
+                Environment::MacOs,
+                5055
+            )
+            .map(|url| url.url),
+            Some("http://kitchen-nas.local:5055".to_owned())
+        );
+    }
+
+    /// A name already in the form the responder answers to is left alone.
+    ///
+    /// Some machines report themselves that way. Appending a second `.local` would
+    /// ask for a machine nobody has.
+    #[test]
+    fn a_name_already_in_the_responders_form_gains_no_second_suffix() {
+        assert_eq!(
+            address(Some("nas.local"), None, Environment::MacOs, 8096).map(|url| url.url),
+            Some("http://nas.local:8096".to_owned())
         );
     }
 
