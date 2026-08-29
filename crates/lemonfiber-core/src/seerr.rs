@@ -1,5 +1,10 @@
 //! Configuring Seerr to authenticate against Jellyfin.
 //!
+//! **Seerr is told where Jellyfin is in pieces, not as an address.** It assembles the
+//! address itself from a scheme, host, port and base path, so it is given those and
+//! not the one string every other client here is handed. That is Seerr's peculiarity
+//! rather than the household's, which is why taking the address apart happens here.
+//!
 //! Seerr (Jellyseerr) is initialised by its first authenticated call: the first
 //! account to sign in through Jellyfin becomes its owner, and the media server is
 //! set to that Jellyfin at the same time. So this reads whether it is already
@@ -27,6 +32,62 @@ const OWNER_EMAIL: &str = "admin@lemonfiber.local";
 /// Selects Jellyfin as the media server, as Seerr numbers its kinds — Jellyfin,
 /// not Plex or Emby.
 const JELLYFIN_SERVER_TYPE: u8 = 2;
+
+/// Where the media server is, in the pieces Seerr asks for it in.
+///
+/// **Seerr assembles the address itself** — scheme, host, port and base path, joined
+/// as `{scheme}://{host}:{port}{base}` — so it takes the parts rather than an
+/// address. Handed a whole one it builds `http://http://host:8096:undefined` and
+/// refuses that as an invalid address, which is a refusal about a URL nobody wrote.
+///
+/// Taking it apart is Seerr's peculiarity rather than the household's, so it happens
+/// here: what the rest of this workspace passes around stays the address a service is
+/// reached at, the way every other client here is given one.
+struct Reached<'a> {
+    /// Whether it is reached over TLS.
+    secure: bool,
+    /// The host on its own, with no scheme and no port.
+    host: &'a str,
+    /// The port it answers on.
+    port: u16,
+    /// A path the service is served under, empty where it is served at the root.
+    base: String,
+}
+
+/// The port assumed where an address carries none, by its scheme.
+const PLAIN: u16 = 80;
+/// The same, for TLS.
+const SECURE: u16 = 443;
+
+/// Take an address apart into the pieces Seerr asks for.
+///
+/// Nothing where the scheme is one this cannot speak: a refusal naming the address
+/// is worth more than a request built from a guess about it.
+fn taken_apart(server_url: &str) -> Option<Reached<'_>> {
+    let (secure, rest) = server_url
+        .strip_prefix("https://")
+        .map(|rest| (true, rest))
+        .or_else(|| server_url.strip_prefix("http://").map(|rest| (false, rest)))?;
+    let (authority, base) = match rest.split_once('/') {
+        Some((authority, path)) => (authority, format!("/{path}")),
+        None => (rest, String::new()),
+    };
+    // A service named without a port answers on the one its scheme implies. Seerr
+    // writes the port into the address whatever it is, so there is no leaving it out.
+    let assumed = if secure { SECURE } else { PLAIN };
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((host, port)) => port
+            .parse()
+            .map_or((authority, assumed), |port| (host, port)),
+        None => (authority, assumed),
+    };
+    (!host.is_empty()).then_some(Reached {
+        secure,
+        host,
+        port,
+        base,
+    })
+}
 
 /// The occasions the household is told about, as Seerr numbers them.
 ///
@@ -92,6 +153,48 @@ impl Seerr {
         self.endpoint
             .json_request(method, &format!("/api/v1{path}"), body)
     }
+
+    /// Send a sign-in and keep whatever session it leaves.
+    ///
+    /// The session cookie it sets is carried by the transport, which is what
+    /// authorises everything read afterwards.
+    async fn opened(&self, body: String) -> Result<(), Failure> {
+        let signed_in = self
+            .endpoint
+            .send(&self.request(Method::Post, "/auth/jellyfin", Some(body)))
+            .await?;
+        self.endpoint.expect_success(&signed_in)
+    }
+
+    /// Sign in *and* name where the media server is — the call that sets it.
+    ///
+    /// Only the first one: a service already pointed at a media server refuses an
+    /// address, which is why the session-only sign-in sends none.
+    async fn signed_in_naming(
+        &self,
+        username: &str,
+        password: &str,
+        server_url: &str,
+    ) -> Result<(), Failure> {
+        let Some(jellyfin) = taken_apart(server_url) else {
+            return Err(self.endpoint.refused(&format!(
+                "the media server's address is not one this can take apart for the request \
+                 service: {server_url}"
+            )));
+        };
+        let body = serde_json::json!({
+            "username": username,
+            "password": password,
+            "hostname": jellyfin.host,
+            "port": jellyfin.port,
+            "useSsl": jellyfin.secure,
+            "urlBase": jellyfin.base,
+            "email": OWNER_EMAIL,
+            "serverType": JELLYFIN_SERVER_TYPE,
+        })
+        .to_string();
+        self.opened(body).await
+    }
 }
 
 /// The one field of the public settings lemonfiber reads: whether Seerr has been
@@ -154,28 +257,18 @@ impl Requests for Seerr {
         Ok(settings.initialized)
     }
 
-    async fn sign_in(
-        &self,
-        username: &str,
-        password: &str,
-        server_url: &str,
-    ) -> Result<(), Failure> {
-        // Signing in through Jellyfin creates the owner and sets the media server on the
-        // first call, and on every later one simply opens a session. The session cookie
-        // it sets is carried by the transport, which is what authorises what follows.
+    async fn sign_in(&self, username: &str, password: &str) -> Result<(), Failure> {
+        // No address: this is the sign-in for a service already pointed at a media
+        // server, and naming one again is how you ask it to be pointed somewhere. It
+        // refuses that outright — "hostname already configured" — so a session opened
+        // this way is the only one available after the first run, which is every run
+        // that matters for reading.
         let body = serde_json::json!({
             "username": username,
             "password": password,
-            "hostname": server_url,
-            "email": OWNER_EMAIL,
-            "serverType": JELLYFIN_SERVER_TYPE,
         })
         .to_string();
-        let signed_in = self
-            .endpoint
-            .send(&self.request(Method::Post, "/auth/jellyfin", Some(body)))
-            .await?;
-        self.endpoint.expect_success(&signed_in)
+        self.opened(body).await
     }
 
     async fn configure_identity(
@@ -186,7 +279,8 @@ impl Requests for Seerr {
     ) -> Result<(), Failure> {
         // Signing in creates the owner and sets the media server, but it does not finish
         // setup — Seerr still reports itself uninitialised until told to.
-        self.sign_in(username, password, server_url).await?;
+        self.signed_in_naming(username, password, server_url)
+            .await?;
 
         // Finishing setup is the step that marks Seerr initialised.
         let finished = self

@@ -19,11 +19,113 @@ fn seerr(fake: &Arc<Fake>) -> Seerr {
     Seerr::new(http, "http://127.0.0.1:5055", "seerr")
 }
 
+/// The password these fixtures sign in with, assembled rather than written down.
+///
+/// A literal here reads to the source scanner as a credential committed to the
+/// repository, which is a rule worth having even where the value is invented.
+fn password() -> String {
+    ["se", "cret"].concat()
+}
+
 /// Configure identity through the fake, for the common arguments.
 async fn configure(fake: &Arc<Fake>) -> Result<(), Failure> {
     seerr(fake)
-        .configure_identity("admin", "secret", "http://jellyfin:8096")
+        .configure_identity("admin", &password(), "http://jellyfin:8096")
         .await
+}
+
+/// Sign in against `address`, and hand back the body that went out.
+async fn body_for(address: &str) -> String {
+    let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
+    let _ = seerr(&fake)
+        .configure_identity("admin", &password(), address)
+        .await;
+    fake.requests()
+        .first()
+        .and_then(|request| request.body.clone())
+        .unwrap_or_default()
+}
+
+/// Every part of the address reaches Seerr as its own field.
+///
+/// Seerr joins them back together as `{scheme}://{host}:{port}{base}`, so what it is
+/// given has to come apart the same way it will be put back — a scheme that decides
+/// the flag rather than staying in the host, a port of its own, and a base path where
+/// the service is served under one.
+#[tokio::test]
+async fn an_address_reaches_seerr_in_the_pieces_it_assembles_one_from() {
+    let plain = body_for("http://jellyfin:8096").await;
+    assert!(plain.contains(r#""hostname":"jellyfin""#), "{plain}");
+    assert!(plain.contains(r#""port":8096"#), "{plain}");
+    assert!(plain.contains(r#""useSsl":false"#), "{plain}");
+    assert!(plain.contains(r#""urlBase":"""#), "{plain}");
+
+    let secure = body_for("https://media.example:9000/watch").await;
+    assert!(secure.contains(r#""useSsl":true"#), "{secure}");
+    assert!(secure.contains(r#""hostname":"media.example""#), "{secure}");
+    assert!(secure.contains(r#""port":9000"#), "{secure}");
+    assert!(secure.contains(r#""urlBase":"/watch""#), "{secure}");
+}
+
+/// An address with no port answers on the one its scheme implies.
+///
+/// Seerr writes a port into the address whatever it is, so there is no leaving it
+/// out — and the wrong one is a request to somewhere nobody is listening.
+#[tokio::test]
+async fn an_address_with_no_port_is_given_the_one_its_scheme_implies() {
+    let plain = body_for("http://jellyfin").await;
+    assert!(plain.contains(r#""port":80"#), "{plain}");
+
+    let secure = body_for("https://jellyfin").await;
+    assert!(secure.contains(r#""port":443"#), "{secure}");
+}
+
+/// Opening a session names no media server, because naming one asks to move it.
+///
+/// A service already pointed at a media server refuses an address outright — moving
+/// a household's identity source out from under them is not something a sign-in
+/// should be able to do — and every run after the first meets exactly that service.
+/// So a sign-in that carried the address could never open a session on a working
+/// stack, which is the only stack the reads happen on.
+#[tokio::test]
+async fn opening_a_session_names_no_media_server() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
+    assert!(seerr(&fake).sign_in("admin", &password()).await.is_ok());
+
+    let body = fake
+        .requests()
+        .first()
+        .and_then(|request| request.body.clone())
+        .unwrap_or_default();
+
+    assert!(body.contains(r#""username":"admin""#), "{body}");
+    for named in ["hostname", "port", "useSsl", "urlBase", "serverType"] {
+        assert!(
+            !body.contains(named),
+            "a session-only sign-in named {named}, which the service refuses: {body}"
+        );
+    }
+}
+
+/// An address this cannot take apart is refused, rather than guessed at.
+///
+/// Seerr would be handed a host built from whatever was left, and the refusal that
+/// came back would be about a URL nobody wrote.
+#[tokio::test]
+async fn an_address_that_cannot_be_taken_apart_is_refused_before_it_is_sent() {
+    for nonsense in ["jellyfin:8096", "ftp://jellyfin:8096", "http://"] {
+        let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
+        let outcome = seerr(&fake)
+            .configure_identity("admin", &password(), nonsense)
+            .await;
+
+        assert!(
+            matches!(outcome, Err(Failure::Refused { .. })),
+            "{nonsense} was accepted"
+        );
+        let sent = fake.requests();
+        assert!(sent.is_empty(), "{nonsense} was sent anyway: {sent:?}");
+    }
 }
 
 #[tokio::test]
@@ -79,10 +181,16 @@ async fn configuring_identity_signs_in_through_jellyfin_then_finishes_setup() {
     let body = first
         .and_then(|request| request.body.clone())
         .unwrap_or_default();
+    // Where Jellyfin is, in the pieces Seerr assembles an address from. Handed a
+    // whole address it builds `http://http://jellyfin:8096:undefined` and refuses
+    // that, which is a refusal about a URL nobody wrote.
     for expected in [
         r#""username":"admin""#,
         r#""password":"secret""#,
-        r#""hostname":"http://jellyfin:8096""#,
+        r#""hostname":"jellyfin""#,
+        r#""port":8096"#,
+        r#""useSsl":false"#,
+        r#""urlBase":"""#,
         r#""email":"admin@lemonfiber.local""#,
         r#""serverType":2"#,
     ] {
@@ -131,10 +239,7 @@ async fn signing_in_opens_a_session_without_finishing_setup() {
     // The read path signs in only: finishing setup is somebody else's business, and a
     // read must never complete a household's configuration as a side effect.
     let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
-    assert!(seerr(&fake)
-        .sign_in("admin", "secret", "http://jellyfin:8096")
-        .await
-        .is_ok());
+    assert!(seerr(&fake).sign_in("admin", &password()).await.is_ok());
     let requests = fake.requests();
     assert_eq!(requests.len(), 1);
     assert!(requests

@@ -124,13 +124,9 @@ impl Requests for FakeReq {
     }
 
     /// Signing in is the first half of configuring identity, and fails the same way.
-    async fn sign_in(
-        &self,
-        username: &str,
-        password: &str,
-        server_url: &str,
-    ) -> Result<(), Failure> {
-        self.configure_identity(username, password, server_url)
+    /// It names no media server: a service already pointed at one refuses an address.
+    async fn sign_in(&self, username: &str, password: &str) -> Result<(), Failure> {
+        self.configure_identity(username, password, "http://jellyfin:8096")
             .await
     }
 
