@@ -252,11 +252,17 @@ mod tests {
 
     const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
 
-    /// Comfortably after every date the stack records, and not the real clock.
+    /// After every date the stack records, and not the real clock.
+    ///
+    /// A service records the day its upstream last released, and a date after this
+    /// one is a fault — so bumping a pin to a newer release puts the stack ahead of
+    /// this and the fixture reports a fault that is nobody's mistake.
+    /// `the_day_these_tests_use_is_after_everything_the_stack_records` is the guard;
+    /// when it fails, move this forward rather than pinning an older image.
     const TODAY: Date = Date {
         year: 2026,
-        month: 7,
-        day: 25,
+        month: 10,
+        day: 1,
     };
 
     fn check(text: &str) -> Vec<Violation> {
@@ -274,6 +280,30 @@ mod tests {
     fn edited(from: &str, to: &str) -> String {
         assert!(STACK.contains(from), "the fixture must contain {from:?}");
         STACK.replacen(from, to, 1)
+    }
+
+    /// The day these tests use is after everything the stack records.
+    ///
+    /// Every fixture here validates the committed stack against `TODAY`, and the
+    /// stack is a submodule that moves forward while this constant does not. Without
+    /// this, a pin bump makes `the_stack_this_binary_ships_is_valid` fail for a
+    /// reason that has nothing to do with the stack being invalid.
+    #[test]
+    fn the_day_these_tests_use_is_after_everything_the_stack_records() {
+        let latest = STACK
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("last_release = "))
+            .map(|value| value.trim().trim_matches('"').to_owned())
+            .max()
+            .unwrap_or_default();
+        let said = format!("{:04}-{:02}-{:02}", TODAY.year, TODAY.month, TODAY.day);
+
+        assert!(
+            said.as_str() >= latest.as_str(),
+            "these tests validate against {said} and the stack records a release on \
+             {latest}; move TODAY forward past it — the fixtures report a fault that \
+             is nobody's mistake otherwise."
+        );
     }
 
     #[test]

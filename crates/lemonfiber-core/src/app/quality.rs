@@ -556,7 +556,7 @@ mod tests {
         assert!(report.customised, "it reports that it overwrote an edit");
         assert!(std::fs::read_to_string(&recyclarr)
             .unwrap_or_default()
-            .contains("sonarr-v4-quality-profile-web-2160p"));
+            .contains("sonarr-web-2160p.yml"));
     }
 
     #[test]

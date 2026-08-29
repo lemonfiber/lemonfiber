@@ -249,7 +249,7 @@ async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
             lemonfiber_core::ports::docker::Lifecycle::Running,
             lemonfiber_core::ports::docker::Health::Healthy,
         )),
-        lemonfiber_fixtures::ports::Stopped::at(1_786_000_000),
+        lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_fixtures::files::Files::ending(Vec::new()),
         Source::External(project()),
         Settings::default(),

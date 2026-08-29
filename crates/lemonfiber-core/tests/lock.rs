@@ -104,7 +104,7 @@ fn ctx(files: &Arc<Remembering>) -> Ctx {
     Ctx::new(
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::absent()),
-        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
+        lemonfiber_fixtures::ports::Stopped::today(),
         Arc::clone(files) as Arc<dyn FileSystem>,
         Source::External(project()),
         Settings {
@@ -120,7 +120,7 @@ fn ctx_without_settings(files: &Arc<Remembering>) -> Ctx {
     Ctx::new(
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::absent()),
-        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
+        lemonfiber_fixtures::ports::Stopped::today(),
         Arc::clone(files) as Arc<dyn FileSystem>,
         Source::External(project()),
         Settings::default(),

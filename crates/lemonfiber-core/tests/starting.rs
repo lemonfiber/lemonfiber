@@ -42,7 +42,7 @@ fn ctx(compose: Result<Output, Failure>) -> Ctx {
             Lifecycle::Running,
             Health::Healthy,
         )),
-        lemonfiber_fixtures::ports::Stopped::at(1_786_968_000),
+        lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_fixtures::files::Files::empty(),
         Source::External(project()),
         Settings {
