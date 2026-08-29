@@ -544,6 +544,84 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// The record is read from further back than the window it is judged against.
+    ///
+    /// The server answers with what happened *since* the moment it is given, and the
+    /// invitations worth finding are the ones already past their window. Read from the
+    /// same moment they are compared to and the answer holds only the ones still
+    /// standing, so nothing is ever found to withdraw — a sweep that runs, reports
+    /// nothing, and looks exactly like a stack with nothing to sweep.
+    ///
+    /// The test above cannot catch that: the fake matches on path and hands back its
+    /// record whatever moment it is asked for, which a real server would not. So the
+    /// moment asked for is the thing to assert, rather than what came back.
+    #[tokio::test]
+    async fn the_record_is_read_from_further_back_than_the_window_it_judges() {
+        let env = recorded_admin("window");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in,
+                ],
+            ),
+            (
+                "/System/ActivityLog",
+                vec![Answer::reply(200, r#"{"Items":[]}"#)],
+            ),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users", vec![Answer::reply(200, "[]")]),
+        ]);
+        let recorded = std::sync::Arc::clone(&http);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let _ = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        let judged = ctx.hours_ago(crate::invitation::HOURS_TO_CLAIM);
+        let read_from = recorded
+            .requests()
+            .into_iter()
+            .find(|request| request.url.contains("/System/ActivityLog"))
+            .and_then(|request| {
+                request
+                    .url
+                    .split("minDate=")
+                    .nth(1)
+                    .and_then(|rest| rest.split('&').next())
+                    .map(str::to_owned)
+            })
+            .unwrap_or_default();
+
+        assert!(
+            !read_from.is_empty() && read_from < judged,
+            "the record was read from {read_from:?}, which is not further back than the \
+             {judged} an invitation is judged against — so nothing past its window can be found"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
     /// An invitation serialises under its own kind, for the surface that reads JSON.
     #[tokio::test]
     async fn an_invitation_serialises_under_its_own_kind() {

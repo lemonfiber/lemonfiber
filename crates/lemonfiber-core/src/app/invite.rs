@@ -12,7 +12,7 @@
 //! account nobody has claimed, reachable only by somebody who was told about it.
 
 use crate::app::Ctx;
-use crate::invitation::{offered, run_out, HOURS_TO_CLAIM};
+use crate::invitation::{offered, run_out, HOURS_OF_RECORD, HOURS_TO_CLAIM};
 use crate::model::Invitation;
 use crate::ports::service::Household as _;
 
@@ -64,8 +64,9 @@ pub(super) async fn offer(
 /// refuse the invitation the operator asked for. The sweep runs again next time.
 async fn sweep(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Vec<String> {
     let cutoff = ctx.hours_ago(HOURS_TO_CLAIM);
+    let since = ctx.hours_ago(HOURS_OF_RECORD);
     let (Ok(household), Ok(records)) =
-        (server.household().await, server.when_invited(&cutoff).await)
+        (server.household().await, server.when_invited(&since).await)
     else {
         return Vec::new();
     };
