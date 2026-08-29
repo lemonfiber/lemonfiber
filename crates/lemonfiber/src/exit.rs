@@ -147,6 +147,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Word(_)
         | Outcome::Glossary(_)
         | Outcome::Clients(_)
+        // An invitation was made or it was not; a refusal already comes back as a
+        // problem, so there is nothing for a code to tell apart here.
+        | Outcome::Invited(_)
         | Outcome::Outbound(_)
         | Outcome::Wizard(_)
         // Putting back what the last repair changed either happened or came back as

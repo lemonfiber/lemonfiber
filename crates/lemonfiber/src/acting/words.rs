@@ -1242,6 +1242,23 @@ mod tests {
         );
     }
 
+    /// A person's name completes the question the same way a file's does.
+    ///
+    /// Same line, different argument — which is the errand's business rather than
+    /// the line's, and this is where that shows: the sentence names the person.
+    #[test]
+    fn the_name_of_somebody_invited_completes_its_question() {
+        let stage = Stage::Agreeing {
+            errand: sent("invite"),
+            given: Given::named("ana".to_owned()),
+            would: None,
+        };
+
+        let said = said(&stage, 20, 90);
+
+        assert!(said.contains("Invite ana?"), "{said}");
+    }
+
     /// A long report keeps the question on the screen: the box holds back the rows
     /// the question needs rather than filling them, so what is being agreed to is
     /// never the thing scrolled off.

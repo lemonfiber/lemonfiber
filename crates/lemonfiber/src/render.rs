@@ -20,6 +20,7 @@ mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
+mod invitation;
 mod outbound;
 mod qr;
 mod quality;
@@ -219,6 +220,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Clients(all) => clients::guidance(all),
+        Outcome::Invited(report) => invitation::invitation(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::Lifecycle(report) => stack::lifecycle(report),

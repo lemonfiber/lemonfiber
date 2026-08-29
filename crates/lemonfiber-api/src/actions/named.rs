@@ -51,6 +51,7 @@ pub const OFFERED: &[&str] = &[
     "reset",
     "forget",
     "backup",
+    "invite",
     "support",
     "restore",
     "watch",
@@ -87,6 +88,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         services,
         wait,
         service,
+        name,
         key,
         value,
         preset,
@@ -134,6 +136,9 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // answers with — so what a browser agrees to is what it was shown.
         "forget" => Ok(Command::Forget { confirm }),
         "backup" => Ok(Command::Backup { service }),
+        "invite" => Ok(Command::Invite {
+            name: name.ok_or_else(|| needs("name"))?,
+        }),
         // The one diagnosis asked for here rather than served as a read. It reaches
         // the same command `/api/checks` reaches, widened by the same word the
         // command line widens it with — so it is not a second reading of the stack,

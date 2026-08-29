@@ -17,6 +17,7 @@ use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::Failure;
 use crate::recyclarr::Kind;
 
+mod household;
 mod library;
 mod setup;
 

@@ -195,6 +195,16 @@ pub enum Command {
     /// the client landscape belongs to the platforms rather than to this stack — so
     /// nothing is asked of the engine and nothing is read from disk.
     Clients,
+    /// Offer somebody in the house an account they can claim.
+    ///
+    /// Makes an account on the media server with no password on it, which is the
+    /// whole of what an invitation is: whoever sets the first password claims it.
+    /// Takes back any nobody claimed in time on the way past, because nothing runs
+    /// between commands to do it on a clock.
+    Invite {
+        /// What they will sign in as.
+        name: String,
+    },
     /// List everything that leaves this machine: what lemonfiber asks of the world
     /// on its own account, and what the stack's own services ask of it.
     ///

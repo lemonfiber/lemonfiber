@@ -37,6 +37,7 @@ mod engine;
 mod fixtures;
 pub mod forwarding;
 mod household;
+mod invite;
 mod materialise;
 mod music;
 mod notify;
@@ -112,6 +113,8 @@ pub enum Outcome {
     Glossary(Vocabulary),
     /// Which app to use on which device.
     Clients(crate::clients::Guidance),
+    /// An account offered to somebody in the house.
+    Invited(crate::model::Invitation),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
@@ -164,6 +167,7 @@ impl Outcome {
             Self::Word(_) => kind::WORD,
             Self::Glossary(_) => kind::GLOSSARY,
             Self::Clients(_) => kind::CLIENTS,
+            Self::Invited(_) => kind::INVITATION,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Stored(_) => crate::model::kind::STORED,
             Self::Status(_) => crate::model::kind::STATUS,
@@ -202,6 +206,7 @@ impl serde::Serialize for Outcome {
             Self::Word(term) => term.serialize(serializer),
             Self::Glossary(report) => report.serialize(serializer),
             Self::Clients(report) => report.serialize(serializer),
+            Self::Invited(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
@@ -277,6 +282,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance())),
+        Command::Invite { name } => invite::offer(ctx, name).await.map(Outcome::Invited),
         Command::Outbound => {
             // The stack has to be readable, because half the answer is about it: a
             // manifest that could not be read would leave the services' own requests
@@ -367,7 +373,7 @@ mod tests {
     use crate::quality::Preset;
     use crate::stack::Source;
     use crate::test_support::{a_context, nowhere, refused, spoke, Recording, Reporting, Scripted};
-    use lemonfiber_fixtures::http::Fake;
+    use lemonfiber_fixtures::http::{Answer, Fake};
     use std::time::Duration;
 
     fn ctx(scripted: Result<Output, Failure>) -> Ctx {
@@ -391,6 +397,443 @@ mod tests {
             })
             .build();
         crate::app::fixtures::keeping(stopped, vault)
+    }
+
+    /// The invitation an answer carries, if it carried one.
+    ///
+    /// A named reader rather than a `matches!` spanning lines inside an assertion:
+    /// that shape leaves the gate a line it cannot see executed, and it reads worse
+    /// besides.
+    fn invited(made: &Result<Outcome, Box<super::Problem>>) -> Option<&crate::model::Invitation> {
+        match made {
+            Ok(Outcome::Invited(report)) => Some(report),
+            _ => None,
+        }
+    }
+
+    /// A scratch environment file holding the media server's recorded password.
+    fn recorded_admin(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-invite-{}-{name}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let env = dir.join(".env");
+        let _ = crate::config::store::set(
+            &env,
+            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        env
+    }
+
+    /// Offering an account hands back one address and the name to sign in as.
+    ///
+    /// Driven through `dispatch` because that is how every surface reaches it: what
+    /// comes back is what a browser is handed as well as what the terminal draws.
+    #[tokio::test]
+    async fn offering_an_account_hands_back_one_address_and_a_name() {
+        let env = recorded_admin("offers");
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![
+                    Answer::reply(200, r#"{"AccessToken":"token"}"#),
+                    Answer::reply(200, r#"{"AccessToken":"token"}"#),
+                    Answer::reply(200, r#"{"AccessToken":"token"}"#),
+                ],
+            ),
+            (
+                "/System/ActivityLog",
+                vec![Answer::reply(200, r#"{"Items":[]}"#)],
+            ),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users", vec![Answer::reply(200, "[]")]),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let made = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            invited(&made)
+                .is_some_and(|report| { report.name == "ana" && !report.address.is_empty() }),
+            "{made:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// An invitation nobody claimed in time is taken back, and named.
+    ///
+    /// The sweep rides along with the request because nothing runs between commands
+    /// to do it on a clock. Asserted by what comes back rather than by the calls
+    /// made: an operator who invited somebody last week is owed the sentence saying
+    /// the account is gone.
+    #[tokio::test]
+    async fn an_invitation_nobody_claimed_is_taken_back_and_named() {
+        let env = recorded_admin("sweeps");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in,
+                ],
+            ),
+            (
+                "/System/ActivityLog",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
+                )],
+            ),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users/7", vec![Answer::reply(204, "")]),
+            (
+                "/Users",
+                vec![Answer::reply(
+                    200,
+                    r#"[{"Id":"7","Name":"bo","HasPassword":false}]"#,
+                )],
+            ),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let made = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            invited(&made).is_some_and(|report| report.withdrawn == ["bo".to_owned()]),
+            "the one nobody claimed was not taken back and named: {made:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// An invitation serialises under its own kind, for the surface that reads JSON.
+    #[tokio::test]
+    async fn an_invitation_serialises_under_its_own_kind() {
+        let env = recorded_admin("json");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![signed_in.clone(), signed_in.clone(), signed_in],
+            ),
+            (
+                "/System/ActivityLog",
+                vec![Answer::reply(200, r#"{"Items":[]}"#)],
+            ),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users", vec![Answer::reply(200, "[]")]),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let json = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await
+        .ok()
+        .and_then(|outcome| outcome.envelope().to_json())
+        .unwrap_or_default();
+
+        assert!(json.contains("\"invitation\""), "{json}");
+        assert!(json.contains("ana"), "{json}");
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A stack that cannot be read is reported rather than treated as empty.
+    #[tokio::test]
+    async fn offering_an_account_over_an_unreadable_stack_says_so() {
+        let ctx = a_context()
+            .over(Source::External(std::path::Path::new(
+                "/lemonfiber/no/such/stack",
+            )))
+            .build()
+            .with_http(Fake::silent());
+
+        assert!(
+            dispatch(
+                Command::Invite {
+                    name: "ana".to_owned(),
+                },
+                &ctx,
+            )
+            .await
+            .is_err(),
+            "an unreadable stack was treated as one with no media server"
+        );
+    }
+
+    /// An invitation the server refuses to take back is not reported as taken back.
+    ///
+    /// The sweep reports what it did, not what it tried. An operator told an account
+    /// was withdrawn would stop expecting that person to appear.
+    #[tokio::test]
+    async fn an_invitation_the_server_will_not_withdraw_is_not_reported_as_withdrawn() {
+        let env = recorded_admin("withdraw-refused");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in.clone(),
+                    signed_in,
+                ],
+            ),
+            (
+                "/System/ActivityLog",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
+                )],
+            ),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users/7", vec![Answer::reply(500, "no")]),
+            (
+                "/Users",
+                vec![Answer::reply(
+                    200,
+                    r#"[{"Id":"7","Name":"bo","HasPassword":false}]"#,
+                )],
+            ),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let made = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            invited(&made).is_some_and(|report| report.withdrawn.is_empty()),
+            "an account still standing was reported as taken back: {made:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A media server that refuses the account says so, rather than reporting one.
+    ///
+    /// The sweep answering and the making failing are different halves: a sweep that
+    /// could not run is not a reason to refuse, and a refusal to make the account is.
+    #[tokio::test]
+    async fn a_media_server_that_refuses_the_account_is_reported() {
+        let env = recorded_admin("refuses");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![signed_in.clone(), signed_in.clone(), signed_in],
+            ),
+            (
+                "/System/ActivityLog",
+                vec![Answer::reply(200, r#"{"Items":[]}"#)],
+            ),
+            ("/Users/New", vec![Answer::reply(400, "name already taken")]),
+            ("/Users", vec![Answer::reply(200, "[]")]),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let refused = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(refused.is_err(), "a refused account was reported as made");
+        assert!(
+            invited(&refused).is_none(),
+            "a refusal carried an invitation anyway"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A sweep that cannot run does not stop the invitation the operator asked for.
+    ///
+    /// The sweep is housekeeping riding along; refusing to invite somebody because
+    /// last week's invitations could not be counted would be the tail wagging the dog.
+    #[tokio::test]
+    async fn a_sweep_that_cannot_run_still_makes_the_invitation() {
+        let env = recorded_admin("sweep-silent");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![signed_in.clone(), signed_in.clone(), signed_in],
+            ),
+            ("/System/ActivityLog", vec![Answer::Silent]),
+            (
+                "/Users/New",
+                vec![Answer::reply(
+                    200,
+                    r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+                )],
+            ),
+            ("/Users", vec![Answer::Silent]),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let made = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            invited(&made).is_some_and(|report| report.withdrawn.is_empty()),
+            "a sweep that could not run stopped the invitation: {made:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A stack with no media server has nothing to make an account on.
+    ///
+    /// Built by taking the shipped stack and removing the one service an invitation
+    /// needs, so what is under test is the absence rather than a hand-written
+    /// manifest that might differ in some other way too.
+    #[tokio::test]
+    async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_make_one() {
+        static WITHOUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+        let dir = WITHOUT.get_or_init(|| {
+            let from = std::path::Path::new(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../assets/media-stack"
+            ));
+            let to =
+                std::env::temp_dir().join(format!("lemonfiber-no-server-{}", std::process::id()));
+            let _ = std::fs::create_dir_all(&to);
+            let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
+            // Every block but the media server's, kept in order.
+            let kept: String = read
+                .split("[[service]]")
+                .filter(|block| !block.contains("id = \"jellyfin\""))
+                .collect::<Vec<_>>()
+                .join("[[service]]");
+            let _ = std::fs::write(to.join("stack.toml"), kept);
+            to
+        });
+        let ctx = a_context()
+            .over(Source::External(Box::leak(dir.clone().into_boxed_path())))
+            .build()
+            .with_http(Fake::silent());
+
+        let refused = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            refused.is_err_and(|problem| problem.summary.contains("no media server")),
+            "a stack with nothing to make an account on did not say so"
+        );
+    }
+
+    /// Without a recorded credential there is nothing to ask the server as.
+    ///
+    /// Refused before anything is attempted rather than after a sign-in fails, so what
+    /// comes back names the setup that has not run rather than a rejection.
+    #[tokio::test]
+    async fn offering_an_account_before_setup_is_refused_rather_than_attempted() {
+        let ctx = a_context().build().with_http(Fake::silent());
+
+        let refused = dispatch(
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            refused.is_err(),
+            "an invitation was made with no credential to make it with"
+        );
+        assert!(invited(&refused).is_none(), "a refusal carried one anyway");
     }
 
     /// What this machine keeps, asked for here as well as from the integration test
@@ -1021,6 +1464,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
+                | Outcome::Invited(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -1062,6 +1506,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
+                | Outcome::Invited(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -1883,6 +2328,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
+                | Outcome::Invited(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -2878,6 +3324,7 @@ mod tests {
                 | Outcome::Word(_)
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
+                | Outcome::Invited(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Doctor(_)

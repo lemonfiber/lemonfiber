@@ -152,6 +152,15 @@ static AFTER: &[Errand] = &[
         going: Going::Once,
     },
     Errand {
+        name: "an invitation",
+        about: "make somebody in the house an account they claim by setting a password",
+        action: "invite",
+        asks: "Invite",
+        needs: Needs::Named("Who it is for, as they will sign in"),
+        accepts: None,
+        going: Going::Once,
+    },
+    Errand {
         name: "a backup",
         about: "capture a configuration to an archive kept on this machine",
         action: "backup",
@@ -322,7 +331,7 @@ fn taken(
         // Two errands open a line and what they do with the word differs, which is
         // [`given`]'s answer rather than this one's: what is decided here is only
         // that there is a line.
-        Needs::Archive(asks) | Needs::Bundling(asks) => {
+        Needs::Archive(asks) | Needs::Bundling(asks) | Needs::Named(asks) => {
             *stage = Stage::Naming {
                 errand,
                 asks,
@@ -393,6 +402,9 @@ fn given(stage: &mut Stage, errand: &'static Errand, typed: String) -> Wanted {
             *stage = bundling::over(errand, typed.parse().unwrap_or(LINES));
             Wanted::Nothing
         }
+        // Same line, different argument: which one the word fills is the errand's
+        // business rather than the line's.
+        Needs::Named(_) => begun(stage, errand, Given::named(typed)),
         _ => begun(stage, errand, Given::typed(typed)),
     }
 }
@@ -510,7 +522,7 @@ pub(super) fn doing(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{all, every, Errand, Given, Going, Needs, Outcome, KEY, LINES};
+    use super::{all, every, Errand, Given, Going, Needs, Outcome, Stage, KEY, LINES};
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber::reaching::{ACTS, ALSO};
     use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
@@ -548,6 +560,38 @@ pub(crate) mod tests {
             .filter(|errand| errand.action == action)
             .map(|errand| errand.name)
             .collect()
+    }
+
+    /// Inviting somebody opens a line to type their name on, and the word fills the
+    /// name rather than an archive.
+    ///
+    /// Driven through the stage machinery rather than by building a `Given` by hand,
+    /// because the two halves are decided in different places — that there is a line
+    /// at all, and which argument the word ends up in — and a test that skipped the
+    /// first would pass with no line ever opening.
+    #[test]
+    fn inviting_somebody_opens_a_line_and_the_word_becomes_their_name() {
+        // Every errand, filtered to the one under test: a `let ... else` here would
+        // leave a branch nothing reaches, which the gate counts as untested code.
+        let errand = every()
+            .find(|errand| errand.action == "invite")
+            .unwrap_or(all().0);
+        let mut stage = Stage::Idle;
+
+        let _ = super::taken(&mut stage, errand, &[]);
+
+        assert!(
+            matches!(&stage, Stage::Naming { asks, .. } if asks.contains("Who it is for")),
+            "no line was opened to type a name on"
+        );
+
+        let _ = super::given(&mut stage, errand, "ana".to_owned());
+
+        assert!(
+            matches!(&stage, Stage::Agreeing { given, .. }
+                if given.said() == "ana" && given.asked().name.as_deref() == Some("ana")),
+            "the word did not become the name it was typed for"
+        );
     }
 
     /// The whole point of naming the action rather than assembling a command here:

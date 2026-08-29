@@ -22,6 +22,8 @@ pub enum Method {
     Post,
     /// Replace an existing resource.
     Put,
+    /// Take a resource away.
+    Delete,
 }
 
 /// A request to a service's API.

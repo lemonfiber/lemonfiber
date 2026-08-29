@@ -349,6 +349,31 @@ impl Ctx {
             .unwrap_or_default()
     }
 
+    /// The moment a given number of hours ago, written as the media server writes
+    /// its own records: an ISO-8601 instant ending in `Z`.
+    ///
+    /// The calendar is left to [`Date::from_unix_seconds`], which already knows
+    /// about leap years; only the time of day is arithmetic on what is left over.
+    /// Written out rather than reached for from a date library, because this is the
+    /// one place in the product that needs an instant rather than a day.
+    pub(super) fn hours_ago(&self, hours: i64) -> String {
+        let now = self
+            .clock
+            .now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
+            .unwrap_or_default();
+        let then = now.saturating_sub(hours.saturating_mul(3600));
+        let day = lemonfiber_manifest::Date::from_unix_seconds(then).unwrap_or(EPOCH);
+        let past = then.rem_euclid(86_400);
+        let (hour, minute, second) = (past / 3600, (past % 3600) / 60, past % 60);
+        format!(
+            "{:04}-{:02}-{:02}T{hour:02}:{minute:02}:{second:02}Z",
+            day.year, day.month, day.day
+        )
+    }
+
     pub(super) fn today(&self) -> lemonfiber_manifest::Date {
         let seconds = self
             .clock

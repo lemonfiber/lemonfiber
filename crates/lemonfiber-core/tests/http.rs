@@ -377,3 +377,26 @@ async fn a_cookie_comes_back_to_the_service_that_set_it() {
 
     downloads.stop().await;
 }
+
+/// A removal is sent as a removal, and carries no body.
+///
+/// The one method this product uses to take something away: an invitation nobody
+/// claimed. It is sent over the same seam as the rest rather than through anything
+/// of its own, which is what this holds — a request built with it must arrive as a
+/// `DELETE` and not as a POST to some path that means the same thing.
+#[tokio::test]
+async fn a_removal_is_sent_as_a_removal() {
+    let server = serve(Reply::Whole(204, "")).await;
+    let request = Request {
+        method: Method::Delete,
+        url: format!("{}/Users/ec5f5785a6f4416a9c993800ef463226", server.base),
+        headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
+        body: None,
+    };
+    let response = Web::new().send(&request).await;
+    let sent = server.request();
+    server.stop().await;
+
+    assert_eq!(response.ok().map(|answer| answer.status), Some(204));
+    assert!(sent.starts_with("DELETE "), "a DELETE was sent: {sent:?}");
+}

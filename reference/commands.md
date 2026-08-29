@@ -33,6 +33,7 @@ Commands:
   outbound     List everything that leaves this machine, and what refusing each of it costs
   stored       List what lemonfiber keeps on this machine, where it is, and why
   clients      Say which app to watch on, for each kind of device somebody in the house has
+  invite       Offer somebody in the house an account they can claim
   forget       Remove everything lemonfiber keeps on this machine
   seed         Wire the stack's services to each other, idempotently
   adopt        Adopt your current edits as lemonfiber's expected state
@@ -1005,6 +1006,36 @@ Say which app to watch on, for each kind of device somebody in the house has.
 The client landscape is uneven and it matters which app is used: some devices have an official one that works, and a smart television may have nothing worth using. This says which is which, names a browser as the answer that always works and needs no installation, and where a device is badly served says what to do instead rather than leaving somebody to find out by failing.
 
 Usage: lemonfiber clients [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber invite`
+
+```text
+Offer somebody in the house an account they can claim.
+
+Makes them an account on the media server with no password on it, and prints the one address to send them. Whoever sets the first password claims it; an invitation nobody takes up is withdrawn.
+
+Usage: lemonfiber invite [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>
+          What they will sign in as
 
 Options:
       --json

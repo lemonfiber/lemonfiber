@@ -78,6 +78,7 @@ impl Http for Web {
             Method::Get => self.client.get(&request.url),
             Method::Post => self.client.post(&request.url),
             Method::Put => self.client.put(&request.url),
+            Method::Delete => self.client.delete(&request.url),
         };
         for (name, value) in &request.headers {
             builder = builder.header(name, value);

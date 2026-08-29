@@ -1,0 +1,170 @@
+//! What to send somebody, and the one thing they should know before they accept.
+//!
+//! The shape is the answer first: who it is for, then the single address to pass
+//! on. An operator reading only the first two lines has everything they need to
+//! send the message.
+//!
+//! The code beneath it is the same address again, for a camera. Somebody being
+//! invited is usually holding the phone they will watch on, and typing an address
+//! and then a password on a phone keyboard is exactly the friction that makes
+//! people give up before they start.
+
+use lemonfiber_core::model::Invitation;
+
+use super::{qr, Lines};
+use crate::say;
+
+/// What an operator is told after offering somebody an account.
+pub(super) fn invitation(report: &Invitation) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!(
+        "{} can sign in — unclaimed until they set a password, and it lapses in {} hours",
+        report.name, report.hours
+    ));
+    lines.put(format!("  {}", report.address));
+
+    if let Some(drawn) = qr::rows(&report.address, say::folding()) {
+        lines.spaced("Or point their phone's camera at this:");
+        for row in drawn {
+            lines.put(format!("  {row}"));
+        }
+    }
+
+    lines.spaced(format!(
+        "Tell them to sign in as `{}`. They will be asked to set a password.",
+        report.name
+    ));
+
+    // Said here because here is where somebody is being asked to join. Telling them
+    // afterwards is telling them once they have already put their watching on a
+    // machine somebody else administers.
+    lines.put(WATCHED.to_owned());
+
+    if !report.withdrawn.is_empty() {
+        lines.spaced("Nobody claimed these in time, so they have been withdrawn:");
+        for name in &report.withdrawn {
+            lines.put(format!("  {name}"));
+        }
+    }
+    lines
+}
+
+/// What the household is owed before they accept.
+///
+/// The operator of this stack can see what everybody watches — the media server
+/// keeps that and shows it to whoever administers it. Said plainly and without
+/// softening: somebody deciding whether to accept an account is entitled to know
+/// what accepting it means, and a sentence they have to go looking for is one they
+/// will not find.
+const WATCHED: &str = "  Tell them too: whoever runs this server can see what they watch and when.";
+
+#[cfg(test)]
+mod tests {
+    use super::invitation;
+    use lemonfiber_core::model::Invitation;
+
+    fn offered(withdrawn: Vec<String>) -> Invitation {
+        Invitation {
+            name: "ana".to_owned(),
+            address: "http://192.168.1.20:8096".to_owned(),
+            hours: 48,
+            withdrawn,
+        }
+    }
+
+    /// The answer first: who, then the one address to send.
+    ///
+    /// An operator reading two lines has the message they need to pass on. Anything
+    /// that pushed the address further down would make them read to find it.
+    #[test]
+    fn the_name_is_the_first_line_and_the_address_the_second() {
+        let said = invitation(&offered(Vec::new())).text();
+        let mut lines = said.lines();
+
+        assert!(
+            lines.next().is_some_and(|first| first.contains("ana")),
+            "{said}"
+        );
+        assert_eq!(lines.next(), Some("  http://192.168.1.20:8096"));
+    }
+
+    /// What they are owed before they accept, said where they are being asked.
+    ///
+    /// Telling somebody afterwards is telling them once they have already put their
+    /// watching on a machine somebody else administers.
+    #[test]
+    fn the_operator_is_told_to_pass_on_that_watching_is_visible() {
+        let said = invitation(&offered(Vec::new())).text();
+
+        assert!(
+            said.contains("can see what they watch"),
+            "the household is not told the operator can see what they watch: {said}"
+        );
+    }
+
+    /// The address is drawn as well as written, and after it.
+    #[test]
+    fn the_address_is_drawn_for_a_camera_as_well_as_written() {
+        let said = invitation(&offered(Vec::new())).text();
+        let written = said.lines().position(|line| line.contains("192.168.1.20"));
+        let drawn = said.lines().position(|line| line.contains('\u{2588}'));
+
+        assert!(
+            written.is_some_and(|written| drawn.is_some_and(|drawn| drawn > written)),
+            "written at {written:?}, drawn at {drawn:?}: it needs to be both, in that order"
+        );
+    }
+
+    /// An address too long to draw still gets the words.
+    ///
+    /// The code is the convenience; the address and the name are the message. A
+    /// drawing that could not be made must not take the sentence with it.
+    #[test]
+    fn an_address_too_long_to_draw_still_carries_the_words() {
+        let mut far_too_long = offered(Vec::new());
+        far_too_long.address = format!("http://{}", "h".repeat(8000));
+
+        let said = invitation(&far_too_long).text();
+
+        assert!(said.contains("ana"), "{}", &said[..said.len().min(200)]);
+        assert!(
+            !said.contains('\u{2588}'),
+            "an address that fits in no code was drawn as one anyway"
+        );
+    }
+
+    /// Reached the way every surface reaches it, not only by calling the renderer.
+    #[test]
+    fn the_dispatch_draws_an_invitation() {
+        let said =
+            crate::render::shaped(&lemonfiber_core::app::Outcome::Invited(offered(Vec::new())))
+                .text();
+
+        assert!(said.contains("ana"), "{said}");
+    }
+
+    /// An invitation taken back is reported rather than done quietly.
+    ///
+    /// Somebody who invited a person last week and heard nothing would otherwise have
+    /// no way to learn the account is gone.
+    #[test]
+    fn invitations_taken_back_are_named() {
+        let said = invitation(&offered(vec!["bo".to_owned()])).text();
+
+        assert!(said.contains("withdrawn"), "{said}");
+        assert!(
+            said.contains("bo"),
+            "the one taken back was not named: {said}"
+        );
+    }
+
+    #[test]
+    fn nothing_is_said_about_withdrawals_where_there_were_none() {
+        let said = invitation(&offered(Vec::new())).text();
+
+        assert!(
+            !said.contains("withdrawn"),
+            "a run that took nothing back said it had: {said}"
+        );
+    }
+}
