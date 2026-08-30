@@ -2012,6 +2012,47 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// A service whose manifest entry names no file publishes no key.
+    ///
+    /// The request service was declared that way until its key was found to be in a
+    /// file — an entry saying the key comes from somewhere this cannot read leaves
+    /// nothing to publish, and an older stack pinned here still says so. Publishing an
+    /// empty value instead would have the dashboard authenticate with it and be
+    /// refused, which reads as a broken service rather than an unconfigured one.
+    #[tokio::test]
+    async fn a_service_whose_entry_names_no_file_publishes_no_key() {
+        let env = recorded_admin("no-file-named");
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_filesystem(
+            Arc::new(SeedFs::keyed(None, None).with_seerr(r#"{"main":{"apiKey":"unreachable"}}"#)),
+        );
+        let mut pathless = seerr_with_settings();
+        pathless.api = Some(lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Seerr,
+            key_source: lemonfiber_manifest::KeySource::ApiSettings,
+            path: None,
+            version: None,
+        });
+
+        let wiring = super::published::publish_keys(
+            &ctx,
+            &[pathless],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            None,
+        )
+        .await;
+
+        assert!(
+            matches!(wiring.state, crate::seed::State::Skipped { .. }),
+            "{wiring:?}"
+        );
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            !written.contains("SEERR_API_KEY"),
+            "a key was published for an entry naming no file: {written}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
     /// A listening server with no account gets one, and its password is kept.
     ///
     /// The token is not: the service hands back the same one on every sign-in, so what

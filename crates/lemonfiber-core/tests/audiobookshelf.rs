@@ -42,7 +42,9 @@ async fn whether_an_account_exists_is_read_from_the_server() {
 async fn the_first_account_is_made_with_the_name_and_password_given() {
     let fake = Fake::always(Answer::reply(200, ""));
     let made = server(&fake).create_account("admin", &password()).await;
-    assert!(made.is_ok(), "{made:?}");
+    // Not printed: the call carries the password, so a failing message would carry it
+    // into the run's log.
+    assert!(made.is_ok(), "the first account was not made");
 
     let sent = fake.requests();
     let body = sent
