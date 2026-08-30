@@ -163,6 +163,13 @@ async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
     let report = diagnose(&ctx, &Narrowing::Category(Category::Providers), false).await;
     let findings = report.map(|report| report.findings).unwrap_or_default();
 
+    // The diagnosis produced something to judge. `unwrap_or_default` hands back an
+    // empty list where it failed, and an `all` over that is true — so the claim below
+    // would hold most firmly in exactly the case it is meant to catch.
+    assert!(
+        !findings.is_empty(),
+        "the providers diagnosis reported nothing at all"
+    );
     assert!(
         findings
             .iter()

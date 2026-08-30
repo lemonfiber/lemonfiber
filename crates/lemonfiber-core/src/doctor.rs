@@ -613,6 +613,9 @@ depends_on = ["gluetun"]
         .about("qbittorrent");
 
         let linked = attributed(vec![tunnel, client], &stack());
+        // Both survived attribution. An `all` over an empty list is true, so without
+        // this the check below would pass for a function that dropped everything.
+        assert_eq!(linked.len(), 2, "{linked:?}");
         assert!(linked.iter().all(|finding| finding.caused_by.is_none()));
     }
 
