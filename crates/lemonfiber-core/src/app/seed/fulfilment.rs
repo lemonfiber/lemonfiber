@@ -16,7 +16,7 @@ use std::path::Path;
 
 use lemonfiber_manifest::Service;
 
-use super::arrs::{read_servarr_key, servarr_arrs};
+use super::arrs::{reached_at, read_servarr_key, servarr_arrs};
 use super::Ctx;
 use crate::ports::service::{Client as _, FulfilmentTarget, QualityProfile};
 
@@ -93,17 +93,6 @@ fn fetches(media_types: &[String]) -> Option<bool> {
         return Some(false);
     }
     None
-}
-
-/// Where the request service reaches this \*arr: its container name and port.
-///
-/// The container name rather than a loopback address, because the request service is
-/// itself a container — `127.0.0.1` there is the request service, not the \*arr.
-fn reached_at(services: &[Service], id: &str) -> Option<(String, u16)> {
-    services
-        .iter()
-        .find(|service| service.id == id)
-        .and_then(|service| service.port.map(|port| (service.id.clone(), port)))
 }
 
 /// The profile requests are fetched at.

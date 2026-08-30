@@ -245,3 +245,29 @@ pub(crate) async fn indexer_aggregator(
         &target.id,
     ))
 }
+
+/// The subtitle finder, holding the key it wrote for itself.
+///
+/// Nothing where the stack has no subtitle finder, no project to read its
+/// configuration from, or where it has not written a key yet — the last is a
+/// service still starting rather than a fault, and a later run completes it.
+pub(crate) async fn bazarr_reader(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&std::path::Path>,
+) -> Option<crate::bazarr::Bazarr> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Bazarr)?;
+    let service = services.iter().find(|service| service.id == addr.id)?;
+    let path = crate::app::targets::config_path(
+        project?,
+        service,
+        service.api.as_ref().and_then(|api| api.path.as_deref()),
+    )?;
+    let key = crate::bazarr::api_key(&ctx.filesystem.read(&path).await?)?;
+    Some(crate::bazarr::Bazarr::new(
+        ctx.http.clone(),
+        addr.loopback,
+        &addr.id,
+        key,
+    ))
+}

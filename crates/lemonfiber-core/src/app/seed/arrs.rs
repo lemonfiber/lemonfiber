@@ -41,10 +41,22 @@ pub(super) fn servarr_arrs(
         .collect()
 }
 
-/// Register an application's root folders, one per media type, under
-/// `/data/media`. The application's key is read from its configuration; without
-/// it — the application has not finished starting — the folders are skipped for a
-/// re-run rather than failed.
+/// Where another service on the stack reaches this \*arr: its container name and
+/// port.
+///
+/// The container name rather than a loopback address, because everything that needs
+/// this is itself a container beside them — `127.0.0.1` there is the caller, not the
+/// \*arr. Nothing where the stack declares no port for it.
+pub(super) fn reached_at(
+    services: &[lemonfiber_manifest::Service],
+    id: &str,
+) -> Option<(String, u16)> {
+    services
+        .iter()
+        .find(|service| service.id == id)
+        .and_then(|service| service.port.map(|port| (service.id.clone(), port)))
+}
+
 /// The inputs a seed pass reads once and hands to every \*arr it seeds: the
 /// cross-\*arr contested-root map, the download-client credentials, the host data
 /// root each root folder is checked against, the loaded baseline to compare with, and
@@ -65,6 +77,10 @@ pub(super) struct ArrSeeding<'a> {
     pub(super) adopt: bool,
 }
 
+/// Register an application's root folders, one per media type, under
+/// `/data/media`, and its download clients beside them. The application's key is
+/// read from its configuration; without it — the application has not finished
+/// starting — both are skipped for a re-run rather than failed.
 pub(super) async fn seed_arr(
     ctx: &Ctx,
     arr: &Arr,

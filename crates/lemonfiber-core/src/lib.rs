@@ -50,6 +50,7 @@ pub mod archive;
 pub mod audio;
 pub mod backup;
 pub mod baseline;
+pub mod bazarr;
 pub mod bundle;
 pub mod bytes;
 pub mod clients;
