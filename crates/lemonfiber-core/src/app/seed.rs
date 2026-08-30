@@ -140,6 +140,19 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // not one of Prowlarr's applications and is wired via Torznab instead.
     wirings.extend(seed_applications(ctx, &manifest.services, project.as_deref()).await);
 
+    // Jellyfin as Seerr's identity source: one household account, not two.
+    // Jellyfin has no key to read, so its admin password is minted and recorded
+    // like qBittorrent's, then Seerr is pointed at it.
+    //
+    // Ahead of everything that talks to the request service, because this is what
+    // gives it an owner. A request service with none refuses the credential, and a
+    // pass that asked it for anything first would report a fresh stack as broken and
+    // then, in the same run, fix what it had just reported.
+    let (identity_wirings, identity_records) =
+        seed_jellyfin_identity(ctx, &manifest.services, &baseline).await;
+    wirings.extend(identity_wirings);
+    baseline.merge(&identity_records);
+
     // The *arrs the request service hands a request to. Without this the household
     // can ask and nothing downstream ever hears, and with it the request surface
     // offers only what the stack can actually deliver.
@@ -163,14 +176,6 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // to look at, and a household gets subtitles for nothing — which looks exactly
     // like releases that happen to have none.
     wirings.extend(subtitles::seed_subtitles(ctx, &manifest.services, project.as_deref()).await);
-
-    // Jellyfin as Seerr's identity source: one household account, not two.
-    // Jellyfin has no key to read, so its admin password is minted and recorded
-    // like qBittorrent's, then Seerr is pointed at it.
-    let (identity_wirings, identity_records) =
-        seed_jellyfin_identity(ctx, &manifest.services, &baseline).await;
-    wirings.extend(identity_wirings);
-    baseline.merge(&identity_records);
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the
@@ -1873,6 +1878,68 @@ mod tests {
             written.contains("SONARR_API_KEY=the-key"),
             "the *arr's key was read and never written down: {written}"
         );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A service the dashboard has a widget for is published even where no \*arr list
+    /// holds it.
+    ///
+    /// The keys were published by walking the media-filing \*arrs, which is the right
+    /// set for root folders and download clients and the wrong one here: Prowlarr
+    /// manages no media and so declares no media types, and the subtitle finder is not
+    /// Servarr-shaped at all. Both have a key, both have a widget, and neither key was
+    /// written — so those widgets asked with an empty credential and were refused.
+    /// qBittorrent is reached by name and password rather than by key, and half a
+    /// credential authenticates as badly as none.
+    #[tokio::test]
+    async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("published-widely");
+        // The name is published to pair with a password already minted, so record one.
+        let _ = store::set(
+            &env,
+            crate::config::QBITTORRENT_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_filesystem(
+            Arc::new(SeedFs::keyed(Some(KEYED), None).with_bazarr(FINDER_CONFIG)),
+        );
+
+        let wiring = super::published::publish_keys(
+            &ctx,
+            &[
+                arr("sonarr", 8989, "tv"),
+                prowlarr(),
+                bazarr_svc(),
+                manifest_service(
+                    "qbittorrent",
+                    Some(lemonfiber_manifest::Api {
+                        kind: lemonfiber_manifest::ApiKind::Qbittorrent,
+                        key_source: lemonfiber_manifest::KeySource::Generated,
+                        path: None,
+                        version: None,
+                    }),
+                    Some(8081),
+                ),
+            ],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            None,
+        )
+        .await;
+
+        assert_eq!(wiring.state, crate::seed::State::Wired, "{wiring:?}");
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        for expected in [
+            "SONARR_API_KEY=the-key",
+            "PROWLARR_API_KEY=the-key",
+            "BAZARR_API_KEY=finder-key",
+            "QBITTORRENT_USERNAME=admin",
+        ] {
+            assert!(
+                written.contains(expected),
+                "{expected} was not published: {written}"
+            );
+        }
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 

@@ -24,6 +24,23 @@ use crate::ports::service::{
 };
 use crate::recyclarr::Kind;
 
+/// Seerr's own API key, read from the settings file it writes.
+///
+/// The manifest declares this key as one retrieved over Seerr's own API, and it can
+/// be — but Seerr also writes it to `settings.json`, where reading it costs no
+/// authenticated call at all. The file is the cheaper answer to the same question,
+/// and the one used here.
+///
+/// Nothing where the file holds no key yet: Seerr writes one when it is initialised,
+/// which is the run that gives it an owner, so a stack seeded before that has none to
+/// publish rather than an empty one to publish wrongly.
+#[must_use]
+pub fn api_key(settings_json: &str) -> Option<String> {
+    let settings: serde_json::Value = serde_json::from_str(settings_json).ok()?;
+    let key = settings.get("main")?.get("apiKey")?.as_str()?;
+    (!key.is_empty()).then(|| key.to_owned())
+}
+
 /// The address a fresh Seerr owner is filed under. Seerr requires an address on
 /// the initialising sign-in but derives the real one from Jellyfin, so a stable
 /// placeholder in lemonfiber's own domain is enough.

@@ -28,6 +28,13 @@ const CONNECTION: &str = "Keys the stack's own services read";
 /// The suffix a published key is named with.
 const SUFFIX: &str = "_API_KEY";
 
+/// The service in this stack answering a given kind of API, where there is one.
+fn with_api(services: &[Service], kind: lemonfiber_manifest::ApiKind) -> Option<&Service> {
+    services
+        .iter()
+        .find(|service| service.api.as_ref().is_some_and(|api| api.kind == kind))
+}
+
 /// The environment name a service's key is published under.
 ///
 /// Upper-cased, with anything that cannot appear in an environment name replaced —
@@ -55,15 +62,54 @@ pub(super) async fn publish_keys(
 ) -> crate::seed::Wiring {
     let mut published = Vec::new();
 
-    for arr in super::arrs::servarr_arrs(services, project) {
-        if let Some(key) = read_servarr_key(ctx, &arr.target.config).await {
-            published.push((published_as(&arr.target.id), key));
+    // Every Servarr-shaped service, not only the ones that file media. Prowlarr
+    // manages no media and so declares no media types, which is what keeps it out of
+    // the \*arr list used for root folders and download clients — but it has a key,
+    // and the dashboard has a widget that reads it.
+    for service in services {
+        let Some(target) = project.and_then(|project| super::target_for(service, project)) else {
+            continue;
+        };
+        if let Some(key) = read_servarr_key(ctx, &target.config).await {
+            published.push((published_as(&target.id), key));
+        }
+    }
+    // The subtitle finder is not Servarr-shaped and keeps its key in a YAML of its own.
+    if let Some(key) = super::super::targets::bazarr_key(ctx, services, project).await {
+        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Bazarr) {
+            published.push((published_as(&service.id), key));
+        }
+    }
+    // The request service, for the same reason: not Servarr-shaped, and its key is in
+    // a settings file of its own. Read rather than fetched — see `seerr::api_key`.
+    if let Some(key) = super::super::targets::seerr_key(ctx, services, project).await {
+        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Seerr) {
+            published.push((published_as(&service.id), key));
+        }
+    }
+    // The media server, whose key is minted rather than read — see `jellyfin_key`.
+    if let Some(key) = super::super::targets::jellyfin_key(ctx, services).await {
+        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Jellyfin) {
+            published.push((published_as(&service.id), key));
         }
     }
     if let Some(key) = sabnzbd_key {
         if let Some(service) = services.iter().find(|s| s.id == "sabnzbd") {
             published.push((published_as(&service.id), key.to_owned()));
         }
+    }
+    // qBittorrent is reached with a name and a password rather than a key. The name is
+    // fixed and the password is recorded when it is minted, so the name is published
+    // only once there is a password for it to pair with — a dashboard holding one half
+    // of a credential authenticates with neither, and a name published on its own would
+    // let this connection report success on a stack where nothing was read at all.
+    if with_api(services, lemonfiber_manifest::ApiKind::Qbittorrent).is_some()
+        && super::super::targets::recorded_qbittorrent_password(ctx).is_some()
+    {
+        published.push((
+            crate::config::QBITTORRENT_USERNAME_KEY.to_owned(),
+            crate::config::QBITTORRENT_USER.to_owned(),
+        ));
     }
 
     if published.is_empty() {

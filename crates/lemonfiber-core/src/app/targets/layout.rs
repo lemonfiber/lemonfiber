@@ -25,17 +25,33 @@ pub(crate) fn project_directory(stack: &Source, stack_dir: Option<&Path>) -> Opt
     }
 }
 
+/// Where a service's configuration is mounted inside its own container.
+///
+/// `/config` for almost everything the stack runs, and `/app/config` for the request
+/// service, which puts its own beneath its application directory. Tried in order, and
+/// the longer one cannot be first: a path under `/config` never begins with the other,
+/// but the reverse is not something to rely on.
+const CONFIG_MOUNTS: [&str; 2] = ["/config/", "/app/config/"];
+
 /// The host path a service's config file is read from, per the stack's bind-mount
-/// convention: a service's `/config` mount is `config/<id>` under the project root,
-/// so its `api.path` of `/config/<inside>` is read from there. Nothing where the api
+/// convention: a service's config mount is `config/<id>` under the project root, so
+/// its `api.path` of `<mount>/<inside>` is read from there. Nothing where the api
 /// names no such path — the one place the convention is spelled, for every service
 /// whose credential is read from disk.
+///
+/// The mount is not the same for every service, which is why it is a list rather than
+/// one prefix. Reading a path that names a mount not here would silently resolve to
+/// nothing, so a service whose credential cannot be found is worth checking against
+/// this before anything else.
 pub(crate) fn config_path(
     project: &Path,
     service: &lemonfiber_manifest::Service,
     api_path: Option<&str>,
 ) -> Option<PathBuf> {
-    let inside = api_path?.strip_prefix("/config/")?;
+    let path = api_path?;
+    let inside = CONFIG_MOUNTS
+        .iter()
+        .find_map(|mount| path.strip_prefix(mount))?;
     Some(project.join("config").join(&service.id).join(inside))
 }
 
@@ -71,4 +87,83 @@ pub(crate) fn data_root(ctx: &Ctx) -> Option<std::path::PathBuf> {
     let path = ctx.settings.env_file.as_deref()?;
     let file = store::read(path).unwrap_or_default();
     crate::config::data_root_from_env(&file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::config_path;
+
+    fn a_service(id: &str) -> lemonfiber_manifest::Service {
+        lemonfiber_manifest::Service {
+            id: id.to_owned(),
+            name: id.to_owned(),
+            profile: "media".to_owned(),
+            image: "example/image".to_owned(),
+            tag: "1".to_owned(),
+            port: None,
+            bind: None,
+            health: None,
+            api: None,
+            criticality: lemonfiber_manifest::Criticality::Core,
+            license: "MIT".to_owned(),
+            upstream: "https://example.test".to_owned(),
+            last_release: "2026-01-01".to_owned(),
+            describes: "an example service".to_owned(),
+            without_it: "nothing works".to_owned(),
+            media_types: Vec::new(),
+            depends_on: Vec::new(),
+            capabilities: Vec::new(),
+            host_managed: false,
+        }
+    }
+
+    /// A path under the usual mount reads from the service's own config directory.
+    ///
+    /// The nested case is the subtitle finder's, whose file sits a directory deeper —
+    /// only the mount is stripped, not every `config` in the path.
+    #[test]
+    fn a_path_under_the_usual_mount_reads_from_the_services_own_directory() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        assert_eq!(
+            config_path(project, &a_service("sonarr"), Some("/config/config.xml")),
+            Some(project.join("config/sonarr/config.xml"))
+        );
+        assert_eq!(
+            config_path(
+                project,
+                &a_service("bazarr"),
+                Some("/config/config/config.yaml")
+            ),
+            Some(project.join("config/bazarr/config/config.yaml"))
+        );
+    }
+
+    /// The request service mounts its config beneath its application directory.
+    ///
+    /// Not every service uses the same mount, and a path naming one this does not know
+    /// resolves to nothing rather than to a wrong file — which is why the list of
+    /// mounts is the first thing to check when a credential cannot be found.
+    #[test]
+    fn a_path_under_the_application_mount_reads_from_the_same_place() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        assert_eq!(
+            config_path(
+                project,
+                &a_service("seerr"),
+                Some("/app/config/settings.json")
+            ),
+            Some(project.join("config/seerr/settings.json"))
+        );
+    }
+
+    /// A path naming no mount this knows, and no path at all, both resolve to nothing.
+    #[test]
+    fn a_path_outside_every_known_mount_resolves_to_nothing() {
+        let project = std::path::Path::new("/opt/lemonfiber/stack");
+        assert_eq!(
+            config_path(project, &a_service("odd"), Some("/etc/odd/settings.json")),
+            None
+        );
+        assert_eq!(config_path(project, &a_service("odd"), None), None);
+    }
 }
