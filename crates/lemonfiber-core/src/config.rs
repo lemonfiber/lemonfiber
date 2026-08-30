@@ -202,6 +202,18 @@ pub const QBITTORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 /// [`JELLYFIN_ADMIN_USER`].
 pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 
+/// The environment key holding the listening server's first-account password.
+///
+/// The same shape as Jellyfin's and for the same reason: the service starts with no
+/// account and writes no key, so lemonfiber mints this, creates the account with it,
+/// and keeps it. The token its dashboard panel uses is derived from this on demand
+/// rather than recorded beside it — the service hands back the same one every
+/// sign-in, so a second record would be a second copy of the same secret.
+pub const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
+
+/// The name of the listening server's first account.
+pub const AUDIOBOOKSHELF_USER: &str = "admin";
+
 /// The name of the Jellyfin administrator account lemonfiber creates at setup — the
 /// household's own account, one source of truth for the name so the first-run driver
 /// creates it, the Seerr identity wiring signs in with it, and a trace's library read
@@ -268,6 +280,7 @@ pub const SETTINGS: &[&str] = &[
     PROVIDER_VALIDATED_KEY,
     QBITTORRENT_PASSWORD_KEY,
     JELLYFIN_ADMIN_PASSWORD_KEY,
+    AUDIOBOOKSHELF_PASSWORD_KEY,
     FRONT_DOOR_KEY,
 ];
 

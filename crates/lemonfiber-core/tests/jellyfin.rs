@@ -407,7 +407,12 @@ async fn a_key_already_ours_is_reused_rather_than_minted_again() {
     ]);
     let held = reader(&fake).api_key().await;
 
-    assert!(held.as_ref().is_ok_and(|key| key == "ours"), "{held:?}");
+    // The value is not in the message: it is a credential, and a failing
+    // assertion prints its message into the run's log.
+    assert!(
+        held.is_ok_and(|key| key == "ours"),
+        "the key already filed under our name was not handed back"
+    );
     assert!(
         !fake
             .requests()
@@ -433,7 +438,12 @@ async fn a_key_is_minted_where_none_is_ours_yet() {
     ]);
     let held = reader(&fake).api_key().await;
 
-    assert!(held.as_ref().is_ok_and(|key| key == "ours"), "{held:?}");
+    // The value is not in the message: it is a credential, and a failing
+    // assertion prints its message into the run's log.
+    assert!(
+        held.is_ok_and(|key| key == "ours"),
+        "the key already filed under our name was not handed back"
+    );
     let minted = fake
         .requests()
         .into_iter()

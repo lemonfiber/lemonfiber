@@ -1031,3 +1031,74 @@ async fn a_refused_custom_format_creation_is_a_failure() {
         .await
         .is_err());
 }
+
+/// The \*arr that files by artist is given a root folder it will accept.
+///
+/// It refuses one described by path alone: it wants a name and the two profiles
+/// anything found beneath the folder is fetched at. The ids are read from the service
+/// rather than assumed, because they are numbered per installation.
+#[tokio::test]
+async fn a_music_root_folder_carries_the_name_and_profiles_that_service_requires() {
+    let fake = Fake::by_path(vec![
+        (
+            "/metadataprofile",
+            Answer::reply(200, r#"[{"id":7,"name":"Standard"}]"#),
+        ),
+        (
+            "/qualityprofile",
+            Answer::reply(200, r#"[{"id":4,"name":"Lossless"}]"#),
+        ),
+        ("/rootfolder", Answer::reply(201, "")),
+    ]);
+    let folder = RootFolder {
+        path: "/data/media/music".to_owned(),
+        media_type: "music".to_owned(),
+    };
+    assert!(lidarr(&fake).register_root_folder(&folder).await.is_ok());
+
+    let body = fake
+        .requests()
+        .into_iter()
+        .find(|request| request.url.contains("/rootfolder") && request.body.is_some())
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    for expected in [
+        "/data/media/music",
+        "\"name\":\"music\"",
+        "\"defaultQualityProfileId\":4",
+        "\"defaultMetadataProfileId\":7",
+    ] {
+        assert!(body.contains(expected), "{expected} is missing from {body}");
+    }
+}
+
+/// A service with no metadata profiles is given a path and nothing else.
+///
+/// Sending the music fields to one that does not file that way is not a field it
+/// ignores — the extra profile ids name nothing it holds. Which service wants them is
+/// asked rather than inferred from its name, so a service answering with no profiles
+/// is one that neither has them nor wants them.
+#[tokio::test]
+async fn a_root_folder_for_a_service_without_metadata_profiles_carries_only_its_path() {
+    let fake = Fake::by_path(vec![
+        ("/metadataprofile", Answer::reply(404, "")),
+        ("/rootfolder", Answer::reply(201, "")),
+    ]);
+    let folder = RootFolder {
+        path: "/data/media/tv".to_owned(),
+        media_type: "tv".to_owned(),
+    };
+    assert!(sonarr(&fake).register_root_folder(&folder).await.is_ok());
+
+    let body = fake
+        .requests()
+        .into_iter()
+        .find(|request| request.url.contains("/rootfolder") && request.body.is_some())
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    assert!(body.contains("/data/media/tv"), "{body}");
+    assert!(
+        !body.contains("defaultMetadataProfileId") && !body.contains("defaultQualityProfileId"),
+        "a service that files no music was sent the music fields: {body}"
+    );
+}

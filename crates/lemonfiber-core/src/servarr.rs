@@ -230,9 +230,38 @@ impl Client for Servarr {
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
-        let body = serde_json::json!({ "path": folder.path }).to_string();
+        let mut body = serde_json::json!({ "path": folder.path });
+
+        // One of these services wants more than a path. Lidarr files by artist and
+        // album rather than by title, so a root folder of its own carries a name and
+        // the two profiles anything found beneath it is fetched at — and it refuses a
+        // registration that names none of them, rather than filling them in.
+        //
+        // Which service that is comes from asking rather than from its name: only the
+        // one that needs them has metadata profiles to offer, so an empty answer is
+        // both "this service has none" and "this service does not want them". The ids
+        // are read rather than assumed, because they are numbered per installation.
+        if let Some(metadata) = self.first_metadata_profile().await {
+            let quality = self
+                .quality_profiles()
+                .await
+                .ok()
+                .and_then(|profiles| profiles.first().map(|profile| profile.id));
+            if let (Some(quality), Some(fields)) = (quality, body.as_object_mut()) {
+                fields.insert("name".to_owned(), serde_json::json!(folder.media_type));
+                fields.insert(
+                    "defaultQualityProfileId".to_owned(),
+                    serde_json::json!(quality),
+                );
+                fields.insert(
+                    "defaultMetadataProfileId".to_owned(),
+                    serde_json::json!(metadata),
+                );
+            }
+        }
+
         let response = self
-            .probe(&self.request(Method::Post, "/rootfolder", Some(body)))
+            .probe(&self.request(Method::Post, "/rootfolder", Some(body.to_string())))
             .await?;
         self.endpoint.expect_success(&response)
     }

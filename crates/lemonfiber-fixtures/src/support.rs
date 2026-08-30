@@ -160,6 +160,9 @@ pub struct SeedFs {
     /// one. Its own key lives in a YAML file rather than a Servarr XML, so a test
     /// wiring subtitles has to be able to answer that path with something else.
     bazarr: Option<&'static str>,
+    /// What the request service's settings say. A JSON of its own, for the same
+    /// reason — and under a different config mount again.
+    seerr: Option<&'static str>,
     /// When set, the Servarr configuration is handed back only for Prowlarr's
     /// path, so a test can make Prowlarr's key readable while an \*arr's is not —
     /// the case of an \*arr that started after Prowlarr.
@@ -181,6 +184,7 @@ impl SeedFs {
             servarr,
             sabnzbd,
             bazarr: None,
+            seerr: None,
             only_prowlarr: false,
             missing: Vec::new(),
             facts: lemonfiber_ports::filesystem::StorageFacts {
@@ -196,6 +200,13 @@ impl SeedFs {
     #[must_use]
     pub fn with_bazarr(mut self, config: &'static str) -> Self {
         self.bazarr = Some(config);
+        self
+    }
+
+    /// The same, answering the request service's settings path with `settings`.
+    #[must_use]
+    pub fn with_seerr(mut self, settings: &'static str) -> Self {
+        self.seerr = Some(settings);
         self
     }
 
@@ -264,6 +275,9 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
         // started and written no key, which is a different thing entirely.
         if path.contains("bazarr") {
             return self.bazarr.map(str::to_owned);
+        }
+        if path.contains("seerr") {
+            return self.seerr.map(str::to_owned);
         }
         if self.only_prowlarr && !path.contains("prowlarr") {
             return None;

@@ -1881,6 +1881,34 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// The request service, declaring the settings file it writes its key to.
+    fn seerr_with_settings() -> lemonfiber_manifest::Service {
+        manifest_service(
+            "seerr",
+            Some(lemonfiber_manifest::Api {
+                kind: lemonfiber_manifest::ApiKind::Seerr,
+                key_source: lemonfiber_manifest::KeySource::ConfigJson,
+                path: Some("/app/config/settings.json".to_owned()),
+                version: None,
+            }),
+            Some(5055),
+        )
+    }
+
+    /// The listening server, whose key is one lemonfiber makes an account for.
+    fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
+        manifest_service(
+            "audiobookshelf",
+            Some(lemonfiber_manifest::Api {
+                kind: lemonfiber_manifest::ApiKind::Audiobookshelf,
+                key_source: lemonfiber_manifest::KeySource::Generated,
+                path: None,
+                version: None,
+            }),
+            Some(13378),
+        )
+    }
+
     /// A service the dashboard has a widget for is published even where no \*arr list
     /// holds it.
     ///
@@ -1901,9 +1929,44 @@ mod tests {
             crate::config::QBITTORRENT_PASSWORD_KEY,
             "minted-earlier",
         );
-        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_filesystem(
-            Arc::new(SeedFs::keyed(Some(KEYED), None).with_bazarr(FINDER_CONFIG)),
+        // The media server signs in and lists its keys; the listening server says it
+        // already has an account and hands a token back on sign-in. Both need a
+        // password already recorded, which is what a run that made them would leave.
+        let _ = store::set(
+            &env,
+            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
         );
+        let _ = store::set(
+            &env,
+            crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let http = Fake::by_path(vec![
+            (
+                "/Users/AuthenticateByName",
+                Answer::reply(200, r#"{"AccessToken":"t"}"#),
+            ),
+            (
+                "/Auth/Keys",
+                Answer::reply(
+                    200,
+                    r#"{"Items":[{"AppName":"lemonfiber","AccessToken":"jellyfin-key"}]}"#,
+                ),
+            ),
+            ("/status", Answer::reply(200, r#"{"isInit":true}"#)),
+            (
+                "/login",
+                Answer::reply(200, r#"{"user":{"token":"listening-token"}}"#),
+            ),
+        ]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http)
+            .with_filesystem(Arc::new(
+                SeedFs::keyed(Some(KEYED), None)
+                    .with_bazarr(FINDER_CONFIG)
+                    .with_seerr(r#"{"main":{"apiKey":"request-key"}}"#),
+            ));
 
         let wiring = super::published::publish_keys(
             &ctx,
@@ -1911,6 +1974,9 @@ mod tests {
                 arr("sonarr", 8989, "tv"),
                 prowlarr(),
                 bazarr_svc(),
+                seerr_with_settings(),
+                jellyfin_svc(),
+                audiobookshelf_svc(),
                 manifest_service(
                     "qbittorrent",
                     Some(lemonfiber_manifest::Api {
@@ -1933,6 +1999,9 @@ mod tests {
             "SONARR_API_KEY=the-key",
             "PROWLARR_API_KEY=the-key",
             "BAZARR_API_KEY=finder-key",
+            "SEERR_API_KEY=request-key",
+            "JELLYFIN_API_KEY=jellyfin-key",
+            "AUDIOBOOKSHELF_API_KEY=listening-token",
             "QBITTORRENT_USERNAME=admin",
         ] {
             assert!(
@@ -1940,6 +2009,89 @@ mod tests {
                 "{expected} was not published: {written}"
             );
         }
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A listening server with no account gets one, and its password is kept.
+    ///
+    /// The token is not: the service hands back the same one on every sign-in, so what
+    /// is recorded is the password it was made with and the token is asked for again.
+    #[tokio::test]
+    async fn a_listening_server_with_no_account_is_given_one() {
+        let env = recorded_admin("listening-fresh");
+        let http = Fake::by_path(vec![
+            ("/status", Answer::reply(200, r#"{"isInit":false}"#)),
+            ("/init", Answer::reply(200, "")),
+            (
+                "/login",
+                Answer::reply(200, r#"{"user":{"token":"listening-token"}}"#),
+            ),
+        ]);
+        let ctx = seed_ctx(None, true, Vec::new(), Some(vec![9; 32]), Some(env.clone()))
+            .with_http(http.clone())
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+
+        let wiring = super::published::publish_keys(
+            &ctx,
+            &[audiobookshelf_svc()],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            None,
+        )
+        .await;
+
+        assert_eq!(wiring.state, crate::seed::State::Wired, "{wiring:?}");
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            written.contains("AUDIOBOOKSHELF_API_KEY=listening-token"),
+            "the token was not published: {written}"
+        );
+        assert!(
+            written.contains("AUDIOBOOKSHELF_PASSWORD="),
+            "the password it was made with was not kept: {written}"
+        );
+        assert!(
+            http.requests()
+                .iter()
+                .any(|asked| asked.url.contains("/init")),
+            "no account was made"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A server somebody else set up publishes nothing, rather than a wrong key.
+    ///
+    /// Both of these are reached with a password lemonfiber minted. Where one already
+    /// has an account and no password is recorded, there is no way to sign in — and a
+    /// key published from a failed sign-in would be an empty one, which the dashboard
+    /// would authenticate with and be refused.
+    #[tokio::test]
+    async fn a_server_set_up_by_somebody_else_publishes_nothing() {
+        let env = recorded_admin("set-up-elsewhere");
+        let http = Fake::by_path(vec![
+            ("/status", Answer::reply(200, r#"{"isInit":true}"#)),
+            ("/Users/AuthenticateByName", Answer::reply(401, "")),
+        ]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http)
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+
+        let wiring = super::published::publish_keys(
+            &ctx,
+            &[audiobookshelf_svc(), jellyfin_svc()],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            None,
+        )
+        .await;
+
+        assert!(
+            matches!(wiring.state, crate::seed::State::Skipped { .. }),
+            "{wiring:?}"
+        );
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            !written.contains("AUDIOBOOKSHELF_API_KEY") && !written.contains("JELLYFIN_API_KEY"),
+            "a key was published for a server that could not be signed in to: {written}"
+        );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 

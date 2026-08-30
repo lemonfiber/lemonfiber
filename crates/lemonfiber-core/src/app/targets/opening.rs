@@ -266,6 +266,45 @@ pub(crate) async fn bazarr_reader(
     ))
 }
 
+/// The listening server's token, creating its first account where there is none.
+///
+/// The second service in the stack with no key to read. Its first account is made
+/// here, with a minted password recorded like the media server's, and the token its
+/// dashboard panel uses is signed in for rather than stored — the service hands back
+/// the same one every time, so recording it would be a second copy of one secret.
+///
+/// Nothing where the randomness to mint a password is unavailable, or where the
+/// server already has an account lemonfiber did not make: its password is unknown
+/// then, and there is no way to sign in for a token.
+pub(crate) async fn audiobookshelf_token(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<(String, Option<String>)> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Audiobookshelf)?;
+    let client =
+        crate::audiobookshelf::Audiobookshelf::new(ctx.http.clone(), addr.loopback, &addr.id);
+    let recorded = super::recorded_secret(ctx, crate::config::AUDIOBOOKSHELF_PASSWORD_KEY);
+
+    let (password, minted) = match (client.has_account().await.ok()?, recorded) {
+        (true, Some(known)) => (known, None),
+        (true, None) => return None,
+        (false, _) => {
+            let fresh = crate::secret::generate(ctx.random.as_ref())?;
+            client
+                .create_account(crate::config::AUDIOBOOKSHELF_USER, &fresh)
+                .await
+                .ok()?;
+            (fresh.clone(), Some(fresh))
+        }
+    };
+
+    let token = client
+        .token(crate::config::AUDIOBOOKSHELF_USER, &password)
+        .await
+        .ok()?;
+    Some((token, minted))
+}
+
 /// The media server's own key, minted under lemonfiber's name and reused after.
 ///
 /// The one credential in the stack that is asked for rather than read: Jellyfin keeps

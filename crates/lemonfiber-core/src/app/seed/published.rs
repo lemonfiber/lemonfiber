@@ -87,6 +87,21 @@ pub(super) async fn publish_keys(
             published.push((published_as(&service.id), key));
         }
     }
+    // The listening server, whose first account is made here where it has none. The
+    // password it was made with is recorded; the token is signed in for each run.
+    if let Some((token, minted)) = super::super::targets::audiobookshelf_token(ctx, services).await
+    {
+        if let Some(password) = &minted {
+            super::super::targets::record_secret(
+                ctx,
+                crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
+                password,
+            );
+        }
+        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Audiobookshelf) {
+            published.push((published_as(&service.id), token));
+        }
+    }
     // The media server, whose key is minted rather than read — see `jellyfin_key`.
     if let Some(key) = super::super::targets::jellyfin_key(ctx, services).await {
         if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Jellyfin) {

@@ -286,6 +286,10 @@ pub enum ApiKind {
     Jellyfin,
     /// Bazarr — the subtitle finder, which is told which \*arrs to watch.
     Bazarr,
+    /// Audiobookshelf — a listening server whose first account lemonfiber creates,
+    /// like Jellyfin's, so its `key_source` is `generated` too. The token it hands
+    /// back on sign-in is stable, so it is read again rather than recorded twice.
+    Audiobookshelf,
 }
 
 /// Where a service's credential comes from.
