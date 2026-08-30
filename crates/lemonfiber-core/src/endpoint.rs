@@ -28,6 +28,30 @@ pub(crate) fn json_content_type(body: Option<&String>) -> Option<(String, String
     body.map(|_| ("Content-Type".to_owned(), JSON.to_owned()))
 }
 
+/// The media type a form request declares — the shape services older than JSON APIs
+/// read their settings in, and the only one they parse.
+const FORM: &str = "application/x-www-form-urlencoded";
+
+/// The `Content-Type` header a form request carries.
+///
+/// Not an `Option`, unlike JSON's: a form request is by definition one with a body,
+/// so there is no bodiless case to fold away.
+pub(crate) fn form_content_type() -> (String, String) {
+    ("Content-Type".to_owned(), FORM.to_owned())
+}
+
+/// Render form fields as an `application/x-www-form-urlencoded` body.
+///
+/// Infallible by construction, so there is no encoding error to fold into the
+/// result: every field is a string, and every string has an encoding.
+pub(crate) fn form_encoded(fields: &[(&str, &str)]) -> String {
+    let mut form = form_urlencoded::Serializer::new(String::new());
+    for (name, value) in fields {
+        form.append_pair(name, value);
+    }
+    form.finish()
+}
+
 /// A service reached over the HTTP port: where it is, and what to call it when
 /// something goes wrong.
 pub(crate) struct Endpoint {

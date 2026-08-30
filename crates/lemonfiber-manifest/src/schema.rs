@@ -265,7 +265,9 @@ pub struct Api {
 ///
 /// Four services share the `servarr` shape, which is what makes one client
 /// enough for them. Bindery is its own kind deliberately: it is not a Servarr
-/// application and Prowlarr's app sync does not reach it.
+/// application and Prowlarr's app sync does not reach it. Bazarr is its own for
+/// the neighbouring reason: it is told about the \*arrs rather than being one of
+/// them, in a form body a client of the shared shape could not send.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiKind {
@@ -282,6 +284,8 @@ pub enum ApiKind {
     /// Jellyfin — a media server whose account lemonfiber creates rather than a
     /// key it reads, so it has a `key_source` of `generated`.
     Jellyfin,
+    /// Bazarr — the subtitle finder, which is told which \*arrs to watch.
+    Bazarr,
 }
 
 /// Where a service's credential comes from.
@@ -294,6 +298,8 @@ pub enum KeySource {
     ConfigIni,
     /// The service writes it to a JSON file lemonfiber reads.
     ConfigJson,
+    /// The service writes it to a YAML file lemonfiber reads.
+    ConfigYaml,
     /// Retrieved over the service's own API once authenticated.
     ApiSettings,
     /// The service offers nothing durable, so lemonfiber mints and records one.

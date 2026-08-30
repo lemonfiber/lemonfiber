@@ -19,15 +19,12 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::dashboard::percent;
-use crate::endpoint::{describe, Endpoint};
+use crate::endpoint::{describe, form_content_type, form_encoded, Endpoint};
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{Download, Failure, Transfers};
 
 /// The service name a failure is reported against.
 const SERVICE: &str = "qbittorrent";
-
-/// The content type qBittorrent's web UI API expects its form bodies as.
-const FORM: &str = "application/x-www-form-urlencoded";
 
 /// The phrase qBittorrent logs its temporary password after.
 const TEMP_MARKER: &str = "A temporary password is provided for this session:";
@@ -89,8 +86,8 @@ impl Qbittorrent {
         Request {
             method: Method::Post,
             url: self.endpoint.url(&format!("/api/v2{path}")),
-            headers: vec![("Content-Type".to_owned(), FORM.to_owned())],
-            body: Some(encode(fields)),
+            headers: vec![form_content_type()],
+            body: Some(form_encoded(fields)),
         }
     }
 
@@ -261,18 +258,6 @@ fn download_of(torrent: TorrentInfo) -> Download {
         // completed count never wraps.
         remaining: Some(torrent.size.saturating_sub(torrent.completed)),
     }
-}
-
-/// Render form fields as an `application/x-www-form-urlencoded` body.
-///
-/// Infallible by construction, so there is no encoding error to fold into the
-/// result: every field is a string, and every string has an encoding.
-fn encode(fields: &[(&str, &str)]) -> String {
-    let mut form = form_urlencoded::Serializer::new(String::new());
-    for (name, value) in fields {
-        form.append_pair(name, value);
-    }
-    form.finish()
 }
 
 #[cfg(test)]

@@ -17,6 +17,7 @@ mod clients;
 mod failure;
 mod providers;
 mod quality;
+mod subtitles;
 mod trace;
 
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
@@ -34,6 +35,7 @@ pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
+pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 
 /// Who a service says it is, once it answers.

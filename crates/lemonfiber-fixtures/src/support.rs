@@ -156,6 +156,10 @@ pub fn seeding_with(extra: Vec<(&'static str, Answer)>) -> Arc<Fake> {
 pub struct SeedFs {
     servarr: Option<&'static str>,
     sabnzbd: Option<&'static str>,
+    /// What the subtitle finder's configuration says, where a test has it written
+    /// one. Its own key lives in a YAML file rather than a Servarr XML, so a test
+    /// wiring subtitles has to be able to answer that path with something else.
+    bazarr: Option<&'static str>,
     /// When set, the Servarr configuration is handed back only for Prowlarr's
     /// path, so a test can make Prowlarr's key readable while an \*arr's is not —
     /// the case of an \*arr that started after Prowlarr.
@@ -176,6 +180,7 @@ impl SeedFs {
         Self {
             servarr,
             sabnzbd,
+            bazarr: None,
             only_prowlarr: false,
             missing: Vec::new(),
             facts: lemonfiber_ports::filesystem::StorageFacts {
@@ -185,6 +190,13 @@ impl SeedFs {
                 total: 0,
             },
         }
+    }
+
+    /// The same, answering the subtitle finder's configuration path with `config`.
+    #[must_use]
+    pub fn with_bazarr(mut self, config: &'static str) -> Self {
+        self.bazarr = Some(config);
+        self
     }
 
     /// The same, but withholding the Servarr key from every path but Prowlarr's.
@@ -246,6 +258,12 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
         let path = path.to_string_lossy();
         if path.contains("sabnzbd") {
             return self.sabnzbd.map(str::to_owned);
+        }
+        // Before the Servarr fall-through, because the finder's key is a YAML of its
+        // own: answering its path with a Servarr XML would read as a service that has
+        // started and written no key, which is a different thing entirely.
+        if path.contains("bazarr") {
+            return self.bazarr.map(str::to_owned);
         }
         if self.only_prowlarr && !path.contains("prowlarr") {
             return None;
