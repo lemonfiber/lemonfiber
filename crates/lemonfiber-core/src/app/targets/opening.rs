@@ -257,17 +257,113 @@ pub(crate) async fn bazarr_reader(
     project: Option<&std::path::Path>,
 ) -> Option<crate::bazarr::Bazarr> {
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Bazarr)?;
-    let service = services.iter().find(|service| service.id == addr.id)?;
-    let path = crate::app::targets::config_path(
-        project?,
-        service,
-        service.api.as_ref().and_then(|api| api.path.as_deref()),
-    )?;
-    let key = crate::bazarr::api_key(&ctx.filesystem.read(&path).await?)?;
+    let key = bazarr_key(ctx, services, project).await?;
     Some(crate::bazarr::Bazarr::new(
         ctx.http.clone(),
         addr.loopback,
         &addr.id,
         key,
     ))
+}
+
+/// The listening server's token, creating its first account where there is none.
+///
+/// The second service in the stack with no key to read. Its first account is made
+/// here, with a minted password recorded like the media server's, and the token its
+/// dashboard panel uses is signed in for rather than stored — the service hands back
+/// the same one every time, so recording it would be a second copy of one secret.
+///
+/// Nothing where the randomness to mint a password is unavailable, or where the
+/// server already has an account lemonfiber did not make: its password is unknown
+/// then, and there is no way to sign in for a token.
+pub(crate) async fn audiobookshelf_token(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<(String, Option<String>)> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Audiobookshelf)?;
+    let client =
+        crate::audiobookshelf::Audiobookshelf::new(ctx.http.clone(), addr.loopback, &addr.id);
+    let recorded = super::recorded_secret(ctx, crate::config::AUDIOBOOKSHELF_PASSWORD_KEY);
+
+    let (password, minted) = match (client.has_account().await.ok()?, recorded) {
+        (true, Some(known)) => (known, None),
+        (true, None) => return None,
+        (false, _) => {
+            let fresh = crate::secret::generate(ctx.random.as_ref())?;
+            client
+                .create_account(crate::config::AUDIOBOOKSHELF_USER, &fresh)
+                .await
+                .ok()?;
+            (fresh.clone(), Some(fresh))
+        }
+    };
+
+    let token = client
+        .token(crate::config::AUDIOBOOKSHELF_USER, &password)
+        .await
+        .ok()?;
+    Some((token, minted))
+}
+
+/// The media server's own key, minted under lemonfiber's name and reused after.
+///
+/// The one credential in the stack that is asked for rather than read: Jellyfin keeps
+/// its keys in its own database. Nothing where lemonfiber does not hold the admin
+/// password — a server somebody else set up is one this cannot sign in to, and asking
+/// is the only way to get a key.
+pub(crate) async fn jellyfin_key(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<String> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
+    let password = crate::app::seed::identity::recorded_jellyfin_password(ctx)?;
+    let client = crate::jellyfin::Jellyfin::authenticated(
+        ctx.http.clone(),
+        addr.loopback,
+        &addr.id,
+        crate::config::JELLYFIN_ADMIN_USER,
+        password,
+    );
+    client.api_key().await.ok()
+}
+
+/// The request service's own key, read from the settings file it writes.
+///
+/// Wanted only so the dashboard's widget can authenticate — lemonfiber itself reaches
+/// Seerr by signing in rather than by key. Nothing before Seerr is initialised, since
+/// that is the run that writes one.
+pub(crate) async fn seerr_key(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&std::path::Path>,
+) -> Option<String> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
+    let service = services.iter().find(|service| service.id == addr.id)?;
+    let path = crate::app::targets::config_path(
+        project?,
+        service,
+        service.api.as_ref().and_then(|api| api.path.as_deref()),
+    )?;
+    crate::seerr::api_key(&ctx.filesystem.read(&path).await?)
+}
+
+/// The subtitle finder's own key, read from the configuration it writes.
+///
+/// Its own rather than shared with a Servarr read: the file is a YAML holding an
+/// `apikey` under several sections, so which one is this service's is decided by the
+/// section it sits under. Nothing where the stack has no subtitle finder, or where it
+/// has not written a key yet.
+pub(crate) async fn bazarr_key(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&std::path::Path>,
+) -> Option<String> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Bazarr)?;
+    let service = services.iter().find(|service| service.id == addr.id)?;
+    let path = crate::app::targets::config_path(
+        project?,
+        service,
+        service.api.as_ref().and_then(|api| api.path.as_deref()),
+    )?;
+    crate::bazarr::api_key(&ctx.filesystem.read(&path).await?)
 }

@@ -202,11 +202,38 @@ pub const QBITTORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 /// [`JELLYFIN_ADMIN_USER`].
 pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 
+/// The environment key holding the listening server's first-account password.
+///
+/// The same shape as Jellyfin's and for the same reason: the service starts with no
+/// account and writes no key, so lemonfiber mints this, creates the account with it,
+/// and keeps it. The token its dashboard panel uses is derived from this on demand
+/// rather than recorded beside it — the service hands back the same one every
+/// sign-in, so a second record would be a second copy of the same secret.
+pub const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
+
+/// The name of the listening server's first account.
+pub const AUDIOBOOKSHELF_USER: &str = "admin";
+
 /// The name of the Jellyfin administrator account lemonfiber creates at setup — the
 /// household's own account, one source of truth for the name so the first-run driver
 /// creates it, the Seerr identity wiring signs in with it, and a trace's library read
 /// authenticates as it, all under the same name.
 pub const JELLYFIN_ADMIN_USER: &str = "admin";
+
+/// The account name qBittorrent's web UI is reached under.
+///
+/// One source of truth for the name, so the client that logs in, the download-client
+/// registration that hands it to an \*arr, and the dashboard's own widget all present
+/// the same one. Separate from Jellyfin's although both spell it `admin`: they are two
+/// services, and either may change without the other.
+pub const QBITTORRENT_USER: &str = "admin";
+
+/// The environment key holding the account name qBittorrent is reached under.
+///
+/// The dashboard reads both halves of the credential from the environment and has no
+/// default for this one, so a name that is never written leaves its widget unable to
+/// authenticate.
+pub const QBITTORRENT_USERNAME_KEY: &str = "QBITTORRENT_USERNAME";
 
 /// Every setting lemonfiber names.
 ///
@@ -219,8 +246,12 @@ pub const JELLYFIN_ADMIN_USER: &str = "admin";
 ///
 /// Reading them back out of this module's source would answer the same question and go
 /// stale the first time somebody writes a name inline, so the list is the declaration and
-/// a test holds the writer to it: what [`crate::wizard::Wizard::plan`] produces, and what
-/// seeding records, may only be named here.
+/// a test holds the writer to it: what [`crate::wizard::Wizard::plan`] produces may only
+/// be named here.
+///
+/// Seeding is not held to this list. What it records is partly computed — a key is
+/// published under the id of the service it was read from — so the names cannot be
+/// declared ahead of knowing the stack.
 pub const SETTINGS: &[&str] = &[
     USENET_KEY,
     TORRENT_KEY,
@@ -249,6 +280,7 @@ pub const SETTINGS: &[&str] = &[
     PROVIDER_VALIDATED_KEY,
     QBITTORRENT_PASSWORD_KEY,
     JELLYFIN_ADMIN_PASSWORD_KEY,
+    AUDIOBOOKSHELF_PASSWORD_KEY,
     FRONT_DOOR_KEY,
 ];
 

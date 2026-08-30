@@ -418,3 +418,29 @@ async fn an_unreadable_request_record_is_a_failure() {
     let fake = Fake::in_turn(vec![Answer::reply(200, "not json")]);
     assert!(seerr(&fake).requests().await.is_err());
 }
+
+/// The request service's key is read from the settings file it writes.
+#[test]
+fn the_key_is_read_from_the_settings_it_writes() {
+    const WRITTEN: &str = r#"{"main":{"apiKey":"the-written-key","applicationTitle":"Seerr"}}"#;
+    assert_eq!(
+        lemonfiber_core::seerr::api_key(WRITTEN).as_deref(),
+        Some("the-written-key")
+    );
+}
+
+/// A settings file written before the service was initialised holds no key.
+///
+/// Seerr writes one when it is given an owner, so a stack seeded before that has
+/// none to publish — and an empty value published is worse than none, since the
+/// dashboard would authenticate with it and be refused.
+#[test]
+fn settings_without_a_key_yet_yield_nothing() {
+    assert_eq!(
+        lemonfiber_core::seerr::api_key(r#"{"main":{"apiKey":""}}"#),
+        None
+    );
+    assert_eq!(lemonfiber_core::seerr::api_key(r#"{"main":{}}"#), None);
+    assert_eq!(lemonfiber_core::seerr::api_key("{}"), None);
+    assert_eq!(lemonfiber_core::seerr::api_key("not json at all"), None);
+}

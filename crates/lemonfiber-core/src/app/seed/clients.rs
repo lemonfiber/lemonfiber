@@ -89,7 +89,7 @@ pub(super) fn download_clients(
             port: QBITTORRENT_HOST.1,
             kind: crate::ports::service::ClientKind::Qbittorrent,
             credential: crate::ports::service::Credential::UserPass {
-                username: "admin".to_owned(),
+                username: crate::config::QBITTORRENT_USER.to_owned(),
                 password: password.to_owned(),
             },
             category: category.clone(),

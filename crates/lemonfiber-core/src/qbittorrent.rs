@@ -99,7 +99,10 @@ impl Qbittorrent {
     async fn login(&self, password: &str) -> Result<(), Failure> {
         let request = self.post(
             "/auth/login",
-            &[("username", "admin"), ("password", password)],
+            &[
+                ("username", crate::config::QBITTORRENT_USER),
+                ("password", password),
+            ],
         );
         let response = self.endpoint.send(&request).await?;
         if response.is_success() && response.body.trim() == "Ok." {

@@ -387,3 +387,96 @@ async fn a_media_server_that_will_not_answer_is_unavailable_for_the_household() 
         Err(Failure::Unavailable { .. })
     ));
 }
+
+/// The key list as Jellyfin answers it, holding one that is not ours.
+const SOMEONE_ELSES: &str =
+    r#"{"Items":[{"AppName":"Seerr","AccessToken":"theirs"}],"TotalRecordCount":1}"#;
+
+/// The same list once lemonfiber's own key is in it.
+const OURS_TOO: &str = r#"{"Items":[{"AppName":"Seerr","AccessToken":"theirs"},{"AppName":"lemonfiber","AccessToken":"ours"}],"TotalRecordCount":2}"#;
+
+/// A key already filed under lemonfiber's name is handed back, not minted again.
+///
+/// Seeding runs repeatedly, and a fresh key each time would leave every earlier one
+/// valid on the server for as long as the stack lives.
+#[tokio::test]
+async fn a_key_already_ours_is_reused_rather_than_minted_again() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, OURS_TOO),
+    ]);
+    let held = reader(&fake).api_key().await;
+
+    // The value is not in the message: it is a credential, and a failing
+    // assertion prints its message into the run's log.
+    assert!(
+        held.is_ok_and(|key| key == "ours"),
+        "the key already filed under our name was not handed back"
+    );
+    assert!(
+        !fake
+            .requests()
+            .iter()
+            .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")),
+        "a key that already existed was minted a second time"
+    );
+}
+
+/// With no key of ours, one is minted and then read back from the list.
+///
+/// Read back rather than taken from the mint's answer, which carries no body at all —
+/// so the value is only knowable by asking again.
+#[tokio::test]
+async fn a_key_is_minted_where_none_is_ours_yet() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, SOMEONE_ELSES),
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(204, ""),
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, OURS_TOO),
+    ]);
+    let held = reader(&fake).api_key().await;
+
+    // The value is not in the message: it is a credential, and a failing
+    // assertion prints its message into the run's log.
+    assert!(
+        held.is_ok_and(|key| key == "ours"),
+        "the key already filed under our name was not handed back"
+    );
+    let minted = fake
+        .requests()
+        .into_iter()
+        .find(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys"));
+    assert!(
+        minted.is_some_and(|asked| asked.url.contains("App=lemonfiber")),
+        "the key was not minted under lemonfiber's own name"
+    );
+}
+
+/// A mint the server takes but does not list is reported rather than called done.
+#[tokio::test]
+async fn a_key_that_does_not_appear_after_minting_is_reported() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, SOMEONE_ELSES),
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(204, ""),
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, SOMEONE_ELSES),
+    ]);
+    assert!(matches!(
+        reader(&fake).api_key().await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+/// A key list that cannot be read is a failure, not an absent key.
+#[tokio::test]
+async fn a_key_list_that_cannot_be_read_is_reported() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, "not json"),
+    ]);
+    assert!(reader(&fake).api_key().await.is_err());
+}

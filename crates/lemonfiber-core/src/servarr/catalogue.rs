@@ -125,6 +125,21 @@ impl Servarr {
         self.endpoint
             .decode(&response, &format!("{what} could be read"))
     }
+
+    /// The first metadata profile this service offers, where it offers any.
+    ///
+    /// Only the service that files by artist and album keeps these; the others answer
+    /// with nothing readable, which is the same answer as having none. Nothing is
+    /// reported either way — this decides how a root folder is described rather than
+    /// whether one can be made.
+    pub(super) async fn first_metadata_profile(&self) -> Option<u32> {
+        let held: Vec<ProfileResource> = self
+            .read("/metadataprofile", "the metadata profiles")
+            .await
+            .ok()?;
+        held.into_iter()
+            .find_map(|profile| u32::try_from(profile.id).ok().filter(|id| *id != 0))
+    }
 }
 
 /// One catalogue result, as either service returns it. The identifier fields are both

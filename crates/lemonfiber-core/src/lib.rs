@@ -48,6 +48,7 @@ pub mod alert;
 pub mod app;
 pub mod archive;
 pub mod audio;
+pub mod audiobookshelf;
 pub mod backup;
 pub mod baseline;
 pub mod bazarr;
