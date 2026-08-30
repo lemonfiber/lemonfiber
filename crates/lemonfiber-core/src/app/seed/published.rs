@@ -60,72 +60,9 @@ pub(super) async fn publish_keys(
     project: Option<&std::path::Path>,
     sabnzbd_key: Option<&str>,
 ) -> crate::seed::Wiring {
-    let mut published = Vec::new();
-
-    // Every Servarr-shaped service, not only the ones that file media. Prowlarr
-    // manages no media and so declares no media types, which is what keeps it out of
-    // the \*arr list used for root folders and download clients — but it has a key,
-    // and the dashboard has a widget that reads it.
-    for service in services {
-        let Some(target) = project.and_then(|project| super::target_for(service, project)) else {
-            continue;
-        };
-        if let Some(key) = read_servarr_key(ctx, &target.config).await {
-            published.push((published_as(&target.id), key));
-        }
-    }
-    // The subtitle finder is not Servarr-shaped and keeps its key in a YAML of its own.
-    if let Some(key) = super::super::targets::bazarr_key(ctx, services, project).await {
-        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Bazarr) {
-            published.push((published_as(&service.id), key));
-        }
-    }
-    // The request service, for the same reason: not Servarr-shaped, and its key is in
-    // a settings file of its own. Read rather than fetched — see `seerr::api_key`.
-    if let Some(key) = super::super::targets::seerr_key(ctx, services, project).await {
-        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Seerr) {
-            published.push((published_as(&service.id), key));
-        }
-    }
-    // The listening server, whose first account is made here where it has none. The
-    // password it was made with is recorded; the token is signed in for each run.
-    if let Some((token, minted)) = super::super::targets::audiobookshelf_token(ctx, services).await
-    {
-        if let Some(password) = &minted {
-            super::super::targets::record_secret(
-                ctx,
-                crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
-                password,
-            );
-        }
-        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Audiobookshelf) {
-            published.push((published_as(&service.id), token));
-        }
-    }
-    // The media server, whose key is minted rather than read — see `jellyfin_key`.
-    if let Some(key) = super::super::targets::jellyfin_key(ctx, services).await {
-        if let Some(service) = with_api(services, lemonfiber_manifest::ApiKind::Jellyfin) {
-            published.push((published_as(&service.id), key));
-        }
-    }
-    if let Some(key) = sabnzbd_key {
-        if let Some(service) = services.iter().find(|s| s.id == "sabnzbd") {
-            published.push((published_as(&service.id), key.to_owned()));
-        }
-    }
-    // qBittorrent is reached with a name and a password rather than a key. The name is
-    // fixed and the password is recorded when it is minted, so the name is published
-    // only once there is a password for it to pair with — a dashboard holding one half
-    // of a credential authenticates with neither, and a name published on its own would
-    // let this connection report success on a stack where nothing was read at all.
-    if with_api(services, lemonfiber_manifest::ApiKind::Qbittorrent).is_some()
-        && super::super::targets::recorded_qbittorrent_password(ctx).is_some()
-    {
-        published.push((
-            crate::config::QBITTORRENT_USERNAME_KEY.to_owned(),
-            crate::config::QBITTORRENT_USER.to_owned(),
-        ));
-    }
+    let mut published = written_down(ctx, services, project).await;
+    published.extend(asked_for(ctx, services).await);
+    published.extend(pairs_with_a_password(ctx, services, sabnzbd_key));
 
     if published.is_empty() {
         return crate::seed::Wiring::settled(
@@ -141,6 +78,118 @@ pub(super) async fn publish_keys(
     }
 
     crate::seed::Wiring::settled(CONNECTION.to_owned(), crate::seed::State::Wired)
+}
+
+/// A key published under the id of the service answering `kind`, where both the key
+/// and the service are there.
+///
+/// The pairing every one of these needs: a key is worth nothing without the name to
+/// file it under, and the name comes from the service that answered.
+fn under_its_service(
+    services: &[Service],
+    kind: lemonfiber_manifest::ApiKind,
+    key: Option<String>,
+) -> Option<(String, String)> {
+    let service = with_api(services, kind)?;
+    Some((published_as(&service.id), key?))
+}
+
+/// The keys the services wrote to disk themselves.
+///
+/// Every Servarr-shaped service, not only the ones that file media: Prowlarr manages
+/// none and so declares no media types, which is what keeps it out of the \*arr list
+/// used for root folders and download clients — but it has a key, and the dashboard
+/// has a widget that reads it. The other two are not Servarr-shaped and each keeps its
+/// key in a file of its own shape.
+async fn written_down(
+    ctx: &Ctx,
+    services: &[Service],
+    project: Option<&std::path::Path>,
+) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    for service in services {
+        let Some(target) = project.and_then(|project| super::target_for(service, project)) else {
+            continue;
+        };
+        if let Some(key) = read_servarr_key(ctx, &target.config).await {
+            found.push((published_as(&target.id), key));
+        }
+    }
+    let bazarr = super::super::targets::bazarr_key(ctx, services, project).await;
+    found.extend(under_its_service(
+        services,
+        lemonfiber_manifest::ApiKind::Bazarr,
+        bazarr,
+    ));
+    let seerr = super::super::targets::seerr_key(ctx, services, project).await;
+    found.extend(under_its_service(
+        services,
+        lemonfiber_manifest::ApiKind::Seerr,
+        seerr,
+    ));
+    found
+}
+
+/// The keys no service writes down, which have to be asked for.
+///
+/// The media server keeps its own in a database, and the listening server has no
+/// account at all until one is made — so where this makes one, the password it used is
+/// recorded, since that is the durable half. The token is signed in for again on every
+/// later run.
+async fn asked_for(ctx: &Ctx, services: &[Service]) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    if let Some((token, minted)) = super::super::targets::audiobookshelf_token(ctx, services).await
+    {
+        if let Some(password) = &minted {
+            super::super::targets::record_secret(
+                ctx,
+                crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
+                password,
+            );
+        }
+        found.extend(under_its_service(
+            services,
+            lemonfiber_manifest::ApiKind::Audiobookshelf,
+            Some(token),
+        ));
+    }
+    let jellyfin = super::super::targets::jellyfin_key(ctx, services).await;
+    found.extend(under_its_service(
+        services,
+        lemonfiber_manifest::ApiKind::Jellyfin,
+        jellyfin,
+    ));
+    found
+}
+
+/// The credentials that are not a key: one already read for the download clients, and
+/// one account name.
+///
+/// The name is published only once a password exists for it to pair with — a dashboard
+/// holding one half of a credential authenticates with neither, and a name published
+/// on its own would let this connection report success on a stack where nothing was
+/// read at all.
+fn pairs_with_a_password(
+    ctx: &Ctx,
+    services: &[Service],
+    sabnzbd_key: Option<&str>,
+) -> Vec<(String, String)> {
+    let mut found: Vec<(String, String)> = services
+        .iter()
+        .find(|service| service.id == "sabnzbd")
+        .zip(sabnzbd_key)
+        .map(|(service, key)| (published_as(&service.id), key.to_owned()))
+        .into_iter()
+        .collect();
+    if with_api(services, lemonfiber_manifest::ApiKind::Qbittorrent).is_some()
+        && super::super::targets::recorded_qbittorrent_password(ctx).is_some()
+    {
+        found.push((
+            crate::config::QBITTORRENT_USERNAME_KEY.to_owned(),
+            crate::config::QBITTORRENT_USER.to_owned(),
+        ));
+    }
+    found
 }
 
 #[cfg(test)]
