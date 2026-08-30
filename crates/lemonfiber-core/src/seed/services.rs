@@ -371,7 +371,7 @@ async fn configure_seerr(seerr: &dyn Requests, password: &str, server_url: &str)
 }
 
 #[cfg(test)]
-mod telling_tests {
+mod tests {
     use super::{said, tell_the_household, wanted_telling, TELLING};
     use crate::baseline::Baseline;
     use crate::seed::drift::{intent, Intent, Observed};

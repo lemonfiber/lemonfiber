@@ -744,6 +744,70 @@ fn no_source_file_outgrows_reading_in_one_sitting() {
     );
 }
 
+/// The name a `mod NAME {` line declares, where it opens one here.
+///
+/// Only an inline module counts. A `mod name;` declaration puts the code in another
+/// file, which the cap measures on its own, so it is not a point this file stops
+/// shipping at — `prompt.rs` and the core's `lib.rs` both declare a test-only module
+/// that way and are production all the way down.
+fn module_name(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start();
+    let rest = trimmed.strip_prefix("pub(crate) ").unwrap_or(trimmed);
+    let opened = rest.strip_prefix("mod ")?.trim_end().strip_suffix('{')?;
+    let name = opened.trim_end();
+    (!name.is_empty()).then_some(name)
+}
+
+/// The modules a file declares behind `#[cfg(test)]`, in the order they appear.
+fn test_modules(text: &str) -> Vec<&str> {
+    text.lines()
+        .zip(text.lines().skip(1))
+        .filter(|(attribute, _)| attribute.trim() == "#[cfg(test)]")
+        .filter_map(|(_, declaration)| module_name(declaration))
+        .collect()
+}
+
+/// A file that has tests declares them somewhere the line cap can find them.
+///
+/// The cap tells production from test by looking for a `mod tests`, so a lone test
+/// module under any other name leaves the *whole* file counted as shipped. That is
+/// not theoretical: `services.rs` measured 538 of 550 while shipping 372 lines,
+/// because its tests were `mod telling_tests`. The next person to add a dozen lines
+/// of test to it would have been told to split a file that had 178 lines spare —
+/// by a cap whose own reason for existing says tests are not rationed.
+///
+/// Conservative in direction, which is why it went unnoticed: over-counting only
+/// ever produces a false red. It still makes the cap arbitrary from file to file,
+/// and a guard nobody can predict is one people learn to raise rather than obey.
+///
+/// A *second* test module beside the first may be named for what it covers —
+/// `exit.rs` has `mod reporting` after its `mod tests`, and the cap has already cut
+/// by then. Only the declaration it cuts at has to be findable.
+#[test]
+fn a_file_with_tests_declares_them_where_the_line_cap_looks() {
+    let mut unfindable: Vec<String> = Vec::new();
+    for (path, text) in sources() {
+        if path.to_string_lossy().contains("tests") {
+            continue;
+        }
+        let declared = test_modules(&text);
+        if declared.is_empty() || declared.contains(&"tests") {
+            continue;
+        }
+        unfindable.push(format!(
+            "{} (mod {})",
+            path.display(),
+            declared.join(", mod ")
+        ));
+    }
+    assert!(
+        unfindable.is_empty(),
+        "the line cap finds where a file stops shipping by its `mod tests`, so these \
+         have their tests counted as production: {}",
+        unfindable.join(", ")
+    );
+}
+
 /// Every door of the funnel treats the text before it puts it out.
 ///
 /// The funnel exists so that a question about how something is shown has one

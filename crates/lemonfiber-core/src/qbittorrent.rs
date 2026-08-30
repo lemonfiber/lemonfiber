@@ -261,7 +261,7 @@ fn download_of(torrent: TorrentInfo) -> Download {
 }
 
 #[cfg(test)]
-mod transfers_tests {
+mod tests {
     use std::time::Duration;
 
     use crate::ports::service::{Failure, Transfers};
