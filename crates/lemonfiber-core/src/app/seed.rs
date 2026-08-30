@@ -68,9 +68,9 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         wirings.push(wiring);
     }
 
-    // A later run mints nothing — the temporary password is long gone — so the
-    // value recorded on the run that minted it stands in. Without this an \*arr
-    // that came up after the first seed would never learn about qBittorrent,
+    // A later run mints nothing — the password in force is the one already set —
+    // so the value recorded on the run that minted it stands in. Without this an
+    // \*arr that came up after the first seed would never learn about qBittorrent,
     // since its password cannot be read back from qBittorrent itself.
     let qbittorrent_password =
         qbittorrent_password.or_else(|| super::targets::recorded_qbittorrent_password(ctx));
@@ -1367,6 +1367,91 @@ mod tests {
         let clients = download_client_wirings(&report);
         assert_eq!(clients.len(), 6);
         assert!(clients.iter().all(|wiring| is_skipped(wiring)));
+    }
+
+    /// A password already set is reported, not set a second time.
+    ///
+    /// The temporary one stays in the container's log — a log is not consumed by
+    /// being read — so a run that reached for it again would authenticate with a
+    /// credential spent on the first run and call a healthy stack refused. Asserted
+    /// on the requests that went out: reporting `AlreadyWired` while still writing
+    /// a new password would look right here and be the same defect.
+    #[tokio::test]
+    async fn a_password_already_set_is_reported_rather_than_set_again() {
+        const ANNOUNCED: &str = "A temporary password is provided for this session: spent";
+        let path = config_scratch("qbt-already-set");
+        let _ = store::set(
+            &path,
+            crate::config::QBITTORRENT_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let http = Fake::always(Answer::reply(200, "Ok."));
+        let ctx =
+            seed_ctx(Some(ANNOUNCED), true, Vec::new(), None, Some(path)).with_http(http.clone());
+
+        let (wiring, recorded) = super::seed_qbittorrent_password(
+            &ctx,
+            &("qbittorrent".to_owned(), "http://127.0.0.1:8081".to_owned()),
+        )
+        .await;
+
+        assert_eq!(wiring.state, crate::seed::State::AlreadyWired, "{wiring:?}");
+        assert!(recorded.is_none(), "nothing new to record: {recorded:?}");
+        assert!(
+            !http
+                .requests()
+                .iter()
+                .any(|asked| asked.url.contains("setPreferences")),
+            "a password already in force was set again"
+        );
+    }
+
+    /// A recorded password the client no longer takes falls through to the
+    /// temporary one — the case of a container rebuilt from nothing.
+    #[tokio::test]
+    async fn a_recorded_password_the_client_refuses_falls_through_to_the_temporary() {
+        const ANNOUNCED: &str = "A temporary password is provided for this session: fresh";
+        let path = config_scratch("qbt-stale-record");
+        let _ = store::set(
+            &path,
+            crate::config::QBITTORRENT_PASSWORD_KEY,
+            "from-a-container-that-is-gone",
+        );
+        // Log in, refused; log in with the temporary, taken; set; confirm.
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/auth/login",
+                vec![
+                    Answer::reply(200, "Fails."),
+                    Answer::reply(200, "Ok."),
+                    Answer::reply(200, "Ok."),
+                ],
+            ),
+            ("/app/setPreferences", vec![Answer::reply(200, "")]),
+        ]);
+        let ctx = seed_ctx(
+            Some(ANNOUNCED),
+            true,
+            Vec::new(),
+            Some(vec![7; 32]),
+            Some(path),
+        )
+        .with_http(http.clone());
+
+        let (wiring, recorded) = super::seed_qbittorrent_password(
+            &ctx,
+            &("qbittorrent".to_owned(), "http://127.0.0.1:8081".to_owned()),
+        )
+        .await;
+
+        assert_eq!(wiring.state, crate::seed::State::Wired, "{wiring:?}");
+        assert!(recorded.is_some(), "the minted password is handed back");
+        assert!(
+            http.requests()
+                .iter()
+                .any(|asked| asked.url.contains("setPreferences")),
+            "the temporary password was never used to set a new one"
+        );
     }
 
     #[tokio::test]

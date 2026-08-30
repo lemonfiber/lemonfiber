@@ -108,18 +108,36 @@ pub(super) fn qbittorrent_target(
         .map(|addr| (addr.id, addr.loopback))
 }
 
-/// Replace qBittorrent's temporary web UI password and record the generated one.
+/// Set qBittorrent's web UI password, where it is still the one it started with.
 ///
-/// The temporary password is read from the container's own log; without it there
-/// is nothing to authenticate with, so the connection is skipped for a re-run
-/// once the container has announced one. A generated password that lands is
-/// recorded in the environment where the forwarded-port push reads it.
+/// A password already recorded and still accepted is the one in force, and the
+/// connection reports that rather than setting another. Otherwise the temporary
+/// password is read from the container's own log; without it there is nothing to
+/// authenticate with, so the connection is skipped for a re-run once the container
+/// has announced one. A generated password that lands is recorded in the
+/// environment where the forwarded-port push reads it.
 pub(super) async fn seed_qbittorrent_password(
     ctx: &Ctx,
     target: &(String, String),
 ) -> (crate::seed::Wiring, Option<String>) {
     let (id, base) = target;
     let connection = "qBittorrent web UI password".to_owned();
+    let client = crate::qbittorrent::Qbittorrent::new(ctx.http.clone(), base);
+
+    // A password lemonfiber has already set is the one in force, and asking again
+    // is how a healthy stack gets reported as refused. The temporary one is still
+    // in the container's log — a log is not consumed by being read — so a run that
+    // reached for it a second time would authenticate with a credential that was
+    // spent the first time. Checked against the client rather than assumed from
+    // the recording, because a container rebuilt from nothing holds neither.
+    if let Some(recorded) = super::super::targets::recorded_qbittorrent_password(ctx) {
+        if client.accepts(&recorded).await.is_ok() {
+            return (
+                crate::seed::Wiring::settled(connection, crate::seed::State::AlreadyWired),
+                None,
+            );
+        }
+    }
 
     let Some(temporary) = read_temporary_password(ctx, id).await else {
         let wiring = crate::seed::Wiring::settled(
@@ -131,7 +149,6 @@ pub(super) async fn seed_qbittorrent_password(
         return (wiring, None);
     };
 
-    let client = crate::qbittorrent::Qbittorrent::new(ctx.http.clone(), base);
     let (wiring, recorded) =
         crate::seed::wire_qbittorrent_password(&client, ctx.random.as_ref(), &temporary).await;
 
