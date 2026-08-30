@@ -1395,8 +1395,13 @@ mod tests {
         )
         .await;
 
-        assert_eq!(wiring.state, crate::seed::State::AlreadyWired, "{wiring:?}");
-        assert!(recorded.is_none(), "nothing new to record: {recorded:?}");
+        assert_eq!(wiring.state, crate::seed::State::AlreadyWired);
+        // The value is deliberately not in the message: it is a credential, and a
+        // failing assertion prints its message into the run's log.
+        assert!(
+            recorded.is_none(),
+            "a password already in force was minted again"
+        );
         assert!(
             !http
                 .requests()
@@ -1444,7 +1449,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(wiring.state, crate::seed::State::Wired, "{wiring:?}");
+        assert_eq!(wiring.state, crate::seed::State::Wired);
         assert!(recorded.is_some(), "the minted password is handed back");
         assert!(
             http.requests()
