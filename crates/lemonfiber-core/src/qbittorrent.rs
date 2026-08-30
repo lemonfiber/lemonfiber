@@ -111,6 +111,19 @@ impl Qbittorrent {
         }
     }
 
+    /// Whether qBittorrent takes this password.
+    ///
+    /// What tells a client already set up from one still holding its start-up
+    /// credential, so a second run reports what is rather than trying to set it
+    /// again.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where qBittorrent cannot be reached, or refuses it.
+    pub async fn accepts(&self, password: &str) -> Result<(), Failure> {
+        self.login(password).await
+    }
+
     /// Replace the web UI password: authenticate with the current one, set the
     /// new one, and confirm it by authenticating again with the new one.
     ///
