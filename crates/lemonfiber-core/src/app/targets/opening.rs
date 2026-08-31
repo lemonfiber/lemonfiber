@@ -327,6 +327,28 @@ pub(crate) async fn jellyfin_key(
     client.api_key().await.ok()
 }
 
+/// A client for the book \*arr, holding the key lemonfiber minted for it.
+///
+/// The key is minted where the services are started, before this one has ever run,
+/// and the service adopts it from its environment then — so the recorded value is what
+/// both sides hold. Nothing before that has happened.
+///
+/// Synchronous, unlike its neighbours: they read a file the service wrote or ask it
+/// something, and this reads only what lemonfiber recorded for itself.
+pub(crate) fn bindery_reader(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<crate::bindery::Bindery> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Bindery)?;
+    let key = super::recorded_secret(ctx, crate::config::BINDERY_API_KEY)?;
+    Some(crate::bindery::Bindery::new(
+        ctx.http.clone(),
+        addr.loopback,
+        &addr.id,
+        key,
+    ))
+}
+
 /// The request service's own key, read from the settings file it writes.
 ///
 /// Wanted only so the dashboard's widget can authenticate — lemonfiber itself reaches

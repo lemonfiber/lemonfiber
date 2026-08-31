@@ -149,7 +149,12 @@ pub async fn start_progress(
     forms: &[String],
     services: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
-    let (_, command, _) = readied(ctx, forms, &aimed(services)).await?;
+    let (manifest, command, _) = readied(ctx, forms, &aimed(services)).await?;
+    // Before the spawn, because one credential has to exist before the service that
+    // uses it has ever run. The waited-on path does the same thing at the same point;
+    // a start that went one way and not the other would leave that service holding a
+    // key nothing else can present.
+    super::mint_adopted_secrets(ctx, &manifest);
     ctx.runner
         .stream(&command)
         .await

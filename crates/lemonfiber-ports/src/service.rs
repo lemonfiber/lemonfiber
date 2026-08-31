@@ -11,6 +11,7 @@ use async_trait::async_trait;
 
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
+mod aggregators;
 mod applications;
 mod catalogue;
 mod clients;
@@ -21,6 +22,7 @@ mod quality;
 mod subtitles;
 mod trace;
 
+pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{

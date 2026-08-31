@@ -11,6 +11,7 @@ use super::{Ctx, Problem};
 use crate::error::Diagnose;
 use crate::ports::docker::LogQuery;
 
+mod aggregators;
 mod applications;
 mod arrs;
 mod baseline;
@@ -139,6 +140,11 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // Prowlarr, so it pushes them its indexers. Bindery is left out here — it is
     // not one of Prowlarr's applications and is wired via Torznab instead.
     wirings.extend(seed_applications(ctx, &manifest.services, project.as_deref()).await);
+
+    // The book *arr, which the aggregator cannot register itself into: it keeps its own
+    // list of aggregators and pulls from them, so it is told where one is instead.
+    wirings
+        .extend(aggregators::seed_aggregators(ctx, &manifest.services, project.as_deref()).await);
 
     // Jellyfin as Seerr's identity source: one household account, not two.
     // Jellyfin has no key to read, so its admin password is minted and recorded
