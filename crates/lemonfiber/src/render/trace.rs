@@ -3,7 +3,9 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
-use lemonfiber_core::model::{HouseholdMember, HouseholdReport, StuckReport, TraceReport};
+use lemonfiber_core::model::{
+    HouseholdMember, HouseholdReport, MemberRequest, StuckReport, TraceReport,
+};
 use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
 
@@ -44,20 +46,7 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
     for member in &report.members {
         lines.put(format!("{} — {}", member.name, standing(member)));
         for request in &member.requests {
-            // A request no service holds yet has no title to print. Naming it by what it
-            // is keeps the line honest rather than inventing something to call it.
-            let name = request.title.clone().unwrap_or_else(|| {
-                request
-                    .media
-                    .clone()
-                    .map_or_else(|| "something".to_owned(), |media| format!("a {media}"))
-            });
-            match request.state {
-                Some(state) => lines.put(format!("  {name}   {}", state.phrase())),
-                None => lines.put(format!(
-                    "  {name}   the request service reports a state this build does not know"
-                )),
-            }
+            lines.put(asked_for(request));
             // Only a named request can be traced: the trace searches by title, so a link
             // for one with no name would lead to a search that finds nothing.
             if let Some(title) = &request.title {
@@ -69,33 +58,59 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
     if report.members.is_empty() && report.available {
         lines.put("The media server holds no accounts yet.");
     } else if !report.members.is_empty() {
-        let requests: usize = report
-            .members
-            .iter()
-            .map(|member| member.requests.len())
-            .sum();
-        // Counted apart, because an invitation nobody has taken up is the one line
-        // here an operator might want to do something about today.
-        let waiting = report
-            .members
-            .iter()
-            .filter(|member| !member.claimed)
-            .count();
-        let invitations = if waiting > 0 {
-            format!(", {waiting} invitation(s) not taken up")
-        } else {
-            String::new()
-        };
-        lines.spaced(format!(
-            "{} member(s), {requests} request(s){invitations}.",
-            report.members.len()
-        ));
+        lines.spaced(counted(report));
     }
     // What could not be read, said rather than left to look like an empty household.
     for finding in &report.findings {
         lines.put(format!("  ! {finding}"));
     }
     lines
+}
+
+/// One request, as its own line: what it is called, and where it stands.
+///
+/// A request no service holds yet has no title to print. Naming it by *what it is*
+/// keeps the line honest rather than inventing something to call it, and a service
+/// reporting a state this build does not know says so rather than guessing at the
+/// nearest word.
+fn asked_for(request: &MemberRequest) -> String {
+    let name = request.title.clone().unwrap_or_else(|| {
+        request
+            .media
+            .clone()
+            .map_or_else(|| "something".to_owned(), |media| format!("a {media}"))
+    });
+    match request.state {
+        Some(state) => format!("  {name}   {}", state.phrase()),
+        None => format!("  {name}   the request service reports a state this build does not know"),
+    }
+}
+
+/// The line under the list: how many people, how much they asked for, and how many
+/// invitations are still out.
+///
+/// Invitations are counted apart because one nobody has taken up is the entry here an
+/// operator might want to do something about today; the rest is context.
+fn counted(report: &HouseholdReport) -> String {
+    let requests: usize = report
+        .members
+        .iter()
+        .map(|member| member.requests.len())
+        .sum();
+    let waiting = report
+        .members
+        .iter()
+        .filter(|member| !member.claimed)
+        .count();
+    let invitations = if waiting > 0 {
+        format!(", {waiting} invitation(s) not taken up")
+    } else {
+        String::new()
+    };
+    format!(
+        "{} member(s), {requests} request(s){invitations}.",
+        report.members.len()
+    )
 }
 
 /// What one member's account says about them, on the line beside their name.
