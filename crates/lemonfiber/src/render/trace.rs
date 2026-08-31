@@ -3,7 +3,7 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
-use lemonfiber_core::model::{HouseholdReport, StuckReport, TraceReport};
+use lemonfiber_core::model::{HouseholdMember, HouseholdReport, StuckReport, TraceReport};
 use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
 
@@ -42,7 +42,7 @@ pub(super) fn one_argument(title: &str) -> String {
 pub(super) fn household(report: &HouseholdReport) -> Lines {
     let mut lines = Lines::default();
     for member in &report.members {
-        lines.put(member.name.clone());
+        lines.put(format!("{} — {}", member.name, standing(member)));
         for request in &member.requests {
             // A request no service holds yet has no title to print. Naming it by what it
             // is keeps the line honest rather than inventing something to call it.
@@ -67,15 +67,27 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
     }
 
     if report.members.is_empty() && report.available {
-        lines.put("Nobody has asked for anything yet.");
+        lines.put("The media server holds no accounts yet.");
     } else if !report.members.is_empty() {
         let requests: usize = report
             .members
             .iter()
             .map(|member| member.requests.len())
             .sum();
+        // Counted apart, because an invitation nobody has taken up is the one line
+        // here an operator might want to do something about today.
+        let waiting = report
+            .members
+            .iter()
+            .filter(|member| !member.claimed)
+            .count();
+        let invitations = if waiting > 0 {
+            format!(", {waiting} invitation(s) not taken up")
+        } else {
+            String::new()
+        };
         lines.spaced(format!(
-            "{} member(s), {requests} request(s).",
+            "{} member(s), {requests} request(s){invitations}.",
             report.members.len()
         ));
     }
@@ -84,6 +96,53 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
         lines.put(format!("  ! {finding}"));
     }
     lines
+}
+
+/// What one member's account says about them, on the line beside their name.
+///
+/// Access first and activity last, because access is what an operator is deciding about
+/// and activity is what tells them whether the decision matters.
+///
+/// **An unclaimed invitation says so rather than saying "never signed in".** Never being
+/// seen is what an unclaimed invitation *is*, so the second reading is true and useless:
+/// the operator's next move is to re-send a message, not to wonder why somebody has
+/// stopped watching.
+fn standing(member: &HouseholdMember) -> String {
+    let mut said = Vec::new();
+    if member.access.disabled {
+        said.push("switched off".to_owned());
+    }
+    if member.access.administrator {
+        said.push("runs the server".to_owned());
+    }
+    said.push(if member.access.every_library {
+        "can watch everything".to_owned()
+    } else if member.access.libraries.is_empty() {
+        // Not "everything minus nothing": the server was asked for the libraries this
+        // account may open and named none of them.
+        "can watch nothing".to_owned()
+    } else {
+        format!("can watch {}", member.access.libraries.join(", "))
+    });
+    if let Some(limit) = member.access.age_limit {
+        said.push(format!("nothing rated above {limit}"));
+    }
+    said.push(if member.claimed {
+        member
+            .last_seen
+            .as_deref()
+            .and_then(|at| at.split('T').next())
+            .map_or_else(
+                // Not "never signed in": the account has been claimed, which on this
+                // media server is done *by* signing in. A date missing here is the
+                // server not reporting one, not somebody who never arrived.
+                || "no sign-in recorded".to_owned(),
+                |day| format!("last seen {day}"),
+            )
+    } else {
+        "invited, nobody has set a password yet".to_owned()
+    });
+    said.join(" · ")
 }
 
 /// How much of a series is actually here, season by season — the answer the single
@@ -248,8 +307,8 @@ mod tests {
     use super::*;
     use crate::render::fixtures::*;
     use lemonfiber_core::model::{
-        HouseholdMember, HouseholdReport, MemberRequest, StuckEntry, StuckReport, TraceMoment,
-        TraceReport, TraceStage,
+        HouseholdMember, HouseholdReport, MemberAccess, MemberRequest, StuckEntry, StuckReport,
+        TraceMoment, TraceReport, TraceStage,
     };
     use lemonfiber_core::trace::{
         Confidence, Coverage, Outcome as TraceOutcome, Part, Stage, HISTORY_HORIZON,
@@ -495,18 +554,132 @@ mod tests {
                         state: None,
                     },
                 ],
+                access: MemberAccess {
+                    every_library: true,
+                    ..MemberAccess::default()
+                },
+                last_seen: Some("2026-08-30T10:00:00.0000000Z".to_owned()),
+                claimed: true,
             }],
             available: true,
             findings: vec!["a library could not be read".to_owned()],
         };
         let text = household(&report).text();
-        assert!(text.contains("Alex"));
+        // The name carries what they may watch and when they were last seen, because
+        // a name alone answers none of what this list is read to find out.
+        assert!(
+            text.contains("Alex — can watch everything · last seen 2026-08-30"),
+            "{text}"
+        );
         assert!(text.contains("The Expanse   here"));
         assert!(text.contains("trace 'The Expanse'"));
         assert!(text.contains("a film   waiting for approval"));
         assert!(text.contains("something   the request service reports a state"));
-        assert!(text.contains("1 member(s), 3 request(s)."));
+        assert!(text.contains("1 member(s), 3 request(s)."), "{text}");
         assert!(text.contains("! a library could not be read"));
+    }
+
+    /// An invitation nobody has taken up says that, and is counted apart.
+    ///
+    /// "Never signed in" would be true and useless — never signing in is what an
+    /// unclaimed invitation *is*, and the operator's next move is to send the message
+    /// again rather than to wonder why somebody stopped watching.
+    #[test]
+    fn an_invitation_nobody_took_up_says_so_rather_than_never_signed_in() {
+        let report = HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "Ana".to_owned(),
+                access: MemberAccess {
+                    every_library: false,
+                    libraries: vec!["Films".to_owned()],
+                    age_limit: Some(12),
+                    ..MemberAccess::default()
+                },
+                ..HouseholdMember::default()
+            }],
+            available: true,
+            findings: Vec::new(),
+        };
+
+        let text = household(&report).text();
+        assert!(
+            text.contains("Ana — can watch Films · nothing rated above 12 · invited, nobody has set a password yet"),
+            "{text}"
+        );
+        assert!(
+            text.contains("1 invitation(s) not taken up"),
+            "an unclaimed invitation was not counted apart: {text}"
+        );
+        assert!(
+            !text.contains("never signed in"),
+            "an invitation was reported as somebody who stopped watching: {text}"
+        );
+    }
+
+    /// The account this program signs in as says that it runs the server.
+    ///
+    /// Worth saying on the line rather than leaving to be inferred: it is the one
+    /// account in the list an operator must not remove, and the reason is that it
+    /// administers the server rather than anything about who holds it.
+    #[test]
+    fn the_account_that_runs_the_server_says_so() {
+        let report = HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "owner".to_owned(),
+                access: MemberAccess {
+                    every_library: true,
+                    administrator: true,
+                    ..MemberAccess::default()
+                },
+                last_seen: Some("2026-09-01T09:14:02.1230000Z".to_owned()),
+                claimed: true,
+                ..HouseholdMember::default()
+            }],
+            available: true,
+            findings: Vec::new(),
+        };
+
+        // Bound once rather than called again in the message: an argument only
+        // evaluated on failure is a line the coverage gate never sees run.
+        let text = household(&report).text();
+        assert!(
+            text.contains("owner — runs the server · can watch everything · last seen 2026-09-01"),
+            "{text}"
+        );
+    }
+
+    /// An account switched off with no library says both, and does not guess at a date.
+    ///
+    /// "Never signed in" would contradict the claimed account beside it — on this media
+    /// server you set a first password *by* signing in — so a missing date is reported
+    /// as one rather than turned into a claim about somebody's behaviour.
+    #[test]
+    fn an_account_switched_off_says_so_and_does_not_invent_a_last_visit() {
+        let report = HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "Sam".to_owned(),
+                access: MemberAccess {
+                    every_library: false,
+                    disabled: true,
+                    ..MemberAccess::default()
+                },
+                last_seen: None,
+                claimed: true,
+                ..HouseholdMember::default()
+            }],
+            available: true,
+            findings: Vec::new(),
+        };
+
+        let text = household(&report).text();
+        assert!(
+            text.contains("Sam — switched off · can watch nothing · no sign-in recorded"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("never signed in"),
+            "a missing date was turned into a claim about somebody: {text}"
+        );
     }
 
     #[test]
@@ -516,9 +689,11 @@ mod tests {
             available: true,
             findings: Vec::new(),
         };
+        // Empty means the media server holds nobody, not that nobody has asked for
+        // anything — the list is of members now, so those are different sentences.
         assert!(household(&asked_nothing)
             .text()
-            .contains("Nobody has asked for anything yet."));
+            .contains("The media server holds no accounts yet."));
         // Unread is not the same as empty: no such claim is made.
         let unread = HouseholdReport {
             members: Vec::new(),

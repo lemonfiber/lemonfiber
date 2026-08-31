@@ -979,11 +979,26 @@
           ]
         },
         "HouseholdMember": {
-          "description": "One household member and everything they have asked for.",
+          "description": "One household member: who they are, what they may watch, when they were last\nseen, and everything they have asked for.",
           "type": "object",
           "properties": {
+            "access": {
+              "description": "What they may watch.",
+              "$ref": "#/$defs/MemberAccess"
+            },
+            "claimed": {
+              "description": "Whether somebody has set a password on the account. False is an invitation\nnobody has taken up rather than a member who is not here.",
+              "type": "boolean"
+            },
+            "last_seen": {
+              "description": "When the media server last saw them, as it timestamps it. Absent where nobody\nhas ever signed in, which is exactly the unclaimed invitations.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "name": {
-              "description": "The member, by the name the request service shows them under.",
+              "description": "The member, by the name their account is held under.",
               "type": "string"
             },
             "requests": {
@@ -996,15 +1011,17 @@
           },
           "required": [
             "name",
-            "requests"
+            "requests",
+            "access",
+            "claimed"
           ]
         },
         "HouseholdReport": {
-          "description": "What the household has asked for, member by member — the simplified view of the same\npipeline a trace reports in the services' own terms.",
+          "description": "Who is in the household, what each may watch, and what each has asked for.",
           "type": "object",
           "properties": {
             "available": {
-              "description": "Whether the requests were read at all. A false here is why the list is empty, and\nkeeps an unread record from being mistaken for a household that has asked for\nnothing — the same honesty a trace keeps about a silence it did not hear.",
+              "description": "Whether the household could be read at all. A false here is why the list is\nempty, and keeps an unread record from being mistaken for an empty house — the\nsame honesty a trace keeps about a silence it did not hear.",
               "type": "boolean"
             },
             "findings": {
@@ -1015,7 +1032,7 @@
               }
             },
             "members": {
-              "description": "The members who have asked for something, in name order.",
+              "description": "Everybody the media server holds an account for, in name order — including\nthose who have never asked for anything, and the invitations nobody has taken\nup yet.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/HouseholdMember"
@@ -1026,6 +1043,46 @@
             "members",
             "available",
             "findings"
+          ]
+        },
+        "MemberAccess": {
+          "description": "What one member may watch, in the household's own words.\n\nRead off the media server's account rather than kept here: that is where access is\ndecided, and a second copy is a copy able to disagree.",
+          "type": "object",
+          "properties": {
+            "administrator": {
+              "description": "Whether the account administers the media server.",
+              "type": "boolean"
+            },
+            "age_limit": {
+              "description": "The highest rating they may watch, where the operator set a limit.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "disabled": {
+              "description": "Whether the account is switched off — held, but unable to sign in.",
+              "type": "boolean"
+            },
+            "every_library": {
+              "description": "Every library, rather than a chosen few. The ordinary case.",
+              "type": "boolean"
+            },
+            "libraries": {
+              "description": "The libraries they may watch where it is not every one, by the names the\noperator gave them — or by the server's identifiers where the library list\ncould not be read, which a finding says.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "every_library",
+            "libraries",
+            "administrator",
+            "disabled"
           ]
         },
         "MemberRequest": {
@@ -3218,11 +3275,26 @@
       ],
       "$defs": {
         "HouseholdMember": {
-          "description": "One household member and everything they have asked for.",
+          "description": "One household member: who they are, what they may watch, when they were last\nseen, and everything they have asked for.",
           "type": "object",
           "properties": {
+            "access": {
+              "description": "What they may watch.",
+              "$ref": "#/$defs/MemberAccess"
+            },
+            "claimed": {
+              "description": "Whether somebody has set a password on the account. False is an invitation\nnobody has taken up rather than a member who is not here.",
+              "type": "boolean"
+            },
+            "last_seen": {
+              "description": "When the media server last saw them, as it timestamps it. Absent where nobody\nhas ever signed in, which is exactly the unclaimed invitations.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "name": {
-              "description": "The member, by the name the request service shows them under.",
+              "description": "The member, by the name their account is held under.",
               "type": "string"
             },
             "requests": {
@@ -3235,15 +3307,17 @@
           },
           "required": [
             "name",
-            "requests"
+            "requests",
+            "access",
+            "claimed"
           ]
         },
         "HouseholdReport": {
-          "description": "What the household has asked for, member by member — the simplified view of the same\npipeline a trace reports in the services' own terms.",
+          "description": "Who is in the household, what each may watch, and what each has asked for.",
           "type": "object",
           "properties": {
             "available": {
-              "description": "Whether the requests were read at all. A false here is why the list is empty, and\nkeeps an unread record from being mistaken for a household that has asked for\nnothing — the same honesty a trace keeps about a silence it did not hear.",
+              "description": "Whether the household could be read at all. A false here is why the list is\nempty, and keeps an unread record from being mistaken for an empty house — the\nsame honesty a trace keeps about a silence it did not hear.",
               "type": "boolean"
             },
             "findings": {
@@ -3254,7 +3328,7 @@
               }
             },
             "members": {
-              "description": "The members who have asked for something, in name order.",
+              "description": "Everybody the media server holds an account for, in name order — including\nthose who have never asked for anything, and the invitations nobody has taken\nup yet.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/HouseholdMember"
@@ -3265,6 +3339,46 @@
             "members",
             "available",
             "findings"
+          ]
+        },
+        "MemberAccess": {
+          "description": "What one member may watch, in the household's own words.\n\nRead off the media server's account rather than kept here: that is where access is\ndecided, and a second copy is a copy able to disagree.",
+          "type": "object",
+          "properties": {
+            "administrator": {
+              "description": "Whether the account administers the media server.",
+              "type": "boolean"
+            },
+            "age_limit": {
+              "description": "The highest rating they may watch, where the operator set a limit.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "disabled": {
+              "description": "Whether the account is switched off — held, but unable to sign in.",
+              "type": "boolean"
+            },
+            "every_library": {
+              "description": "Every library, rather than a chosen few. The ordinary case.",
+              "type": "boolean"
+            },
+            "libraries": {
+              "description": "The libraries they may watch where it is not every one, by the names the\noperator gave them — or by the server's identifiers where the library list\ncould not be read, which a finding says.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "every_library",
+            "libraries",
+            "administrator",
+            "disabled"
           ]
         },
         "MemberRequest": {

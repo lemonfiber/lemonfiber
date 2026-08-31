@@ -98,6 +98,7 @@ mod tests {
             id: id.to_owned(),
             name: name.to_owned(),
             claimed,
+            ..Member::default()
         }
     }
 

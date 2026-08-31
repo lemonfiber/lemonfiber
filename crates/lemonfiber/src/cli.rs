@@ -219,10 +219,13 @@ pub enum Request {
         #[arg(long)]
         season: Option<u32>,
     },
-    /// Show what the household asked for, and where each request stands.
+    /// Show who is in the household, what each may watch, and what each asked for.
     ///
-    /// Grouped by whoever asked, in the words they would use rather than the
-    /// services' own. Each named request links to its full trace.
+    /// Everybody the media server holds an account for — including those who have
+    /// asked for nothing, and the invitations nobody has taken up yet. Each person
+    /// carries what they may watch and when they were last seen; their requests read
+    /// in the words they would use rather than the services' own, and each named one
+    /// links to its full trace.
     Household {
         /// Narrow to one member, named the way you would say it.
         #[arg(long)]

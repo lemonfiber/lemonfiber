@@ -15,7 +15,7 @@ use async_trait::async_trait;
 
 use super::Jellyfin;
 use crate::ports::http::Method;
-use crate::ports::service::{Failure, Invited, Member};
+use crate::ports::service::{Access, Failure, Invited, Member, NamedLibrary};
 
 /// The account list, as the media server names its fields.
 #[derive(serde::Deserialize)]
@@ -28,17 +28,66 @@ struct UserResource {
     /// invitation rather than a member.
     #[serde(rename = "HasPassword", default)]
     has_password: bool,
+    /// What this account may watch. Absent from an answer this build does not
+    /// recognise, which reads as the closed default rather than as open access.
+    #[serde(rename = "Policy", default)]
+    policy: Option<PolicyResource>,
+    /// When the server last saw them. **Absent until somebody signs in**, so this
+    /// is missing on every unclaimed invitation and on nothing else.
+    #[serde(rename = "LastActivityDate", default)]
+    last_activity: Option<String>,
+}
+
+/// What one account is allowed, as the media server names its fields.
+#[derive(serde::Deserialize, Default)]
+struct PolicyResource {
+    #[serde(rename = "EnableAllFolders", default)]
+    every_library: bool,
+    #[serde(rename = "EnabledFolders", default)]
+    libraries: Vec<String>,
+    /// The age limit, which the server sends as `null` where none is set.
+    #[serde(rename = "MaxParentalRating", default)]
+    age_limit: Option<u32>,
+    #[serde(rename = "IsAdministrator", default)]
+    administrator: bool,
+    #[serde(rename = "IsDisabled", default)]
+    disabled: bool,
 }
 
 impl UserResource {
     /// The same account in this product's own words.
     fn member(self) -> Member {
+        let policy = self.policy.unwrap_or_default();
         Member {
             id: self.id,
             name: self.name,
             claimed: self.has_password,
+            access: Access {
+                every_library: policy.every_library,
+                libraries: policy.libraries,
+                age_limit: policy.age_limit,
+                administrator: policy.administrator,
+                disabled: policy.disabled,
+            },
+            last_seen: self.last_activity,
         }
     }
+}
+
+/// One library, as the media server names its fields.
+#[derive(serde::Deserialize)]
+struct FolderResource {
+    #[serde(rename = "Id", default)]
+    id: String,
+    #[serde(rename = "Name", default)]
+    name: String,
+}
+
+/// The libraries, in the envelope the server wraps them in.
+#[derive(serde::Deserialize)]
+struct FoldersResource {
+    #[serde(rename = "Items", default)]
+    items: Vec<FolderResource>,
 }
 
 /// One thing the media server recorded happening.
@@ -117,6 +166,24 @@ impl crate::ports::service::Household for Jellyfin {
             .map(|entry| Invited {
                 member: entry.user,
                 at: entry.date,
+            })
+            .collect())
+    }
+
+    async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
+        let request = self
+            .as_admin(Method::Get, "/Library/MediaFolders", None)
+            .await?;
+        let response = self.endpoint.send(&request).await?;
+        let held: FoldersResource = self
+            .endpoint
+            .decode(&response, "the server's libraries could not be read")?;
+        Ok(held
+            .items
+            .into_iter()
+            .map(|folder| NamedLibrary {
+                id: folder.id,
+                name: folder.name,
             })
             .collect())
     }

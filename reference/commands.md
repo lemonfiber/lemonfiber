@@ -25,7 +25,7 @@ Commands:
   doctor       Run the checks that prove the stack is doing what it should
   watch        Guard the data location while forms run, stopping them if it disappears
   trace        Follow one show or film across the services — "where is my show?"
-  household    Show what the household asked for, and where each request stands
+  household    Show who is in the household, what each may watch, and what each asked for
   walkthrough  Add one thing, end to end, and watch every step of it happen
   explain      Say what one of this product's words means
   stuck        List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
@@ -806,9 +806,9 @@ Options:
 ## `lemonfiber household`
 
 ```text
-Show what the household asked for, and where each request stands.
+Show who is in the household, what each may watch, and what each asked for.
 
-Grouped by whoever asked, in the words they would use rather than the services' own. Each named request links to its full trace.
+Everybody the media server holds an account for — including those who have asked for nothing, and the invitations nobody has taken up yet. Each person carries what they may watch and when they were last seen; their requests read in the words they would use rather than the services' own, and each named one links to its full trace.
 
 Usage: lemonfiber household [OPTIONS]
 
