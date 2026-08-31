@@ -419,18 +419,18 @@ mod tests {
             .with_random(std::sync::Arc::new(
                 lemonfiber_fixtures::support::FixedRandom(Some(vec![7; 32])),
             ));
-        let Ok(manifest) = Manifest::from_toml(STACK) else {
-            unreachable!("the shipped stack parses");
-        };
-
-        super::mint_adopted_secrets(&ctx, &manifest);
-
-        let written = std::fs::read_to_string(&env).unwrap_or_default();
-        assert!(
-            written.contains("BINDERY_API_KEY="),
-            "no key was minted for the service that adopts one: {written}"
-        );
+        let written = Manifest::from_toml(STACK).ok().map(|manifest| {
+            super::mint_adopted_secrets(&ctx, &manifest);
+            std::fs::read_to_string(&env).unwrap_or_default()
+        });
         let _ = std::fs::remove_dir_all(&dir);
+
+        assert!(
+            written
+                .as_deref()
+                .is_some_and(|written| written.contains("BINDERY_API_KEY=")),
+            "no key was minted for the service that adopts one: {written:?}"
+        );
     }
 
     /// Both ways of starting mint the key, because there are two.

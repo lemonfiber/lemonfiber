@@ -2018,6 +2018,229 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// The book \*arr, as a manifest service whose key lemonfiber mints for it.
+    fn bindery_svc() -> lemonfiber_manifest::Service {
+        manifest_service(
+            "bindery",
+            Some(lemonfiber_manifest::Api {
+                kind: lemonfiber_manifest::ApiKind::Bindery,
+                key_source: lemonfiber_manifest::KeySource::Generated,
+                path: None,
+                version: None,
+            }),
+            Some(8787),
+        )
+    }
+
+    /// The aggregator is registered, under the names the service reads.
+    #[tokio::test]
+    async fn the_book_arr_is_told_where_the_aggregator_is() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("bindery-told");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path_in_turn(vec![(
+            "/api/v1/prowlarr",
+            vec![Answer::reply(200, "[]"), Answer::reply(201, "{}")],
+        )]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http.clone())
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        let wirings = super::aggregators::seed_aggregators(
+            &ctx,
+            &[prowlarr(), bindery_svc()],
+            Some(stack_root()),
+        )
+        .await;
+
+        assert_eq!(wirings.len(), 1, "{wirings:?}");
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Wired),
+            "{wirings:?}"
+        );
+        let body = http
+            .requests()
+            .into_iter()
+            .find_map(|asked| asked.body)
+            .unwrap_or_default();
+        assert!(body.contains("\"apiKey\":\"the-key\""), "{body}");
+        assert!(body.contains("http://prowlarr:9696"), "{body}");
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// An aggregator already registered with a key is left alone.
+    #[tokio::test]
+    async fn an_aggregator_already_known_is_not_registered_again() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        const HELD: &str = r#"[{"id":1,"url":"http://prowlarr:9696","apiKey":"set"}]"#;
+        let env = recorded_admin("bindery-known");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, HELD))]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http.clone())
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        let wirings = super::aggregators::seed_aggregators(
+            &ctx,
+            &[prowlarr(), bindery_svc()],
+            Some(stack_root()),
+        )
+        .await;
+
+        assert_eq!(wirings.len(), 1, "{wirings:?}");
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::AlreadyWired),
+            "{wirings:?}"
+        );
+        assert!(
+            http.requests().iter().all(|asked| asked.body.is_none()),
+            "an aggregator already known was registered again"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// One held without a key counts as absent, and is registered again.
+    ///
+    /// The service stores an entry from a registration whose key it did not
+    /// understand and answers success. Reading that back as already wired would leave
+    /// the connection unmade and reported as done.
+    #[tokio::test]
+    async fn an_entry_the_service_kept_without_a_key_is_registered_again() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        const KEYLESS: &str = r#"[{"id":1,"url":"http://prowlarr:9696","apiKey":""}]"#;
+        let env = recorded_admin("bindery-keyless");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path_in_turn(vec![(
+            "/api/v1/prowlarr",
+            vec![Answer::reply(200, KEYLESS), Answer::reply(201, "{}")],
+        )]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http)
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        let wirings = super::aggregators::seed_aggregators(
+            &ctx,
+            &[prowlarr(), bindery_svc()],
+            Some(stack_root()),
+        )
+        .await;
+
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::Wired),
+            "an entry holding no key was read as one that did: {wirings:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// Nothing to do where either end is absent, or the key to reach one is.
+    ///
+    /// The aggregator's absence is its own case rather than a repeat of the book
+    /// \*arr's: the book \*arr is reached first, so a stack holding one and no
+    /// aggregator gets as far as having a client and nothing to tell it about.
+    #[tokio::test]
+    async fn nothing_is_told_where_a_book_arr_a_key_or_an_aggregator_is_missing() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("bindery-absent");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http)
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        assert!(
+            super::aggregators::seed_aggregators(&ctx, &[prowlarr()], Some(stack_root()))
+                .await
+                .is_empty(),
+            "a stack with no book *arr wired something"
+        );
+
+        let bare = recorded_admin("bindery-unkeyed");
+        let unkeyed = seed_ctx(None, true, Vec::new(), None, Some(bare.clone()))
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+        assert!(
+            super::aggregators::seed_aggregators(
+                &unkeyed,
+                &[prowlarr(), bindery_svc()],
+                Some(stack_root())
+            )
+            .await
+            .is_empty(),
+            "a book *arr with no key minted yet wired something"
+        );
+
+        assert!(
+            super::aggregators::seed_aggregators(&ctx, &[bindery_svc()], Some(stack_root()))
+                .await
+                .is_empty(),
+            "a stack with no aggregator wired something"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+        let _ = std::fs::remove_dir_all(bare.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A service that will not answer is reported, in its own words.
+    #[tokio::test]
+    async fn a_book_arr_that_refuses_is_reported() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("bindery-refuses");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(401, ""))]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http)
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        let wirings = super::aggregators::seed_aggregators(
+            &ctx,
+            &[prowlarr(), bindery_svc()],
+            Some(stack_root()),
+        )
+        .await;
+
+        assert!(
+            wirings
+                .first()
+                .is_some_and(|wiring| matches!(wiring.state, crate::seed::State::Failed { .. })),
+            "{wirings:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A registration the service refuses is reported rather than counted as made.
+    ///
+    /// The read succeeding says nothing about the write. A key the service will not
+    /// accept refuses only the registration, and reporting that connection as made
+    /// would leave it unmade with nothing anywhere to say so.
+    #[tokio::test]
+    async fn a_registration_the_book_arr_refuses_is_reported() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("bindery-refused-write");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path_in_turn(vec![(
+            "/api/v1/prowlarr",
+            vec![Answer::reply(200, "[]"), Answer::reply(401, "")],
+        )]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http)
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+
+        let wirings = super::aggregators::seed_aggregators(
+            &ctx,
+            &[prowlarr(), bindery_svc()],
+            Some(stack_root()),
+        )
+        .await;
+
+        let state = wirings.first().map(|wiring| &wiring.state);
+        assert!(
+            matches!(state, Some(&crate::seed::State::Failed { .. })),
+            "a refused registration was not reported: {wirings:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
     /// A service whose manifest entry names no file publishes no key.
     ///
     /// The request service was declared that way until its key was found to be in a
