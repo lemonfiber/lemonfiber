@@ -98,10 +98,17 @@ async fn restoring_one_service_leaves_the_others_untouched() {
         "<Radarr/>",
     );
 
-    // Make the backed-up file group- and other-readable so the archive
-    // provably stores those bits regardless of the runner's umask — otherwise a
-    // tight umask would leave it 0600 at the source and the mode assertion below
-    // would pass without the mask having done anything.
+    // **This one has to be permissive, and it is the only one here that does.**
+    //
+    // The file is made group- and other-readable so the archive provably stores those
+    // bits regardless of the runner's umask — otherwise a tight umask would leave it
+    // 0600 at the source and the mode assertion below would pass without the mask
+    // having done anything. The test exists to prove the restore *strips* these bits,
+    // so the bits have to be there to strip.
+    //
+    // An analyser asking whether this permission is safe cannot be answered: the
+    // fixture's whole job is to be unsafe. Hence the rule is turned off for files that
+    // are nothing but tests — see `sonar-project.properties`.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;
@@ -215,7 +222,9 @@ async fn a_bundle_that_cannot_be_created_leaves_nothing_behind() {
         .await;
 
     // Restored first, so the scratch directory can be cleaned up whatever happened.
-    let _ = fs::set_permissions(&root, fs::Permissions::from_mode(0o755));
+    // Owner-only: nothing here is read by anybody else, and a scratch directory that
+    // does not need to be group-readable should not be.
+    let _ = fs::set_permissions(&root, fs::Permissions::from_mode(0o700));
     assert!(refused.is_err());
     assert!(
         !dest.exists(),
@@ -297,7 +306,9 @@ fn forge(dest: &Path, build: impl FnOnce(&mut tar::Builder<GzEncoder<File>>)) ->
 fn regular(builder: &mut tar::Builder<GzEncoder<File>>, path: &str, data: &[u8]) {
     let mut header = tar::Header::new_gnu();
     header.set_size(data.len() as u64);
-    header.set_mode(0o644);
+    // Owner-only. What these entries are for is their name and their bytes; the mode
+    // is incidental, and the one test that is *about* a mode sets its own.
+    header.set_mode(0o600);
     header.set_cksum();
     let _ = builder.append_data(&mut header, path, data);
 }
@@ -352,8 +363,9 @@ fn a_directory_that_will_not_open_contributes_nothing() {
     // Best effort: an entry that cannot be read is left out of the estimate
     // rather than aborting the measurement the caller's headroom absorbs.
     let measured = tree_size(&shut);
-    // Restore access so the scratch directory can be cleaned up later.
-    let _ = fs::set_permissions(&shut, fs::Permissions::from_mode(0o755));
+    // Restore access so the scratch directory can be cleaned up later. Owner-only:
+    // deleting it needs the owner's rwx and nobody else's anything.
+    let _ = fs::set_permissions(&shut, fs::Permissions::from_mode(0o700));
     assert_eq!(measured, 0);
 }
 
@@ -486,7 +498,8 @@ async fn an_entry_that_would_escape_its_area_is_refused() {
         let data = b"pwned";
         let mut header = tar::Header::new_gnu();
         header.set_size(data.len() as u64);
-        header.set_mode(0o644);
+        // Owner-only: what makes this archive malicious is the name below, not the mode.
+        header.set_mode(0o600);
         let name = b"../../etc/passwd";
         // Written into the header's raw name bytes: `set_path` refuses a
         // traversing name, which is exactly why an archive from another tool
