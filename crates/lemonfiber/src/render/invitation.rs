@@ -9,7 +9,7 @@
 //! and then a password on a phone keyboard is exactly the friction that makes
 //! people give up before they start.
 
-use lemonfiber_core::model::{Invitation, InvitationStanding};
+use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 
 use super::{qr, Lines};
 use crate::say;
@@ -42,7 +42,7 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     // it is still where they sign in, but a code and an instruction about setting a
     // first password would be telling somebody to do again what they have done.
     if report.standing == InvitationStanding::Joined {
-        return withdrawals(lines, report);
+        return footer(lines, report);
     }
 
     if let Some(drawn) = qr::rows(&report.address, say::folding()) {
@@ -62,6 +62,21 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     // machine somebody else administers.
     lines.put(WATCHED.to_owned());
 
+    footer(lines, report)
+}
+
+/// What is left to say once the invitation itself has been said.
+///
+/// Both paths through this view end here — the one for somebody already in the house
+/// as much as the one for a new account — so anything owed at the end is owed on
+/// both, and there is one place it can be forgotten from rather than two.
+fn footer(mut lines: Lines, report: &Invitation) -> Lines {
+    // Said only where it is not the ordinary case. A member the request service
+    // already knows about needs no line about it; one it does not is the partial
+    // state, and the operator's next question is whether they must do anything.
+    if report.linked == Linked::NotYet {
+        lines.spaced(NOT_ASKING_YET.to_owned());
+    }
     withdrawals(lines, report)
 }
 
@@ -79,6 +94,20 @@ fn withdrawals(mut lines: Lines, report: &Invitation) -> Lines {
     }
     lines
 }
+
+/// Said where the account was made but the request service could not be told of it.
+///
+/// **The invitation is not held back for this.** The account somebody watches with is
+/// on the media server and stands from the moment it is made — nothing has to be
+/// running for them to claim it. Being able to *ask* for something is a second account
+/// on a second service, and that one being down is worth a sentence rather than a
+/// refusal.
+///
+/// It says there is nothing to undo, because the obvious fear on reading this is that
+/// half a thing was made and somebody must go and tidy it up.
+const NOT_ASKING_YET: &str = "The request service could not be reached, so they can \
+    watch but cannot ask for anything yet. Nothing is half-made and nothing needs \
+    undoing — invite them again once it is up and they will be able to ask.";
 
 /// Where the address works, said beside the address rather than under it.
 ///
@@ -100,7 +129,7 @@ const WATCHED: &str = "  Tell them too: whoever runs this server can see what th
 #[cfg(test)]
 mod tests {
     use super::invitation;
-    use lemonfiber_core::model::{Invitation, InvitationStanding};
+    use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 
     fn offered(withdrawn: Vec<String>) -> Invitation {
         Invitation {
@@ -111,6 +140,7 @@ mod tests {
             withdrawn,
             rehearsed: false,
             standing: InvitationStanding::Made,
+            linked: Linked::Made,
         }
     }
 
@@ -349,6 +379,65 @@ mod tests {
             !said.contains("have been withdrawn"),
             "a rehearsal reported taking an account back: {said}"
         );
+    }
+
+    /// A link that could not be made is said, and says there is nothing to undo.
+    ///
+    /// The fear on reading that a second service was unreachable is that half a thing
+    /// was made and somebody has to go and tidy it up. Nothing was, so it says so.
+    #[test]
+    fn a_link_that_could_not_be_made_is_said_and_says_nothing_needs_undoing() {
+        let unlinked = Invitation {
+            linked: Linked::NotYet,
+            ..offered(Vec::new())
+        };
+
+        let text = invitation(&unlinked).text();
+        assert!(
+            text.contains("can watch but cannot ask for anything yet"),
+            "{text}"
+        );
+        assert!(text.contains("Nothing is half-made"), "{text}");
+    }
+
+    /// The ordinary case says nothing about it, and neither does a rehearsal.
+    ///
+    /// A member the request service already knows about needs no line: the invitation
+    /// is what the operator is reading, and a sentence that is true of every ordinary
+    /// run is one they learn to skip — taking the unusual one with it.
+    #[test]
+    fn a_link_that_was_made_or_never_tried_says_nothing_about_it() {
+        for report in [
+            offered(Vec::new()),
+            Invitation {
+                linked: Linked::NotTried,
+                ..offered(Vec::new())
+            },
+        ] {
+            let text = invitation(&report).text();
+            assert!(
+                !text.contains("cannot ask for anything yet"),
+                "an ordinary invitation explained a link nobody asked about: {text}"
+            );
+        }
+    }
+
+    /// Somebody already in the house is told it too, on the path that returns early.
+    ///
+    /// Both endings of this view go through one footer, so a caveat owed on one is
+    /// owed on the other — this is what holds that, since the early return is the
+    /// place it would be forgotten.
+    #[test]
+    fn somebody_already_here_is_told_about_the_link_as_well() {
+        let unlinked = Invitation {
+            linked: Linked::NotYet,
+            ..joined()
+        };
+
+        // Bound once rather than called again in the message: an argument only
+        // evaluated on failure is a line the coverage gate never sees run.
+        let text = invitation(&unlinked).text();
+        assert!(text.contains("cannot ask for anything yet"), "{text}");
     }
 
     #[test]

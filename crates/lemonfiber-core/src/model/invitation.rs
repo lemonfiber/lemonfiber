@@ -26,6 +26,32 @@ pub enum InvitationStanding {
     Joined,
 }
 
+/// Whether the request service has been given an account for the household yet.
+///
+/// The account somebody watches with is made on the media server, and it stands on its
+/// own from that moment — nothing has to be running for them to claim it. Being able
+/// to *ask* for something is a second account, on a second service, and that service
+/// can be down while the first is not.
+///
+/// So this is reported rather than made a condition of the invitation: an operator who
+/// invites somebody during an outage has still invited them, and what they cannot do
+/// yet is worth one line rather than a refusal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Linked {
+    /// It holds an account for everybody the media server does.
+    Made,
+    /// It could not be told. The media-server account stands, and the next run tells
+    /// it — the service skips anybody it already knows, so nothing has to be
+    /// remembered in between.
+    NotYet,
+    /// Nothing was tried: a rehearsal, or a stack with no request service at all.
+    ///
+    /// Not a failure either way, and nothing a later run would put right — which is
+    /// what separates it from `NotYet`.
+    NotTried,
+}
+
 /// One invitation, as it was just made.
 ///
 /// Carries what the operator has to pass on and nothing else — a name to sign in
@@ -65,4 +91,10 @@ pub struct Invitation {
     pub rehearsed: bool,
     /// What was found where this was going.
     pub standing: InvitationStanding,
+    /// Whether the request service knows about the household yet.
+    ///
+    /// Separate from `standing`, which is about the media-server account alone. The
+    /// two can disagree — an account made while the request service was unreachable
+    /// is `Made` and `NotYet` — and that disagreement is the state this reports.
+    pub linked: Linked,
 }

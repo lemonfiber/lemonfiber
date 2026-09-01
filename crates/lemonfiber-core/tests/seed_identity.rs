@@ -150,6 +150,13 @@ impl Requests for FakeReq {
         Ok(())
     }
 
+    /// Linking is not what this file is about — identity setup is — so it answers
+    /// success and records nothing. A fake that refused would make every test here
+    /// about a second service's availability.
+    async fn link_members(&self, _members: &[String]) -> Result<(), Failure> {
+        Ok(())
+    }
+
     /// What this fake was told to say the service is telling the household.
     async fn telling(&self) -> Result<Telling, Failure> {
         match self.gate {

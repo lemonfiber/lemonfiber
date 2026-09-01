@@ -3501,6 +3501,10 @@
               "type": "integer",
               "format": "int64"
             },
+            "linked": {
+              "description": "Whether the request service knows about the household yet.\n\nSeparate from `standing`, which is about the media-server account alone. The\ntwo can disagree — an account made while the request service was unreachable\nis `Made` and `NotYet` — and that disagreement is the state this reports.",
+              "$ref": "#/$defs/Linked"
+            },
             "name": {
               "description": "The name they sign in as.",
               "type": "string"
@@ -3527,7 +3531,8 @@
             "hours",
             "withdrawn",
             "rehearsed",
-            "standing"
+            "standing",
+            "linked"
           ]
         },
         "InvitationStanding": {
@@ -3547,6 +3552,26 @@
               "description": "They have set a password, so they are already in the house.\n\nNothing to claim and nothing to send. An account is not made, because the one\nthey have is theirs and a second under a nearly identical name is how a\nhousehold ends up with two of somebody.",
               "type": "string",
               "const": "joined"
+            }
+          ]
+        },
+        "Linked": {
+          "description": "Whether the request service has been given an account for the household yet.\n\nThe account somebody watches with is made on the media server, and it stands on its\nown from that moment — nothing has to be running for them to claim it. Being able\nto *ask* for something is a second account, on a second service, and that service\ncan be down while the first is not.\n\nSo this is reported rather than made a condition of the invitation: an operator who\ninvites somebody during an outage has still invited them, and what they cannot do\nyet is worth one line rather than a refusal.",
+          "oneOf": [
+            {
+              "description": "It holds an account for everybody the media server does.",
+              "type": "string",
+              "const": "made"
+            },
+            {
+              "description": "It could not be told. The media-server account stands, and the next run tells\nit — the service skips anybody it already knows, so nothing has to be\nremembered in between.",
+              "type": "string",
+              "const": "not-yet"
+            },
+            {
+              "description": "Nothing was tried: a rehearsal, or a stack with no request service at all.\n\nNot a failure either way, and nothing a later run would put right — which is\nwhat separates it from `NotYet`.",
+              "type": "string",
+              "const": "not-tried"
             }
           ]
         }

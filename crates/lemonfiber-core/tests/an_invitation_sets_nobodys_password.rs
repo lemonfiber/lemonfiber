@@ -32,8 +32,14 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 use lemonfiber_ports::docker::{Health, Lifecycle};
 
-/// Where this program signs in as itself, and the only place a password belongs.
-const SIGN_IN: &str = "/Users/AuthenticateByName";
+/// Where this program signs in as itself. **Two services, one credential**: it
+/// authenticates to the media server directly, and to the request service *through* the
+/// media server, which is the whole of why a household member needs no second account.
+///
+/// Both are this program identifying itself. Neither is somebody else's password, which
+/// is what the requirement is about — so the claim below is that the credential goes to
+/// these and nowhere else, not that it goes to one place.
+const SIGN_INS: [&str; 2] = ["/Users/AuthenticateByName", "/auth/jellyfin"];
 
 /// Where an account is asked for.
 const NEW_ACCOUNT: &str = "/Users/New";
@@ -73,9 +79,11 @@ fn answering() -> Arc<Fake> {
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     Fake::by_path_in_turn(vec![
         (
-            SIGN_IN,
+            "/Users/AuthenticateByName",
             vec![signed_in.clone(), signed_in.clone(), signed_in],
         ),
+        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         (
             "/System/ActivityLog",
             vec![Answer::reply(200, r#"{"Items":[]}"#)],
@@ -181,8 +189,10 @@ async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
          where one travels — the exchange under it did not run"
     );
     assert!(
-        carrying.iter().all(|url| url.contains(SIGN_IN)),
-        "a password left for somewhere other than this program's own sign-in: {carrying:?}"
+        carrying
+            .iter()
+            .all(|url| SIGN_INS.iter().any(|door| url.contains(door))),
+        "a password left for somewhere other than this program's own sign-ins: {carrying:?}"
     );
 }
 
@@ -212,6 +222,9 @@ async fn what_is_passed_on_carries_no_password() {
             "address",
             "caution",
             "hours",
+            // Whether the request service has been told about them — not a password,
+            // and asserted here so that adding one would have to pass this list.
+            "linked",
             "name",
             "rehearsed",
             "standing",

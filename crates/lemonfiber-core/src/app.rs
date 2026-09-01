@@ -453,6 +453,11 @@ mod tests {
                     r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
                 )],
             ),
+            // The request service answers too, so this copy of the app layer reaches
+            // the whole of the linking an invitation does. It is compiled twice, and a
+            // path driven from only one of them leaves the other counted as never run.
+            ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+            ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
             ("/Users", vec![Answer::reply(200, "[]")]),
         ]);
         let ctx = a_context()

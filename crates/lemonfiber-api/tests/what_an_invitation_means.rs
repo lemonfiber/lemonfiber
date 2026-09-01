@@ -10,7 +10,7 @@
 
 use lemonfiber_api::actions::{named, Arguments, Refused};
 use lemonfiber_core::app::{Command, Outcome};
-use lemonfiber_core::model::{Invitation, InvitationStanding};
+use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 
 /// What an action came to, or nothing where it was refused.
 fn command(action: &str, given: Arguments) -> Option<Command> {
@@ -63,6 +63,7 @@ fn an_invitation_reaches_a_browser_under_its_own_name() {
         withdrawn: vec!["bo".to_owned()],
         rehearsed: false,
         standing: InvitationStanding::Made,
+        linked: Linked::Made,
     });
 
     let json = made.envelope().to_json().unwrap_or_default();

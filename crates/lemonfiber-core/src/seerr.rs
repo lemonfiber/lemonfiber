@@ -135,6 +135,13 @@ pub const OCCASIONS: u32 =
 const FILM: &str = "/settings/radarr";
 const TELEVISION: &str = "/settings/sonarr";
 
+/// Where media-server accounts are given accounts here.
+///
+/// It reads the media server itself, using the credentials this service was set up
+/// with, so what is sent is identifiers and not accounts. **A member it already holds
+/// is skipped**, which is what lets every member be sent on every run.
+const LINK_MEMBERS: &str = "/user/import-from-jellyfin";
+
 /// How available a film must be before it is fetched.
 ///
 /// The service's own vocabulary. Released is the one that matches what a household
@@ -386,6 +393,21 @@ impl Requests for Seerr {
         let written = self
             .endpoint
             .send(&self.request(Method::Post, path, Some(body)))
+            .await?;
+        self.endpoint.expect_success(&written)
+    }
+
+    async fn link_members(&self, members: &[String]) -> Result<(), Failure> {
+        // Nothing to say rather than an empty import: a request naming nobody is one
+        // the service has no reason to answer, and a run with no members is ordinary
+        // on a stack whose media server could not be read.
+        if members.is_empty() {
+            return Ok(());
+        }
+        let body = serde_json::json!({ "jellyfinUserIds": members }).to_string();
+        let written = self
+            .endpoint
+            .send(&self.request(Method::Post, LINK_MEMBERS, Some(body)))
             .await?;
         self.endpoint.expect_success(&written)
     }

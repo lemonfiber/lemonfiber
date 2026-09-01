@@ -210,6 +210,58 @@ async fn an_address_that_cannot_be_taken_apart_is_refused_before_it_is_sent() {
     }
 }
 
+/// The members are named to the collection the service imports them into.
+///
+/// It reads the media server itself with the credentials it was set up with, so what
+/// travels is identifiers and not accounts — which is why the body is one field.
+#[tokio::test]
+async fn the_members_are_named_to_the_service_that_imports_them() {
+    let fake = Fake::always(Answer::reply(201, "{}"));
+    let told = seerr(&fake)
+        .link_members(&["a1".to_owned(), "b2".to_owned()])
+        .await;
+
+    assert!(told.is_ok(), "{told:?}");
+    let asked = fake.request();
+    assert!(
+        asked
+            .as_ref()
+            .is_some_and(|request| request.url.ends_with("/api/v1/user/import-from-jellyfin")),
+        "{asked:?}"
+    );
+    assert_eq!(
+        asked.and_then(|request| request.body),
+        Some(r#"{"jellyfinUserIds":["a1","b2"]}"#.to_owned())
+    );
+}
+
+/// Naming nobody asks nothing, rather than importing an empty list.
+///
+/// A run with no members is ordinary on a stack whose media server could not be read,
+/// and a request the service has no reason to answer is one not worth making.
+#[tokio::test]
+async fn naming_nobody_sends_nothing() {
+    let fake = Fake::always(Answer::reply(500, ""));
+    let told = seerr(&fake).link_members(&[]).await;
+
+    assert!(
+        told.is_ok(),
+        "naming nobody was treated as a failure: {told:?}"
+    );
+    assert!(
+        fake.request().is_none(),
+        "a request was made about nobody: {:?}",
+        fake.request()
+    );
+}
+
+/// A service that refuses the import says so, rather than reading as done.
+#[tokio::test]
+async fn a_refused_import_is_reported() {
+    let fake = Fake::always(Answer::reply(403, ""));
+    assert!(seerr(&fake).link_members(&["a1".to_owned()]).await.is_err());
+}
+
 #[tokio::test]
 async fn an_initialised_seerr_is_reported() {
     let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"initialized":true}"#)]);
