@@ -13,8 +13,8 @@
 
 use crate::app::Ctx;
 use crate::invitation::{offered, run_out, Offered, HOURS_OF_RECORD, HOURS_TO_CLAIM};
-use crate::model::{Invitation, InvitationStanding};
-use crate::ports::service::{Household as _, Member};
+use crate::model::{Invitation, InvitationStanding, Linked};
+use crate::ports::service::{Household as _, Member, Requests as _};
 
 /// Offer somebody an account, and withdraw any nobody claimed in time.
 ///
@@ -87,33 +87,83 @@ pub(super) async fn offer(
             withdrawn: held.spent.into_iter().map(|it| it.member.name).collect(),
             rehearsed: true,
             standing,
+            linked: Linked::NotTried,
         });
     }
 
     let withdrawn = take_back(&server, &held.spent).await;
 
-    // The name comes back from whichever account this is about, so the operator is
-    // told the one somebody signs in as rather than the one they typed — those
-    // differ by case whenever an account was already here.
-    let name = if let Some(member) = already {
-        member.name
+    // The account comes back from whichever this is about, so the operator is told
+    // the name somebody signs in as rather than the one they typed — those differ by
+    // case whenever an account was already here.
+    let member = if let Some(member) = already {
+        member
     } else {
         server
             .invite(&name)
             .await
             .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?
-            .name
     };
 
+    let linked = link(ctx, &manifest.services, &to_link(&held, &member)).await;
+
     Ok(Invitation {
-        name,
+        name: member.name,
         address: reachable.url,
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn,
         rehearsed: false,
         standing,
+        linked,
     })
+}
+
+/// Everybody the media server holds now, as the identifiers the request service reads.
+///
+/// **Everybody, not only the person just invited.** The request service skips anybody
+/// it already holds, so sending the whole household is what completes a link an earlier
+/// run could not make — and it completes it without anything having been written down
+/// in between, which is the only kind of "later" that survives this program being
+/// closed, reinstalled, or run from somewhere else.
+///
+/// The invitations just taken back are left out: they no longer have an account.
+fn to_link(held: &Held, made: &Member) -> Vec<String> {
+    let mut linking: Vec<String> = held
+        .household
+        .iter()
+        .filter(|member| !held.spent.iter().any(|gone| gone.member.id == member.id))
+        .map(|member| member.id.clone())
+        .collect();
+    // The account just made was not in the household when it was read.
+    if !linking.contains(&made.id) {
+        linking.push(made.id.clone());
+    }
+    linking
+}
+
+/// Tell the request service about them, where there is one and it can be reached.
+///
+/// **Best-effort by design.** The account on the media server is what an invitation
+/// *is*, and it stands whether or not a second service is up — so a request service
+/// that will not answer is reported rather than allowed to refuse the invitation. What
+/// the person cannot do yet is worth a line; it is not worth the account.
+async fn link(ctx: &Ctx, services: &[lemonfiber_manifest::Service], members: &[String]) -> Linked {
+    let Some(access) = crate::app::targets::seerr_reader(ctx, services) else {
+        return Linked::NotTried;
+    };
+    if access
+        .seerr
+        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
+        .await
+        .is_err()
+    {
+        return Linked::NotYet;
+    }
+    if access.seerr.link_members(members).await.is_err() {
+        return Linked::NotYet;
+    }
+    Linked::Made
 }
 
 /// What was found where the invitation was going.
@@ -249,4 +299,37 @@ fn no_credential() -> crate::error::Problem {
         crate::error::Remedy::new("Run setup so the media server's account is made and recorded")
             .with_detail("lemonfiber setup"),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{link, Linked};
+    use crate::test_support::a_context;
+
+    /// A stack with nothing to reach the request service with tells it nothing, and
+    /// says so as a thing not tried rather than a thing that failed.
+    ///
+    /// Driven at `link` directly: reached through the whole command, the media
+    /// server's own reader refuses first for the same missing password, so the branch
+    /// this is about is never the one that answers.
+    #[tokio::test]
+    async fn with_no_request_service_to_reach_nothing_is_tried() {
+        let ctx = a_context().build();
+        let services = ctx
+            .stack
+            .checked_manifest(ctx.today())
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
+        assert!(
+            !services.is_empty(),
+            "the shipped stack declared no services, so this asserts nothing"
+        );
+
+        assert_eq!(
+            link(&ctx, &services, &["1".to_owned()]).await,
+            Linked::NotTried,
+            "a stack with nothing to sign in with reported a link that failed rather \
+             than one nothing was tried on"
+        );
+    }
 }

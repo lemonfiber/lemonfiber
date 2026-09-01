@@ -15,6 +15,7 @@ mod applications;
 mod catalogue;
 mod clients;
 mod failure;
+mod household;
 mod providers;
 mod quality;
 mod subtitles;
@@ -31,6 +32,7 @@ pub use failure::{
     Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
     SERVICE_UNSUPPORTED,
 };
+pub use household::{Access, Household, Invited, Member, NamedLibrary};
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
@@ -188,127 +190,6 @@ pub trait MediaServer: Send + Sync {
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
 }
 
-/// Making and withdrawing the accounts a household signs in with.
-///
-/// Apart from the media server's setup because it is a different errand entirely:
-/// setup runs once and never again, while this is what an operator reaches for every
-/// time somebody new moves in.
-#[async_trait]
-pub trait Household: Send + Sync {
-    /// Everybody the media server holds an account for, and whether each has
-    /// claimed it.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn household(&self) -> Result<Vec<Member>, Failure>;
-
-    /// Make an account somebody can claim by setting a password on it.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn invite(&self, name: &str) -> Result<Member, Failure>;
-
-    /// Take an account away again.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn withdraw(&self, id: &str) -> Result<(), Failure>;
-
-    /// When each account was made, for those made since `since`.
-    ///
-    /// Read from what the server records happening rather than from the accounts
-    /// themselves, because an account carries no date — see the media server's own
-    /// activity record. `since` bounds the read rather than filtering it
-    /// afterwards, so a long-lived server is not walked to answer a question about
-    /// the last two days.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn when_invited(&self, since: &str) -> Result<Vec<Invited>, Failure>;
-
-    /// The libraries the server holds, named.
-    ///
-    /// Wanted so an [`Access`] naming a few of them can be said in the words the
-    /// operator gave those libraries, rather than in the identifiers the server
-    /// tells them apart by. One read for the whole household rather than one per
-    /// member: the answer is the same for everybody.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure>;
-}
-
-/// One library the media server holds, with the name it was given.
-///
-/// Named apart from the [`Library`](crate::service::Library) trait beside it: that is
-/// a service which *has* a library, and this is one library it holds.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedLibrary {
-    /// The identifier the server tells it apart by, which is what an [`Access`]
-    /// naming a few libraries names them with.
-    pub id: String,
-    /// What the operator called it.
-    pub name: String,
-}
-
-/// What one household member may watch.
-///
-/// Read off the account rather than stored here: the media server is where access is
-/// decided, so anything written down would be a second copy able to disagree with it.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Access {
-    /// Every library the server holds, rather than a chosen few.
-    ///
-    /// True is the ordinary case and the one an operator does not have to think
-    /// about; where it is false, `libraries` says which.
-    pub every_library: bool,
-    /// The libraries chosen, by the server's own identifier, where not every one.
-    pub libraries: Vec<String>,
-    /// The highest rating they may watch, where the operator set a limit.
-    pub age_limit: Option<u32>,
-    /// Whether this account administers the server.
-    pub administrator: bool,
-    /// Whether the account is switched off — held, but unable to sign in.
-    pub disabled: bool,
-}
-
-/// Somebody the media server holds an account for.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Member {
-    /// The identifier the server assigned.
-    pub id: String,
-    /// What they are called.
-    pub name: String,
-    /// Whether they have set a password.
-    ///
-    /// An account nobody has set one on is an invitation nobody has taken up: the
-    /// whole of what makes it an invitation rather than an account, and the reason
-    /// nothing needs to be written down about it here.
-    pub claimed: bool,
-    /// What they may watch.
-    pub access: Access,
-    /// When the server last saw them, as it timestamps it.
-    ///
-    /// `None` before anybody has signed in, which is every unclaimed invitation and
-    /// nothing else — so an absence here is a fact about the account rather than a
-    /// gap in what was read.
-    pub last_seen: Option<String>,
-}
-
-/// When one account was made, as the media server recorded it happening.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Invited {
-    /// The account it is about, matching a [`Member::id`].
-    pub member: String,
-    /// When it was made, as the server timestamps it.
-    pub at: String,
-}
-
 /// One thing a household member asked for, as the request service records it.
 ///
 /// The two statuses are carried as the service's own numbers rather than folded here:
@@ -388,6 +269,22 @@ pub trait Requests: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure>;
+
+    /// Give the request service an account for each of these media-server members.
+    ///
+    /// The link an invitation owes: the account exists on the media server from the
+    /// moment somebody is invited, and this is what makes the same person known to
+    /// the service they ask through.
+    ///
+    /// **Sending somebody it already knows is not an error and does nothing** — the
+    /// service skips a member it already holds. So this is safe to call with everybody
+    /// on every run, and a link that could not be made while the service was down is
+    /// completed by the next run rather than by anything remembered in between.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn link_members(&self, members: &[String]) -> Result<(), Failure>;
 
     /// What the request service will tell the household about, as it stands.
     ///
