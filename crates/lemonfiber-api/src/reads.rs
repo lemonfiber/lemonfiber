@@ -54,7 +54,11 @@ pub const CHECKS: &str = "/api/checks";
 /// What the checks about the disk found.
 pub const STORAGE: &str = "/api/storage";
 
-/// What the household has asked for, and where each request stands.
+/// Who is in the household, what each may watch, and what each has asked for.
+///
+/// The path keeps the name it was published under. What it answers with is described
+/// by the contract rather than by the path, and a published path renamed outruns its
+/// own redirect.
 pub const REQUESTS: &str = "/api/requests";
 
 /// The one address to hand somebody who lives here.

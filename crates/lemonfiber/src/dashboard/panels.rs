@@ -408,7 +408,10 @@ pub(super) fn household(panel: &Panel<HouseholdReport>, room: usize) -> Vec<Line
         Panel::Unavailable { reason } => return unavailable(reason, room),
     };
     if !report.available {
-        return vec![Line::styled("the request service was not read", quiet())];
+        // The household is unread when the *media server* would not say who holds an
+        // account. A request service that refused costs the requests and not the
+        // household, and says so in a finding beside a list that still reads.
+        return vec![Line::styled("the household was not read", quiet())];
     }
     let waiting: Vec<Line<'static>> = report
         .members
@@ -515,6 +518,7 @@ mod tests {
                         state: *state,
                     })
                     .collect(),
+                ..HouseholdMember::default()
             }],
             available: true,
             findings: Vec::new(),
@@ -589,7 +593,7 @@ mod tests {
         });
         let said = said(&household(&unread, WIDE));
 
-        assert_eq!(said, vec!["the request service was not read".to_owned()]);
+        assert_eq!(said, vec!["the household was not read".to_owned()]);
     }
 
     /// One transfer, however it is going.

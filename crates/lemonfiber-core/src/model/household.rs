@@ -21,24 +21,54 @@ pub struct MemberRequest {
     pub state: Option<crate::household::State>,
 }
 
-/// One household member and everything they have asked for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+/// What one member may watch, in the household's own words.
+///
+/// Read off the media server's account rather than kept here: that is where access is
+/// decided, and a second copy is a copy able to disagree.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct MemberAccess {
+    /// Every library, rather than a chosen few. The ordinary case.
+    pub every_library: bool,
+    /// The libraries they may watch where it is not every one, by the names the
+    /// operator gave them — or by the server's identifiers where the library list
+    /// could not be read, which a finding says.
+    pub libraries: Vec<String>,
+    /// The highest rating they may watch, where the operator set a limit.
+    pub age_limit: Option<u32>,
+    /// Whether the account administers the media server.
+    pub administrator: bool,
+    /// Whether the account is switched off — held, but unable to sign in.
+    pub disabled: bool,
+}
+
+/// One household member: who they are, what they may watch, when they were last
+/// seen, and everything they have asked for.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct HouseholdMember {
-    /// The member, by the name the request service shows them under.
+    /// The member, by the name their account is held under.
     pub name: String,
     /// What they asked for, newest first.
     pub requests: Vec<MemberRequest>,
+    /// What they may watch.
+    pub access: MemberAccess,
+    /// When the media server last saw them, as it timestamps it. Absent where nobody
+    /// has ever signed in, which is exactly the unclaimed invitations.
+    pub last_seen: Option<String>,
+    /// Whether somebody has set a password on the account. False is an invitation
+    /// nobody has taken up rather than a member who is not here.
+    pub claimed: bool,
 }
 
-/// What the household has asked for, member by member — the simplified view of the same
-/// pipeline a trace reports in the services' own terms.
+/// Who is in the household, what each may watch, and what each has asked for.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct HouseholdReport {
-    /// The members who have asked for something, in name order.
+    /// Everybody the media server holds an account for, in name order — including
+    /// those who have never asked for anything, and the invitations nobody has taken
+    /// up yet.
     pub members: Vec<HouseholdMember>,
-    /// Whether the requests were read at all. A false here is why the list is empty, and
-    /// keeps an unread record from being mistaken for a household that has asked for
-    /// nothing — the same honesty a trace keeps about a silence it did not hear.
+    /// Whether the household could be read at all. A false here is why the list is
+    /// empty, and keeps an unread record from being mistaken for an empty house — the
+    /// same honesty a trace keeps about a silence it did not hear.
     pub available: bool,
     /// What could not be read, and anything else worth the operator's attention.
     pub findings: Vec<String>,
