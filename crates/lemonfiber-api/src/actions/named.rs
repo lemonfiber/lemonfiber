@@ -53,6 +53,7 @@ pub const OFFERED: &[&str] = &[
     "backup",
     "invite",
     "remove",
+    "reissue",
     "support",
     "restore",
     "watch",
@@ -71,10 +72,10 @@ pub const OFFERED: &[&str] = &[
 /// refuses all four the same way.
 const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 
-/// The command one of the two household actions names.
+/// The command one of the three household actions names.
 ///
-/// Both are addressed to a member rather than to a form, a file or a service, and both
-/// are refused the same way when nobody is named — so the refusal is written once.
+/// All are addressed to a member rather than to a form, a file or a service, and all are
+/// refused the same way when nobody is named — so the refusal is written once.
 fn about_a_person(
     action: &str,
     which: &str,
@@ -85,10 +86,11 @@ fn about_a_person(
         action: action.to_owned(),
         argument: "name".to_owned(),
     })?;
-    if which == "invite" {
-        return Ok(Command::Invite { name });
+    match which {
+        "invite" => Ok(Command::Invite { name }),
+        "reissue" => Ok(Command::Reissue { name }),
+        _ => Ok(Command::Remove { name, confirm }),
     }
-    Ok(Command::Remove { name, confirm })
 }
 
 /// The command an action names, or why it names none.
@@ -157,11 +159,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // answers with — so what a browser agrees to is what it was shown.
         "forget" => Ok(Command::Forget { confirm }),
         "backup" => Ok(Command::Backup { service }),
-        // The two addressed to a person rather than a form, a file or a service.
+        // The three addressed to a person rather than a form, a file or a service.
         // Unconfirmed, a removal says what it takes — their watch history, and every
         // request they made — and touches neither service, so what a browser agrees
-        // to is what it was shown, the way a forget's agreement is.
+        // to is what it was shown, the way a forget's agreement is. A reissue asks
+        // for no agreement: nothing is destroyed and nothing is listed first, and
+        // what ends is a password nobody here knew.
         "invite" => about_a_person(action, "invite", name, confirm),
+        "reissue" => about_a_person(action, "reissue", name, confirm),
         "remove" => about_a_person(action, "remove", name, confirm),
         // The one diagnosis asked for here rather than served as a read. It reaches
         // the same command `/api/checks` reaches, widened by the same word the

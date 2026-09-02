@@ -24,6 +24,14 @@ pub enum InvitationStanding {
     /// they have is theirs and a second under a nearly identical name is how a
     /// household ends up with two of somebody.
     Joined,
+    /// The account was theirs already, and its password has been taken off.
+    ///
+    /// **Told apart from [`Made`](Self::Made) because what the person needs to hear is
+    /// different.** Nobody is being invited: they are already in the household, and the
+    /// news is that the password they had has stopped working. It runs out on the same
+    /// window an offer does, counted from the reset — and what is at stake if it does is
+    /// larger, because the account being withdrawn is one they have watched on.
+    Reset,
 }
 
 /// Whether the request service has been given an account for the household yet.
@@ -76,6 +84,10 @@ pub struct Invitation {
     /// invitation because that is the copy somebody keeps.
     pub caution: Option<String>,
     /// How many hours it stands before it is withdrawn.
+    ///
+    /// Counted from when it was *offered*, which for an account whose password was
+    /// taken off is the moment of the reset rather than when the account was made.
+    /// What happens at the end is withdrawal, and withdrawal removes the account.
     pub hours: i64,
     /// Invitations nobody claimed in time, taken back on the way past.
     ///

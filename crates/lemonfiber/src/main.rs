@@ -292,6 +292,7 @@ async fn main() -> ExitCode {
         Request::Stored => Command::Stored,
         Request::Clients => Command::Clients,
         Request::Invite { name } => Command::Invite { name },
+        Request::Reissue { name } => Command::Reissue { name },
         Request::Remove { name, confirm } => Command::Remove { name, confirm },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Seed => Command::Seed,

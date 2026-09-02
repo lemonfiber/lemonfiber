@@ -17,6 +17,13 @@
 //! password appears" — it is that the only one that ever leaves is this program's
 //! own, and it goes only to the route where this program identifies itself.
 //!
+//! **A reset is held to the same claim, because it is the same claim.** Putting an
+//! account back to having no password is the one way somebody who lost theirs gets in
+//! again without the operator choosing one for them, so it is the invitation mechanism
+//! reused rather than a second path with a second promise. Every assertion here runs
+//! over both commands for that reason: a password could only reappear by one of them
+//! gaining somewhere to put it, and a guard that watched one would not see it.
+//!
 //! Driven through `dispatch` rather than asserted about the source, because a sweep
 //! for the words the code uses would pass a password sent under a different spelling
 //! and go red on a comment that was only rephrased.
@@ -43,6 +50,20 @@ const SIGN_INS: [&str; 2] = ["/Users/AuthenticateByName", "/auth/jellyfin"];
 
 /// Where an account is asked for.
 const NEW_ACCOUNT: &str = "/Users/New";
+
+/// Where an account is put back to having no password on it.
+///
+/// The same endpoint somebody changes their own password at, which is why what is sent
+/// to it is asserted whole below rather than searched: `CurrentPw` and `NewPw` are
+/// fields it accepts, and sending neither is the whole of what makes this a reset the
+/// operator cannot read the result of.
+const RESET: &str = "/Users/9/Password";
+
+/// The household after Ana has claimed her account, which is what a reset is for.
+const CLAIMED: &str = r#"[
+    {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true}},
+    {"Id":"9","Name":"ana","HasPassword":true,"Policy":{"IsAdministrator":false}}
+]"#;
 
 /// The operator's own recorded credential, assembled rather than written down: a
 /// literal reads to a source scanner as a credential committed to the repository.
@@ -74,8 +95,22 @@ fn recorded_admin(name: &str) -> std::path::PathBuf {
     env
 }
 
+/// A media server that signs in, holds Ana with a password, and accepts the reset.
+fn a_server_holding_a_claimed_account() -> Arc<Fake> {
+    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+    Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![signed_in.clone(), signed_in.clone(), signed_in],
+        ),
+        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        (RESET, vec![Answer::reply(204, "")]),
+        ("/Users", vec![Answer::reply(200, CLAIMED)]),
+    ])
+}
+
 /// A media server that signs in, holds nobody, and takes the account it is given.
-fn answering() -> Arc<Fake> {
+fn a_server_holding_nobody() -> Arc<Fake> {
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     Fake::by_path_in_turn(vec![
         (
@@ -121,22 +156,57 @@ fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
     .with_http(http)
 }
 
-/// Offer somebody an account, and hand back everything that was sent doing it.
-async fn offering(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
+/// Every command that hands an operator an invitation to pass on, with the server each
+/// one needs answering behind it.
+///
+/// **Named as a pair so that a third such command cannot be added without landing
+/// here.** The claim this file makes is about the set of ways an account comes to have
+/// a password set on it, and a set is only a claim while nothing outside it exists —
+/// so the guard below walks this list rather than naming a command.
+fn both_ways_an_account_becomes_claimable() -> Vec<(&'static str, Command, Arc<Fake>)> {
+    vec![
+        (
+            "invite",
+            Command::Invite {
+                name: "ana".to_owned(),
+            },
+            a_server_holding_nobody(),
+        ),
+        (
+            "reissue",
+            Command::Reissue {
+                name: "ana".to_owned(),
+            },
+            a_server_holding_a_claimed_account(),
+        ),
+    ]
+}
+
+/// Run one of them, and hand back everything that was sent doing it.
+async fn driving(
+    scratch: &str,
+    command: Command,
+    http: Arc<Fake>,
+) -> (Vec<Request>, Option<Outcome>) {
     let env = recorded_admin(scratch);
-    let http = answering();
     let ctx = context(&env, http.clone());
 
-    let made = dispatch(
-        Command::Invite {
-            name: "ana".to_owned(),
-        },
-        &ctx,
-    )
-    .await;
+    let made = dispatch(command, &ctx).await;
 
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     (http.requests(), made.ok())
+}
+
+/// Offer somebody an account, and hand back everything that was sent doing it.
+async fn offering(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
+    driving(
+        scratch,
+        Command::Invite {
+            name: "ana".to_owned(),
+        },
+        a_server_holding_nobody(),
+    )
+    .await
 }
 
 /// The account is asked for by name, and there is nothing else in the request.
@@ -163,15 +233,23 @@ async fn the_account_is_asked_for_by_name_and_nothing_else() {
     );
 }
 
-/// The only password that leaves is this program's own, to its own sign-in.
+/// The only password that leaves is this program's own, to its own sign-in — whichever
+/// command was asked for.
 ///
 /// Stated as where it *does* go rather than as a filter over where it does not: an
 /// exclusion list is a place to add a second entry, and the point of the claim is
 /// that there is exactly one.
 #[tokio::test]
 async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
-    let (sent, _) = offering("one-password").await;
+    for (which, command, http) in both_ways_an_account_becomes_claimable() {
+        let (sent, _) = driving(which, command, http).await;
+        no_password_left_except_this_program_s_own(which, &sent);
+    }
+}
 
+/// Held apart from the loop above so the two assertions read as one claim about one
+/// command's traffic rather than as a pass over everything both of them sent.
+fn no_password_left_except_this_program_s_own(which: &str, sent: &[Request]) {
     let carrying: Vec<String> = sent
         .iter()
         .filter(|request| {
@@ -185,14 +263,15 @@ async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
 
     assert!(
         !carrying.is_empty(),
-        "no request carried the recorded credential, so this proves nothing about \
+        "{which} carried the recorded credential nowhere, so this proves nothing about \
          where one travels — the exchange under it did not run"
     );
     assert!(
         carrying
             .iter()
             .all(|url| SIGN_INS.iter().any(|door| url.contains(door))),
-        "a password left for somewhere other than this program's own sign-ins: {carrying:?}"
+        "{which} sent a password somewhere other than this program's own sign-ins: \
+         {carrying:?}"
     );
 }
 
@@ -233,5 +312,83 @@ async fn what_is_passed_on_carries_no_password() {
         "an empty list means no invitation was read and this asserts nothing; a field \
          beside these means the message an operator passes on gained somewhere to \
          carry a password"
+    );
+}
+
+/// A reset asks for one, and there is nothing else in the request.
+///
+/// The mirror of the account-creation body above, and the reason the promise holds for
+/// somebody who lost their password rather than only for somebody new. `CurrentPw` and
+/// `NewPw` are fields this endpoint accepts, so the body is asserted **whole**: a
+/// password added here would be the operator choosing the next one, and a search for
+/// what should not be present would pass anything spelled differently.
+#[tokio::test]
+async fn a_reset_asks_for_one_and_sends_nothing_else() {
+    let (sent, _) = driving(
+        "reset-body",
+        Command::Reissue {
+            name: "ana".to_owned(),
+        },
+        a_server_holding_a_claimed_account(),
+    )
+    .await;
+
+    let reset: Vec<String> = sent
+        .iter()
+        .filter(|request| request.url.contains(RESET))
+        .filter_map(|request| request.body.clone())
+        .collect();
+
+    assert_eq!(
+        reset,
+        [r#"{"ResetPassword":true}"#],
+        "an empty list means no reset was asked for and nothing here was read; anything \
+         beside the flag means the operator sent something about how somebody else \
+         signs in"
+    );
+}
+
+/// What a reset hands back is an invitation, carrying no password either.
+///
+/// Asserted as the same field set the offer above is held to, because it is the same
+/// shape: after a reset the thing to send somebody *is* an invitation, and one message
+/// with one description is the reason neither can gain a password without the other
+/// noticing. `hours` is among them for both, since both run out.
+#[tokio::test]
+async fn what_a_reset_passes_on_is_an_invitation_with_no_password_in_it() {
+    let (_, made) = driving(
+        "reset-passed-on",
+        Command::Reissue {
+            name: "ana".to_owned(),
+        },
+        a_server_holding_a_claimed_account(),
+    )
+    .await;
+
+    let fields: Vec<String> = made
+        .and_then(|outcome| outcome.envelope().to_json())
+        .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
+        .and_then(|envelope| {
+            envelope
+                .get("data")
+                .and_then(|invitation| invitation.as_object())
+                .map(|invitation| invitation.keys().cloned().collect())
+        })
+        .unwrap_or_default();
+
+    assert_eq!(
+        fields,
+        [
+            "address",
+            "caution",
+            "hours",
+            "linked",
+            "name",
+            "rehearsed",
+            "standing",
+            "withdrawn"
+        ],
+        "an empty list means the reset did not answer and this asserts nothing; a field \
+         beside these means a reset says something an invitation does not"
     );
 }

@@ -339,16 +339,72 @@ async fn withdrawing_an_invitation_removes_the_account() {
     );
 }
 
-/// When an account was made comes from what the server recorded happening.
+/// Resetting a password sends a flag and never a password.
 ///
-/// The account itself carries no date at all, so this reads the record instead — and
-/// keeps only the entries about an account being made, since the same record holds
-/// every sign-in and every password change too.
+/// **This is the structural half of the promise** that the operator cannot learn what
+/// somebody's next password is: the request body has one field in it and that field is
+/// a boolean. There is no key here a password could be put under by mistake, and the
+/// server answers by putting the account back to having none — which is the state an
+/// invitation leaves it in, so what comes back out of this is an invitation to send.
+///
+/// Verified against `jellyfin/jellyfin:10.10.3`: the same endpoint takes `CurrentPw`
+/// and `NewPw` when somebody changes their own password, so naming neither is what
+/// makes this a reset rather than a password chosen for them.
+#[tokio::test]
+async fn resetting_a_password_sends_a_flag_and_never_a_password() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN), Answer::reply(204, "")]);
+
+    assert!(reader(&fake).unclaim("1").await.is_ok());
+
+    let body = fake
+        .requests()
+        .into_iter()
+        .find(|asked| asked.method == Method::Post && asked.url.ends_with("/Users/1/Password"))
+        .and_then(|asked| asked.body)
+        .unwrap_or_default();
+    assert!(
+        body.contains(r#""ResetPassword":true"#),
+        "no reset was asked for at the account's own password: {body:?}"
+    );
+    assert!(
+        !body.to_lowercase().contains("pw") && body.matches(':').count() == 1,
+        "the reset carried more than the flag, so a password could be among it: {body}"
+    );
+}
+
+/// A server that refuses the reset is reported as a failure rather than a success.
+///
+/// Worth its own case because the answer carries no body either way: a `403` and a
+/// `204` are told apart by the status alone, and reading only the body would make
+/// every refusal look like it worked. What the operator would then send is an
+/// invitation to an account whose old password still opens it.
+#[tokio::test]
+async fn a_refused_reset_is_not_reported_as_done() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN), Answer::reply(403, "")]);
+
+    assert!(
+        reader(&fake).unclaim("1").await.is_err(),
+        "a refused reset was reported as having happened"
+    );
+}
+
+/// When an account was offered comes from what the server recorded happening.
+///
+/// The account itself carries no date at all, so this reads the record instead. It keeps
+/// **two** kinds of entry: an account being made, and a password moving on or off one.
+/// Both are moments an account came to have no password on it, which is what an
+/// invitation is — a reset offers an existing account again, months after it was made,
+/// and dating that by its creation would have it expire before anybody was told.
+///
+/// Everything else the record holds is dropped: it also carries every sign-in and every
+/// session, and an entry naming no account at all.
 #[tokio::test]
 async fn when_an_account_was_made_is_read_from_what_the_server_recorded() {
     let recorded = r#"{"Items":[
         {"Type":"UserCreated","Date":"2026-08-29T09:00:00Z","UserId":"1"},
+        {"Type":"UserPasswordChanged","Date":"2026-08-30T09:00:00Z","UserId":"1"},
         {"Type":"AuthenticationSucceeded","Date":"2026-08-29T10:00:00Z","UserId":"2"},
+        {"Type":"SessionStarted","Date":"2026-08-29T10:00:01Z","UserId":"2"},
         {"Type":"UserCreated","Date":"2026-08-29T11:00:00Z","UserId":""}
     ]}"#;
     let fake = Fake::in_turn(vec![
@@ -365,8 +421,9 @@ async fn when_an_account_was_made_is_read_from_what_the_server_recorded() {
         made.iter()
             .map(|entry| (entry.member.as_str(), entry.at.as_str()))
             .collect::<Vec<_>>(),
-        [("1", "2026-08-29T09:00:00Z")],
-        "something other than an account being made was carried through"
+        [("1", "2026-08-29T09:00:00Z"), ("1", "2026-08-30T09:00:00Z")],
+        "either an account being offered was dropped, or something that is not an \
+         offering was carried through"
     );
     assert!(
         fake.requests().iter().any(

@@ -193,7 +193,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 23;
+    const OUTCOMES: usize = 24;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -203,7 +203,18 @@ mod tests {
 
     /// One sample of every outcome, so each kind's description can be held against
     /// the document that kind actually writes.
+    ///
+    /// Split in two only because one list of every outcome this product has is longer
+    /// than a function may be. The halves mean nothing apart; `OUTCOMES` counts what
+    /// they come to together, which is the number that has to move when a kind lands.
     fn samples() -> Vec<Outcome> {
+        let mut every = the_first_of_them();
+        every.extend(the_rest_of_them());
+        every
+    }
+
+    /// The first half of them, in the order the contract lists their kinds.
+    fn the_first_of_them() -> Vec<Outcome> {
         vec![
             Outcome::Version(VersionReport {
                 binary: "0.1.0".to_owned(),
@@ -259,6 +270,12 @@ mod tests {
                 }],
                 acted: true,
             }),
+        ]
+    }
+
+    /// The rest of them, continuing that order.
+    fn the_rest_of_them() -> Vec<Outcome> {
+        vec![
             Outcome::Undo(crate::app::repair::Reversal {
                 reversed: vec![crate::journal::Undo {
                     target: "qbittorrent".to_owned(),
@@ -294,6 +311,16 @@ mod tests {
             }),
             Outcome::Glossary(Vocabulary {
                 words: vec![a_word()],
+            }),
+            Outcome::Invited(crate::model::Invitation {
+                name: "ana".to_owned(),
+                address: "http://a-machine.local:8096".to_owned(),
+                caution: None,
+                hours: 48,
+                withdrawn: Vec::new(),
+                rehearsed: false,
+                standing: crate::model::InvitationStanding::Made,
+                linked: crate::model::Linked::Made,
             }),
             Outcome::Removed(crate::model::HouseholdRemoval {
                 name: "ana".to_owned(),

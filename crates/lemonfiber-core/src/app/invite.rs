@@ -1,4 +1,12 @@
-//! Offering somebody an account, and taking back the ones nobody took up.
+//! Offering somebody an account, taking back the ones nobody took up, and putting one
+//! back to being claimable.
+//!
+//! All three are the same errand seen from different sides, which is why they are one
+//! file: an invitation is an account with **no password on it**, so making one, sweeping
+//! one away and returning one to that state are three ways of moving the same line. Both
+//! commands here end in an [`Invitation`] for the operator to pass on, and both read
+//! where to send it through [`reaching`] — an address derived twice is an address the two
+//! can disagree about.
 //!
 //! What the operator sends is an address the stack already serves. There is no page
 //! of lemonfiber's for anybody to open: it runs nothing between commands, so a link
@@ -10,6 +18,13 @@
 //! done when the operator next offers one. An invitation therefore stands a little
 //! past its window on a quiet stack, which is the direction to err in: it is an
 //! account nobody has claimed, reachable only by somebody who was told about it.
+//!
+//! **An account offered again is dated from when it was offered again.** Once a password
+//! can be taken off an existing account, "unclaimed" stops meaning "new": the record that
+//! an account was *made* is months old for a household member, so a reset read that way
+//! would be expired before anybody was told about it, and the next offer to anybody would
+//! withdraw it. The media server records the reset too, and
+//! [`offered`](crate::invitation::offered) takes the later of the two.
 
 use crate::app::Ctx;
 use crate::invitation::{offered, run_out, Offered, HOURS_OF_RECORD, HOURS_TO_CLAIM};
@@ -30,43 +45,11 @@ pub(super) async fn offer(
     // different person: offering `ana ` beside `ana` makes a second account that
     // reads identically in every list either of them appears in.
     let name = name.trim().to_owned();
-    if name.is_empty() {
-        return Err(Box::new(nobody_named()));
-    }
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
-    let Some(jellyfin) = super::seed::identity::jellyfin_service(&manifest.services) else {
-        return Err(Box::new(no_media_server()));
-    };
-    let Some(password) = super::seed::identity::recorded_jellyfin_password(ctx) else {
-        return Err(Box::new(no_credential()));
-    };
-    // Where a *person* reaches the media server, which is neither of the URLs the
-    // stack wires itself with: those name a host only this machine or this stack can
-    // resolve, and an invitation carrying one sends somebody an address that cannot
-    // open. Asked now rather than remembered, so a machine renamed since the last
-    // look answers as it is. Where there is no name and nothing recorded there is no
-    // address rather than a guess — an invented one is the one thing that gets sent
-    // on, and what gets sent on has to be true.
-    let named = ctx.site.name().await;
-    let Some(reachable) = crate::door::address(
-        named.as_deref(),
-        ctx.settings.household_host.as_deref(),
-        ctx.environment,
-        jellyfin.port,
-    ) else {
-        return Err(Box::new(nowhere_to_send()));
-    };
-
-    let server = crate::jellyfin::Jellyfin::authenticated(
-        ctx.http.clone(),
-        &jellyfin.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        &password,
-    );
+    let Reaching {
+        server,
+        reachable,
+        services,
+    } = reaching(ctx, &name).await?;
 
     let held = held(ctx, &server).await;
     let already = already_here(&held, &name).cloned();
@@ -105,7 +88,7 @@ pub(super) async fn offer(
             .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?
     };
 
-    let linked = link(ctx, &manifest.services, &to_link(&held, &member)).await;
+    let linked = link(ctx, &services, &to_link(&held, &member)).await;
 
     Ok(Invitation {
         name: member.name,
@@ -166,10 +149,149 @@ async fn link(ctx: &Ctx, services: &[lemonfiber_manifest::Service], members: &[S
     Linked::Made
 }
 
+/// Make somebody's account claimable again, and hand back the invitation to send them.
+///
+/// **A reset here is not a password chosen for somebody.** The account goes back to
+/// having none at all — the state an invitation leaves it in — so whoever holds it sets
+/// the next first password themselves, at the media server, where the operator cannot
+/// read it. The call that does it carries a flag and not a password, so there is nowhere
+/// to put one even in error.
+///
+/// What comes back is an [`Invitation`] rather than a report of its own, because after
+/// this the thing to send *is* an invitation: the same address, the same code, the same
+/// line about setting a password. A second shape here would be a second account of one
+/// message, and the two would drift.
+///
+/// # Errors
+///
+/// Returns a [`Problem`](crate::error::Problem) where the stack has no media server,
+/// where it will not answer, where nobody is named, where nobody by that name is here,
+/// or where the account named administers the server.
+pub(super) async fn reissued(
+    ctx: &Ctx,
+    name: String,
+) -> Result<Invitation, Box<crate::error::Problem>> {
+    let name = name.trim().to_owned();
+    let Reaching {
+        server, reachable, ..
+    } = reaching(ctx, &name).await?;
+
+    let Ok(household) = server.household().await else {
+        return Err(Box::new(unreadable()));
+    };
+    let asked = name.to_lowercase();
+    let Some(member) = household
+        .iter()
+        .find(|member| member.name.to_lowercase() == asked)
+        .cloned()
+    else {
+        return Err(Box::new(nobody_here(&name)));
+    };
+    // Refused for the same reason a removal refuses it: this is the account the program
+    // signs in as, and taking its password away would leave nothing to sign in with.
+    if member.access.administrator {
+        return Err(Box::new(runs_the_server(&member.name)));
+    }
+
+    if ctx.dry_run {
+        return Ok(reissue(member.name, reachable, true));
+    }
+    if server.unclaim(&member.id).await.is_err() {
+        return Err(Box::new(would_not_reissue(&member.name)));
+    }
+    Ok(reissue(member.name, reachable, false))
+}
+
+/// The invitation a reissued account is sent with.
+///
+/// `Reset` rather than `Made`, because what the person needs to hear is different: nobody
+/// is being invited, and the news is that the password they had has stopped working. The
+/// window is the offer's, and it is real — the sweep withdraws this one like any other,
+/// which for an account somebody has watched on is a larger loss than for an offer nobody
+/// took up. That is why the message says what happens at the end of it rather than
+/// leaving the word "lapses" to carry it.
+fn reissue(name: String, reachable: crate::door::Address, rehearsed: bool) -> Invitation {
+    Invitation {
+        name,
+        address: reachable.url,
+        caution: reachable.caution,
+        hours: HOURS_TO_CLAIM,
+        withdrawn: Vec::new(),
+        rehearsed,
+        standing: InvitationStanding::Reset,
+        // Whoever it is was already known to the request service, or was never known to
+        // it; taking a password away changes neither.
+        linked: Linked::NotTried,
+    }
+}
+
+/// What both halves of this errand need before either can act: a way to reach the media
+/// server, and the address a person reaches it at.
+struct Reaching {
+    /// The media server, signed in as this program.
+    server: crate::jellyfin::Jellyfin,
+    /// Where a *person* opens it.
+    reachable: crate::door::Address,
+    /// The stack's services, which the request service is found among.
+    services: Vec<lemonfiber_manifest::Service>,
+}
+
+/// Everything an invitation or a reissue needs before it touches anything.
+///
+/// Shared because both send the same message in the end, and an address derived twice is
+/// an address that can differ between the two.
+async fn reaching(ctx: &Ctx, name: &str) -> Result<Reaching, Box<crate::error::Problem>> {
+    if name.is_empty() {
+        return Err(Box::new(nobody_named()));
+    }
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
+    let Some(jellyfin) = super::seed::identity::jellyfin_service(&manifest.services) else {
+        return Err(Box::new(no_media_server()));
+    };
+    let Some(password) = super::seed::identity::recorded_jellyfin_password(ctx) else {
+        return Err(Box::new(no_credential()));
+    };
+    // Where a *person* reaches the media server, which is neither of the URLs the
+    // stack wires itself with: those name a host only this machine or this stack can
+    // resolve, and an invitation carrying one sends somebody an address that cannot
+    // open. Asked now rather than remembered, so a machine renamed since the last
+    // look answers as it is. Where there is no name and nothing recorded there is no
+    // address rather than a guess — an invented one is the one thing that gets sent
+    // on, and what gets sent on has to be true.
+    let named = ctx.site.name().await;
+    let Some(reachable) = crate::door::address(
+        named.as_deref(),
+        ctx.settings.household_host.as_deref(),
+        ctx.environment,
+        jellyfin.port,
+    ) else {
+        return Err(Box::new(nowhere_to_send()));
+    };
+    Ok(Reaching {
+        server: crate::jellyfin::Jellyfin::authenticated(
+            ctx.http.clone(),
+            &jellyfin.loopback,
+            "jellyfin",
+            crate::config::JELLYFIN_ADMIN_USER,
+            &password,
+        ),
+        reachable,
+        services: manifest.services,
+    })
+}
+
 /// What was found where the invitation was going.
 fn standing_of(already: Option<&Member>) -> InvitationStanding {
     match already {
         Some(member) if member.claimed => InvitationStanding::Joined,
+        // Unclaimed, but somebody has been in it: their password was taken off rather
+        // than an offer they never took up. Told apart because the message differs —
+        // nobody is being invited, and what they need to hear is that a password they
+        // had has stopped working.
+        Some(member) if member.last_seen.is_some() => InvitationStanding::Reset,
         Some(_) => InvitationStanding::Waiting,
         None => InvitationStanding::Made,
     }
@@ -298,6 +420,56 @@ fn no_credential() -> crate::error::Problem {
          has not recorded one",
         crate::error::Remedy::new("Run setup so the media server's account is made and recorded")
             .with_detail("lemonfiber setup"),
+    )
+}
+
+/// Said where the media server will not say who holds an account.
+fn unreadable() -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::Code::new("REISSUE-1"),
+        crate::error::Severity::Error,
+        "the media server would not say who holds an account, so nothing was reset",
+        "Making an account claimable again starts by finding it, and that read did not \
+         answer",
+        crate::error::Remedy::new("Check the media server is running, then run this again"),
+    )
+}
+
+/// Said where nobody by that name is in the household.
+fn nobody_here(name: &str) -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::Code::new("REISSUE-2"),
+        crate::error::Severity::Error,
+        format!("nobody called {name} is in this household"),
+        "Nothing was reset. The name has to match an account the media server holds, \
+         though not its capitalisation",
+        crate::error::Remedy::new("Run `lemonfiber household` to see who is here"),
+    )
+}
+
+/// Said where the account named administers the server.
+fn runs_the_server(name: &str) -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::Code::new("REISSUE-3"),
+        crate::error::Severity::Error,
+        format!("{name} administers the media server, so its password is not one to reset"),
+        "This is the account lemonfiber signs in as, and taking its password away would \
+         leave nothing to sign in with",
+        crate::error::Remedy::new(
+            "Reset a household member instead; to change the administrator's own \
+             password, do it in the media server's settings",
+        ),
+    )
+}
+
+/// Said where the media server refused to make the account claimable again.
+fn would_not_reissue(name: &str) -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::Code::new("REISSUE-4"),
+        crate::error::Severity::Error,
+        format!("the media server would not reset {name}'s password, so nothing changed"),
+        "Their existing password still works and the account is untouched",
+        crate::error::Remedy::new("Check the media server is running, then run this again"),
     )
 }
 

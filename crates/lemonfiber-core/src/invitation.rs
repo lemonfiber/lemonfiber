@@ -12,6 +12,12 @@
 //! made it by hand, or it is older than what the server still remembers. Withdrawing
 //! it on a guess would take away an account somebody is about to use, which is worse
 //! than leaving one standing a while longer.
+//!
+//! **An invitation is dated by whenever it was last offered**, which is not always when
+//! the account was made. A password reset returns an existing account to having none,
+//! and that is the account being offered again — months after it was created. So the
+//! record read here is the latest of them, and a reset invitation runs out from the
+//! reset rather than being expired the instant it is made.
 
 use crate::ports::service::{Invited, Member};
 
@@ -51,10 +57,16 @@ pub fn offered(household: Vec<Member>, invited: &[Invited]) -> Vec<Offered> {
         .into_iter()
         .filter(|member| !member.claimed)
         .map(|member| {
+            // The **latest** of them, not the first: an account carries a record of
+            // being made and one for every time a password moved on or off it, and
+            // what dates the invitation is whichever happened last. An account whose
+            // password was taken off was offered again at that moment, months after it
+            // was made — dated by its creation it would already be long expired.
             let at = invited
                 .iter()
-                .find(|record| record.member == member.id)
-                .map(|record| record.at.clone());
+                .filter(|record| record.member == member.id)
+                .map(|record| record.at.clone())
+                .max();
             Offered { member, at }
         })
         .collect()
@@ -66,6 +78,19 @@ pub fn offered(household: Vec<Member>, invited: &[Invited]) -> Vec<Offered> {
 /// correctly as text because they are fixed-width and end in `Z`. Comparing the
 /// strings rather than parsing them keeps this free of a clock and of a date
 /// library, and a record this cannot compare is one it declines to act on.
+///
+/// **An account whose password was taken off runs out from that moment**, not from when
+/// the account was made. Unclaimed no longer means new: a reset puts an existing account
+/// back to having no password, and dating that by its creation would find it expired the
+/// instant it was reset — so the very next invitation offered to anybody would withdraw
+/// it. What makes the window real is [`offered`] taking the latest record rather than the
+/// first.
+///
+/// What expiry costs here is worth naming: withdrawing removes the account, and for
+/// somebody who was in the household that takes their watch history with it. An
+/// invitation nobody claims does not stand, whichever kind it is, and that is why the
+/// message an operator passes on says what running out costs rather than only that it
+/// happens.
 #[must_use]
 pub fn run_out<'a>(offered: &'a [Offered], cutoff: &str) -> Vec<&'a Offered> {
     offered
@@ -187,6 +212,39 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["ana"],
             "the wrong invitations were called finished"
+        );
+    }
+
+    /// An account offered again is dated by the later offer, not by its making.
+    ///
+    /// **The window only exists because of this.** A reset writes a second record
+    /// against an account that already carries one for being made, and the two can be
+    /// months apart. Read as the first, every reset invitation is expired the instant it
+    /// is made and the next `invite` withdraws it — which is not expiry, it is deletion
+    /// with no window at all.
+    ///
+    /// Both entries are what `jellyfin/jellyfin:10.10.3` actually records: `UserCreated`
+    /// when the account is made, `UserPasswordChanged` when a password moves on or off.
+    #[test]
+    fn an_account_offered_again_is_dated_by_the_later_offer() {
+        let household = vec![member("1", "ana", false)];
+        let records = [
+            invited("1", "2026-01-04T09:00:00.0000000Z"),
+            invited("1", "2026-08-30T10:00:00.0000000Z"),
+        ];
+
+        let waiting = offered(household, &records);
+
+        assert_eq!(
+            waiting.first().and_then(|o| o.at.as_deref()),
+            Some("2026-08-30T10:00:00.0000000Z"),
+            "the invitation was dated by when the account was made rather than by when \
+             it was last offered"
+        );
+        assert!(
+            run_out(&waiting, "2026-08-27T09:00:00Z").is_empty(),
+            "an account offered two days ago was withdrawn as an eight-month-old \
+             invitation nobody claimed"
         );
     }
 

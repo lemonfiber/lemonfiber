@@ -111,11 +111,31 @@ struct ActivityResource {
 /// What the media server calls the making of an account.
 const ACCOUNT_MADE: &str = "UserCreated";
 
+/// What it calls a password being set on one, or taken off it.
+///
+/// **Read alongside [`ACCOUNT_MADE`] because either can be the moment an account became
+/// claimable.** An account made and never claimed was offered when it was made; one whose
+/// password has since been taken off was offered again at that moment, and it is months
+/// younger than its own creation. Driven against `jellyfin/jellyfin:10.10.3`: a reset
+/// records exactly this, against the account, timestamped when it happened.
+///
+/// The same entry is written when somebody *sets* a password, which is the opposite
+/// event — but an account that has one is claimed, and a claimed account is not an
+/// invitation at all, so the reading below never sees that case.
+const PASSWORD_MOVED: &str = "UserPasswordChanged";
+
 /// How many records are read at once.
 ///
 /// The read is already bounded by the date asked for, and an invitation lives days
 /// rather than months — so this is a ceiling against a server that logged a great
 /// deal in that window, not a page size to walk.
+///
+/// **The server answers newest first, and that is what makes the ceiling safe.** An
+/// account can carry two records that date it — being made, and its password being taken
+/// off — and the reader keeps the later one. If the ceiling cuts the list short it cuts
+/// the *oldest* entries, so a reset can never fall off while the creation it postdates
+/// survives. The reverse would be the dangerous shape: an account dated by its making
+/// alone is one the sweep finds expired the moment it was offered again.
 const AT_ONCE: u32 = 200;
 
 #[async_trait]
@@ -143,6 +163,18 @@ impl crate::ports::service::Household for Jellyfin {
         Ok(made.member())
     }
 
+    async fn unclaim(&self, id: &str) -> Result<(), Failure> {
+        // A flag rather than a password: the same endpoint takes `CurrentPw`/`NewPw`
+        // when somebody changes their own, and naming neither is what makes this a
+        // reset the operator cannot read the result of.
+        let body = serde_json::json!({ "ResetPassword": true }).to_string();
+        let request = self
+            .as_admin(Method::Post, &format!("/Users/{id}/Password"), Some(body))
+            .await?;
+        let response = self.endpoint.send(&request).await?;
+        self.endpoint.expect_success(&response)
+    }
+
     async fn withdraw(&self, id: &str) -> Result<(), Failure> {
         let request = self
             .as_admin(Method::Delete, &format!("/Users/{id}"), None)
@@ -162,7 +194,10 @@ impl crate::ports::service::Household for Jellyfin {
         Ok(recorded
             .items
             .into_iter()
-            .filter(|entry| entry.kind == ACCOUNT_MADE && !entry.user.is_empty())
+            .filter(|entry| {
+                (entry.kind == ACCOUNT_MADE || entry.kind == PASSWORD_MOVED)
+                    && !entry.user.is_empty()
+            })
             .map(|entry| Invited {
                 member: entry.user,
                 at: entry.date,

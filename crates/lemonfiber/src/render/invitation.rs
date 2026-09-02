@@ -31,6 +31,16 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
             report.name
         ),
         InvitationStanding::Joined => format!("{} is already in the house", report.name),
+        // Said as what stopped working and what is at stake, because both are things
+        // the operator is about to be asked. The window is the same one an offer has,
+        // counted from the reset — but what is withdrawn at the end of it is an account
+        // somebody has watched on, so this is the one place the consequence is spelled
+        // out rather than left to the word "lapses".
+        InvitationStanding::Reset => format!(
+            "{}'s old password no longer works — they set a new one next time they sign \
+             in, within {} hours or the account is removed",
+            report.name, report.hours
+        ),
     });
     lines.put(format!("  {}", report.address));
     lines.put(HOME_ONLY.to_owned());
@@ -178,6 +188,44 @@ mod tests {
             standing: InvitationStanding::Joined,
             ..offered(Vec::new())
         }
+    }
+
+    /// The same person, whose password has just been taken off.
+    fn reset() -> Invitation {
+        Invitation {
+            standing: InvitationStanding::Reset,
+            ..offered(Vec::new())
+        }
+    }
+
+    /// A reset says what stopped working, and what it costs to leave it.
+    ///
+    /// Both halves matter and neither is obvious from the other. The first is what the
+    /// operator is about to be asked — why the old password does not open it. The second
+    /// is the consequence they have to be able to pass on: this window ends in the
+    /// account being **removed**, and unlike an invitation nobody took up, that account
+    /// is one somebody has watched on. "Lapses" is not a strong enough word for that, so
+    /// this view does not use it here.
+    #[test]
+    fn a_reset_says_what_stopped_working_and_what_leaving_it_costs() {
+        let said = invitation(&reset()).text();
+
+        assert!(
+            said.contains("old password no longer works"),
+            "a reset did not say the thing the person will ask about: {said}"
+        );
+        assert!(
+            said.contains("48 hours") && said.contains("the account is removed"),
+            "a reset did not say the window or what happens at the end of it: {said}"
+        );
+        assert!(
+            said.contains("set a password"),
+            "a reset left out how to claim the account again: {said}"
+        );
+        assert!(
+            said.contains('\u{2588}'),
+            "a reset lost the code that makes the address easy to take: {said}"
+        );
     }
 
     /// An invitation still standing is that message again, not a refusal.

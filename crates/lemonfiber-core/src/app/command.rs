@@ -205,6 +205,15 @@ pub enum Command {
         /// What they will sign in as.
         name: String,
     },
+    /// Put somebody's account back to having no password, so they can claim it again.
+    ///
+    /// The operator never chooses or reads a password: the account returns to the
+    /// unclaimed state an invitation leaves it in, and whoever holds it sets the next
+    /// first password themselves. What is handed back is the invitation to send them.
+    Reissue {
+        /// Whose account to make claimable again.
+        name: String,
+    },
     /// Take somebody out of the household, revoking their access to both the media
     /// server and the request service.
     ///

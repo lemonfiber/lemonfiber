@@ -748,6 +748,16 @@ mod tests {
             Outcome::Archives(Listing {
                 archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
             }),
+            Outcome::Invited(lemonfiber_core::model::Invitation {
+                name: "ana".to_owned(),
+                address: "http://a-machine.local:8096".to_owned(),
+                caution: None,
+                hours: 48,
+                withdrawn: Vec::new(),
+                rehearsed: false,
+                standing: lemonfiber_core::model::InvitationStanding::Made,
+                linked: lemonfiber_core::model::Linked::Made,
+            }),
             Outcome::Removed(lemonfiber_core::model::HouseholdRemoval {
                 name: "ana".to_owned(),
                 confirmed: false,
