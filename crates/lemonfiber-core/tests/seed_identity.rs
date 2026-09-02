@@ -150,6 +150,16 @@ impl Requests for FakeReq {
         Ok(())
     }
 
+    /// Neither is anything about removing somebody: this file is about identity setup.
+    /// A fake that refused would make every test here about a second service.
+    async fn member_for(&self, _media_server_id: &str) -> Result<Option<String>, Failure> {
+        Ok(None)
+    }
+
+    async fn remove_member(&self, _id: &str) -> Result<(), Failure> {
+        Ok(())
+    }
+
     /// Linking is not what this file is about — identity setup is — so it answers
     /// success and records nothing. A fake that refused would make every test here
     /// about a second service's availability.

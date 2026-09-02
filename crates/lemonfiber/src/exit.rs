@@ -14,6 +14,7 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::kind;
+use lemonfiber_core::model::Revoked;
 use lemonfiber_core::model::{Disposition, Envelope, ResetReport, Triggered, UpgradeReport};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
@@ -100,6 +101,11 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // are pending reverts, so either one left unconfirmed is a non-zero result.
         // Confirmed, or with nothing to revert, it succeeded.
         Outcome::Reset(report) => reset_exit(report),
+        // Taking somebody out of the household has the same three answers a forget
+        // does. Unconfirmed is waiting on the operator's say-so, so a script reading
+        // success would carry on as though the person were gone; a removal that reached
+        // only the media server left an account behind that the next run has to take.
+        Outcome::Removed(report) => removing(report),
         // A listing is a question and asking is never a failure. A removal that was
         // not confirmed is waiting on the operator's say-so, and one that could not
         // take a directory left something behind — a script that read either as
@@ -172,6 +178,20 @@ fn forgetting(removal: &lemonfiber_core::stored::Removal) -> ExitCode {
         lemonfiber_core::stored::Removal::Unconfirmed => ExitCode::from(VALIDATION),
         lemonfiber_core::stored::Removal::Done { left, .. } if left.is_empty() => ExitCode::SUCCESS,
         lemonfiber_core::stored::Removal::Done { .. } => ExitCode::from(FAILURE),
+    }
+}
+
+/// The exit code taking somebody out of the household earns.
+///
+/// Unconfirmed earns `VALIDATION` rather than success: the command was asked to remove
+/// somebody and removed nobody, and a script that read that as done would carry on as
+/// though they were gone. Reaching only the media server earns `FAILURE`, because
+/// something is left that the next run has to take — they cannot use it, but it is there.
+fn removing(report: &lemonfiber_core::model::HouseholdRemoval) -> ExitCode {
+    match report.revoked {
+        Revoked::Everywhere => ExitCode::SUCCESS,
+        Revoked::Nothing => ExitCode::from(VALIDATION),
+        Revoked::MediaServerOnly => ExitCode::from(FAILURE),
     }
 }
 
@@ -561,6 +581,60 @@ mod tests {
                 }],
             }),
             success()
+        );
+    }
+
+    /// A removal that would take somebody, as it stands before it is confirmed.
+    fn removal(
+        revoked: lemonfiber_core::model::Revoked,
+    ) -> lemonfiber_core::model::HouseholdRemoval {
+        use lemonfiber_core::model::Revoked;
+        lemonfiber_core::model::HouseholdRemoval {
+            name: "ana".to_owned(),
+            confirmed: !matches!(revoked, Revoked::Nothing),
+            requests: 1,
+            asks_through_the_request_service: true,
+            revoked,
+            findings: Vec::new(),
+        }
+    }
+
+    /// Each of the three answers earns a different code, and only one is success.
+    ///
+    /// The unconfirmed case is the one worth having: a script that read "removed
+    /// nobody" as success would carry on as though the person were gone. Reaching only
+    /// the media server is a failure for the opposite reason — something is left.
+    #[test]
+    fn removing_somebody_earns_success_only_where_both_accounts_went() {
+        assert_eq!(
+            format!(
+                "{:?}",
+                settled(&Outcome::Removed(removal(
+                    lemonfiber_core::model::Revoked::Everywhere
+                )))
+            ),
+            success(),
+            "a removal that reached both places was not a success"
+        );
+        assert_ne!(
+            format!(
+                "{:?}",
+                settled(&Outcome::Removed(removal(
+                    lemonfiber_core::model::Revoked::Nothing
+                )))
+            ),
+            success(),
+            "a removal that removed nobody read as done"
+        );
+        assert_ne!(
+            format!(
+                "{:?}",
+                settled(&Outcome::Removed(removal(
+                    lemonfiber_core::model::Revoked::MediaServerOnly
+                )))
+            ),
+            success(),
+            "a removal that left an account behind read as done"
         );
     }
 

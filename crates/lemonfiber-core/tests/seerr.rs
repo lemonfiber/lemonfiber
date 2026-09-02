@@ -10,7 +10,7 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
-use lemonfiber_core::ports::http::Http;
+use lemonfiber_core::ports::http::{Http, Method};
 use lemonfiber_core::ports::service::{Failure, FulfilmentTarget, QualityProfile, Requests};
 use lemonfiber_core::seerr::Seerr;
 
@@ -260,6 +260,75 @@ async fn naming_nobody_sends_nothing() {
 async fn a_refused_import_is_reported() {
     let fake = Fake::always(Answer::reply(403, ""));
     assert!(seerr(&fake).link_members(&["a1".to_owned()]).await.is_err());
+}
+
+/// The account is looked up by the *media server's* identifier, which is the one held.
+#[tokio::test]
+async fn the_account_is_found_by_the_media_servers_own_identifier() {
+    let fake = Fake::always(Answer::reply(200, r#"{"id":7,"jellyfinUsername":"ana"}"#));
+    let found = seerr(&fake)
+        .member_for("c7e31fb2cfa544d6b6ab9d99821d7424")
+        .await;
+
+    assert_eq!(found.ok().flatten(), Some("7".to_owned()));
+    assert!(
+        fake.request().is_some_and(|request| request
+            .url
+            .ends_with("/api/v1/user/jellyfin/c7e31fb2cfa544d6b6ab9d99821d7424")),
+        "{:?}",
+        fake.request()
+    );
+}
+
+/// Never having heard of somebody is an answer, not a failure.
+///
+/// A member who has not signed in here has no account to take away, and a removal that
+/// read that as a refusal would report a revocation it could not make — of a thing that
+/// was never there.
+#[tokio::test]
+async fn an_account_this_service_never_made_is_nothing_rather_than_a_failure() {
+    let fake = Fake::always(Answer::reply(404, r#"{"message":"User not found."}"#));
+    let found = seerr(&fake)
+        .member_for("c7e31fb2cfa544d6b6ab9d99821d7424")
+        .await;
+
+    assert!(
+        matches!(found, Ok(None)),
+        "a member it has never heard of was reported as a failure: {found:?}"
+    );
+}
+
+/// Any other refusal is a refusal, and is not read as nobody being there.
+#[tokio::test]
+async fn a_refused_lookup_is_not_read_as_nobody_being_there() {
+    let fake = Fake::always(Answer::reply(403, ""));
+    assert!(seerr(&fake)
+        .member_for("c7e31fb2cfa544d6b6ab9d99821d7424")
+        .await
+        .is_err());
+}
+
+/// The account is taken away where this service keeps its own.
+#[tokio::test]
+async fn the_account_is_removed_where_the_service_keeps_them() {
+    let fake = Fake::always(Answer::reply(200, "{}"));
+    assert!(seerr(&fake).remove_member("7").await.is_ok());
+
+    let asked = fake.request();
+    assert!(
+        asked
+            .as_ref()
+            .is_some_and(|request| request.method == Method::Delete
+                && request.url.ends_with("/api/v1/user/7")),
+        "{asked:?}"
+    );
+}
+
+/// A service that will not give the account up says so.
+#[tokio::test]
+async fn a_refused_removal_is_reported() {
+    let fake = Fake::always(Answer::reply(405, ""));
+    assert!(seerr(&fake).remove_member("1").await.is_err());
 }
 
 #[tokio::test]

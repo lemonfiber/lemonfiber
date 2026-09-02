@@ -31,10 +31,10 @@ use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind::{self, Kind},
-    Admitted, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HouseholdReport,
-    Invitation, LifecycleReport, MusicReport, QualityReport, ResetReport, SetupReport, Started,
-    StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
-    WalkthroughReport, WizardReport, API_VERSION,
+    Admitted, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HouseholdRemoval,
+    HouseholdReport, Invitation, LifecycleReport, MusicReport, QualityReport, ResetReport,
+    SetupReport, Started, StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport,
+    VersionReport, WalkthroughReport, WizardReport, API_VERSION,
 };
 use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
@@ -99,6 +99,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::GLOSSARY, schema_for!(Envelope<Vocabulary>));
     describing(kinds, kind::CLIENTS, schema_for!(Envelope<Guidance>));
     describing(kinds, kind::INVITATION, schema_for!(Envelope<Invitation>));
+    describing(
+        kinds,
+        kind::REMOVAL,
+        schema_for!(Envelope<HouseholdRemoval>),
+    );
     describing(
         kinds,
         kind::HOUSEHOLD,

@@ -65,6 +65,9 @@ pub const CLIENTS: Kind = Kind("clients");
 pub const HOUSEHOLD: Kind = Kind("household");
 /// An account offered to somebody in the house.
 pub const INVITATION: Kind = Kind("invitation");
+
+/// Somebody taken out of the household, or what taking them would cost.
+pub const REMOVAL: Kind = Kind("removal");
 /// The name given to work that outlives the request that started it.
 pub const JOB: Kind = Kind("job");
 /// What a lifecycle command did, or would have done.
@@ -135,6 +138,7 @@ pub const ALL: &[Kind] = &[
     CLIENTS,
     HOUSEHOLD,
     INVITATION,
+    REMOVAL,
     JOB,
     LIFECYCLE,
     LOG,

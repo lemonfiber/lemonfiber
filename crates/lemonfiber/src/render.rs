@@ -24,6 +24,7 @@ mod invitation;
 mod outbound;
 mod qr;
 mod quality;
+mod removal;
 pub(crate) mod repair;
 mod seed;
 pub(crate) mod stack;
@@ -221,6 +222,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Clients(all) => clients::guidance(all),
         Outcome::Invited(report) => invitation::invitation(report),
+        Outcome::Removed(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::Lifecycle(report) => stack::lifecycle(report),

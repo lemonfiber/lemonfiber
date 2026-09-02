@@ -34,6 +34,7 @@ Commands:
   stored       List what lemonfiber keeps on this machine, where it is, and why
   clients      Say which app to watch on, for each kind of device somebody in the house has
   invite       Offer somebody in the house an account they can claim
+  remove       Take somebody out of the household, in both places they have an account
   forget       Remove everything lemonfiber keeps on this machine
   seed         Wire the stack's services to each other, idempotently
   adopt        Adopt your current edits as lemonfiber's expected state
@@ -1038,6 +1039,39 @@ Arguments:
           What they will sign in as
 
 Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber remove`
+
+```text
+Take somebody out of the household, in both places they have an account.
+
+Revokes access to the media server and to the request service. Their watch history goes with the account — the media server offers no way to keep it — and the request service destroys what they asked for. Because none of that can be got back, it says what would go and does nothing until `--confirm`.
+
+Usage: lemonfiber remove [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>
+          Whose account to take away, as `lemonfiber household` shows them
+
+Options:
+      --confirm
+          Go ahead and remove them, having seen what goes
+
       --json
           Print machine-readable output
 

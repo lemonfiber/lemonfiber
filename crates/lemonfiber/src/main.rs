@@ -156,6 +156,14 @@ async fn repairing(ctx: Ctx, mending: Mending, json: bool) -> ExitCode {
     repair::run(ctx, paths, mending, &Keyboard, json).await
 }
 
+/// A context that narrates each step, as a walk-through wants and a script does not.
+///
+/// Named because it is the one piece of context-building long enough to push the arm
+/// that needs it onto three lines, and `main` has no room to spare.
+fn narrating(ctx: Ctx, json: bool) -> Ctx {
+    ctx.narrating_steps(walking(json))
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -202,9 +210,7 @@ async fn main() -> ExitCode {
         //
         // Narrated because setup ends by offering the walk: the offer is put at a
         // terminal, so what the walk says has a terminal to say it to.
-        Request::Setup { flags } => {
-            return setup_from(ctx.narrating_steps(walking(cli.json)), flags).await
-        }
+        Request::Setup { flags } => return setup_from(narrating(ctx, cli.json), flags).await,
         Request::Version => Command::Version,
         // Naming nothing asks what forms there are; naming one asks what it would
         // come to. Two questions about the same subject, so one word answers both.
@@ -286,6 +292,7 @@ async fn main() -> ExitCode {
         Request::Stored => Command::Stored,
         Request::Clients => Command::Clients,
         Request::Invite { name } => Command::Invite { name },
+        Request::Remove { name, confirm } => Command::Remove { name, confirm },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
