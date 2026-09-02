@@ -261,6 +261,10 @@ async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
 /// that carried the credential is therefore reported as *which door it went to*, drawn
 /// from [`SIGN_INS`], or as [`SOMEWHERE_ELSE`] where it went anywhere this file does not
 /// name. A wrong door is the whole finding; its spelling adds nothing.
+///
+/// So nothing derived from the traffic reaches the message at all — not even the list of
+/// doors, which would only repeat one of two constants back. What a failure prints is the
+/// phrase for "somewhere else" and the set of doors that are allowed, both written here.
 fn no_password_left_except_this_program_s_own(which: &str, sent: &[Request]) {
     let doors: Vec<&str> = sent
         .iter()
@@ -286,8 +290,8 @@ fn no_password_left_except_this_program_s_own(which: &str, sent: &[Request]) {
     );
     assert!(
         !doors.contains(&SOMEWHERE_ELSE),
-        "{which} sent a password somewhere other than this program's own sign-ins: \
-         {doors:?}"
+        "{which} sent the recorded credential to {SOMEWHERE_ELSE}; the only ones it may \
+         reach are this program's own sign-ins, {SIGN_INS:?}"
     );
 }
 
