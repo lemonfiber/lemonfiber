@@ -161,23 +161,22 @@ fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
 }
 
 /// Every command that hands an operator an invitation to pass on, with the server each
-/// one needs answering behind it.
+/// one needs answering behind it. Named in [`BOTH_WAYS`], which is held to this list's
+/// length.
 ///
 /// **Named as a pair so that a third such command cannot be added without landing
 /// here.** The claim this file makes is about the set of ways an account comes to have
 /// a password set on it, and a set is only a claim while nothing outside it exists —
 /// so the guard below walks this list rather than naming a command.
-fn both_ways_an_account_becomes_claimable() -> Vec<(&'static str, Command, Arc<Fake>)> {
+fn both_ways_an_account_becomes_claimable() -> Vec<(Command, Arc<Fake>)> {
     vec![
         (
-            "invite",
             Command::Invite {
                 name: "ana".to_owned(),
             },
             a_server_holding_nobody(),
         ),
         (
-            "reissue",
             Command::Reissue {
                 name: "ana".to_owned(),
             },
@@ -185,6 +184,13 @@ fn both_ways_an_account_becomes_claimable() -> Vec<(&'static str, Command, Arc<F
         ),
     ]
 }
+
+/// What each of them is called, in the order they are built above.
+///
+/// **Kept apart from the pair rather than carried in it** so that no value a failure
+/// message prints has ever travelled beside a credential. A label bundled with the
+/// server that holds one is, to anything reading the flow, a thing derived from it.
+const BOTH_WAYS: [&str; 2] = ["invite", "reissue"];
 
 /// Run one of them, and hand back everything that was sent doing it.
 async fn driving(
@@ -245,7 +251,16 @@ async fn the_account_is_asked_for_by_name_and_nothing_else() {
 /// that there is exactly one.
 #[tokio::test]
 async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
-    for (which, command, http) in both_ways_an_account_becomes_claimable() {
+    let both = both_ways_an_account_becomes_claimable();
+    assert_eq!(
+        both.len(),
+        BOTH_WAYS.len(),
+        "a way for an account to become claimable was added without a name to report it \
+         by, so a failure would not say which one leaked"
+    );
+    // Zipped rather than indexed, so `which` comes out of the constant above and is
+    // never derived from the pair it is describing.
+    for (which, (command, http)) in BOTH_WAYS.into_iter().zip(both) {
         let (sent, _) = driving(which, command, http).await;
         no_password_left_except_this_program_s_own(which, &sent);
     }
