@@ -211,6 +211,14 @@ pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 /// sign-in, so a second record would be a second copy of the same secret.
 pub const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
 
+/// The environment key holding the book \*arr's API key.
+///
+/// The one credential in the stack that lemonfiber mints and the *service* adopts,
+/// rather than one it mints and keeps: given this in its environment the service takes
+/// it verbatim instead of generating its own, which is what lets both sides know it
+/// without reading the database it would otherwise keep it in.
+pub const BINDERY_API_KEY: &str = "BINDERY_API_KEY";
+
 /// The name of the listening server's first account.
 pub const AUDIOBOOKSHELF_USER: &str = "admin";
 
@@ -281,6 +289,7 @@ pub const SETTINGS: &[&str] = &[
     QBITTORRENT_PASSWORD_KEY,
     JELLYFIN_ADMIN_PASSWORD_KEY,
     AUDIOBOOKSHELF_PASSWORD_KEY,
+    BINDERY_API_KEY,
     FRONT_DOOR_KEY,
 ];
 

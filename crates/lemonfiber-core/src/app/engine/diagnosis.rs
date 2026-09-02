@@ -150,7 +150,7 @@ pub(crate) async fn quoted(ctx: &Ctx, findings: Vec<Finding>) -> Vec<Finding> {
         return findings;
     }
 
-    let lines = super::lately(ctx, &troubled).await;
+    let lines = super::settling::lately(ctx, &troubled).await;
     findings
         .into_iter()
         .map(|finding| {
