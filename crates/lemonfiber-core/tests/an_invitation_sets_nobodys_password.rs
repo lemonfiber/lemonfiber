@@ -48,6 +48,10 @@ use lemonfiber_ports::docker::{Health, Lifecycle};
 /// these and nowhere else, not that it goes to one place.
 const SIGN_INS: [&str; 2] = ["/Users/AuthenticateByName", "/auth/jellyfin"];
 
+/// Stood in for any door [`SIGN_INS`] does not name, so that a failure says a password
+/// went somewhere it should not have without repeating where.
+const SOMEWHERE_ELSE: &str = "a door this file does not name";
+
 /// Where an account is asked for.
 const NEW_ACCOUNT: &str = "/Users/New";
 
@@ -249,8 +253,16 @@ async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
 
 /// Held apart from the loop above so the two assertions read as one claim about one
 /// command's traffic rather than as a pass over everything both of them sent.
+///
+/// **What a failure prints is named from this file's own constants, never from the
+/// traffic.** The subject here is a credential that must not travel, so a message built
+/// out of the requests would put the very thing under test into a terminal and a CI log —
+/// which is the failure this exists to catch, arriving by the back door. Each request
+/// that carried the credential is therefore reported as *which door it went to*, drawn
+/// from [`SIGN_INS`], or as [`SOMEWHERE_ELSE`] where it went anywhere this file does not
+/// name. A wrong door is the whole finding; its spelling adds nothing.
 fn no_password_left_except_this_program_s_own(which: &str, sent: &[Request]) {
-    let carrying: Vec<String> = sent
+    let doors: Vec<&str> = sent
         .iter()
         .filter(|request| {
             request
@@ -258,20 +270,24 @@ fn no_password_left_except_this_program_s_own(which: &str, sent: &[Request]) {
                 .as_ref()
                 .is_some_and(|body| body.contains(&admin_password()))
         })
-        .map(|request| request.url.clone())
+        .map(|request| {
+            SIGN_INS
+                .iter()
+                .find(|door| request.url.contains(*door))
+                .copied()
+                .unwrap_or(SOMEWHERE_ELSE)
+        })
         .collect();
 
     assert!(
-        !carrying.is_empty(),
+        !doors.is_empty(),
         "{which} carried the recorded credential nowhere, so this proves nothing about \
          where one travels — the exchange under it did not run"
     );
     assert!(
-        carrying
-            .iter()
-            .all(|url| SIGN_INS.iter().any(|door| url.contains(door))),
+        !doors.contains(&SOMEWHERE_ELSE),
         "{which} sent a password somewhere other than this program's own sign-ins: \
-         {carrying:?}"
+         {doors:?}"
     );
 }
 
