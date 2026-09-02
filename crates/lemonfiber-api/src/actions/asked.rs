@@ -188,6 +188,7 @@ pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "w
 /// command line drops it there too.
 pub const TAKES_AGREEMENT: &[&str] = &[
     "forget",
+    "remove",
     "quality-set",
     "quality-upgrade",
     "repair",
@@ -331,8 +332,11 @@ pub const TAKES_PRESET: &[&str] = &["quality-set"];
 /// but here.
 pub const TAKES_ARCHIVE: &[&str] = &["restore"];
 
-/// The one action that is about a person rather than a form, a file or a service.
-pub const TAKES_NAME: &[&str] = &["invite"];
+/// The actions that are about a person rather than a form, a file or a service.
+///
+/// Both halves of the same errand: offering somebody an account, and taking it away
+/// again. Nothing else on this surface is addressed to a member of the household.
+pub const TAKES_NAME: &[&str] = &["invite", "remove"];
 
 /// The action whose command carries what goes in a bundle.
 ///

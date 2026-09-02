@@ -47,6 +47,7 @@ pub mod queue;
 mod quiesced;
 mod record;
 pub mod recover;
+mod remove;
 pub mod repair;
 mod repairs;
 mod reset;
@@ -115,6 +116,8 @@ pub enum Outcome {
     Clients(crate::clients::Guidance),
     /// An account offered to somebody in the house.
     Invited(crate::model::Invitation),
+    /// Somebody taken out of the household, or what taking them would cost.
+    Removed(crate::model::HouseholdRemoval),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
@@ -168,6 +171,7 @@ impl Outcome {
             Self::Glossary(_) => kind::GLOSSARY,
             Self::Clients(_) => kind::CLIENTS,
             Self::Invited(_) => kind::INVITATION,
+            Self::Removed(_) => kind::REMOVAL,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Stored(_) => crate::model::kind::STORED,
             Self::Status(_) => crate::model::kind::STATUS,
@@ -207,6 +211,7 @@ impl serde::Serialize for Outcome {
             Self::Glossary(report) => report.serialize(serializer),
             Self::Clients(report) => report.serialize(serializer),
             Self::Invited(report) => report.serialize(serializer),
+            Self::Removed(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
@@ -238,6 +243,14 @@ pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
 /// Fetching images is switched off, so there was nothing to fetch with.
 pub const REGISTRY_REFUSED: Code = Code::new("LIFE-4");
 
+/// Ask the engine to act on a set of services, which three commands do identically.
+///
+/// Named apart because they differ only in the action, and three arms that said the same
+/// thing three times is what left `dispatch` with no room for a new command.
+async fn acting(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcome, Box<Problem>> {
+    engine::lifecycle(ctx, forms, &action).await
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -250,16 +263,12 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
-        Command::Start { forms, services } => {
-            engine::lifecycle(ctx, &forms, &Action::Start(services)).await
-        }
+        Command::Start { forms, services } => acting(ctx, &forms, Action::Start(services)).await,
         Command::Down { forms, wait } => engine::teardown(ctx, &forms, wait).await,
-        Command::Halt { forms, services } => {
-            engine::lifecycle(ctx, &forms, &Action::Stop(services)).await
-        }
+        Command::Halt { forms, services } => acting(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await,
         Command::Restart { forms, services } => {
-            engine::lifecycle(ctx, &forms, &Action::Restart(services)).await
+            acting(ctx, &forms, Action::Restart(services)).await
         }
         Command::Pull { forms } => engine::lifecycle(ctx, &forms, &Action::Pull).await,
         Command::ConfigGet { key } => configuring::configuration(ctx, Some(&key), None),
@@ -283,6 +292,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance())),
         Command::Invite { name } => invite::offer(ctx, name).await.map(Outcome::Invited),
+        Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
         Command::Outbound => {
             // The stack has to be readable, because half the answer is about it: a
             // manifest that could not be read would leave the services' own requests
@@ -410,6 +420,92 @@ mod tests {
             Ok(Outcome::Invited(report)) => Some(report),
             _ => None,
         }
+    }
+
+    /// The removal a dispatch answered with, where it answered with one.
+    ///
+    /// Named for the same reason `invited` is: a `matches!` spanning lines inside an
+    /// assertion leaves the gate a line it cannot see executed.
+    fn removed(
+        said: &Result<Outcome, Box<super::Problem>>,
+    ) -> Option<&crate::model::HouseholdRemoval> {
+        match said {
+            Ok(Outcome::Removed(report)) => Some(report),
+            _ => None,
+        }
+    }
+
+    /// Removing somebody dispatches, and unconfirmed it removes nobody.
+    ///
+    /// **In-crate as well as out**, because this file is compiled twice — once with this
+    /// module and once as the library the `tests/*.rs` binaries link — and a command
+    /// dispatched from only one leaves the other copy's arm counted as never run.
+    #[tokio::test]
+    async fn a_removal_dispatches_and_says_what_it_would_cost() {
+        let env = recorded_admin("removing");
+        let household = r#"[{"Id":"9","Name":"ana","HasPassword":true,
+            "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![signed_in.clone(), signed_in],
+            ),
+            ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+            (
+                "/api/v1/request",
+                vec![Answer::reply(
+                    200,
+                    r#"{"pageInfo":{"results":0},"results":[]}"#,
+                )],
+            ),
+            ("/user/jellyfin/", vec![Answer::reply(404, "")]),
+            ("/Users", vec![Answer::reply(200, household)]),
+            ("", vec![Answer::reply(200, "[]")]),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let said = dispatch(
+            Command::Remove {
+                name: "ana".to_owned(),
+                confirm: false,
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            removed(&said).is_some_and(|report| !report.confirmed && report.name == "ana"),
+            "{said:?}"
+        );
+
+        // And the other answer the reader has: a refusal is not a removal, which is
+        // what stops a test reading one as the other where both are `Ok`-shaped.
+        let refused = dispatch(
+            Command::Remove {
+                name: "  ".to_owned(),
+                confirm: false,
+            },
+            &ctx,
+        )
+        .await;
+        assert!(removed(&refused).is_none(), "{refused:?}");
+
+        // Serialised here as well as from `tests/`: this file is compiled twice, and
+        // the envelope arm is a line of the copy that does the serialising — so the
+        // copy that never serialises leaves it counted as never run.
+        let json = said
+            .ok()
+            .and_then(|outcome| outcome.envelope().to_json())
+            .unwrap_or_default();
+        assert!(json.contains(r#""kind":"removal""#), "{json}");
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
     /// A scratch environment file holding the media server's recorded password.
@@ -1879,6 +1975,7 @@ mod tests {
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
+                | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -1921,6 +2018,7 @@ mod tests {
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
+                | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -2743,6 +2841,7 @@ mod tests {
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
+                | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Status(_)
@@ -3739,6 +3838,7 @@ mod tests {
                 | Outcome::Glossary(_)
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
+                | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Doctor(_)

@@ -98,3 +98,53 @@ pub struct Invitation {
     /// is `Made` and `NotYet` — and that disagreement is the state this reports.
     pub linked: Linked,
 }
+
+/// How far a removal got, across the two services a household member exists on.
+///
+/// The media server is removed first and the request service second, because the
+/// request service authenticates *through* the media server — so once the first is gone
+/// they can do nothing either way, and a failure at the second leaves an account that
+/// cannot sign in rather than somebody who can still watch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Revoked {
+    /// Both, which is what removal means.
+    Everywhere,
+    /// The media server only, and the request service still holds an account.
+    ///
+    /// They can neither watch nor ask — the account left behind signs in through the one
+    /// that is gone — but something is there that should not be, and the next run of this
+    /// command takes it.
+    MediaServerOnly,
+    /// Nothing was removed, because nothing was confirmed.
+    Nothing,
+}
+
+/// What removing somebody costs, and what it did.
+///
+/// Read before anything is written: the whole point of the unconfirmed run is that every
+/// figure here is knowable without removing anybody.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub struct HouseholdRemoval {
+    /// The name their account is held under, as the media server spells it rather than
+    /// as the operator typed it.
+    pub name: String,
+    /// Whether it was carried out, or only described pending confirmation.
+    pub confirmed: bool,
+    /// How many of their requests go with them.
+    ///
+    /// **They are destroyed, not reassigned.** The request service removes them by hand
+    /// so that a title still waiting goes back to being unrequested rather than pointing
+    /// at nobody — so this is a count of things that will stop existing.
+    pub requests: usize,
+    /// Whether the request service holds an account for them at all.
+    ///
+    /// False where they never signed in there, which is nothing to revoke rather than a
+    /// revocation that failed.
+    pub asks_through_the_request_service: bool,
+    /// How far it got.
+    pub revoked: Revoked,
+    /// What could not be done, and anything else worth the operator's attention.
+    pub findings: Vec<String>,
+}

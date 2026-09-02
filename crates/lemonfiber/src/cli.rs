@@ -295,6 +295,19 @@ pub enum Request {
         /// What they will sign in as.
         name: String,
     },
+    /// Take somebody out of the household, in both places they have an account.
+    ///
+    /// Revokes access to the media server and to the request service. Their watch
+    /// history goes with the account — the media server offers no way to keep it —
+    /// and the request service destroys what they asked for. Because none of that
+    /// can be got back, it says what would go and does nothing until `--confirm`.
+    Remove {
+        /// Whose account to take away, as `lemonfiber household` shows them.
+        name: String,
+        /// Go ahead and remove them, having seen what goes.
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Remove everything lemonfiber keeps on this machine.
     ///
     /// The two directories and everything under them. Your library, your downloads

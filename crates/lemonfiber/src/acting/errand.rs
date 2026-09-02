@@ -161,6 +161,18 @@ static AFTER: &[Errand] = &[
         going: Going::Once,
     },
     Errand {
+        name: "somebody taken out of the household",
+        about: "revoke their account on the media server and on the request service",
+        action: "remove",
+        asks: "Remove from the household",
+        needs: Needs::Named("Who to remove, as they appear in the household"),
+        accepts: None,
+        // Agreed rather than once: the run before it says what goes — their watch
+        // history, which cannot be kept, and every request they made, which stops
+        // existing — so what is agreed to is what was read.
+        going: Going::Agreed,
+    },
+    Errand {
         name: "a backup",
         about: "capture a configuration to an archive kept on this machine",
         action: "backup",

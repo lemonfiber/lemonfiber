@@ -70,6 +70,12 @@ what to do about it, is written for operators at
 - `QUAL-3`
 - `READ-1`
 - `READ-2`
+- `REMOVE-1`
+- `REMOVE-2`
+- `REMOVE-3`
+- `REMOVE-4`
+- `REMOVE-5`
+- `REMOVE-6`
 - `REPAIR-1`
 - `REPAIR-2`
 - `REPAIR-3`

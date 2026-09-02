@@ -286,6 +286,29 @@ pub trait Requests: Send + Sync {
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn link_members(&self, members: &[String]) -> Result<(), Failure>;
 
+    /// The account this service holds for a media-server member, where it holds one.
+    ///
+    /// `None` where it holds none — a member who has never signed in here is somebody
+    /// this service has never heard of, which is **nothing to revoke** rather than a
+    /// failure to revoke something.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn member_for(&self, media_server_id: &str) -> Result<Option<String>, Failure>;
+
+    /// Take that account away, and with it everything it asked for.
+    ///
+    /// **This destroys their requests**, which is the service's own behaviour and not a
+    /// choice made here: it removes them by hand so that a title still waiting goes back
+    /// to being unrequested rather than being left pointing at nobody. Anything shown to
+    /// an operator before this runs has to say so.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn remove_member(&self, id: &str) -> Result<(), Failure>;
+
     /// What the request service will tell the household about, as it stands.
     ///
     /// # Errors

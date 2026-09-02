@@ -205,6 +205,18 @@ pub enum Command {
         /// What they will sign in as.
         name: String,
     },
+    /// Take somebody out of the household, revoking their access to both the media
+    /// server and the request service.
+    ///
+    /// Because it throws away what cannot be got back — their watch history goes with
+    /// the account, and the request service destroys what they asked for — it says
+    /// what would go and does nothing until `confirm`.
+    Remove {
+        /// Whose account to take away.
+        name: String,
+        /// Go ahead and remove them, having seen what goes.
+        confirm: bool,
+    },
     /// List everything that leaves this machine: what lemonfiber asks of the world
     /// on its own account, and what the stack's own services ask of it.
     ///

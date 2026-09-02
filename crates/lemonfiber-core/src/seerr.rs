@@ -17,12 +17,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+mod records;
+
+use records::{RequestPage, RequestRecord, REQUEST_PAGE};
+
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
     Failure, FulfilmentTarget, HouseholdRequest, RegisteredTarget, Requests, Telling,
 };
-use crate::recyclarr::Kind;
 
 /// Seerr's own API key, read from the settings file it writes.
 ///
@@ -141,6 +144,31 @@ const TELEVISION: &str = "/settings/sonarr";
 /// with, so what is sent is identifiers and not accounts. **A member it already holds
 /// is skipped**, which is what lets every member be sent on every run.
 const LINK_MEMBERS: &str = "/user/import-from-jellyfin";
+
+/// What this service answers when it holds no account for somebody.
+///
+/// Its own word for "I have never heard of this person", which for a removal is an
+/// answer rather than a fault.
+const NOT_FOUND: u16 = 404;
+
+/// One account this service holds, in the spelling it answers with.
+///
+/// Only the identifier is read. Everything else about the person — what they are called,
+/// what they may watch — is the media server's to say, and a second copy here would be a
+/// copy able to disagree with it.
+#[derive(Deserialize)]
+struct MemberResource {
+    #[serde(default)]
+    id: i64,
+}
+
+/// Where the accounts this service holds are read and removed.
+///
+/// The lookup is by the **media server's** identifier rather than this service's own,
+/// because that is the one lemonfiber holds: it made the account over there. The service
+/// normalises it — dashes stripped, lower-cased, and refused unless it is 32 hex
+/// characters — so what goes must be a media-server account identifier and nothing else.
+const MEMBERS: &str = "/user";
 
 /// How available a film must be before it is fetched.
 ///
@@ -412,6 +440,34 @@ impl Requests for Seerr {
         self.endpoint.expect_success(&written)
     }
 
+    async fn member_for(&self, media_server_id: &str) -> Result<Option<String>, Failure> {
+        let path = format!("{MEMBERS}/jellyfin/{media_server_id}");
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, &path, None))
+            .await?;
+        // Never having heard of somebody is an answer, not a fault: a member who has
+        // not signed in here has no account to take away. Any other refusal is a
+        // refusal, and is reported as one.
+        if response.status == NOT_FOUND {
+            return Ok(None);
+        }
+        let held: MemberResource = self.endpoint.decode(
+            &response,
+            "the account this service holds could not be read",
+        )?;
+        Ok(Some(held.id.to_string()))
+    }
+
+    async fn remove_member(&self, id: &str) -> Result<(), Failure> {
+        let path = format!("{MEMBERS}/{id}");
+        let gone = self
+            .endpoint
+            .send(&self.request(Method::Delete, &path, None))
+            .await?;
+        self.endpoint.expect_success(&gone)
+    }
+
     async fn telling(&self) -> Result<Telling, Failure> {
         let response = self
             .endpoint
@@ -437,81 +493,5 @@ impl Requests for Seerr {
             .send(&self.request(Method::Post, WEBPUSH, Some(body)))
             .await?;
         self.endpoint.expect_success(&written)
-    }
-}
-
-/// How many requests are read per page. Seerr answers ten at a time unless told
-/// otherwise, so a household of any size would take a walk; this asks for a generous
-/// page and walks on only where the service's own total says there is more.
-const REQUEST_PAGE: usize = 100;
-
-/// A page of the household's requests, and the totals that say whether there are more.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RequestPage {
-    #[serde(default)]
-    page_info: PageInfo,
-    #[serde(default)]
-    results: Vec<RequestRecord>,
-}
-
-/// How many requests there are in total, so the walk knows when it has them all.
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PageInfo {
-    #[serde(default)]
-    results: usize,
-}
-
-/// One request as Seerr records it: what became of it, what became of the media it
-/// asked for, who asked, and — once it has been handed over — which \*arr item it is.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RequestRecord {
-    #[serde(default)]
-    status: u8,
-    #[serde(default, rename = "type")]
-    media_type: String,
-    #[serde(default)]
-    media: MediaRecord,
-    #[serde(default)]
-    requested_by: MemberRecord,
-}
-
-/// The media a request asked for. It carries no title — Seerr looks those up from a
-/// metadata service rather than storing them — but it does carry the id the \*arr
-/// filing it knows it by, which is the exact join a name is found through.
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MediaRecord {
-    #[serde(default)]
-    status: u8,
-    #[serde(default)]
-    external_service_id: Option<i64>,
-}
-
-/// The member who asked, under the display name Seerr shows them by.
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MemberRecord {
-    #[serde(default)]
-    display_name: String,
-}
-
-impl RequestRecord {
-    /// The request as the port carries it, with the media type read into the service
-    /// that files it — television or film, or nothing for a kind this build does not know.
-    fn into_request(self) -> HouseholdRequest {
-        HouseholdRequest {
-            member: self.requested_by.display_name,
-            kind: match self.media_type.as_str() {
-                "tv" => Some(Kind::Sonarr),
-                "movie" => Some(Kind::Radarr),
-                _ => None,
-            },
-            item: self.media.external_service_id,
-            request_status: self.status,
-            media_status: self.media.status,
-        }
     }
 }
