@@ -292,9 +292,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance())),
         Command::Invite { name } => invite::offer(ctx, name).await.map(Outcome::Invited),
-        Command::Remove { name, confirm } => remove::remove(ctx, name, confirm)
-            .await
-            .map(Outcome::Removed),
+        Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
         Command::Outbound => {
             // The stack has to be readable, because half the answer is about it: a
             // manifest that could not be read would leave the services' own requests
@@ -486,6 +484,27 @@ mod tests {
             removed(&said).is_some_and(|report| !report.confirmed && report.name == "ana"),
             "{said:?}"
         );
+
+        // And the other answer the reader has: a refusal is not a removal, which is
+        // what stops a test reading one as the other where both are `Ok`-shaped.
+        let refused = dispatch(
+            Command::Remove {
+                name: "  ".to_owned(),
+                confirm: false,
+            },
+            &ctx,
+        )
+        .await;
+        assert!(removed(&refused).is_none(), "{refused:?}");
+
+        // Serialised here as well as from `tests/`: this file is compiled twice, and
+        // the envelope arm is a line of the copy that does the serialising — so the
+        // copy that never serialises leaves it counted as never run.
+        let json = said
+            .ok()
+            .and_then(|outcome| outcome.envelope().to_json())
+            .unwrap_or_default();
+        assert!(json.contains(r#""kind":"removal""#), "{json}");
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 

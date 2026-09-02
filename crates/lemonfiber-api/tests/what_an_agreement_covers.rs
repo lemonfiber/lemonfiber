@@ -5,7 +5,7 @@
 //! were read as one thing for long enough that three artefacts came to disagree: the
 //! table, the doc comment over it and the code underneath.
 //!
-//! So each of the six is held to where its agreement actually lands, one at a time,
+//! So each of the seven is held to where its agreement actually lands, one at a time,
 //! rather than to a rule they were assumed to share. A guard that asserted the shared
 //! rule would have to be either false or vacuous — false for the two that do not
 //! follow it, and vacuous if it were weakened until they did.
@@ -43,20 +43,21 @@ fn bundling(write: bool, reveal: &[&str], confirm: bool) -> Arguments {
     }
 }
 
-// ── Six actions carry an agreement, and every one of them can be given it ──────
+// ── Seven actions carry an agreement, and every one of them can be given it ────
 
 #[test]
 fn every_action_the_table_names_accepts_the_agreement_it_names_them_for() {
-    // The table's own claim, which is the only one all six share: this is the list
+    // The table's own claim, which is the only one all seven share: this is the list
     // of names whose command has somewhere to put a yes. An entry that did not
     // would refuse the very argument the table says it takes.
     for action in TAKES_AGREEMENT {
         let given = Arguments {
             confirm: true,
-            // The two that cannot be asked for at all without a subject, so what
-            // this holds is the agreement rather than the missing name.
+            // The three that cannot be asked for at all without a subject, so what
+            // this holds is the agreement rather than the missing one.
             preset: (*action == "quality-set").then(|| Preset::Balanced.label().to_owned()),
             archive: (*action == "restore").then(|| "a-backup.tar.gz".to_owned()),
+            name: (*action == "remove").then(|| "ana".to_owned()),
             ..Arguments::default()
         };
         assert_eq!(refusal(action, given), None, "{action}");

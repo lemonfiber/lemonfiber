@@ -52,6 +52,7 @@ pub const OFFERED: &[&str] = &[
     "forget",
     "backup",
     "invite",
+    "remove",
     "support",
     "restore",
     "watch",
@@ -69,6 +70,26 @@ pub const OFFERED: &[&str] = &[
 /// would see the drive vanish and have nothing to do about it. The command line
 /// refuses all four the same way.
 const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
+
+/// The command one of the two household actions names.
+///
+/// Both are addressed to a member rather than to a form, a file or a service, and both
+/// are refused the same way when nobody is named — so the refusal is written once.
+fn about_a_person(
+    action: &str,
+    which: &str,
+    name: Option<String>,
+    confirm: bool,
+) -> Result<Command, Refused> {
+    let name = name.ok_or_else(|| Refused::Missing {
+        action: action.to_owned(),
+        argument: "name".to_owned(),
+    })?;
+    if which == "invite" {
+        return Ok(Command::Invite { name });
+    }
+    Ok(Command::Remove { name, confirm })
+}
 
 /// The command an action names, or why it names none.
 ///
@@ -136,9 +157,12 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // answers with — so what a browser agrees to is what it was shown.
         "forget" => Ok(Command::Forget { confirm }),
         "backup" => Ok(Command::Backup { service }),
-        "invite" => Ok(Command::Invite {
-            name: name.ok_or_else(|| needs("name"))?,
-        }),
+        // The two addressed to a person rather than a form, a file or a service.
+        // Unconfirmed, a removal says what it takes — their watch history, and every
+        // request they made — and touches neither service, so what a browser agrees
+        // to is what it was shown, the way a forget's agreement is.
+        "invite" => about_a_person(action, "invite", name, confirm),
+        "remove" => about_a_person(action, "remove", name, confirm),
         // The one diagnosis asked for here rather than served as a read. It reaches
         // the same command `/api/checks` reaches, widened by the same word the
         // command line widens it with — so it is not a second reading of the stack,

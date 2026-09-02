@@ -42,24 +42,21 @@ pub(super) fn removal(report: &HouseholdRemoval) -> Lines {
         );
     }
 
-    if report.confirmed {
-        lines.spaced(match report.revoked {
-            Revoked::Everywhere => "Both accounts are gone.".to_owned(),
-            Revoked::MediaServerOnly => {
-                "The media server's account is gone. The request service's is not — see \
-                 below."
-                    .to_owned()
-            }
-            // Not reachable from a confirmed run, and said plainly rather than left to
-            // print an empty line if it ever becomes so.
-            Revoked::Nothing => "Nothing was removed.".to_owned(),
-        });
-    } else {
-        lines.spaced(format!(
+    // Read off what was revoked rather than off the flag beside it. Saying it twice —
+    // once from `confirmed`, once from `revoked` — is two accounts of one fact that can
+    // disagree, and it left a sentence for a state that cannot arise: a confirmed run
+    // that revoked nothing. Taken from `revoked` alone, every ending is one that happens.
+    lines.spaced(match report.revoked {
+        Revoked::Everywhere => "Both accounts are gone.".to_owned(),
+        Revoked::MediaServerOnly => {
+            "The media server's account is gone. The request service's is not — see below."
+                .to_owned()
+        }
+        Revoked::Nothing => format!(
             "Nothing has been removed. Run `lemonfiber remove {} --confirm` to go ahead.",
             report.name
-        ));
-    }
+        ),
+    });
 
     for finding in &report.findings {
         lines.put(format!("  ! {finding}"));
@@ -176,6 +173,35 @@ mod tests {
         assert!(
             !text.contains("--confirm"),
             "a done removal still asked: {text}"
+        );
+    }
+
+    /// The dispatcher draws a removal, which is how every surface reaches this.
+    ///
+    /// Calling the renderer directly proves what it writes; this proves the outcome
+    /// arrives at it, which is the half a renderer's own tests cannot see.
+    #[test]
+    fn the_dispatch_draws_a_removal() {
+        let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Removed(asked(1))).text();
+
+        assert!(
+            drawn.contains("Removing ana would take all of this:"),
+            "{drawn}"
+        );
+    }
+
+    /// Several requests read as several, and in the tense of a run that has happened.
+    #[test]
+    fn more_than_one_request_reads_as_more_than_one() {
+        let done = HouseholdRemoval {
+            confirmed: true,
+            revoked: Revoked::Everywhere,
+            ..asked(3)
+        };
+        let text = removal(&done).text();
+        assert!(
+            text.contains("The 3 things they asked for, which no longer exist"),
+            "{text}"
         );
     }
 

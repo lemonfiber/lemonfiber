@@ -371,6 +371,32 @@ fn context_on(env: &std::path::Path, http: Arc<Fake>, stack: Source) -> Ctx {
     .with_http(http)
 }
 
+/// A stack that cannot be read is an error rather than an empty household.
+///
+/// Nothing is removed and nothing is claimed about who is here: a manifest that will
+/// not parse says nothing about the household, and reporting nobody would be a claim.
+#[tokio::test]
+async fn a_stack_that_cannot_be_read_removes_nobody() {
+    let env = recorded_admin("unreadable-stack");
+    let ctx = context_on(
+        &env,
+        answering(),
+        Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
+    );
+
+    let refused = dispatch(
+        Command::Remove {
+            name: "ana".to_owned(),
+            confirm: true,
+        },
+        &ctx,
+    )
+    .await;
+
+    assert!(refused.is_err(), "an unreadable stack removed somebody");
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
 /// A stack with no media server has no household to remove anybody from.
 #[tokio::test]
 async fn a_stack_with_no_media_server_has_nobody_to_remove() {

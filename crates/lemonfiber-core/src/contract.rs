@@ -186,7 +186,14 @@ mod tests {
     use crate::stack::closure::Plan;
 
     /// Arms in `Outcome::envelope`, so a variant added without a sample here fails.
-    const OUTCOMES: usize = 22;
+    ///
+    /// **Bump this when you add one.** The comparison is against how many kinds the
+    /// samples below actually wrote, so a variant added *with* its sample trips this
+    /// and a variant added *without* one slips past — the opposite of what this is for.
+    /// The number is what makes it bite either way, so it is the number that has to
+    /// move, and the sample beside it is what proves the new kind writes what the
+    /// contract says it writes.
+    const OUTCOMES: usize = 23;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -287,6 +294,14 @@ mod tests {
             }),
             Outcome::Glossary(Vocabulary {
                 words: vec![a_word()],
+            }),
+            Outcome::Removed(crate::model::HouseholdRemoval {
+                name: "ana".to_owned(),
+                confirmed: false,
+                requests: 1,
+                asks_through_the_request_service: true,
+                revoked: crate::model::Revoked::Nothing,
+                findings: Vec::new(),
             }),
         ]
     }

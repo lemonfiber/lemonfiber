@@ -628,10 +628,22 @@ mod tests {
         .text();
         assert!(!listed.contains("Words used here:"), "{listed}");
     }
+    /// One of every outcome the dispatch can answer with.
+    ///
+    /// A list rather than a derivation, so it has to be edited when a variant is added
+    /// — and the test below is what makes forgetting expensive: an outcome missing here
+    /// is one whose prose and whose envelope are both proved by nothing.
+    ///
+    /// In two halves only because one list of them outgrew what a function may hold.
+    fn every_outcome() -> Vec<Outcome> {
+        let mut every = the_first_of_them();
+        every.extend(the_rest_of_them());
+        every
+    }
 
-    #[test]
-    fn every_outcome_renders_and_every_outcome_renders_as_json() {
-        let outcomes = vec![
+    /// The first half of the list above.
+    fn the_first_of_them() -> Vec<Outcome> {
+        vec![
             Outcome::Version(a_version()),
             Outcome::Forms(some_forms()),
             Outcome::Preview(a_plan("media", Vec::new())),
@@ -682,6 +694,12 @@ mod tests {
                 beside: Vec::new(),
             }),
             Outcome::Lifecycle(a_lifecycle("up", a_plan("media", Vec::new()))),
+        ]
+    }
+
+    /// The second half of the list above.
+    fn the_rest_of_them() -> Vec<Outcome> {
+        vec![
             Outcome::Status(StatusReport {
                 forms: Vec::new(),
                 condition: Condition::Inactive,
@@ -730,10 +748,22 @@ mod tests {
             Outcome::Archives(Listing {
                 archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
             }),
-        ];
+            Outcome::Removed(lemonfiber_core::model::HouseholdRemoval {
+                name: "ana".to_owned(),
+                confirmed: false,
+                requests: 1,
+                asks_through_the_request_service: true,
+                revoked: lemonfiber_core::model::Revoked::Nothing,
+                findings: Vec::new(),
+            }),
+        ]
+    }
+
+    #[test]
+    fn every_outcome_renders_and_every_outcome_renders_as_json() {
         // Every arm of the dispatch renders something, and every one of them also
         // renders as an envelope a script can parse.
-        for outcome in outcomes {
+        for outcome in every_outcome() {
             assert!(!answer(&outcome, false).text().is_empty());
             let json = answer(&outcome, true).text();
             assert!(json.contains(r#""api_version""#), "{json}");

@@ -18,6 +18,25 @@ use crate::app::Ctx;
 use crate::model::{HouseholdRemoval, Revoked};
 use crate::ports::service::{Household as _, Member, Requests as _};
 
+/// The same, as the answer a surface is handed.
+///
+/// Here rather than in the dispatcher so that what a removal *is* and what it is called
+/// stay together: the dispatcher's job is to route, and a route that also builds the
+/// answer is two jobs in one line.
+///
+/// # Errors
+///
+/// Returns whatever [`remove`] returns.
+pub(super) async fn dispatched(
+    ctx: &Ctx,
+    name: String,
+    confirm: bool,
+) -> Result<super::Outcome, Box<crate::error::Problem>> {
+    remove(ctx, name, confirm)
+        .await
+        .map(super::Outcome::Removed)
+}
+
 /// Remove somebody from the household, or — until `confirm` — say what that would cost.
 ///
 /// # Errors
