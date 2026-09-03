@@ -437,7 +437,7 @@ pub(crate) mod tests {
     use super::{all, every, Errand, Given, Going, Needs, Outcome, Stage, KEY, LINES};
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber::reaching::{ACTS, ALSO};
-    use lemonfiber_api::actions::{Arguments, OFFERED as WEB, TAKES_AGREEMENT};
+    use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
     use lemonfiber_core::app::restore::{Consent, Kept};
     use lemonfiber_core::app::Command;
     use lemonfiber_core::bundle::Filenames;
@@ -529,11 +529,11 @@ pub(crate) mod tests {
 
         let _ = super::given(&mut stage, errand, "ana".to_owned());
 
-        let (asked, said) = match &stage {
-            Stage::Agreeing { given, .. } => (given.asked(), given.said().to_owned()),
-            _ => (Arguments::default(), String::new()),
-        };
-        assert_eq!(asked.name.as_deref(), Some("ana"), "{said}");
+        assert!(
+            matches!(&stage, Stage::Agreeing { given, .. }
+                if given.asked().name.as_deref() == Some("ana")),
+            "the word typed did not reach the question that sends it"
+        );
     }
 
     /// The whole point of naming the action rather than assembling a command here:
