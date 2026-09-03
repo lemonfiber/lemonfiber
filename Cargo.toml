@@ -70,6 +70,14 @@ indexing_slicing = "deny"
 todo = "deny"
 unimplemented = "deny"
 pedantic = { level = "warn", priority = -1 }
+# The one lint here that is off, and the reason is that its fix cannot be written:
+# it asks for `Duration::from_hours` and its siblings, which are unstable on every
+# stable compiler — `duration_constructors` has not landed. Saying the version this
+# builds on is what switched it on, because clippy withholds a suggestion whose fix
+# would not compile on the floor a crate names, and it believes these are available
+# at ours. Take this line out when the constructors stabilise; the code it wants is
+# better than the code it replaces.
+duration_suboptimal_units = "allow"
 
 # Config for 'dist'
 [workspace.metadata.dist]
