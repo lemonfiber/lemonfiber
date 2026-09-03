@@ -364,6 +364,10 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
         .filter(|request| request.method == Method::Delete)
         .map(|request| request.url)
         .collect();
+    // Counted before it is judged. The withdrawal asserted above can only have
+    // happened through one of these, so an empty list here would mean the two
+    // readings disagree — and `all` over an empty list would call that fine.
+    assert_eq!(taken.len(), 1, "{taken:?}");
     assert!(
         taken.iter().all(|url| url.ends_with("/Users/7")),
         "an account other than the expired invitation was deleted: {taken:?}"
