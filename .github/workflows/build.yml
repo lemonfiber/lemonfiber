@@ -36,6 +36,23 @@ jobs:
         run: cargo clippy --all-targets --workspace -- -D warnings
       - name: Test
         run: cargo test --workspace
+  # `rust-version` in the root manifest is a promise about who can build this from
+  # source. This is what collects on it, on the exact toolchain that number names:
+  # every other job here runs on stable, which compiles plenty the oldest supported
+  # version will not.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.95.0
+        with:
+          toolchain: "1.95.0"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: The workspace builds on the version it claims
+        run: cargo check --workspace --locked
   deny:
     runs-on: ubuntu-latest
     steps:
