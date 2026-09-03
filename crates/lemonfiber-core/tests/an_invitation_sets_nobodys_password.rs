@@ -30,7 +30,7 @@
 
 use std::sync::Arc;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::http::Request;
@@ -173,6 +173,7 @@ fn both_ways_an_account_becomes_claimable() -> Vec<(Command, Arc<Fake>)> {
         (
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             a_server_holding_nobody(),
         ),
@@ -213,6 +214,7 @@ async fn offering(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
         scratch,
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         a_server_holding_nobody(),
     )

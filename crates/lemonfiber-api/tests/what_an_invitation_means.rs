@@ -33,8 +33,69 @@ fn an_invitation_carries_the_name_it_is_for() {
 
     assert!(matches!(
         command("invite", with_name),
-        Some(Command::Invite { name }) if name == "ana"
+        Some(Command::Invite { name, allowance })
+            if name == "ana" && allowance == lemonfiber_core::app::Allowance::default()
     ));
+}
+
+/// What an invitation is told the person may watch reaches the command whole: the
+/// libraries by the names they were given, and the age limit as the age it was given
+/// as, which is what the media server keeps.
+///
+/// Both together rather than one each, because they are one decision made at one
+/// moment and a carrier that dropped either would still be carrying an invitation.
+#[test]
+fn an_invitation_carries_what_they_may_watch() {
+    let narrowed = Arguments {
+        name: Some("ana".to_owned()),
+        libraries: vec!["Films".to_owned(), "Shows".to_owned()],
+        age_limit: Some(12),
+        ..Arguments::default()
+    };
+
+    assert!(
+        matches!(
+            command("invite", narrowed),
+            Some(Command::Invite { allowance, .. })
+                if allowance.libraries == ["Films", "Shows"] && allowance.age_limit == Some(12)
+        ),
+        "an invitation reached the core without what it was told they may watch"
+    );
+}
+
+/// Neither reaches the two household actions that make no account. A reissue takes a
+/// password off an account somebody already chose the access for, and a removal takes
+/// the account away — so both are refused by name rather than taken and dropped.
+#[test]
+fn what_somebody_may_watch_is_refused_to_the_actions_that_make_no_account() {
+    for action in ["reissue", "remove"] {
+        for (argument, given) in [
+            (
+                "libraries",
+                Arguments {
+                    name: Some("ana".to_owned()),
+                    libraries: vec!["Films".to_owned()],
+                    ..Arguments::default()
+                },
+            ),
+            (
+                "age_limit",
+                Arguments {
+                    name: Some("ana".to_owned()),
+                    age_limit: Some(15),
+                    ..Arguments::default()
+                },
+            ),
+        ] {
+            assert!(
+                matches!(
+                    refusal(action, given),
+                    Some(Refused::Unwanted { argument: named, .. }) if named == argument
+                ),
+                "{action} took {argument} rather than refusing it"
+            );
+        }
+    }
 }
 
 /// An invitation for nobody is refused, and the refusal names the argument.

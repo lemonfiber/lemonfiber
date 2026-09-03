@@ -50,6 +50,9 @@ what to do about it, is written for operators at
 - `INVITE-3`
 - `INVITE-4`
 - `INVITE-5`
+- `INVITE-6`
+- `INVITE-7`
+- `INVITE-8`
 - `KEPT-1`
 - `LIFE-1`
 - `LIFE-2`

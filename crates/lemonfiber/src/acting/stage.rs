@@ -35,6 +35,7 @@ use super::bundling::Held;
 use super::chooser::Chooser;
 use super::disturbing::Widening;
 use super::errand::{Errand, Given};
+use super::inviting::Limit;
 use super::lasting::{Begun, Lasting};
 use super::mending::{Agreed, Mending, Offering, Warning};
 use super::narrowing::Subject;
@@ -151,6 +152,25 @@ pub(super) enum Stage {
         /// The two answers, one of them selected, each carrying the whole of what the
         /// bundle would then be asked for.
         chooser: Chooser<Held>,
+    },
+    /// Typing which libraries an invitation lets somebody open, the name having been
+    /// typed.
+    Allowing {
+        /// The errand waiting on it, which is the one that offers an account.
+        errand: &'static Errand,
+        /// Who it is for, kept because the question after this one says all three
+        /// answers together and the line they were typed on is gone by then.
+        name: String,
+        /// What has been typed of the libraries.
+        typed: String,
+    },
+    /// Choosing how far up the ratings an invitation goes, the rest having been typed.
+    Limiting {
+        /// The errand being chosen for, which is the one that offers an account.
+        errand: &'static Errand,
+        /// No limit and each step above it, one of them selected, each carrying the
+        /// whole of what the invitation would then be asked for.
+        chooser: Chooser<Limit>,
     },
     /// Asking the core what the errand would do, before anybody agrees to it.
     Weighing {

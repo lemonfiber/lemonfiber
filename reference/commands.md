@@ -1043,6 +1043,12 @@ Options:
       --json
           Print machine-readable output
 
+      --library <NAME>
+          Let them watch only these libraries, named as the media server names them; none lets them watch all of them
+
+      --age-limit <AGE>
+          Hold back anything the media server rates above this age — 0, 7, 12, 15 and 18 are the steps offered; none sets no limit at all
+
       --dry-run
           Say what would happen, and change nothing
 

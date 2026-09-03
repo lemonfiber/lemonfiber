@@ -15,7 +15,7 @@ use async_trait::async_trait;
 
 use super::Jellyfin;
 use crate::ports::http::Method;
-use crate::ports::service::{Access, Failure, Invited, Member, NamedLibrary};
+use crate::ports::service::{Access, Allowed, Failure, Invited, Member, NamedLibrary};
 
 /// The account list, as the media server names its fields.
 #[derive(serde::Deserialize)]
@@ -74,6 +74,18 @@ impl UserResource {
     }
 }
 
+/// One account with its policy left exactly as the media server sent it.
+///
+/// Held as the server's own object rather than as the fields this product reads,
+/// because it goes back whole. Every key it carries travels back untouched, which is
+/// what keeps an age limit set here from putting a setting made in the media server's
+/// own screens back to that server's default.
+#[derive(serde::Deserialize)]
+struct AccountResource {
+    #[serde(rename = "Policy", default)]
+    policy: serde_json::Map<String, serde_json::Value>,
+}
+
 /// One library, as the media server names its fields.
 #[derive(serde::Deserialize)]
 struct FolderResource {
@@ -107,6 +119,19 @@ struct ActivityResource {
     #[serde(rename = "Items", default)]
     items: Vec<EntryResource>,
 }
+
+/// Whether an account may open every library, as the media server names the field.
+///
+/// The same three names [`PolicyResource`] reads by. A policy written under one
+/// spelling and read under another is a limit that reads back as no limit at all, so
+/// the three are declared where a reader meets both halves at once.
+const EVERY_LIBRARY: &str = "EnableAllFolders";
+
+/// The libraries it may open, where it is not every one.
+const CHOSEN_LIBRARIES: &str = "EnabledFolders";
+
+/// The highest rating it may watch, which the server holds as a number.
+const AGE_LIMIT: &str = "MaxParentalRating";
 
 /// What the media server calls the making of an account.
 const ACCOUNT_MADE: &str = "UserCreated";
@@ -203,6 +228,42 @@ impl crate::ports::service::Household for Jellyfin {
                 at: entry.date,
             })
             .collect())
+    }
+
+    async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {
+        // The account's own policy, read first, with what was chosen written over it.
+        // **A body naming only what changed is refused.** Driven against
+        // `jellyfin/jellyfin:10.10.3`: this endpoint answers `400` to one, naming
+        // `AuthenticationProviderId` and `PasswordResetProviderId` as required — and a
+        // body carrying those two and nothing else is accepted and puts every other
+        // field back to the server's own default, which is every setting made in the
+        // media server's own screens undone by an age limit.
+        let request = self
+            .as_admin(Method::Get, &format!("/Users/{id}"), None)
+            .await?;
+        let response = self.endpoint.send(&request).await?;
+        let held: AccountResource = self
+            .endpoint
+            .decode(&response, "what the account is allowed could not be read")?;
+
+        let mut policy = held.policy;
+        // Only what was chosen. Every other key travels back as it came, and the two
+        // this call may write are left alone where nothing was said about them —
+        // naming libraries is not saying there is no age limit.
+        if let Some(libraries) = &allowed.libraries {
+            policy.insert(EVERY_LIBRARY.to_owned(), false.into());
+            policy.insert(CHOSEN_LIBRARIES.to_owned(), libraries.clone().into());
+        }
+        if let Some(limit) = allowed.age_limit {
+            policy.insert(AGE_LIMIT.to_owned(), limit.into());
+        }
+
+        let body = serde_json::Value::Object(policy).to_string();
+        let request = self
+            .as_admin(Method::Post, &format!("/Users/{id}/Policy"), Some(body))
+            .await?;
+        let response = self.endpoint.send(&request).await?;
+        self.endpoint.expect_success(&response)
     }
 
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {

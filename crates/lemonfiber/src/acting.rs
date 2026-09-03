@@ -66,6 +66,7 @@ mod bundling;
 mod chooser;
 mod disturbing;
 mod errand;
+mod inviting;
 mod lasting;
 mod mending;
 mod narrowing;
@@ -290,6 +291,14 @@ impl Acting {
             Stage::Bundling { errand, chooser } => {
                 bundling::bundling(&mut self.stage, errand, chooser, press)
             }
+            Stage::Allowing {
+                errand,
+                name,
+                typed,
+            } => inviting::allowing(&mut self.stage, errand, name, typed, press),
+            Stage::Limiting { errand, chooser } => {
+                inviting::limited(&mut self.stage, errand, chooser, press)
+            }
             Stage::Weighing { errand, given } => {
                 errand::weighing(&mut self.stage, errand, given, press)
             }
@@ -488,7 +497,7 @@ mod tests {
     use lemonfiber_core::app::repair::{Consent, Report as RepairReport};
     use lemonfiber_core::app::restore::{self, Kept, Preview, Restoration};
     use lemonfiber_core::app::support::{Bundle, Destination};
-    use lemonfiber_core::app::{backup, Command, Outcome, QualityAction, Waiting};
+    use lemonfiber_core::app::{backup, Allowance, Command, Outcome, QualityAction, Waiting};
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::backup::{Manifest, Relocation, Scope, SCHEMA};
     use lemonfiber_core::bundle::{Contents, Filenames};
@@ -2946,6 +2955,70 @@ mod tests {
             },
             done: None,
         }
+    }
+
+    /// An invitation is asked what the account is for: the libraries, on a line, and
+    /// how far up the ratings it goes, off a list — and all three reach the command.
+    ///
+    /// All three together, because a screen that asked three things and carried two
+    /// would pass a test that read any of them alone. The name is the one that would
+    /// go missing quietest: it is typed first and the line it was typed on is gone by
+    /// the time the list is on the screen.
+    #[test]
+    fn an_invitation_is_asked_which_libraries_and_how_far_up_the_ratings() {
+        let (mut acting, _) = sending("invite");
+        let naming = showing(&acting);
+        assert!(naming.contains("Who it is for"), "{naming}");
+
+        for character in "ana".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Accept);
+
+        // The name stays on the screen while the next thing is asked, so the question
+        // is not "which libraries" about nobody.
+        let asking = showing(&acting);
+        assert!(asking.contains("Which libraries"), "{asking}");
+        assert!(asking.contains("ana"), "{asking}");
+
+        for character in "Films".chars() {
+            acting.pressed(&Press::Typed(character));
+        }
+        acting.pressed(&Press::Accept);
+
+        let listed = showing(&acting);
+        assert!(listed.contains("> anything"), "{listed}");
+        let step = lemonfiber_core::age_limit::steps()
+            .iter()
+            .find(|step| step.age == 12)
+            .map_or_else(String::new, |step| {
+                lemonfiber_core::age_limit::reading(Some(step.age))
+            });
+        assert!(
+            !step.is_empty(),
+            "the core no longer offers a limit of twelve"
+        );
+        onto(&mut acting, &step);
+        acting.pressed(&Press::Accept);
+
+        // The question says all three, in the words a household read says the same
+        // facts in. Nothing has been sent yet: an invitation is one of the errands
+        // whose yes is the whole of the agreement.
+        let asked = showing(&acting);
+        assert!(asked.contains("ana"), "{asked}");
+        assert!(asked.contains("Films"), "{asked}");
+        assert!(asked.contains(&step), "{asked}");
+
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Invite {
+                name: "ana".to_owned(),
+                allowance: Allowance {
+                    libraries: vec!["Films".to_owned()],
+                    age_limit: Some(12),
+                },
+            })
+        );
     }
 
     /// A bundle is asked what it is to hold: how much log, on a line, and what becomes

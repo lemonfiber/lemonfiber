@@ -26,6 +26,7 @@ use ratatui::text::Line;
 use super::chooser::Listed;
 use super::disturbing;
 use super::errand::Errand;
+use super::inviting;
 use super::lasting::{self, Begun, Lasting};
 use super::mending::{Agreed, Mending, Warning};
 use super::offer::{Offer, Taken};
@@ -92,9 +93,9 @@ pub(super) fn pane(stage: &Stage, rows: usize, across: usize) -> Option<Pane> {
 /// What the box one of the keyed flows opened says, or nothing where the box belongs
 /// to a flow behind a list — and nothing, too, for the stages that draw no box.
 ///
-/// Two functions over one enum, the way the routing beside them is two: thirty stages
+/// Two functions over one enum, the way the routing beside them is two: forty stages
 /// arrive here and a reader looking for one of them should not have to walk the other
-/// twenty-nine. Nothing from either is the answer the caller wants, so this one also
+/// thirty-nine. Nothing from either is the answer the caller wants, so this one also
 /// carries the stages there is no box for at all.
 fn on_a_key(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<Line<'static>>)> {
     Some(match stage {
@@ -168,6 +169,23 @@ fn off_a_list(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<
             typed,
         } => (sending(errand), typing(&[], asks, typed, across)),
         Stage::Bundling { errand, chooser } => (sending(errand), choosing(chooser, rows, across)),
+        // The name stays on the screen, dimmed, for the reason a trace's title does:
+        // "which libraries" is a question about somebody, and a box that had taken
+        // the name away would be asking who.
+        Stage::Allowing {
+            errand,
+            name,
+            typed,
+        } => (
+            sending(errand),
+            typing(
+                std::slice::from_ref(name),
+                inviting::ASKS_LIBRARIES,
+                typed,
+                across,
+            ),
+        ),
+        Stage::Limiting { errand, chooser } => (sending(errand), choosing(chooser, rows, across)),
         Stage::Weighing { errand, .. } => (sending(errand), vec![dimmed(WEIGHING, across)]),
         Stage::Agreeing {
             errand,

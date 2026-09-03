@@ -8,9 +8,9 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawAllowance, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome, SetupAction, Waiting};
 use lemonfiber_core::doctor::Narrowing;
 
 mod acting;
@@ -164,6 +164,21 @@ fn narrating(ctx: Ctx, json: bool) -> Ctx {
     ctx.narrating_steps(walking(json))
 }
 
+/// Who an invitation is for, and what the account is to let them watch.
+///
+/// Named for the reason [`narrating`] is: the command line spells what somebody may
+/// watch as two flags and the core carries them as one choice, and `main` has no room
+/// for the arm that puts the two together.
+fn invitation(name: String, allowance: RawAllowance) -> Command {
+    Command::Invite {
+        name,
+        allowance: Allowance {
+            libraries: allowance.libraries,
+            age_limit: allowance.age_limit,
+        },
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -291,7 +306,7 @@ async fn main() -> ExitCode {
         Request::Outbound => Command::Outbound,
         Request::Stored => Command::Stored,
         Request::Clients => Command::Clients,
-        Request::Invite { name } => Command::Invite { name },
+        Request::Invite { name, allowance } => invitation(name, allowance),
         Request::Reissue { name } => Command::Reissue { name },
         Request::Remove { name, confirm } => Command::Remove { name, confirm },
         Request::Forget { confirm } => Command::Forget { confirm },

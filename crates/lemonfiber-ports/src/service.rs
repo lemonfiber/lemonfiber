@@ -34,7 +34,7 @@ pub use failure::{
     Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
     SERVICE_UNSUPPORTED,
 };
-pub use household::{Access, Household, Invited, Member, NamedLibrary};
+pub use household::{Access, Allowed, Household, Invited, Member, NamedLibrary};
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };

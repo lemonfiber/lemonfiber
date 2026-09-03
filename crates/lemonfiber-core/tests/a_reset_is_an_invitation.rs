@@ -21,7 +21,7 @@
 
 use std::sync::Arc;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 use lemonfiber_core::platform::Environment;
@@ -340,6 +340,7 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
     let offered = dispatch(
         Command::Invite {
             name: "cy".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -410,6 +411,7 @@ async fn offering_an_account_to_somebody_reset_says_their_password_went() {
     let offered = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
