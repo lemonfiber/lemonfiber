@@ -127,7 +127,7 @@ fn carry_on(line: &str, said: &mut String) -> bool {
 /// What a line leaves inside an open literal, where it leaves one.
 fn left_open(line: &str) -> Option<&str> {
     let quotes = unescaped_quotes(line);
-    if quotes.len() % 2 == 0 {
+    if quotes.len().is_multiple_of(2) {
         return None;
     }
     let last = quotes.last()?;
