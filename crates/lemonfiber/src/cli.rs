@@ -10,7 +10,7 @@ mod setup;
 
 use std::path::PathBuf;
 
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use include_dir::{include_dir, Dir};
 
 // Re-exported rather than reached for through the module they now live in: where a
@@ -71,6 +71,23 @@ pub struct Cli {
 #[must_use]
 pub fn help() -> String {
     Cli::command().render_long_help().to_string()
+}
+
+/// What an invitation lets the person it is for watch, as the command line spells it.
+///
+/// Flattened rather than sat on the request as two fields, because they are one
+/// decision taken at one moment and the core carries them as one value — and two
+/// fields here would be a request the translation next door had to put back together.
+#[derive(Debug, Args)]
+pub struct RawAllowance {
+    /// Let them watch only these libraries, named as the media server names them;
+    /// none lets them watch all of them.
+    #[arg(long = "library", value_name = "NAME")]
+    pub libraries: Vec<String>,
+    /// Hold back anything the media server rates above this age — 0, 7, 12, 15 and
+    /// 18 are the steps offered; none sets no limit at all.
+    #[arg(long, value_name = "AGE")]
+    pub age_limit: Option<u32>,
 }
 
 /// What the operator asked for.
@@ -294,6 +311,9 @@ pub enum Request {
     Invite {
         /// What they will sign in as.
         name: String,
+        /// What the account is to let them watch.
+        #[command(flatten)]
+        allowance: RawAllowance,
     },
     /// Let somebody set a new password, without you choosing or seeing it.
     ///
@@ -447,7 +467,7 @@ pub enum ConfigAction {
 #[cfg(test)]
 mod tests {
     use super::{Cli, Mending, Request};
-    use clap::Parser;
+    use clap::{CommandFactory, Parser};
 
     /// What `doctor` was asked to do about what it finds, for one command line.
     ///
@@ -515,6 +535,93 @@ mod tests {
     #[test]
     fn repairing_and_reversing_at_once_is_refused() {
         assert!(doctoring(&["lemonfiber", "doctor", "--fix", "--undo"]).is_none());
+    }
+
+    /// What an invitation was told somebody may watch, for one command line.
+    ///
+    /// Answered through the parser for the reason a `doctor` run is: what is under test
+    /// is what a person typing this gets, including the lines the parser turns away.
+    fn inviting(args: &[&str]) -> Option<(String, Vec<String>, Option<u32>)> {
+        match Cli::try_parse_from(args).ok()?.command? {
+            Request::Invite { name, allowance } => {
+                Some((name, allowance.libraries, allowance.age_limit))
+            }
+            _ => None,
+        }
+    }
+
+    /// An invitation that names neither chooses neither, which is the ordinary case:
+    /// every library, and no age limit.
+    #[test]
+    fn an_invitation_that_chooses_nothing_carries_nothing() {
+        assert_eq!(
+            inviting(&["lemonfiber", "invite", "ana"]),
+            Some(("ana".to_owned(), Vec::new(), None))
+        );
+    }
+
+    /// Several libraries are named one flag at a time, the way named services are, so
+    /// the list cannot run on into the name the invitation is for.
+    #[test]
+    fn libraries_are_named_one_at_a_time_and_do_not_swallow_the_name() {
+        assert_eq!(
+            inviting(&[
+                "lemonfiber",
+                "invite",
+                "--library",
+                "Films",
+                "--library",
+                "Shows",
+                "ana",
+            ]),
+            Some((
+                "ana".to_owned(),
+                vec!["Films".to_owned(), "Shows".to_owned()],
+                None
+            ))
+        );
+    }
+
+    /// The age limit is carried as the age it was typed as, because the media server
+    /// keeps an age and there is nothing to translate.
+    #[test]
+    fn the_age_limit_is_carried_as_the_age_it_was_typed_as() {
+        assert_eq!(
+            inviting(&["lemonfiber", "invite", "ana", "--age-limit", "12"]),
+            Some(("ana".to_owned(), Vec::new(), Some(12)))
+        );
+    }
+
+    /// A limit that is not an age at all is refused at the parser rather than sent to
+    /// the media server to be refused as something else.
+    #[test]
+    fn a_limit_that_is_not_an_age_is_refused() {
+        assert_eq!(
+            inviting(&["lemonfiber", "invite", "ana", "--age-limit", "PG"]),
+            None
+        );
+    }
+
+    /// The steps the flag's own help names are the steps the core offers.
+    ///
+    /// Held rather than trusted, because the help is a sentence in a doc comment and
+    /// the steps are a table somewhere else: a step added to one and not the other is
+    /// a number an operator is either never told about or told about wrongly.
+    #[test]
+    fn the_help_names_every_step_the_core_offers() {
+        let help = Cli::command()
+            .find_subcommand_mut("invite")
+            .map(|invite| invite.render_long_help().to_string())
+            .unwrap_or_default();
+
+        assert!(!help.is_empty(), "the invite command has no help to read");
+        for step in lemonfiber_core::age_limit::steps() {
+            assert!(
+                help.contains(&step.age.to_string()),
+                "{} is a step the core offers and the help does not name",
+                step.age
+            );
+        }
     }
 
     /// Two flags that read differently on the command line must be two arguments

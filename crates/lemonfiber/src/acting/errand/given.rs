@@ -45,6 +45,16 @@ pub(crate) enum Needs {
     /// person being invited is not on this screen yet. That is the whole point of
     /// inviting them.
     Named(&'static str),
+    /// Somebody's name, then what they may watch: the libraries, typed on a line of
+    /// their own, and then the age limit, taken off a list.
+    ///
+    /// Three answers and two shapes, decided the way everything else on this screen is.
+    /// The person and the libraries are typed because neither is on this screen — the
+    /// person is the point of inviting them, and the libraries are the media server's
+    /// and this screen does not reach it between one keypress and the next. The age
+    /// limit is taken off a list because the steps it is offered as are a table
+    /// compiled into this binary, which is a list already in hand.
+    Invitation(&'static str),
     /// What a bundle is to hold: how much of each service's log, typed on a line of
     /// its own, and then what becomes of media filenames, taken off a list.
     ///
@@ -107,6 +117,37 @@ impl Given {
                 ..Arguments::default()
             },
             said: typed,
+        }
+    }
+
+    /// Somebody's name, what they may watch, and how far up the ratings they may go —
+    /// the whole of what an invitation is given, once all three lines are answered.
+    ///
+    /// The sentence is built here beside the arguments for the reason every other one
+    /// is: it is what the operator agrees to, and kept apart from what is sent the two
+    /// would eventually disagree — in the line above the yes, which is the worst place
+    /// for them to.
+    ///
+    /// The limit is said in the words a household read says the same limit back in,
+    /// off [`lemonfiber_core::age_limit`], because it is one setting and two surfaces
+    /// naming it differently is what that one place exists to prevent.
+    pub(crate) fn inviting(name: &str, libraries: Vec<String>, age_limit: Option<u32>) -> Self {
+        let watching = if libraries.is_empty() {
+            "who can watch everything".to_owned()
+        } else {
+            format!("who can watch {}", libraries.join(", "))
+        };
+        let limited = age_limit.map_or_else(String::new, |age| {
+            format!(", and {}", lemonfiber_core::age_limit::reading(Some(age)))
+        });
+        Self {
+            asked: Arguments {
+                name: (!name.is_empty()).then(|| name.to_owned()),
+                libraries,
+                age_limit,
+                ..Arguments::default()
+            },
+            said: format!("{name}, {watching}{limited}"),
         }
     }
 
@@ -178,7 +219,7 @@ impl Given {
     /// Handed over rather than read off a field, so what an errand is given stays here
     /// and what is done with it — the run that only reports, the run that acts — stays
     /// next door.
-    pub(super) fn asked(&self) -> Arguments {
+    pub(crate) fn asked(&self) -> Arguments {
         self.asked.clone()
     }
 }

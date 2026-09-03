@@ -39,6 +39,11 @@ pub struct Arguments {
     pub service: Option<String>,
     /// Who an invitation is for, as they will sign in.
     pub name: Option<String>,
+    /// The libraries an invitation lets them open, by the names the media server
+    /// gives those libraries. Empty is every one.
+    pub libraries: Vec<String>,
+    /// The age above which an invitation has the media server hold things back.
+    pub age_limit: Option<u32>,
     /// The setting to change.
     pub key: Option<String>,
     /// What to change it to.
@@ -339,6 +344,22 @@ pub const TAKES_ARCHIVE: &[&str] = &["restore"];
 /// the household.
 pub const TAKES_NAME: &[&str] = &["invite", "reissue", "remove"];
 
+/// The action whose command carries what the person being invited may watch.
+///
+/// An invitation and nothing else. It is apart from [`TAKES_NAME`] because it is a
+/// different half of the same errand: all three of those are addressed to a person,
+/// and only one of them decides anything about the account. A reissue takes a password
+/// off an account whose access somebody already chose, and a removal takes the account
+/// away, so a library or an age limit named to either would be a choice about an
+/// account that is not being made.
+///
+/// The two are one list because they are one decision, taken at one moment. Which
+/// libraries somebody may open and how far up the ratings they may go are the two
+/// halves of what an account is *for*, and the reason both are asked here rather than
+/// left for later is the same reason: an account made open and narrowed afterwards is
+/// open for as long as it takes anybody to remember.
+pub const TAKES_ALLOWANCE: &[&str] = &["invite"];
+
 /// The action whose command carries what goes in a bundle.
 ///
 /// A support run and nothing else. All four decide what the file holds — whether
@@ -362,7 +383,7 @@ pub const TAKES_ITEM: &[&str] = &["walkthrough"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 22] = [
+    let carried: [(&str, bool, &[&str]); 24] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -377,6 +398,8 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("media_type", given.media_type.is_some(), TAKES_PRESET),
         ("archive", given.archive.is_some(), TAKES_ARCHIVE),
         ("name", given.name.is_some(), TAKES_NAME),
+        ("libraries", !given.libraries.is_empty(), TAKES_ALLOWANCE),
+        ("age_limit", given.age_limit.is_some(), TAKES_ALLOWANCE),
         ("repoint", given.repoint, TAKES_ARCHIVE),
         ("write", given.write, TAKES_BUNDLING),
         ("logs", given.logs.is_some(), TAKES_BUNDLING),

@@ -26,20 +26,31 @@
 //! withdraw it. The media server records the reset too, and
 //! [`offered`](crate::invitation::offered) takes the later of the two.
 
-use crate::app::Ctx;
+mod allowing;
+
+use crate::app::{Allowance, Ctx};
 use crate::invitation::{offered, run_out, Offered, HOURS_OF_RECORD, HOURS_TO_CLAIM};
 use crate::model::{Invitation, InvitationStanding, Linked};
 use crate::ports::service::{Household as _, Member, Requests as _};
 
+use allowing::{allowing, would_not_allow};
+
 /// Offer somebody an account, and withdraw any nobody claimed in time.
+///
+/// What they may watch is chosen here rather than left for somebody to go and set in
+/// the media server afterwards: an account made open and narrowed later is open for as
+/// long as it takes anybody to remember, and the person most likely to be given a limit
+/// is a child who has been handed the address already.
 ///
 /// # Errors
 ///
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server
-/// to hold the account, or where it will not answer.
+/// to hold the account, where it will not answer, or where no library goes by a name
+/// that was given.
 pub(super) async fn offer(
     ctx: &Ctx,
     name: String,
+    allowance: Allowance,
 ) -> Result<Invitation, Box<crate::error::Problem>> {
     // Trimmed, because the media server keeps the spaces and treats the result as a
     // different person: offering `ana ` beside `ana` makes a second account that
@@ -78,6 +89,11 @@ pub(super) async fn offer(
     } else {
         standing_of(already.as_ref())
     };
+    // Resolved before the account is made, and in a rehearsal too. A library named
+    // wrong is a refusal the operator is owed instead of an account, not after one —
+    // and a rehearsal that skipped the check would say an invitation would be made
+    // that the real run then refuses.
+    let allowed = allowing(&server, &allowance.libraries, allowance.age_limit).await?;
 
     // A rehearsal makes no account and takes none back. Both halves of this command
     // change the household, and the one that removes accounts is the half nobody
@@ -122,6 +138,16 @@ pub(super) async fn offer(
             .await
             .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?
     };
+
+    // Written on the account, which is why it happens after there is one. Nothing is
+    // written where nothing was chosen: an offer that named neither must leave what an
+    // account already here is allowed exactly as its household set it.
+    if let Some(allowed) = &allowed {
+        server
+            .allow(&member.id, allowed)
+            .await
+            .map_err(|_| Box::new(would_not_allow(&member.name)))?;
+    }
 
     let linked = link(ctx, &services, &to_link(&held, &member)).await;
 

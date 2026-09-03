@@ -20,7 +20,7 @@
 
 use std::sync::Arc;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Invitation, InvitationStanding};
 use lemonfiber_core::platform::Environment;
@@ -175,6 +175,7 @@ async fn offering(scratch: &str, name: &str, http: Arc<Fake>, rehearsing: bool) 
     let said = dispatch(
         Command::Invite {
             name: name.to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )

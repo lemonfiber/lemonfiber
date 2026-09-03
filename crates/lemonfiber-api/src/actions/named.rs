@@ -22,7 +22,7 @@ use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::{self, Kept};
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Allowance, Command, QualityAction, Waiting};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::quality::Preset;
@@ -76,21 +76,54 @@ const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 ///
 /// All are addressed to a member rather than to a form, a file or a service, and all are
 /// refused the same way when nobody is named — so the refusal is written once.
+///
+/// What they may watch reaches only the one that makes an account. The other two are
+/// given it and drop it, which they may because the carrier refuses it to them first:
+/// a library or an age limit named to a reissue or a removal is turned away by name
+/// before this is reached.
 fn about_a_person(
     action: &str,
-    which: &str,
     name: Option<String>,
     confirm: bool,
+    libraries: Vec<String>,
+    age_limit: Option<u32>,
 ) -> Result<Command, Refused> {
     let name = name.ok_or_else(|| Refused::Missing {
         action: action.to_owned(),
         argument: "name".to_owned(),
     })?;
-    match which {
-        "invite" => Ok(Command::Invite { name }),
+    let allowance = Allowance {
+        libraries,
+        age_limit,
+    };
+    match action {
+        "invite" => Ok(Command::Invite { name, allowance }),
         "reissue" => Ok(Command::Reissue { name }),
         _ => Ok(Command::Remove { name, confirm }),
     }
+}
+
+/// The command a warning being answered names, or why it names none.
+///
+/// Over the whole suite. Only something a run warns about can be answered, and a
+/// narrowed run is a run that may not have raised it — so what a browser narrows is
+/// the diagnosis it reads, not the warning it answers.
+///
+/// Apart from the table for the reason [`about_a_person`] is: the table is one row per
+/// request, and an action that has to say what it lacks before it can name a command
+/// is longer than a row.
+fn accepting(check: Option<String>, disruptive: Disturbing) -> Result<Command, Refused> {
+    let Some(check) = check else {
+        return Err(Refused::Missing {
+            action: "accept".to_owned(),
+            argument: "check".to_owned(),
+        });
+    };
+    Ok(Command::Doctor {
+        narrowing: Narrowing::Suite,
+        disruptive: disruptive.included(),
+        accept: Some(check),
+    })
 }
 
 /// The command an action names, or why it names none.
@@ -129,6 +162,8 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         agreed,
         confirm,
         item,
+        libraries,
+        age_limit,
     } = given;
     match action {
         // Starting named services and bringing a form up are different requests
@@ -165,9 +200,9 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // to is what it was shown, the way a forget's agreement is. A reissue asks
         // for no agreement: nothing is destroyed and nothing is listed first, and
         // what ends is a password nobody here knew.
-        "invite" => about_a_person(action, "invite", name, confirm),
-        "reissue" => about_a_person(action, "reissue", name, confirm),
-        "remove" => about_a_person(action, "remove", name, confirm),
+        "invite" | "reissue" | "remove" => {
+            about_a_person(action, name, confirm, libraries, age_limit)
+        }
         // The one diagnosis asked for here rather than served as a read. It reaches
         // the same command `/api/checks` reaches, widened by the same word the
         // command line widens it with — so it is not a second reading of the stack,
@@ -198,17 +233,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // which of those need a service to reach are the core's to decide, so
         // there is nothing here for a caller to name.
         "undo" => Ok(Command::Undo),
-        // Over the whole suite. Only something a run warns about can be answered,
-        // and a narrowed run is a run that may not have raised it — so what a
-        // browser narrows is the diagnosis it reads, not the warning it answers.
-        "accept" => match check {
-            Some(check) => Ok(Command::Doctor {
-                narrowing: Narrowing::Suite,
-                disruptive: disruptive.included(),
-                accept: Some(check),
-            }),
-            None => Err(needs("check")),
-        },
+        "accept" => accepting(check, disruptive),
         // The bundle goes where lemonfiber keeps its own files. A browser has no
         // filesystem in front of it and no path it could name that would mean
         // anything here, so the destination is settled rather than asked for —

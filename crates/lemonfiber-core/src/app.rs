@@ -64,7 +64,7 @@ mod upgrade;
 mod walkthrough;
 pub mod watch;
 
-pub use command::{Command, QualityAction};
+pub use command::{Allowance, Command, QualityAction};
 pub use ctx::Ctx;
 pub use setup::SetupAction;
 
@@ -251,6 +251,18 @@ async fn acting(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcome, 
     engine::lifecycle(ctx, forms, &action).await
 }
 
+/// Offer somebody an account, which is the one request this table takes apart.
+///
+/// Named apart for the reason [`acting`] is: every other row here passes what it was
+/// given straight along in one line, and an invitation carries three things. Spelling
+/// them out in the table would make the request this file does least with the longest
+/// arm in it.
+async fn invited(ctx: &Ctx, name: String, allowance: Allowance) -> Result<Outcome, Box<Problem>> {
+    invite::offer(ctx, name, allowance)
+        .await
+        .map(Outcome::Invited)
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -291,7 +303,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance())),
-        Command::Invite { name } => invite::offer(ctx, name).await.map(Outcome::Invited),
+        Command::Invite { name, allowance } => invited(ctx, name, allowance).await,
         Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
         Command::Outbound => {
@@ -373,8 +385,8 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Command, Ctx, Outcome, QualityAction, SetupAction, VersionReport,
-        Waiting,
+        dispatch, pull_progress, Allowance, Command, Ctx, Outcome, QualityAction, SetupAction,
+        VersionReport, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -623,6 +635,7 @@ mod tests {
         let made = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -670,6 +683,7 @@ mod tests {
         let made = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -735,6 +749,7 @@ mod tests {
         dispatch(
             Command::Invite {
                 name: name.to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -940,6 +955,7 @@ mod tests {
         let made = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1009,6 +1025,7 @@ mod tests {
         let made = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1085,6 +1102,7 @@ mod tests {
         let _ = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1148,6 +1166,7 @@ mod tests {
         let json = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1175,6 +1194,7 @@ mod tests {
             dispatch(
                 Command::Invite {
                     name: "ana".to_owned(),
+                    allowance: Allowance::default(),
                 },
                 &ctx,
             )
@@ -1237,6 +1257,7 @@ mod tests {
         let made = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1281,6 +1302,7 @@ mod tests {
         let refused = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1329,6 +1351,7 @@ mod tests {
         let made = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1375,6 +1398,7 @@ mod tests {
         let refused = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )
@@ -1397,6 +1421,7 @@ mod tests {
         let refused = dispatch(
             Command::Invite {
                 name: "ana".to_owned(),
+                allowance: Allowance::default(),
             },
             &ctx,
         )

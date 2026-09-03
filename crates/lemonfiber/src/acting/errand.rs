@@ -65,14 +65,19 @@ use lemonfiber_core::app::bundle::LINES;
 use lemonfiber_core::app::{Command, Outcome};
 
 mod given;
+mod listed;
 
 use super::bundling;
 use super::chooser::{Chooser, Listed};
+use super::inviting;
 use super::reading::{moved, Reading};
 use super::service;
 use super::{Press, Stage, Wanted};
 
 pub(crate) use given::{Given, Needs};
+pub(super) use listed::all;
+#[cfg(test)]
+pub(super) use listed::every;
 
 /// How many digits the line a log window is typed on will hold.
 ///
@@ -122,123 +127,6 @@ pub(crate) struct Errand {
     /// What it sends once it has been agreed to.
     going: Going,
 }
-
-/// The errand the list opens on.
-///
-/// Held apart from the rest for the reason the selected question is: a list built
-/// from a slice that might have been empty carries a case for there being no
-/// errands, which is not a state this screen can be in.
-static OPENS_ON: Errand = Errand {
-    name: "wiring",
-    about: "connect each service to the others, leaving what you changed alone",
-    action: "seed",
-    asks: "Wire the services to each other",
-    needs: Needs::Nothing,
-    accepts: None,
-    going: Going::Once,
-};
-
-/// The errands after it, read from the ones that keep work towards the one that
-/// throws it away — which is also the order nobody lands on the destructive one by
-/// pressing enter at the list.
-static AFTER: &[Errand] = &[
-    Errand {
-        name: "your edits kept",
-        about: "take every value you changed as lemonfiber's own, so a seed leaves it",
-        action: "adopt",
-        asks: "Keep every value you changed",
-        needs: Needs::Nothing,
-        accepts: None,
-        going: Going::Once,
-    },
-    Errand {
-        name: "an invitation",
-        about: "make somebody in the house an account they claim by setting a password",
-        action: "invite",
-        asks: "Invite",
-        needs: Needs::Named("Who it is for, as they will sign in"),
-        accepts: None,
-        going: Going::Once,
-    },
-    Errand {
-        name: "a password somebody can set again",
-        about: "put their account back to having none, so they choose the next one",
-        action: "reissue",
-        asks: "Let a new password be set for",
-        needs: Needs::Named("Whose account, as they appear in the household"),
-        accepts: None,
-        // Once rather than agreed: nothing is destroyed and nothing is listed first.
-        // What ends is a password nobody here knows, and the account is claimable the
-        // moment this returns.
-        going: Going::Once,
-    },
-    Errand {
-        name: "somebody taken out of the household",
-        about: "revoke their account on the media server and on the request service",
-        action: "remove",
-        asks: "Remove from the household",
-        needs: Needs::Named("Who to remove, as they appear in the household"),
-        accepts: None,
-        // Agreed rather than once: the run before it says what goes — their watch
-        // history, which cannot be kept, and every request they made, which stops
-        // existing — so what is agreed to is what was read.
-        going: Going::Agreed,
-    },
-    Errand {
-        name: "a backup",
-        about: "capture a configuration to an archive kept on this machine",
-        action: "backup",
-        asks: "Capture the configuration of",
-        needs: Needs::Service,
-        accepts: None,
-        going: Going::Once,
-    },
-    Errand {
-        name: "a support bundle",
-        about: "what somebody helping would ask for, with every credential replaced",
-        action: "support",
-        asks: "Write the bundle",
-        needs: Needs::Bundling("How many lines of each service's log to take"),
-        accepts: None,
-        going: Going::Written,
-    },
-    Errand {
-        name: "the last repair put back",
-        about: "reverse what the last repair changed, leaving the wiring under it alone",
-        action: "undo",
-        asks: "Put back what the last repair changed",
-        needs: Needs::Nothing,
-        accepts: None,
-        going: Going::Once,
-    },
-    Errand {
-        name: "a backup put back",
-        about: "restore one this machine took, over the configuration here now",
-        action: "restore",
-        asks: "Restore from",
-        needs: Needs::Archive("Which backup, by the name it was written under"),
-        accepts: Some("re-pointing the data root to this machine's"),
-        going: Going::Agreed,
-    },
-    Errand {
-        name: "your edits thrown away",
-        about: "put lemonfiber's own state back over every value you changed",
-        action: "reset",
-        asks: "Throw away every edit above",
-        needs: Needs::Nothing,
-        accepts: None,
-        going: Going::Agreed,
-    },
-    Errand {
-        name: "everything lemonfiber keeps removed",
-        about: "take every file lemonfiber wrote off this machine; your library is not one",
-        action: "forget",
-        asks: "Remove everything listed above",
-        needs: Needs::Nothing,
-        accepts: None,
-        going: Going::Agreed,
-    },
-];
 
 impl Listed for Errand {
     fn name(&self) -> &str {
@@ -311,17 +199,6 @@ impl Errand {
     }
 }
 
-/// The errands, the one the list opens on apart from the rest.
-pub(super) fn all() -> (&'static Errand, Vec<&'static Errand>) {
-    (&OPENS_ON, AFTER.iter().collect())
-}
-
-/// Every errand, in the order they are read.
-#[cfg(test)]
-pub(super) fn every() -> impl Iterator<Item = &'static Errand> {
-    std::iter::once(&OPENS_ON).chain(AFTER)
-}
-
 /// Over the errands: move, take one, or leave it.
 pub(super) fn sending(
     stage: &mut Stage,
@@ -352,10 +229,13 @@ fn taken(
     services: &[(String, String, String)],
 ) -> Wanted {
     match errand.needs {
-        // Two errands open a line and what they do with the word differs, which is
+        // Four errands open a line and what they do with the word differs, which is
         // [`given`]'s answer rather than this one's: what is decided here is only
         // that there is a line.
-        Needs::Archive(asks) | Needs::Bundling(asks) | Needs::Named(asks) => {
+        Needs::Archive(asks)
+        | Needs::Bundling(asks)
+        | Needs::Named(asks)
+        | Needs::Invitation(asks) => {
             *stage = Stage::Naming {
                 errand,
                 asks,
@@ -429,6 +309,14 @@ fn given(stage: &mut Stage, errand: &'static Errand, typed: String) -> Wanted {
         // Same line, different argument: which one the word fills is the errand's
         // business rather than the line's.
         Needs::Named(_) => begun(stage, errand, Given::named(typed)),
+        // The first of an invitation's three answers, so it opens the second rather
+        // than going on. The name is carried rather than folded into the arguments
+        // here, because the sentence above the yes says all three together and there
+        // is no way to say two of them and add the third.
+        Needs::Invitation(_) => {
+            *stage = inviting::over(errand, typed);
+            Wanted::Nothing
+        }
         _ => begun(stage, errand, Given::typed(typed)),
     }
 }
@@ -586,15 +474,16 @@ pub(crate) mod tests {
             .collect()
     }
 
-    /// Inviting somebody opens a line to type their name on, and the word fills the
-    /// name rather than an archive.
+    /// Inviting somebody opens a line to type their name on, and the word goes on to
+    /// what they may watch rather than straight to the question.
     ///
     /// Driven through the stage machinery rather than by building a `Given` by hand,
     /// because the two halves are decided in different places — that there is a line
-    /// at all, and which argument the word ends up in — and a test that skipped the
-    /// first would pass with no line ever opening.
+    /// at all, and what the word opens next — and a test that skipped the first would
+    /// pass with no line ever opening. What becomes of the two answers after it is
+    /// [`super::super::inviting`]'s, and is held there.
     #[test]
-    fn inviting_somebody_opens_a_line_and_the_word_becomes_their_name() {
+    fn inviting_somebody_opens_a_line_and_the_word_carries_their_name_on() {
         // Every errand, filtered to the one under test: a `let ... else` here would
         // leave a branch nothing reaches, which the gate counts as untested code.
         let errand = every()
@@ -612,9 +501,9 @@ pub(crate) mod tests {
         let _ = super::given(&mut stage, errand, "ana".to_owned());
 
         assert!(
-            matches!(&stage, Stage::Agreeing { given, .. }
-                if given.said() == "ana" && given.asked().name.as_deref() == Some("ana")),
-            "the word did not become the name it was typed for"
+            matches!(&stage, Stage::Allowing { name, typed, .. }
+                if name == "ana" && typed.is_empty()),
+            "the name did not carry on to what they may watch"
         );
     }
 

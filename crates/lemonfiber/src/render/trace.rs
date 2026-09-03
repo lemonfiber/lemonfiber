@@ -139,8 +139,13 @@ fn standing(member: &HouseholdMember) -> String {
     } else {
         format!("can watch {}", member.access.libraries.join(", "))
     });
+    // Said in the words the limit is chosen in, from the place those words live,
+    // because a household list naming it differently from the invitation that set it
+    // is two surfaces disagreeing about one setting. The media server keeps this as a
+    // number, and what is said is a reading of that number — so a limit no words are
+    // offered for is said as the age it is.
     if let Some(limit) = member.access.age_limit {
-        said.push(format!("nothing rated above {limit}"));
+        said.push(lemonfiber_core::age_limit::reading(Some(limit)));
     }
     said.push(if member.claimed {
         member
@@ -618,7 +623,7 @@ mod tests {
 
         let text = household(&report).text();
         assert!(
-            text.contains("Ana — can watch Films · nothing rated above 12 · invited, nobody has set a password yet"),
+            text.contains("Ana — can watch Films · nothing above about 12 · invited, nobody has set a password yet"),
             "{text}"
         );
         assert!(
@@ -628,6 +633,74 @@ mod tests {
         assert!(
             !text.contains("never signed in"),
             "an invitation was reported as somebody who stopped watching: {text}"
+        );
+    }
+
+    /// A limit reads in the same words the surface that sets it offers it in, for
+    /// every step this product offers.
+    ///
+    /// The media server keeps a number, and the number is an age; what a household list
+    /// prints is a reading of it. Held here because the two ends are far apart — one is
+    /// this renderer, the other is the list an invitation is chosen off — and the
+    /// failure is silent: an operator picks a step, reads the household back, and finds
+    /// the same setting under another name.
+    #[test]
+    fn a_limit_reads_in_the_words_it_was_chosen_in() {
+        let offered = lemonfiber_core::age_limit::steps();
+        assert!(
+            !offered.is_empty(),
+            "no step is offered, so this asserts nothing"
+        );
+
+        for step in offered {
+            let report = HouseholdReport {
+                members: vec![HouseholdMember {
+                    name: "Ana".to_owned(),
+                    access: MemberAccess {
+                        every_library: true,
+                        age_limit: Some(step.age),
+                        ..MemberAccess::default()
+                    },
+                    ..HouseholdMember::default()
+                }],
+                available: true,
+                findings: Vec::new(),
+            };
+
+            let text = household(&report).text();
+            let said = lemonfiber_core::age_limit::reading(Some(step.age));
+            assert!(
+                text.contains(&said),
+                "a limit of {} reads as something other than {said}: {text}",
+                step.age
+            );
+        }
+    }
+
+    /// A limit that is none of the steps offered still says what it is.
+    ///
+    /// An account may carry one set in the media server's own screens, and a line that
+    /// dropped it would read as an account with no limit on it at all.
+    #[test]
+    fn a_limit_that_is_no_step_offered_still_says_what_it_is() {
+        let report = HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "Ana".to_owned(),
+                access: MemberAccess {
+                    every_library: true,
+                    age_limit: Some(13),
+                    ..MemberAccess::default()
+                },
+                ..HouseholdMember::default()
+            }],
+            available: true,
+            findings: Vec::new(),
+        };
+
+        assert!(
+            household(&report).text().contains("nothing above about 13"),
+            "{}",
+            household(&report).text()
         );
     }
 

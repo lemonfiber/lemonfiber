@@ -77,6 +77,20 @@ pub trait Household: Send + Sync {
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure>;
+
+    /// Set what one account may watch.
+    ///
+    /// The only write in this port that changes an account rather than making or
+    /// taking one away, and the counterpart of the [`Access`] every read carries: what
+    /// comes back from [`Household::household`] is what a call to this left behind.
+    ///
+    /// Given the whole of [`Allowed`] rather than the parts that changed, because the
+    /// media server takes a policy whole — see the adapter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure>;
 }
 
 /// One library the media server holds, with the name it was given.
@@ -90,6 +104,34 @@ pub struct NamedLibrary {
     pub id: String,
     /// What the operator called it.
     pub name: String,
+}
+
+/// What one household member is to be allowed to watch.
+///
+/// The half of [`Access`] an operator chooses. The other two things an account carries
+/// — whether it administers the server, and whether it is switched off — are not
+/// offered alongside these: the first is what this program signs in as, and the second
+/// is a state an account is put into rather than one it is made in. A shape holding all
+/// five would be a call able to make somebody an administrator by way of setting an age
+/// limit.
+///
+/// **Each field is a change or the absence of one**, and the absence leaves what the
+/// account already carries exactly as it is. An operator who set an age limit said
+/// nothing about libraries, and a call that wrote a value for what nobody mentioned
+/// would widen an account back to every library on its way to narrowing what may be
+/// watched on it. So there is deliberately nothing here that says "every library" or
+/// "no limit": naming neither is saying nothing, which on a new account is the media
+/// server's own opening state and on an existing one is what its household chose.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Allowed {
+    /// The libraries chosen, by the server's own identifier.
+    ///
+    /// `None` leaves what the account already opens as it is.
+    pub libraries: Option<Vec<String>>,
+    /// The highest rating they may watch.
+    ///
+    /// `None` leaves the limit the account already has as it is.
+    pub age_limit: Option<u32>,
 }
 
 /// What one household member may watch.

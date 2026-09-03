@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::Linked;
 use lemonfiber_core::platform::Environment;
@@ -133,6 +133,7 @@ async fn an_invitation_carries_one_address_and_the_name_to_sign_in_as() {
     let made = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -165,6 +166,7 @@ async fn the_request_service_is_told_about_everybody_and_not_only_the_new_accoun
     let made = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -204,6 +206,7 @@ async fn an_invitation_stands_when_the_request_service_will_not_answer() {
     let made = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -240,6 +243,7 @@ async fn somebody_already_here_is_named_once() {
     let made = dispatch(
         Command::Invite {
             name: "owner".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -309,6 +313,7 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
     let made = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -347,6 +352,7 @@ async fn a_refused_session_leaves_the_invitation_standing_too() {
     let made = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -377,6 +383,7 @@ async fn a_rehearsal_tells_the_request_service_nothing() {
     let made = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
@@ -405,6 +412,7 @@ async fn an_invitation_serialises_under_its_own_name() {
     let json = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
+            allowance: Allowance::default(),
         },
         &ctx,
     )
