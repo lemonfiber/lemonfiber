@@ -27,9 +27,7 @@
 
 use std::path::Path;
 
-use argon2::password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier as _};
-use argon2::password_hash::{Salt, SaltString};
-use argon2::Argon2;
+use argon2::{Argon2, PasswordHash, PasswordHasher as _, PasswordVerifier as _};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -173,18 +171,16 @@ impl Credential {
 
 /// The record one password is written down as, or nothing where it could not be.
 ///
-/// Four ways to come back with nothing, and every one of them is the randomness
-/// port answering with something no record may be made from: nothing at all, too
-/// few bytes to encode as a salt, too many to write one down, or a salt shorter
-/// than the function itself will use. None of them falls back to a weaker record,
-/// because a narrow salt is invisible in the result — it looks exactly like a wide
-/// one right up until two machines write down the same password the same way.
+/// Three ways to come back with nothing, and every one of them is the randomness
+/// port answering with something no record may be made from: nothing at all, fewer
+/// bytes than the function will salt with, or more than a record holds. None of
+/// them falls back to a weaker record, because a narrow salt is invisible in the
+/// result — it looks exactly like a wide one right up until two machines write down
+/// the same password the same way.
 fn written(password: &str, random: &dyn Random) -> Option<String> {
     let bytes = random.bytes(SALT_BYTES)?;
-    let encoded = SaltString::encode_b64(&bytes).ok()?;
-    let salt = Salt::from_b64(encoded.as_str()).ok()?;
     let hashed = Argon2::default()
-        .hash_password(password.as_bytes(), salt)
+        .hash_password_with_salt(password.as_bytes(), &bytes)
         .ok()?;
     Some(hashed.to_string())
 }
@@ -261,6 +257,12 @@ mod tests {
     fn another() -> String {
         chosen().to_uppercase()
     }
+
+    /// A record argon2 0.5.3 wrote, as it wrote it.
+    ///
+    /// The salt is the sixteen bytes `answering` supplies and the password is the
+    /// one `chosen` builds, so the whole of it is reproducible from this file.
+    const WRITTEN_BY_THE_PREVIOUS_MAJOR: &str = "$argon2id$v=19$m=19456,t=2,p=1$WlpaWlpaWlpaWlpaWlpaWg$PE3F5E5m7b7cHU3UZgC4eu4vbgqA0M+hqFRFWUYHTtU";
 
     /// The record a machine that answers makes of that password.
     ///
@@ -343,10 +345,9 @@ mod tests {
 
     #[test]
     fn a_salt_of_the_wrong_width_leaves_no_record_either() {
-        // Three ways for a source to answer with something no record may be made
-        // from, and each is refused where it is noticed: too few bytes to encode as
-        // a salt at all, too many to be written into one, and a salt the function
-        // itself will not use for being narrower than it requires.
+        // The two widths no record may be made from, and each is refused where it
+        // is noticed: fewer bytes than the function will salt with, and more than a
+        // record holds.
         for count in [2, 4, 64] {
             assert_eq!(written(&chosen(), &answering(count)), None, "{count} bytes");
         }
@@ -368,6 +369,23 @@ mod tests {
         assert_eq!(Credential::parse("not a record"), None);
         let damaged = Credential::parse(r#"{"verifier":"nonsense"}"#);
         assert!(damaged.is_some_and(|damaged| !damaged.verifies(&chosen())));
+    }
+
+    #[test]
+    fn a_record_the_previous_major_version_wrote_still_proves_its_password() {
+        // Written by argon2 0.5.3 and pasted in as it came. What sits on an
+        // operator's disk was written by whatever version shipped when they set the
+        // password, and it has to go on opening the door: a bump that moved the
+        // format, the costs or the salt encoding would lock them out of their own
+        // machine, and this is where that is noticed.
+        let held = Credential::parse(&format!(
+            r#"{{"verifier":"{WRITTEN_BY_THE_PREVIOUS_MAJOR}"}}"#
+        ));
+        assert!(held.as_ref().is_some_and(|held| held.verifies(&chosen())));
+        // Accepting the right password is half of it: a verifier that accepted
+        // everything would pass that half too.
+        assert!(!held.as_ref().is_some_and(|held| held.verifies(&another())));
+        assert!(!held.is_some_and(|held| held.verifies("")));
     }
 
     #[test]
