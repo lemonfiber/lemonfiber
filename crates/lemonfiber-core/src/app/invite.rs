@@ -53,7 +53,31 @@ pub(super) async fn offer(
 
     let held = held(ctx, &server).await;
     let already = already_here(&held, &name).cloned();
-    let standing = standing_of(already.as_ref());
+    // The one being offered again is not among the ones taken back. Withdrawing means
+    // removing the account, and this is the account the offer is *for* — so the sweep
+    // goes around it, and everybody else's expired invitation is taken as before.
+    let renewing = already
+        .as_ref()
+        .is_some_and(|member| has_run_out(&held, member));
+    let sweeping: Vec<Offered> = held
+        .spent
+        .iter()
+        .filter(|gone| {
+            already
+                .as_ref()
+                .is_none_or(|member| member.id != gone.member.id)
+        })
+        .cloned()
+        .collect();
+    // `Made` rather than `Waiting`, because an invitation that ran out does not still
+    // stand — one is being made now, on an account they already had. That the account
+    // is not new is the requirement being met and not something to report: what the
+    // operator sends is the same either way.
+    let standing = if renewing {
+        InvitationStanding::Made
+    } else {
+        standing_of(already.as_ref())
+    };
 
     // A rehearsal makes no account and takes none back. Both halves of this command
     // change the household, and the one that removes accounts is the half nobody
@@ -67,19 +91,30 @@ pub(super) async fn offer(
             address: reachable.url,
             caution: reachable.caution,
             hours: HOURS_TO_CLAIM,
-            withdrawn: held.spent.into_iter().map(|it| it.member.name).collect(),
+            withdrawn: sweeping.into_iter().map(|it| it.member.name).collect(),
             rehearsed: true,
             standing,
             linked: Linked::NotTried,
         });
     }
 
-    let withdrawn = take_back(&server, &held.spent).await;
+    let withdrawn = take_back(&server, &sweeping).await;
 
     // The account comes back from whichever this is about, so the operator is told
     // the name somebody signs in as rather than the one they typed — those differ by
     // case whenever an account was already here.
     let member = if let Some(member) = already {
+        // An invitation that ran out is offered again by dating it again. The account
+        // already has no password, so taking one off changes nothing about it — what it
+        // does is write the record that says when it was offered, which is what the
+        // window is counted from. Refused rather than glossed: the message about to be
+        // sent promises a window, and one that will not be honoured is worse than none.
+        if renewing {
+            server
+                .unclaim(&member.id)
+                .await
+                .map_err(|_| Box::new(would_not_renew(&member.name)))?;
+        }
         member
     } else {
         server
@@ -304,15 +339,23 @@ fn standing_of(already: Option<&Member>) -> InvitationStanding {
 /// here walks straight into the refusal this exists to prevent, and the operator is
 /// handed the server's own word for it, which is `400`.
 ///
-/// The ones about to be taken back are not counted. An invitation that has run out
-/// is one this run is replacing, and treating it as already here would make an
-/// expired invitation impossible to offer again.
+/// **The ones that have run out are counted too**, and that is the whole of offering
+/// an expired invitation again without making somebody a second time. The account is
+/// already theirs; what has run out is the window on it, and a window is restarted by
+/// dating the invitation again rather than by building a new account to carry it. Left
+/// out, this run would withdraw the account — which is to say delete it — and then make
+/// another under the same name with a different identifier, so anything already linked
+/// to them would be linked to somebody who no longer exists.
 fn already_here<'a>(held: &'a Held, name: &str) -> Option<&'a Member> {
     let asked = name.to_lowercase();
-    held.household.iter().find(|member| {
-        member.name.to_lowercase() == asked
-            && !held.spent.iter().any(|gone| gone.member.id == member.id)
-    })
+    held.household
+        .iter()
+        .find(|member| member.name.to_lowercase() == asked)
+}
+
+/// Whether this account is one the sweep was about to take back.
+fn has_run_out(held: &Held, member: &Member) -> bool {
+    held.spent.iter().any(|gone| gone.member.id == member.id)
 }
 
 /// What the media server holds right now, as this command needs to see it.
@@ -407,6 +450,23 @@ fn nowhere_to_send() -> crate::error::Problem {
          no name on the network and has none written down",
         crate::error::Remedy::new("Record the address the household should use")
             .with_detail("lemonfiber config set HOUSEHOLD_HOST <address>"),
+    )
+}
+
+/// Said where an expired invitation could not be dated again, so its window is not real.
+///
+/// The account is untouched and still theirs — what failed is the write that says when it
+/// was offered. Reported rather than glossed over because the message the operator is
+/// about to send promises a window, and this one would be counted from whenever the
+/// invitation was first made, which has already passed.
+fn would_not_renew(name: &str) -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::Code::new("INVITE-5"),
+        crate::error::Severity::Error,
+        format!("the media server would not offer {name}'s invitation again"),
+        "Their account is still there and still has no password on it; what could not be \
+         written is when it was offered, which is what the window is counted from",
+        crate::error::Remedy::new("Check the media server is running, then run this again"),
     )
 }
 

@@ -49,6 +49,7 @@ what to do about it, is written for operators at
 - `INVITE-2`
 - `INVITE-3`
 - `INVITE-4`
+- `INVITE-5`
 - `KEPT-1`
 - `LIFE-1`
 - `LIFE-2`
