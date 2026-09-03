@@ -795,13 +795,15 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
-    /// An invitation that has run out is offered again, under the same name.
+    /// An invitation that has run out is offered again on the account it was for.
     ///
-    /// The account it was is taken back on the way past, so what is already here no
-    /// longer holds that name and a fresh one is made. Without that, an invitation
-    /// nobody took up would make the name unusable for the person it was for.
+    /// **Not by taking that account back and building another**, which is what this
+    /// used to do: the identifier is what everything else in the stack knows somebody
+    /// by, so a second account under the same name is the wrong one for anything
+    /// holding the first. The window is restarted by dating the invitation again, and
+    /// the account it names is untouched.
     #[tokio::test]
-    async fn an_invitation_that_ran_out_is_offered_again_rather_than_blocking_the_name() {
+    async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for() {
         let env = recorded_admin("reissue");
         let http = holding(
             r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
@@ -812,13 +814,19 @@ mod tests {
         let made = offering(&env, http, "ana").await;
 
         assert!(
-            invited(&made).is_some_and(|report| report.standing == InvitationStanding::Made
-                && report.withdrawn == ["ana".to_owned()]),
+            invited(&made)
+                .is_some_and(|report| report.standing == InvitationStanding::Made
+                    && report.withdrawn.is_empty()),
             "{made:?}"
         );
         assert!(
-            recorded.asked_for("/Users/New"),
-            "the name stayed taken by an invitation nobody took up"
+            !recorded.asked_for("/Users/New"),
+            "a second account was made under a name the household already holds"
+        );
+        assert!(
+            recorded.asked_for("/Users/7/Password"),
+            "the invitation was offered again without being dated again, so the window \
+             it promises ran out before it was sent"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
