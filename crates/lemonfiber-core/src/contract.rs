@@ -179,13 +179,13 @@ mod tests {
     use crate::app::Outcome;
     use crate::glossary::{Term, Vocabulary};
     use crate::model::{
-        ConfigReport, DoctorReport, FormsReport, HouseholdReport, LifecycleReport, MusicReport,
-        QualityReport, ResetReport, StatusReport, StuckReport, TraceReport, UpgradeReport,
-        VersionReport,
+        ConfigReport, DoctorReport, FormsReport, FrontDoorReport, HouseholdReport, LifecycleReport,
+        MusicReport, QualityReport, ResetReport, StatusReport, StuckReport, SupervisionReport,
+        TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
     };
     use crate::stack::closure::Plan;
 
-    /// Arms in `Outcome::envelope`, so a variant added without a sample here fails.
+    /// Arms in `Outcome::envelope`, and every one of them is sampled below.
     ///
     /// **Bump this when you add one.** The comparison is against how many kinds the
     /// samples below actually wrote, so a variant added *with* its sample trips this
@@ -193,7 +193,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 24;
+    const OUTCOMES: usize = 32;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -204,16 +204,18 @@ mod tests {
     /// One sample of every outcome, so each kind's description can be held against
     /// the document that kind actually writes.
     ///
-    /// Split in two only because one list of every outcome this product has is longer
-    /// than a function may be. The halves mean nothing apart; `OUTCOMES` counts what
-    /// they come to together, which is the number that has to move when a kind lands.
+    /// Split in three only because one list of every outcome this product has is
+    /// longer than a function may be. The parts mean nothing apart; `OUTCOMES` counts
+    /// what they come to together, which is the number that has to move when a kind
+    /// lands.
     fn samples() -> Vec<Outcome> {
         let mut every = the_first_of_them();
-        every.extend(the_rest_of_them());
+        every.extend(the_next_of_them());
+        every.extend(the_last_of_them());
         every
     }
 
-    /// The first half of them, in the order the contract lists their kinds.
+    /// The first of them, in the order the contract lists their kinds.
     fn the_first_of_them() -> Vec<Outcome> {
         vec![
             Outcome::Version(VersionReport {
@@ -273,8 +275,8 @@ mod tests {
         ]
     }
 
-    /// The rest of them, continuing that order.
-    fn the_rest_of_them() -> Vec<Outcome> {
+    /// The next of them, continuing that order.
+    fn the_next_of_them() -> Vec<Outcome> {
         vec![
             Outcome::Undo(crate::app::repair::Reversal {
                 reversed: vec![crate::journal::Undo {
@@ -331,6 +333,123 @@ mod tests {
                 findings: Vec::new(),
             }),
         ]
+    }
+
+    /// The last of them, continuing that order.
+    fn the_last_of_them() -> Vec<Outcome> {
+        vec![
+            Outcome::FrontDoor(a_front_door()),
+            Outcome::Clients(crate::clients::guidance()),
+            Outcome::Outbound(what_leaves()),
+            Outcome::Stored(crate::stored::stored(
+                &crate::config::paths::Paths::rooted(
+                    std::path::Path::new("/home/op/.config"),
+                    std::path::Path::new("/home/op/.local/share"),
+                ),
+                crate::stored::Removal::Done {
+                    gone: vec!["/home/op/.config/lemonfiber".to_owned()],
+                    left: vec![crate::stored::Left {
+                        at: "/home/op/.local/share/lemonfiber".to_owned(),
+                        why: "permission denied".to_owned(),
+                    }],
+                },
+            )),
+            Outcome::Wizard(a_setup_part_way()),
+            Outcome::Archives(crate::app::archives::Listing {
+                archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
+            }),
+            Outcome::Watch(SupervisionReport {
+                forms: vec!["media".to_owned()],
+                reason: "the data location went away".to_owned(),
+                stopped: true,
+            }),
+            Outcome::Walkthrough(a_walk()),
+        ]
+    }
+
+    /// A front door with every field filled: a named service, an address to hand
+    /// somebody, and one thing beside it that is not the door.
+    fn a_front_door() -> FrontDoorReport {
+        FrontDoorReport {
+            standing: crate::model::Standing::Established,
+            chosen: crate::door::Chosen::Named("jellyseerr".to_owned()),
+            service: Some("jellyseerr".to_owned()),
+            address: Some(crate::door::Address {
+                url: "http://a-machine.local:5055".to_owned(),
+                caution: Some("this machine's name has to resolve on their network".to_owned()),
+            }),
+            facing: Some(crate::door::Facing::Asking),
+            meaning: "everybody in the house begins at the request service".to_owned(),
+            beside: vec![crate::model::Beside {
+                service: "homepage".to_owned(),
+                facing: crate::door::Facing::Operators,
+                because: crate::door::Facing::Operators.because().to_owned(),
+            }],
+        }
+    }
+
+    /// One request of this product's own and one of a service's, which is both
+    /// halves of what leaves this machine.
+    fn what_leaves() -> crate::outbound::Leaving {
+        crate::outbound::Leaving {
+            ours: vec![crate::outbound::Outbound {
+                reach: crate::outbound::Reach::Indexer,
+                destination: vec!["https://an-indexer.example".to_owned()],
+                purpose: "proving an indexer key against the indexer it belongs to".to_owned(),
+                sends: "the key, to the address it was given beside".to_owned(),
+                allowed: true,
+                switch: crate::config::REACH_INDEXER_KEY.to_owned(),
+                cost: "a key is recorded without ever having been proven".to_owned(),
+            }],
+            theirs: vec![crate::outbound::Elsewhere {
+                service: "prowlarr".to_owned(),
+                destination: "the indexers you configured".to_owned(),
+                purpose: "runs the searches everything else asks for".to_owned(),
+            }],
+        }
+    }
+
+    /// A setup part-way through, carrying what it has settled and what the service
+    /// answered to the credential just given.
+    fn a_setup_part_way() -> WizardReport {
+        WizardReport {
+            offered: true,
+            phase: crate::wizard::Phase::InProgress,
+            at: crate::wizard::Step::Credentials,
+            asks: true,
+            unanswered: vec![
+                crate::wizard::Step::Credentials,
+                crate::wizard::Step::Library,
+            ],
+            ready_for_review: false,
+            plan: vec![crate::model::SettingReport {
+                key: "DATA_ROOT".to_owned(),
+                value: "/srv/media".to_owned(),
+                secret: false,
+            }],
+            written: Vec::new(),
+            proof: Some(crate::validate::Validation::Valid {
+                observed: "the indexer answered with its capabilities".to_owned(),
+            }),
+        }
+    }
+
+    /// A walk that got all the way through, so the fields only an ending fills are
+    /// compared rather than left null.
+    fn a_walk() -> WalkthroughReport {
+        WalkthroughReport {
+            shape: crate::walkthrough::Shape::Pipeline,
+            state: crate::walkthrough::State::Complete,
+            proves: crate::walkthrough::Shape::Pipeline.proves().to_owned(),
+            item: Some("Sintel (2010)".to_owned()),
+            lines: vec![crate::walkthrough::Line::searched(3, 47)],
+            stopped: None,
+            link: Some(crate::walkthrough::Link::Hardlinked),
+            handover: Some(crate::walkthrough::Handover::of(true)),
+            suggestions: Vec::new(),
+            in_background: false,
+            already_here: false,
+        }
     }
 
     /// One repair with every field filled, so the shape is compared whole rather
