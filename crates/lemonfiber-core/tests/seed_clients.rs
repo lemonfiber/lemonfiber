@@ -1023,6 +1023,10 @@ async fn an_unavailable_service_skips_every_download_client() {
         ],
     )
     .await;
+    // Counted before it is judged: `all` over an empty list is true, so a run that
+    // produced no state at all would pass a test named for skipping every client
+    // while proving nothing was skipped.
+    assert_eq!(states.len(), 2, "{states:?}");
     assert!(
         states
             .iter()

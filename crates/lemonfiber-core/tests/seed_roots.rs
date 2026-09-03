@@ -260,6 +260,10 @@ async fn an_unavailable_service_skips_every_folder() {
         &[folder("/data/media/tv"), folder("/data/media/movies")],
     )
     .await;
+    // Counted before it is judged: `all` over an empty list is true, so a run that
+    // produced no state at all would pass a test named for skipping every folder
+    // while proving nothing was skipped.
+    assert_eq!(states.len(), 2, "{states:?}");
     assert!(
         states
             .iter()
