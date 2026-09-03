@@ -292,6 +292,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance())),
         Command::Invite { name } => invite::offer(ctx, name).await.map(Outcome::Invited),
+        Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
         Command::Outbound => {
             // The stack has to be readable, because half the answer is about it: a
@@ -520,6 +521,60 @@ mod tests {
             "minted-earlier",
         );
         env
+    }
+
+    /// A reset is driven from this copy of the app layer too.
+    ///
+    /// **Not a duplicate of the integration test that covers the same command.** The app
+    /// layer is compiled twice — once with these tests and once as the library the test
+    /// binaries link — and a path driven from only one of them leaves the other counted
+    /// as never run. What it asserts is the fact that makes a reset different from an
+    /// offer: it answers under its own standing, because nobody is being invited and the
+    /// news is that a password they had has stopped working.
+    #[tokio::test]
+    async fn a_reset_hands_back_an_invitation_under_its_own_standing() {
+        let env = recorded_admin("reissues");
+        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+        let http = Fake::by_path_in_turn(vec![
+            (
+                "/Users/AuthenticateByName",
+                vec![signed_in.clone(), signed_in],
+            ),
+            ("/Users/9/Password", vec![Answer::reply(204, "")]),
+            (
+                "/Users",
+                vec![Answer::reply(
+                    200,
+                    r#"[{"Id":"9","Name":"ana","HasPassword":true,"Policy":{"IsAdministrator":false}}]"#,
+                )],
+            ),
+        ]);
+        let ctx = a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http);
+
+        let said = dispatch(
+            Command::Reissue {
+                name: "ana".to_owned(),
+            },
+            &ctx,
+        )
+        .await;
+
+        assert!(
+            invited(&said).is_some_and(|report| report.standing == InvitationStanding::Reset),
+            "{said:?}"
+        );
+        assert!(
+            invited(&said).is_some_and(|report| report.hours > 0),
+            "a reset carried no window, so nothing will ever act on it: {said:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
     /// Offering an account hands back one address and the name to sign in as.

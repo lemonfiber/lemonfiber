@@ -1,8 +1,10 @@
-//! What a browser may ask when somebody new moves in.
+//! What a browser may ask when somebody new moves in, or when somebody already here
+//! has lost the way back in.
 //!
-//! One action, and one argument — which is why it has a file rather than a corner
-//! of the one beside it: everything interesting about an invitation is what it is
-//! *for*, and there is nothing else to get wrong.
+//! Two actions and one argument each — which is why they share a file rather than
+//! having one apiece: everything interesting about either is who it is *for*, and a
+//! reissue ends in the same invitation an invite does, so a browser has one shape to
+//! render for both.
 //!
 //! The name is required and the refusal names the argument rather than the action,
 //! which is what lets a form put the message beside the field somebody typed in
@@ -73,5 +75,54 @@ fn an_invitation_reaches_a_browser_under_its_own_name() {
     assert!(
         json.contains("bo"),
         "an invitation taken back was dropped on the way to a browser: {json}"
+    );
+}
+
+/// A reissue carries the name it is for, the same way an invitation does.
+#[test]
+fn a_reissue_carries_the_name_it_is_for() {
+    let with_name = Arguments {
+        name: Some("ana".to_owned()),
+        ..Arguments::default()
+    };
+
+    assert!(matches!(
+        command("reissue", with_name),
+        Some(Command::Reissue { name }) if name == "ana"
+    ));
+}
+
+/// A reissue for nobody is refused by the argument it lacks.
+#[test]
+fn a_reissue_for_nobody_is_refused_by_the_argument_it_lacks() {
+    assert!(
+        matches!(
+            refusal("reissue", Arguments::default()),
+            Some(Refused::Missing { argument, .. }) if argument == "name"
+        ),
+        "a reset for nobody was accepted"
+    );
+}
+
+/// A reissue asks for no agreement, unlike the removal it sits beside.
+///
+/// Worth stating from this side because a browser decides whether to put a
+/// confirmation in front of somebody by asking here. Nothing is destroyed and nothing
+/// is listed first, and what ends is a password nobody on this side knew — asking
+/// somebody to agree to that is asking them to weigh a loss they cannot see.
+#[test]
+fn a_reissue_needs_nobody_to_agree_to_it() {
+    let unconfirmed = Arguments {
+        name: Some("ana".to_owned()),
+        confirm: false,
+        ..Arguments::default()
+    };
+
+    assert!(
+        matches!(
+            command("reissue", unconfirmed),
+            Some(Command::Reissue { .. })
+        ),
+        "a reset was withheld until somebody agreed to it"
     );
 }

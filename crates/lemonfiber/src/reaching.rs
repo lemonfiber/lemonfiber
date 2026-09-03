@@ -68,6 +68,10 @@ pub const ACTS: &[Reach] = &[
         through: "invite",
     },
     Reach {
+        request: "reissue",
+        through: "reissue",
+    },
+    Reach {
         request: "remove",
         through: "remove",
     },

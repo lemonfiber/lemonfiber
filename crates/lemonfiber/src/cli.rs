@@ -295,6 +295,16 @@ pub enum Request {
         /// What they will sign in as.
         name: String,
     },
+    /// Let somebody set a new password, without you choosing or seeing it.
+    ///
+    /// Their account goes back to having no password on it — the state a fresh
+    /// invitation leaves it in — so they claim it again by setting the first one
+    /// themselves. Their old password stops working immediately. What this prints is
+    /// the invitation to send them: the same address, the same code.
+    Reissue {
+        /// Whose account to make claimable again.
+        name: String,
+    },
     /// Take somebody out of the household, in both places they have an account.
     ///
     /// Revokes access to the media server and to the request service. Their watch

@@ -34,6 +34,7 @@ Commands:
   stored       List what lemonfiber keeps on this machine, where it is, and why
   clients      Say which app to watch on, for each kind of device somebody in the house has
   invite       Offer somebody in the house an account they can claim
+  reissue      Let somebody set a new password, without you choosing or seeing it
   remove       Take somebody out of the household, in both places they have an account
   forget       Remove everything lemonfiber keeps on this machine
   seed         Wire the stack's services to each other, idempotently
@@ -1037,6 +1038,36 @@ Usage: lemonfiber invite [OPTIONS] <NAME>
 Arguments:
   <NAME>
           What they will sign in as
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber reissue`
+
+```text
+Let somebody set a new password, without you choosing or seeing it.
+
+Their account goes back to having no password on it — the state a fresh invitation leaves it in — so they claim it again by setting the first one themselves. Their old password stops working immediately. What this prints is the invitation to send them: the same address, the same code.
+
+Usage: lemonfiber reissue [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>
+          Whose account to make claimable again
 
 Options:
       --json

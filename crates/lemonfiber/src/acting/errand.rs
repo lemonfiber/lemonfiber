@@ -161,6 +161,18 @@ static AFTER: &[Errand] = &[
         going: Going::Once,
     },
     Errand {
+        name: "a password somebody can set again",
+        about: "put their account back to having none, so they choose the next one",
+        action: "reissue",
+        asks: "Let a new password be set for",
+        needs: Needs::Named("Whose account, as they appear in the household"),
+        accepts: None,
+        // Once rather than agreed: nothing is destroyed and nothing is listed first.
+        // What ends is a password nobody here knows, and the account is claimable the
+        // moment this returns.
+        going: Going::Once,
+    },
+    Errand {
         name: "somebody taken out of the household",
         about: "revoke their account on the media server and on the request service",
         action: "remove",

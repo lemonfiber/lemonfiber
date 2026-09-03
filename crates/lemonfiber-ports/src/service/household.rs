@@ -34,6 +34,18 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn invite(&self, name: &str) -> Result<Member, Failure>;
 
+    /// Put the account back to having no password on it.
+    ///
+    /// **This is what a reset is here**: not a new password chosen for somebody, but the
+    /// account returned to the unclaimed state an invitation leaves it in — so whoever
+    /// holds it sets the next first password themselves, where the operator cannot see
+    /// it. There is nowhere in this call to put a password even if one wanted to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn unclaim(&self, id: &str) -> Result<(), Failure>;
+
     /// Take an account away again.
     ///
     /// # Errors
@@ -118,9 +130,11 @@ pub struct Member {
     pub access: Access,
     /// When the server last saw them, as it timestamps it.
     ///
-    /// `None` before anybody has signed in, which is every unclaimed invitation and
-    /// nothing else — so an absence here is a fact about the account rather than a
-    /// gap in what was read.
+    /// `None` before anybody has signed in, so an absence here is a fact about the
+    /// account rather than a gap in what was read.
+    ///
+    /// Absent on every unclaimed invitation and on nothing else, so it is what a
+    /// household read shows as never having arrived.
     pub last_seen: Option<String>,
 }
 

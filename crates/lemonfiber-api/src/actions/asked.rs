@@ -334,9 +334,10 @@ pub const TAKES_ARCHIVE: &[&str] = &["restore"];
 
 /// The actions that are about a person rather than a form, a file or a service.
 ///
-/// Both halves of the same errand: offering somebody an account, and taking it away
-/// again. Nothing else on this surface is addressed to a member of the household.
-pub const TAKES_NAME: &[&str] = &["invite", "remove"];
+/// The whole of one errand: offering somebody an account, letting its password be set
+/// again, and taking it away. Nothing else on this surface is addressed to a member of
+/// the household.
+pub const TAKES_NAME: &[&str] = &["invite", "reissue", "remove"];
 
 /// The action whose command carries what goes in a bundle.
 ///

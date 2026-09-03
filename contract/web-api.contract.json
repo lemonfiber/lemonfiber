@@ -3497,7 +3497,7 @@
               ]
             },
             "hours": {
-              "description": "How many hours it stands before it is withdrawn.",
+              "description": "How many hours it stands before it is withdrawn.\n\nCounted from when it was *offered*, which for an account whose password was\ntaken off is the moment of the reset rather than when the account was made.\nWhat happens at the end is withdrawal, and withdrawal removes the account.",
               "type": "integer",
               "format": "int64"
             },
@@ -3552,6 +3552,11 @@
               "description": "They have set a password, so they are already in the house.\n\nNothing to claim and nothing to send. An account is not made, because the one\nthey have is theirs and a second under a nearly identical name is how a\nhousehold ends up with two of somebody.",
               "type": "string",
               "const": "joined"
+            },
+            {
+              "description": "The account was theirs already, and its password has been taken off.\n\n**Told apart from [`Made`](Self::Made) because what the person needs to hear is\ndifferent.** Nobody is being invited: they are already in the household, and the\nnews is that the password they had has stopped working. It runs out on the same\nwindow an offer does, counted from the reset — and what is at stake if it does is\nlarger, because the account being withdrawn is one they have watched on.",
+              "type": "string",
+              "const": "reset"
             }
           ]
         },
