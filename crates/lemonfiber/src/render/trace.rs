@@ -697,11 +697,8 @@ mod tests {
             findings: Vec::new(),
         };
 
-        assert!(
-            household(&report).text().contains("nothing above about 13"),
-            "{}",
-            household(&report).text()
-        );
+        let said = household(&report).text();
+        assert!(said.contains("nothing above about 13"), "{said}");
     }
 
     /// The account this program signs in as says that it runs the server.

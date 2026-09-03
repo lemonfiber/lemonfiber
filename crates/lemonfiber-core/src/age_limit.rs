@@ -126,11 +126,9 @@ mod tests {
     #[test]
     fn every_step_says_who_it_suits() {
         for step in steps() {
-            assert!(
-                !step.suits.is_empty(),
-                "{} has nothing beside it",
-                reading(Some(step.age))
-            );
+            // Bound rather than called in the message, which only runs on failure.
+            let said = reading(Some(step.age));
+            assert!(!step.suits.is_empty(), "{said} has nothing beside it");
         }
     }
 }

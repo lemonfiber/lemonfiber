@@ -602,6 +602,16 @@ mod tests {
         );
     }
 
+    /// The reader answers for an invitation and for nothing else.
+    ///
+    /// Every other command parses perfectly well and carries no allowance, so the
+    /// helper above has a case for them — and a case nothing reaches is a case that
+    /// could say anything.
+    #[test]
+    fn a_command_that_is_not_an_invitation_carries_no_allowance() {
+        assert_eq!(inviting(&["lemonfiber", "household"]), None);
+    }
+
     /// The steps the flag's own help names are the steps the core offers.
     ///
     /// Held rather than trusted, because the help is a sentence in a doc comment and

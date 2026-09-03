@@ -507,6 +507,35 @@ pub(crate) mod tests {
         );
     }
 
+    /// An errand that wants only a name opens the same line and sends on the word.
+    ///
+    /// The invitation above asks for three things and moves to the second, so it no
+    /// longer reaches the case where the word typed is the whole of what was wanted.
+    /// A reissue does, and so does a removal — one line, one word, and the errand
+    /// sent as soon as it is answered.
+    #[test]
+    fn an_errand_that_wants_only_a_name_sends_it_as_soon_as_it_is_typed() {
+        let errand = every()
+            .find(|errand| errand.action == "reissue")
+            .unwrap_or(all().0);
+        let mut stage = Stage::Idle;
+
+        let _ = super::taken(&mut stage, errand, &[]);
+
+        assert!(
+            matches!(&stage, Stage::Naming { asks, .. } if asks.contains("Whose account")),
+            "no line was opened to type a name on"
+        );
+
+        let _ = super::given(&mut stage, errand, "ana".to_owned());
+
+        let (asked, said) = match &stage {
+            Stage::Agreeing { given, .. } => (given.asked(), given.said().to_owned()),
+            _ => (Arguments::default(), String::new()),
+        };
+        assert_eq!(asked.name.as_deref(), Some("ana"), "{said}");
+    }
+
     /// The whole point of naming the action rather than assembling a command here:
     /// what this screen sends has to be something another surface already offers,
     /// or the requirement it is being built for is defeated by the thing built for

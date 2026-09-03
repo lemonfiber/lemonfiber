@@ -214,6 +214,19 @@ mod tests {
         }
     }
 
+    /// A stage that reached no question is read as having been given nothing.
+    ///
+    /// The reader above says so, and every assertion below leans on it: a stage that
+    /// stopped early has to come back empty rather than carrying whatever the last
+    /// answered question left, or a test would pass on an errand that never asked.
+    #[test]
+    fn a_stage_that_asked_nothing_is_read_as_empty() {
+        let (asked, said) = agreed(&Stage::Idle);
+
+        assert_eq!(asked, Arguments::default());
+        assert!(said.is_empty(), "{said}");
+    }
+
     /// A line of library names becomes the names, with the spaces and the empty
     /// pieces a stray comma leaves dropped.
     #[test]
