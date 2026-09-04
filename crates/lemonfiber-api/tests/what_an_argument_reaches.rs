@@ -16,7 +16,9 @@
 
 mod acting;
 
-use acting::{exactly_what, AGE, ARCHIVE, ITEM, LIBRARY, LOGS, NARROWED, OFFER, WARNED};
+use acting::{
+    exactly_what, AGE, ARCHIVE, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER, SEASON, WARNED,
+};
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;
@@ -146,7 +148,11 @@ fn carries_check(command: &Command) -> bool {
     matches!(command, Command::Doctor { accept: Some(check), .. } if check == WARNED)
 }
 
-/// Whether the command was told to include the checks that disturb the system.
+/// Whether the command was told to do the widened thing rather than the plain one.
+///
+/// A trace carries it as `searching`. The word buys the same thing at every door that
+/// takes it — the widened form of a read, which reaches past this machine — and each
+/// command holds it under its own name for that.
 fn carries_disruption(command: &Command) -> bool {
     matches!(
         command,
@@ -155,6 +161,9 @@ fn carries_disruption(command: &Command) -> bool {
             ..
         } | Command::Doctor {
             disruptive: true,
+            ..
+        } | Command::Trace {
+            searching: true,
             ..
         }
     )
@@ -303,6 +312,30 @@ fn give_item(given: &mut Arguments) {
     given.item = Some(ITEM.to_owned());
 }
 
+/// Whether the command has the title it was told to follow in it.
+fn carries_term(command: &Command) -> bool {
+    matches!(command, Command::Trace { term, .. } if term == FOLLOWED)
+}
+
+fn give_term(given: &mut Arguments) {
+    given.term = Some(FOLLOWED.to_owned());
+}
+
+/// Whether the command has the season the following was narrowed to in it.
+fn carries_season(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Trace {
+            season: Some(SEASON),
+            ..
+        }
+    )
+}
+
+fn give_season(given: &mut Arguments) {
+    given.season = Some(SEASON);
+}
+
 /// Whether the command has the libraries it was told they may open in it.
 fn carries_libraries(command: &Command) -> bool {
     matches!(command, Command::Invite { allowance, .. }
@@ -367,7 +400,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 23] = [
+const SWEEPS: [Sweep; 25] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -391,6 +424,8 @@ const SWEEPS: [Sweep; 23] = [
     ("item", give_item, carries_item),
     ("libraries", give_libraries, carries_libraries),
     ("age_limit", give_age_limit, carries_age_limit),
+    ("term", give_term, carries_term),
+    ("season", give_season, carries_season),
 ];
 
 /// Every offered action given one argument on top of what it takes, gathering what
@@ -471,6 +506,8 @@ fn every_argument_the_carrier_holds_is_swept() {
         "item",
         "libraries",
         "age_limit",
+        "term",
+        "season",
     ];
     let swept: Vec<&str> = SWEEPS.iter().map(|(argument, _, _)| *argument).collect();
     assert_eq!(swept, held);
