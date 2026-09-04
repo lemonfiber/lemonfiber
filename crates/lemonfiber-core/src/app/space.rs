@@ -13,8 +13,8 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use crate::error::{Amiss, Problem, Remedy, Severity, State};
-use crate::ports::service::{Queued, Seeded, Seeding};
+use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
+use crate::ports::service::{Queued, Queues, Seeded, Seeding};
 use crate::space::{
     reckon, Left, Level, Measured, Reckoning, Reclaimed, Role, Stalled, Volume, HALTED,
     NOWHERE_TO_MEASURE, WALK_REFUSED,
