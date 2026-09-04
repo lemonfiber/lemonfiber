@@ -36,3 +36,35 @@ jobs:
           # first. The check then reports a configuration it saw on main as missing
           # here, and says so about whichever language finished second.
           category: "/language:${{ matrix.language }}"
+
+  # The analysis finding something is not the same as anything stopping it. The
+  # check GitHub raises beside it compares the configurations a pull request
+  # produced against every one seen on main, and the supply-chain scan uploads
+  # three that only ever run on main — so it is neutral on every pull request,
+  # whatever the analysis found, and gates nothing. This asks the question that
+  # was meant instead: is there an open alert against what this branch proposes.
+  alerts:
+    needs: analyze
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: read
+    steps:
+      - name: No open CodeQL alert reaches main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RESULT_REF: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
+        run: |
+          set -euo pipefail
+          open=$(gh api --paginate \
+            "repos/${REPO}/code-scanning/alerts?state=open&tool_name=CodeQL&ref=${RESULT_REF}" \
+            --jq '.[] | "\(.rule.security_severity_level // .rule.severity)\t\(.rule.id)\t\(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line)"')
+          if [ -n "$open" ]; then
+            printf '%s\n' "$open" | while IFS= read -r line; do
+              echo "::error::open CodeQL alert — ${line}"
+            done
+            count=$(printf '%s\n' "$open" | wc -l | tr -d ' ')
+            echo "::error::${count} open alert(s) against this branch; dismiss with a reason or fix them."
+            exit 1
+          fi
+          echo "No open CodeQL alert against ${RESULT_REF}."
