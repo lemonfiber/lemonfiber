@@ -8,9 +8,9 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, RawAllowance, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome, SetupAction, Waiting};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 use lemonfiber_core::doctor::Narrowing;
 
 mod acting;
