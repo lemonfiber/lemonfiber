@@ -627,8 +627,8 @@ mod tests {
         })
     }
 
-    /// What an unanswered offer says, as one string.
-    fn said(offer: &lemonfiber_core::space::Letting) -> String {
+    /// What one offer says, as one string.
+    fn offered(offer: &lemonfiber_core::space::Letting) -> String {
         letting(offer).text()
     }
 
@@ -636,7 +636,7 @@ mod tests {
     #[test]
     fn an_offer_puts_what_it_costs_above_the_only_way_to_agree_to_it() {
         let offer = an_offer();
-        let printed = said(&offer);
+        let printed = offered(&offer);
         let cost = printed.find("ratio");
         let answer = printed.find(offer.agreement.as_str());
 
@@ -679,9 +679,9 @@ mod tests {
             ..an_offer()
         };
 
-        assert!(said(&rehearsed).contains("Nothing was asked"));
-        assert!(said(&taken).contains("no longer seeding"));
-        assert_ne!(said(&rehearsed), said(&taken));
+        assert!(offered(&rehearsed).contains("Nothing was asked"));
+        assert!(offered(&taken).contains("no longer seeding"));
+        assert_ne!(offered(&rehearsed), offered(&taken));
     }
 
     /// A download nothing ever imported is offered without a consequence to weigh.
@@ -693,7 +693,7 @@ mod tests {
             standing: Standing::NeverImported,
             consequence: None,
         });
-        let printed = said(&free);
+        let printed = offered(&free);
         assert!(printed.contains("loses nothing"), "{printed}");
         assert!(!printed.contains("ratio"), "{printed}");
     }
