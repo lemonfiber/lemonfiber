@@ -19,7 +19,7 @@ pub(crate) use lemonfiber_api::actions::{
     TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_NAME, TAKES_NARROWING,
     TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES,
-    TAKES_SETTING, TAKES_TERM, TAKES_WAITING,
+    TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_WAITING,
 };
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::guard::Token;
@@ -137,6 +137,13 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         days: takes(TAKES_POLICY).then_some(PERIOD),
         request: takes(TAKES_REQUEST).then_some(WAITING),
         reason: takes(TAKES_REASON).then(|| REASON.to_owned()),
+        down: takes(TAKES_SHARING).then(|| SHARE.to_owned()),
+        up: takes(TAKES_SHARING).then(|| SHARE.to_owned()),
+        active: takes(TAKES_SHARING).then(|| HOURS.to_owned()),
+        line: takes(TAKES_SHARING).then(|| CARRIES.to_owned()),
+        cap: takes(TAKES_SHARING).then(|| MONTHLY.to_owned()),
+        exceeded: takes(TAKES_SHARING).then(|| AT_THE_CAP.to_owned()),
+        unrestricted_for: takes(TAKES_SHARING).then_some(MINUTES),
     }
 }
 
@@ -188,6 +195,7 @@ pub(crate) const UNRATED: &str = "allow";
 /// words a walk or a trace is given, so a command carrying this cannot pass for one
 /// carrying either of those.
 pub(crate) const DOWNLOAD: &str = "A.Show.S01E01.1080p";
+
 /// A policy, as a request body writes it. The one that lives inside a limit, so the
 /// limit beside it is not an argument the translation could drop without noticing.
 pub(crate) const POLICY: &str = "within-a-limit";
@@ -206,3 +214,27 @@ pub(crate) const WAITING: i64 = 7;
 
 /// Why a request was turned down, in the operator's own words.
 pub(crate) const REASON: &str = "there is no room this month";
+
+/// A share of the line, as an operator writes one. Not a figure and not a round
+/// half, so a command carrying it cannot pass for one carrying a default.
+pub(crate) const SHARE: &str = "37%";
+
+/// The household's hours, as an operator writes them. Not the ones this product
+/// would ever choose for anybody, so a command carrying them can only have been
+/// given them.
+pub(crate) const HOURS: &str = "06:30-22:45";
+
+/// What a line carries, both directions. Lopsided, because a home connection is,
+/// and a command that folded the two into one would come back symmetrical.
+pub(crate) const CARRIES: &str = "60MiB/6MiB";
+
+/// A month's allowance, as an operator writes one.
+pub(crate) const MONTHLY: &str = "1TiB";
+
+/// What is to happen at that allowance. Not the middle answer, so a command that
+/// dropped it and fell back cannot pass for one that carried it.
+pub(crate) const AT_THE_CAP: &str = "pause";
+
+/// How long the limits may be lifted for. Not an hour, so a command carrying it
+/// cannot pass for one carrying a round default.
+pub(crate) const MINUTES: u64 = 37;

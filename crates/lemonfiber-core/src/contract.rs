@@ -131,6 +131,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         kind::SPACE,
         schema_for!(Envelope<crate::space::Reckoning>),
     );
+    describing(
+        kinds,
+        kind::BANDWIDTH,
+        schema_for!(Envelope<crate::bandwidth::Sharing>),
+    );
     describing(kinds, kind::STATUS, schema_for!(Envelope<StatusReport>));
     describing(
         kinds,
@@ -203,7 +208,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 34;
+    const OUTCOMES: usize = 35;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -384,6 +389,7 @@ mod tests {
                 standing: crate::space::Standing::Seeding { ratio: 175 },
                 consequence: Some(crate::space::RATIO_CONSEQUENCE.to_owned()),
             })),
+            Outcome::Bandwidth(a_shared_line()),
             Outcome::Wizard(a_setup_part_way()),
             Outcome::Archives(crate::app::archives::Listing {
                 archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
@@ -489,6 +495,56 @@ mod tests {
             }),
             ..crate::space::reckon(&measured)
         }
+    }
+
+    /// A line with every optional half of the shape filled: a measured capacity
+    /// carrying both its cautions, a schedule, a cap being approached, an override
+    /// that has run out, and a client answering in both directions.
+    fn a_shared_line() -> crate::bandwidth::Sharing {
+        let taken = 1_700_000_000;
+        crate::bandwidth::weigh(&crate::bandwidth::Measured {
+            declared: crate::bandwidth::Declared {
+                down: Some(crate::bandwidth::Limit::Share(50)),
+                up: Some(crate::bandwidth::Limit::Absolute(256_000)),
+                rhythm: crate::bandwidth::Rhythm::read("07:00-23:00"),
+                cap: Some(crate::bandwidth::Cap {
+                    monthly: 1_000_000_000_000,
+                    exceeded: crate::bandwidth::WhenExceeded::Throttle,
+                }),
+                capacity: Some(crate::bandwidth::Capacity {
+                    down: 60_000_000,
+                    up: 6_000_000,
+                    source: crate::bandwidth::capacity::Source::Observed,
+                    taken: 1_600_000_000,
+                    through_tunnel: true,
+                }),
+                respite: Some(crate::bandwidth::Respite {
+                    until: taken - 3_600,
+                }),
+            },
+            now: taken,
+            zone: Some("Europe/Amsterdam".to_owned()),
+            clients: vec![crate::bandwidth::Holding {
+                client: "qbittorrent".to_owned(),
+                answer: crate::bandwidth::Answer::Held {
+                    down: crate::bandwidth::Held::of(
+                        Some(30_000_000),
+                        Some(30_000_000),
+                        Some(29_000_000),
+                        true,
+                    ),
+                    up: crate::bandwidth::Held::of(Some(256_000), Some(1_000), Some(900), true),
+                    period: Some(crate::bandwidth::Period::Active),
+                },
+            }],
+            metered: Some(crate::bandwidth::Metered::of(
+                "2026-09",
+                950_000_000_000,
+                10_000_000_000,
+                vec!["qbittorrent counts only since it last started.".to_owned()],
+            )),
+            applied: true,
+        })
     }
 
     /// A setup part-way through, carrying what it has settled and what the service

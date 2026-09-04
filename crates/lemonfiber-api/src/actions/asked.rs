@@ -17,7 +17,7 @@ pub use takers::{
     unwanted, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING,
     TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM,
     TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST,
-    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_TERM, TAKES_WAITING,
+    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_WAITING,
 };
 
 use lemonfiber_core::app::Waiting;
@@ -107,6 +107,26 @@ pub struct Arguments {
     pub request: Option<i64>,
     /// Why a request is being turned down.
     pub reason: Option<String>,
+    /// How much of the line downloads may take, as a share or a rate.
+    ///
+    /// Carried as it was written and read in the core, like `unrated` above and for
+    /// the same reason: a surface that decided what `50%` meant would be a second
+    /// answer to the question, and the two would part company on the first change
+    /// to either — which a household would meet as an evening that went wrong on
+    /// one surface and not on another.
+    pub down: Option<String>,
+    /// How much of it uploads may take, set apart from the download.
+    pub up: Option<String>,
+    /// The hours the household is awake, as `HH:MM-HH:MM` on the wall clock.
+    pub active: Option<String>,
+    /// What the line carries, as `<down>/<up>`, where the operator knows.
+    pub line: Option<String>,
+    /// A monthly allowance for what the stack itself moves.
+    pub cap: Option<String>,
+    /// What is to happen when that cap is reached, decided in advance.
+    pub exceeded: Option<String>,
+    /// How many minutes to lift the limits for, and no longer.
+    pub unrestricted_for: Option<u64>,
 }
 
 /// Whether a run includes the checks that disturb a running system.

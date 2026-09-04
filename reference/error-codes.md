@@ -79,6 +79,10 @@ what to do about it, is written for operators at
 - `QUOTA-5`
 - `QUOTA-6`
 - `QUOTA-7`
+- `RATE-1`
+- `RATE-2`
+- `RATE-3`
+- `RATE-4`
 - `READ-1`
 - `READ-2`
 - `REISSUE-1`

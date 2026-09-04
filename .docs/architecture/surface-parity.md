@@ -101,12 +101,13 @@ and the rest is named in **Standing**.
 | `restore` | `restore`, `/api/backups` | dashboard | Reachable in full from a browser, and the confirmation is inside the command rather than in a screen: unconfirmed it verifies the archive and answers with what it holds, having touched nothing, and only a second request carrying the agreement overwrites — so a surface that skipped the listing would be asking for something else, not rendering the same thing differently. That is what makes the listing the terminal's consequence-before-the-question: what the archive would overwrite is on the screen, and the question is the line under it. What was missing was the step before naming one: the name is typed rather than pointed at, and nothing anywhere said what this machine had kept, so a browser could only ask for an archive whose name it already knew. `/api/backups` is that listing, and on the command line it is `lemonfiber restore` with nothing named — the fork `forms` and `explain` take on their own word, taken here for the reason they take it: a surface that has to name a thing cannot know the names in advance. The name still travels as a name and is resolved beneath the backups directory by the core, so one carrying a path, or climbing out of that directory, is refused by name rather than followed — which is the poorer picker `G1` records, not a request a browser cannot make. Accepting a re-point is offered there now, and it is offered where the operator can already see why it is being asked. The unconfirmed run that lists what the archive would overwrite is the same run that names the data root it was taken against, so where the two differ the question under that listing *is* the re-point — the consequence-before-the-question this row already had, carrying the one decision it was short of, rather than a second agreement given blind. Where they do not differ nothing more is asked and nothing more is sent, which is what that field means on the web too. |
 
 | `space` | `space`, `/api/space` | dashboard | Reachable in full from all three, and the confirmation is inside the command rather than in a screen, exactly as a forget's is: unconfirmed it accounts for the disk and offers, and only a second request carrying the agreement removes. Which is why the web needs both halves named here — `/api/space` is the account, and the action of the same name is the answer to it, reaching one command that reads the same way twice. It takes one argument, and deliberately only one. There is no argument choosing *what* to reclaim, because that choice is not a caller's to make: what a confirmed run takes is the downloads nothing ever imported and the archive parts already unpacked beside their contents, and nothing else is ever in it. A torrent still seeding is named, sized, and left with the operator with what removing it does to a tracker's opinion of them stated beside it — a consequence outside this machine is not one a surface can weigh — and anything the operator has already asked to be left alone is not on offer at any level of fullness. A narrowing argument would be a way to ask for those, so there is none to ask with. On the terminal it is an errand rather than a question, under the forget, and its own unconfirmed run is what the box is drawn over: the account is read first and the yes sits under it. |
+| `bandwidth` | `bandwidth`, `/api/bandwidth` | dashboard, partial | Reachable in full from a browser and the command line, and the same two halves the disk accounting has: `/api/bandwidth` is the account of the line — what it was measured to carry, what the stack is being held to, which side of the household's day each download client says it is on, and whether each is actually keeping to what it was given — and the action of the same name is where a limit is declared. It takes seven arguments and every one of them arrives as the operator wrote it, because what `50%` means is one answer given in the core for all three surfaces at once; a surface that read a share would be a second answer to the same question, and the two would part company on the first change to either — which a household meets as an evening that goes wrong on one surface and not on another. **The terminal's half is the account and not the declaring**, which is the one gap on this page. The screen asks the question and renders the whole answer; what it cannot do is set a limit, because seven answers is a form and the three shapes the errand list has — a word typed, a value taken off a list, and a pair of the two — do not carry one. A `Needs` that did would be a flow of its own beside `inviting` and `bundling`, which is a slice rather than a row, and offering two of the seven from a screen would be a screen that could constrain the house and not lift the constraint. So it is a question here rather than an errand, and the gap is written down rather than argued away. |
 
 | `stop-seeding` | `stop-seeding` | dashboard | Reachable in full from all three, and the one request in this table whose yes is **not** a flag. It is the other half of `space`, kept apart from it because the spec forbids bundling a torrent's removal with generic cleanup: that account offers what costs nothing and names what costs something without touching it, and this takes one of the named ones, files and all. What it costs is stated first — where the download stands, the ratio it is still earning, what a private tracker does about an account that stops earning one, and what goes with it and what stays — and the run that states it prints a name for that reading. Answering is saying that name back, and there is nothing else to say: the command carries no `confirm`, so the argument list refuses one by name, and a caller who never read the consequence has nothing to send. An answer given for a reading that has since moved is refused rather than spent, because the name is built from what was read. The terminal reaches it through the errands list, where the name is carried rather than typed — the screen holds the question open in the process that asked it, which is exactly what a browser cannot do and why the name exists. |
 
 ## What the table adds up to
 
-Of the thirty-six requests, thirty-five reach the web in full, zero reach it in
+Of the thirty-seven requests, thirty-six reach the web in full, zero reach it in
 part, zero do not reach it at all, and one — `ui` — is an honest exception. Zero
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
@@ -119,18 +120,23 @@ read that disturbed something would still not be a read, so it is asked for at t
 door changes are asked for instead. That leaves `ui` as the only exception this
 table permits, in either column.
 
-On the other side of the table thirty-five reach the terminal in full, zero reach
+On the other side of the table thirty-five reach the terminal in full, one reaches
 the terminal in part, one reaches the terminal but for an exception, and zero have
-no terminal form — which is where three stood seven slices ago, nine before the one
+no terminal form — which is where three stood eight slices ago, nine before the one
 ahead of that, and twenty before the one that began it. Every request the command
-line accepts is reachable from a screen, and every one of them is reachable whole.
+line accepts is reachable from a screen, and all but one of them is reachable whole.
 
-**Both columns are finished.** No row in this table says `partial` any more. What
-that column lost, it lost an argument at a time — a screen that reaches a request but
-not one of its arguments has not finished reaching it — and the last four went
-together: the media a quality choice applies to, the season a trace is narrowed to,
-the re-point a restore may need, and what a bundle holds. Two exceptions stand, one in
-each column, and each of them was argued rather than left.
+**The web column is still finished and the terminal's has one gap again.** It had
+none for five slices, and it is `bandwidth` that opened this one: the screen asks
+for the account of the line and renders every word of it, and what it cannot do is
+declare a limit. The reason is the shape of the answer rather than the request —
+seven values is a form, and the errand list carries a word typed, a value taken off
+a list, and a pair of the two, none of which is one. It is written as `partial`
+rather than argued into an exception, because it is short of something somebody is
+going to build: a `Needs` beside `inviting` and `bundling` closes it, and that is a
+slice rather than a row. What was refused in the meantime was the half-measure —
+offering two of the seven would give a screen that can constrain the household and
+cannot lift the constraint, which is worse than a screen that does neither.
 
 **The terminal has an exception of its own now, and it is spelled as one.** `support`
 reaches every part of a bundle but the settings shown as they are, and that one is
@@ -326,7 +332,7 @@ argument is that the fork belongs to the surface: the core spells this as a fiel
 on the command it already had, so a second command here would have been a browser
 asking for something no command line can.
 
-## The terminal acts on thirteen and asks about nine
+## The terminal acts on thirteen and asks about ten
 
 It did neither. The dashboard read and the log viewer read; the wizard was the
 only screen that changed anything, and it only runs on a machine that has not been
@@ -338,11 +344,11 @@ the far end of a remote session, who is the least able of the three to reach
 another surface to act on what this one has just told them.
 
 The dashboard offers the five the screen already showed state for — starting,
-stopping, switching, restarting and fetching — and answers the nine reads it showed
+stopping, switching, restarting and fetching — and answers the ten reads it showed
 nothing of, or showed the raw material of: the versions in play, how this stack is
 doing, the forms it declares, the settings, the quality in force, what the household
-asked for, where the household begins, where one of those things got to, and what
-has stopped on the way. Beside them are the seven writes that are not about what is
+asked for, where the household begins, where one of those things got to, what has
+stopped on the way, and how the line the household shares is being shared. Beside them are the seven writes that are not about what is
 running at all: the wiring,
 keeping an operator's edits, throwing them away, a capture, a bundle, an archive put
 back and the last repair put back; the two that keep going once they are started;

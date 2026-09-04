@@ -52,7 +52,7 @@ impl Stuck {
     /// The line an operator reads.
     #[must_use]
     pub fn said(&self) -> String {
-        let held = spoken(self.held_for);
+        let held = crate::spoken::duration(self.held_for);
         let cause = self
             .blocking
             .as_deref()
@@ -69,23 +69,6 @@ impl Stuck {
         }
         format!("{} — {} for {held}{cause}", self.name, self.stall.word())
     }
-}
-
-/// A duration in the words a person uses for it.
-///
-/// Hours stay hours until two days, because "36 hours" tells an operator more
-/// about a stall than "2 days" does; past that the precision stops helping.
-fn spoken(seconds: u64) -> String {
-    let (count, unit) = match seconds {
-        0..=5399 => (seconds.max(60) / 60, "minute"),
-        5400..=172_799 => ((seconds + 1_800) / 3_600, "hour"),
-        _ => ((seconds + 43_200) / 86_400, "day"),
-    };
-    // Saturating rather than `as`: a count large enough to truncate is a clock
-    // that has gone wrong, and reporting "1 minute" for it would be worse than
-    // reporting an implausibly large number honestly.
-    let plural = usize::try_from(count).unwrap_or(usize::MAX);
-    format!("{count} {unit}{}", crate::plural::s(plural))
 }
 
 /// Everything wrong with the queue, worst first.
@@ -221,7 +204,7 @@ pub fn category(item: &Item) -> Option<Stall> {
 mod tests {
     use std::time::Duration;
 
-    use super::{assess, spoken, Stuck, LOOPING, REPEATED};
+    use super::{assess, Stuck, LOOPING, REPEATED};
     use crate::queue::{Fetching, Importing, Item, Stall, Thresholds};
 
     /// Long enough that every threshold here has been passed.
@@ -449,20 +432,6 @@ mod tests {
             stuck.said(),
             "20 items — not moving for 7 hours: No space left on device"
         );
-    }
-
-    #[test]
-    fn a_duration_reads_in_the_units_a_person_would_use() {
-        assert_eq!(spoken(0), "1 minute", "never nothing at all");
-        assert_eq!(spoken(60), "1 minute");
-        assert_eq!(spoken(30 * 60), "30 minutes");
-        assert_eq!(spoken(2 * 60 * 60), "2 hours");
-        // Hours stay hours until two days, because "36 hours" tells an operator
-        // more about a stall than "2 days" does.
-        assert_eq!(spoken(24 * 60 * 60), "24 hours");
-        assert_eq!(spoken(47 * 60 * 60), "47 hours");
-        assert_eq!(spoken(48 * 60 * 60), "2 days");
-        assert_eq!(spoken(8 * 24 * 60 * 60), "8 days");
     }
 
     #[test]

@@ -4,6 +4,7 @@
 //! dispatcher that routes them and the translation that turns them into the core's
 //! own commands. A flag is added here; what it does is added next door.
 
+mod bandwidth;
 mod repair;
 mod serving;
 mod setup;
@@ -20,6 +21,7 @@ pub use under::{ConfigAction, HouseholdCommand, QualityCommand};
 // Re-exported rather than reached for through the module they now live in: where a
 // flag is declared is this file's business and nobody else's, and moving one would
 // otherwise be a change at every call site that names it.
+pub use bandwidth::RawBandwidth;
 pub use repair::{Fixing, Mending};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
@@ -419,6 +421,18 @@ pub enum Request {
         #[arg(long, value_name = "NAME")]
         offer: Option<String>,
     },
+    /// Account for the line: what it carries, what the stack takes, what that costs.
+    ///
+    /// Asked nothing it reports — the limits in force, which side of your day the
+    /// clients say they are on, and whether they are actually keeping to what they
+    /// were given. Asked for a limit it declares one and hands it to every download
+    /// client, then reads back what each says, because a client that accepts a
+    /// setting and does not apply it looks exactly like one that did.
+    ///
+    /// Nothing here touches anybody watching from your own library, and nothing
+    /// here shapes this machine's traffic. It sets limits inside lemonfiber's own
+    /// download clients and nowhere else.
+    Bandwidth(RawBandwidth),
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.

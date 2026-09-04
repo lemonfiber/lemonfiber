@@ -408,6 +408,8 @@ fn download_of(torrent: TorrentInfo) -> Download {
     }
 }
 
+mod throttling;
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;

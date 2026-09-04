@@ -301,6 +301,7 @@ async fn main() -> ExitCode {
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Space { confirm } => Command::Space { confirm },
         Request::StopSeeding { download, offer } => letting(download, offer),
+        Request::Bandwidth(asked) => translate::sharing(asked),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },

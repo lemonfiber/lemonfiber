@@ -731,6 +731,38 @@ async fn where_the_disk_went_is_the_envelope_the_command_renders() {
 }
 
 #[tokio::test]
+async fn how_the_line_is_shared_is_the_envelope_the_command_renders() {
+    // A page can be told a number; it cannot sign in to a download client, read
+    // what that client is limited to and read what it is moving beside it, and the
+    // whole answer here is built out of those three.
+    let asking = || Command::Bandwidth(lemonfiber_core::app::BandwidthAsked::default());
+    let expected = as_the_command_renders_it(&measuring("line"), asking()).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(measuring("line"), reads::BANDWIDTH).await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn how_the_line_is_shared_always_says_what_it_will_never_limit() {
+    // Written out rather than derived. The two fears an operator brings to a
+    // bandwidth feature are that it throttles the household's own viewing and that
+    // it meddles with the machine, and a report that left either to be inferred is
+    // one that gets read as doing them.
+    let seen = asked(measuring("untouched"), reads::BANDWIDTH).await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"bandwidth","data":{"restraint":"#)
+            && body.contains("watching from your own library")
+            && body.contains("does not shape the machine's traffic")
+            && body.contains(r#""applied":false"#)),
+        "the account a browser is served, with nothing declared"
+    );
+}
+
+#[tokio::test]
 async fn where_the_disk_went_carries_the_volume_and_takes_nothing() {
     // Written out rather than derived, so a second serialisation could not pass this
     // by agreeing with itself. A read never removes anything, so the field that says

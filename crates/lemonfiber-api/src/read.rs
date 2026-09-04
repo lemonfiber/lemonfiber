@@ -1,5 +1,5 @@
-//! The twenty reads: one endpoint per question a command already answers, plus the
-//! two that answer with something other than a value.
+//! The twenty-one reads: one endpoint per question a command already answers, plus
+//! the two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
 //! into the command a person would type, hands that to the dispatcher the
@@ -22,6 +22,7 @@
 //! words, the files lemonfiber keeps of its own, and where the disk went.
 
 mod archives;
+mod bandwidth;
 mod chosen;
 mod clients;
 mod diagnosis;
@@ -68,6 +69,7 @@ pub fn routes() -> Router<Serving> {
         .merge(outbound::routes())
         .merge(stored::routes())
         .merge(space::routes())
+        .merge(bandwidth::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.

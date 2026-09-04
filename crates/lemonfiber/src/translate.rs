@@ -7,7 +7,9 @@
 
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Allowance, Answer, Chosen, Command, Decision, QualityAction};
+use lemonfiber_core::app::{
+    Allowance, Answer, BandwidthAsked, Chosen, Command, Decision, QualityAction,
+};
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::service::{Quota, Unrated};
@@ -17,7 +19,7 @@ use lemonfiber_core::recyclarr::Kind;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawUnrated,
+    Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawBandwidth, RawUnrated,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -212,6 +214,24 @@ pub(crate) fn traced(term: &[String], season: Option<u32>, search: bool) -> Comm
     }
 }
 
+/// What was asked about the line, carried as it was written.
+///
+/// Not one value is interpreted here. What `50%` means, what may be lifted for how
+/// long, and what a cap needs beside it are all decisions the core makes for every
+/// surface at once — a shell that read them would be a second answer to the same
+/// question, and the two would part company on the first change to either.
+pub(crate) fn sharing(asked: RawBandwidth) -> Command {
+    Command::Bandwidth(BandwidthAsked {
+        down: asked.down,
+        up: asked.up,
+        active: asked.active,
+        line: asked.line,
+        cap: asked.cap,
+        exceeded: asked.when_exceeded,
+        unrestricted_for: asked.unrestricted_for,
+    })
+}
+
 /// A restart of named services, or of everything the form holds where none are named.
 pub(crate) fn restarting(form: String, services: Vec<String>) -> Command {
     Command::Restart {
@@ -245,13 +265,15 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{
-        bundling, configuration, household, invitation, letting, quality, restarting, traced,
-        Answer, Chosen, Decision, Destination, Policy, Quota, Wanted,
+        bundling, configuration, household, invitation, letting, quality, restarting, sharing,
+        traced, Answer, Chosen, Decision, Destination, Policy, Quota, Wanted,
     };
     use crate::exit::USAGE;
     use lemonfiber::cli::{
-        Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawUnrated,
+        Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawBandwidth,
+        RawUnrated,
     };
+    use lemonfiber_core::app::BandwidthAsked;
     use lemonfiber_core::bundle::Filenames;
     use lemonfiber_core::ports::service::Unrated;
 
@@ -399,6 +421,53 @@ mod tests {
                     unrated: Some(Unrated::HeldBack),
                 },
             }
+        );
+    }
+
+    /// Every flag reaches the core as it was written, and none of it is read here.
+    ///
+    /// A shell that read `50%` would be a second answer to what a share means, and
+    /// the two would part company on the first change to either — which a
+    /// household would meet as an evening that went wrong on one surface and not
+    /// on another.
+    #[test]
+    fn what_was_asked_about_the_line_reaches_the_core_unread() {
+        assert_eq!(
+            sharing(RawBandwidth {
+                down: Some("50%".to_owned()),
+                up: Some("2MiB".to_owned()),
+                active: Some("07:00-23:00".to_owned()),
+                line: Some("60MiB/6MiB".to_owned()),
+                cap: Some("1TiB".to_owned()),
+                when_exceeded: Some("pause".to_owned()),
+                unrestricted_for: Some(60),
+            }),
+            Command::Bandwidth(BandwidthAsked {
+                down: Some("50%".to_owned()),
+                up: Some("2MiB".to_owned()),
+                active: Some("07:00-23:00".to_owned()),
+                line: Some("60MiB/6MiB".to_owned()),
+                cap: Some("1TiB".to_owned()),
+                exceeded: Some("pause".to_owned()),
+                unrestricted_for: Some(60),
+            })
+        );
+    }
+
+    /// Asked nothing, it asks the core for nothing — which is the reading.
+    #[test]
+    fn a_line_asked_about_and_not_changed_carries_no_answers() {
+        assert_eq!(
+            sharing(RawBandwidth {
+                down: None,
+                up: None,
+                active: None,
+                line: None,
+                cap: None,
+                when_exceeded: None,
+                unrestricted_for: None,
+            }),
+            Command::Bandwidth(BandwidthAsked::default())
         );
     }
 

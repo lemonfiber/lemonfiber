@@ -30,7 +30,7 @@
 
 mod asked;
 
-use lemonfiber_core::app::{Command, QualityAction};
+use lemonfiber_core::app::{BandwidthAsked, Command, QualityAction};
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
 
@@ -100,6 +100,14 @@ pub const STORED: &str = "/api/stored";
 /// this one reaches the command with nothing confirmed.
 pub const SPACE: &str = "/api/space";
 
+/// How the line is shared, what that costs, and whether the clients keep to it.
+///
+/// A read rather than the action of the same name, and the two answer with the same
+/// document. It takes nothing: a read never declares a limit, so this one reaches
+/// the command with nothing asked of it, and the action beside it is where a
+/// declaration goes.
+pub const BANDWIDTH: &str = "/api/bandwidth";
+
 /// Which app to watch on, for each kind of device somebody in the house has.
 ///
 /// The same answer on every machine — the client landscape belongs to the
@@ -140,7 +148,7 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
     VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, FRONT_DOOR, TRACE, STUCK, CONFIG,
-    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, SPACE, CLIENTS,
+    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, SPACE, BANDWIDTH, CLIENTS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -241,6 +249,10 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // with is the account and the offer, and the action beside it is where an
         // answer to that offer goes.
         SPACE => Ok(Command::Space { confirm: false }),
+        // Nothing asked of it, for the same reason: what this answers with is the
+        // account of the line, and the action beside it is where a limit is
+        // declared.
+        BANDWIDTH => Ok(Command::Bandwidth(BandwidthAsked::default())),
         CLIENTS => Ok(Command::Clients),
         _ => Err(NO_SUCH_READ),
     }

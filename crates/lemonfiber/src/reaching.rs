@@ -161,6 +161,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/stored",
     },
     Reach {
+        request: "bandwidth",
+        through: "/api/bandwidth",
+    },
+    Reach {
         request: "clients",
         through: "/api/clients",
     },
