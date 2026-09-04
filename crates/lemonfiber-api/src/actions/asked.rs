@@ -91,6 +91,9 @@ pub struct Arguments {
     pub term: Option<String>,
     /// The season a followed show is narrowed to, or every season where absent.
     pub season: Option<u32>,
+    /// The completed download the client is to be asked to let go, by the name both
+    /// sides use.
+    pub download: Option<String>,
 }
 
 /// Whether a run includes the checks that disturb a running system.
@@ -217,17 +220,37 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 
 /// The actions whose command carries what the operator read before answering.
 ///
-/// The two that show the operator something and then act on what they answered. A
-/// repair is offered and then carried out; a restore is listed and then overwrites.
-/// Both are two requests with a decision in the gap, and in that gap the thing that
-/// was read can move — a repair's effects rewritten by a fresh diagnosis, a
-/// restore's re-point derived again from a data root that has changed. So the
+/// The three that show the operator something and then act on what they answered. A
+/// repair is offered and then carried out; a restore is listed and then overwrites;
+/// letting a download go states what that costs a tracker's opinion of somebody and
+/// then asks the client to take it. All three are two requests with a decision in the
+/// gap, and in that gap the thing that was read can move — a repair's effects
+/// rewritten by a fresh diagnosis, a restore's re-point derived again from a data root
+/// that has changed, a download's ratio earned while somebody was deciding. So the
 /// answer names what it was given for, and the run that acts builds that name again
 /// and compares.
 ///
+/// On two of them it sits beside a `confirm` that can stand in for it. On the third
+/// there is no `confirm` at all — see [`TAKES_AGREEMENT`], which deliberately leaves
+/// it out — so the name of the offer is the only way to say yes to it. That is the
+/// point of it there: a blanket yes would be a removal agreed to by somebody who had
+/// not read what it costs.
+///
 /// No other action needs one, because no other action shows the operator something
 /// and then acts on what they answered. Everywhere else the reply is the answer.
-pub const TAKES_CONSENT: &[&str] = &["repair", "restore"];
+pub const TAKES_CONSENT: &[&str] = &["repair", "restore", "stop-seeding"];
+
+/// The action whose command carries which completed download it is about.
+///
+/// Letting one go, and nothing else. It is required rather than optional: this is the
+/// one request in the whole surface that destroys something outside this machine's
+/// filesystem, and one with nothing named would be a request that has lost the only
+/// subject that makes it safe.
+///
+/// Apart from every other list here because it is a different kind of subject. A form
+/// is part of the stack, a service is part of a form, a name is a person, and this is
+/// a torrent — matched by the name the download client and the disk account both use.
+pub const TAKES_DOWNLOAD: &[&str] = &["stop-seeding"];
 
 /// The action whose command carries *which* of what it read was agreed to.
 ///
@@ -421,7 +444,7 @@ pub const TAKES_TERM: &[&str] = &["search"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 27] = [
+    let carried: [(&str, bool, &[&str]); 28] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -457,6 +480,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("item", given.item.is_some(), TAKES_ITEM),
         ("term", given.term.is_some(), TAKES_TERM),
         ("season", given.season.is_some(), TAKES_TERM),
+        ("download", given.download.is_some(), TAKES_DOWNLOAD),
     ];
     if !offered.contains(&action) {
         return None;

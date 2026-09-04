@@ -17,8 +17,8 @@
 mod acting;
 
 use acting::{
-    exactly_what, AGE, ARCHIVE, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER, SEASON, UNRATED,
-    WARNED,
+    exactly_what, AGE, ARCHIVE, DOWNLOAD, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER, SEASON,
+    UNRATED, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
@@ -186,8 +186,24 @@ fn carries_offer(command: &Command) -> bool {
             consent: RestoreConsent::Given { listing },
             ..
         } => listing == OFFER,
+        // The third has no other way of saying yes at all: the offer's own name is the
+        // agreement, so an offer dropped here is a removal nobody could ask for — and
+        // one silently kept would be a removal nobody read the cost of.
+        Command::StopSeeding {
+            agreement: Some(named),
+            ..
+        } => named == OFFER,
         _ => false,
     }
+}
+
+/// Whether the command has the completed download it was told to stop seeding in it.
+fn carries_download(command: &Command) -> bool {
+    matches!(command, Command::StopSeeding { download, .. } if download == DOWNLOAD)
+}
+
+fn give_download(given: &mut Arguments) {
+    given.download = Some(DOWNLOAD.to_owned());
 }
 
 /// Whether the command has the repairs that were agreed to.
@@ -416,7 +432,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 26] = [
+const SWEEPS: [Sweep; 27] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -443,6 +459,7 @@ const SWEEPS: [Sweep; 26] = [
     ("unrated", give_unrated, carries_unrated),
     ("term", give_term, carries_term),
     ("season", give_season, carries_season),
+    ("download", give_download, carries_download),
 ];
 
 /// Every offered action given one argument on top of what it takes, gathering what

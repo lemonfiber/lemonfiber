@@ -167,6 +167,90 @@ fn a_quality_choice_reaches_the_same_command_agreed_to_or_not() {
     assert_eq!(chosen(true), recorded(true));
 }
 
+// ── The one removal with a ratio behind it takes no blanket yes at all ────────
+
+/// One completed download, as a client and the disk account both name it.
+const HELD: &str = "A.Show.S01E01.1080p";
+
+/// An offer, as one names itself.
+const READ: &str = "0f0f0f0f";
+
+#[test]
+fn stopping_one_download_seeding_refuses_the_yes_the_account_beside_it_takes() {
+    // The account's yes is to reclaiming what costs nothing. This takes the one thing
+    // on the disk that costs something, so the account's shape of yes is refused by
+    // name here rather than quietly accepted: what this takes is the offer's own name,
+    // which nobody holds who did not read what it cost.
+    assert!(
+        !TAKES_AGREEMENT.contains(&"stop-seeding"),
+        "a blanket yes would be agreement from somebody who read no consequence"
+    );
+    assert_eq!(
+        refusal(
+            "stop-seeding",
+            Arguments {
+                download: Some(HELD.to_owned()),
+                confirm: true,
+                ..Arguments::default()
+            }
+        ),
+        Some(Refused::Unwanted {
+            action: "stop-seeding".to_owned(),
+            argument: "confirm".to_owned()
+        })
+    );
+}
+
+#[test]
+fn the_offer_read_is_the_whole_of_how_this_one_is_agreed_to() {
+    // Without it the request is the offer and removes nothing; with it, it is the
+    // answer to that offer and nothing else could have been.
+    assert_eq!(
+        command(
+            "stop-seeding",
+            Arguments {
+                download: Some(HELD.to_owned()),
+                ..Arguments::default()
+            }
+        ),
+        Some(Command::StopSeeding {
+            download: HELD.to_owned(),
+            agreement: None
+        })
+    );
+    assert_eq!(
+        command(
+            "stop-seeding",
+            Arguments {
+                download: Some(HELD.to_owned()),
+                offer: Some(READ.to_owned()),
+                ..Arguments::default()
+            }
+        ),
+        Some(Command::StopSeeding {
+            download: HELD.to_owned(),
+            agreement: Some(READ.to_owned())
+        })
+    );
+}
+
+#[test]
+fn an_answer_naming_no_download_has_lost_the_only_subject_that_makes_it_safe() {
+    assert_eq!(
+        refusal(
+            "stop-seeding",
+            Arguments {
+                offer: Some(READ.to_owned()),
+                ..Arguments::default()
+            }
+        ),
+        Some(Refused::Missing {
+            action: "stop-seeding".to_owned(),
+            argument: "download".to_owned()
+        })
+    );
+}
+
 // ── A bundle's agreement is the revealing, and the file is the other field ─────
 
 #[test]

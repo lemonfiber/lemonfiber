@@ -40,10 +40,10 @@ const SERVICE_FILES: &str = "config";
 /// stack could not be read, or where the data location is there and will not be
 /// walked.
 pub(super) async fn space(ctx: &Ctx, confirm: bool) -> Result<Reckoning, Box<Problem>> {
-    let measured = measure(ctx).await?;
-    let mut reckoned = reckon(&measured);
+    let gathered = measure(ctx).await?;
+    let mut reckoned = reckon(&gathered.measured);
     if confirm {
-        reckoned.reclaimed = Some(reclaim(ctx, &reckoned, &measured).await);
+        reckoned.reclaimed = Some(reclaim(ctx, &reckoned, &gathered.measured).await);
     }
     Ok(reckoned)
 }
@@ -161,8 +161,23 @@ async fn watched(ctx: &Ctx, projecting: bool) -> Result<Watched, Box<Problem>> {
     })
 }
 
+/// Everything one reckoning is made of, and the client the completed downloads in
+/// it were read from.
+///
+/// The client is carried rather than resolved again by whatever acts next. Resolving
+/// it a second time is a second parse of the stack and a second chance for the two
+/// halves of one errand to be addressed to different clients — and the errand that
+/// removes one of those downloads has to be addressed to the client that reported it.
+pub(super) struct Gathered {
+    /// What was measured.
+    pub(super) measured: Measured,
+    /// The torrent client the completed downloads came from, where the stack has one
+    /// this run can authenticate to.
+    pub(super) holder: Option<crate::qbittorrent::Qbittorrent>,
+}
+
 /// Read everything one reckoning is made of.
-async fn measure(ctx: &Ctx) -> Result<Measured, Box<Problem>> {
+pub(super) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
     let watched = watched(ctx, true).await?;
     let project = watched.project.as_deref();
 
@@ -179,19 +194,23 @@ async fn measure(ctx: &Ctx) -> Result<Measured, Box<Problem>> {
         None => Vec::new(),
     };
 
-    let held = holding(ctx, &watched.stack.services, project).await;
+    let holder = torrent_client(ctx, &download_targets(&watched.stack.services, project));
+    let held = holding(holder.as_ref()).await;
     let (awaited, stalled) = queued(ctx, &watched.stack.services, project).await;
     let marked = marked(ctx, &held);
-    Ok(Measured {
-        volumes: watched.volumes,
-        root: watched.root,
-        data,
-        services,
-        landing: watched.landing,
-        held,
-        awaited,
-        stalled,
-        marked,
+    Ok(Gathered {
+        measured: Measured {
+            volumes: watched.volumes,
+            root: watched.root,
+            data,
+            services,
+            landing: watched.landing,
+            held,
+            awaited,
+            stalled,
+            marked,
+        },
+        holder,
     })
 }
 
@@ -208,13 +227,8 @@ fn now(ctx: &Ctx) -> u64 {
 /// Only a torrent client has an answer — Usenet has no seeding to have — so a
 /// stack with no torrent client, or one lemonfiber cannot authenticate to, holds
 /// nothing rather than failing the reading.
-async fn holding(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&Path>,
-) -> Vec<Seeded> {
-    let targets = download_targets(services, project);
-    match torrent_client(ctx, &targets) {
+async fn holding(holder: Option<&crate::qbittorrent::Qbittorrent>) -> Vec<Seeded> {
+    match holder {
         Some(client) => client.seeding().await.unwrap_or_default(),
         None => Vec::new(),
     }
@@ -477,7 +491,7 @@ mod tests {
     /// wiping the other's while it was reading it.
     fn holding_one(name: &str, scratch: &str) -> crate::app::Ctx {
         let body =
-            format!("[{{\"name\":\"{name}\",\"size\":3000,\"uploaded\":0,\"downloaded\":3000}}]");
+            format!("[{{\"hash\":\"aa\",\"name\":\"{name}\",\"size\":3000,\"uploaded\":0,\"downloaded\":3000}}]");
         let http = Fake::by_path(vec![
             ("/api/v2/auth/login", Answer::reply(200, "Ok.")),
             ("/api/v2/torrents/info", Answer::reply(200, body)),
@@ -607,7 +621,7 @@ mod tests {
                 "/api/v2/torrents/info",
                 Answer::reply(
                     200,
-                    r#"[{"name":"Never.Taken","size":3000,"uploaded":0,"downloaded":3000}]"#,
+                    r#"[{"hash":"aa","name":"Never.Taken","size":3000,"uploaded":0,"downloaded":3000}]"#,
                 ),
             ),
             ("/queue", Answer::reply(200, STALLED)),

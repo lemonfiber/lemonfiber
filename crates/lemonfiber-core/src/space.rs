@@ -33,6 +33,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 pub mod category;
+pub mod letting;
 pub mod level;
 pub mod outsized;
 pub mod tally;
@@ -41,6 +42,7 @@ pub mod volume;
 pub mod waste;
 
 pub use category::{Category, Consumption, Reclaim};
+pub use letting::{Gone, Letting, WHAT_GOES};
 pub use level::Level;
 pub use outsized::Outsized;
 pub use tally::{Counting, Tally};
@@ -58,6 +60,18 @@ pub const NOWHERE_TO_MEASURE: crate::error::Code = crate::error::Code::new("SPAC
 
 /// Raised when the data location is there and could not be read.
 pub const WALK_REFUSED: crate::error::Code = crate::error::Code::new("SPACE-3");
+
+/// Raised when there is no torrent client here to be holding a completed download.
+pub const NOTHING_TO_ASK: crate::error::Code = crate::error::Code::new("SPACE-4");
+
+/// Raised when the client answers and is holding nothing of the name given.
+pub const NOT_HELD: crate::error::Code = crate::error::Code::new("SPACE-5");
+
+/// Raised when an agreement names an offer that is not the one standing now.
+pub const ANOTHER_OFFER: crate::error::Code = crate::error::Code::new("SPACE-6");
+
+/// Raised when the client could not be reached, or would not let a download go.
+pub const STILL_HELD: crate::error::Code = crate::error::Code::new("SPACE-7");
 
 /// An import that stopped part-way, in the words of whatever stopped it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -731,6 +745,10 @@ mod tests {
             super::HALTED,
             super::NOWHERE_TO_MEASURE,
             super::WALK_REFUSED,
+            super::NOTHING_TO_ASK,
+            super::NOT_HELD,
+            super::ANOTHER_OFFER,
+            super::STILL_HELD,
         ] {
             // Bound rather than called inside the message: an argument to a
             // passing assertion is never evaluated, and a line nothing evaluates

@@ -10,42 +10,43 @@ Orchestrates a fully open-source, self-hosted media stack
 Usage: lemonfiber [OPTIONS] [COMMAND]
 
 Commands:
-  setup        Set up the stack by answering a few questions
-  version      Report the versions in play
-  forms        List the forms this stack has, and what each one is for
-  up           Start a form, or the union of several
-  down         Stop and remove what a form started
-  switch       Make these forms the active set, leaving shared services running
-  restart      Restart services without touching the rest
-  pull         Fetch newer images without applying them
-  ps           Report what each service is actually doing
-  logs         Show what services are saying
-  config       Read or change one setting
-  quality      Choose how good your media should look, in plain language
-  doctor       Run the checks that prove the stack is doing what it should
-  watch        Guard the data location while forms run, stopping them if it disappears
-  trace        Follow one show or film across the services — "where is my show?"
-  household    Show who is in the household, what each may watch, and what each asked for
-  walkthrough  Add one thing, end to end, and watch every step of it happen
-  explain      Say what one of this product's words means
-  stuck        List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
-  front-door   Name the one address to send somebody who lives here
-  outbound     List everything that leaves this machine, and what refusing each of it costs
-  stored       List what lemonfiber keeps on this machine, where it is, and why
-  clients      Say which app to watch on, for each kind of device somebody in the house has
-  invite       Offer somebody in the house an account they can claim
-  reissue      Let somebody set a new password, without you choosing or seeing it
-  remove       Take somebody out of the household, in both places they have an account
-  forget       Remove everything lemonfiber keeps on this machine
-  space        Account for the disk: where the room went, when it runs out, what can go
-  seed         Wire the stack's services to each other, idempotently
-  adopt        Adopt your current edits as lemonfiber's expected state
-  reset        Put the stack back to lemonfiber's own state, reverting every edit you made
-  backup       Back up your configuration to an archive, so it stops being precious
-  support      Gather everything a person helping you would ask for, with every value not named safe replaced by a stand-in
-  ui           Serve the web interface, for as long as you leave it running
-  restore      Restore your configuration from a backup archive
-  help         Print this message or the help of the given subcommand(s)
+  setup         Set up the stack by answering a few questions
+  version       Report the versions in play
+  forms         List the forms this stack has, and what each one is for
+  up            Start a form, or the union of several
+  down          Stop and remove what a form started
+  switch        Make these forms the active set, leaving shared services running
+  restart       Restart services without touching the rest
+  pull          Fetch newer images without applying them
+  ps            Report what each service is actually doing
+  logs          Show what services are saying
+  config        Read or change one setting
+  quality       Choose how good your media should look, in plain language
+  doctor        Run the checks that prove the stack is doing what it should
+  watch         Guard the data location while forms run, stopping them if it disappears
+  trace         Follow one show or film across the services — "where is my show?"
+  household     Show who is in the household, what each may watch, and what each asked for
+  walkthrough   Add one thing, end to end, and watch every step of it happen
+  explain       Say what one of this product's words means
+  stuck         List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
+  front-door    Name the one address to send somebody who lives here
+  outbound      List everything that leaves this machine, and what refusing each of it costs
+  stored        List what lemonfiber keeps on this machine, where it is, and why
+  clients       Say which app to watch on, for each kind of device somebody in the house has
+  invite        Offer somebody in the house an account they can claim
+  reissue       Let somebody set a new password, without you choosing or seeing it
+  remove        Take somebody out of the household, in both places they have an account
+  forget        Remove everything lemonfiber keeps on this machine
+  space         Account for the disk: where the room went, when it runs out, what can go
+  stop-seeding  Stop seeding one completed download, and let its files go with it
+  seed          Wire the stack's services to each other, idempotently
+  adopt         Adopt your current edits as lemonfiber's expected state
+  reset         Put the stack back to lemonfiber's own state, reverting every edit you made
+  backup        Back up your configuration to an archive, so it stops being precious
+  support       Gather everything a person helping you would ask for, with every value not named safe replaced by a stand-in
+  ui            Serve the web interface, for as long as you leave it running
+  restore       Restore your configuration from a backup archive
+  help          Print this message or the help of the given subcommand(s)
 
 Options:
       --json
@@ -1182,6 +1183,39 @@ Options:
 
       --json
           Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber stop-seeding`
+
+```text
+Stop seeding one completed download, and let its files go with it.
+
+Everything the disk account names and deliberately leaves alone is asked for here instead, one download at a time. Named on its own it says what that download is, what it occupies, where it stands and, while it is still seeding, what removing it does to a private tracker's opinion of you. It removes nothing, and prints a name for that offer; answering with that name is the yes. There is no other way to say it, because a blanket confirmation would be agreement from somebody who had not read the cost.
+
+Usage: lemonfiber stop-seeding [OPTIONS] <DOWNLOAD>
+
+Arguments:
+  <DOWNLOAD>
+          The completed download, as the account and the client both name it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the run that made it printed it
 
       --dry-run
           Say what would happen, and change nothing

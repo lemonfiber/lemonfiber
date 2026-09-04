@@ -141,6 +141,19 @@ static AFTER: &[Errand] = &[
         // removing it does to a tracker's opinion and left alone.
         going: Going::Agreed,
     },
+    Errand {
+        name: "one download stopped seeding",
+        about: "have the client let one go, at what that costs the ratio it has earned",
+        action: "stop-seeding",
+        asks: "Stop seeding",
+        needs: Needs::Download("Which completed download, as the account above names it"),
+        accepts: None,
+        // Answered rather than agreed, and it is the only errand here that is. The run
+        // before the question says what removing that one download does to a private
+        // tracker's opinion of the operator, and the yes is the name that run gave
+        // itself — so there is no flag anybody could set without having read it.
+        going: Going::Answered,
+    },
 ];
 
 /// The errands, the one the list opens on apart from the rest.

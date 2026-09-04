@@ -227,6 +227,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::Space(report) => space::reckoning(report),
+        Outcome::Letting(offer) => space::letting(offer),
         Outcome::Lifecycle(report) => stack::lifecycle(report),
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),
@@ -774,6 +775,16 @@ mod tests {
             // optional paragraph absent — and still a report rather than a blank.
             Outcome::Space(lemonfiber_core::space::reckon(
                 &lemonfiber_core::space::Measured::default(),
+            )),
+            // An offer with the cost stated and nothing taken, which is the shape the
+            // consequence has to survive being rendered in.
+            Outcome::Letting(lemonfiber_core::space::letting::offering(
+                lemonfiber_core::space::Candidate {
+                    name: "A.Show.S01E01".to_owned(),
+                    bytes: 8_000,
+                    standing: lemonfiber_core::space::Standing::Seeding { ratio: 175 },
+                    consequence: Some(lemonfiber_core::space::RATIO_CONSEQUENCE.to_owned()),
+                },
             )),
         ]
     }

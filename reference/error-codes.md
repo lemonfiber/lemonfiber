@@ -117,6 +117,10 @@ what to do about it, is written for operators at
 - `SPACE-1`
 - `SPACE-2`
 - `SPACE-3`
+- `SPACE-4`
+- `SPACE-5`
+- `SPACE-6`
+- `SPACE-7`
 - `STACK-1`
 - `STACK-2`
 - `STACK-3`

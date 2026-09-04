@@ -143,6 +143,24 @@ pub(crate) fn restarting(form: String, services: Vec<String>) -> Command {
     }
 }
 
+/// Which completed download to stop seeding, and the offer being answered.
+///
+/// A rename and nothing else, which is what makes it worth writing down: the command
+/// line calls the answer `--offer`, because what an operator types is the name the run
+/// before it printed, and the core calls it the agreement, because what it does with
+/// it is compare it against the offer standing now. One word for one thing on each
+/// side, and this is the whole of the join.
+///
+/// Nothing typed is nothing agreed to. A flag given empty is an answer to no offer,
+/// and carrying it would be a name the core goes and fails to match, so it is dropped
+/// here, where the emptiness is visible, rather than travelling as one.
+pub(crate) fn letting(download: String, offer: Option<String>) -> Command {
+    Command::StopSeeding {
+        download,
+        agreement: offer.filter(|named| !named.trim().is_empty()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::app::{Allowance, Command, QualityAction};
@@ -150,7 +168,8 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{
-        bundling, configuration, invitation, quality, restarting, traced, Destination, Wanted,
+        bundling, configuration, invitation, letting, quality, restarting, traced, Destination,
+        Wanted,
     };
     use crate::exit::USAGE;
     use lemonfiber::cli::{Asked, ConfigAction, QualityCommand, RawAllowance, RawUnrated};
@@ -418,5 +437,44 @@ mod tests {
     #[test]
     fn saying_nothing_about_unrated_content_carries_nothing() {
         assert_eq!(offering(None), reaching(None));
+    }
+
+    /// The download every stopping case here names.
+    const HELD: &str = "A.Show.S01E01";
+
+    /// Named alone, it asks what stopping it would cost and agrees to nothing.
+    #[test]
+    fn a_download_named_alone_asks_what_stopping_it_would_cost() {
+        assert_eq!(
+            letting(HELD.to_owned(), None),
+            Command::StopSeeding {
+                download: HELD.to_owned(),
+                agreement: None
+            }
+        );
+    }
+
+    /// The offer typed back is the agreement the core compares against what stands.
+    #[test]
+    fn the_offer_typed_back_is_the_agreement_the_core_compares() {
+        assert_eq!(
+            letting(HELD.to_owned(), Some("3f2a1b9c".to_owned())),
+            Command::StopSeeding {
+                download: HELD.to_owned(),
+                agreement: Some("3f2a1b9c".to_owned())
+            }
+        );
+    }
+
+    /// An empty answer is no answer, rather than one the core goes and fails to match.
+    #[test]
+    fn an_empty_answer_is_no_answer_at_all() {
+        assert_eq!(
+            letting(HELD.to_owned(), Some("   ".to_owned())),
+            Command::StopSeeding {
+                download: HELD.to_owned(),
+                agreement: None
+            }
+        );
     }
 }

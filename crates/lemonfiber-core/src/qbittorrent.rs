@@ -208,6 +208,82 @@ impl Qbittorrent {
             ))),
         }
     }
+
+    /// Every completed torrent the client is holding, as it reports them.
+    ///
+    /// One listing behind both the read of what is being seeded and the removal of
+    /// one of them, so the two cannot come to disagree about what the client holds.
+    /// It authenticates nothing: each caller logs in first, because a client holding
+    /// no password is a refusal about the caller rather than about the listing.
+    async fn completed(&self) -> Result<Vec<CompletedInfo>, Failure> {
+        let request = Request {
+            method: Method::Get,
+            url: self.endpoint.url("/api/v2/torrents/info?filter=completed"),
+            headers: Vec::new(),
+            body: None,
+        };
+        let response = self.endpoint.send(&request).await?;
+        self.endpoint
+            .decode(&response, "the completed torrent list could not be read")
+    }
+
+    /// Stop seeding one completed download: take it out of the client, and the copy
+    /// in the downloads tree with it.
+    ///
+    /// Asked for by the name both sides call it, because a name is what every other
+    /// reading here matches on and a hash is a thing nobody reads. The hash it is
+    /// addressed by is looked up in the same call, from a listing taken now, so what
+    /// goes is what the client is holding at the moment it is asked rather than what
+    /// it was holding when somebody read an offer.
+    ///
+    /// Two completed torrents of one name are refused rather than chosen between.
+    /// Which was meant is not a question anything here can answer, and answering it
+    /// wrongly takes the other.
+    ///
+    /// Confirmed by looking again, for the reason the port change is: a client that
+    /// answered the removal and went on holding the torrent would otherwise have a
+    /// ratio reported as spent while it is still being earned, which is the one
+    /// figure this whole errand turns on.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where qBittorrent cannot be reached, rejects the password,
+    /// is holding nothing of that name or more than one of it, refuses the removal,
+    /// or is still holding it afterwards.
+    pub async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
+        let password = self
+            .password
+            .as_deref()
+            .ok_or_else(|| self.endpoint.unauthorised())?;
+        self.login(password).await?;
+
+        let holding = self.completed().await?;
+        let named: Vec<&CompletedInfo> = holding
+            .iter()
+            .filter(|torrent| torrent.name == name)
+            .collect();
+        let [one] = named.as_slice() else {
+            return Err(self.endpoint.refused(&format!(
+                "the client is holding {} completed downloads called {name}",
+                named.len()
+            )));
+        };
+
+        let request = self.post(
+            "/torrents/delete",
+            &[("hashes", one.hash.as_str()), ("deleteFiles", "true")],
+        );
+        let response = self.endpoint.send(&request).await?;
+        self.endpoint.expect_success(&response)?;
+
+        let after = self.completed().await?;
+        if after.iter().any(|torrent| torrent.name == name) {
+            return Err(self
+                .endpoint
+                .refused(&format!("the client is still holding {name}")));
+        }
+        Ok(())
+    }
 }
 
 /// The preferences fields the forwarded port is read from. The many others
@@ -275,6 +351,7 @@ impl Transfers for Qbittorrent {
 /// numbers and are the same answer without any of that.
 #[derive(Deserialize)]
 struct CompletedInfo {
+    hash: String,
     name: String,
     size: u64,
     uploaded: u64,
@@ -288,17 +365,7 @@ impl Seeding for Qbittorrent {
             return Err(self.endpoint.unauthorised());
         };
         self.login(password).await?;
-
-        let request = Request {
-            method: Method::Get,
-            url: self.endpoint.url("/api/v2/torrents/info?filter=completed"),
-            headers: Vec::new(),
-            body: None,
-        };
-        let response = self.endpoint.send(&request).await?;
-        let torrents: Vec<CompletedInfo> = self
-            .endpoint
-            .decode(&response, "the completed torrent list could not be read")?;
+        let torrents = self.completed().await?;
         Ok(torrents.into_iter().map(seeded_of).collect())
     }
 }
@@ -394,9 +461,9 @@ mod tests {
     /// that has given back almost nothing, and one added from files already on
     /// disk, which downloaded nothing at all.
     const THREE_COMPLETED: &str = r#"[
-        {"name":"Show.S01E01","size":1000,"uploaded":1750,"downloaded":1000},
-        {"name":"Movie.2024","size":4000,"uploaded":7,"downloaded":4000},
-        {"name":"Already.Here","size":9000,"uploaded":100,"downloaded":0}
+        {"hash":"aa","name":"Show.S01E01","size":1000,"uploaded":1750,"downloaded":1000},
+        {"hash":"bb","name":"Movie.2024","size":4000,"uploaded":7,"downloaded":4000},
+        {"hash":"cc","name":"Already.Here","size":9000,"uploaded":100,"downloaded":0}
     ]"#;
 
     #[tokio::test]
@@ -524,6 +591,85 @@ mod tests {
             refused.is_err(),
             "the client is not on the port it was set to"
         );
+    }
+
+    /// One completed torrent, and the same name twice, for the removal's own cases.
+    const ONE_COMPLETED: &str = r#"[{"hash":"a1","name":"Show.S01E01","size":1000,
+        "uploaded":1750,"downloaded":1000}]"#;
+
+    /// Two completed torrents of one name, which is a question nothing here can
+    /// answer and a wrong answer removes the other one.
+    const TWO_OF_A_NAME: &str = r#"[
+        {"hash":"a1","name":"Show.S01E01","size":1000,"uploaded":1750,"downloaded":1000},
+        {"hash":"b2","name":"Show.S01E01","size":1000,"uploaded":10,"downloaded":1000}
+    ]"#;
+
+    /// Nothing at all, which is what the listing says once the torrent has gone.
+    const NONE_COMPLETED: (u16, &str) = (200, "[]");
+
+    /// A write qBittorrent accepted, which it answers with an empty body.
+    const ACCEPTED: (u16, &str) = (200, "");
+
+    #[tokio::test]
+    async fn a_torrent_let_go_is_addressed_by_hash_and_read_back_as_gone() {
+        // Addressed by the hash a listing taken now reports, rather than by anything
+        // somebody read earlier, and confirmed by looking again: a client that
+        // answered the removal and went on holding it would have a ratio recorded as
+        // lost while it is still being earned.
+        let client = client(vec![
+            LOGGED_IN,
+            (200, ONE_COMPLETED),
+            ACCEPTED,
+            NONE_COMPLETED,
+        ]);
+        assert!(client.stop_seeding("Show.S01E01").await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_client_still_holding_it_afterwards_is_a_failure_rather_than_a_removal() {
+        let client = client(vec![
+            LOGGED_IN,
+            (200, ONE_COMPLETED),
+            ACCEPTED,
+            (200, ONE_COMPLETED),
+        ]);
+        let refused = client.stop_seeding("Show.S01E01").await;
+        assert!(
+            refused.is_err(),
+            "it is still seeding and the room is still spent"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_name_the_client_no_longer_holds_is_refused_rather_than_guessed_at() {
+        // Between an offer being read and being answered a torrent can finish and be
+        // gone, and the listing this takes now is what says so.
+        let client = client(vec![LOGGED_IN, NONE_COMPLETED]);
+        assert!(client.stop_seeding("Show.S01E01").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn two_completed_torrents_of_one_name_are_refused_rather_than_chosen_between() {
+        let client = client(vec![LOGGED_IN, (200, TWO_OF_A_NAME)]);
+        assert!(
+            client.stop_seeding("Show.S01E01").await.is_err(),
+            "answering which was meant wrongly removes the other"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_removal_the_client_refuses_is_reported_rather_than_read_back() {
+        let client = client(vec![LOGGED_IN, (200, ONE_COMPLETED), (403, "Forbidden")]);
+        assert!(client.stop_seeding("Show.S01E01").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_client_holding_no_password_cannot_ask_for_anything_to_be_removed() {
+        let anonymous = Qbittorrent::new(Fake::scripted(Vec::new()), "http://127.0.0.1:8080");
+        assert!(matches!(
+            anonymous.stop_seeding("Show.S01E01").await,
+            Err(Failure::Unauthorised { .. })
+        ));
     }
 
     #[tokio::test]

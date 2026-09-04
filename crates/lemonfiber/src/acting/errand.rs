@@ -93,6 +93,7 @@ pub(crate) const KEY: char = 'm';
 pub(crate) const HINT: &str = "more";
 
 /// What an errand sends once it has been agreed to.
+#[derive(Clone, Copy)]
 enum Going {
     /// As it stands. The question is the whole of the agreement, because the
     /// command has no half that reports and changes nothing.
@@ -101,6 +102,15 @@ enum Going {
     Agreed,
     /// The file, the run before it having said what would go in it.
     Written,
+    /// The name the offer gave itself, which is the only yes this one has.
+    ///
+    /// Apart from [`Going::Agreed`] because it is a stronger thing rather than a
+    /// differently spelled one. That yes is a flag, and a flag can be set by somebody
+    /// who never read the run before it; this is the offer's own name, so saying it at
+    /// all means the offer was read. The command carries no flag it could be given
+    /// instead — see [`lemonfiber_api::actions::TAKES_AGREEMENT`], which leaves this
+    /// action out on purpose.
+    Answered,
 }
 
 /// One errand this stack can be sent on.
@@ -146,7 +156,7 @@ impl Errand {
     fn would(&self, given: &Given) -> Option<Result<Command, String>> {
         match self.going {
             Going::Once => None,
-            Going::Agreed | Going::Written => Some(self.reaching(given.asked())),
+            Going::Agreed | Going::Written | Going::Answered => Some(self.reaching(given.asked())),
         }
     }
 
@@ -164,7 +174,9 @@ impl Errand {
     fn sent(&self, given: &Given) -> Result<Command, String> {
         let mut asked = given.asked();
         match self.going {
-            Going::Once => (),
+            // Nothing added: the yes is the name the offer gave itself, and it was put
+            // into what this was given the moment that offer came back.
+            Going::Once | Going::Answered => (),
             Going::Agreed => asked.confirm = true,
             Going::Written => {
                 asked.write = true;
@@ -188,6 +200,19 @@ impl Errand {
             Outcome::Restore(restoration) => {
                 restoration.would.relocation.is_some().then_some(accepts)
             }
+            _ => None,
+        }
+    }
+
+    /// The name the offer this errand just read gave itself, where its yes is that
+    /// name rather than a flag.
+    ///
+    /// Read off the answer rather than remembered, for the reason the re-point above
+    /// it is: the name is built from what the offer said, and this screen is not the
+    /// thing that knows what it said.
+    fn answering(&self, outcome: &Outcome) -> Option<String> {
+        match (self.going, outcome) {
+            (Going::Answered, Outcome::Letting(offer)) => Some(offer.agreement.clone()),
             _ => None,
         }
     }
@@ -234,6 +259,7 @@ fn taken(
         // that there is a line.
         Needs::Archive(asks)
         | Needs::Bundling(asks)
+        | Needs::Download(asks)
         | Needs::Named(asks)
         | Needs::Invitation(asks) => {
             *stage = Stage::Naming {
@@ -309,6 +335,7 @@ fn given(stage: &mut Stage, errand: &'static Errand, typed: String) -> Wanted {
         // Same line, different argument: which one the word fills is the errand's
         // business rather than the line's.
         Needs::Named(_) => begun(stage, errand, Given::named(typed)),
+        Needs::Download(_) => begun(stage, errand, Given::downloaded(typed)),
         // The first of an invitation's three answers, so it opens the second rather
         // than going on. The name is carried rather than folded into the arguments
         // here, because the sentence above the yes says all three together and there
@@ -374,6 +401,10 @@ pub(super) fn weighed(
         Some(accepts) => given.repointing(accepts),
         None => given,
     };
+    let given = match errand.answering(outcome) {
+        Some(offer) => given.answering(offer),
+        None => given,
+    };
     Stage::Agreeing {
         errand,
         given,
@@ -437,7 +468,7 @@ pub(crate) mod tests {
     use super::{all, every, Errand, Given, Going, Needs, Outcome, Stage, KEY, LINES};
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber::reaching::{ACTS, ALSO};
-    use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT};
+    use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT, TAKES_CONSENT};
     use lemonfiber_core::app::restore::{Consent, Kept};
     use lemonfiber_core::app::Command;
     use lemonfiber_core::bundle::Filenames;
@@ -607,14 +638,20 @@ pub(crate) mod tests {
         assert_eq!(offered, published);
     }
 
-    /// Which errands say what they would do first is asked of the table that says
-    /// which actions carry an agreement, rather than being decided again here — a
-    /// second list would come to disagree with the first, and the place it would
-    /// disagree is in front of somebody about to throw work away.
+    /// Which errands say what they would do first is asked of the tables that say
+    /// which actions carry an answer, rather than being decided again here — a second
+    /// list would come to disagree with the first, and the place it would disagree is
+    /// in front of somebody about to throw work away.
+    ///
+    /// Two tables rather than one, because there are two shapes of answer and both of
+    /// them are answers to something read. Most carry a flag, and the one that lets a
+    /// download go carries the name the offer gave itself — which is the stronger of
+    /// the two and, on that action, the only one there is.
     #[test]
-    fn an_errand_whose_action_takes_an_agreement_says_what_it_would_do_first() {
+    fn an_errand_whose_action_takes_an_answer_says_what_it_would_do_first() {
         for errand in every() {
-            let takes = TAKES_AGREEMENT.contains(&errand.action);
+            let takes =
+                TAKES_AGREEMENT.contains(&errand.action) || TAKES_CONSENT.contains(&errand.action);
             let says = errand.would(&typed("a-backup.tar.gz")).is_some();
             assert_eq!(says, takes, "{}", errand.name);
         }
@@ -675,6 +712,103 @@ pub(crate) mod tests {
             restoring.and_then(|errand| errand.accepting(&Outcome::Version(a_version())));
 
         assert_eq!(accepting, None);
+    }
+
+    /// An offer over one seeding download, as the core would answer with one.
+    fn an_offer() -> lemonfiber_core::space::Letting {
+        lemonfiber_core::space::letting::offering(lemonfiber_core::space::Candidate {
+            name: "A.Show.S01E01".to_owned(),
+            bytes: 8_000,
+            standing: lemonfiber_core::space::Standing::Seeding { ratio: 175 },
+            consequence: Some(lemonfiber_core::space::RATIO_CONSEQUENCE.to_owned()),
+        })
+    }
+
+    /// Letting a download go opens a line, and the word fills the download rather
+    /// than any of the other things a line on this screen can be typed for.
+    ///
+    /// Driven through the stage machinery rather than by building a `Given` by hand,
+    /// because that there is a line at all and what the word fills are decided in
+    /// different places, and a test that skipped the first would pass with no line
+    /// ever opening.
+    #[test]
+    fn letting_a_download_go_opens_a_line_and_the_word_names_the_download() {
+        let errand = every()
+            .find(|errand| errand.action == "stop-seeding")
+            .unwrap_or(all().0);
+        let mut stage = Stage::Idle;
+
+        let _ = super::taken(&mut stage, errand, &[]);
+
+        assert!(
+            matches!(&stage, Stage::Naming { asks, .. } if asks.contains("Which completed download")),
+            "no line was opened to name a download on"
+        );
+
+        let _ = super::given(&mut stage, errand, "A.Show.S01E01".to_owned());
+
+        assert!(
+            matches!(&stage, Stage::Weighing { .. }),
+            "the word did not carry on to the run that says what it would cost"
+        );
+    }
+
+    /// The yes is the name the offer gave itself, carried off the answer rather than
+    /// typed — and it reaches the command as the agreement.
+    ///
+    /// The whole of what makes this errand safe. A screen that sent it without the
+    /// name would be asking the core to remove a torrent on a yes nobody could have
+    /// read a consequence for, and the core refuses that — so the failure would be a
+    /// dead end rather than a wrong removal, and this is what keeps it from being one.
+    #[test]
+    fn the_yes_to_letting_a_download_go_is_the_name_the_offer_gave_itself() {
+        let errand = every()
+            .find(|errand| errand.action == "stop-seeding")
+            .unwrap_or(all().0);
+        let offer = an_offer();
+
+        let stage = super::weighed(
+            errand,
+            Given::downloaded("A.Show.S01E01".to_owned()),
+            &Outcome::Letting(offer.clone()),
+            vec!["what it costs".to_owned()],
+        );
+        // Read out of the stage rather than matched with an arm for the case that
+        // cannot happen: an arm no run reaches is a line the coverage gate counts
+        // against a file every one of whose cases passed.
+        let mut answered = None;
+        if let Stage::Agreeing { errand, given, .. } = &stage {
+            answered = Some(errand.sent(given));
+        }
+
+        assert_eq!(
+            answered,
+            Some(Ok(Command::StopSeeding {
+                download: "A.Show.S01E01".to_owned(),
+                agreement: Some(offer.agreement),
+            })),
+            "the offer that was read is what the yes names"
+        );
+    }
+
+    /// An answer of another shape carries no offer to answer.
+    ///
+    /// The same rule the re-point above it follows, for the same reason: a name read
+    /// out of the wrong answer would be an agreement to a reading nobody made.
+    #[test]
+    fn an_answer_that_is_not_an_offer_carries_no_name_to_answer_it_with() {
+        let stopping = every().find(|errand| errand.action == "stop-seeding");
+
+        assert_eq!(
+            stopping.and_then(|errand| errand.answering(&Outcome::Version(a_version()))),
+            None
+        );
+        // And an errand whose yes is a flag takes no name off one either, however
+        // right the shape of the answer looks.
+        assert_eq!(
+            sending("space").and_then(|errand| errand.answering(&Outcome::Letting(an_offer()))),
+            None
+        );
     }
 
     /// A version report, which is an answer of a shape no errand ever has.

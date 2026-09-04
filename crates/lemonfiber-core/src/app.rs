@@ -39,6 +39,7 @@ mod fixtures;
 pub mod forwarding;
 mod household;
 mod invite;
+mod letting;
 mod materialise;
 mod music;
 mod notify;
@@ -126,6 +127,8 @@ pub enum Outcome {
     Stored(crate::stored::Stored),
     /// Where the disk stands, where the room went, and what could be got back.
     Space(crate::space::Reckoning),
+    /// What letting one completed download go would cost, and what became of it.
+    Letting(crate::space::Letting),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -179,6 +182,7 @@ impl Outcome {
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Stored(_) => crate::model::kind::STORED,
             Self::Space(_) => kind::SPACE,
+            Self::Letting(_) => kind::STOP_SEEDING,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Repair(_) => kind::REPAIR,
@@ -220,6 +224,7 @@ impl serde::Serialize for Outcome {
             Self::Outbound(report) => report.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
             Self::Space(report) => report.serialize(serializer),
+            Self::Letting(offer) => offer.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Repair(report) => report.serialize(serializer),
@@ -300,6 +305,17 @@ async fn diagnosed(
 ) -> Result<Outcome, Box<Problem>> {
     let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
     accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
+}
+
+/// What letting one completed download go costs, and what became of letting it.
+async fn letting(
+    ctx: &Ctx,
+    download: String,
+    agreement: Option<String>,
+) -> Result<Outcome, Box<Problem>> {
+    letting::stop_seeding(ctx, download, agreement)
+        .await
+        .map(Outcome::Letting)
 }
 
 /// A walk through the stack, said onto whatever the surface is listening with.
@@ -383,6 +399,14 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         // files: unconfirmed it accounts and offers, confirmed it takes what the
         // account named as costing nothing.
         Command::Space { confirm } => space::space(ctx, confirm).await.map(Outcome::Space),
+        // The one download the account leaves with the operator, asked for by name and
+        // answered by the offer's own name. Apart from the account rather than an
+        // argument to it, because a yes to reclaiming what costs nothing is not a yes
+        // to losing a ratio a tracker keeps somebody's account on.
+        Command::StopSeeding {
+            download,
+            agreement,
+        } => letting(ctx, download, agreement).await,
         // Held open until the location is lost, which is what a guard is. The
         // interval is this command's own rather than the caller's: a surface that
         // could choose it could choose one that misses the moment it exists for.
@@ -1942,6 +1966,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_request_to_stop_seeding_reaches_its_own_arm() {
+        // The same machine and the same refusal: a consequence nobody could state is
+        // not one anybody can agree to, so a run that cannot account for the disk is
+        // refused before it looks at what a client is holding. Which is also what
+        // exercises the arm, and it is a different arm from the account beside it.
+        let refused = dispatch(
+            Command::StopSeeding {
+                download: "A.Show.S01E01".to_owned(),
+                agreement: None,
+            },
+            &ctx(Ok(spoke(""))),
+        )
+        .await
+        .err()
+        .map(|problem| problem.code);
+        assert_eq!(refused, Some(crate::space::NOWHERE_TO_MEASURE));
+    }
+
+    #[tokio::test]
     async fn a_dispatched_upgrade_over_an_unreadable_stack_is_an_error() {
         // The dispatch arm unboxes the driver's error: a confirmed upgrade cannot read
         // an unreadable stack's services, so it fails rather than half-acting.
@@ -2117,6 +2160,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
+                | Outcome::Letting(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -2161,6 +2205,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
+                | Outcome::Letting(_)
                 | Outcome::Status(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)
@@ -2985,6 +3030,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
+                | Outcome::Letting(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -3983,6 +4029,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
+                | Outcome::Letting(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)

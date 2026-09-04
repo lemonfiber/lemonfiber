@@ -102,9 +102,11 @@ and the rest is named in **Standing**.
 
 | `space` | `space`, `/api/space` | dashboard | Reachable in full from all three, and the confirmation is inside the command rather than in a screen, exactly as a forget's is: unconfirmed it accounts for the disk and offers, and only a second request carrying the agreement removes. Which is why the web needs both halves named here — `/api/space` is the account, and the action of the same name is the answer to it, reaching one command that reads the same way twice. It takes one argument, and deliberately only one. There is no argument choosing *what* to reclaim, because that choice is not a caller's to make: what a confirmed run takes is the downloads nothing ever imported and the archive parts already unpacked beside their contents, and nothing else is ever in it. A torrent still seeding is named, sized, and left with the operator with what removing it does to a tracker's opinion of them stated beside it — a consequence outside this machine is not one a surface can weigh — and anything the operator has already asked to be left alone is not on offer at any level of fullness. A narrowing argument would be a way to ask for those, so there is none to ask with. On the terminal it is an errand rather than a question, under the forget, and its own unconfirmed run is what the box is drawn over: the account is read first and the yes sits under it. |
 
+| `stop-seeding` | `stop-seeding` | dashboard | Reachable in full from all three, and the one request in this table whose yes is **not** a flag. It is the other half of `space`, kept apart from it because the spec forbids bundling a torrent's removal with generic cleanup: that account offers what costs nothing and names what costs something without touching it, and this takes one of the named ones, files and all. What it costs is stated first — where the download stands, the ratio it is still earning, what a private tracker does about an account that stops earning one, and what goes with it and what stays — and the run that states it prints a name for that reading. Answering is saying that name back, and there is nothing else to say: the command carries no `confirm`, so the argument list refuses one by name, and a caller who never read the consequence has nothing to send. An answer given for a reading that has since moved is refused rather than spent, because the name is built from what was read. The terminal reaches it through the errands list, where the name is carried rather than typed — the screen holds the question open in the process that asked it, which is exactly what a browser cannot do and why the name exists. |
+
 ## What the table adds up to
 
-Of the thirty-five requests, thirty-four reach the web in full, zero reach it in
+Of the thirty-six requests, thirty-five reach the web in full, zero reach it in
 part, zero do not reach it at all, and one — `ui` — is an honest exception. Zero
 gaps and one exception is the split `G1-R1` asks for, and it is deliberately
 lopsided: an exception has to survive being argued, and almost nothing does.
@@ -117,7 +119,7 @@ read that disturbed something would still not be a read, so it is asked for at t
 door changes are asked for instead. That leaves `ui` as the only exception this
 table permits, in either column.
 
-On the other side of the table thirty-four reach the terminal in full, zero reach
+On the other side of the table thirty-five reach the terminal in full, zero reach
 the terminal in part, one reaches the terminal but for an exception, and zero have
 no terminal form — which is where three stood seven slices ago, nine before the one
 ahead of that, and twenty before the one that began it. Every request the command
