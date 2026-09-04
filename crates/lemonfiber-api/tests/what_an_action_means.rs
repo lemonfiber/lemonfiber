@@ -6,11 +6,15 @@
 //! invented. A surface that could grow an action of its own is a surface that has
 //! started implementing behaviour, and this is where that is stopped.
 //!
+//! Which argument each action may be given is next door, in
+//! `what_an_argument_reaches.rs`: it is a sweep over every action rather than a
+//! reading of any one of them, and both halves are built from the same table of
+//! what each action takes.
+//!
 //! Driven from outside the crate, because what a caller can reach is the thing
 //! worth holding still.
 
-use std::collections::BTreeSet;
-use std::sync::Arc;
+mod acting;
 
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
@@ -25,10 +29,6 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
-
-mod asking;
-
-use asking::exactly_what;
 
 /// Nothing named, which is what most actions are asked with.
 fn nothing() -> Arguments {
@@ -52,6 +52,8 @@ fn command(action: &str, given: Arguments) -> Option<Command> {
 fn refusal(action: &str, given: Arguments) -> Option<Refused> {
     named(action, given).err()
 }
+
+use acting::*;
 
 // ── Every action is one of the command line's own ─────────────────────────────
 

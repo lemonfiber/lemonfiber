@@ -306,6 +306,7 @@ async fn following_one_item_is_the_envelope_the_command_renders() {
         Command::Trace {
             term: "the expanse".to_owned(),
             season: None,
+            searching: false,
         },
     )
     .await;
@@ -337,6 +338,7 @@ async fn a_season_narrows_a_trace_the_way_it_narrows_the_command() {
         Command::Trace {
             term: "the expanse".to_owned(),
             season: Some(2),
+            searching: false,
         },
     )
     .await;

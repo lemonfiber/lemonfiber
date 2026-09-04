@@ -281,9 +281,17 @@ async fn main() -> ExitCode {
         }
         // The term is taken as words so it can be typed unquoted; joined back into the
         // title as said.
-        Request::Trace { term, season } => Command::Trace {
+        // The searching form is the one that reaches past this machine, spending a
+        // real search against the indexers' daily allowance, so it happens only where
+        // the flag asked for it.
+        Request::Trace {
+            term,
+            season,
+            search,
+        } => Command::Trace {
             term: term.join(" "),
             season,
+            searching: search,
         },
         // Narrated for minutes and then one report, so the report goes through
         // dispatch and the narration goes wherever the surface is listening. A run

@@ -26,14 +26,14 @@
 //! held is chosen, and only then is the question put. What differs is what is read and
 //! how many of it can be taken — [`super::mending`] holds both.
 //!
-//! One stage is reached by no key at all. The checks that disturb a running system
-//! are offered under the diagnosis that does not, so what opens that question is an
-//! answer already on the screen — which is why [`Stage::Answered`] carries the offer
-//! and [`super::disturbing`] decides what becomes of it.
+//! One stage is reached by no key at all. The runs that disturb something to answer
+//! are offered under the reads that do not, so what opens either question is an answer
+//! already on the screen — which is why [`Stage::Answered`] carries the offer and
+//! [`super::disturbing`] decides what becomes of it.
 
 use super::bundling::Held;
 use super::chooser::Chooser;
-use super::disturbing::Widening;
+use super::disturbing::{Widened, Widening};
 use super::errand::{Errand, Given};
 use super::inviting::Limit;
 use super::lasting::{Begun, Lasting};
@@ -317,12 +317,13 @@ pub(super) enum Stage {
     },
     /// The putting-right is with the core.
     Putting(&'static Mending),
-    /// The checks that disturb a running system are with the core.
+    /// A run that disturbs something to answer is with the core.
     ///
-    /// It carries nothing, because there is nothing left to decide: what it was
-    /// narrowed to went into the command when the offer was agreed to, and the panels
-    /// behind this are the report.
-    Disturbing,
+    /// It carries which run, and nothing else. What it was narrowed to went into the
+    /// command when the offer was agreed to, and the panels behind this are the
+    /// report — but there are two of these now, and a screen that could not say which
+    /// would name the checks that disturb while the indexers were being searched.
+    Disturbing(&'static Widened),
     /// Holding the question before the terminal is handed to the web surface, and
     /// whatever is open under it.
     Handing {

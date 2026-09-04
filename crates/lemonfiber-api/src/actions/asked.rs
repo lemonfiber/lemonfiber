@@ -79,6 +79,10 @@ pub struct Arguments {
     pub confirm: bool,
     /// The one thing to add end to end, as it would be said.
     pub item: Option<String>,
+    /// What to follow, named as a person would say it.
+    pub term: Option<String>,
+    /// The season a followed show is narrowed to, or every season where absent.
+    pub season: Option<u32>,
 }
 
 /// Whether a run includes the checks that disturb a running system.
@@ -251,9 +255,16 @@ pub const TAKES_AGREED: &[&str] = &["repair"];
 /// repair to offer: what a caller widening an offer wants is what those checks found,
 /// and that is `diagnose`, which reports them.
 ///
-/// The diagnosis this surface serves as a read takes no such argument. A check that
-/// disturbs a running system changes something, and changes are asked for here.
-pub const TAKES_DISRUPTION: &[&str] = &["repair", "accept", "diagnose"];
+/// The two reads this surface serves take no such argument. A check that disturbs a
+/// running system changes something, and so does a trace that spends one of the
+/// indexers' daily allowance to answer — and changes are asked for here.
+///
+/// A searching trace is the fourth, and it is the diagnosis's arrangement again for the
+/// same reason. The read at `/api/trace` follows an item across the services and touches
+/// nothing; widened, it asks the indexers what they carry, which is the one thing a
+/// trace can do that reaches past this machine. Required there too: a trace that asks
+/// the indexers nothing is the read already served.
+pub const TAKES_DISRUPTION: &[&str] = &["repair", "accept", "diagnose", "search"];
 
 /// The action whose command carries what the run is narrowed to.
 ///
@@ -377,6 +388,23 @@ pub const TAKES_BUNDLING: &[&str] = &["support"];
 /// empty library needs.
 pub const TAKES_ITEM: &[&str] = &["walkthrough"];
 
+/// The action whose command carries what it was told to follow.
+///
+/// A searching trace and nothing else, and it is required rather than optional: a
+/// trace with nothing to follow is a request that has lost its subject, refused here
+/// in the sentence `/api/trace` refuses the same omission with.
+///
+/// Apart from [`TAKES_ITEM`] although both name one piece of content, because the two
+/// commands do different things with it. A walk is told what to add and goes and adds
+/// it; this is told what to look for and reports where it already is. An action that
+/// took one for the other would have an operator asking where something was and
+/// finding it had been fetched.
+///
+/// The season it may be narrowed by belongs to the same group. A season means nothing
+/// without the show it is a season of, and there is no other request here that a
+/// season narrows.
+pub const TAKES_TERM: &[&str] = &["search"];
+
 /// The argument this action's command has nowhere to put, where one was given.
 ///
 /// Only for a name this surface offers — a name it does not offer is absent before
@@ -416,6 +444,8 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("agreed", !given.agreed.is_empty(), TAKES_AGREED),
         ("confirm", given.confirm, TAKES_AGREEMENT),
         ("item", given.item.is_some(), TAKES_ITEM),
+        ("term", given.term.is_some(), TAKES_TERM),
+        ("season", given.season.is_some(), TAKES_TERM),
     ];
     if !offered.contains(&action) {
         return None;

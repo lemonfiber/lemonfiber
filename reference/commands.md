@@ -779,6 +779,8 @@ Follow one show or film across the services — "where is my show?".
 
 Searched for the way you would name it, not by an internal id. Reports how far it got and, where it plainly stopped, why. A show is reported season by season: how many episodes are here, and what each one that is not is waiting on.
 
+Something monitored that has never been grabbed stopped for one of two reasons, and nothing on this machine can tell them apart: the indexers carry nothing for it, or they carry releases the quality you chose rejects. `--search` asks them.
+
 Usage: lemonfiber trace [OPTIONS] <TERM>...
 
 Arguments:
@@ -794,6 +796,9 @@ Options:
 
       --dry-run
           Say what would happen, and change nothing
+
+      --search
+          Ask the indexers what they carry, to tell "nothing at your quality" from "nothing at all". Spends one real search against their daily allowance
 
       --force
           Take the stack from a run that claimed it and did not give it back

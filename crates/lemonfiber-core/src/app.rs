@@ -290,9 +290,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::ConfigShow => configuring::configuration(ctx, None, None),
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
-        Command::Trace { term, season } => {
-            trace::trace(ctx, &term, season).await.map(Outcome::Trace)
-        }
+        Command::Trace {
+            term,
+            season,
+            searching,
+        } => trace::trace(ctx, &term, season, searching)
+            .await
+            .map(Outcome::Trace),
         Command::Household { member } => household::household(ctx, member.as_deref())
             .await
             .map(Outcome::Household),
@@ -1656,6 +1660,7 @@ mod tests {
             Command::Trace {
                 term: "the expanse".to_owned(),
                 season: None,
+                searching: false,
             },
             &ctx(Ok(spoke(""))),
         )

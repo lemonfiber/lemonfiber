@@ -14,9 +14,9 @@
 //! Driven from outside the crate, because what a caller can reach is the thing worth
 //! holding still.
 
-mod asking;
+mod acting;
 
-use asking::{exactly_what, AGE, ARCHIVE, ITEM, LIBRARY, LOGS, NARROWED, OFFER, WARNED};
+use acting::{exactly_what, AGE, ARCHIVE, ITEM, LIBRARY, LOGS, NARROWED, OFFER, WARNED};
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;

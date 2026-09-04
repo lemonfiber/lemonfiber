@@ -25,9 +25,9 @@ mod explaining;
 mod reading;
 
 use assembling::assemble;
-use explaining::not_matched;
+use explaining::{not_matched, searched, unexplained};
 use reading::{
-    account_explainable, beside, library_presence, providers, troubles, Fragments, Reads,
+    account_explainable, asking, beside, library_presence, providers, troubles, Fragments, Reads,
 };
 
 use super::targets::{jellyfin_reader, open_servarrs};
@@ -41,10 +41,16 @@ use crate::ports::service::Pipeline;
 /// Searches each \*arr's library for a title matching the term; the first match is
 /// followed. No match at all is itself the answer — nobody asked for it, the first stage
 /// the trace tells apart.
+///
+/// Every read here is a read until `searching`. That one asks the indexers what they
+/// carry, which spends a real search against the daily allowance they hold the operator
+/// to — the one thing a trace can do that reaches past this machine — so it is made only
+/// where it was asked for, and only where the trace has a silence it could explain.
 pub(super) async fn trace(
     ctx: &Ctx,
     term: &str,
     season: Option<u32>,
+    searching: bool,
 ) -> Result<TraceReport, Box<Problem>> {
     let manifest = ctx
         .stack
@@ -98,6 +104,9 @@ pub(super) async fn trace(
                 reads,
             },
         );
+        if searching && unexplained(&report) {
+            searched(&mut report, &arr.name, asking(&service, kind).await);
+        }
         if let Some(reason) = account_explainable(&report) {
             let said = troubles(providers(ctx, &manifest.services).await);
             report.stall = Some(beside(reason, &said));
@@ -166,6 +175,24 @@ mod tests {
     /// to report, as a film's does.
     const NO_EPISODES: &str = "[]";
 
+    /// One monitored item, with nothing yet done about it.
+    const MONITORED: &str = r#"[{"id":1,"title":"The Expanse","monitored":true}]"#;
+
+    /// A wanted-missing page naming one item, which is what a release search is run for.
+    const ONE_WANTED: &str = r#"{"records":[{"id":7}]}"#;
+
+    /// A wanted-missing page with nothing on it, so there is nothing to search for.
+    const NOTHING_WANTED: &str = r#"{"records":[]}"#;
+
+    /// A release search that came back with releases the profile rejected every one of.
+    const ALL_REJECTED: &str = r#"[{"rejections":["quality 1080p is not wanted"]}]"#;
+
+    /// A release search that came back with a release the profile would grab.
+    const ONE_ACCEPTED: &str = r#"[{"rejections":[]}]"#;
+
+    /// A release search that ran cleanly and came back with nothing at all.
+    const NO_RELEASES: &str = "[]";
+
     /// A Jellyfin sign-in that hands back an access token, and a library that has the
     /// traced item — the pair a media server answers when the item is finally available.
     const SIGNED_IN: &str = r#"{"AccessToken":"token"}"#;
@@ -182,6 +209,8 @@ mod tests {
         episodes: &'static str,
         sign_in: &'static str,
         jellyfin_library: &'static str,
+        wanted: &'static str,
+        releases: &'static str,
     }
 
     impl Fake {
@@ -195,6 +224,18 @@ mod tests {
                 episodes: NO_EPISODES,
                 sign_in: "",
                 jellyfin_library: "",
+                wanted: "",
+                releases: "",
+            }
+        }
+
+        /// The same, with the two reads a search against the indexers makes: the list
+        /// of what is missing, and what a release search for the first of it returned.
+        fn searching(library: &'static str, wanted: &'static str, releases: &'static str) -> Self {
+            Self {
+                wanted,
+                releases,
+                ..Self::arr(library, r#"{"records":[]}"#, EMPTY_QUEUE)
             }
         }
 
@@ -220,6 +261,8 @@ mod tests {
                 ("/history", Answer::reply(200, self.history)),
                 ("/queue", Answer::reply(200, self.queue)),
                 ("/episode", Answer::reply(200, self.episodes)),
+                ("/wanted", Answer::reply(200, self.wanted)),
+                ("/release", Answer::reply(200, self.releases)),
                 ("", Answer::reply(200, self.library)),
             ])
         }
@@ -342,7 +385,10 @@ mod tests {
     }
 
     #[test]
-    fn a_monitored_item_with_no_history_stalls_as_never_found() {
+    fn a_monitored_item_with_no_history_says_which_question_is_open() {
+        // Nothing grabbed, and no search made. Two causes look identical from here —
+        // the indexers carry nothing, and they carry only what the quality in force
+        // rejects — so the reason names neither and says what would tell them apart.
         let report = assemble(
             "Sonarr",
             "The Expanse",
@@ -350,10 +396,10 @@ mod tests {
             frags(Vec::new(), Vec::new(), None),
         );
         assert_eq!(report.furthest, Stage::Monitored);
-        assert!(report
-            .stall
-            .as_deref()
-            .is_some_and(|reason| reason.contains("indexers returned nothing")));
+        let reason = report.stall.unwrap_or_default();
+        assert!(reason.contains("no search was run"), "{reason}");
+        assert!(reason.contains("quality in force"), "{reason}");
+        assert!(reason.contains("ask for a search"), "{reason}");
     }
 
     #[test]
@@ -759,7 +805,9 @@ mod tests {
             EMPTY_QUEUE,
             "not json",
         ));
-        let report = trace(&context, "expanse", None).await.unwrap_or_default();
+        let report = trace(&context, "expanse", None, false)
+            .await
+            .unwrap_or_default();
         assert!(report.matched);
         assert_eq!(report.coverage, None);
         assert!(report
@@ -779,7 +827,9 @@ mod tests {
                 {"id":13,"seasonNumber":0,"episodeNumber":1,"monitored":false,"hasFile":false}
             ]"#,
         ));
-        let report = trace(&context, "expanse", None).await.unwrap_or_default();
+        let report = trace(&context, "expanse", None, false)
+            .await
+            .unwrap_or_default();
         let coverage = report.coverage.unwrap_or_default();
         // The special nobody asked for is counted apart, never dragging the denominator
         // to three and reading as a fault to chase.
@@ -795,7 +845,9 @@ mod tests {
             r#"{"records":[{"eventType":"grabbed","date":"2026-01-01T00:00:00Z"}]}"#,
             r#"{"records":[{"seriesId":1,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}]}"#,
         );
-        let report = trace(&context, "expanse", None).await.unwrap_or_default();
+        let report = trace(&context, "expanse", None, false)
+            .await
+            .unwrap_or_default();
         assert!(report.matched);
         assert_eq!(report.furthest, Stage::Downloading);
     }
@@ -809,7 +861,9 @@ mod tests {
             "not json",
             "not json",
         );
-        let report = trace(&context, "expanse", None).await.unwrap_or_default();
+        let report = trace(&context, "expanse", None, false)
+            .await
+            .unwrap_or_default();
         assert!(report.matched);
         assert!(report
             .findings
@@ -824,7 +878,7 @@ mod tests {
     #[tokio::test]
     async fn tracing_a_term_no_item_matches_is_not_monitored() {
         let context = ctx("[]", "{}", EMPTY_QUEUE);
-        let report = trace(&context, "nothing here", None)
+        let report = trace(&context, "nothing here", None, false)
             .await
             .unwrap_or_default();
         assert!(!report.matched);
@@ -835,7 +889,7 @@ mod tests {
     async fn tracing_passes_over_a_service_whose_library_cannot_be_read() {
         // A service that answers nonsense to the library read is passed over rather than
         // failing the whole trace; with every service unreadable, nothing matched.
-        let report = trace(&ctx("not json", "{}", EMPTY_QUEUE), "expanse", None)
+        let report = trace(&ctx("not json", "{}", EMPTY_QUEUE), "expanse", None, false)
             .await
             .unwrap_or_default();
         assert!(!report.matched);
@@ -854,10 +908,14 @@ mod tests {
                 episodes: NO_EPISODES,
                 sign_in: SIGNED_IN,
                 jellyfin_library: HAS_ITEM,
+                wanted: "",
+                releases: "",
             },
             "available",
         );
-        let report = trace(&context, "expanse", None).await.unwrap_or_default();
+        let report = trace(&context, "expanse", None, false)
+            .await
+            .unwrap_or_default();
         assert_eq!(report.furthest, Stage::Available);
         assert_eq!(report.confidence, crate::trace::Confidence::Uncertain);
         assert!(report
@@ -878,6 +936,8 @@ mod tests {
                 episodes: NO_EPISODES,
                 sign_in: SIGNED_IN,
                 jellyfin_library: NO_ITEM,
+                wanted: "",
+                releases: "",
             })),
             Kind::Sonarr,
             "The Expanse",
@@ -902,7 +962,7 @@ mod tests {
     #[tokio::test]
     async fn tracing_over_an_unreadable_stack_is_an_error() {
         let bad = a_context().over(nowhere()).build();
-        assert!(trace(&bad, "anything", None).await.is_err());
+        assert!(trace(&bad, "anything", None, false).await.is_err());
     }
 
     /// A queue holding one stuck download, the show embedded so it can be named.
@@ -953,6 +1013,139 @@ mod tests {
         assert!(super::stuck(&bad).await.is_err());
     }
 
+    /// A trace that was allowed to ask the indexers, and what it came back saying.
+    async fn searched_for(fake: &Fake) -> TraceReport {
+        trace(&ctx_with(fake), "expanse", None, true)
+            .await
+            .unwrap_or_default()
+    }
+
+    /// The distinction this whole path exists to draw: releases are out there and the
+    /// quality in force rejects every one of them.
+    ///
+    /// That is a different situation from an indexer carrying nothing, and it has a
+    /// different remedy — the operator can ease the preset — so the item reads as having
+    /// reached `Found`, the stage the pipeline has for exactly this, and the reason names
+    /// the quality rather than the indexers.
+    #[tokio::test]
+    async fn releases_the_quality_rejects_read_as_found_rather_than_as_nothing_found() {
+        let report = searched_for(&Fake::searching(MONITORED, ONE_WANTED, ALL_REJECTED)).await;
+
+        assert_eq!(report.furthest, Stage::Found);
+        assert_eq!(
+            report.stages.last().map(|stage| stage.stage),
+            Some(Stage::Found)
+        );
+        let reason = report.stall.unwrap_or_default();
+        assert!(reason.contains("quality preset"), "{reason}");
+        assert!(reason.contains("easing"), "{reason}");
+        // And never the generic one it would have carried unasked, which claims the
+        // question is open when the search has just closed it.
+        assert!(!reason.contains("no search was run"), "{reason}");
+    }
+
+    /// The other half of the same distinction, and the reason it is worth drawing: a
+    /// clean search that found nothing at all says so, and says it is not the preset's
+    /// doing — so an operator does not go and ease a quality that rejected nothing.
+    #[tokio::test]
+    async fn a_search_that_found_nothing_says_the_indexers_carry_nothing() {
+        let report = searched_for(&Fake::searching(MONITORED, ONE_WANTED, NO_RELEASES)).await;
+
+        assert_eq!(report.furthest, Stage::Monitored);
+        let reason = report.stall.unwrap_or_default();
+        assert!(reason.contains("a search found nothing"), "{reason}");
+        assert!(reason.contains("not the quality preset"), "{reason}");
+    }
+
+    /// A search that settled nothing is neither of the two, and says so.
+    ///
+    /// Nothing was wanted to search for, so what came back is about no item at all — and
+    /// reading that as an empty indexer would send an operator after a fault that has not
+    /// been shown to exist.
+    #[tokio::test]
+    async fn a_search_that_settled_nothing_leaves_the_question_open_and_says_it_asked() {
+        let report = searched_for(&Fake::searching(MONITORED, NOTHING_WANTED, NO_RELEASES)).await;
+
+        assert_eq!(report.furthest, Stage::Monitored);
+        let reason = report.stall.unwrap_or_default();
+        assert!(reason.contains("settled nothing"), "{reason}");
+    }
+
+    /// A search whose answer is about content other than the item followed settles
+    /// nothing about that item either, however healthy it reads.
+    #[tokio::test]
+    async fn a_search_that_answers_about_other_content_settles_nothing_here() {
+        let report = searched_for(&Fake::searching(MONITORED, ONE_WANTED, ONE_ACCEPTED)).await;
+
+        assert_eq!(report.furthest, Stage::Monitored);
+        assert!(report
+            .stall
+            .as_deref()
+            .is_some_and(|reason| reason.contains("settled nothing")));
+    }
+
+    /// A search that will not run establishes nothing, and is never read as an absence.
+    ///
+    /// An indexer that could not be reached is not an indexer carrying nothing, and the
+    /// trace that confused the two would send its operator to ease a preset that was
+    /// never the problem.
+    #[tokio::test]
+    async fn a_search_that_will_not_run_is_not_an_indexer_carrying_nothing() {
+        let report = searched_for(&Fake::searching(MONITORED, "not json", NO_RELEASES)).await;
+
+        assert_eq!(report.furthest, Stage::Monitored);
+        assert!(report
+            .stall
+            .as_deref()
+            .is_some_and(|reason| reason.contains("settled nothing")));
+    }
+
+    /// The gate itself: nothing is asked of the indexers unless it was asked for.
+    ///
+    /// Asserted on the request having been made rather than on the reading it would have
+    /// produced, because the cost is the request — a search spent against the allowance
+    /// the indexers hold the operator to is spent whatever the trace then says.
+    #[tokio::test]
+    async fn a_trace_nobody_asked_to_search_asks_the_indexers_nothing() {
+        let fake = Fake::searching(MONITORED, ONE_WANTED, ALL_REJECTED);
+        let transport = fake.transport();
+        let context = ctx_with(&fake).with_http(Arc::<Transport>::clone(&transport));
+
+        let report = trace(&context, "expanse", None, false)
+            .await
+            .unwrap_or_default();
+
+        assert!(
+            !transport.asked_for("/release"),
+            "the indexers were searched"
+        );
+        assert_eq!(report.furthest, Stage::Monitored);
+    }
+
+    /// And nothing is asked of them for an item that already has its answer.
+    ///
+    /// A search says nothing about something already imported, so spending one on it
+    /// would cost the operator an indexer request for a question that is not open.
+    #[tokio::test]
+    async fn a_trace_that_already_has_its_answer_asks_the_indexers_nothing() {
+        let fake = Fake {
+            history: r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-01-01T00:00:00Z"}]}"#,
+            ..Fake::searching(MONITORED, ONE_WANTED, ALL_REJECTED)
+        };
+        let transport = fake.transport();
+        let context = ctx_with(&fake).with_http(Arc::<Transport>::clone(&transport));
+
+        let report = trace(&context, "expanse", None, true)
+            .await
+            .unwrap_or_default();
+
+        assert!(
+            !transport.asked_for("/release"),
+            "the indexers were searched"
+        );
+        assert_eq!(report.furthest, Stage::Imported);
+    }
+
     /// A stall the accounts could explain, on a stack whose accounts will not answer: the
     /// reason stands exactly as it did. A service that could not be read says nothing about
     /// the accounts behind it, and a trace that added an empty aside would be claiming it
@@ -964,11 +1157,14 @@ mod tests {
             r#"{"records":[]}"#,
             EMPTY_QUEUE,
         ));
-        let report = trace(&context, "expanse", None).await.unwrap_or_default();
+        let report = trace(&context, "expanse", None, false)
+            .await
+            .unwrap_or_default();
         assert_eq!(report.furthest, Stage::Monitored);
-        assert!(report.stall.as_deref().is_some_and(|reason| reason
-            .contains("indexers returned nothing")
-            && !reason.contains('(')));
+        assert!(report
+            .stall
+            .as_deref()
+            .is_some_and(|reason| reason.contains("no search was run") && !reason.contains('(')));
     }
 
     /// The two stages an account can explain, and the ones it cannot. A preset that finds
@@ -1037,14 +1233,14 @@ mod tests {
     /// question that was asked.
     #[test]
     fn what_the_accounts_say_travels_beside_the_stall() {
-        let reason = "monitored, but no search has found it yet".to_owned();
+        let reason = "monitored, but nothing has been grabbed for it yet".to_owned();
         assert_eq!(beside(reason.clone(), &[]), reason);
         assert_eq!(
             beside(
                 reason,
                 &["Fast — capped".to_owned(), "Slow — refused".to_owned()]
             ),
-            "monitored, but no search has found it yet (Fast — capped; Slow — refused)"
+            "monitored, but nothing has been grabbed for it yet (Fast — capped; Slow — refused)"
         );
     }
 

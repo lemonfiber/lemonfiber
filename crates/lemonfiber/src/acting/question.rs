@@ -646,6 +646,7 @@ pub(crate) mod tests {
             Ok(Command::Trace {
                 term: "The Expanse".to_owned(),
                 season: None,
+                searching: false,
             })
         );
         assert_eq!(
@@ -732,6 +733,7 @@ pub(crate) mod tests {
             Ok(Command::Trace {
                 term: "The Expanse".to_owned(),
                 season: None,
+                searching: false,
             })
         );
 

@@ -407,7 +407,7 @@ impl Acting {
                 widening,
                 reading,
             } => question::answered(&mut self.stage, question, widening, reading, press),
-            Stage::Disturbing => disturbing::disturbing(&mut self.stage, press),
+            Stage::Disturbing(widened) => disturbing::disturbing(&mut self.stage, widened, press),
             Stage::Handing { asked, open } => surface::handing(&mut self.stage, asked, open, press),
             // Put back rather than carried out: a stage this does not claim is one
             // the dispatcher below it does, and it has to be there to be taken again.
@@ -1302,11 +1302,29 @@ mod tests {
         );
     }
 
-    /// Every other answer is closed by the same key rather than acted on. A `y` over
-    /// a trace taking the tunnel away would be an action arriving through a key that
-    /// puts a box away everywhere else on this screen.
+    /// Every answer that carries no offer is closed by the same key rather than
+    /// acted on. A `y` over a setting sending anything at all would be an action
+    /// arriving through a key that puts a box away everywhere else on this screen.
     #[test]
-    fn a_yes_over_an_answer_that_is_not_a_diagnosis_puts_it_away() {
+    fn a_yes_over_an_answer_that_carries_no_offer_puts_it_away() {
+        let mut acting = asking("settings");
+        acting.came_to(Ok(Outcome::Trace(a_trace("The Expanse"))));
+
+        let said = showing(&acting);
+        assert!(!said.contains("Ask the indexers"), "{said}");
+        assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
+
+        assert!(showing(&acting).is_empty());
+    }
+
+    /// A trace does carry one, and it is the search rather than the checks.
+    ///
+    /// The plain reading says in as many words that whether the indexers carry
+    /// nothing or the quality in force wants none of what they carry is not known, so
+    /// the offer that answers it sits under exactly the account that named the gap —
+    /// and the yes sends the search for the show that was followed, never a diagnosis.
+    #[test]
+    fn a_yes_over_a_trace_asks_the_indexers_about_the_show_it_followed() {
         let mut acting = asking_where();
         for character in "The Expanse".chars() {
             acting.pressed(&Press::Typed(character));
@@ -1315,10 +1333,21 @@ mod tests {
         acting.came_to(Ok(Outcome::Trace(a_trace("The Expanse"))));
 
         let said = showing(&acting);
-        assert!(!said.contains("disturb"), "{said}");
-        assert_eq!(acting.pressed(&Press::Typed('y')), Wanted::Nothing);
+        assert!(said.contains("Ask the indexers"), "{said}");
+        assert!(said.contains("spends a live search"), "{said}");
 
-        assert!(showing(&acting).is_empty());
+        assert_eq!(
+            acting.pressed(&Press::Typed('y')),
+            Wanted::Carry(Command::Trace {
+                term: "The Expanse".to_owned(),
+                season: None,
+                searching: true,
+            })
+        );
+        // And the foot of the screen names the search rather than the checks, which
+        // are not what is running.
+        let footing = footing(&acting);
+        assert!(footing.contains("search against the indexers"), "{footing}");
     }
 
     /// A diagnosis that could not be run offers nothing to widen. There is no report
@@ -1658,6 +1687,7 @@ mod tests {
             Wanted::Carry(Command::Trace {
                 term: "Expanse".to_owned(),
                 season: None,
+                searching: false,
             })
         );
     }
@@ -1725,6 +1755,7 @@ mod tests {
             Wanted::Carry(Command::Trace {
                 term: "Dune".to_owned(),
                 season: None,
+                searching: false,
             })
         );
 
@@ -1785,6 +1816,7 @@ mod tests {
             Wanted::Carry(Command::Trace {
                 term: "Dune".to_owned(),
                 season: None,
+                searching: false,
             })
         );
 
@@ -2857,6 +2889,7 @@ mod tests {
             Wanted::Carry(Command::Trace {
                 term: "The Expanse".to_owned(),
                 season: Some(2),
+                searching: false,
             })
         );
     }
