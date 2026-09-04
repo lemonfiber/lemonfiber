@@ -105,7 +105,7 @@ pub fn candidates(
             }
             let standing = standing(download, awaited, marked, &files);
             Some(Candidate {
-                consequence: consequence(&standing),
+                consequence: consequence(standing),
                 standing,
                 name: download.name.clone(),
                 bytes: download.bytes,
@@ -148,7 +148,7 @@ fn standing(
 ///
 /// Read off where it stands rather than taken beside it, so a download can never
 /// be reported as costing nothing while standing somewhere that costs something.
-fn consequence(standing: &Standing) -> Option<String> {
+fn consequence(standing: Standing) -> Option<String> {
     match standing {
         Standing::NeverImported => None,
         Standing::Seeding { .. } => Some(RATIO_CONSEQUENCE.to_owned()),

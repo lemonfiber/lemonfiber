@@ -69,7 +69,7 @@ fn gather(entry: &std::fs::DirEntry, pending: &mut Vec<PathBuf>, found: &mut Vec
     // symbolic link is the link and never the tree at the far end of it. An entry
     // whose metadata will not read is passed over — it is a name that was there a
     // moment ago and is not now, which is a gap in a count rather than a failure.
-    for meta in entry.metadata() {
+    if let Ok(meta) = entry.metadata() {
         if meta.is_dir() {
             pending.push(entry.path());
         } else {

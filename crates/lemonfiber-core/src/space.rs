@@ -300,11 +300,11 @@ fn reclaimable(measured: &Measured, candidates: &[Candidate]) -> Vec<Consumption
 fn standing_tally(
     measured: &Measured,
     candidates: &[Candidate],
-    wanted: fn(&Standing) -> bool,
+    wanted: fn(Standing) -> bool,
 ) -> Tally {
     let names: BTreeSet<&str> = candidates
         .iter()
-        .filter(|candidate| wanted(&candidate.standing))
+        .filter(|candidate| wanted(candidate.standing))
         .map(|candidate| candidate.name.as_str())
         .collect();
     let files: Vec<Occupant> = measured
