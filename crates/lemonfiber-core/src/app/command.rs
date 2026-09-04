@@ -214,9 +214,15 @@ pub enum Command {
     /// Say which app to use on which device, and where the honest answer is to use
     /// something else.
     ///
-    /// A read with no arguments. What it answers is the same for every machine —
-    /// the client landscape belongs to the platforms rather than to this stack — so
-    /// nothing is asked of the engine and nothing is read from disk.
+    /// A read with no arguments. The table it answers with is the same for every
+    /// machine — the client landscape belongs to the platforms rather than to this
+    /// stack — and nothing is asked of the engine to build it.
+    ///
+    /// One caution above it is this machine's own: the quality preset on record and
+    /// the platform decide together whether playback here will be transcoded on the
+    /// processor, which is the likeliest cause of trouble on any of the devices
+    /// below. Both are read best-effort, so a machine with nothing set up is
+    /// answered in full and simply warned about nothing.
     Clients,
     /// Offer somebody in the house an account they can claim.
     ///

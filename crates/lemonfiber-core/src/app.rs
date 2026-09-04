@@ -302,7 +302,9 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .map(|term| Outcome::Word(*term))
             .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
         Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
-        Command::Clients => Ok(Outcome::Clients(crate::clients::guidance())),
+        Command::Clients => Ok(Outcome::Clients(crate::clients::guidance(
+            quality::straining(ctx),
+        ))),
         Command::Invite { name, allowance } => invited(ctx, name, allowance).await,
         Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,

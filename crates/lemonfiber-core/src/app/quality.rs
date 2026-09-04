@@ -10,6 +10,11 @@
 //! The choice is recorded, not applied here: it decides what future acquisitions
 //! aim for, and the stack picks it up when it is next written. Nothing on disk is
 //! rewritten to match it, and nothing already downloaded is touched.
+//!
+//! Whether the choice already on record would be transcoded here is answered from
+//! this module as well, for the playback guidance that carries the same caution long
+//! after a confirmation is forgotten — one judgement read by two surfaces rather than
+//! two that can drift.
 
 use std::path::PathBuf;
 
@@ -19,7 +24,7 @@ use crate::config::{store, JELLYFIN_MODE_KEY};
 use crate::error::{Diagnose, Problem};
 use crate::model::{Disposition, MusicChoice, PresetChoice, QualityReport};
 use crate::quality::{Preset, Selection};
-use crate::transcoding::{warn_before_confirming, Playback};
+use crate::transcoding::{warn_before_confirming, Playback, Warning};
 use crate::wizard::Library;
 
 /// The scope a global choice is reported under, as opposed to a media type's name.
@@ -146,6 +151,23 @@ pub(super) fn most_demanding_or_default(ctx: &Ctx) -> Preset {
     recorded_selection(ctx).most_demanding()
 }
 
+/// Whether what is already chosen asks this host for transcoding it can only do on
+/// the processor — the same question a `set` answers before recording a choice,
+/// asked here of the choice already on record.
+///
+/// The most demanding preset in force rather than the global one: a household that
+/// left television at balanced and put film at maximum still meets this on film
+/// night, and a caution that missed it would be wrong on exactly the evening it is
+/// wanted.
+///
+/// Everything it reads is best-effort. A choice file that cannot be read falls back
+/// to the default, which asks for no transcoding, and an unreadable environment file
+/// reads as no media server — so a machine with nothing set up warrants no caution
+/// rather than refusing to answer.
+pub(super) fn straining(ctx: &Ctx) -> Option<Warning> {
+    warn_before_confirming(most_demanding_or_default(ctx), playback(ctx))
+}
+
 /// Record the choice where the next run — and a backup — will find it.
 ///
 /// Unlike the baseline seeding keeps best-effort, this is the operator's explicit
@@ -240,7 +262,7 @@ mod tests {
 
     use include_dir::{include_dir, Dir};
 
-    use super::{quality, Ctx, QualityAction};
+    use super::{quality, straining, Ctx, QualityAction};
     use crate::config::{store, Settings, JELLYFIN_MODE_KEY};
     use crate::model::{Disposition, PresetChoice, QualityReport};
     use crate::platform::Environment;
@@ -392,6 +414,49 @@ mod tests {
         let report = run(&context, set(Preset::Maximum, None, true));
         assert_eq!(report.disposition, Disposition::Recorded);
         assert!(global(&report).needs_transcoding_here);
+    }
+
+    /// The choice already on record is weighed again, for a surface that shows the
+    /// caution long after the confirmation is forgotten.
+    ///
+    /// A per-type exception is the case worth driving: the global preset asks for
+    /// nothing, and film night still meets the transcode.
+    #[test]
+    fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
+        let env = scratch("straining");
+        let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
+        let context = ctx(Some(env), Environment::MacOs);
+        assert!(
+            straining(&context).is_none(),
+            "nothing is chosen yet, so nothing is strained"
+        );
+
+        let recorded = run(&context, set(Preset::Maximum, Some("movies"), true));
+        assert_eq!(recorded.disposition, Disposition::Recorded);
+
+        assert_eq!(
+            straining(&context).map(|warning| warning.preset),
+            Some(Preset::Maximum),
+            "the most demanding preset in force is what playback meets"
+        );
+    }
+
+    /// A host that reaches its encoder is strained by nothing, whatever is chosen.
+    #[test]
+    fn a_host_that_transcodes_in_hardware_is_never_strained() {
+        let env = scratch("unstrained");
+        let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
+        let context = ctx(Some(env), Environment::LinuxNative);
+
+        let recorded = run(&context, set(Preset::Maximum, None, false));
+        assert_eq!(recorded.disposition, Disposition::Recorded);
+        assert!(straining(&context).is_none());
+    }
+
+    /// A machine with nothing configured is answered rather than refused.
+    #[test]
+    fn a_machine_with_no_choice_and_no_stack_is_strained_by_nothing() {
+        assert!(straining(&ctx(None, Environment::MacOs)).is_none());
     }
 
     #[test]

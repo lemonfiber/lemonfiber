@@ -2,8 +2,15 @@
 //!
 //! One entry per device category, each carrying how well served it is, what to use,
 //! what is worth knowing before starting, and where support is poor what to do
-//! instead. The same on every machine: nothing here is read from disk or asked of
-//! the engine.
+//! instead. The table is the same on every machine: nothing here is read from disk
+//! or asked of the engine.
+//!
+//! One thing above the table is not the same everywhere. Where the quality preset
+//! in force asks for transcoding this platform cannot do in hardware, playback
+//! struggles whatever app is installed — so [`Straining`] says so before any device
+//! is chosen, and names the transcode as the likely cause of trouble that otherwise
+//! reads as a bad app on a bad television. The fact is [`crate::transcoding`]'s and
+//! is handed in; this module still reads nothing.
 //!
 //! A device marked [`Support::Poor`] carries an alternative, and a test refuses one
 //! that does not. The browser is present as [`Support::Fallback`] — no installation,
@@ -19,6 +26,8 @@
 //! the rest is instructions.
 
 use serde::Serialize;
+
+use crate::transcoding::Warning;
 
 /// How well a device is served.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -140,6 +149,59 @@ pub const NOTHING_IS_INSTALLED: &str =
     "lemonfiber does not install anything on your device and cannot. What is here is where to \
      look and what to choose; the installing is yours.";
 
+/// What a preset this machine can only transcode on the processor does to playback,
+/// in the terms somebody watching would describe it.
+///
+/// Names the transcode, because the trouble it causes looks exactly like a bad app:
+/// a household told only that a television is poorly served will change the app,
+/// then the television, and arrive at the preset last if at all.
+pub const PLAYBACK_WILL_STRUGGLE: &str =
+    "This preset asks for more than most devices can play as it arrives, and no hardware \
+     encoder is reachable from where the media server runs — so anything a device cannot \
+     play directly is transcoded by the processor alone. Where a video stutters, takes a \
+     long time to start, or stops partway through, that transcode is the likely cause \
+     rather than the app, the device or the network.";
+
+/// The two things that stop it, for an operator who would rather playback were
+/// smooth than deep.
+pub const A_LIGHTER_PRESET: &str =
+    "A lighter preset leaves most devices nothing to transcode: `lemonfiber quality set \
+     balanced` decides what arrives next and changes nothing already on disk. Running \
+     Jellyfin natively, where it can reach the encoder, is the other answer.";
+
+/// Why playback here is likely to struggle, whatever app the household installs.
+///
+/// Present only where the preset in force asks for transcoding this platform cannot
+/// do in hardware. It belongs to the guidance rather than to any one device: the
+/// preset and the platform decide it between them, and every device in the table
+/// meets it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Straining {
+    /// The preset in force, under the name it was chosen by.
+    pub preset: &'static str,
+    /// What that preset asks of this machine, and what playback does where this
+    /// machine cannot give it.
+    pub caution: &'static str,
+    /// What makes it stop.
+    pub instead: &'static str,
+}
+
+impl Straining {
+    /// The caution a [`Warning`] comes to, said for a household rather than for the
+    /// operator about to confirm a preset.
+    ///
+    /// The same fact reaching a second surface: [`crate::transcoding`] decides
+    /// whether there is one, and each surface says it in the words its reader needs.
+    #[must_use]
+    pub const fn of(warning: Warning) -> Self {
+        Self {
+            preset: warning.preset.label(),
+            caution: PLAYBACK_WILL_STRUGGLE,
+            instead: A_LIGHTER_PRESET,
+        }
+    }
+}
+
 /// One thing that could be behind a symptom, and how to tell it from the others.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Cause {
@@ -235,6 +297,13 @@ pub const TROUBLE: &[Trouble] = &[
 /// The guidance in full, for a surface that shows all of it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Guidance {
+    /// Why playback here is likely to struggle before any app is chosen, or `None`
+    /// where the preset in force asks for nothing this platform cannot serve.
+    ///
+    /// Absent far more often than present, and it must be: a caution shown to
+    /// everybody says nothing about anybody's machine, and a reader who meets one
+    /// every time stops reading it.
+    pub straining: Option<Straining>,
     /// Every device, in the order somebody is likely to be holding one.
     pub devices: Vec<Device>,
     /// What to do when it does not work, keyed by the symptom.
@@ -245,10 +314,17 @@ pub struct Guidance {
     pub nothing_is_installed: &'static str,
 }
 
-/// What to use, for every device this product has an answer for.
+/// What to use, for every device this product has an answer for — carrying the
+/// caution where playback here will struggle whatever is installed.
+///
+/// `strained` is the surface's answer to a question this module cannot ask: what the
+/// preset in force is, and what the platform can transcode. Handed in rather than
+/// read here, and optional, so guidance still answers on a machine with no stack set
+/// up at all — where nothing can be read, there is nothing to caution about.
 #[must_use]
-pub fn guidance() -> Guidance {
+pub fn guidance(strained: Option<Warning>) -> Guidance {
     Guidance {
+        straining: strained.map(Straining::of),
         devices: DEVICES.to_vec(),
         trouble: TROUBLE.to_vec(),
         only_at_home: ONLY_AT_HOME,
@@ -258,7 +334,14 @@ pub fn guidance() -> Guidance {
 
 #[cfg(test)]
 mod tests {
-    use super::{guidance, Support, DEVICES, NOTHING_IS_INSTALLED, ONLY_AT_HOME, TROUBLE};
+    use super::{
+        guidance, Straining, Support, A_LIGHTER_PRESET, DEVICES, NOTHING_IS_INSTALLED,
+        ONLY_AT_HOME, PLAYBACK_WILL_STRUGGLE, TROUBLE,
+    };
+    use crate::platform::Environment;
+    use crate::quality::Preset;
+    use crate::transcoding::{warn_before_confirming, Playback};
+    use crate::wizard::Library;
 
     /// Every cause says how to tell it from the others under its symptom.
     ///
@@ -381,10 +464,81 @@ mod tests {
         );
     }
 
+    /// The caution names the transcode as what playback trouble is likely to be.
+    ///
+    /// Naming the preset alone would leave a household to work out why a preset has
+    /// anything to do with a video that stops, which is the step nobody takes.
+    #[test]
+    fn a_preset_this_machine_can_only_transcode_in_software_names_the_transcode() {
+        let strained = warn_before_confirming(
+            Preset::Maximum,
+            Playback::of(Environment::MacOs, Library::JellyfinDocker),
+        );
+        assert!(strained.is_some(), "the fixture must warrant a caution");
+
+        assert_eq!(
+            guidance(strained).straining,
+            Some(Straining {
+                preset: Preset::Maximum.label(),
+                caution: PLAYBACK_WILL_STRUGGLE,
+                instead: A_LIGHTER_PRESET,
+            }),
+            "the preset the operator chose is what the caution is about"
+        );
+        assert!(
+            PLAYBACK_WILL_STRUGGLE.contains("transcode"),
+            "the cause is not named: {PLAYBACK_WILL_STRUGGLE}"
+        );
+        assert!(
+            PLAYBACK_WILL_STRUGGLE.contains("likely cause"),
+            "the transcode is not named as the likely cause: {PLAYBACK_WILL_STRUGGLE}"
+        );
+        assert!(
+            A_LIGHTER_PRESET.contains("lighter preset"),
+            "nothing is offered that would stop it: {A_LIGHTER_PRESET}"
+        );
+    }
+
+    /// Where nothing is strained the guidance gains no sentence.
+    ///
+    /// A caution shown to everybody says nothing about anybody's machine. The three
+    /// ways not to warrant one are all here — a preset that provokes no transcode, a
+    /// host that transcodes in hardware, and no media server at all — because each
+    /// reaches this through a different arm of the decision.
+    #[test]
+    fn guidance_that_warrants_no_caution_does_not_gain_one() {
+        let software_only = Playback::of(Environment::MacOs, Library::JellyfinDocker);
+        let mut asked = 0_usize;
+        for (preset, playback) in [
+            (Preset::Balanced, software_only),
+            (
+                Preset::Maximum,
+                Playback::of(Environment::LinuxNative, Library::JellyfinDocker),
+            ),
+            (
+                Preset::Maximum,
+                Playback::of(Environment::MacOs, Library::None),
+            ),
+        ] {
+            asked += 1;
+            let all = guidance(warn_before_confirming(preset, playback));
+            assert!(
+                all.straining.is_none(),
+                "{preset:?} on {playback:?} gained a caution it does not warrant"
+            );
+            assert_eq!(
+                all.devices.len(),
+                DEVICES.len(),
+                "and still answers in full"
+            );
+        }
+        assert_eq!(asked, 3, "each way of warranting nothing is exercised");
+    }
+
     /// Both statements true of every device are present.
     #[test]
     fn the_limits_that_hold_for_everything_are_stated() {
-        let all = guidance();
+        let all = guidance(None);
 
         assert_eq!(all.devices.len(), DEVICES.len());
         assert!(
