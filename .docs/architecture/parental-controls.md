@@ -132,6 +132,87 @@ image: a member signs in, the policy is rewritten with a lower limit, and the sa
 token reads the new limit back on the next request. Nothing is invalidated and nobody
 is asked to sign in again.
 
+## What the server shows a restricted member
+
+Everything above is what lemonfiber *writes*. This is what the media server then does
+with it, driven against `jellyfin/jellyfin:10.10.3` rather than read off its
+documentation — and driving it needed the one thing no fake supplies, a library holding
+content the server has a certificate for. That library is
+[`scripts/a_library_with_certificates_on_it.py`](../../scripts/a_library_with_certificates_on_it.py):
+a container of its own, eleven titles whose `.nfo` files carry a certificate in `<mpaa>`,
+and a member the policy above is written against. Nothing in CI runs it. It is kept so
+the next claim about what the server shows can be checked the same way.
+
+The run below is a member limited to **13** with unrated content held back, against a
+catalogue the administrator sees eleven titles in.
+
+### Withheld content is absent, not offered and refused
+
+Four of the eleven are offered, and every read the member can make agrees on which four:
+
+| Read | Answers |
+|------|---------|
+| `GET /Items?Recursive=true` | 4 |
+| `GET /Users/{id}/Items?Recursive=true` | 4 |
+| `GET /Items/Latest` | 4 |
+| `GET /Items/Counts` | `MovieCount: 4` — the administrator's own read of the same endpoint says 11 |
+| `GET /Items` `TotalRecordCount` | 4, so the count does not give away what the list withholds |
+| `GET /Search/Hints?searchTerm=` *(a withheld title's own name)* | nothing, for every one of the seven |
+
+**There is no flag on a withheld title, because there is no title.** Asked for directly
+by the identifier the administrator can see, `GET /Users/{id}/Items/{item}` answers
+**404**, and `GET /Items/{item}/PlaybackInfo` answers 404 too — not `403`, not a
+playable-false field on an item that is still described. So the server cannot present
+something and then refuse it: by the time a refusal could happen the item does not exist
+for that account.
+
+### A certificate revised upstream
+
+Rewriting an item's `<mpaa>` and asking the server to look again moves it, **in both
+directions, on a token nobody re-authenticated**:
+
+| Title | Was | Became | Before the refresh | After it |
+|-------|-----|--------|--------------------|----------|
+| `Younger Film (2002)` | `PG` | `R` | member gets `200` | member gets `404` |
+| `Grown Film (2004)` | `R` | `PG` | member gets `404` | member gets `200` |
+
+The refresh was `POST /Library/Refresh` — the same call
+[`jellyfin/library.rs`](../../crates/lemonfiber-core/src/jellyfin/library.rs) already
+sends — and it took about a second.
+
+**But a scan re-reads what it can see has changed, and only that.** With the same
+content change made and the file's modification time put back afterwards,
+`POST /Library/Refresh` left the old certificate in place and the member kept the title.
+A forced `POST /Items/{id}/Refresh?metadataRefreshMode=FullRefresh&replaceAllMetadata=true`
+re-read it within two seconds, and the member's own read of it went from `200` to `404`
+with it. So *re-evaluated on metadata refresh* is true of a refresh that re-reads the
+metadata, and a library scan is one only when the file it reads has moved.
+
+Worth knowing beside that: **this server schedules no metadata refresh at all.** Its
+only library task is `Scan Media Library`, every twelve hours, and a library's
+`AutomaticRefreshIntervalDays` is `0`. A certificate revised at a metadata provider,
+with nothing on disk to show for it, is therefore re-read when somebody asks and not
+before.
+
+### A certificate this server's table does not name
+
+A household's files do not all come from one country, and the server keeps one table.
+What it does with the rest was driven at every step lemonfiber offers:
+
+| Certificate | Read as | Why |
+|-------------|---------|-----|
+| `15`, `18` | 15, 18 | the lookup crosses countries — these are the `GB` table's |
+| `GB-18` | 18 | a country prefix is stripped before the lookup |
+| `R18` | held back at every step, 18 included | the `GB` table puts it at 1000 |
+| `MADEUP-9` | 9 | no table names it, so the number inside the string is taken |
+| `TOTALLY MADE UP` | unrated | no table, no number — it appears only where unrated is let through, exactly as content carrying no rating at all does |
+
+The last row is the one that matters. A certificate the server cannot resolve is not
+quietly allowed: it is treated as unrated, which is the case
+[the default above](#unrated-content) already holds back for anybody being narrowed. So
+the conservative default is what closes this, and an operator who lets unrated content
+through has let through content with an unrecognised certificate as well.
+
 ## What follows the person, not the device
 
 Everything above sits on the **account**. Jellyfin's policy also carries
