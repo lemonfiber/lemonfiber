@@ -245,11 +245,12 @@ mod tests {
             )],
         );
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].standing, Standing::NeverImported);
-        assert!(found[0].offered(), "nothing is lost by removing it");
-        assert_eq!(
-            found[0].consequence, None,
-            "nothing to weigh, so nothing is said about weighing it"
+        let one = found.first();
+        assert!(
+            one.is_some_and(|candidate| candidate.standing == Standing::NeverImported
+                && candidate.offered()
+                && candidate.consequence.is_none()),
+            "nothing is lost by removing it, so nothing is said about weighing it: {one:?}"
         );
     }
 
@@ -266,12 +267,15 @@ mod tests {
                 2,
             )],
         );
-        assert_eq!(found[0].standing, Standing::Seeding { ratio: 175 });
+        let one = found.first();
         assert!(
-            !found[0].offered(),
-            "a consequence outside this machine is not this product's to weigh"
+            one.is_some_and(
+                |candidate| candidate.standing == Standing::Seeding { ratio: 175 }
+                    && !candidate.offered()
+                    && candidate.consequence.as_deref() == Some(RATIO_CONSEQUENCE)
+            ),
+            "a consequence outside this machine is not this product's to weigh: {one:?}"
         );
-        assert_eq!(found[0].consequence.as_deref(), Some(RATIO_CONSEQUENCE));
     }
 
     #[test]
@@ -301,8 +305,12 @@ mod tests {
                 1,
             )],
         );
-        assert!(!found[0].offered());
-        assert_eq!(found[0].standing, Standing::Seeding { ratio: 20 });
+        let one = found.first();
+        assert!(
+            one.is_some_and(|candidate| !candidate.offered()
+                && candidate.standing == Standing::Seeding { ratio: 20 }),
+            "{one:?}"
+        );
     }
 
     #[test]
@@ -318,15 +326,15 @@ mod tests {
                 1,
             )],
         );
-        assert_eq!(found[0].standing, Standing::LeftAlone);
-        assert!(!found[0].offered());
+        let one = found.first();
         assert!(
-            found[0]
-                .consequence
-                .as_deref()
-                .is_some_and(|said| said.contains("left alone")),
-            "it says whose instruction it is following: {:?}",
-            found[0].consequence
+            one.is_some_and(|candidate| candidate.standing == Standing::LeftAlone
+                && !candidate.offered()
+                && candidate
+                    .consequence
+                    .as_deref()
+                    .is_some_and(|said| said.contains("left alone"))),
+            "it says whose instruction it is following: {one:?}"
         );
     }
 
@@ -365,7 +373,9 @@ mod tests {
             &[file("/srv/media/downloads/A.Film.2019.mkv", 9_000, 42, 1)],
         );
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].standing, Standing::NeverImported);
+        assert!(found
+            .first()
+            .is_some_and(|one| one.standing == Standing::NeverImported));
     }
 
     #[test]
@@ -381,10 +391,10 @@ mod tests {
             &nothing_marked(),
             &[unidentified],
         );
-        assert_eq!(
-            found[0].standing,
-            Standing::NeverImported,
-            "no second name was found, and absence of a reading is not a link"
+        let one = found.first();
+        assert!(
+            one.is_some_and(|candidate| candidate.standing == Standing::NeverImported),
+            "no second name was found, and absence of a reading is not a link: {one:?}"
         );
     }
 

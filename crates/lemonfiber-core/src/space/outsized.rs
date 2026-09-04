@@ -118,9 +118,13 @@ mod tests {
         walk.push(file("/d/films/A.Remux.mkv", FLOOR * 2));
         let found = outsized(&walk);
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].path, "/d/films/A.Remux.mkv");
-        assert_eq!(found[0].bytes, FLOOR * 2);
-        assert!(found[0].times_typical >= 8, "{}", found[0].times_typical);
+        let pointed = found.first();
+        assert!(
+            pointed.is_some_and(|one| one.path == "/d/films/A.Remux.mkv"
+                && one.bytes == FLOOR * 2
+                && one.times_typical >= 8),
+            "{pointed:?}"
+        );
     }
 
     #[test]
@@ -179,9 +183,10 @@ mod tests {
         }
         let found = outsized(&walk);
         assert_eq!(found.len(), 5);
-        assert_eq!(
-            found[0].path, "/d/films/big-00.mkv",
-            "a tie is broken by name, so two runs read alike"
+        let first = found.first();
+        assert!(
+            first.is_some_and(|one| one.path == "/d/films/big-00.mkv"),
+            "a tie is broken by name, so two runs read alike: {first:?}"
         );
     }
 

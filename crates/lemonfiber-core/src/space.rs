@@ -620,13 +620,18 @@ mod tests {
         ];
         let reckoned = reckon(&measured);
         assert_eq!(reckoned.interrupted.len(), 2);
-        assert_eq!(reckoned.interrupted[0].partial, 3_000);
-        assert_eq!(reckoned.interrupted[0].said, "No space left on device");
-        assert_eq!(reckoned.interrupted[1].partial, 0);
+        let named = reckoned.interrupted.first();
         assert!(
-            reckoned.interrupted[1].said.contains("no reason"),
-            "silence is said as silence: {}",
-            reckoned.interrupted[1].said
+            named.is_some_and(
+                |stopped| stopped.partial == 3_000 && stopped.said == "No space left on device"
+            ),
+            "{named:?}"
+        );
+        let silent = reckoned.interrupted.get(1);
+        assert!(
+            silent
+                .is_some_and(|stopped| stopped.partial == 0 && stopped.said.contains("no reason")),
+            "silence is said as silence: {silent:?}"
         );
     }
 
