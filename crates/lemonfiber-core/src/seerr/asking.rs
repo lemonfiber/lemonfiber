@@ -355,27 +355,26 @@ mod tests {
     use crate::ports::service::Quota;
 
     /// One member's settings as the service answers them, with a name worth keeping.
+    ///
+    /// Built rather than parsed, because what these cases are about is what goes back
+    /// *out*: a fallback for a parse that cannot fail is a branch nothing ever takes,
+    /// and reading the service's own document is held next door, where a real answer
+    /// goes through the client.
     fn held() -> MemberSettings {
-        serde_json::from_str(
-            r#"{"username":"ana","email":"ana@example.test","locale":"en",
-                "movieQuotaLimit":3,"movieQuotaDays":7,
-                "tvQuotaLimit":3,"tvQuotaDays":7,
-                "watchlistSyncMovies":true}"#,
-        )
-        .unwrap_or_else(|_| MemberSettings {
-            username: None,
-            email: None,
-            locale: None,
+        MemberSettings {
+            username: Some("ana".to_owned()),
+            email: Some("ana@example.test".to_owned()),
+            locale: Some("en".to_owned()),
             discover_region: None,
             streaming_region: None,
             original_language: None,
-            movie_quota_limit: None,
-            movie_quota_days: None,
-            tv_quota_limit: None,
-            tv_quota_days: None,
-            watchlist_sync_movies: None,
+            movie_quota_limit: Some(3),
+            movie_quota_days: Some(7),
+            tv_quota_limit: Some(3),
+            tv_quota_days: Some(7),
+            watchlist_sync_movies: Some(true),
             watchlist_sync_tv: None,
-        })
+        }
     }
 
     /// Setting a limit changes the four figures and carries everything else back.

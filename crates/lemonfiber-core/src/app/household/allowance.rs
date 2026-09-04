@@ -273,9 +273,10 @@ mod tests {
         let said = worth_saying(&[member(Some(holding(true, Some(5), 4)), &[])]);
 
         assert_eq!(said.len(), 1, "{said:?}");
-        assert!(said[0].contains("close to their limit"), "{said:?}");
-        assert!(said[0].contains("4 of 5"), "{said:?}");
-        assert!(said[0].contains("a week"), "{said:?}");
+        let line = said.first().cloned().unwrap_or_default();
+        assert!(line.contains("close to their limit"), "{line}");
+        assert!(line.contains("4 of 5"), "{line}");
+        assert!(line.contains("a week"), "{line}");
     }
 
     /// A member with room, and one nothing limits, are not mentioned.
@@ -296,9 +297,10 @@ mod tests {
         let said = worth_saying(&[member(None, &[9, 2, 12])]);
 
         assert_eq!(said.len(), 1, "{said:?}");
-        assert!(said[0].contains("2 requests waiting"), "{said:?}");
-        assert!(said[0].contains("oldest for 12 days"), "{said:?}");
-        assert!(said[0].contains("nothing expires them"), "{said:?}");
+        let line = said.first().cloned().unwrap_or_default();
+        assert!(line.contains("2 requests waiting"), "{line}");
+        assert!(line.contains("oldest for 12 days"), "{line}");
+        assert!(line.contains("nothing expires them"), "{line}");
     }
 
     /// Nothing has waited long enough is nothing said.

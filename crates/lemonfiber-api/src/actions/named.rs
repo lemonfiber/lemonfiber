@@ -23,15 +23,13 @@ use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::{self, Kept};
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Answer, Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
 mod household;
-
-use household::{about_a_person, allowing, deciding, RawAllowance};
 
 use super::asked::{unwanted, Arguments, Disturbing};
 use super::Refused;
@@ -150,6 +148,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     if let Some(refused) = beforehand(action, &given) {
         return Err(refused);
     }
+    // Everything addressed to somebody who lives here goes next door before this
+    // takes the carrier apart: an account offered, a password taken off, an account
+    // taken away, what the household may ask for, and one thing it already asked for.
+    // Each of them has to say what it lacks before it can name a command, which is
+    // longer than a row — and none of the fields they use is one this table reads.
+    if household::about_the_household(action) {
+        return household::asked_for(action, given);
+    }
     let needs = |argument: &str| Refused::Missing {
         action: action.to_owned(),
         argument: argument.to_owned(),
@@ -177,17 +183,10 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         agreed,
         confirm,
         item,
-        libraries,
-        age_limit,
-        unrated,
         term,
         season,
         download,
-        policy,
-        requests,
-        days,
-        request,
-        reason,
+        ..
     } = given;
     match action {
         // Starting named services and bringing a form up are different requests
@@ -220,22 +219,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // The one thing that account names and leaves alone, asked for on its own.
         "stop-seeding" => stopping(download, offer),
         "backup" => Ok(Command::Backup { service }),
-        // The three addressed to a person rather than a form, a file or a service.
-        // Unconfirmed, a removal says what it takes — their watch history, and every
-        // request they made — and touches neither service, so what a browser agrees
-        // to is what it was shown, the way a forget's agreement is. A reissue asks
-        // for no agreement: nothing is destroyed and nothing is listed first, and
-        // what ends is a password nobody here knew.
-        "invite" | "reissue" | "remove" => about_a_person(
-            action,
-            name,
-            confirm,
-            RawAllowance {
-                libraries,
-                age_limit,
-                unrated,
-            },
-        ),
         // The two reads this surface serves twice, each reaching the same command its
         // own endpoint reaches and widened by the same word the command line widens
         // it with. Neither is a second reading of the stack; each is the reading that
@@ -275,19 +258,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
                 consent,
             }),
             None => Err(needs("archive")),
-        },
-        // What a household may ask for, and one thing it already asked for. Both
-        // answer with the household as it now stands rather than with a report of
-        // their own, so what a browser is shown after a change is the change.
-        //
-        // Naming nobody is the household's own choice rather than an omission, which
-        // is why this is the one action addressed to a person that does not require
-        // one — and why the refusal for a missing name is not reached from here.
-        "household-allow" => allowing(name, policy.as_deref(), requests, days),
-        "household-approve" => deciding(action, request, Answer::LetThrough),
-        "household-decline" => match reason {
-            Some(reason) => deciding(action, request, Answer::TurnedDown { reason }),
-            None => Err(needs("reason")),
         },
         "watch" => Ok(Command::Watch { forms }),
         // Naming nothing is a request rather than an omission: a walk asked for
