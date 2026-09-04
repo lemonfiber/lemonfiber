@@ -117,9 +117,12 @@ mod tests {
 
     #[test]
     fn parts_beside_what_was_unpacked_from_them_are_the_waste() {
+        // In the order they were walked in, which is the order they are given in:
+        // the walk above this sorts by path, so a caller gets them sorted without
+        // this sorting them a second time.
         let seen = found(&[
-            file("/d/A.Release/a.rar", 500),
             file("/d/A.Release/a.r00", 500),
+            file("/d/A.Release/a.rar", 500),
             file("/d/A.Release/A.Release.mkv", 1_000),
         ]);
         assert_eq!(seen, ["/d/A.Release/a.r00", "/d/A.Release/a.rar"]);

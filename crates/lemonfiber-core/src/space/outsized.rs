@@ -106,9 +106,18 @@ mod tests {
     }
 
     /// A library of ordinary files, each a twentieth of the floor.
+    ///
+    /// Enough of them that a handful of outsized ones does not become the middle
+    /// file itself — which is the trap the comparison is arranged around, and one a
+    /// case about the cap can walk into by adding twenty of them.
     fn ordinary() -> Vec<Occupant> {
-        (0..9)
-            .map(|number| file(&format!("/d/films/ordinary-{number}.mkv"), FLOOR / 20))
+        many_ordinary(9)
+    }
+
+    /// The same, however many are asked for.
+    fn many_ordinary(count: u32) -> Vec<Occupant> {
+        (0..count)
+            .map(|number| file(&format!("/d/films/ordinary-{number:03}.mkv"), FLOOR / 20))
             .collect()
     }
 
@@ -177,8 +186,11 @@ mod tests {
 
     #[test]
     fn a_handful_is_a_highlight_and_a_hundred_is_a_listing() {
-        let mut walk = ordinary();
-        for number in 0..20 {
+        // Forty-one ordinary files against seven outsized ones, so the middle file
+        // is still an ordinary one: a walk whose middle is itself outsized has
+        // nothing out of line in it by definition, and would report none.
+        let mut walk = many_ordinary(41);
+        for number in 0..7 {
             walk.push(file(&format!("/d/films/big-{number:02}.mkv"), FLOOR * 2));
         }
         let found = outsized(&walk);
