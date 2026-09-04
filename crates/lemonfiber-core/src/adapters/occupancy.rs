@@ -117,9 +117,13 @@ mod tests {
                     .map(|name| name.to_string_lossy().into_owned())
             })
             .collect();
+        // Ordered by the whole path rather than by the name at the end of it, which
+        // is why the file in the root comes before the one under `under/`: `top`
+        // sorts before `under`. What matters is that it is the same order twice,
+        // whatever a directory read happened to hand back.
         assert_eq!(
             names,
-            ["deep.txt", "top.txt"],
+            ["top.txt", "deep.txt"],
             "read in one order every run"
         );
         assert_eq!(
