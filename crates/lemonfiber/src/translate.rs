@@ -139,8 +139,7 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{
-        bundling, configuration, invitation, quality, restarting, traced, Allowance, Destination,
-        RawAllowance, Wanted,
+        bundling, configuration, invitation, quality, restarting, traced, Destination, Wanted,
     };
     use crate::exit::USAGE;
     use lemonfiber::cli::{Asked, ConfigAction, QualityCommand};
