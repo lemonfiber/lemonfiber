@@ -279,20 +279,11 @@ async fn main() -> ExitCode {
                 Err(code) => return code,
             }
         }
-        // The term is taken as words so it can be typed unquoted; joined back into the
-        // title as said.
-        // The searching form is the one that reaches past this machine, spending a
-        // real search against the indexers' daily allowance, so it happens only where
-        // the flag asked for it.
         Request::Trace {
             term,
             season,
             search,
-        } => Command::Trace {
-            term: term.join(" "),
-            season,
-            searching: search,
-        },
+        } => traced(term, season, search),
         // Narrated for minutes and then one report, so the report goes through
         // dispatch and the narration goes wherever the surface is listening. A run
         // whose whole answer is a JSON document must not have prose interleaved
@@ -343,13 +334,7 @@ async fn main() -> ExitCode {
         Request::Restore { archive: None, .. } => Command::Archives,
     };
 
-    match dispatch(command, &ctx).await {
-        Ok(outcome) => {
-            render(&outcome, cli.json);
-            settled(&outcome)
-        }
-        Err(problem) => complain(&problem),
-    }
+    answered(command, &ctx, cli.json).await
 }
 
 /// The app this binary serves a browser.
@@ -425,6 +410,34 @@ async fn explaining(ctx: &Ctx, word: &[String], json: bool, rehearsing: bool) ->
 /// The two directions share this because they share the sentence — only the verb
 /// differs — and a second copy of "say it, then do it" would be a second place for
 /// them to fall out of step about which half comes first.
+/// Carry the command out and say what came back.
+///
+/// The exit code is the outcome's own, so what a run reports and what it exits with
+/// cannot disagree.
+async fn answered(command: Command, ctx: &Ctx, json: bool) -> ExitCode {
+    match dispatch(command, ctx).await {
+        Ok(outcome) => {
+            render(&outcome, json);
+            settled(&outcome)
+        }
+        Err(problem) => complain(&problem),
+    }
+}
+
+/// What a trace is asked about, from the words it was typed as.
+///
+/// The term is taken as words so it can be typed unquoted; joined back into the title
+/// as said. The searching form is the one that reaches past this machine, spending a
+/// real search against the indexers' daily allowance, so it happens only where the
+/// flag asked for it.
+fn traced(term: Vec<String>, season: Option<u32>, search: bool) -> Command {
+    Command::Trace {
+        term: term.join(" "),
+        season,
+        searching: search,
+    }
+}
+
 /// A restart of named services, or of everything the form holds where none are named.
 fn restarting(form: String, services: Vec<String>) -> Command {
     Command::Restart {
