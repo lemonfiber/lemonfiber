@@ -128,10 +128,22 @@ fn a_server_holding_nobody() -> Arc<Fake> {
             vec![Answer::reply(200, r#"{"Items":[]}"#)],
         ),
         (
+            "/Localization/ParentalRatings",
+            vec![Answer::reply(200, r#"[{"Name":"12A","Value":12}]"#)],
+        ),
+        ("/Users/9/Policy", vec![Answer::reply(204, "")]),
+        (
             NEW_ACCOUNT,
             vec![Answer::reply(
                 200,
                 r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+            )],
+        ),
+        (
+            "/Users/9",
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"9","Name":"ana","HasPassword":false,"Policy":{}}"#,
             )],
         ),
         ("/Users", vec![Answer::reply(200, "[]")]),
@@ -215,6 +227,27 @@ async fn offering(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+        },
+        a_server_holding_nobody(),
+    )
+    .await
+}
+
+/// Offer somebody an account with a limit on it, so the answer says what it wrote.
+///
+/// The plain offer above narrows nothing and therefore reports nothing about access,
+/// which is the right answer and the wrong fixture for a claim about what that report
+/// carries.
+async fn allowing(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
+    driving(
+        scratch,
+        Command::Invite {
+            name: "ana".to_owned(),
+            allowance: Allowance {
+                libraries: Vec::new(),
+                age_limit: Some(12),
+                unrated: None,
+            },
         },
         a_server_holding_nobody(),
     )
@@ -336,6 +369,11 @@ async fn what_is_passed_on_carries_no_password() {
         fields,
         [
             "address",
+            // What the offer wrote on the account: a limit, the libraries, what
+            // becomes of unrated content and whether requesting was held to the same
+            // decision. Not a password, and asserted here so that adding one would
+            // have to pass this list — its own field set is held below.
+            "applied",
             "caution",
             "hours",
             // Whether the request service has been told about them — not a password,
@@ -417,6 +455,7 @@ async fn what_a_reset_passes_on_is_an_invitation_with_no_password_in_it() {
         fields,
         [
             "address",
+            "applied",
             "caution",
             "hours",
             "linked",
@@ -427,5 +466,35 @@ async fn what_a_reset_passes_on_is_an_invitation_with_no_password_in_it() {
         ],
         "an empty list means the reset did not answer and this asserts nothing; a field \
          beside these means a reset says something an invitation does not"
+    );
+}
+
+/// What an offer says it wrote has no password in it either.
+///
+/// The field set is asserted whole for the reason the invitation's own is: this is the
+/// half of the message that describes an account, and describing an account is exactly
+/// where somewhere to carry a password would look like it belonged.
+#[tokio::test]
+async fn what_an_offer_says_it_wrote_carries_no_password() {
+    let (_, made) = allowing("wrote").await;
+
+    let fields: Vec<String> = made
+        .and_then(|outcome| outcome.envelope().to_json())
+        .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
+        .and_then(|envelope| {
+            envelope
+                .get("data")
+                .and_then(|invitation| invitation.get("applied"))
+                .and_then(|applied| applied.as_object())
+                .map(|applied| applied.keys().cloned().collect())
+        })
+        .unwrap_or_default();
+
+    assert_eq!(
+        fields,
+        ["filtering", "libraries", "limit", "requesting", "unrated"],
+        "an empty list means nothing was written and this asserts nothing; a field \
+         beside these means what an offer reports about an account gained somewhere \
+         to carry a password"
     );
 }
