@@ -94,6 +94,20 @@ pub struct Arguments {
     /// The completed download the client is to be asked to let go, by the name both
     /// sides use.
     pub download: Option<String>,
+    /// What is to happen to what the household asks for, as it is written.
+    ///
+    /// A word rather than a switch, for the reason `unrated` is one: there are three
+    /// answers rather than two, and a word this build does not know is refused by name
+    /// instead of falling to whichever arrangement the shape happened to default to.
+    pub policy: Option<String>,
+    /// How many requests a period allows.
+    pub requests: Option<u32>,
+    /// How long that period is, in days.
+    pub days: Option<u32>,
+    /// The request being ruled on, by the number the request service files it under.
+    pub request: Option<i64>,
+    /// Why a request is being turned down.
+    pub reason: Option<String>,
 }
 
 /// Whether a run includes the checks that disturb a running system.
@@ -382,10 +396,49 @@ pub const TAKES_ARCHIVE: &[&str] = &["restore"];
 
 /// The actions that are about a person rather than a form, a file or a service.
 ///
-/// The whole of one errand: offering somebody an account, letting its password be set
-/// again, and taking it away. Nothing else on this surface is addressed to a member of
-/// the household.
-pub const TAKES_NAME: &[&str] = &["invite", "reissue", "remove"];
+/// Four. Three of them are one errand — offering somebody an account, letting its
+/// password be set again, and taking it away — and each of those *requires* a name,
+/// because a request addressed to nobody has lost its subject.
+///
+/// The fourth is not that errand and does not require one. Choosing what may be asked
+/// for is a decision about the household, and naming somebody narrows it to them: a
+/// choice with nobody named is the household's own, which is a request rather than an
+/// omission. So the name is optional there and refused nowhere else, which is exactly
+/// what this list says and [`crate::actions::named`] enforces separately.
+pub const TAKES_NAME: &[&str] = &["invite", "reissue", "remove", "household-allow"];
+
+/// The action whose command carries what the household may ask for.
+///
+/// One, and all three arguments belong to it because they are one decision: a policy
+/// without a limit is half of "within a limit", and a limit without a policy is a count
+/// nothing acts on. Named to anything else they would be a decision about a household
+/// that is not being made.
+///
+/// The two numbers are one group rather than two because neither means anything alone —
+/// "five" is not a limit and "a week" is not a limit, and the command line refuses
+/// either without the other before this is reached.
+pub const TAKES_POLICY: &[&str] = &["household-allow"];
+
+/// The actions whose command carries the request being ruled on.
+///
+/// Two, and the number is required of both: a decision with no request has lost its
+/// subject, and answering it with every waiting request would rule on things nobody
+/// mentioned.
+///
+/// Apart from [`TAKES_POLICY`] although both are about what a household may ask for,
+/// because they are different errands. One settles what happens to everything from now
+/// on; these settle one thing somebody already asked for. An action that took one for
+/// the other would have an operator setting a limit and finding they had approved
+/// something.
+pub const TAKES_REQUEST: &[&str] = &["household-approve", "household-decline"];
+
+/// The action whose command carries why a request was turned down.
+///
+/// **One, and it is not the pair.** An approval owes the person who asked the thing
+/// they asked for; a refusal owes them a sentence. So a reason named to an approval is
+/// refused by name here rather than accepted and dropped — and the core carries it
+/// inside the variant that needs it, so a refusal cannot be built without one at all.
+pub const TAKES_REASON: &[&str] = &["household-decline"];
 
 /// The action whose command carries what the person being invited may watch.
 ///
@@ -444,7 +497,7 @@ pub const TAKES_TERM: &[&str] = &["search"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 28] = [
+    let carried: [(&str, bool, &[&str]); 33] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -481,6 +534,11 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("term", given.term.is_some(), TAKES_TERM),
         ("season", given.season.is_some(), TAKES_TERM),
         ("download", given.download.is_some(), TAKES_DOWNLOAD),
+        ("policy", given.policy.is_some(), TAKES_POLICY),
+        ("requests", given.requests.is_some(), TAKES_POLICY),
+        ("days", given.days.is_some(), TAKES_POLICY),
+        ("request", given.request.is_some(), TAKES_REQUEST),
+        ("reason", given.reason.is_some(), TAKES_REASON),
     ];
     if !offered.contains(&action) {
         return None;

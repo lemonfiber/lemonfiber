@@ -262,17 +262,28 @@ pub enum Request {
         #[arg(long)]
         search: bool,
     },
-    /// Show who is in the household, what each may watch, and what each asked for.
+    /// Show who is in the household, what each may watch and ask for, and what each
+    /// asked for.
     ///
     /// Everybody the media server holds an account for — including those who have
     /// asked for nothing, and the invitations nobody has taken up yet. Each person
     /// carries what they may watch and when they were last seen; their requests read
     /// in the words they would use rather than the services' own, and each named one
     /// links to its full trace.
+    ///
+    /// Each person also carries what they may ask for: how much a period allows them,
+    /// how much of it is gone, and when there is room again. A request nobody has ruled
+    /// on shows how long it has been waiting and about how much room it would want.
+    ///
+    /// Name one of the three things underneath to change any of that, or to answer one
+    /// request that is waiting.
     Household {
         /// Narrow to one member, named the way you would say it.
         #[arg(long)]
         member: Option<String>,
+        /// Decide what the household may ask for, or answer one waiting request.
+        #[command(subcommand)]
+        action: Option<HouseholdCommand>,
     },
     /// Add one thing, end to end, and watch every step of it happen.
     ///
@@ -464,6 +475,56 @@ pub enum Request {
         /// Accept re-pointing to this machine's data root where it differs.
         #[arg(long)]
         repoint: bool,
+    },
+}
+
+/// What can be decided about what the household may ask for.
+///
+/// Three, and they are two different errands. Choosing a policy settles what happens to
+/// everything asked for from now on; approving and declining settle one thing somebody
+/// has already asked for, which is why each names a request and the choice does not.
+#[derive(Debug, Subcommand)]
+pub enum HouseholdCommand {
+    /// Choose what happens to what the household asks for, and how much it may ask.
+    ///
+    /// Naming only a limit leaves the policy alone, and naming only a policy leaves the
+    /// limit alone — saying nothing about something is not choosing it.
+    ///
+    /// Television is counted a season at a time, because that is how the request service
+    /// counts it: one ask for a six-season series spends six.
+    Allow {
+        /// Set it for one person instead of for the whole household.
+        #[arg(long)]
+        member: Option<String>,
+        /// What happens to a request: trusted, within-a-limit, or everything-waits.
+        #[arg(long)]
+        policy: Option<String>,
+        /// How many requests a period allows. Needs `--days` beside it.
+        #[arg(long, requires = "days")]
+        requests: Option<u32>,
+        /// How long that period is, in days. Needs `--requests` beside it.
+        #[arg(long, requires = "requests")]
+        days: Option<u32>,
+    },
+    /// Let one waiting request through, by the number the household list gives it.
+    ///
+    /// Refused where there is no room left on the disk, and said as the disk rather
+    /// than as anybody's limit — raising a limit would change nothing.
+    Approve {
+        /// The request, by the number beside it.
+        request: i64,
+    },
+    /// Turn one waiting request down, saying why.
+    ///
+    /// The reason is required and it does not travel: the request service tells whoever
+    /// asked that it was declined and carries no reason with it, so what you write here
+    /// is yours to pass on.
+    Decline {
+        /// The request, by the number beside it.
+        request: i64,
+        /// Why, in a few words.
+        #[arg(long, required = true)]
+        reason: String,
     },
 }
 

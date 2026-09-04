@@ -17,13 +17,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+mod asking;
 mod members;
 mod records;
 
-use members::{
-    approves_own, without_approval, MemberResource, PermissionsResource, LINK_MEMBERS, MEMBERS,
-    NOT_FOUND, PERMISSIONS,
-};
+use members::{approves_own, MemberResource, LINK_MEMBERS, MEMBERS, NOT_FOUND};
 use records::{RequestPage, RequestRecord, REQUEST_PAGE};
 
 use crate::endpoint::Endpoint;
@@ -453,21 +451,10 @@ impl Requests for Seerr {
     }
 
     async fn approval_first(&self, id: &str) -> Result<(), Failure> {
-        let path = format!("{MEMBERS}/{id}/{PERMISSIONS}");
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, &path, None))
-            .await?;
-        let held: PermissionsResource = self
-            .endpoint
-            .decode(&response, "what this member may ask for could not be read")?;
-        let body =
-            serde_json::json!({ "permissions": without_approval(held.permissions) }).to_string();
-        let written = self
-            .endpoint
-            .send(&self.request(Method::Post, &path, Some(body)))
-            .await?;
-        self.endpoint.expect_success(&written)
+        // The same write the approval port makes, asked for the other way round: this
+        // is that call with the answer already decided, and a second implementation of
+        // it would be a second reading of which bits approval is.
+        crate::ports::service::Approving::approves_own(self, id, false).await
     }
 
     async fn remove_member(&self, id: &str) -> Result<(), Failure> {

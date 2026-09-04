@@ -12,6 +12,7 @@
 pub const API_VERSION: u32 = 1;
 
 mod admission;
+mod asking;
 mod checking;
 mod door;
 mod envelope;
@@ -28,6 +29,7 @@ mod upgrade;
 mod walkthrough;
 
 pub use admission::*;
+pub use asking::*;
 pub use checking::*;
 pub use door::*;
 pub use envelope::*;

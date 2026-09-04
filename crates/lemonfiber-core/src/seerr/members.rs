@@ -54,6 +54,15 @@ pub(super) const PERMISSIONS: &str = "settings/permissions";
 /// powerful account its most restricted one.
 const APPROVES_OWN: u64 = 2 | 128 | 256 | 512 | 32_768 | 65_536 | 131_072;
 
+/// The one of them a grant sets, which is the plain `AUTO_APPROVE`.
+///
+/// One bit rather than the set, because the set is not all one thing. `ADMIN` is in it
+/// because an administrator holds every permission, and granting approval by granting
+/// that would hand somebody the media server's address along with it. The four narrower
+/// forms are about 4K and about one media type; granting the plain one covers what a
+/// household means and leaves the narrower answers to whoever wanted them.
+const GRANTS_APPROVAL: u64 = 128;
+
 /// One account this service holds, in the spelling it answers with.
 #[derive(Deserialize)]
 pub(super) struct MemberResource {
@@ -96,9 +105,19 @@ pub(super) const fn without_approval(permissions: u64) -> u64 {
     permissions & !APPROVES_OWN
 }
 
+/// The same permissions with the approval put on, and nothing else changed.
+///
+/// The inverse of the above, and deliberately not its mirror: taking approval off takes
+/// every form of it, and putting it on puts one back. Setting the whole set would make
+/// an administrator of somebody who was only meant to stop waiting for one.
+#[must_use]
+pub(super) const fn with_approval(permissions: u64) -> u64 {
+    permissions | GRANTS_APPROVAL
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{approves_own, without_approval, APPROVES_OWN};
+    use super::{approves_own, with_approval, without_approval, APPROVES_OWN};
 
     /// An account holding the plain approval bit approves its own requests.
     #[test]
@@ -129,6 +148,25 @@ mod tests {
 
         assert_eq!(left, 32 | 64 | 4_194_304);
         assert!(!approves_own(left));
+    }
+
+    /// Putting the approval on puts one form of it on, and makes nobody an
+    /// administrator on the way.
+    ///
+    /// Taking it off takes every form; putting it on puts one back. A grant that set
+    /// the whole set would hand somebody the media server's address along with a
+    /// shorter wait.
+    #[test]
+    fn putting_the_approval_on_makes_nobody_an_administrator() {
+        // `REQUEST` and `CREATE_ISSUES`, which is an ordinary member's shape.
+        let held = 32 | 4_194_304;
+
+        let granted = with_approval(held);
+
+        assert!(approves_own(granted));
+        assert_eq!(granted & 2, 0, "the grant made them an administrator");
+        assert_eq!(granted & held, held, "the grant took something away");
+        assert!(!approves_own(without_approval(granted)));
     }
 
     /// Every bit named is one the reading actually turns on.

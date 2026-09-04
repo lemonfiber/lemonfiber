@@ -38,6 +38,55 @@ pub struct Allowance {
     pub unrated: Option<crate::ports::service::Unrated>,
 }
 
+/// What a household is to be allowed to ask for, and who the choice is about.
+///
+/// One value over three answers because they are one decision: a policy without a limit
+/// is half of "within a limit", and a limit without somebody to hold to it is a number
+/// nobody is held to. Every surface asks all three at once for that reason.
+///
+/// **Nothing said is nothing changed.** A run that named only a limit is not a run that
+/// chose to trust everybody; it is a run that said nothing about the policy, which leaves
+/// whatever the household already had. A value written here for something nobody typed
+/// would be a surface deciding on the household's behalf.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Chosen {
+    /// Whose it is about, matched the way a name is typed — or the whole household
+    /// where absent.
+    pub member: Option<String>,
+    /// What is to happen to what they ask for. `None` leaves the policy in force.
+    pub policy: Option<crate::asking::Policy>,
+    /// How much a period allows. `None` leaves whatever limit is in force.
+    pub quota: Option<crate::ports::service::Quota>,
+}
+
+/// What is being done about one request that is waiting on somebody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Decision {
+    /// The request, by the number the request service files it under.
+    ///
+    /// A number rather than a title: a household asks for the same film twice under two
+    /// spellings, and a decision that matched on words could rule on the wrong one.
+    pub request: i64,
+    /// Which way it goes.
+    pub answer: Answer,
+}
+
+/// The two ways a waiting request can go.
+///
+/// The reason sits inside the variant that needs one rather than beside both, so a
+/// refusal cannot be constructed without one — which is what a decline owes the person
+/// who asked, and is stronger here than a check somebody could forget to make.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Answer {
+    /// Let it through.
+    LetThrough,
+    /// Turn it down, with what the person who asked is owed.
+    TurnedDown {
+        /// Why, in the operator's own words.
+        reason: String,
+    },
+}
+
 /// What a surface is asking for.
 ///
 /// Deliberately exhaustive. The surfaces ship in the same binary, so a new
@@ -203,6 +252,19 @@ pub enum Command {
         /// The member to narrow to, or every member where absent.
         member: Option<String>,
     },
+    /// Choose what the household may ask for — the policy, the limit, or both, for
+    /// everybody or for one person.
+    ///
+    /// Answers with the household as it now stands rather than with a report of its
+    /// own, the way a forget answers with what is left: what an operator wants to see
+    /// after changing a limit is the limit, on the people it applies to.
+    Allowing(Chosen),
+    /// Rule on one request that is waiting, letting it through or turning it down.
+    ///
+    /// Apart from [`Command::Allowing`] because they are different errands: one settles
+    /// what a household may ask for from now on, and this settles one thing somebody
+    /// already asked for. Answers with the household for the same reason that one does.
+    Deciding(Decision),
     /// List the items whose downloads are stuck, each named so it links to its own
     /// trace — the landing point for "N items stuck".
     Stuck,

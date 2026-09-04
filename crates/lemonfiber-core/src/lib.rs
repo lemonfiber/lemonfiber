@@ -48,6 +48,7 @@ pub mod agreement;
 pub mod alert;
 pub mod app;
 pub mod archive;
+pub mod asking;
 pub mod audio;
 pub mod audiobookshelf;
 pub mod backup;

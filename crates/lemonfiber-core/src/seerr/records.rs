@@ -37,11 +37,20 @@ pub(super) struct PageInfo {
     pub(super) results: usize,
 }
 
-/// One request as Seerr records it: what became of it, what became of the media it
-/// asked for, who asked, and — once it has been handed over — which \*arr item it is.
+/// One request as Seerr records it: the number it is filed under, when it was asked
+/// for, what became of it, what became of the media it asked for, who asked, and —
+/// once it has been handed over — which \*arr item it is.
+///
+/// The number is read because a decision has to name one, and the date because two
+/// questions turn on it: how long somebody has been waiting on an answer, and when the
+/// window a count runs over lets go of this request.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct RequestRecord {
+    #[serde(default)]
+    pub(super) id: i64,
+    #[serde(default)]
+    pub(super) created_at: Option<String>,
     #[serde(default)]
     pub(super) status: u8,
     #[serde(default, rename = "type")]
@@ -77,6 +86,8 @@ impl RequestRecord {
     /// that files it — television or film, or nothing for a kind this build does not know.
     pub(super) fn into_request(self) -> HouseholdRequest {
         HouseholdRequest {
+            id: self.id,
+            made: self.created_at,
             member: self.requested_by.display_name,
             kind: match self.media_type.as_str() {
                 "tv" => Some(Kind::Sonarr),

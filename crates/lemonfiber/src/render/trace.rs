@@ -61,6 +61,12 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
     } else if !report.members.is_empty() {
         lines.spaced(counted(report));
     }
+    // What happens to what anybody asks for, said once under the list rather than on
+    // every line: it is one arrangement for the house, and repeating it per member
+    // would read as a per-member setting.
+    if let Some(policy) = report.policy {
+        lines.put(format!("  {}", allowed(policy, report.allows.as_deref())));
+    }
     // What the limits above are, and what they are not — said where anybody carries
     // one, because the reader who most needs it is the parent who set it.
     if let Some(filtering) = &report.filtering {
@@ -86,9 +92,35 @@ fn asked_for(request: &MemberRequest) -> String {
             .clone()
             .map_or_else(|| "something".to_owned(), |media| format!("a {media}"))
     });
-    match request.state {
-        Some(state) => format!("  {name}   {}", state.phrase()),
-        None => format!("  {name}   the request service reports a state this build does not know"),
+    let said = match request.state {
+        Some(state) => state.phrase().to_owned(),
+        None => "the request service reports a state this build does not know".to_owned(),
+    };
+    format!("  #{} {name}   {said}{}", request.id, pending(request))
+}
+
+/// What is worth saying about a request nobody has ruled on yet, and nothing about
+/// one that has been.
+///
+/// How long it has waited and about what it would take, which are the two things
+/// somebody deciding needs and nobody deciding wants. On a request already answered
+/// they are noise: the wait is over and the cost is already being paid.
+fn pending(request: &MemberRequest) -> String {
+    let mut said = Vec::new();
+    if let Some(days) = request.waiting_days {
+        said.push(format!("waiting {days} day(s)"));
+    }
+    // Only where it is still a decision. The word is carried on the figure rather than
+    // added here, so every surface hedges it the same way.
+    if request.waiting_days.is_some() {
+        if let Some(estimate) = request.estimate {
+            said.push(estimate.reading());
+        }
+    }
+    if said.is_empty() {
+        String::new()
+    } else {
+        format!("   ({})", said.join(", "))
     }
 }
 
@@ -117,6 +149,18 @@ fn counted(report: &HouseholdReport) -> String {
         "{} member(s), {requests} request(s){invitations}.",
         report.members.len()
     )
+}
+
+/// What happens to what the household asks for, and how much of it it may ask.
+///
+/// The limit is said beside the policy rather than under it, because the two are one
+/// arrangement: "everything arrives" and "within five a week" are different promises,
+/// and a reader shown only the first has been told the wrong one.
+fn allowed(policy: lemonfiber_core::asking::Policy, allows: Option<&str>) -> String {
+    match allows {
+        Some(allows) => format!("Requests: {} — {allows}.", policy.means()),
+        None => format!("Requests: {}.", policy.means()),
+    }
 }
 
 /// What one member's account says about them, on the line beside their name.
@@ -171,6 +215,13 @@ fn standing(member: &HouseholdMember) -> String {
     // in a finding at the foot: half a limit looks exactly like a whole one.
     if member.access.restriction.disagrees() {
         said.push(member.access.restriction.phrase().to_owned());
+    }
+    // What they may *ask for*, beside what they may watch, because the two are one
+    // question about the same person and read apart they look like two people. Absent
+    // where the request service holds no account for them, which is an invitation
+    // nobody has used rather than somebody nothing limits.
+    if let Some(asking) = &member.asking {
+        said.push(asking.standing.phrase().to_owned());
     }
     said.push(if member.claimed {
         member
@@ -586,18 +637,27 @@ mod tests {
                         title: Some("The Expanse".to_owned()),
                         media: Some("series".to_owned()),
                         state: Some(lemonfiber_core::household::State::Here),
+                        id: 0,
+                        waiting_days: None,
+                        estimate: None,
                     },
                     // No service holds it yet, so it is named by what it is.
                     MemberRequest {
                         title: None,
                         media: Some("film".to_owned()),
                         state: Some(lemonfiber_core::household::State::WaitingForApproval),
+                        id: 0,
+                        waiting_days: None,
+                        estimate: None,
                     },
                     // Neither a title nor a kind this build knows.
                     MemberRequest {
                         title: None,
                         media: None,
                         state: None,
+                        id: 0,
+                        waiting_days: None,
+                        estimate: None,
                     },
                 ],
                 access: MemberAccess {
@@ -606,10 +666,13 @@ mod tests {
                 },
                 last_seen: Some("2026-08-30T10:00:00.0000000Z".to_owned()),
                 claimed: true,
+                asking: None,
             }],
             available: true,
             findings: vec!["a library could not be read".to_owned()],
             filtering: None,
+            policy: None,
+            allows: None,
         };
         let text = household(&report).text();
         // The name carries what they may watch and when they were last seen, because
@@ -647,6 +710,8 @@ mod tests {
             available: true,
             findings: Vec::new(),
             filtering: None,
+            policy: None,
+            allows: None,
         };
 
         let text = household(&report).text();
@@ -697,6 +762,8 @@ mod tests {
                 available: true,
                 findings: Vec::new(),
                 filtering: None,
+                policy: None,
+                allows: None,
             };
 
             let text = household(&report).text();
@@ -728,6 +795,8 @@ mod tests {
             available: true,
             findings: Vec::new(),
             filtering: None,
+            policy: None,
+            allows: None,
         };
 
         let said = household(&report).text();
@@ -756,6 +825,8 @@ mod tests {
             available: true,
             findings: Vec::new(),
             filtering: None,
+            policy: None,
+            allows: None,
         };
 
         // Bound once rather than called again in the message: an argument only
@@ -789,6 +860,8 @@ mod tests {
             available: true,
             findings: Vec::new(),
             filtering: None,
+            policy: None,
+            allows: None,
         };
 
         let text = household(&report).text();
@@ -809,6 +882,8 @@ mod tests {
             available: true,
             findings: Vec::new(),
             filtering: None,
+            policy: None,
+            allows: None,
         };
         // Empty means the media server holds nobody, not that nobody has asked for
         // anything — the list is of members now, so those are different sentences.
@@ -821,6 +896,8 @@ mod tests {
             available: false,
             findings: vec!["could not be read".to_owned()],
             filtering: None,
+            policy: None,
+            allows: None,
         };
         let text = household(&unread).text();
         assert!(!text.contains("Nobody has asked"));
@@ -874,6 +951,8 @@ mod tests {
             available: true,
             findings: Vec::new(),
             filtering: Some("a content filter, not a security boundary".to_owned()),
+            policy: None,
+            allows: None,
         }
     }
 

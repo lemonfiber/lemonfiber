@@ -516,6 +516,9 @@ mod tests {
                         title: Some(format!("A film {at}")),
                         media: Some("film".to_owned()),
                         state: *state,
+                        id: 0,
+                        waiting_days: None,
+                        estimate: None,
                     })
                     .collect(),
                 ..HouseholdMember::default()
@@ -523,6 +526,8 @@ mod tests {
             available: true,
             findings: Vec::new(),
             filtering: None,
+            policy: None,
+            allows: None,
         })
     }
 
@@ -592,6 +597,8 @@ mod tests {
             available: false,
             findings: vec!["seerr did not answer".to_owned()],
             filtering: None,
+            policy: None,
+            allows: None,
         });
         let said = said(&household(&unread, WIDE));
 

@@ -23,10 +23,11 @@ use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::{self, Kept};
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Allowance, Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Allowance, Answer, Chosen, Command, Decision, QualityAction, Waiting};
+use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
-use lemonfiber_core::ports::service::Unrated;
+use lemonfiber_core::ports::service::{Quota, Unrated};
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
@@ -58,6 +59,9 @@ pub const OFFERED: &[&str] = &[
     "invite",
     "remove",
     "reissue",
+    "household-allow",
+    "household-approve",
+    "household-decline",
     "support",
     "restore",
     "watch",
@@ -240,6 +244,11 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         term,
         season,
         download,
+        policy,
+        requests,
+        days,
+        request,
+        reason,
     } = given;
     match action {
         // Starting named services and bringing a form up are different requests
@@ -327,6 +336,19 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
                 consent,
             }),
             None => Err(needs("archive")),
+        },
+        // What a household may ask for, and one thing it already asked for. Both
+        // answer with the household as it now stands rather than with a report of
+        // their own, so what a browser is shown after a change is the change.
+        //
+        // Naming nobody is the household's own choice rather than an omission, which
+        // is why this is the one action addressed to a person that does not require
+        // one — and why the refusal for a missing name is not reached from here.
+        "household-allow" => allowing(name, policy.as_deref(), requests, days),
+        "household-approve" => deciding(action, request, Answer::LetThrough),
+        "household-decline" => match reason {
+            Some(reason) => deciding(action, request, Answer::TurnedDown { reason }),
+            None => Err(needs("reason")),
         },
         "watch" => Ok(Command::Watch { forms }),
         // Naming nothing is a request rather than an omission: a walk asked for
@@ -501,6 +523,60 @@ fn following(term: Option<String>, season: Option<u32>) -> Result<Command, Refus
         season,
         searching: true,
     })
+}
+
+/// What the household is to be allowed to ask for, or why the words name nothing.
+///
+/// The two numbers arrive as a pair or not at all: half a limit is not a limit, and one
+/// half accepted alone would be a household held to a figure over no period, or to no
+/// figure over one. Refused rather than completed with a length of this surface's
+/// choosing, which is the same refusal the command line makes with `requires`.
+fn allowing(
+    member: Option<String>,
+    policy: Option<&str>,
+    requests: Option<u32>,
+    days: Option<u32>,
+) -> Result<Command, Refused> {
+    let chosen = match policy {
+        None => None,
+        Some(written) => {
+            Some(
+                Policy::from_label(written).ok_or_else(|| Refused::Unrecognised {
+                    argument: "policy".to_owned(),
+                    offered: format!("try {}", Policy::labels()),
+                })?,
+            )
+        }
+    };
+    let quota = match (requests, days) {
+        (Some(requests), Some(days)) => Some(Quota { requests, days }),
+        (None, None) => None,
+        (None, Some(_)) => return Err(missing("household-allow", "requests")),
+        (Some(_), None) => return Err(missing("household-allow", "days")),
+    };
+    Ok(Command::Allowing(Chosen {
+        member,
+        policy: chosen,
+        quota,
+    }))
+}
+
+/// Ruling on one waiting request, or why it rules on none.
+///
+/// The number is required for the reason a trace's term is: a decision with no request
+/// has lost its subject, and answering it with every waiting request would rule on
+/// things nobody mentioned.
+fn deciding(action: &str, request: Option<i64>, answer: Answer) -> Result<Command, Refused> {
+    let request = request.ok_or_else(|| missing(action, "request"))?;
+    Ok(Command::Deciding(Decision { request, answer }))
+}
+
+/// The refusal for an argument an action cannot do without.
+fn missing(action: &str, argument: &str) -> Refused {
+    Refused::Missing {
+        action: action.to_owned(),
+        argument: argument.to_owned(),
+    }
 }
 
 /// A quality choice, which is two commands depending on what it is about.
