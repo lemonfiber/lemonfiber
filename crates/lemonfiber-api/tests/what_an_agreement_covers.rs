@@ -43,11 +43,11 @@ fn bundling(write: bool, reveal: &[&str], confirm: bool) -> Arguments {
     }
 }
 
-// ── Seven actions carry an agreement, and every one of them can be given it ────
+// ── The actions that carry an agreement, and every one can be given it ─────────
 
 #[test]
 fn every_action_the_table_names_accepts_the_agreement_it_names_them_for() {
-    // The table's own claim, which is the only one all seven share: this is the list
+    // The table's own claim, which is the only one all of them share: this is the list
     // of names whose command has somewhere to put a yes. An entry that did not
     // would refuse the very argument the table says it takes.
     for action in TAKES_AGREEMENT {

@@ -307,6 +307,7 @@ mod tests {
     /// about filled in generously.
     fn facts(kind: FsKind, removable: bool) -> StorageFacts {
         StorageFacts {
+            point: PathBuf::from("/"),
             kind,
             removable,
             available: AMPLE,

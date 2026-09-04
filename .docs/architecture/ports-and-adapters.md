@@ -44,6 +44,7 @@ Held as `Arc<dyn …>` and faked in every test that does not want the real thing
 | `ports::http` | `Http` | Any HTTP request, which every service client is built on |
 | `ports::narration` | `Narrator` | Where a long wait says what it is waiting for, for a surface to render |
 | `ports::network` | `Site` | What this machine calls itself, which is the name another device on the network asks for it by |
+| `ports::occupancy` | `Occupancy` | What a directory tree actually holds, file by file, with the identity that says which of them are one file |
 | `ports::nntp` | `Nntp` | A Usenet provider, dialled directly to prove the credential works |
 | `ports::process` | `Runner` | Spawned programs, which is how Compose is driven |
 | `ports::random` | `Random` | The entropy a minted credential is drawn from |
@@ -139,7 +140,7 @@ would add over the real thing and the secret-file mode handling has to be real.
 | `adapters::process::Local` | Real. `tokio::process`, four tests. |
 | `adapters::time::System` | Real. |
 | `adapters::docker::Daemon` | Real. `bollard`; see [engine-api.md](engine-api.md). |
-| `adapters::filesystem::Disk` | Real. Standard-library I/O; `sysinfo` for the filesystem type. Implements `Volume` too. |
+| `adapters::filesystem::Disk` | Real. Standard-library I/O; `sysinfo` for the filesystem type. Implements `Volume`, `Eraser` and `Occupancy` too. |
 | `adapters::http::Web` | Real. `reqwest` + `rustls`, with connect and request timeouts and a host-scoped cookie store for session-auth services. |
 | `adapters::network::Here` | Real. `hostname` through the process port, so there stays one place in this workspace that spawns anything. |
 | `nntp` (binary crate) | Real. `tokio-rustls` for a TLS-wrapped NNTP dial; lives in the binary crate, not core. |

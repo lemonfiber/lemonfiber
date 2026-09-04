@@ -92,6 +92,14 @@ pub const OUTBOUND: &str = "/api/outbound";
 /// in front of it and cannot see the host at all.
 pub const STORED: &str = "/api/stored";
 
+/// Where the disk stands, where the room went, and what could be got back.
+///
+/// A read rather than the action of the same name, and the two answer with the same
+/// document: the accounting is what a browser is shown, and what a browser agrees
+/// to afterwards is what the accounting named. A read never removes anything, so
+/// this one reaches the command with nothing confirmed.
+pub const SPACE: &str = "/api/space";
+
 /// Which app to watch on, for each kind of device somebody in the house has.
 ///
 /// The same answer on every machine — the client landscape belongs to the
@@ -132,7 +140,7 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
     VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, FRONT_DOOR, TRACE, STUCK, CONFIG,
-    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, CLIENTS,
+    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, SPACE, CLIENTS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -229,6 +237,10 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         BACKUPS => Ok(Command::Archives),
         OUTBOUND => Ok(Command::Outbound),
         STORED => Ok(Command::Stored),
+        // Nothing confirmed, because a read never takes anything: what this answers
+        // with is the account and the offer, and the action beside it is where an
+        // answer to that offer goes.
+        SPACE => Ok(Command::Space { confirm: false }),
         CLIENTS => Ok(Command::Clients),
         _ => Err(NO_SUCH_READ),
     }

@@ -103,9 +103,25 @@ impl FileSystem for Disk {
 
 #[async_trait]
 impl Eraser for Disk {
+    /// A tree or a single file, decided by asking rather than by trying.
+    ///
+    /// The port says "this path and everything beneath it", and a path with nothing
+    /// beneath it is a file — which the tree removal refuses with a message about
+    /// directories that would reach the operator as though something were wrong with
+    /// their disk. Read first and remove accordingly: what is not there is already
+    /// removed, and anything the metadata read itself refuses is the platform's own
+    /// answer about a path nobody can act on.
     async fn erase(&self, path: &Path) -> Result<(), Fault> {
-        match std::fs::remove_dir_all(path) {
+        let removed = match std::fs::symlink_metadata(path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(fault(&error)),
+            Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(path),
+            Ok(_) => std::fs::remove_file(path),
+        };
+        match removed {
             Ok(()) => Ok(()),
+            // Something else removed it between the reading and the removal, which is
+            // the outcome asked for either way.
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(fault(&error)),
         }
@@ -134,7 +150,7 @@ fn fault(error: &std::io::Error) -> Fault {
 /// A file's identity as Unix reports it: its inode and how many names point at
 /// it.
 #[cfg(unix)]
-fn identity_of(meta: &std::fs::Metadata) -> Identity {
+pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
     use std::os::unix::fs::MetadataExt as _;
 
     Identity {
@@ -194,7 +210,7 @@ fn volume_of(_meta: &std::fs::Metadata) -> u64 {
 /// caller reads as being unable to confirm the link rather than as a failure to
 /// make one.
 #[cfg(windows)]
-fn identity_of(meta: &std::fs::Metadata) -> Identity {
+pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
     use std::os::windows::fs::MetadataExt as _;
 
     Identity {
@@ -315,15 +331,37 @@ mod tests {
         assert!(Disk.erase(&dir).await.is_ok());
     }
 
-    /// A path that is not a directory is the platform's own refusal, carried
-    /// verbatim — it is what the operator needs in order to finish by hand.
+    /// A path with nothing beneath it is a file, and the port's promise covers it.
+    ///
+    /// The tree removal refuses one with a message about directories, which would
+    /// reach an operator as though something were wrong with their disk — so which
+    /// removal to make is decided by reading the path rather than by trying one and
+    /// reporting what it said.
     #[tokio::test]
-    async fn a_tree_that_will_not_go_comes_back_in_the_platforms_own_words() {
+    async fn a_single_file_goes_the_way_a_tree_does() {
+        let dir = scratch();
+        let file = dir.join("on-its-own");
+        assert!(Disk.touch(&file).await.is_ok());
+
+        assert!(Disk.erase(&file).await.is_ok());
+        assert!(!file.exists());
+        assert!(
+            Disk.erase(&file).await.is_ok(),
+            "and again is not a failure"
+        );
+    }
+
+    /// A path nobody can act on is the platform's own refusal, carried verbatim —
+    /// it is what the operator needs in order to finish by hand.
+    #[tokio::test]
+    async fn a_path_that_will_not_go_comes_back_in_the_platforms_own_words() {
         let dir = scratch();
         let file = dir.join("not-a-directory");
         assert!(Disk.touch(&file).await.is_ok());
 
-        let refused = Disk.erase(&file).await;
+        // Beneath a file rather than beneath a directory, which is neither a path
+        // that is there nor one that is plainly absent.
+        let refused = Disk.erase(&file.join("under-it")).await;
         assert!(
             refused.is_err_and(|fault| !fault.message.is_empty()),
             "the platform said nothing about refusing"

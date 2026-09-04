@@ -127,6 +127,20 @@ static AFTER: &[Errand] = &[
         accepts: None,
         going: Going::Agreed,
     },
+    Errand {
+        name: "the disk accounted for",
+        about: "where the room went, when it runs out, and what can go for nothing",
+        action: "space",
+        asks: "Remove what costs nothing, as listed above",
+        needs: Needs::Nothing,
+        accepts: None,
+        // Agreed rather than once, and this is the row the ordering above is most
+        // about: the run before the question is the whole account, so what is agreed
+        // to is a list somebody read rather than a promise about one. Nothing that
+        // costs anything is ever in it — a torrent still seeding is named with what
+        // removing it does to a tracker's opinion and left alone.
+        going: Going::Agreed,
+    },
 ];
 
 /// The errands, the one the list opens on apart from the rest.

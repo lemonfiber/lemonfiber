@@ -126,6 +126,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         kind::SEED,
         schema_for!(Envelope<crate::seed::Report>),
     );
+    describing(
+        kinds,
+        kind::SPACE,
+        schema_for!(Envelope<crate::space::Reckoning>),
+    );
     describing(kinds, kind::STATUS, schema_for!(Envelope<StatusReport>));
     describing(kinds, kind::STORED, schema_for!(Envelope<Stored>));
     describing(kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
@@ -193,7 +198,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 32;
+    const OUTCOMES: usize = 33;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -360,6 +365,7 @@ mod tests {
                     }],
                 },
             )),
+            Outcome::Space(a_reckoning()),
             Outcome::Wizard(a_setup_part_way()),
             Outcome::Archives(crate::app::archives::Listing {
                 archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
@@ -412,6 +418,58 @@ mod tests {
                 destination: "the indexers you configured".to_owned(),
                 purpose: "runs the searches everything else asks for".to_owned(),
             }],
+        }
+    }
+
+    /// A reckoning with every optional half of its shape filled: a volume whose
+    /// reading goes stale, both kinds of accounting line, a candidate carrying the
+    /// consequence of removing it, an outsized file, an interrupted import, and
+    /// what a confirmed cleanup came to.
+    fn a_reckoning() -> crate::space::Reckoning {
+        let measured = crate::space::Measured {
+            volumes: vec![crate::space::Volume::measured(
+                crate::space::Role::Data,
+                std::path::Path::new("/srv/media"),
+                &crate::ports::filesystem::StorageFacts {
+                    point: std::path::PathBuf::from("/srv"),
+                    kind: crate::ports::filesystem::FsKind::classify("nfs"),
+                    removable: false,
+                    available: 40_000_000_000,
+                    total: 400_000_000_000,
+                },
+                35_000_000_000,
+                1_700_000_000,
+            )],
+            root: std::path::PathBuf::from("/srv/media"),
+            data: vec![crate::ports::occupancy::Occupant {
+                path: std::path::PathBuf::from("/srv/media/downloads/A.Release/a.mkv"),
+                bytes: 90_000_000_000,
+                identity: Some(crate::ports::filesystem::Identity { file: 41, links: 1 }),
+            }],
+            services: Vec::new(),
+            landing: 35_000_000_000,
+            held: vec![crate::ports::service::Seeded {
+                name: "A.Release".to_owned(),
+                bytes: 90_000_000_000,
+                ratio: 175,
+            }],
+            awaited: std::collections::BTreeSet::from(["A.Release".to_owned()]),
+            stalled: vec![crate::space::Stalled {
+                name: "A.Release".to_owned(),
+                said: Some("No space left on device".to_owned()),
+            }],
+            marked: std::collections::BTreeSet::new(),
+        };
+        crate::space::Reckoning {
+            reclaimed: Some(crate::space::Reclaimed {
+                gone: vec!["/srv/media/downloads/Gone/a.rar".to_owned()],
+                bytes: 400,
+                left: vec![crate::space::Left {
+                    at: "/srv/media/downloads/Held/a.rar".to_owned(),
+                    why: "permission denied".to_owned(),
+                }],
+            }),
+            ..crate::space::reckon(&measured)
         }
     }
 

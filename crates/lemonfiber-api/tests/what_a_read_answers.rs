@@ -691,3 +691,58 @@ async fn what_leaves_this_machine_carries_the_switch_beside_each_request() {
         "the list a browser is served"
     );
 }
+
+/// A machine whose data location is a real directory this test made, holding one
+/// file — so the walk has something to answer about.
+///
+/// The volume itself is described through a fake rather than by this machine's own
+/// disk, and that is what makes the parity below mean anything: the free space on a
+/// real volume moves between two readings taken a moment apart, so comparing what a
+/// browser is served against what a shell prints would be comparing two moments and
+/// would fail on a machine that happened to be busy.
+fn measuring(named: &str) -> Ctx {
+    let dir = std::env::temp_dir().join(format!("lemonfiber-space-{}-{named}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(dir.join("films"));
+    let _ = std::fs::write(dir.join("films").join("a.mkv"), "0123456789");
+    holding(
+        running(),
+        stack(),
+        Settings {
+            data_root: Some(dir),
+            ..Settings::default()
+        },
+    )
+    .with_filesystem(lemonfiber_fixtures::files::Files::empty())
+}
+
+#[tokio::test]
+async fn where_the_disk_went_is_the_envelope_the_command_renders() {
+    // A page can be told how much room is left; it cannot walk a tree or count the
+    // names pointing at a file, and the whole answer here is built out of those.
+    let expected =
+        as_the_command_renders_it(&measuring("rendered"), Command::Space { confirm: false }).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(measuring("rendered"), reads::SPACE).await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn where_the_disk_went_carries_the_volume_and_takes_nothing() {
+    // Written out rather than derived, so a second serialisation could not pass this
+    // by agreeing with itself. A read never removes anything, so the field that says
+    // what a cleanup took is absent rather than empty.
+    let seen = asked(measuring("carried"), reads::SPACE).await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(
+                r#"{"api_version":1,"kind":"space","data":{"volumes":[{"role":"data""#
+            )
+            && body.contains(r#""of":"tree","name":"films""#)
+            && body.contains(r#""reclaimed":null"#)),
+        "the account a browser is served, with nothing taken"
+    );
+}

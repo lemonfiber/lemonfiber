@@ -28,7 +28,7 @@ pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
     Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, FulfilmentTarget,
     QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient, RegisteredFolder,
-    RegisteredTarget, RootFolder, Transfers,
+    RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
 pub use failure::{
     Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,

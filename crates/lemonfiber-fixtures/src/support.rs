@@ -188,6 +188,7 @@ impl SeedFs {
             only_prowlarr: false,
             missing: Vec::new(),
             facts: lemonfiber_ports::filesystem::StorageFacts {
+                point: std::path::PathBuf::new(),
                 kind: lemonfiber_ports::filesystem::FsKind::Linking("test".to_owned()),
                 removable: false,
                 available: 0,

@@ -180,7 +180,7 @@ pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "w
 /// what the agreement is for, and the two are separate fields because they are
 /// separate decisions.
 ///
-/// Four of them the command line declares a `--confirm` for, and a repair declares
+/// Most of them the command line declares a `--confirm` for, and a repair declares
 /// `--yes`, which is the same fork under the name that fits it. A restore is the one it
 /// answers for itself: it lists what the archive holds and then restores, which is
 /// the same two commands in one run, because the operator who typed it is there to
@@ -203,6 +203,7 @@ pub const TAKES_AGREEMENT: &[&str] = &[
     "repair",
     "reset",
     "restore",
+    "space",
     "support",
 ];
 

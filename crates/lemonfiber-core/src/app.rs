@@ -57,6 +57,7 @@ mod screen;
 mod seed;
 pub mod seeding;
 pub mod setup;
+mod space;
 mod stored;
 pub mod support;
 mod targets;
@@ -123,6 +124,8 @@ pub enum Outcome {
     Outbound(crate::outbound::Leaving),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
     Stored(crate::stored::Stored),
+    /// Where the disk stands, where the room went, and what could be got back.
+    Space(crate::space::Reckoning),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -175,6 +178,7 @@ impl Outcome {
             Self::Removed(_) => kind::REMOVAL,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Stored(_) => crate::model::kind::STORED,
+            Self::Space(_) => kind::SPACE,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Repair(_) => kind::REPAIR,
@@ -215,6 +219,7 @@ impl serde::Serialize for Outcome {
             Self::Removed(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
+            Self::Space(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Repair(report) => report.serialize(serializer),
@@ -374,6 +379,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
         Command::Forget { confirm } => stored::forgetting(ctx, confirm).await.map(Outcome::Stored),
+        // The same shape, over the operator's own disk rather than over lemonfiber's
+        // files: unconfirmed it accounts and offers, confirmed it takes what the
+        // account named as costing nothing.
+        Command::Space { confirm } => space::space(ctx, confirm).await.map(Outcome::Space),
         // Held open until the location is lost, which is what a guard is. The
         // interval is this command's own rather than the caller's: a surface that
         // could choose it could choose one that misses the moment it exists for.
@@ -1921,6 +1930,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_accounting_of_the_disk_serialises_under_its_own_kind() {
+        // A machine with no data location has nothing to account for, which is the
+        // one answer this reaches with nothing running and nothing on a disk — and
+        // it exercises the dispatch arm, which is what this is here for.
+        let refused = dispatch(Command::Space { confirm: false }, &ctx(Ok(spoke(""))))
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refused, Some(crate::space::NOWHERE_TO_MEASURE));
+    }
+
+    #[tokio::test]
     async fn a_dispatched_upgrade_over_an_unreadable_stack_is_an_error() {
         // The dispatch arm unboxes the driver's error: a confirmed upgrade cannot read
         // an unreadable stack's services, so it fails rather than half-acting.
@@ -2095,6 +2116,7 @@ mod tests {
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
+                | Outcome::Space(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -2138,6 +2160,7 @@ mod tests {
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
+                | Outcome::Space(_)
                 | Outcome::Status(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)
@@ -2961,6 +2984,7 @@ mod tests {
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
+                | Outcome::Space(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -3958,6 +3982,7 @@ mod tests {
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
                 | Outcome::Stored(_)
+                | Outcome::Space(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)

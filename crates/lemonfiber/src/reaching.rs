@@ -92,6 +92,10 @@ pub const ACTS: &[Reach] = &[
         through: "forget",
     },
     Reach {
+        request: "space",
+        through: "space",
+    },
+    Reach {
         request: "reset",
         through: "reset",
     },

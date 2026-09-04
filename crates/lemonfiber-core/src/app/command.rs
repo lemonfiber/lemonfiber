@@ -293,6 +293,20 @@ pub enum Command {
         /// listed and nothing is removed.
         confirm: bool,
     },
+    /// Account for the disk: where the room went, when it runs out, and what could
+    /// be got back.
+    ///
+    /// One argument, and it is the same shape a forget takes: unconfirmed it
+    /// reports and offers, confirmed it takes what the report already named as
+    /// costing nothing. There is no argument choosing *what* to reclaim, because
+    /// the answer to that is never a caller's — a seeding torrent's removal has a
+    /// consequence outside this machine and is named and left, and something the
+    /// operator asked to be left alone is not on offer at any level of fullness.
+    Space {
+        /// Whether the operator agreed to what the unconfirmed run listed; without
+        /// it, nothing is removed.
+        confirm: bool,
+    },
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///

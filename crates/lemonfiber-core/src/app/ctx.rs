@@ -18,6 +18,7 @@ use crate::ports::filesystem::{Eraser, Volume};
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
+use crate::ports::occupancy::Occupancy;
 use crate::ports::random::Random;
 use crate::ports::{Clock, FileSystem, Narrator, Runner};
 use crate::stack::Source;
@@ -49,6 +50,12 @@ pub struct Ctx {
     /// asks needs nothing else of a filesystem, and this is the one operation here
     /// that cannot be undone.
     pub eraser: Arc<dyn Eraser>,
+    /// How a tree is walked to find out what is actually in it.
+    ///
+    /// Apart from the filesystem for the reason the other two are: the reckoning
+    /// that asks needs nothing else of a filesystem, and every other implementation
+    /// of the wider trait would gain a method it never calls.
+    pub occupancy: Arc<dyn Occupancy>,
     /// How services are reached over HTTP, for the checks and seeding that ask
     /// one what it is or wire it to another.
     pub http: Arc<dyn Http>,
@@ -166,6 +173,9 @@ impl Ctx {
             // And the real eraser, for the same reason: a run asked to remove what
             // this machine keeps is asking about this machine.
             eraser: Arc::new(crate::adapters::Disk),
+            // And the real walk: a run asked where the disk went is asking about
+            // this machine's own.
+            occupancy: Arc::new(crate::adapters::Disk),
             validator: live(&http, settings.reaching.clone()),
             http,
             random: Arc::new(crate::adapters::Os),
@@ -298,6 +308,16 @@ impl Ctx {
     #[must_use]
     pub fn narrating(mut self, narrator: Arc<dyn Narrator>) -> Self {
         self.narrator = narrator;
+        self
+    }
+
+    /// The same context, walking trees through the given seam.
+    ///
+    /// Lets a reckoning be driven over a tree a test described, so what a full disk
+    /// comes to is exercised without one.
+    #[must_use]
+    pub fn surveying(mut self, occupancy: Arc<dyn Occupancy>) -> Self {
+        self.occupancy = occupancy;
         self
     }
 

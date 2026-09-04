@@ -114,6 +114,9 @@ what to do about it, is written for operators at
 - `SETUP-7`
 - `SETUP-8`
 - `SETUP-9`
+- `SPACE-1`
+- `SPACE-2`
+- `SPACE-3`
 - `STACK-1`
 - `STACK-2`
 - `STACK-3`

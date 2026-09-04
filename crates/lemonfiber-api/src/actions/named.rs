@@ -51,6 +51,7 @@ pub const OFFERED: &[&str] = &[
     "adopt",
     "reset",
     "forget",
+    "space",
     "backup",
     "invite",
     "remove",
@@ -197,6 +198,10 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // Unconfirmed it lists what would go, which is the same listing `/api/stored`
         // answers with — so what a browser agrees to is what it was shown.
         "forget" => Ok(Command::Forget { confirm }),
+        // The same reading twice, over the operator's own disk: unconfirmed it is the
+        // account `/api/space` answers with, and confirmed it takes only what that
+        // account named as costing nothing.
+        "space" => Ok(Command::Space { confirm }),
         "backup" => Ok(Command::Backup { service }),
         // The three addressed to a person rather than a form, a file or a service.
         // Unconfirmed, a removal says what it takes — their watch history, and every

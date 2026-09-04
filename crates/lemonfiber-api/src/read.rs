@@ -1,4 +1,4 @@
-//! The nineteen reads: one endpoint per question a command already answers, plus the
+//! The twenty reads: one endpoint per question a command already answers, plus the
 //! two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -19,7 +19,7 @@
 //! reads that take nothing at all. What is left here is the carrying out. The
 //! endpoints themselves are grouped beside it by what they are about: the stack,
 //! the diagnosis, one item, where the household begins, the choices in force, the
-//! words, and the files lemonfiber keeps of its own.
+//! words, the files lemonfiber keeps of its own, and where the disk went.
 
 mod archives;
 mod chosen;
@@ -29,6 +29,7 @@ mod door;
 mod glossary;
 mod items;
 mod outbound;
+mod space;
 mod stack;
 mod stored;
 
@@ -66,6 +67,7 @@ pub fn routes() -> Router<Serving> {
         .merge(clients::routes())
         .merge(outbound::routes())
         .merge(stored::routes())
+        .merge(space::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.

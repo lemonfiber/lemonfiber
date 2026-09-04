@@ -593,6 +593,7 @@ mod tests {
         }
         async fn describe(&self, _path: &Path) -> StorageFacts {
             StorageFacts {
+                point: std::path::PathBuf::new(),
                 kind: self.kind.clone(),
                 removable: false,
                 available: 0,

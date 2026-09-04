@@ -164,6 +164,7 @@ mod tests {
     /// A filesystem that reports the given free and total bytes for any describe.
     fn with_space(available: u64, total: u64) -> Arc<SeedFs> {
         Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
+            point: std::path::PathBuf::from("/"),
             kind: FsKind::Linking("test".to_owned()),
             removable: false,
             available,

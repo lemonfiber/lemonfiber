@@ -1,15 +1,15 @@
 //! The rest of what this stack can be told to do, and what becomes of one.
 //!
-//! Eight errands behind one key. The screen already answers `q`, `r`, `?`, the key
+//! Every errand behind one key. The screen already answers `q`, `r`, `?`, the key
 //! that opens the questions and five actions of its own, and there is no letter
 //! left that anybody would guess — so this is the arrangement [`super::question`]
 //! already made for the reads, made again for the writes that are not the lifecycle
-//! five. A ninth errand goes on the list without costing anybody a letter to
-//! learn.
+//! five. The next errand goes on the list without costing anybody a letter to
+//! learn, which is why this paragraph counts none of them.
 //!
 //! The key promises only that there is more. A wiring, a capture, a bundle, an
 //! archive put back and a revert have no one word between them that is not vaguer
-//! than the eight names on the list, and a key claiming something the list does not
+//! than the names on the list, and a key claiming something the list does not
 //! hold is worse than one claiming nothing — so what each errand is is said on the
 //! row, where there is room to say it.
 //!
