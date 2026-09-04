@@ -23,7 +23,9 @@ pub(super) use deciding::deciding;
 use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::model::HouseholdReport;
-use crate::ports::service::{Approving as _, Asking, Household as _, Member, Requests as _};
+use crate::ports::service::{
+    Approving as _, Asking, Headroom, Household as _, Member, Quota, Requests as _,
+};
 
 use super::command::Chosen;
 use super::targets::{jellyfin_reader, HouseholdAccess};
@@ -39,16 +41,14 @@ pub(super) async fn allowing(ctx: &Ctx, chosen: &Chosen) -> Result<HouseholdRepo
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
     let access = reached(ctx, &manifest.services).await?;
-    let held = access
-        .seerr
-        .asking()
-        .await
-        .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
-    let wanted = settled(chosen, &held)?;
 
+    // Each half reads what *it* is about to change before it changes it. A per-person
+    // choice read against the household's own setting would inherit the household's
+    // limit onto somebody who had one of their own, which is the opposite of leaving
+    // alone what nobody named.
     let said = match chosen.member.as_deref() {
-        Some(name) => one_person(ctx, &access, &manifest.services, name, &wanted).await?,
-        None => everybody(ctx, &access, &wanted).await?,
+        Some(name) => one_person(ctx, &access, &manifest.services, name, chosen).await?,
+        None => everybody(ctx, &access, chosen).await?,
     };
 
     let mut report = super::household::household(ctx, None).await?;
@@ -100,27 +100,37 @@ fn settled(chosen: &Chosen, held: &Asking) -> Result<Asking, Box<Problem>> {
 async fn everybody(
     ctx: &Ctx,
     access: &HouseholdAccess,
-    wanted: &Asking,
+    chosen: &Chosen,
 ) -> Result<String, Box<Problem>> {
-    let said = format!("the household {}", now_reads(wanted));
+    let held = access
+        .seerr
+        .asking()
+        .await
+        .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
+    let wanted = settled(chosen, &held)?;
+    let said = format!("the household {}", now_reads(&wanted));
     if ctx.dry_run {
         return Ok(format!("{said} — rehearsed, and nothing was written"));
     }
     access
         .seerr
-        .set_asking(wanted)
+        .set_asking(&wanted)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
     Ok(said)
 }
 
 /// Write the choice against one person, leaving the household's own where it is.
+///
+/// **What is read first is theirs, not the household's.** Somebody already held to
+/// three a week who is moved to waiting for approval keeps three a week; read against
+/// the household's setting they would silently inherit whatever the house allows.
 async fn one_person(
     ctx: &Ctx,
     access: &HouseholdAccess,
     services: &[lemonfiber_manifest::Service],
     name: &str,
-    wanted: &Asking,
+    chosen: &Chosen,
 ) -> Result<String, Box<Problem>> {
     let account = found(ctx, services, name).await?;
     let held = access
@@ -131,7 +141,13 @@ async fn one_person(
     let Some(held) = held else {
         return Err(Box::new(crate::asking::never_asked_here(&account.name)));
     };
-    let said = format!("{} {}", account.name, now_reads(wanted));
+    let headroom = access
+        .seerr
+        .left(&held.id)
+        .await
+        .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
+    let wanted = settled(chosen, &theirs(held.approves_own, headroom))?;
+    let said = format!("{} {}", account.name, now_reads(&wanted));
     if ctx.dry_run {
         return Ok(format!("{said} — rehearsed, and nothing was written"));
     }
@@ -149,6 +165,23 @@ async fn one_person(
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
     Ok(said)
+}
+
+/// What one member is under now, from what the service says about them.
+///
+/// The counts come back per kind and a household chooses one figure, so the one that
+/// is set is the one read back — the same reading the whole-household setting gets,
+/// and for the same reason: both halves are written together.
+fn theirs(approves_own: bool, headroom: Headroom) -> Asking {
+    let held = |left: crate::ports::service::Left| {
+        left.limit
+            .zip(left.days)
+            .map(|(requests, days)| Quota { requests, days })
+    };
+    Asking {
+        approves_own,
+        quota: held(headroom.films).or_else(|| held(headroom.television)),
+    }
 }
 
 /// The member the name was meant for, matched the forgiving way a name is typed.
@@ -200,7 +233,7 @@ mod tests {
 
     use lemonfiber_fixtures::http::{Answer, Fake};
 
-    use super::{allowing, deciding, now_reads, settled, Ctx};
+    use super::{allowing, deciding, now_reads, settled, theirs, Ctx};
     use crate::app::command::{Answer as Ruling, Chosen, Decision};
     use crate::asking::Policy;
     use crate::ports::service::{Asking, Quota};
@@ -551,6 +584,58 @@ mod tests {
         );
 
         assert!(wanted.is_ok(), "{wanted:?}");
+    }
+
+    /// What one member is under is read off their own counts, and off whichever of
+    /// the two halves carries a limit.
+    ///
+    /// A household chooses one figure and both halves are written together, so the
+    /// one that is set is the one read back — and a member with no limit of their own
+    /// reads as having none rather than as having the household's.
+    #[test]
+    fn what_one_member_is_under_is_read_off_their_own_counts() {
+        let counted = |limit, days| crate::ports::service::Left {
+            limit,
+            used: 0,
+            days,
+        };
+
+        let films = theirs(
+            true,
+            crate::ports::service::Headroom {
+                films: counted(Some(3), Some(7)),
+                television: counted(None, None),
+            },
+        );
+        assert_eq!(
+            films.quota,
+            Some(Quota {
+                requests: 3,
+                days: 7
+            })
+        );
+        assert!(films.approves_own);
+
+        let television = theirs(
+            false,
+            crate::ports::service::Headroom {
+                films: counted(None, None),
+                television: counted(Some(4), Some(30)),
+            },
+        );
+        assert_eq!(
+            television.quota,
+            Some(Quota {
+                requests: 4,
+                days: 30
+            })
+        );
+        assert!(!television.approves_own);
+
+        assert_eq!(
+            theirs(true, crate::ports::service::Headroom::default()).quota,
+            None
+        );
     }
 
     /// Each arrangement reads back as its own line.

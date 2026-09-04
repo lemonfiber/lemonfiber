@@ -70,10 +70,16 @@ pub(super) async fn gathered(seerr: &crate::seerr::Seerr, accounts: &[Member]) -
 
 /// What one member may ask for, as the report carries it.
 ///
-/// `made` is when each of their requests was asked for, which is the only thing that can
-/// say when the period next makes room: the count runs over a window that rolls rather
-/// than over a month that ends, so what frees up is their earliest request ageing out.
-pub(super) fn reported(held: &Held, made: &[&str]) -> MemberAsking {
+/// `made` is when each of their requests that the period still counts was asked for,
+/// which is the only thing that can say when it next makes room: the count runs over a
+/// window that rolls rather than over a month that ends, so what frees up is their
+/// earliest counted request ageing out.
+///
+/// **Only the ones inside the window.** A request from last year is not what the count
+/// is waiting on, and the earliest of everything they ever asked for would name a day
+/// already past — a date in the past is worse than no date, because it reads as room
+/// they already have.
+pub(super) fn reported(held: &Held, made: &[&str], now: SystemTime) -> MemberAsking {
     let policy = Policy::of(&Asking {
         approves_own: held.approves_own,
         quota: None,
@@ -91,10 +97,20 @@ pub(super) fn reported(held: &Held, made: &[&str]) -> MemberAsking {
         standing: Standing::across(held.headroom),
         films: counted(held.headroom.films),
         television: counted(held.headroom.television),
-        frees_up: days.and_then(|days| {
-            crate::asking::frees_up(crate::asking::earliest(made.iter().copied()), days)
-        }),
+        frees_up: days.and_then(|days| crate::asking::frees_up(counting(made, days, now), days)),
     }
+}
+
+/// The earliest of their requests that the window still counts, where any of them is.
+///
+/// A stamp this cannot read is left out rather than guessed at, and so is one the
+/// window has already let go of: what is wanted is the moment one more becomes
+/// possible, and the earliest of everything they ever asked for would name a day that
+/// has already been.
+fn counting<'a>(made: &[&'a str], days: u32, now: SystemTime) -> Option<&'a str> {
+    crate::asking::earliest(made.iter().copied().filter(|stamp| {
+        crate::asking::waiting_for(Some(stamp), now).is_some_and(|since| since < u64::from(days))
+    }))
 }
 
 /// The policy a member with a limit is under, given what happens to their requests.
@@ -218,7 +234,15 @@ mod tests {
     use crate::ports::service::{Headroom, Left};
     use crate::quality::{Preset, Selection};
     use crate::recyclarr::Kind;
-    use std::time::{Duration, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    /// Three days after the moment these fixtures ask at.
+    ///
+    /// Inside every window they are given, so what these cases turn on is the reading
+    /// rather than the request having aged out from under them.
+    fn now() -> SystemTime {
+        crate::instant::read(ASKED).unwrap_or(UNIX_EPOCH) + Duration::from_secs(3 * 86_400)
+    }
 
     /// One member, with what they may ask for and what they have asked for.
     fn member(asking: Option<Held>, waiting_days: &[u64]) -> HouseholdMember {
@@ -235,7 +259,7 @@ mod tests {
                     estimate: None,
                 })
                 .collect(),
-            asking: asking.map(|held| reported(&held, &[ASKED])),
+            asking: asking.map(|held| reported(&held, &[ASKED], now())),
             ..HouseholdMember::default()
         }
     }
@@ -305,7 +329,7 @@ mod tests {
     /// A member held to a limit reads as living inside one, whatever the house is on.
     #[test]
     fn a_member_held_to_a_limit_reads_as_living_inside_one() {
-        let said = reported(&holding(true, Some(5), 4), &[ASKED]);
+        let said = reported(&holding(true, Some(5), 4), &[ASKED], now());
 
         assert_eq!(said.policy, Policy::WithinALimit);
         assert_eq!(said.standing, Standing::NearQuota);
@@ -317,7 +341,7 @@ mod tests {
     /// A member nothing limits reads as trusted, and has no date to give.
     #[test]
     fn a_member_nothing_limits_reads_as_trusted() {
-        let said = reported(&holding(true, None, 0), &[ASKED]);
+        let said = reported(&holding(true, None, 0), &[ASKED], now());
 
         assert_eq!(said.policy, Policy::Trusted);
         assert_eq!(said.standing, Standing::Unlimited);
@@ -328,14 +352,30 @@ mod tests {
     #[test]
     fn a_member_whose_requests_wait_reads_as_waiting() {
         assert_eq!(
-            reported(&holding(false, None, 0), &[]).policy,
+            reported(&holding(false, None, 0), &[], now()).policy,
             Policy::EverythingWaits
         );
         assert_eq!(
-            reported(&holding(false, Some(5), 1), &[ASKED]).policy,
+            reported(&holding(false, Some(5), 1), &[ASKED], now()).policy,
             Policy::EverythingWaits
         );
         assert_eq!(limited(Policy::Trusted), Policy::WithinALimit);
+    }
+
+    /// A request the window has already let go of does not name the day it frees up.
+    ///
+    /// The earliest of *everything* they ever asked for would name a day already past,
+    /// which is worse than no day at all: it reads as room they already have.
+    #[test]
+    fn a_request_the_window_has_let_go_of_names_no_day() {
+        let stale = "2026-01-01T00:00:00";
+
+        let only_stale = reported(&holding(true, Some(5), 5), &[stale], now());
+        assert_eq!(only_stale.frees_up, None, "a day already past was named");
+
+        // The one still inside the window is the one it is waiting on.
+        let both = reported(&holding(true, Some(5), 5), &[stale, ASKED], now());
+        assert_eq!(both.frees_up.as_deref(), Some("2026-08-24T21:04:09"));
     }
 
     /// A member with a limit and no readable dates has no date to give.
@@ -344,10 +384,13 @@ mod tests {
     #[test]
     fn a_member_with_no_readable_dates_has_no_date_to_give() {
         assert_eq!(
-            reported(&holding(true, Some(5), 5), &["soon"]).frees_up,
+            reported(&holding(true, Some(5), 5), &["soon"], now()).frees_up,
             None
         );
-        assert_eq!(reported(&holding(true, Some(5), 5), &[]).frees_up, None);
+        assert_eq!(
+            reported(&holding(true, Some(5), 5), &[], now()).frees_up,
+            None
+        );
     }
 
     /// A count with no limit carries no period and no figure left.

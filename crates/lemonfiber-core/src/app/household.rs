@@ -263,7 +263,11 @@ fn assemble(
         // Kept beside the requests rather than read back off them: what a period counts
         // is when something was asked for, and a request already fetched is still inside
         // the window that counted it.
-        if let Some(made) = made.clone() {
+        //
+        // A request that was turned down is not, which is the service's own arithmetic
+        // and not a choice made here: it excludes a declined one from the count, so
+        // counting its date would name a day the window is not waiting on.
+        if let Some(made) = made.clone().filter(|_| state != Some(State::Declined)) {
             theirs.made.push(made);
         }
         theirs.requests.push(MemberRequest {
@@ -301,7 +305,7 @@ fn assemble(
         let made: Vec<&str> = theirs.made.iter().map(String::as_str).collect();
         members.push(HouseholdMember {
             access: named_access(&account.access, naming, approves_own),
-            asking: held.map(|held| allowance::reported(held, &made)),
+            asking: held.map(|held| allowance::reported(held, &made, naming.now)),
             last_seen: account.last_seen,
             claimed: account.claimed,
             name: account.name,
