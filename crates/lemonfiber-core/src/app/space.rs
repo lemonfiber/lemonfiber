@@ -417,19 +417,25 @@ mod tests {
 
     #[tokio::test]
     async fn the_reckoning_measures_the_volume_and_walks_what_is_on_it() {
-        let reckoned = space(&measuring_a_volume(900_000_000_000), false)
-            .await
-            .unwrap_or_else(|_| unreachable!());
-        assert_eq!(reckoned.level, Level::Ample);
-        assert!(!reckoned.halted);
-        assert!(reckoned.reclaimed.is_none(), "nothing was asked for");
-        let headings: Vec<String> = reckoned
-            .consumption
-            .iter()
-            .map(|line| line.category.heading())
-            .collect();
-        assert!(headings.contains(&"downloads".to_owned()), "{headings:?}");
-        assert!(headings.contains(&"films".to_owned()), "{headings:?}");
+        // Asserted through the answer rather than unwrapped out of it: a closure
+        // for the case that cannot happen is a line no run ever reaches, and the
+        // coverage gate counts it against a file every one of whose cases passed.
+        let reckoned = space(&measuring_a_volume(900_000_000_000), false).await;
+        assert!(
+            reckoned.is_ok_and(|reckoned| {
+                let headings: Vec<String> = reckoned
+                    .consumption
+                    .iter()
+                    .map(|line| line.category.heading())
+                    .collect();
+                reckoned.level == Level::Ample
+                    && !reckoned.halted
+                    && reckoned.reclaimed.is_none()
+                    && headings.contains(&"downloads".to_owned())
+                    && headings.contains(&"films".to_owned())
+            }),
+            "an ample volume, walked, with nothing asked for and nothing taken"
+        );
     }
 
     #[tokio::test]
@@ -464,7 +470,12 @@ mod tests {
 
     /// A context whose torrent client answers with one completed download of that
     /// name, and whose disk is the tree above with room to spare.
-    fn holding_one(name: &str) -> crate::app::Ctx {
+    ///
+    /// `scratch` names the directory this run keeps its own files in, and every
+    /// caller passes a different one: those files are written to a real disk and
+    /// the cases run at the same time, so two sharing a directory would be one
+    /// wiping the other's while it was reading it.
+    fn holding_one(name: &str, scratch: &str) -> crate::app::Ctx {
         let body =
             format!("[{{\"name\":\"{name}\",\"size\":3000,\"uploaded\":0,\"downloaded\":3000}}]");
         let http = Fake::by_path(vec![
@@ -473,7 +484,7 @@ mod tests {
         ]);
         a_context()
             .settings(Settings {
-                env_file: Some(env_at("space", "a-recorded-password")),
+                env_file: Some(env_at(scratch, "a-recorded-password")),
                 ..measuring()
             })
             .build()
@@ -486,23 +497,21 @@ mod tests {
 
     #[tokio::test]
     async fn a_download_nothing_ever_linked_is_named_as_costing_nothing() {
-        let reckoned = space(&holding_one("Never.Taken"), false)
-            .await
-            .unwrap_or_else(|_| unreachable!());
+        let reckoned = space(&holding_one("Never.Taken", "space-named"), false).await;
         assert!(
-            reckoned
+            reckoned.is_ok_and(|reckoned| reckoned
                 .candidates
                 .iter()
-                .any(|candidate| candidate.standing == Standing::NeverImported),
-            "{:?}",
-            reckoned.candidates
+                .any(|candidate| candidate.standing == Standing::NeverImported)),
+            "one name on disk is one nothing ever imported"
         );
     }
 
     #[tokio::test]
     async fn nothing_is_removed_until_an_answer_arrives_and_then_only_what_was_offered() {
         let erasing = Erasing::willing();
-        let ctx = holding_one("Never.Taken").erasing(Arc::clone(&erasing) as Arc<_>);
+        let ctx =
+            holding_one("Never.Taken", "space-offered").erasing(Arc::clone(&erasing) as Arc<_>);
 
         assert!(space(&ctx, false).await.is_ok());
         assert!(
@@ -510,41 +519,71 @@ mod tests {
             "a reading removes nothing, whatever it found"
         );
 
-        let taken = space(&ctx, true).await.unwrap_or_else(|_| unreachable!());
+        let taken = space(&ctx, true).await;
         assert_eq!(
             erasing.asked(),
             vec![PathBuf::from("/srv/media/downloads/Never.Taken/b.mkv")],
             "the imported one is not touched"
         );
-        assert!(taken
+        assert!(taken.is_ok_and(|taken| taken
             .reclaimed
-            .is_some_and(|reclaimed| reclaimed.bytes == 3_000 && reclaimed.left.is_empty()));
+            .is_some_and(|reclaimed| reclaimed.bytes == 3_000 && reclaimed.left.is_empty())));
     }
 
     #[tokio::test]
     async fn what_could_not_be_removed_is_reported_rather_than_counted_as_freed() {
         let erasing = Erasing::refusing("permission denied");
-        let ctx = holding_one("Never.Taken").erasing(Arc::clone(&erasing) as Arc<_>);
-        let taken = space(&ctx, true).await.unwrap_or_else(|_| unreachable!());
-        assert!(taken.reclaimed.is_some_and(|reclaimed| reclaimed.bytes == 0
-            && reclaimed.gone.is_empty()
-            && reclaimed
-                .left
-                .first()
-                .is_some_and(|left| left.why == "permission denied")));
+        let ctx =
+            holding_one("Never.Taken", "space-refused").erasing(Arc::clone(&erasing) as Arc<_>);
+        let taken = space(&ctx, true).await;
+        assert!(taken.is_ok_and(
+            |taken| taken.reclaimed.is_some_and(|reclaimed| reclaimed.bytes == 0
+                && reclaimed.gone.is_empty()
+                && reclaimed
+                    .left
+                    .first()
+                    .is_some_and(|left| left.why == "permission denied"))
+        ));
     }
 
     #[tokio::test]
     async fn a_rehearsal_says_what_would_go_and_takes_nothing() {
         let erasing = Erasing::willing();
-        let ctx = holding_one("Never.Taken")
+        let ctx = holding_one("Never.Taken", "space-rehearsed")
             .erasing(Arc::clone(&erasing) as Arc<_>)
             .rehearsing();
-        let taken = space(&ctx, true).await.unwrap_or_else(|_| unreachable!());
+        let taken = space(&ctx, true).await;
         assert!(erasing.asked().is_empty(), "a rehearsal removes nothing");
-        assert!(taken
-            .reclaimed
-            .is_some_and(|reclaimed| reclaimed.gone.len() == 1 && reclaimed.bytes == 3_000));
+        assert!(
+            taken.is_ok_and(|taken| taken
+                .reclaimed
+                .is_some_and(|reclaimed| reclaimed.gone.len() == 1 && reclaimed.bytes == 3_000))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_download_the_operator_already_answered_for_is_left_alone() {
+        // The marker is the answer they gave the queue check rather than one of this
+        // command's own: having said once that an item is theirs to manage is having
+        // said it, and asking again somewhere else would be this product forgetting.
+        let ctx = holding_one("Never.Taken", "space-answered");
+        let beside = ctx
+            .settings
+            .env_file
+            .as_deref()
+            .map(|env| env.with_file_name("accepted.json"));
+        assert!(beside.is_some(), "the scratch machine keeps its answers");
+        if let Some(at) = beside {
+            let _ = std::fs::write(&at, "{\"checks\":[\"queue.Never.Taken\"]}");
+        }
+
+        let reckoned = space(&ctx, false).await;
+        assert!(
+            reckoned.is_ok_and(|reckoned| reckoned.candidates.iter().all(|candidate| {
+                candidate.standing == Standing::LeftAlone && !candidate.offered()
+            })),
+            "what they answered for is never named as waste"
+        );
     }
 
     /// A Servarr-shape service's own configuration, with the key it wrote.
@@ -586,26 +625,22 @@ mod tests {
             ))
             .surveying(Walking::holding(a_tree()));
 
-        let reckoned = space(&ctx, false).await.unwrap_or_else(|_| unreachable!());
+        // A service still waiting for it is also what stops it being called waste,
+        // whatever the filesystem says about how many names point at its file — so
+        // both halves are asserted over the one answer.
+        let reckoned = space(&ctx, false).await;
         assert!(
-            reckoned
-                .interrupted
-                .iter()
-                .any(|stopped| stopped.name == "Never.Taken"
-                    && stopped.said == "No space left on device"
-                    && stopped.partial == 3_000),
-            "{:?}",
-            reckoned.interrupted
-        );
-        // And a service still waiting for it is what stops it being called waste,
-        // whatever the filesystem says about how many names point at its file.
-        assert!(
-            reckoned
-                .candidates
-                .iter()
-                .all(|candidate| !candidate.offered()),
-            "{:?}",
-            reckoned.candidates
+            reckoned.is_ok_and(|reckoned| {
+                reckoned.interrupted.iter().any(|stopped| {
+                    stopped.name == "Never.Taken"
+                        && stopped.said == "No space left on device"
+                        && stopped.partial == 3_000
+                }) && reckoned
+                    .candidates
+                    .iter()
+                    .all(|candidate| !candidate.offered())
+            }),
+            "the import that stopped is named with what is on disk, and offered to nobody"
         );
     }
 
@@ -638,11 +673,14 @@ mod tests {
                 SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
             ))
             .surveying(Walking::holding(a_tree()));
-        let reckoned = space(&ctx, false).await.unwrap_or_else(|_| unreachable!());
-        assert_eq!(reckoned.volumes.len(), 1);
-        assert!(reckoned
-            .consumption
-            .iter()
-            .all(|line| line.category.heading() != "the services' own files"));
+        let reckoned = space(&ctx, false).await;
+        assert!(
+            reckoned.is_ok_and(|reckoned| reckoned.volumes.len() == 1
+                && reckoned
+                    .consumption
+                    .iter()
+                    .all(|line| line.category.heading() != "the services' own files")),
+            "one volume, and no line for files there is nowhere to keep"
+        );
     }
 }

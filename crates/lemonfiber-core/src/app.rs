@@ -1930,6 +1930,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_accounting_of_the_disk_serialises_under_its_own_kind() {
+        // A machine with no data location has nothing to account for, which is the
+        // one answer this reaches with nothing running and nothing on a disk — and
+        // it exercises the dispatch arm, which is what this is here for.
+        let refused = dispatch(Command::Space { confirm: false }, &ctx(Ok(spoke(""))))
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refused, Some(crate::space::NOWHERE_TO_MEASURE));
+    }
+
+    #[tokio::test]
     async fn a_dispatched_upgrade_over_an_unreadable_stack_is_an_error() {
         // The dispatch arm unboxes the driver's error: a confirmed upgrade cannot read
         // an unreadable stack's services, so it fails rather than half-acting.
