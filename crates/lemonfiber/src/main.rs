@@ -43,7 +43,7 @@ use render::stack::Doing;
 use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
 use stopping::Choice;
-use translate::{bundling, configuration, quality};
+use translate::{bundling, configuration, quality, traced};
 
 /// Logs as a screen, or logs as a stream.
 ///
@@ -283,7 +283,7 @@ async fn main() -> ExitCode {
             term,
             season,
             search,
-        } => traced(term, season, search),
+        } => traced(&term, season, search),
         // Narrated for minutes and then one report, so the report goes through
         // dispatch and the narration goes wherever the surface is listening. A run
         // whose whole answer is a JSON document must not have prose interleaved
@@ -421,20 +421,6 @@ async fn answered(command: Command, ctx: &Ctx, json: bool) -> ExitCode {
             settled(&outcome)
         }
         Err(problem) => complain(&problem),
-    }
-}
-
-/// What a trace is asked about, from the words it was typed as.
-///
-/// The term is taken as words so it can be typed unquoted; joined back into the title
-/// as said. The searching form is the one that reaches past this machine, spending a
-/// real search against the indexers' daily allowance, so it happens only where the
-/// flag asked for it.
-fn traced(term: Vec<String>, season: Option<u32>, search: bool) -> Command {
-    Command::Trace {
-        term: term.join(" "),
-        season,
-        searching: search,
     }
 }
 
