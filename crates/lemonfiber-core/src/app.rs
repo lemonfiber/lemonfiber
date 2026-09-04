@@ -9,6 +9,7 @@
 //! Whether this is a rehearsal is a property of the [`Ctx`], not a second code
 //! path, so there is no parallel implementation to fall out of step.
 
+use crate::doctor::Narrowing;
 use crate::error::{Code, Diagnose, Problem};
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
@@ -281,6 +282,28 @@ fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     )))
 }
 
+/// A diagnosis, and the warning it was told to consider answered.
+///
+/// Named apart for the reason [`acting`] is: the run happens first and what it found
+/// is then read against what was accepted, which is two steps rather than a
+/// pass-along.
+async fn diagnosed(
+    ctx: &Ctx,
+    narrowing: Narrowing,
+    disruptive: bool,
+    accept: Option<String>,
+) -> Result<Outcome, Box<Problem>> {
+    let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
+    accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
+}
+
+/// A walk through the stack, said onto whatever the surface is listening with.
+async fn walked(ctx: &Ctx, item: Option<String>) -> Result<Outcome, Box<Problem>> {
+    walkthrough::walkthrough(ctx, item.as_deref(), ctx.steps.as_ref())
+        .await
+        .map(Outcome::Walkthrough)
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -339,10 +362,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             narrowing,
             disruptive,
             accept,
-        } => {
-            let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
-            accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
-        }
+        } => diagnosed(ctx, narrowing, disruptive, accept).await,
         Command::Repair {
             consent,
             disruptive,
@@ -362,11 +382,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             .map(Outcome::Watch),
         // Said onto whatever the surface is listening with, which is how a walk is
         // watched rather than read afterwards.
-        Command::Walkthrough { item } => {
-            walkthrough::walkthrough(ctx, item.as_deref(), ctx.steps.as_ref())
-                .await
-                .map(Outcome::Walkthrough)
-        }
+        Command::Walkthrough { item } => walked(ctx, item).await,
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),

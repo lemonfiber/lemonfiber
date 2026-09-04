@@ -5,9 +5,10 @@
 //! so that what a request *means* can be read, and proven, without going through
 //! everything that happens to it afterwards.
 
+use lemonfiber::cli::RawAllowance;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, QualityAction};
+use lemonfiber_core::app::{Allowance, Command, QualityAction};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
@@ -108,16 +109,82 @@ pub(crate) fn traced(term: &[String], season: Option<u32>, search: bool) -> Comm
     }
 }
 
+/// Who an invitation is for, and what the account is to let them watch.
+///
+/// The command line spells what somebody may
+/// watch as two flags and the core carries them as one choice,, so the two are put together here.
+pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
+    Command::Invite {
+        name,
+        allowance: Allowance {
+            libraries: allowance.libraries,
+            age_limit: allowance.age_limit,
+        },
+    }
+}
+
+/// A restart of named services, or of everything the form holds where none are named.
+pub(crate) fn restarting(form: String, services: Vec<String>) -> Command {
+    Command::Restart {
+        forms: vec![form],
+        services,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use lemonfiber_core::app::{Command, QualityAction};
+    use lemonfiber::cli::RawAllowance;
+    use lemonfiber_core::app::{Allowance, Command, QualityAction};
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
-    use super::{bundling, configuration, quality, traced, Destination, Wanted};
+    use super::{
+        bundling, configuration, invitation, quality, restarting, traced, Allowance, Destination,
+        RawAllowance, Wanted,
+    };
     use crate::exit::USAGE;
     use lemonfiber::cli::{Asked, ConfigAction, QualityCommand};
     use lemonfiber_core::bundle::Filenames;
+
+    /// Two flags at the command line are one choice in the core.
+    #[test]
+    fn an_invitation_carries_what_was_chosen_as_one_allowance() {
+        assert_eq!(
+            invitation(
+                "ada".to_owned(),
+                RawAllowance {
+                    libraries: vec!["Films".to_owned()],
+                    age_limit: Some(12),
+                }
+            ),
+            Command::Invite {
+                name: "ada".to_owned(),
+                allowance: Allowance {
+                    libraries: vec!["Films".to_owned()],
+                    age_limit: Some(12),
+                },
+            }
+        );
+    }
+
+    /// Naming no service restarts whatever the form holds, which is the form alone.
+    #[test]
+    fn a_restart_carries_the_one_form_and_only_the_services_named() {
+        assert_eq!(
+            restarting("media".to_owned(), vec!["sonarr".to_owned()]),
+            Command::Restart {
+                forms: vec!["media".to_owned()],
+                services: vec!["sonarr".to_owned()],
+            }
+        );
+        assert_eq!(
+            restarting("media".to_owned(), Vec::new()),
+            Command::Restart {
+                forms: vec!["media".to_owned()],
+                services: Vec::new(),
+            }
+        );
+    }
 
     /// The words are the title, and the search happens only where it was asked for.
     ///

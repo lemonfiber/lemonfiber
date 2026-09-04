@@ -43,7 +43,7 @@ use render::stack::Doing;
 use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
 use stopping::Choice;
-use translate::{bundling, configuration, quality, traced};
+use translate::{bundling, configuration, invitation, quality, restarting, traced};
 
 /// Logs as a screen, or logs as a stream.
 ///
@@ -162,21 +162,6 @@ async fn repairing(ctx: Ctx, mending: Mending, json: bool) -> ExitCode {
 /// that needs it onto three lines, and `main` has no room to spare.
 fn narrating(ctx: Ctx, json: bool) -> Ctx {
     ctx.narrating_steps(walking(json))
-}
-
-/// Who an invitation is for, and what the account is to let them watch.
-///
-/// Named for the reason [`narrating`] is: the command line spells what somebody may
-/// watch as two flags and the core carries them as one choice, and `main` has no room
-/// for the arm that puts the two together.
-fn invitation(name: String, allowance: RawAllowance) -> Command {
-    Command::Invite {
-        name,
-        allowance: Allowance {
-            libraries: allowance.libraries,
-            age_limit: allowance.age_limit,
-        },
-    }
 }
 
 #[tokio::main]
@@ -421,14 +406,6 @@ async fn answered(command: Command, ctx: &Ctx, json: bool) -> ExitCode {
             settled(&outcome)
         }
         Err(problem) => complain(&problem),
-    }
-}
-
-/// A restart of named services, or of everything the form holds where none are named.
-fn restarting(form: String, services: Vec<String>) -> Command {
-    Command::Restart {
-        forms: vec![form],
-        services,
     }
 }
 
