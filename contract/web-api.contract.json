@@ -7056,6 +7056,177 @@
         }
       }
     },
+    "stop-seeding": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Letting"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Candidate": {
+          "description": "One completed download, and what reclaiming it would come to.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "What it occupies.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "consequence": {
+              "description": "What removing it costs, where it costs anything.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "description": "What both sides call it.",
+              "type": "string"
+            },
+            "standing": {
+              "description": "Where it stands.",
+              "$ref": "#/$defs/Standing"
+            }
+          },
+          "required": [
+            "name",
+            "bytes",
+            "standing"
+          ]
+        },
+        "Gone": {
+          "description": "What became of a download the client was asked to let go.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "What it occupied, as the client reported it.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "name": {
+              "description": "What the client is no longer holding.",
+              "type": "string"
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal, which asks the client for nothing.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "bytes",
+            "rehearsed"
+          ]
+        },
+        "Letting": {
+          "description": "One completed download, what letting it go would cost, and what became of it.",
+          "type": "object",
+          "properties": {
+            "agreement": {
+              "description": "What this offer names itself, so an answer to it can say which offer it\nanswered.",
+              "type": "string"
+            },
+            "download": {
+              "description": "The download, in the same words the account names it in: where it stands, what\nit occupies, and what removing it costs.",
+              "$ref": "#/$defs/Candidate"
+            },
+            "goes": {
+              "description": "What goes with it, carried rather than left for a surface to remember.",
+              "type": "string"
+            },
+            "gone": {
+              "description": "What became of an answered offer, and nothing where the offer is all this is.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Gone"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "download",
+            "goes",
+            "agreement"
+          ]
+        },
+        "Standing": {
+          "description": "Where one completed download stands.",
+          "oneOf": [
+            {
+              "description": "Nothing ever linked it into a library: it was never imported, and removing\nit loses nothing.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "never_imported"
+                }
+              },
+              "required": [
+                "standing"
+              ]
+            },
+            {
+              "description": "It was imported and is still seeding, so removing it has a consequence\noutside this machine.",
+              "type": "object",
+              "properties": {
+                "ratio": {
+                  "description": "What it has uploaded against what it downloaded, in hundredths, as the\nclient reports it.\n\nA whole number rather than a fraction because every report this product\nmakes is compared for equality somewhere, and a fraction cannot be —\ntwo figures a client would call the same would not be. The hundredth is\nfiner than any decision made on a ratio.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "standing": {
+                  "type": "string",
+                  "const": "seeding"
+                }
+              },
+              "required": [
+                "standing",
+                "ratio"
+              ]
+            },
+            {
+              "description": "The operator asked for this one to be left alone.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "left_alone"
+                }
+              },
+              "required": [
+                "standing"
+              ]
+            }
+          ]
+        }
+      }
+    },
     "stored": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
