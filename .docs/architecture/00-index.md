@@ -15,7 +15,7 @@ are about Rust rather than about the product.
 | [embedded-stack.md](embedded-stack.md) | How the stack gets into the binary, and why a bad pairing cannot compile |
 | [form-closure.md](form-closure.md) | Forms to profiles to a Compose invocation, and the golden files |
 | [surface-parity.md](surface-parity.md) | What each surface reaches, the one intrinsic exception, and the guard that reads the table |
-| [parental-controls.md](parental-controls.md) | Which service carries which half of a limit, the regional rating table, and the mapping that stands in for it |
+| [parental-controls.md](parental-controls.md) | Which service carries which half of a limit, the regional rating table, the mapping that stands in for it, and what the media server then shows a restricted member |
 
 Planned as their subsystems land: `render-loop.md`, `vpn-port-forwarding.md`,
 `seed-clients.md`, `compose-construction.md`.

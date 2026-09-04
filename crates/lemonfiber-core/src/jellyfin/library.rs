@@ -52,6 +52,11 @@ impl Library for Jellyfin {
         // Every library, not the one the item landed in: Jellyfin's refresh is per-server
         // and the alternative is guessing which of the household's folders an *arr filed
         // something under, which is a guess with nothing riding on being right.
+
+        // This is also what re-applies a certificate revised upstream, and it re-reads
+        // only files the scan can see have changed — a rewritten rating whose file kept
+        // its modification time needs a forced per-item refresh instead. Driven with the
+        // rest of what a limit does to a library in `.docs/architecture/parental-controls.md`.
         let request = self
             .as_admin(Method::Post, "/Library/Refresh", None)
             .await?;
