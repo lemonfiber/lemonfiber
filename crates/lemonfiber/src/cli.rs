@@ -228,6 +228,10 @@ pub enum Request {
     /// Searched for the way you would name it, not by an internal id. Reports how far
     /// it got and, where it plainly stopped, why. A show is reported season by season:
     /// how many episodes are here, and what each one that is not is waiting on.
+    ///
+    /// Something monitored that has never been grabbed stopped for one of two reasons,
+    /// and nothing on this machine can tell them apart: the indexers carry nothing for
+    /// it, or they carry releases the quality you chose rejects. `--search` asks them.
     Trace {
         /// The show or film to follow, named as you would say it.
         #[arg(required = true)]
@@ -235,6 +239,10 @@ pub enum Request {
         /// Narrow to one season, instead of every season of the show.
         #[arg(long)]
         season: Option<u32>,
+        /// Ask the indexers what they carry, to tell "nothing at your quality" from
+        /// "nothing at all". Spends one real search against their daily allowance.
+        #[arg(long)]
+        search: bool,
     },
     /// Show who is in the household, what each may watch, and what each asked for.
     ///

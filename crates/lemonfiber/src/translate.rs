@@ -94,16 +94,54 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
     Ok(Command::Quality(action))
 }
 
+/// What a trace is asked about, from the words it was typed as.
+///
+/// The term is taken as words so it can be typed unquoted; joined back into the title
+/// as said. The searching form is the one that reaches past this machine, spending a
+/// real search against the indexers' daily allowance, so it happens only where the
+/// flag asked for it.
+pub(crate) fn traced(term: &[String], season: Option<u32>, search: bool) -> Command {
+    Command::Trace {
+        term: term.join(" "),
+        season,
+        searching: search,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::app::{Command, QualityAction};
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
-    use super::{bundling, configuration, quality, Destination, Wanted};
+    use super::{bundling, configuration, quality, traced, Destination, Wanted};
     use crate::exit::USAGE;
     use lemonfiber::cli::{Asked, ConfigAction, QualityCommand};
     use lemonfiber_core::bundle::Filenames;
+
+    /// The words are the title, and the search happens only where it was asked for.
+    ///
+    /// A term typed unquoted arrives as words and is one title again; the flag is what
+    /// separates a trace that reads from one that spends a real search.
+    #[test]
+    fn a_trace_joins_its_words_and_searches_only_when_asked() {
+        assert_eq!(
+            traced(&["the".to_owned(), "wire".to_owned()], Some(2), true),
+            Command::Trace {
+                term: "the wire".to_owned(),
+                season: Some(2),
+                searching: true,
+            }
+        );
+        assert_eq!(
+            traced(&["dune".to_owned()], None, false),
+            Command::Trace {
+                term: "dune".to_owned(),
+                season: None,
+                searching: false,
+            }
+        );
+    }
 
     #[test]
     fn each_configuration_action_becomes_its_own_command() {

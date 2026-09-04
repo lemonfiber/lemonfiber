@@ -24,7 +24,6 @@ pub(super) use footing::{footer, staying_for};
 use ratatui::text::Line;
 
 use super::chooser::Listed;
-use super::disturbing;
 use super::errand::Errand;
 use super::inviting;
 use super::lasting::{self, Begun, Lasting};
@@ -128,13 +127,13 @@ fn on_a_key(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<Li
         // larger than a sentence is read on this screen.
         Stage::Answered {
             question,
-            widening: Some(_),
+            widening: Some(widening),
             reading,
         } => (
             asked(question),
             agreed(
-                disturbing::ASKS,
-                disturbing::ABOUT,
+                widening.widened().asks,
+                widening.widened().about,
                 Some(reading),
                 rows,
                 across,
@@ -479,7 +478,7 @@ fn covering(taken: &Taken, room: usize, across: usize) -> Vec<Line<'static>> {
 mod tests {
     use super::{footer, pane, staying_for, surface, Asked, Offer, Open, Stage};
     use crate::acting::chooser::Chooser;
-    use crate::acting::disturbing::{under, Widening, NAME};
+    use crate::acting::disturbing::{under, Widening, DIAGNOSIS};
     use crate::acting::errand::{self, Errand, Given};
     use crate::acting::mending::{self, Mending};
     use crate::acting::narrowing::Subject;
@@ -927,19 +926,25 @@ mod tests {
     /// While it runs, nothing is drawn over the panels — the VPN panel behind this
     /// box is the check being run — and the footer says what is running and what
     /// leaving would leave the stack in.
+    ///
+    /// Named off the run itself rather than off one written down here, because there
+    /// are two of these: a screen naming the checks that disturb while the indexers
+    /// are being searched would be telling an operator about the wrong wait.
     #[test]
     fn a_run_that_disturbs_covers_nothing_and_is_named_in_the_footer() {
-        let said = said(&Stage::Disturbing, 20, 200);
-        let footing = text(&footer(&Stage::Disturbing, 200));
-        let staying = staying_for(&Stage::Disturbing);
+        let running = Stage::Disturbing(&DIAGNOSIS);
+        let said = said(&running, 20, 200);
+        let footing = text(&footer(&running, 200));
+        let staying = staying_for(&running);
 
         assert!(said.is_empty(), "{said}");
-        assert!(footing.contains("the checks that disturb"), "{footing}");
+        assert!(footing.contains(DIAGNOSIS.name), "{footing}");
         assert!(footing.contains("still running"), "{footing}");
         assert_eq!(
             staying,
             Some(format!(
-                "waiting for {NAME} to finish — leaving it now would leave the stack claimed"
+                "waiting for {} to finish — leaving it now would leave the stack claimed",
+                DIAGNOSIS.name
             ))
         );
     }

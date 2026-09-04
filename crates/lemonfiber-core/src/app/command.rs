@@ -183,6 +183,16 @@ pub enum Command {
         term: String,
         /// The season to narrow the per-part coverage to, or every season where absent.
         season: Option<u32>,
+        /// Whether the indexers may be asked what they carry for it.
+        ///
+        /// The one read in a trace that costs something outside this machine: it
+        /// spends a live search against the daily allowance the indexers hold the
+        /// operator to. Without it a trace that finds an item wanted and never
+        /// grabbed cannot say whether the indexers carry nothing or the quality in
+        /// force wants none of what they carry, and it says so rather than picking
+        /// one. Carried like [`Command::Doctor`]'s widening, and asked for at the
+        /// door changes are asked for.
+        searching: bool,
     },
     /// Report what the household has asked for and where each request stands, in the
     /// words the member who asked would use rather than the services' own.

@@ -297,6 +297,10 @@ fn household(member: Option<String>) -> Result<Command, &'static str> {
 /// The term is one value rather than several. The command line takes it as words so
 /// it can be typed without quoting and joins them back into the title as said; every
 /// other surface carries the title already whole.
+///
+/// Nothing is searched. A read looks and does not touch, and asking the indexers what
+/// they carry spends a live search against the allowance they hold the operator to —
+/// so the widened form of this is an action, at the door changes are asked for.
 fn following(term: Option<String>, season: Option<&str>) -> Result<Command, &'static str> {
     let Some(term) = term.filter(|term| !term.is_empty()) else {
         return Err(NO_TERM);
@@ -304,5 +308,9 @@ fn following(term: Option<String>, season: Option<&str>) -> Result<Command, &'st
     let Ok(season) = season.map(str::parse::<u32>).transpose() else {
         return Err(NOT_A_SEASON);
     };
-    Ok(Command::Trace { term, season })
+    Ok(Command::Trace {
+        term,
+        season,
+        searching: false,
+    })
 }

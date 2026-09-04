@@ -10,9 +10,55 @@ use crate::app::Ctx;
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::{Check, Finding, Verdict};
 use crate::model::TraceReport;
-use crate::ports::service::{Indexers, ItemPart, Library, QueueItem, TraceEvent, UsenetAccounts};
+use crate::ports::service::{
+    Indexers, ItemPart, Library, QualityReleases, QueueItem, ReleaseProbe, TraceEvent,
+    UsenetAccounts,
+};
 use crate::recyclarr::Kind;
+use crate::servarr::Servarr;
 use crate::trace::{Presence, Stage};
+
+/// What asking the indexers about a stalled item came to.
+///
+/// Only where a search was actually made. A trace that made none carries no value of
+/// this at all, which is what keeps the reading honest: the sentence for "no search was
+/// run" is the stage's own, and none of these three can stand in for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Searched {
+    /// The indexers carry releases and the quality profile in force wants none of them.
+    NoneAtTheQuality,
+    /// The search ran cleanly and the indexers carry nothing at all.
+    Nothing,
+    /// The search settled nothing about why this item stopped: it could not be run, or
+    /// what came back was about something other than an item nothing has been grabbed
+    /// for.
+    Unsettled,
+}
+
+/// Ask one \*arr's indexers what they carry for the content this stack is missing, read
+/// against the quality profile in force.
+///
+/// The one read a trace makes that costs something outside this machine: it spends a
+/// live search against the daily allowance the indexers hold the operator to. So it is
+/// made only where it was asked for, and only where an answer could say anything — an
+/// item its service has carried nowhere at all.
+///
+/// What it searches for is what the service says it is missing, which is the same
+/// search the diagnosis and the walk spend. The scope is the service's wanted list
+/// rather than this one item, so what comes back is read as a fact about what the
+/// indexers carry at the quality in force — which is the question a stalled item raises
+/// and the one an operator can act on.
+///
+/// A search that will not run settles nothing rather than becoming an absence. An
+/// indexer that could not be reached is not an indexer carrying nothing, and reading it
+/// as one would send an operator to ease a preset that was never the problem.
+pub(crate) async fn asking(service: &Servarr, kind: Kind) -> Searched {
+    match service.probe_releases(kind.release_id_param()).await {
+        Ok(ReleaseProbe::NoneMatch) => Searched::NoneAtTheQuality,
+        Ok(ReleaseProbe::NoneFound) => Searched::Nothing,
+        Ok(ReleaseProbe::NothingWanted | ReleaseProbe::Matching) | Err(_) => Searched::Unsettled,
+    }
+}
 
 /// The stall an account underneath the stack could explain, where this trace has one.
 ///

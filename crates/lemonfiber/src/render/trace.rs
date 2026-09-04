@@ -492,7 +492,7 @@ mod tests {
         assert!(text.contains("(1 more not asked for)"));
         assert!(text.contains("season 2   1 of 1   complete"));
         // The outstanding episode carries the reason it stopped, not just its number.
-        assert!(text.contains("S01E02   monitored, but no search has found it"));
+        assert!(text.contains("S01E02   monitored, but nothing has been grabbed"));
     }
 
     #[test]

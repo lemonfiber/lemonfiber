@@ -103,7 +103,7 @@ impl Acting {
             // offer itself, or the warnings this stack is raising. Both are read
             // before the question rather than reported after it.
             Stage::Looking(mending) => mending::looked(mending, answer),
-            Stage::Doing { .. } | Stage::Disturbing | Stage::Putting(_) => {
+            Stage::Doing { .. } | Stage::Disturbing(_) | Stage::Putting(_) => {
                 Stage::Came(Reading::of(match answer {
                     Ok(outcome) => lines_of(&crate::render::shaped(&outcome)),
                     Err(problem) => complaint(&problem),

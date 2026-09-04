@@ -20,7 +20,6 @@
 use lemonfiber_core::text::plain;
 use ratatui::text::Line;
 
-use super::super::disturbing;
 use super::super::lasting;
 use super::super::offer::OFFERED;
 use super::super::{errand, mending, quality, question, surface};
@@ -54,7 +53,7 @@ pub(crate) fn footer(stage: &Stage, across: usize) -> Line<'static> {
         }
         Stage::Doing { errand, .. } => format!("{}   {WAITING}", errand.name),
         Stage::Applying { change, .. } => format!("{}   {WAITING}", change.name),
-        Stage::Disturbing => format!("{}   {WAITING}", disturbing::NAME),
+        Stage::Disturbing(widened) => format!("{}   {WAITING}", widened.name),
         Stage::Putting(mending) => format!("{}   {WAITING}", mending.name),
         // The one with no ending of its own says how it is ended; the one that ends
         // by itself says what leaving does, as every other running thing here does.
@@ -96,7 +95,7 @@ pub(crate) fn staying_for(stage: &Stage) -> Option<String> {
         // A screen left in the middle of that has a stack halfway between two states
         // and nothing on it saying which.
         Stage::Putting(mending) => waited(mending.name),
-        Stage::Disturbing => waited(disturbing::NAME),
+        Stage::Disturbing(widened) => waited(widened.name),
         // The one that never ends by itself is the one this cannot say "to finish"
         // about. What it will go on doing, and the one thing that ends it once the
         // screen is gone, are said instead — a run held open on a promise nobody

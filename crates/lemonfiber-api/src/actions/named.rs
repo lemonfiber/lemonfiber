@@ -12,11 +12,12 @@
 //! and imports; that both spend most of their time watching does not make either
 //! of them a question.
 //!
-//! One of them answers with a diagnosis and is here for the same reason. Widened to
-//! the checks that disturb a running system, a diagnosis takes the tunnel away to
-//! prove it comes back and spends a real search against the indexers — so it is
-//! asked for at the door changes are asked for, whatever its answer looks like. A
-//! read that disturbed something would not be a read.
+//! Two of them answer with what a read answers and are here for the same reason.
+//! Widened to the checks that disturb a running system, a diagnosis takes the tunnel
+//! away to prove it comes back and spends a real search against the indexers; widened
+//! to asking the indexers what they carry, a trace spends one too. So both are asked
+//! for at the door changes are asked for, whatever their answers look like. A read
+//! that disturbed something would not be a read.
 
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
@@ -62,6 +63,7 @@ pub const OFFERED: &[&str] = &[
     "repair",
     "undo",
     "accept",
+    "search",
 ];
 
 /// The actions that must be told what to act on.
@@ -164,6 +166,8 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         item,
         libraries,
         age_limit,
+        term,
+        season,
     } = given;
     match action {
         // Starting named services and bringing a form up are different requests
@@ -203,25 +207,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "invite" | "reissue" | "remove" => {
             about_a_person(action, name, confirm, libraries, age_limit)
         }
-        // The one diagnosis asked for here rather than served as a read. It reaches
-        // the same command `/api/checks` reaches, widened by the same word the
-        // command line widens it with — so it is not a second reading of the stack,
-        // it is the reading that changes it: the tunnel is taken away to prove the
-        // killswitch, and a live search is spent against the indexers. A read that
-        // disturbed something would not be a read, and a POST is the only door this
-        // surface has that is not one.
-        //
-        // The widening is required rather than assumed. Without it this would be
-        // the plain diagnosis, which is already served, and two ways to ask one
-        // thing is the arrangement every read on this surface is kept out of.
-        "diagnose" => match disruptive {
-            Disturbing::Included => narrowed(only).map(|narrowing| Command::Doctor {
-                narrowing,
-                disruptive: true,
-                accept: None,
-            }),
-            Disturbing::Left => Err(needs("disruptive")),
-        },
+        // The two reads this surface serves twice, each reaching the same command its
+        // own endpoint reaches and widened by the same word the command line widens
+        // it with. Neither is a second reading of the stack; each is the reading that
+        // changes it — the tunnel taken away to prove the killswitch, and a live
+        // search spent against the indexers. A read that disturbed something would
+        // not be a read, and a POST is the only door this surface has that is not one.
+        "diagnose" => widening(action, disruptive).and_then(|()| diagnosing(only)),
+        "search" => widening(action, disruptive).and_then(|()| following(term, season)),
         // The offer and the yes are one action because they are one request read
         // twice: unconfirmed it says what each repair would do and what else
         // changes if it does, and confirmed it carries out what was agreed to.
@@ -379,6 +372,54 @@ fn listing(confirm: bool, offer: Option<String>) -> Result<restore::Consent, Ref
             argument: "confirm".to_owned(),
         }),
     }
+}
+
+/// The widening a read's second door requires, or the refusal for want of it.
+///
+/// Two actions here are the widened form of a read this surface also serves, and both
+/// require the word rather than defaulting it: without it each is that read, and two
+/// ways to ask one thing is the arrangement every read on this surface is kept out of.
+/// Which read each widens is what the names say — `diagnose` over `/api/checks`, and
+/// `search` over `/api/trace` — because one word answering at two doors is that same
+/// arrangement wearing a disguise.
+fn widening(action: &str, disruptive: Disturbing) -> Result<(), Refused> {
+    if disruptive.included() {
+        return Ok(());
+    }
+    Err(Refused::Missing {
+        action: action.to_owned(),
+        argument: "disruptive".to_owned(),
+    })
+}
+
+/// The diagnosis a widened run asks for, narrowed as the reading it follows was.
+fn diagnosing(only: Option<String>) -> Result<Command, Refused> {
+    narrowed(only).map(|narrowing| Command::Doctor {
+        narrowing,
+        disruptive: true,
+        accept: None,
+    })
+}
+
+/// Following one item with the indexers asked, or why it follows nothing.
+///
+/// The term is required for the reason it is required of the read: a trace with
+/// nothing to follow is a request that has lost its subject, and answering it with
+/// everything would be answering a question nobody asked. Blank is nothing named
+/// rather than an empty title, so a browser that sent the field and left it alone is
+/// refused as one that left it out.
+fn following(term: Option<String>, season: Option<u32>) -> Result<Command, Refused> {
+    let term = term
+        .filter(|term| !term.trim().is_empty())
+        .ok_or_else(|| Refused::Missing {
+            action: "search".to_owned(),
+            argument: "term".to_owned(),
+        })?;
+    Ok(Command::Trace {
+        term,
+        season,
+        searching: true,
+    })
 }
 
 /// A quality choice, which is two commands depending on what it is about.

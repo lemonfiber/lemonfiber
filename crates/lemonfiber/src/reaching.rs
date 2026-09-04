@@ -194,14 +194,22 @@ pub const SHOWS: &[&str] = &["ps"];
 /// The requests the dashboard reaches a second way, having already reached them as a
 /// question.
 ///
-/// Two requests, seven actions. `quality` is on [`ASKS`] as a read — the preset in
+/// Three requests, eight actions. `quality` is on [`ASKS`] as a read — the preset in
 /// force, what each one means and what it costs — and three of these are the writes
-/// offered beside that reading. `doctor` is on [`ASKS`] too, and the other four are
+/// offered beside that reading. `doctor` is on [`ASKS`] too, and four more are
 /// the whole of what can be done about what that reading reports: the same diagnosis
 /// widened to the checks that disturb a running system, the repairs it found put
 /// right, one of its warnings answered, and the last repair put back. A read that
 /// disturbed something would not be a read, and none of the other three is a read at
 /// all, so all four are asked for at the door this screen asks for changes.
+///
+/// `trace` is the third, and it is `doctor`'s widening again for the same reason.
+/// Following an item touches nothing and is a read; asking the indexers what they
+/// carry for one spends a real search against the daily allowance they hold the
+/// operator to, which is the one thing a trace can do that reaches past this machine.
+/// So the searching form is asked for at the door changes are asked for, under a name
+/// of its own — the read is `trace`, and one word answering at two doors is the
+/// arrangement every read on this surface is kept out of.
 ///
 /// The last of them is offered from a different place on the screen — it is on the
 /// list of errands rather than beside the other two, because it reads nothing before
@@ -246,6 +254,10 @@ pub const ALSO: &[Reach] = &[
     Reach {
         request: "doctor",
         through: "undo",
+    },
+    Reach {
+        request: "trace",
+        through: "search",
     },
 ];
 

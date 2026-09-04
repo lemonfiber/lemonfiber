@@ -183,12 +183,11 @@ impl Stage {
     pub const fn stall(self) -> Option<&'static str> {
         match self {
             Self::NotMonitored => Some("nobody has asked for it — no service is monitoring it"),
-            Self::Monitored => {
-                Some("monitored, but no search has found it yet — the indexers returned nothing")
-            }
-            Self::Found => {
-                Some("found, but nothing met the quality preset, so nothing was grabbed")
-            }
+            Self::Monitored => Some("monitored, but nothing has been grabbed for it yet"),
+            Self::Found => Some(
+                "found, but nothing met the quality preset — releases are out there and the \
+                 quality in force rejects every one, so easing the preset is what gets this",
+            ),
             Self::Grabbed => Some("grabbed, but the download client never took it"),
             Self::Downloaded => Some("downloaded, but it was never imported to the library"),
             Self::Imported => {
@@ -437,9 +436,32 @@ mod tests {
 
     #[test]
     fn the_never_found_and_never_grabbed_reasons_are_distinct() {
-        // The two most-confused cases must not read the same: "indexers returned
-        // nothing" is a different problem from "nothing met the preset".
+        // The two most-confused cases must not read the same: nothing grabbed yet is a
+        // different problem from releases the quality in force rejects.
         assert_ne!(Stage::Monitored.stall(), Stage::Found.stall());
+    }
+
+    #[test]
+    fn resting_at_monitored_claims_no_cause_it_cannot_know() {
+        // A monitored item with nothing grabbed for it may have had no search run, or a
+        // search that came back empty, or a search whose every release the quality in
+        // force rejected. This stage alone tells none of the three apart, so it names
+        // none of them: the indexers, the quality preset and any search are all absent
+        // from what it says.
+        let resting = Stage::Monitored.stall().unwrap_or_default();
+        for claimed in ["indexer", "quality", "search"] {
+            assert!(!resting.contains(claimed), "{resting} claims {claimed}");
+        }
+    }
+
+    #[test]
+    fn nothing_at_the_chosen_quality_says_so_and_says_what_eases_it() {
+        // Releases exist and the profile wants none of them is the one stall an operator
+        // can end by choosing differently, so it names both halves: that there is
+        // something out there, and that the quality in force is what is refusing it.
+        let unmet = Stage::Found.stall().unwrap_or_default();
+        assert!(unmet.contains("quality"), "{unmet}");
+        assert!(unmet.contains("easing"), "{unmet}");
     }
 
     #[test]

@@ -579,12 +579,13 @@ pub(crate) mod tests {
     /// entry there naming an action nothing offers leaves it claiming more.
     ///
     /// Six places offer one: the keys, this list, the two that keep going, the three
-    /// quality changes, the two that answer a diagnosis, and the widening offered
-    /// under one, which is on no list at all because there is one of it.
+    /// quality changes, the two that answer a diagnosis, and the two widened reads,
+    /// which are on no key at all because each is offered under the answer that named
+    /// the gap.
     ///
     /// The published names come off two lists because the requests do. Every other
     /// action is the only way its request is reached; the three quality writes and
-    /// the widened diagnosis act on requests the screen already reaches as reads, so
+    /// the two widened reads act on requests the screen already reaches as reads, so
     /// they are published beside the rest rather than among them — and both lists are
     /// read here, or a write could be added to the screen and excused by the list it
     /// was not on.
@@ -597,7 +598,7 @@ pub(crate) mod tests {
             .chain(crate::acting::lasting::every().map(|lasting| lasting.action))
             .chain(crate::acting::quality::every().map(|change| change.action))
             .chain(crate::acting::mending::every().map(|mending| mending.action))
-            .chain(std::iter::once(crate::acting::disturbing::ACTION))
+            .chain(crate::acting::disturbing::every().map(|widened| widened.action))
             .collect();
         let mut published: Vec<&str> = ACTS.iter().chain(ALSO).map(|reach| reach.through).collect();
         offered.sort_unstable();
