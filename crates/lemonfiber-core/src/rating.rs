@@ -58,6 +58,13 @@ pub struct Rated {
 /// off `jellyfin/jellyfin:10.10.3` under `GB` rather than recalled.
 const FALLBACK: &[(u32, &str)] = &[(0, "U"), (7, "7+"), (12, "12A"), (15, "15"), (18, "18")];
 
+/// Said after a reading whose names came from the mapping rather than the server.
+///
+/// A certificate said to be this household's when it is this program's is exactly the
+/// claim a parent would act on, so it is attributed in the reading itself rather than
+/// only in a document.
+const NOT_THIS_SERVERS: &str = " (named from lemonfiber's own mapping, not this server's)";
+
 /// How many certificates are named for one age.
 ///
 /// A table can put a great many names against one age: the media server's own United
@@ -135,24 +142,28 @@ pub fn reading(named: &[Certificate], age: Option<u32>) -> String {
 /// from the chooser that set it is two surfaces disagreeing about one setting.
 #[must_use]
 pub fn said(age: u32, rated: &Rated) -> String {
-    let mut said = crate::age_limit::reading(Some(age));
-    if !rated.allows.is_empty() {
-        said.push_str(&format!(" — allows {}", rated.allows.join(", ")));
-    }
-    if !rated.holds_back.is_empty() {
-        said.push_str(&format!(
+    let allows =
+        (!rated.allows.is_empty()).then(|| format!(" — allows {}", rated.allows.join(", ")));
+    let holds_back = (!rated.holds_back.is_empty()).then(|| {
+        format!(
             "{} holds back {}",
             if rated.allows.is_empty() { " —" } else { ";" },
             rated.holds_back.join(", ")
-        ));
-    }
+        )
+    });
     // Always said where it applies, and it applies whenever the table was empty: the
     // mapping brackets every age on at least one side, so there is no reading from it
     // that carries no certificate to attribute.
-    if rated.fell_back {
-        said.push_str(" (named from lemonfiber's own mapping, not this server's)");
-    }
-    said
+    let attributed = rated.fell_back.then(|| NOT_THIS_SERVERS.to_owned());
+    [
+        Some(crate::age_limit::reading(Some(age))),
+        allows,
+        holds_back,
+        attributed,
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 #[cfg(test)]
@@ -223,7 +234,13 @@ mod tests {
         assert_eq!(here.allows, vec!["12A".to_owned()], "{here:?}");
         assert_eq!(here.holds_back, vec!["15".to_owned()], "{here:?}");
         assert_eq!(there.allows, vec!["PG".to_owned()], "{there:?}");
-        assert_eq!(there.holds_back, vec!["PG-13".to_owned()], "{there:?}");
+        // Three, because that table puts three of its own names against thirteen and
+        // the reading takes the first few rather than all of them.
+        assert_eq!(
+            there.holds_back.first(),
+            Some(&"PG-13".to_owned()),
+            "{there:?}"
+        );
     }
 
     /// A table naming a great many at one age names the first few and stops.

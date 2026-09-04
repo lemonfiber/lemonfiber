@@ -659,7 +659,7 @@ mod tests {
         for (typed, chosen) in [("block", RawUnrated::Block), ("allow", RawUnrated::Allow)] {
             assert_eq!(
                 unrating(&["lemonfiber", "invite", "ana", "--unrated", typed]),
-                Some(Some(chosen)),
+                Some(("ana".to_owned(), Some(chosen))),
                 "{typed}"
             );
         }
@@ -680,15 +680,20 @@ mod tests {
     fn saying_nothing_about_unrated_content_carries_nothing() {
         assert_eq!(
             unrating(&["lemonfiber", "invite", "ana"]),
-            Some(None),
+            Some(("ana".to_owned(), None)),
             "a word nobody typed was carried anyway"
         );
     }
 
-    /// What an invitation was told to do about unrated content, for one command line.
-    fn unrating(args: &[&str]) -> Option<Option<RawUnrated>> {
+    /// Who an invitation is for and what it was told to do about unrated content, for
+    /// one command line.
+    ///
+    /// The name comes back beside the word so that nothing is the *absence* of a
+    /// parse: a line the parser turned away answers with nothing at all, and one that
+    /// named no word answers with the name and no word.
+    fn unrating(args: &[&str]) -> Option<(String, Option<RawUnrated>)> {
         match Cli::try_parse_from(args).ok()?.command? {
-            Request::Invite { allowance, .. } => Some(allowance.unrated),
+            Request::Invite { name, allowance } => Some((name, allowance.unrated)),
             _ => None,
         }
     }

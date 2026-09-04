@@ -1133,15 +1133,15 @@
               "description": "What they are held to, in one word — including where what they may watch and\nwhat they may ask for disagree.",
               "$ref": "#/$defs/Restriction"
             },
-            "unrated_blocked": {
-              "description": "Whether content the media server has no rating for is held back from them.\n\nSaid whether or not it is, because an unexplained absence is the thing this\nanswers: a restricted member missing half the library is either this setting or\na defect, and an operator cannot tell which from silence.",
-              "type": "boolean"
+            "unrated": {
+              "description": "What becomes of content the media server has no rating for.\n\nSaid either way, because an unexplained absence is the thing this answers: a\nrestricted member missing half the library is either this setting or a defect,\nand an operator cannot tell which from silence.",
+              "$ref": "#/$defs/Unrated"
             }
           },
           "required": [
             "every_library",
             "libraries",
-            "unrated_blocked",
+            "unrated",
             "restriction",
             "administrator",
             "disabled"
@@ -2240,6 +2240,21 @@
             "protocol",
             "progress",
             "speed"
+          ]
+        },
+        "Unrated": {
+          "description": "What is to happen to content the media server has no rating for.\n\nA choice rather than a default, because a great deal of content carries no rating\nand either answer is wrong for somebody: holding it back makes legitimate content\ninvisible, and letting it through lets through the one thing nobody vetted.\n\nSpelled `HeldBack` and `LetThrough` rather than blocked and allowed, because\n[`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would\nread as the opposite of what it is.\n\nA word rather than a flag on both the read and the write, so the setting is named\nthe same in the answer that reports it as in the call that made it — and so neither\n[`Access`] nor the report built from it becomes a row of four unlabelled booleans.\n\nLetting it through is the default because it is the media server's: a new account\nis made holding nothing back, so that is the state an account is found in rather\nthan a decision anybody took.",
+          "oneOf": [
+            {
+              "description": "Content with no rating is held back.",
+              "type": "string",
+              "const": "held-back"
+            },
+            {
+              "description": "Content with no rating is let through.",
+              "type": "string",
+              "const": "let-through"
+            }
           ]
         },
         "Vpn": {
@@ -3516,15 +3531,15 @@
               "description": "What they are held to, in one word — including where what they may watch and\nwhat they may ask for disagree.",
               "$ref": "#/$defs/Restriction"
             },
-            "unrated_blocked": {
-              "description": "Whether content the media server has no rating for is held back from them.\n\nSaid whether or not it is, because an unexplained absence is the thing this\nanswers: a restricted member missing half the library is either this setting or\na defect, and an operator cannot tell which from silence.",
-              "type": "boolean"
+            "unrated": {
+              "description": "What becomes of content the media server has no rating for.\n\nSaid either way, because an unexplained absence is the thing this answers: a\nrestricted member missing half the library is either this setting or a defect,\nand an operator cannot tell which from silence.",
+              "$ref": "#/$defs/Unrated"
             }
           },
           "required": [
             "every_library",
             "libraries",
-            "unrated_blocked",
+            "unrated",
             "restriction",
             "administrator",
             "disabled"
@@ -3659,6 +3674,21 @@
               "const": "gone"
             }
           ]
+        },
+        "Unrated": {
+          "description": "What is to happen to content the media server has no rating for.\n\nA choice rather than a default, because a great deal of content carries no rating\nand either answer is wrong for somebody: holding it back makes legitimate content\ninvisible, and letting it through lets through the one thing nobody vetted.\n\nSpelled `HeldBack` and `LetThrough` rather than blocked and allowed, because\n[`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would\nread as the opposite of what it is.\n\nA word rather than a flag on both the read and the write, so the setting is named\nthe same in the answer that reports it as in the call that made it — and so neither\n[`Access`] nor the report built from it becomes a row of four unlabelled booleans.\n\nLetting it through is the default because it is the media server's: a new account\nis made holding nothing back, so that is the state an account is found in rather\nthan a decision anybody took.",
+          "oneOf": [
+            {
+              "description": "Content with no rating is held back.",
+              "type": "string",
+              "const": "held-back"
+            },
+            {
+              "description": "Content with no rating is let through.",
+              "type": "string",
+              "const": "let-through"
+            }
+          ]
         }
       }
     },
@@ -3715,14 +3745,14 @@
               "description": "Whether the request service was held to the same decision.\n\nThe same three answers a link carries, and for the same reason: what somebody\nmay *ask for* is a second service's business, and that service can be down while\nthe media server is not. `NotTried` here is a service with no account for them\nyet — nothing to hold rather than a failure to hold something.",
               "$ref": "#/$defs/Linked"
             },
-            "unrated_blocked": {
-              "description": "Whether content the media server has no rating for is held back from them.\n\nHeld back by default on somebody being narrowed, because a rating limit cannot\ndecide about a thing that carries no rating. The cost is real and is why this is\nreported rather than assumed: some legitimate content becomes invisible to them.",
-              "type": "boolean"
+            "unrated": {
+              "description": "What becomes of content the media server has no rating for.\n\nHeld back by default on somebody being narrowed, because a rating limit cannot\ndecide about a thing that carries no rating. The cost is real and is why this is\nreported rather than assumed: some legitimate content becomes invisible to them.",
+              "$ref": "#/$defs/Unrated"
             }
           },
           "required": [
             "libraries",
-            "unrated_blocked",
+            "unrated",
             "requesting",
             "filtering"
           ]
@@ -3834,6 +3864,21 @@
               "description": "Nothing was tried: a rehearsal, or a stack with no request service at all.\n\nNot a failure either way, and nothing a later run would put right — which is\nwhat separates it from `NotYet`.",
               "type": "string",
               "const": "not-tried"
+            }
+          ]
+        },
+        "Unrated": {
+          "description": "What is to happen to content the media server has no rating for.\n\nA choice rather than a default, because a great deal of content carries no rating\nand either answer is wrong for somebody: holding it back makes legitimate content\ninvisible, and letting it through lets through the one thing nobody vetted.\n\nSpelled `HeldBack` and `LetThrough` rather than blocked and allowed, because\n[`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would\nread as the opposite of what it is.\n\nA word rather than a flag on both the read and the write, so the setting is named\nthe same in the answer that reports it as in the call that made it — and so neither\n[`Access`] nor the report built from it becomes a row of four unlabelled booleans.\n\nLetting it through is the default because it is the media server's: a new account\nis made holding nothing back, so that is the state an account is found in rather\nthan a decision anybody took.",
+          "oneOf": [
+            {
+              "description": "Content with no rating is held back.",
+              "type": "string",
+              "const": "held-back"
+            },
+            {
+              "description": "Content with no rating is let through.",
+              "type": "string",
+              "const": "let-through"
             }
           ]
         }

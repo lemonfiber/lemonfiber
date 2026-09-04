@@ -518,7 +518,7 @@ fn declared() -> Vec<String> {
         .split_once("pub struct Arguments {")
         .map(|(_, rest)| rest)
         .unwrap_or_default();
-    let body = opened.split_once("\n}").map(|(body, _)| body).unwrap_or("");
+    let body = opened.split_once("\n}").map_or("", |(body, _)| body);
     body.lines()
         .filter_map(|line| line.strip_prefix("    pub "))
         .filter_map(|declared| declared.split_once(':'))

@@ -625,6 +625,7 @@ mod tests {
     struct Fake {
         accounts: &'static str,
         folders: &'static str,
+        ratings: &'static str,
         sign_in: &'static str,
         requests: &'static str,
         library: &'static str,
@@ -638,6 +639,10 @@ mod tests {
                     "Policy":{"EnableAllFolders":true},
                     "LastActivityDate":"2026-08-30T10:00:00Z"}]"#,
                 folders: r#"{"Items":[{"Id":"lib-1","Name":"Films"}]}"#,
+                // As the pinned image answers, including the row that carries no age
+                // at all — its name for content it has no rating for.
+                ratings: r#"[{"Name":"Unrated"},{"Name":"U","Value":0},
+                    {"Name":"12A","Value":12},{"Name":"15","Value":15}]"#,
                 sign_in: "",
                 requests: "",
                 library: "[]",
@@ -658,6 +663,10 @@ mod tests {
                     Answer::reply(200, r#"{"AccessToken":"token"}"#),
                 ),
                 ("/Library/MediaFolders", Answer::reply(200, self.folders)),
+                (
+                    "/Localization/ParentalRatings",
+                    Answer::reply(200, self.ratings),
+                ),
                 ("/Users", Answer::reply(200, self.accounts)),
                 (
                     "/auth/jellyfin",
