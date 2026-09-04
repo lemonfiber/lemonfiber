@@ -938,17 +938,14 @@ mod tests {
             Restriction::RatingLimited,
         );
 
+        // Bound rather than called in the message, which only runs on failure.
+        let held = household(&holding).text();
+        let let_through = household(&letting).text();
+
+        assert!(held.contains("nothing unrated"), "{held}");
         assert!(
-            household(&holding).text().contains("nothing unrated"),
-            "{:?}",
-            household(&holding).text()
-        );
-        assert!(
-            household(&letting)
-                .text()
-                .contains("including what has no rating"),
-            "{:?}",
-            household(&letting).text()
+            let_through.contains("including what has no rating"),
+            "{let_through}"
         );
     }
 
@@ -994,16 +991,14 @@ mod tests {
             ..held(None, None, Unrated::LetThrough, Restriction::Unrestricted)
         };
 
+        // Bound rather than called in the message, which only runs on failure.
+        let warned = household(&limited).text();
+        let unwarned = household(&open).text();
+
+        assert!(warned.contains("not a security boundary"), "{warned}");
         assert!(
-            household(&limited)
-                .text()
-                .contains("not a security boundary"),
-            "{:?}",
-            household(&limited).text()
-        );
-        assert!(
-            !household(&open).text().contains("not a security boundary"),
-            "a household nobody narrowed was warned about a limit it does not have"
+            !unwarned.contains("not a security boundary"),
+            "a household nobody narrowed was warned about a limit it does not have:              {unwarned}"
         );
     }
 }

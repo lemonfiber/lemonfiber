@@ -3037,8 +3037,16 @@ mod tests {
         onto(&mut acting, &step);
         acting.pressed(&Press::Accept);
         // Something was narrowed, so the last question stands between the list and the
-        // agreement: what happens to content the media server has no rating for. The
-        // row it opens on is the one a restriction defaults to everywhere else.
+        // agreement: what happens to content the media server has no rating for. Both
+        // rows are on the screen with what taking each comes to beside it, and the one
+        // it opens on is what a restriction defaults to everywhere else.
+        let unrated = showing(&acting);
+        assert!(unrated.contains("> nothing unrated"), "{unrated}");
+        assert!(
+            unrated.contains("including what has no rating"),
+            "{unrated}"
+        );
+        assert!(unrated.contains("invisible"), "{unrated}");
         acting.pressed(&Press::Accept);
 
         // The question says all four, in the words a household read says the same

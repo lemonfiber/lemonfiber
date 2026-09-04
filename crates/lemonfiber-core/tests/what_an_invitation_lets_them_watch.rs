@@ -731,3 +731,134 @@ async fn what_was_applied_travels_back_with_the_invitation() {
         "the answer did not say what a limit here is not: {filtering}"
     );
 }
+
+/// The account of somebody whose requests already wait for an adult.
+///
+/// `32` is `REQUEST` and nothing else: they may ask, and what they ask for is seen
+/// first. There is nothing here to take off.
+const ALREADY_WAITING: &str = r#"{"id":4,"permissions":32}"#;
+
+/// A stack whose request service holds an account whose requests already wait.
+fn a_stack_where_requests_already_wait() -> Arc<Fake> {
+    a_stack_asking(
+        Answer::reply(200, ALREADY_WAITING),
+        Answer::reply(200, ALREADY_WAITING),
+    )
+}
+
+/// A stack where the request service holds the account and refuses the write.
+fn a_stack_that_will_not_hold() -> Arc<Fake> {
+    a_stack_asking(Answer::reply(200, APPROVES_OWN), Answer::reply(500, ""))
+}
+
+/// The same stack, with what the request service says about a member and what it does
+/// with the write chosen.
+fn a_stack_asking(member: Answer, written: Answer) -> Arc<Fake> {
+    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+    Fake::by_path_in_turn(vec![
+        ("/Users/AuthenticateByName", vec![signed_in]),
+        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
+        (PERMISSIONS, vec![Answer::reply(200, APPROVES_OWN), written]),
+        ("/user/jellyfin/", vec![member]),
+        (RATINGS, vec![Answer::reply(200, CERTIFICATES)]),
+        (
+            "/System/ActivityLog",
+            vec![Answer::reply(200, r#"{"Items":[]}"#)],
+        ),
+        ("/Library/MediaFolders", vec![Answer::reply(200, LIBRARIES)]),
+        (POLICY, vec![Answer::reply(204, "")]),
+        (
+            NEW_ACCOUNT,
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+            )],
+        ),
+        (ONE_ACCOUNT, vec![Answer::reply(200, AS_IT_OPENS)]),
+        ("/Users", vec![Answer::reply(200, "[]")]),
+    ])
+}
+
+/// What an invitation says about a member being narrowed, for one stack.
+fn requesting(made: Option<Outcome>) -> Option<lemonfiber_core::model::Linked> {
+    match made {
+        Some(Outcome::Invited(invitation)) => invitation.applied.map(|applied| applied.requesting),
+        _ => None,
+    }
+}
+
+/// A limit set on somebody whose requests already wait writes nothing there.
+///
+/// The narrowest thing the request service can be told is already true of them, and a
+/// write that said it again would be a change to an account nobody asked to change.
+#[tokio::test]
+async fn a_member_whose_requests_already_wait_is_left_as_they_are() {
+    let (sent, made) = driving(
+        "already-waiting",
+        a_stack_where_requests_already_wait(),
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: None,
+        },
+    )
+    .await;
+
+    assert_eq!(
+        requesting(made),
+        Some(lemonfiber_core::model::Linked::Made),
+        "somebody already held was not reported as held"
+    );
+    assert!(
+        !sent
+            .iter()
+            .any(|request| request.url.contains(PERMISSIONS) && request.body.is_some()),
+        "an account that already waits was written to anyway"
+    );
+}
+
+/// A request service that will not take the write still leaves the invitation standing.
+///
+/// The account on the media server is what an invitation *is*. What could not be held
+/// is worth a line on the answer; it is not worth the account.
+#[tokio::test]
+async fn a_request_service_that_will_not_hold_still_leaves_the_invitation() {
+    let (_, made) = driving(
+        "will-not-hold",
+        a_stack_that_will_not_hold(),
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: None,
+        },
+    )
+    .await;
+
+    assert_eq!(
+        requesting(made),
+        Some(lemonfiber_core::model::Linked::NotYet),
+        "a write the request service refused was reported as made"
+    );
+}
+
+/// A request service that will not answer at all is said, and the account stands.
+#[tokio::test]
+async fn a_request_service_that_will_not_answer_is_said_rather_than_guessed() {
+    let (_, made) = driving(
+        "will-not-answer",
+        a_stack_asking(Answer::reply(500, ""), Answer::reply(500, "")),
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: None,
+        },
+    )
+    .await;
+
+    assert_eq!(
+        requesting(made),
+        Some(lemonfiber_core::model::Linked::NotYet),
+        "a service that would not answer was reported as having held somebody"
+    );
+}

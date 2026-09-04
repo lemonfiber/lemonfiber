@@ -72,11 +72,29 @@ pub(super) async fn household(
     // A request service that will not answer costs the requests, not the household.
     // Who is here is the media server's fact, and reporting nobody because a second
     // service is down would be this same defect one service along.
-    let requests = match asked_for(ctx, &manifest.services).await {
-        Ok(requests) => requests,
+    //
+    // Reached once for both questions it is asked — what the household requested, and
+    // what each member may request — because a second reach would be a second chance
+    // to disagree about whether it answered at all.
+    let (requests, requesting) = match reaching(ctx, &manifest.services).await {
+        Ok(access) => {
+            let asked = access.seerr.requests().await.map_err(|_| {
+                "the request service's own record could not be read, so what the \
+                 household has asked for is not shown"
+                    .to_owned()
+            });
+            let requests = match asked {
+                Ok(requests) => requests,
+                Err(reason) => {
+                    findings.push(reason);
+                    Vec::new()
+                }
+            };
+            (requests, asking(&access, &accounts).await)
+        }
         Err(reason) => {
             findings.push(reason);
-            Vec::new()
+            (Vec::new(), BTreeMap::new())
         }
     };
 
@@ -104,10 +122,6 @@ pub(super) async fn household(
         );
     }
 
-    // What each member may *ask for*, which is a second service's answer and the half a
-    // limit on watching says nothing about.
-    let requesting = asking(ctx, &manifest.services, &accounts).await;
-
     let mut report = assemble(
         accounts,
         requests,
@@ -130,22 +144,10 @@ pub(super) async fn household(
 /// left out entirely, because an unread answer is not a disagreement — reporting one
 /// would send an operator looking for a defect in a service that is merely down.
 async fn asking(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    access: &crate::app::targets::HouseholdAccess,
     accounts: &[Member],
 ) -> BTreeMap<String, bool> {
     let mut asking = BTreeMap::new();
-    let Some(access) = seerr_reader(ctx, services) else {
-        return asking;
-    };
-    if access
-        .seerr
-        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
-        .await
-        .is_err()
-    {
-        return asking;
-    }
     for account in accounts {
         if let Ok(Some(requesting)) = access.seerr.requesting(&account.id).await {
             asking.insert(account.id.clone(), requesting.approves_own);
@@ -171,14 +173,14 @@ struct Naming<'a> {
     requesting: &'a BTreeMap<String, bool>,
 }
 
-/// What the household has asked for, or in plain words why it could not be read.
+/// The request service, signed in — or in plain words why it could not be asked.
 ///
 /// A reason rather than an error: none of these stops the household being listed, and
 /// each is something the operator can act on.
-async fn asked_for(
+async fn reaching(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
-) -> Result<Vec<HouseholdRequest>, String> {
+) -> Result<crate::app::targets::HouseholdAccess, String> {
     let Some(access) = seerr_reader(ctx, services) else {
         return Err(
             "there is no request service to ask, or no recorded media-server \
@@ -201,11 +203,7 @@ async fn asked_for(
         );
     }
 
-    access.seerr.requests().await.map_err(|_| {
-        "the request service's own record could not be read, so what the household has \
-         asked for is not shown"
-            .to_owned()
-    })
+    Ok(access)
 }
 
 /// The title each \*arr knows its items by, keyed by the service and the id the request
@@ -394,7 +392,7 @@ mod tests {
 
     use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-    use super::{asked_for, assemble, household, title_of, Ctx, Naming};
+    use super::{assemble, household, reaching, title_of, Ctx, Naming};
     use crate::household::State;
     use crate::model::{HouseholdReport, Restriction};
     use crate::ports::service::Certificate;
@@ -1087,7 +1085,7 @@ mod tests {
     /// With nothing to sign in to the request service with, that is said and the
     /// household still reads.
     ///
-    /// Driven at `asked_for` directly: reached through the whole command, the media
+    /// Driven at `reaching` directly: reached through the whole command, the media
     /// server's own reader refuses first for the same missing password, so the branch
     /// this is about is never the one that answers.
     #[tokio::test]
@@ -1103,7 +1101,7 @@ mod tests {
             "the shipped stack declared no services, so this asserts nothing"
         );
 
-        let asked = asked_for(&context, &services).await;
+        let asked = reaching(&context, &services).await;
 
         assert!(
             asked.is_err_and(|reason| reason.contains("no request service")),
@@ -1219,6 +1217,68 @@ mod tests {
                 .findings
                 .iter()
                 .any(|finding| finding.contains("no recorded")),
+            "{report:?}"
+        );
+    }
+
+    /// Ratings that will not read cost the certificates, not the limit.
+    ///
+    /// The words for the number still read and lemonfiber's own mapping stands in for
+    /// the names — which is a claim about where those names came from, so it is said
+    /// rather than left for a parent to take as their own server's.
+    #[tokio::test]
+    async fn ratings_that_will_not_read_cost_the_certificates_and_not_the_limit() {
+        let context = ctx_with(
+            &Fake {
+                ratings: "not json",
+                accounts: r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
+                    "Policy":{"EnableAllFolders":true,"MaxParentalRating":12}}]"#,
+                ..Fake::default()
+            },
+            "unreadable-ratings",
+        );
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(report.available, "{report:?}");
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.contains("own ratings could not be read")),
+            "{report:?}"
+        );
+        let rated = report
+            .members
+            .first()
+            .and_then(|member| member.access.rated.clone())
+            .unwrap_or_default();
+        assert!(rated.fell_back, "{rated:?}");
+        assert_eq!(rated.allows, vec!["12A".to_owned()], "{rated:?}");
+    }
+
+    /// An account holding unrated content back reads as one that does.
+    ///
+    /// The server keeps it as a list of kinds and what a household means by it is all
+    /// of them or none, so a list with anything in it is the one answer that question
+    /// has — and a member missing half the library is either this or a defect.
+    #[tokio::test]
+    async fn an_account_that_holds_unrated_content_back_reads_as_one_that_does() {
+        let context = ctx_with(
+            &Fake {
+                accounts: r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
+                    "Policy":{"EnableAllFolders":true,"MaxParentalRating":12,
+                    "BlockUnratedItems":["Movie","Series"]}}]"#,
+                ..Fake::default()
+            },
+            "unrated-held",
+        );
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert_eq!(
+            report.members.first().map(|member| member.access.unrated),
+            Some(crate::ports::service::Unrated::HeldBack),
             "{report:?}"
         );
     }

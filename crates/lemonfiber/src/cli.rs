@@ -676,6 +676,10 @@ mod tests {
     }
 
     /// Saying nothing about it says nothing, which leaves the answer to the core.
+    ///
+    /// And the reader answers for an invitation and for nothing else: every other
+    /// command parses perfectly well and carries no word, so the case for them is here
+    /// rather than left as a case nothing reaches.
     #[test]
     fn saying_nothing_about_unrated_content_carries_nothing() {
         assert_eq!(
@@ -683,6 +687,7 @@ mod tests {
             Some(("ana".to_owned(), None)),
             "a word nobody typed was carried anyway"
         );
+        assert_eq!(unrating(&["lemonfiber", "household"]), None);
     }
 
     /// Who an invitation is for and what it was told to do about unrated content, for

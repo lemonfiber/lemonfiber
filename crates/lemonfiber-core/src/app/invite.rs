@@ -156,15 +156,12 @@ pub(super) async fn offer(
             .map_err(|_| Box::new(would_not_allow(&member.name)))?;
     }
 
-    let linked = link(ctx, &services, &to_link(&held, &member)).await;
-    // After the link, because there has to be an account over there to hold. A member
-    // the request service has never heard of has no second permission to disagree with
-    // the first, which is not the same as one whose permissions could not be read.
-    let requesting = if allowed.is_some() {
-        holding(ctx, &services, &member.id).await
-    } else {
-        Linked::NotTried
-    };
+    // The account being narrowed is named only where something was written on it: an
+    // offer that says nothing about access must not quietly take a permission off
+    // somebody's account one service along.
+    let narrowed = allowed.as_ref().map(|_| member.id.as_str());
+    let Told { linked, requesting } =
+        told(ctx, &services, &to_link(&held, &member), narrowed).await;
     let applied = applied(&server, &allowance, allowed.as_ref(), requesting).await;
 
     Ok(Invitation {
@@ -189,21 +186,9 @@ pub(super) async fn offer(
 /// content rating, so what it can be told instead is the difference that matters: what
 /// this person asks for waits for somebody to see it.
 ///
-/// Best-effort for the reason the link is: the account on the media server is what an
-/// invitation *is*, and it stands whether or not a second service is up. What could not
-/// be held is reported rather than allowed to refuse the invitation.
-async fn holding(ctx: &Ctx, services: &[lemonfiber_manifest::Service], member: &str) -> Linked {
-    let Some(access) = crate::app::targets::seerr_reader(ctx, services) else {
-        return Linked::NotTried;
-    };
-    if access
-        .seerr
-        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
-        .await
-        .is_err()
-    {
-        return Linked::NotYet;
-    }
+/// Reached with the service already signed in, because telling it about the household
+/// and holding one of them are one errand: see [`told`].
+async fn holding(access: &crate::app::targets::HouseholdAccess, member: &str) -> Linked {
     match access.seerr.requesting(member).await {
         // Nothing to hold rather than a failure to hold something: a member this
         // service has never heard of has no second permission to disagree with the
@@ -271,15 +256,36 @@ fn to_link(held: &Held, made: &Member) -> Vec<String> {
     linking
 }
 
-/// Tell the request service about them, where there is one and it can be reached.
+/// What the request service was told, in the two things there are to tell it.
+struct Told {
+    /// Whether it holds an account for everybody the media server does.
+    linked: Linked,
+    /// Whether what the one being narrowed asks for was held to the same decision.
+    requesting: Linked,
+}
+
+/// Tell the request service about them, and hold the narrowed one to what they may
+/// watch — where there is a service and it can be reached.
+///
+/// **One errand rather than two**, because it is one sign-in and one set of reasons it
+/// could not be made: a second reach would be a second chance to disagree about whether
+/// the service answered at all.
 ///
 /// **Best-effort by design.** The account on the media server is what an invitation
 /// *is*, and it stands whether or not a second service is up — so a request service
 /// that will not answer is reported rather than allowed to refuse the invitation. What
 /// the person cannot do yet is worth a line; it is not worth the account.
-async fn link(ctx: &Ctx, services: &[lemonfiber_manifest::Service], members: &[String]) -> Linked {
+async fn told(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    members: &[String],
+    narrowed: Option<&str>,
+) -> Told {
     let Some(access) = crate::app::targets::seerr_reader(ctx, services) else {
-        return Linked::NotTried;
+        return Told {
+            linked: Linked::NotTried,
+            requesting: Linked::NotTried,
+        };
     };
     if access
         .seerr
@@ -287,12 +293,24 @@ async fn link(ctx: &Ctx, services: &[lemonfiber_manifest::Service], members: &[S
         .await
         .is_err()
     {
-        return Linked::NotYet;
+        return Told {
+            linked: Linked::NotYet,
+            requesting: Linked::NotYet,
+        };
     }
-    if access.seerr.link_members(members).await.is_err() {
-        return Linked::NotYet;
+    let linked = if access.seerr.link_members(members).await.is_err() {
+        Linked::NotYet
+    } else {
+        Linked::Made
+    };
+    Told {
+        linked,
+        // After the link, because there has to be an account over there to hold.
+        requesting: match narrowed {
+            None => Linked::NotTried,
+            Some(member) => holding(&access, member).await,
+        },
     }
-    Linked::Made
 }
 
 /// What both halves of this errand need before either can act: a way to reach the media
@@ -520,15 +538,18 @@ fn no_credential() -> crate::error::Problem {
 
 #[cfg(test)]
 mod tests {
-    use super::{link, Linked};
+    use super::{told, Linked};
     use crate::test_support::a_context;
 
     /// A stack with nothing to reach the request service with tells it nothing, and
     /// says so as a thing not tried rather than a thing that failed.
     ///
-    /// Driven at `link` directly: reached through the whole command, the media
+    /// Driven at `told` directly: reached through the whole command, the media
     /// server's own reader refuses first for the same missing password, so the branch
     /// this is about is never the one that answers.
+    ///
+    /// Both halves say it, because both are about the same unreachable service: an
+    /// account it was never told about has nothing held on it either.
     #[tokio::test]
     async fn with_no_request_service_to_reach_nothing_is_tried() {
         let ctx = a_context().build();
@@ -542,11 +563,14 @@ mod tests {
             "the shipped stack declared no services, so this asserts nothing"
         );
 
+        let said = told(&ctx, &services, &["1".to_owned()], Some("1")).await;
+
         assert_eq!(
-            link(&ctx, &services, &["1".to_owned()]).await,
+            said.linked,
             Linked::NotTried,
             "a stack with nothing to sign in with reported a link that failed rather \
              than one nothing was tried on"
         );
+        assert_eq!(said.requesting, Linked::NotTried);
     }
 }

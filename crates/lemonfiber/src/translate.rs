@@ -375,18 +375,27 @@ mod tests {
         ));
     }
 
-    /// What an invitation was told to allow, for one set of flags.
-    fn allowed(unrated: Option<RawUnrated>) -> Option<lemonfiber_core::app::Allowance> {
-        match invitation(
+    /// One invitation, told what to do about unrated content or told nothing.
+    fn offering(unrated: Option<RawUnrated>) -> Command {
+        invitation(
             "ana".to_owned(),
             RawAllowance {
                 libraries: vec!["Films".to_owned()],
                 age_limit: Some(12),
                 unrated,
             },
-        ) {
-            Command::Invite { allowance, .. } => Some(allowance),
-            _ => None,
+        )
+    }
+
+    /// The same invitation as it reaches the core, told what to do or told nothing.
+    fn reaching(unrated: Option<Unrated>) -> Command {
+        Command::Invite {
+            name: "ana".to_owned(),
+            allowance: Allowance {
+                libraries: vec!["Films".to_owned()],
+                age_limit: Some(12),
+                unrated,
+            },
         }
     }
 
@@ -395,8 +404,8 @@ mod tests {
     #[test]
     fn the_other_word_reaches_the_other_answer() {
         assert_eq!(
-            allowed(Some(RawUnrated::Allow)).unwrap_or_default().unrated,
-            Some(Unrated::LetThrough)
+            offering(Some(RawUnrated::Allow)),
+            reaching(Some(Unrated::LetThrough))
         );
     }
 
@@ -408,6 +417,6 @@ mod tests {
     /// household's behalf.
     #[test]
     fn saying_nothing_about_unrated_content_carries_nothing() {
-        assert_eq!(allowed(None).unwrap_or_default().unrated, None);
+        assert_eq!(offering(None), reaching(None));
     }
 }
