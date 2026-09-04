@@ -370,6 +370,11 @@ mod tests {
     #[test]
     fn a_yes_over_a_trace_sends_the_search_and_says_which_run_it_is() {
         let mut stage = Stage::Idle;
+        assert_eq!(
+            running(&stage),
+            None,
+            "a screen holding nothing is holding no widened run"
+        );
 
         let wanted = answered(
             &mut stage,
