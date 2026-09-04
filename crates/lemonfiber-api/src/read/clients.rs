@@ -1,7 +1,9 @@
 //! The one read about which app to watch on.
 //!
-//! Takes no arguments and reads nothing: the answer is the same on every machine,
-//! so this needs neither a stack running nor a daemon reachable.
+//! Takes no arguments: the table is the same on every machine, so this needs
+//! neither a stack running nor a daemon reachable. The one caution above it is read
+//! from the quality choice and the platform, best-effort, so a machine with nothing
+//! set up is still answered in full.
 
 use axum::extract::{RawQuery, State};
 use axum::response::Response;

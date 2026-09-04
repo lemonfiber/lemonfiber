@@ -456,6 +456,17 @@
               "description": "True of every device, said once.",
               "type": "string"
             },
+            "straining": {
+              "description": "Why playback here is likely to struggle before any app is chosen, or `None`\nwhere the preset in force asks for nothing this platform cannot serve.\n\nAbsent far more often than present, and it must be: a caution shown to\neverybody says nothing about anybody's machine, and a reader who meets one\nevery time stops reading it.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Straining"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "trouble": {
               "description": "What to do when it does not work, keyed by the symptom.",
               "type": "array",
@@ -469,6 +480,29 @@
             "trouble",
             "only_at_home",
             "nothing_is_installed"
+          ]
+        },
+        "Straining": {
+          "description": "Why playback here is likely to struggle, whatever app the household installs.\n\nPresent only where the preset in force asks for transcoding this platform cannot\ndo in hardware. It belongs to the guidance rather than to any one device: the\npreset and the platform decide it between them, and every device in the table\nmeets it.",
+          "type": "object",
+          "properties": {
+            "caution": {
+              "description": "What that preset asks of this machine, and what playback does where this\nmachine cannot give it.",
+              "type": "string"
+            },
+            "instead": {
+              "description": "What makes it stop.",
+              "type": "string"
+            },
+            "preset": {
+              "description": "The preset in force, under the name it was chosen by.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "preset",
+            "caution",
+            "instead"
           ]
         },
         "Support": {

@@ -513,7 +513,7 @@ mod tests {
         render(&Outcome::Version(a_version()), false);
         render(&Outcome::Watch(a_watch()), false);
         render(
-            &Outcome::Clients(lemonfiber_core::clients::guidance()),
+            &Outcome::Clients(lemonfiber_core::clients::guidance(None)),
             false,
         );
     }

@@ -339,7 +339,13 @@ mod tests {
     fn the_last_of_them() -> Vec<Outcome> {
         vec![
             Outcome::FrontDoor(a_front_door()),
-            Outcome::Clients(crate::clients::guidance()),
+            // Carrying its caution rather than leaving it out, so the optional half
+            // of the shape is compared too.
+            Outcome::Clients(crate::clients::guidance(Some(
+                crate::transcoding::Warning {
+                    preset: crate::quality::Preset::Maximum,
+                },
+            ))),
             Outcome::Outbound(what_leaves()),
             Outcome::Stored(crate::stored::stored(
                 &crate::config::paths::Paths::rooted(
