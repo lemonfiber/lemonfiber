@@ -26,7 +26,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install the yaml reader
-        run: python3 -m pip install --quiet --disable-pip-version-check "pyyaml==6.0.2"
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check \
+            --require-hashes -r .github/requirements/yaml.txt
 
       - name: The release workflow still carries every patch
         run: python3 scripts/verify_release_workflow.py
