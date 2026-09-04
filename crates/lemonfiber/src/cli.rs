@@ -10,7 +10,7 @@ mod setup;
 
 use std::path::PathBuf;
 
-use clap::{Args, CommandFactory, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use include_dir::{include_dir, Dir};
 
 // Re-exported rather than reached for through the module they now live in: where a
@@ -75,8 +75,8 @@ pub fn help() -> String {
 
 /// What an invitation lets the person it is for watch, as the command line spells it.
 ///
-/// Flattened rather than sat on the request as two fields, because they are one
-/// decision taken at one moment and the core carries them as one value — and two
+/// Flattened rather than sat on the request as three fields, because they are one
+/// decision taken at one moment and the core carries them as one value — and three
 /// fields here would be a request the translation next door had to put back together.
 #[derive(Debug, Args)]
 pub struct RawAllowance {
@@ -88,6 +88,24 @@ pub struct RawAllowance {
     /// 18 are the steps offered; none sets no limit at all.
     #[arg(long, value_name = "AGE")]
     pub age_limit: Option<u32>,
+    /// What to do about content the media server has no rating for; anybody being
+    /// narrowed has it held back unless this says otherwise.
+    #[arg(long, value_name = "CHOICE")]
+    pub unrated: Option<RawUnrated>,
+}
+
+/// What is to happen to content the media server has no rating for.
+///
+/// Offered as two words rather than as a switch, because a switch has a default the
+/// operator cannot see and this choice has a cost either way: holding it back makes
+/// legitimate content invisible, and letting it through lets through the one thing
+/// nobody rated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum RawUnrated {
+    /// Hold it back.
+    Block,
+    /// Let it through.
+    Allow,
 }
 
 /// What the operator asked for.
@@ -488,7 +506,7 @@ pub enum ConfigAction {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cli, Mending, Request};
+    use super::{Cli, Mending, RawUnrated, Request};
     use clap::{CommandFactory, Parser};
 
     /// What `doctor` was asked to do about what it finds, for one command line.
@@ -632,6 +650,57 @@ mod tests {
     #[test]
     fn a_command_that_is_not_an_invitation_carries_no_allowance() {
         assert_eq!(inviting(&["lemonfiber", "household"]), None);
+    }
+
+    /// What to do about unrated content is one of two words, and it reaches the
+    /// request as the one that was typed.
+    #[test]
+    fn what_to_do_about_unrated_content_is_carried_as_the_word_it_was_typed_as() {
+        for (typed, chosen) in [("block", RawUnrated::Block), ("allow", RawUnrated::Allow)] {
+            assert_eq!(
+                unrating(&["lemonfiber", "invite", "ana", "--unrated", typed]),
+                Some(("ana".to_owned(), Some(chosen))),
+                "{typed}"
+            );
+        }
+    }
+
+    /// A third word is refused at the parser rather than sent on to mean whichever
+    /// answer the far side happened to default to.
+    #[test]
+    fn a_third_word_about_unrated_content_is_refused() {
+        assert_eq!(
+            unrating(&["lemonfiber", "invite", "ana", "--unrated", "hide"]),
+            None
+        );
+    }
+
+    /// Saying nothing about it says nothing, which leaves the answer to the core.
+    ///
+    /// And the reader answers for an invitation and for nothing else: every other
+    /// command parses perfectly well and carries no word, so the case for them is here
+    /// rather than left as a case nothing reaches.
+    #[test]
+    fn saying_nothing_about_unrated_content_carries_nothing() {
+        assert_eq!(
+            unrating(&["lemonfiber", "invite", "ana"]),
+            Some(("ana".to_owned(), None)),
+            "a word nobody typed was carried anyway"
+        );
+        assert_eq!(unrating(&["lemonfiber", "household"]), None);
+    }
+
+    /// Who an invitation is for and what it was told to do about unrated content, for
+    /// one command line.
+    ///
+    /// The name comes back beside the word so that nothing is the *absence* of a
+    /// parse: a line the parser turned away answers with nothing at all, and one that
+    /// named no word answers with the name and no word.
+    fn unrating(args: &[&str]) -> Option<(String, Option<RawUnrated>)> {
+        match Cli::try_parse_from(args).ok()?.command? {
+            Request::Invite { name, allowance } => Some((name, allowance.unrated)),
+            _ => None,
+        }
     }
 
     /// The steps the flag's own help names are the steps the core offers.

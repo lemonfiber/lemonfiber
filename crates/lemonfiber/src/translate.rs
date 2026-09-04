@@ -5,17 +5,17 @@
 //! so that what a request *means* can be read, and proven, without going through
 //! everything that happens to it afterwards.
 
-use lemonfiber::cli::RawAllowance;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{Allowance, Command, QualityAction};
 use lemonfiber_core::audio::Format;
+use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
 use crate::exit::USAGE;
 use crate::say::complain;
-use lemonfiber::cli::{Asked, ConfigAction, QualityCommand};
+use lemonfiber::cli::{Asked, ConfigAction, QualityCommand, RawAllowance, RawUnrated};
 
 /// What a support bundle was asked to hold, and where it goes.
 ///
@@ -33,6 +33,32 @@ pub(crate) fn bundling(asked: Asked) -> Command {
             asked.confirm,
         ),
         dest: asked.out.map_or(Destination::Beside, Destination::At),
+    }
+}
+
+/// Who an invitation is for, and what the account is to let them watch.
+///
+/// The command line spells what somebody may watch as three flags and the core carries
+/// them as one choice, because they are one decision taken at one moment. Only the
+/// third needs turning: libraries are named as the media server names them and an age
+/// limit is the age the server already keeps, while what to do about unrated content is
+/// a word here and a choice there.
+///
+/// **Nothing said is nothing carried.** Leaving the flag out is not choosing to let
+/// unrated content through — it is saying nothing about it, which leaves the answer to
+/// whatever a restriction carries by default. A `false` written for a word nobody typed
+/// would be this surface deciding on the household's behalf.
+pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
+    Command::Invite {
+        name,
+        allowance: Allowance {
+            libraries: allowance.libraries,
+            age_limit: allowance.age_limit,
+            unrated: allowance.unrated.map(|chosen| match chosen {
+                RawUnrated::Block => Unrated::HeldBack,
+                RawUnrated::Allow => Unrated::LetThrough,
+            }),
+        },
     }
 }
 
@@ -109,20 +135,6 @@ pub(crate) fn traced(term: &[String], season: Option<u32>, search: bool) -> Comm
     }
 }
 
-/// Who an invitation is for, and what the account is to let them watch.
-///
-/// The command line spells what somebody may
-/// watch as two flags and the core carries them as one choice,, so the two are put together here.
-pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
-    Command::Invite {
-        name,
-        allowance: Allowance {
-            libraries: allowance.libraries,
-            age_limit: allowance.age_limit,
-        },
-    }
-}
-
 /// A restart of named services, or of everything the form holds where none are named.
 pub(crate) fn restarting(form: String, services: Vec<String>) -> Command {
     Command::Restart {
@@ -133,7 +145,6 @@ pub(crate) fn restarting(form: String, services: Vec<String>) -> Command {
 
 #[cfg(test)]
 mod tests {
-    use lemonfiber::cli::RawAllowance;
     use lemonfiber_core::app::{Allowance, Command, QualityAction};
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
@@ -142,10 +153,11 @@ mod tests {
         bundling, configuration, invitation, quality, restarting, traced, Destination, Wanted,
     };
     use crate::exit::USAGE;
-    use lemonfiber::cli::{Asked, ConfigAction, QualityCommand};
+    use lemonfiber::cli::{Asked, ConfigAction, QualityCommand, RawAllowance, RawUnrated};
     use lemonfiber_core::bundle::Filenames;
+    use lemonfiber_core::ports::service::Unrated;
 
-    /// Two flags at the command line are one choice in the core.
+    /// Three flags at the command line are one choice in the core.
     #[test]
     fn an_invitation_carries_what_was_chosen_as_one_allowance() {
         assert_eq!(
@@ -154,6 +166,7 @@ mod tests {
                 RawAllowance {
                     libraries: vec!["Films".to_owned()],
                     age_limit: Some(12),
+                    unrated: Some(RawUnrated::Block),
                 }
             ),
             Command::Invite {
@@ -161,6 +174,7 @@ mod tests {
                 allowance: Allowance {
                     libraries: vec!["Films".to_owned()],
                     age_limit: Some(12),
+                    unrated: Some(Unrated::HeldBack),
                 },
             }
         );
@@ -359,5 +373,50 @@ mod tests {
                 ..
             } if path == std::path::Path::new("/tmp/bundle.tar.gz")
         ));
+    }
+
+    /// One invitation, told what to do about unrated content or told nothing.
+    fn offering(unrated: Option<RawUnrated>) -> Command {
+        invitation(
+            "ana".to_owned(),
+            RawAllowance {
+                libraries: vec!["Films".to_owned()],
+                age_limit: Some(12),
+                unrated,
+            },
+        )
+    }
+
+    /// The same invitation as it reaches the core, told what to do or told nothing.
+    fn reaching(unrated: Option<Unrated>) -> Command {
+        Command::Invite {
+            name: "ana".to_owned(),
+            allowance: Allowance {
+                libraries: vec!["Films".to_owned()],
+                age_limit: Some(12),
+                unrated,
+            },
+        }
+    }
+
+    /// The other word reaches the other answer, so the two cannot be one flag read
+    /// twice — the case above carries the first, and each has to reach its own.
+    #[test]
+    fn the_other_word_reaches_the_other_answer() {
+        assert_eq!(
+            offering(Some(RawUnrated::Allow)),
+            reaching(Some(Unrated::LetThrough))
+        );
+    }
+
+    /// Saying nothing about unrated content carries nothing.
+    ///
+    /// Leaving the flag out is not choosing to let it through; it is saying nothing,
+    /// which leaves the answer to whatever a restriction carries by default. A value
+    /// written here for a word nobody typed would be this surface deciding on the
+    /// household's behalf.
+    #[test]
+    fn saying_nothing_about_unrated_content_carries_nothing() {
+        assert_eq!(offering(None), reaching(None));
     }
 }

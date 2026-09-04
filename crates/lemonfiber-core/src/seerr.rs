@@ -17,14 +17,19 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+mod members;
 mod records;
 
+use members::{
+    approves_own, without_approval, MemberResource, PermissionsResource, LINK_MEMBERS, MEMBERS,
+    NOT_FOUND, PERMISSIONS,
+};
 use records::{RequestPage, RequestRecord, REQUEST_PAGE};
 
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
-    Failure, FulfilmentTarget, HouseholdRequest, RegisteredTarget, Requests, Telling,
+    Failure, FulfilmentTarget, HouseholdRequest, RegisteredTarget, Requesting, Requests, Telling,
 };
 
 /// Seerr's own API key, read from the settings file it writes.
@@ -137,38 +142,6 @@ pub const OCCASIONS: u32 =
 /// intrinsic to which \*arr it is.
 const FILM: &str = "/settings/radarr";
 const TELEVISION: &str = "/settings/sonarr";
-
-/// Where media-server accounts are given accounts here.
-///
-/// It reads the media server itself, using the credentials this service was set up
-/// with, so what is sent is identifiers and not accounts. **A member it already holds
-/// is skipped**, which is what lets every member be sent on every run.
-const LINK_MEMBERS: &str = "/user/import-from-jellyfin";
-
-/// What this service answers when it holds no account for somebody.
-///
-/// Its own word for "I have never heard of this person", which for a removal is an
-/// answer rather than a fault.
-const NOT_FOUND: u16 = 404;
-
-/// One account this service holds, in the spelling it answers with.
-///
-/// Only the identifier is read. Everything else about the person — what they are called,
-/// what they may watch — is the media server's to say, and a second copy here would be a
-/// copy able to disagree with it.
-#[derive(Deserialize)]
-struct MemberResource {
-    #[serde(default)]
-    id: i64,
-}
-
-/// Where the accounts this service holds are read and removed.
-///
-/// The lookup is by the **media server's** identifier rather than this service's own,
-/// because that is the one lemonfiber holds: it made the account over there. The service
-/// normalises it — dashes stripped, lower-cased, and refused unless it is 32 hex
-/// characters — so what goes must be a media-server account identifier and nothing else.
-const MEMBERS: &str = "/user";
 
 /// How available a film must be before it is fetched.
 ///
@@ -457,6 +430,44 @@ impl Requests for Seerr {
             "the account this service holds could not be read",
         )?;
         Ok(Some(held.id.to_string()))
+    }
+
+    async fn requesting(&self, media_server_id: &str) -> Result<Option<Requesting>, Failure> {
+        let path = format!("{MEMBERS}/jellyfin/{media_server_id}");
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, &path, None))
+            .await?;
+        // Never having heard of somebody is an answer here too: a member who has not
+        // signed in has no account for a restriction to disagree with.
+        if response.status == NOT_FOUND {
+            return Ok(None);
+        }
+        let held: MemberResource = self
+            .endpoint
+            .decode(&response, "what this member may ask for could not be read")?;
+        Ok(Some(Requesting {
+            id: held.id.to_string(),
+            approves_own: approves_own(held.permissions),
+        }))
+    }
+
+    async fn approval_first(&self, id: &str) -> Result<(), Failure> {
+        let path = format!("{MEMBERS}/{id}/{PERMISSIONS}");
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, &path, None))
+            .await?;
+        let held: PermissionsResource = self
+            .endpoint
+            .decode(&response, "what this member may ask for could not be read")?;
+        let body =
+            serde_json::json!({ "permissions": without_approval(held.permissions) }).to_string();
+        let written = self
+            .endpoint
+            .send(&self.request(Method::Post, &path, Some(body)))
+            .await?;
+        self.endpoint.expect_success(&written)
     }
 
     async fn remove_member(&self, id: &str) -> Result<(), Failure> {

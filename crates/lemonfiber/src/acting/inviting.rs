@@ -1,14 +1,20 @@
 //! What an invitation lets somebody watch, decided while they are being invited.
 //!
-//! `Command::Invite` is three answers: who it is for, which libraries they may open,
-//! and how far up the ratings they may go. This screen carried the first and sent
-//! nothing for the other two — which is the right thing to send when nobody has been
-//! asked, and is not the same as being the only answer available.
+//! `Command::Invite` is four answers: who it is for, which libraries they may open,
+//! how far up the ratings they may go, and what happens to content the media server
+//! has no rating for. This screen carried the first and sent nothing for the rest —
+//! which is the right thing to send when nobody has been asked, and is not the same as
+//! being the only answer available.
 //!
-//! All three are asked now, and they are asked in one run because that is the whole
-//! point of asking them here. An account made open and narrowed afterwards is open for
-//! as long as it takes anybody to remember, and the person most likely to be given a
-//! limit has already been handed the address.
+//! They are asked in one run because that is the whole point of asking them here. An
+//! account made open and narrowed afterwards is open for as long as it takes anybody
+//! to remember, and the person most likely to be given a limit has already been handed
+//! the address.
+//!
+//! **The fourth is asked only where something was narrowed.** An offer that names
+//! neither a library nor a limit writes no policy at all, so what would happen to
+//! unrated content is a question about a setting this run does not touch — and a
+//! keypress the ordinary case does not owe.
 //!
 //! **The libraries are typed and the age limit is taken off a list**, which is the same
 //! rule every other pair on this screen is decided by: a list is offered where the
@@ -46,14 +52,70 @@ pub(super) const ASKS_LIBRARIES: &str = "Which libraries, separated by commas; n
 /// presses enter through the errand sends the invitation this screen always sent.
 const NO_LIMIT: &str = "they can watch anything in the libraries above";
 
+/// What is said on the row that holds unrated content back.
+///
+/// The one an operator lands on by pressing enter, because it is what a restriction
+/// defaults to everywhere else — and because the cost of the other answer is the one
+/// nobody can weigh in advance.
+const HOLD_UNRATED: &str = "safer; some legitimate content becomes invisible to them";
+
+/// What is said on the row that lets it through.
+const ALLOW_UNRATED: &str = "more permissive; content with no rating is unpredictable";
+
+/// The word each row sends, as a request body and the command line both spell it.
+///
+/// The same two words the other surfaces take, so the choice made here is the choice
+/// they make — a third spelling would be a third answer nobody could hold the others
+/// to.
+const HELD_BACK: &str = "block";
+
+/// The word for letting it through.
+const LET_THROUGH: &str = "allow";
+
+/// One answer to what happens to content the media server has no rating for.
+pub(super) struct Unrated {
+    /// What it is called on the row.
+    name: &'static str,
+    /// What choosing it comes to, in the line beside the name.
+    about: &'static str,
+    /// What the errand is given by taking it.
+    given: Given,
+}
+
+impl Listed for Unrated {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn about(&self) -> &str {
+        self.about
+    }
+}
+
 /// One answer to how far up the ratings an invitation goes.
 pub(super) struct Limit {
     /// What it is called on the row, in the core's own words for that limit.
     name: String,
     /// What choosing it comes to, in the line beside the name.
     about: &'static str,
-    /// What the errand is given by taking it.
-    given: Given,
+    /// What has been answered by the time this row is taken, kept because the
+    /// question at the end says every answer together and the two lines they were
+    /// given on are gone by then.
+    answered: Answered,
+}
+
+/// What has been answered by the time an age limit is taken.
+///
+/// Carried on each row rather than beside the chooser, because the row is what a
+/// keypress hands on and a second copy alongside it is a copy able to disagree with
+/// the one that was actually taken.
+struct Answered {
+    /// Who the invitation is for.
+    name: String,
+    /// The libraries typed, as separate names. Empty is every one.
+    libraries: Vec<String>,
+    /// The limit the row carries, where the row carries one.
+    age_limit: Option<u32>,
 }
 
 impl Listed for Limit {
@@ -129,7 +191,11 @@ fn limiting(errand: &'static Errand, name: &str, libraries: &[String]) -> Stage 
     let row = |age: Option<u32>, suits: &'static str| Limit {
         name: age_limit::reading(age),
         about: suits,
-        given: Given::inviting(name, libraries.to_vec(), age),
+        answered: Answered {
+            name: name.to_owned(),
+            libraries: libraries.to_vec(),
+            age_limit: age,
+        },
     };
     Stage::Limiting {
         errand,
@@ -152,7 +218,18 @@ pub(super) fn limited(
 ) -> Wanted {
     match *press {
         Press::Abandon => return Wanted::Nothing,
-        Press::Accept => return errand::begun(stage, errand, chooser.taken().given),
+        Press::Accept => {
+            let answered = chooser.taken().answered;
+            // Nothing narrowed is nothing written, so there is no unrated content to
+            // decide about: the errand goes straight to its question, saying nothing
+            // about a setting this run does not touch.
+            if answered.age_limit.is_none() && answered.libraries.is_empty() {
+                let given = Given::inviting(&answered.name, answered.libraries, None, None);
+                return errand::begun(stage, errand, given);
+            }
+            *stage = unrating(errand, &answered);
+            return Wanted::Nothing;
+        }
         Press::Back => chooser.back(),
         Press::Forward => chooser.forward(),
         Press::Typed(_) | Press::Rubout => (),
@@ -161,9 +238,61 @@ pub(super) fn limited(
     Wanted::Nothing
 }
 
+/// The list of what happens to content the media server has no rating for.
+///
+/// Held back first, because it is what a restriction defaults to on every other
+/// surface and an operator pressing enter through this errand should land on the same
+/// answer a command line leaving the flag out lands on.
+fn unrating(errand: &'static Errand, answered: &Answered) -> Stage {
+    let row = |word: &'static str, name: &'static str, about: &'static str| Unrated {
+        name,
+        about,
+        given: Given::inviting(
+            &answered.name,
+            answered.libraries.clone(),
+            answered.age_limit,
+            // The row's own name is what the question says it as, so the sentence an
+            // operator agrees to and the row they took cannot come apart.
+            Some((word, name)),
+        ),
+    };
+    Stage::Unrated {
+        errand,
+        chooser: Chooser::over(
+            row(HELD_BACK, "nothing unrated", HOLD_UNRATED),
+            vec![row(
+                LET_THROUGH,
+                "including what has no rating",
+                ALLOW_UNRATED,
+            )],
+        ),
+    }
+}
+
+/// Over what happens to unrated content: move, take one, or leave it.
+pub(super) fn unrated(
+    stage: &mut Stage,
+    errand: &'static Errand,
+    mut chooser: Chooser<Unrated>,
+    press: &Press,
+) -> Wanted {
+    match *press {
+        Press::Abandon => return Wanted::Nothing,
+        Press::Accept => return errand::begun(stage, errand, chooser.taken().given),
+        Press::Back => chooser.back(),
+        Press::Forward => chooser.forward(),
+        Press::Typed(_) | Press::Rubout => (),
+    }
+    *stage = Stage::Unrated { errand, chooser };
+    Wanted::Nothing
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{allowing, limited, named, over, ASKS_LIBRARIES, NO_LIMIT};
+    use super::{
+        allowing, limited, named, over, unrated, ALLOW_UNRATED, ASKS_LIBRARIES, HELD_BACK,
+        HOLD_UNRATED, LET_THROUGH, NO_LIMIT,
+    };
     use crate::acting::errand::{self, Errand};
     use crate::acting::{Press, Stage};
     use lemonfiber_api::actions::Arguments;
@@ -193,6 +322,9 @@ mod tests {
             }
             Stage::Limiting { errand, chooser } => {
                 let _ = limited(stage, errand, chooser, pressed);
+            }
+            Stage::Unrated { errand, chooser } => {
+                let _ = unrated(stage, errand, chooser, pressed);
             }
             other => *stage = other,
         }
@@ -276,6 +408,9 @@ mod tests {
         // The row under no limit, which is the lowest step the core offers.
         press(&mut stage, &Press::Forward);
         press(&mut stage, &Press::Accept);
+        // Something was narrowed, so the third question is asked; the row it opens on
+        // is the one a restriction defaults to everywhere else.
+        press(&mut stage, &Press::Accept);
 
         let (asked, said) = agreed(&stage);
         assert_eq!(asked.name.as_deref(), Some("ana"), "{said}");
@@ -309,6 +444,97 @@ mod tests {
         );
     }
 
+    /// Content the media server has no rating for is asked about last, and only where
+    /// the answers before it narrowed something.
+    ///
+    /// An offer that names neither a library nor a limit writes no policy at all, so
+    /// the question would be about a setting the run does not touch — and a keypress
+    /// the ordinary case does not owe.
+    #[test]
+    fn what_happens_to_unrated_content_is_asked_only_where_something_was_narrowed() {
+        let mut stage = over(inviting(), "ana".to_owned());
+        press(&mut stage, &Press::Accept);
+        press(&mut stage, &Press::Accept);
+        assert!(
+            matches!(&stage, Stage::Agreeing { .. }),
+            "an offer that narrowed nothing was asked about unrated content"
+        );
+
+        let mut stage = over(inviting(), "ana".to_owned());
+        typing(&mut stage, "Films");
+        press(&mut stage, &Press::Accept);
+        press(&mut stage, &Press::Accept);
+        assert!(
+            matches!(&stage, Stage::Unrated { .. }),
+            "an offer that narrowed a library was not asked about unrated content"
+        );
+    }
+
+    /// The two answers reach the question, and the row it opens on is the one a
+    /// restriction defaults to on every other surface.
+    #[test]
+    fn the_answer_about_unrated_content_reaches_the_question_with_the_rest() {
+        for (presses, expected) in [(0, HELD_BACK.to_owned()), (1, LET_THROUGH.to_owned())] {
+            let mut stage = over(inviting(), "ana".to_owned());
+            typing(&mut stage, "Films");
+            press(&mut stage, &Press::Accept);
+            press(&mut stage, &Press::Accept);
+            for _ in 0..presses {
+                press(&mut stage, &Press::Forward);
+            }
+            press(&mut stage, &Press::Accept);
+
+            let (asked, said) = agreed(&stage);
+            assert_eq!(asked.name.as_deref(), Some("ana"), "{said}");
+            assert_eq!(asked.libraries, ["Films".to_owned()], "{said}");
+            // Both rows send a word. The answer is a choice with a cost either way,
+            // so the row an operator lands on is an answer they gave rather than one
+            // this screen left for somewhere else to fill in.
+            assert_eq!(asked.unrated.as_deref(), Some(expected.as_str()), "{said}");
+        }
+    }
+
+    /// Both rows say what taking them comes to, because either answer has a cost.
+    #[test]
+    fn both_answers_about_unrated_content_say_what_they_cost() {
+        assert!(HOLD_UNRATED.contains("invisible"), "{HOLD_UNRATED}");
+        assert!(ALLOW_UNRATED.contains("unpredictable"), "{ALLOW_UNRATED}");
+    }
+
+    /// Backing out of the last question closes the errand rather than sending it with
+    /// an answer nobody gave.
+    #[test]
+    fn backing_out_of_the_last_question_closes_it() {
+        let mut stage = over(inviting(), "ana".to_owned());
+        typing(&mut stage, "Films");
+        press(&mut stage, &Press::Accept);
+        press(&mut stage, &Press::Accept);
+        press(&mut stage, &Press::Abandon);
+
+        assert!(matches!(stage, Stage::Idle), "the last list did not close");
+    }
+
+    /// The last list answers no keypress it has no use for.
+    #[test]
+    fn the_last_list_answers_no_press_it_has_no_use_for() {
+        let mut stage = over(inviting(), "ana".to_owned());
+        typing(&mut stage, "Films");
+        press(&mut stage, &Press::Accept);
+        press(&mut stage, &Press::Accept);
+        press(&mut stage, &Press::Typed('x'));
+        press(&mut stage, &Press::Rubout);
+        press(&mut stage, &Press::Forward);
+        press(&mut stage, &Press::Back);
+        press(&mut stage, &Press::Accept);
+
+        let (asked, said) = agreed(&stage);
+        assert_eq!(
+            asked.unrated.as_deref(),
+            Some(HELD_BACK),
+            "typing at the last list moved it: {said}"
+        );
+    }
+
     /// Taking a character back takes one character back, and moving down the list of
     /// age limits and back up comes back to where it opened.
     #[test]
@@ -326,8 +552,15 @@ mod tests {
         press(&mut stage, &Press::Forward);
         press(&mut stage, &Press::Back);
         press(&mut stage, &Press::Accept);
+        // A library was named, so the third question stands between the list and the
+        // question at the end.
+        press(&mut stage, &Press::Accept);
 
         let (asked, said) = agreed(&stage);
+        assert!(
+            matches!(&stage, Stage::Agreeing { .. }),
+            "the errand did not reach its question: {said}"
+        );
         assert_eq!(
             asked.age_limit, None,
             "moving down the list and back up did not come back to no limit: {said}"

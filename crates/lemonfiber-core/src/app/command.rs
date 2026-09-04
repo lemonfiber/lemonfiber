@@ -33,6 +33,9 @@ pub struct Allowance {
     pub libraries: Vec<String>,
     /// The age above which the media server holds things back. `None` is no limit.
     pub age_limit: Option<u32>,
+    /// What is to happen to content the media server has no rating for. `None` leaves
+    /// it to the default a restriction carries — see [`crate::app::invite`].
+    pub unrated: Option<crate::ports::service::Unrated>,
 }
 
 /// What a surface is asking for.

@@ -681,6 +681,7 @@ mod tests {
                 members: Vec::new(),
                 available: true,
                 findings: Vec::new(),
+                filtering: None,
             }),
             Outcome::Stuck(StuckReport {
                 items: Vec::new(),
@@ -759,6 +760,7 @@ mod tests {
                 rehearsed: false,
                 standing: lemonfiber_core::model::InvitationStanding::Made,
                 linked: lemonfiber_core::model::Linked::Made,
+                applied: None,
             }),
             Outcome::Removed(lemonfiber_core::model::HouseholdRemoval {
                 name: "ana".to_owned(),

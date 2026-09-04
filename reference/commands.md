@@ -1061,6 +1061,13 @@ Options:
       --force
           Take the stack from a run that claimed it and did not give it back
 
+      --unrated <CHOICE>
+          What to do about content the media server has no rating for; anybody being narrowed has it held back unless this says otherwise
+
+          Possible values:
+          - block: Hold it back
+          - allow: Let it through
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 

@@ -185,6 +185,7 @@ fn off_a_list(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<
             ),
         ),
         Stage::Limiting { errand, chooser } => (sending(errand), choosing(chooser, rows, across)),
+        Stage::Unrated { errand, chooser } => (sending(errand), choosing(chooser, rows, across)),
         Stage::Weighing { errand, .. } => (sending(errand), vec![dimmed(WEIGHING, across)]),
         Stage::Agreeing {
             errand,

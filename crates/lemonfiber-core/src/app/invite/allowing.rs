@@ -20,7 +20,8 @@
 //! account is made, in a rehearsal too, and `--dry-run` refuses what the real run would
 //! refuse.
 
-use crate::ports::service::{Allowed, Household as _, NamedLibrary};
+use crate::app::Allowance;
+use crate::ports::service::{Allowed, Household as _, NamedLibrary, Unrated};
 
 /// What the person being invited is to be allowed, or nothing where nothing was chosen.
 ///
@@ -31,19 +32,36 @@ use crate::ports::service::{Allowed, Household as _, NamedLibrary};
 /// household had narrowed it to, and undoing it silently.
 pub(super) async fn allowing(
     server: &crate::jellyfin::Jellyfin,
-    named: &[String],
-    age_limit: Option<u32>,
+    allowance: &Allowance,
 ) -> Result<Option<Allowed>, Box<crate::error::Problem>> {
-    if named.is_empty() && age_limit.is_none() {
+    if allowance.libraries.is_empty() && allowance.age_limit.is_none() {
         return Ok(None);
     }
     Ok(Some(Allowed {
         // Naming no library is saying nothing about libraries rather than asking for
         // all of them. An offer that set only an age limit must leave what an account
         // already opens alone, and an account being made has every library anyway.
-        libraries: chosen(server, named).await?,
-        age_limit,
+        libraries: chosen(server, &allowance.libraries).await?,
+        age_limit: allowance.age_limit,
+        unrated: Some(unrated(allowance)),
     }))
+}
+
+/// What is to happen to content the media server has no rating for.
+///
+/// **Held back unless the operator said otherwise, and only on somebody being
+/// restricted.** A great deal of content carries no rating at all, and a rating limit
+/// cannot decide about a thing it has no rating for — so the choice has to be made, and
+/// the conservative one is the one to make for a person somebody has just decided to
+/// narrow. The cost is stated rather than hidden: some legitimate content becomes
+/// invisible to them, which is why what was applied travels back on the answer.
+///
+/// An offer that narrows nothing never reaches here, because nothing is written at all.
+const fn unrated(allowance: &Allowance) -> Unrated {
+    match allowance.unrated {
+        Some(chosen) => chosen,
+        None => Unrated::HeldBack,
+    }
 }
 
 /// The libraries named, by the identifiers the media server tells them apart by.

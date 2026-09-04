@@ -15,7 +15,9 @@ use async_trait::async_trait;
 
 use super::Jellyfin;
 use crate::ports::http::Method;
-use crate::ports::service::{Access, Allowed, Failure, Invited, Member, NamedLibrary};
+use crate::ports::service::{
+    Access, Allowed, Certificate, Failure, Invited, Member, NamedLibrary, Unrated,
+};
 
 /// The account list, as the media server names its fields.
 #[derive(serde::Deserialize)]
@@ -48,6 +50,10 @@ struct PolicyResource {
     /// The age limit, which the server sends as `null` where none is set.
     #[serde(rename = "MaxParentalRating", default)]
     age_limit: Option<u32>,
+    /// The kinds of unrated thing held back. Empty is nothing held back, which is the
+    /// state a new account is made in.
+    #[serde(rename = "BlockUnratedItems", default)]
+    unrated_blocked: Vec<String>,
     #[serde(rename = "IsAdministrator", default)]
     administrator: bool,
     #[serde(rename = "IsDisabled", default)]
@@ -66,6 +72,11 @@ impl UserResource {
                 every_library: policy.every_library,
                 libraries: policy.libraries,
                 age_limit: policy.age_limit,
+                unrated: if policy.unrated_blocked.is_empty() {
+                    Unrated::LetThrough
+                } else {
+                    Unrated::HeldBack
+                },
                 administrator: policy.administrator,
                 disabled: policy.disabled,
             },
@@ -84,6 +95,20 @@ impl UserResource {
 struct AccountResource {
     #[serde(rename = "Policy", default)]
     policy: serde_json::Map<String, serde_json::Value>,
+}
+
+/// One row of the media server's own rating table, as it names its fields.
+///
+/// **The age is absent on one row and only one.** Driven against
+/// `jellyfin/jellyfin:10.10.3`: the table opens with the server's name for content it
+/// has no rating for, which carries no age because it is not a certificate. Every other
+/// row carries one, so a missing age is what tells that row apart.
+#[derive(serde::Deserialize)]
+struct RatingResource {
+    #[serde(rename = "Name", default)]
+    name: String,
+    #[serde(rename = "Value", default)]
+    age: Option<u32>,
 }
 
 /// One library, as the media server names its fields.
@@ -132,6 +157,34 @@ const CHOSEN_LIBRARIES: &str = "EnabledFolders";
 
 /// The highest rating it may watch, which the server holds as a number.
 const AGE_LIMIT: &str = "MaxParentalRating";
+
+/// The kinds of unrated thing the server holds back, as it names them.
+///
+/// All of them, because what a household means by "hold back what has no rating" is
+/// all of them — a policy naming some would hold back an unrated film and let an
+/// unrated series through, which is a distinction nobody asked for and nobody would
+/// find. Every name here was written and read back off `jellyfin/jellyfin:10.10.3`.
+const UNRATED_KINDS: [&str; 9] = [
+    "Movie",
+    "Trailer",
+    "Series",
+    "Music",
+    "Book",
+    "LiveTvChannel",
+    "LiveTvProgram",
+    "ChannelContent",
+    "Other",
+];
+
+/// The kinds of unrated thing held back, as the media server names the field.
+const UNRATED: &str = "BlockUnratedItems";
+
+/// Where the server's own certificates and the ages it holds them against are read.
+///
+/// **The answer is the operator's country's, not this product's.** The server keeps a
+/// country and answers with that country's table, so the same age carries different
+/// names in different houses — and under some countries carries none at all.
+const RATINGS: &str = "/Localization/ParentalRatings";
 
 /// What the media server calls the making of an account.
 const ACCOUNT_MADE: &str = "UserCreated";
@@ -230,6 +283,23 @@ impl crate::ports::service::Household for Jellyfin {
             .collect())
     }
 
+    async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {
+        let request = self.as_admin(Method::Get, RATINGS, None).await?;
+        let response = self.endpoint.send(&request).await?;
+        let held: Vec<RatingResource> = self
+            .endpoint
+            .decode(&response, "the server's own ratings could not be read")?;
+        Ok(held
+            .into_iter()
+            .filter_map(|rating| {
+                rating.age.map(|age| Certificate {
+                    name: rating.name,
+                    age,
+                })
+            })
+            .collect())
+    }
+
     async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {
         // The account's own policy, read first, with what was chosen written over it.
         // **A body naming only what changed is refused.** Driven against
@@ -256,6 +326,13 @@ impl crate::ports::service::Household for Jellyfin {
         }
         if let Some(limit) = allowed.age_limit {
             policy.insert(AGE_LIMIT.to_owned(), limit.into());
+        }
+        if let Some(unrated) = allowed.unrated {
+            let kinds = match unrated {
+                Unrated::HeldBack => UNRATED_KINDS.to_vec(),
+                Unrated::LetThrough => Vec::new(),
+            };
+            policy.insert(UNRATED.to_owned(), kinds.into());
         }
 
         let body = serde_json::Value::Object(policy).to_string();

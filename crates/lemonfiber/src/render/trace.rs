@@ -4,8 +4,9 @@
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
 use lemonfiber_core::model::{
-    HouseholdMember, HouseholdReport, MemberRequest, StuckReport, TraceReport,
+    HouseholdMember, HouseholdReport, MemberRequest, Restriction, StuckReport, TraceReport,
 };
+use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
 
@@ -59,6 +60,11 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
         lines.put("The media server holds no accounts yet.");
     } else if !report.members.is_empty() {
         lines.spaced(counted(report));
+    }
+    // What the limits above are, and what they are not — said where anybody carries
+    // one, because the reader who most needs it is the parent who set it.
+    if let Some(filtering) = &report.filtering {
+        lines.put(format!("  {filtering}"));
     }
     // What could not be read, said rather than left to look like an empty household.
     for finding in &report.findings {
@@ -142,10 +148,29 @@ fn standing(member: &HouseholdMember) -> String {
     // Said in the words the limit is chosen in, from the place those words live,
     // because a household list naming it differently from the invitation that set it
     // is two surfaces disagreeing about one setting. The media server keeps this as a
-    // number, and what is said is a reading of that number — so a limit no words are
-    // offered for is said as the age it is.
+    // number, and what is said is a reading of that number — with the certificates
+    // this household's own server names on either side of it, since a number alone
+    // says nothing about what it actually holds back here.
     if let Some(limit) = member.access.age_limit {
-        said.push(lemonfiber_core::age_limit::reading(Some(limit)));
+        said.push(member.access.rated.as_ref().map_or_else(
+            || lemonfiber_core::age_limit::reading(Some(limit)),
+            |rated| lemonfiber_core::rating::said(limit, rated),
+        ));
+    }
+    // Said either way on somebody narrowed, because an unexplained absence is what
+    // this answers: a member missing half the library is either this or a defect, and
+    // silence does not tell an operator which. Nobody unnarrowed is missing anything,
+    // so the line stays off theirs.
+    if member.access.restriction != Restriction::Unrestricted {
+        said.push(match member.access.unrated {
+            Unrated::HeldBack => "nothing unrated".to_owned(),
+            Unrated::LetThrough => "including what has no rating".to_owned(),
+        });
+    }
+    // The gap the setting exists to close, on the member's own line rather than only
+    // in a finding at the foot: half a limit looks exactly like a whole one.
+    if member.access.restriction.disagrees() {
+        said.push(member.access.restriction.phrase().to_owned());
     }
     said.push(if member.claimed {
         member
@@ -330,6 +355,7 @@ mod tests {
         HouseholdMember, HouseholdReport, MemberAccess, MemberRequest, StuckEntry, StuckReport,
         TraceMoment, TraceReport, TraceStage,
     };
+    use lemonfiber_core::rating::Rated;
     use lemonfiber_core::trace::{
         Confidence, Coverage, Outcome as TraceOutcome, Part, Stage, HISTORY_HORIZON,
     };
@@ -583,6 +609,7 @@ mod tests {
             }],
             available: true,
             findings: vec!["a library could not be read".to_owned()],
+            filtering: None,
         };
         let text = household(&report).text();
         // The name carries what they may watch and when they were last seen, because
@@ -619,11 +646,15 @@ mod tests {
             }],
             available: true,
             findings: Vec::new(),
+            filtering: None,
         };
 
         let text = household(&report).text();
         assert!(
-            text.contains("Ana — can watch Films · nothing above about 12 · invited, nobody has set a password yet"),
+            text.contains(
+                "Ana — can watch Films · nothing above about 12 · invited, nobody has \
+                 set a password yet"
+            ),
             "{text}"
         );
         assert!(
@@ -665,6 +696,7 @@ mod tests {
                 }],
                 available: true,
                 findings: Vec::new(),
+                filtering: None,
             };
 
             let text = household(&report).text();
@@ -695,6 +727,7 @@ mod tests {
             }],
             available: true,
             findings: Vec::new(),
+            filtering: None,
         };
 
         let said = household(&report).text();
@@ -722,6 +755,7 @@ mod tests {
             }],
             available: true,
             findings: Vec::new(),
+            filtering: None,
         };
 
         // Bound once rather than called again in the message: an argument only
@@ -754,6 +788,7 @@ mod tests {
             }],
             available: true,
             findings: Vec::new(),
+            filtering: None,
         };
 
         let text = household(&report).text();
@@ -773,6 +808,7 @@ mod tests {
             members: Vec::new(),
             available: true,
             findings: Vec::new(),
+            filtering: None,
         };
         // Empty means the media server holds nobody, not that nobody has asked for
         // anything — the list is of members now, so those are different sentences.
@@ -784,6 +820,7 @@ mod tests {
             members: Vec::new(),
             available: false,
             findings: vec!["could not be read".to_owned()],
+            filtering: None,
         };
         let text = household(&unread).text();
         assert!(!text.contains("Nobody has asked"));
@@ -811,5 +848,157 @@ mod tests {
             incomplete: false,
         };
         assert!(stuck(&clear).text().contains("Nothing is stuck"));
+    }
+
+    /// One member, held to what the arguments say.
+    fn held(
+        age_limit: Option<u32>,
+        rated: Option<Rated>,
+        unrated: Unrated,
+        restriction: Restriction,
+    ) -> HouseholdReport {
+        HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "Ana".to_owned(),
+                claimed: true,
+                access: MemberAccess {
+                    every_library: true,
+                    age_limit,
+                    rated,
+                    unrated,
+                    restriction,
+                    ..MemberAccess::default()
+                },
+                ..HouseholdMember::default()
+            }],
+            available: true,
+            findings: Vec::new(),
+            filtering: Some("a content filter, not a security boundary".to_owned()),
+        }
+    }
+
+    /// A limit reads with the certificates this household's own server names beside it.
+    ///
+    /// A bare number says nothing about what the limit actually holds back here, which
+    /// is the whole reason the table is read off the server.
+    #[test]
+    fn a_limit_reads_with_the_certificates_around_it() {
+        let report = held(
+            Some(12),
+            Some(Rated {
+                allows: vec!["12A".to_owned()],
+                holds_back: vec!["15".to_owned()],
+                fell_back: false,
+            }),
+            Unrated::HeldBack,
+            Restriction::RatingLimited,
+        );
+
+        let text = household(&report).text();
+
+        assert!(text.contains("nothing above about 12"), "{text}");
+        assert!(text.contains("allows 12A"), "{text}");
+        assert!(text.contains("holds back 15"), "{text}");
+    }
+
+    /// A report carrying no reading falls back to the words for the number.
+    ///
+    /// A limit said as nothing at all would read as an account with no limit on it,
+    /// which is the one reading a household list must never invite.
+    #[test]
+    fn a_limit_with_no_reading_still_says_the_number() {
+        let report = held(
+            Some(12),
+            None,
+            Unrated::HeldBack,
+            Restriction::RatingLimited,
+        );
+
+        let text = household(&report).text();
+
+        assert!(text.contains("nothing above about 12"), "{text}");
+    }
+
+    /// What happens to unrated content is said either way, on anybody narrowed.
+    ///
+    /// A member missing half the library is either this setting or a defect, and
+    /// silence does not tell an operator which.
+    #[test]
+    fn what_happens_to_unrated_content_is_said_either_way() {
+        let holding = held(
+            Some(12),
+            None,
+            Unrated::HeldBack,
+            Restriction::RatingLimited,
+        );
+        let letting = held(
+            Some(12),
+            None,
+            Unrated::LetThrough,
+            Restriction::RatingLimited,
+        );
+
+        // Bound rather than called in the message, which only runs on failure.
+        let held = household(&holding).text();
+        let let_through = household(&letting).text();
+
+        assert!(held.contains("nothing unrated"), "{held}");
+        assert!(
+            let_through.contains("including what has no rating"),
+            "{let_through}"
+        );
+    }
+
+    /// Nobody narrowed is told nothing about unrated content, because nothing about
+    /// their library is missing.
+    #[test]
+    fn nobody_narrowed_is_told_nothing_about_unrated_content() {
+        let report = held(None, None, Unrated::LetThrough, Restriction::Unrestricted);
+
+        let text = household(&report).text();
+
+        assert!(!text.contains("has no rating"), "{text}");
+        assert!(!text.contains("nothing unrated"), "{text}");
+    }
+
+    /// A member limited on one service and not the other says so on their own line.
+    ///
+    /// Half a limit looks exactly like a whole one, so it is on the row rather than
+    /// only in a finding at the foot of the list.
+    #[test]
+    fn a_disagreement_is_on_the_members_own_line() {
+        let report = held(Some(12), None, Unrated::HeldBack, Restriction::Inconsistent);
+
+        let text = household(&report).text();
+
+        assert!(
+            text.contains("can ask for what they cannot watch"),
+            "{text}"
+        );
+    }
+
+    /// What a limit here is not is printed under the list where anybody carries one.
+    #[test]
+    fn what_a_limit_is_not_is_printed_under_the_list() {
+        let limited = held(
+            Some(12),
+            None,
+            Unrated::HeldBack,
+            Restriction::RatingLimited,
+        );
+        let open = HouseholdReport {
+            filtering: None,
+            ..held(None, None, Unrated::LetThrough, Restriction::Unrestricted)
+        };
+
+        // Bound rather than called in the message, which only runs on failure.
+        let warned = household(&limited).text();
+        let unwarned = household(&open).text();
+
+        assert!(warned.contains("not a security boundary"), "{warned}");
+        assert!(
+            !unwarned.contains("not a security boundary"),
+            "a household nobody narrowed was warned about a limit it does not have:              {unwarned}"
+        );
     }
 }

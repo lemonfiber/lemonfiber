@@ -127,6 +127,7 @@ fn an_invitation_reaches_a_browser_under_its_own_name() {
         rehearsed: false,
         standing: InvitationStanding::Made,
         linked: Linked::Made,
+        applied: None,
     });
 
     let json = made.envelope().to_json().unwrap_or_default();

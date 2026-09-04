@@ -451,6 +451,57 @@ fn a_preset_that_names_nothing_is_refused_with_what_it_could_have_said() {
     }
 }
 
+/// A word about unrated content this build does not know is refused with the ones it
+/// does, rather than falling to whichever answer is safer.
+///
+/// Falling to the safe answer is the tempting mistake and it is the wrong one: a caller
+/// who wrote `allow` and meant it would be given `block` because of a spelling, and
+/// would find out when somebody in the house could not find half the library.
+#[test]
+fn a_word_about_unrated_content_this_build_does_not_know_is_refused() {
+    let mistaken = Arguments {
+        name: Some("ana".to_owned()),
+        age_limit: Some(12),
+        unrated: Some("hide".to_owned()),
+        ..Arguments::default()
+    };
+
+    let refused = refusal("invite", mistaken);
+
+    assert!(
+        matches!(&refused, Some(Refused::Unrecognised { argument, offered })
+            if argument == "unrated" && offered.contains("block") && offered.contains("allow")),
+        "{refused:?}"
+    );
+}
+
+/// Each word this build does know reaches the command carrying the choice it names.
+#[test]
+fn each_word_about_unrated_content_reaches_the_choice_it_names() {
+    for (written, chosen) in [
+        ("block", lemonfiber_core::ports::service::Unrated::HeldBack),
+        (
+            "allow",
+            lemonfiber_core::ports::service::Unrated::LetThrough,
+        ),
+    ] {
+        let given = Arguments {
+            name: Some("ana".to_owned()),
+            age_limit: Some(12),
+            unrated: Some(written.to_owned()),
+            ..Arguments::default()
+        };
+
+        let reached = named("invite", given);
+
+        assert!(
+            matches!(&reached, Ok(Command::Invite { allowance, .. })
+                if allowance.unrated == Some(chosen)),
+            "{written}: {reached:?}"
+        );
+    }
+}
+
 #[test]
 fn an_argument_no_action_takes_is_refused_rather_than_ignored() {
     // A caller who spelled `form` where `forms` was meant has been told, instead

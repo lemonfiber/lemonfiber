@@ -17,7 +17,8 @@
 mod acting;
 
 use acting::{
-    exactly_what, AGE, ARCHIVE, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER, SEASON, WARNED,
+    exactly_what, AGE, ARCHIVE, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER, SEASON, UNRATED,
+    WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
@@ -26,6 +27,7 @@ use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
+use lemonfiber_core::ports::service::Unrated;
 
 /// One form named, which is what most of the rest are asked with.
 fn naming(form: &str) -> Arguments {
@@ -357,6 +359,19 @@ fn give_age_limit(given: &mut Arguments) {
     given.age_limit = Some(AGE);
 }
 
+/// Whether the command has the choice about unrated content it was given in it.
+///
+/// The word given is the one a restriction does *not* default to, so a command that
+/// dropped it and fell to the default cannot pass for one that carried it.
+fn carries_unrated(command: &Command) -> bool {
+    matches!(command, Command::Invite { allowance, .. }
+        if allowance.unrated == Some(Unrated::LetThrough))
+}
+
+fn give_unrated(given: &mut Arguments) {
+    given.unrated = Some(UNRATED.to_owned());
+}
+
 fn give_check(given: &mut Arguments) {
     given.check = Some(WARNED.to_owned());
 }
@@ -401,7 +416,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 25] = [
+const SWEEPS: [Sweep; 26] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -425,6 +440,7 @@ const SWEEPS: [Sweep; 25] = [
     ("item", give_item, carries_item),
     ("libraries", give_libraries, carries_libraries),
     ("age_limit", give_age_limit, carries_age_limit),
+    ("unrated", give_unrated, carries_unrated),
     ("term", give_term, carries_term),
     ("season", give_season, carries_season),
 ];
@@ -479,39 +495,64 @@ fn an_argument_is_taken_exactly_where_the_command_it_reaches_carries_it() {
     assert!(wrong.is_empty(), "{wrong:?}");
 }
 
+/// The one field the sweeps leave out, and why.
+///
+/// Every action that takes a name is handed one by `exactly_what`, and the tests that
+/// are about a name are the ones that refuse an action without one. A sweep for it
+/// would be a sweep every action passes.
+const NOT_SWEPT: [&str; 1] = ["name"];
+
+/// Where the carrier is declared, read rather than transcribed.
+const CARRIER: &str = "src/actions/asked.rs";
+
+/// What the carrier declares it holds, read off the declaration itself.
+///
+/// **Read rather than written down here.** This guard used to hold the table below
+/// against a second list typed out beside it, which meant a field added to the carrier
+/// and to neither list was one it stayed green through — the exact failure it is for.
+/// A list compared against another list is a list agreeing with itself.
+fn declared() -> Vec<String> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(CARRIER);
+    let source = std::fs::read_to_string(&path).unwrap_or_default();
+    let opened = source
+        .split_once("pub struct Arguments {")
+        .map(|(_, rest)| rest)
+        .unwrap_or_default();
+    let body = opened.split_once("\n}").map_or("", |(body, _)| body);
+    body.lines()
+        .filter_map(|line| line.strip_prefix("    pub "))
+        .filter_map(|declared| declared.split_once(':'))
+        .map(|(field, _)| field.to_owned())
+        .collect()
+}
+
 #[test]
 fn every_argument_the_carrier_holds_is_swept() {
     // A field added to the carrier and not to the table above is a field nothing
     // decides about, which is how one comes to be dropped in the first place.
-    let held = [
-        "forms",
-        "services",
-        "wait",
-        "service",
-        "key",
-        "value",
-        "preset",
-        "media_type",
-        "archive",
-        "repoint",
-        "write",
-        "logs",
-        "filenames",
-        "reveal",
-        "only",
-        "check",
-        "disruptive",
-        "offer",
-        "agreed",
-        "confirm",
-        "item",
-        "libraries",
-        "age_limit",
-        "term",
-        "season",
-    ];
+    let held: Vec<String> = declared()
+        .into_iter()
+        .filter(|field| !NOT_SWEPT.contains(&field.as_str()))
+        .collect();
+    assert!(
+        held.len() > 20,
+        "the carrier could not be read, so this asserts nothing: {held:?}"
+    );
+
     let swept: Vec<&str> = SWEEPS.iter().map(|(argument, _, _)| *argument).collect();
-    assert_eq!(swept, held);
+
+    for field in &held {
+        assert!(
+            swept.contains(&field.as_str()),
+            "the carrier holds `{field}` and nothing sweeps for it"
+        );
+    }
+    for argument in &swept {
+        assert!(
+            held.iter().any(|field| field == argument) || NOT_SWEPT.contains(argument),
+            "`{argument}` is swept for and the carrier no longer holds it"
+        );
+    }
 }
 
 #[test]

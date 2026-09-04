@@ -299,6 +299,9 @@ impl Acting {
             Stage::Limiting { errand, chooser } => {
                 inviting::limited(&mut self.stage, errand, chooser, press)
             }
+            Stage::Unrated { errand, chooser } => {
+                inviting::unrated(&mut self.stage, errand, chooser, press)
+            }
             Stage::Weighing { errand, given } => {
                 errand::weighing(&mut self.stage, errand, given, press)
             }
@@ -3033,8 +3036,20 @@ mod tests {
         );
         onto(&mut acting, &step);
         acting.pressed(&Press::Accept);
+        // Something was narrowed, so the last question stands between the list and the
+        // agreement: what happens to content the media server has no rating for. Both
+        // rows are on the screen with what taking each comes to beside it, and the one
+        // it opens on is what a restriction defaults to everywhere else.
+        let unrated = showing(&acting);
+        assert!(unrated.contains("> nothing unrated"), "{unrated}");
+        assert!(
+            unrated.contains("including what has no rating"),
+            "{unrated}"
+        );
+        assert!(unrated.contains("invisible"), "{unrated}");
+        acting.pressed(&Press::Accept);
 
-        // The question says all three, in the words a household read says the same
+        // The question says all four, in the words a household read says the same
         // facts in. Nothing has been sent yet: an invitation is one of the errands
         // whose yes is the whole of the agreement.
         let asked = showing(&acting);
@@ -3049,6 +3064,7 @@ mod tests {
                 allowance: Allowance {
                     libraries: vec!["Films".to_owned()],
                     age_limit: Some(12),
+                    unrated: Some(lemonfiber_core::ports::service::Unrated::HeldBack),
                 },
             })
         );

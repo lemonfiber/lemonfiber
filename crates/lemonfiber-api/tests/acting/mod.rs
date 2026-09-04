@@ -121,6 +121,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
             Vec::new()
         },
         age_limit: takes(TAKES_ALLOWANCE).then_some(AGE),
+        unrated: takes(TAKES_ALLOWANCE).then(|| UNRATED.to_owned()),
         term: takes(TAKES_TERM).then(|| FOLLOWED.to_owned()),
         season: takes(TAKES_TERM).then_some(SEASON),
     }
@@ -164,3 +165,8 @@ pub(crate) const LIBRARY: &str = "Films";
 /// One age a limit may be given as. Not nought, so a command carrying a limit cannot
 /// pass for one carrying none.
 pub(crate) const AGE: u32 = 12;
+
+/// What to do about unrated content, as a request body writes it. The word that is
+/// *not* what a restriction defaults to, so a command carrying the choice cannot pass
+/// for one carrying the default.
+pub(crate) const UNRATED: &str = "allow";
