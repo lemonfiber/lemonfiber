@@ -18,7 +18,10 @@ use std::path::PathBuf;
 ///
 /// Split on the separator a request uses rather than handed to the platform's own
 /// path parser: a backslash means one thing on Windows and nothing on Linux, and a
-/// rule about what may be reached must not change with the machine.
+/// rule about what may be reached must not change with the machine. A colon goes the
+/// same way and for the same reason: `C:evil` names a drive rather than a file, and
+/// the platform's own `join` drops the directory it was given when handed one — so a
+/// name carrying either is refused rather than pushed.
 #[must_use]
 pub fn beneath(asked: &str) -> Option<PathBuf> {
     let mut path = PathBuf::new();
@@ -26,7 +29,7 @@ pub fn beneath(asked: &str) -> Option<PathBuf> {
         match segment {
             "" | "." => {}
             ".." => return None,
-            name if name.contains('\\') => return None,
+            name if name.contains('\\') || name.contains(':') => return None,
             name => path.push(name),
         }
     }
@@ -63,6 +66,24 @@ mod tests {
         assert_eq!(
             beneath("assets/app.css"),
             Some(PathBuf::from("assets/app.css"))
+        );
+    }
+
+    /// A name that carries a drive names no file, on the one platform that has them.
+    ///
+    /// `C:evil` is drive-relative rather than a name, and the platform's own `join`
+    /// drops the directory it was given when the joined path carries a drive — so a
+    /// caller holding a directory of its own files would be handed somewhere else
+    /// entirely. Refused with the backslash, and for the reason it is: the answer
+    /// must not depend on which machine is asking.
+    #[test]
+    fn a_name_carrying_a_drive_or_a_stream_is_refused_wherever_it_is_read() {
+        assert_eq!(beneath("C:evil"), None);
+        assert_eq!(beneath("bundle.tar:hidden"), None);
+        assert_eq!(one_file("C:evil"), None);
+        assert_eq!(
+            beneath("ordinary.tar.xz"),
+            Some(PathBuf::from("ordinary.tar.xz"))
         );
     }
 

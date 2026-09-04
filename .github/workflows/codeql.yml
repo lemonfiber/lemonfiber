@@ -30,3 +30,9 @@ jobs:
       - uses: github/codeql-action/autobuild@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         if: matrix.language == 'rust'
       - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
+        with:
+          # One category per language, because two analyses of one commit that do not
+          # name themselves apart land in the same place and the second replaces the
+          # first. The check then reports a configuration it saw on main as missing
+          # here, and says so about whichever language finished second.
+          category: "/language:${{ matrix.language }}"
