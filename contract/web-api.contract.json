@@ -5809,6 +5809,654 @@
         }
       }
     },
+    "space": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Reckoning"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Candidate": {
+          "description": "One completed download, and what reclaiming it would come to.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "What it occupies.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "consequence": {
+              "description": "What removing it costs, where it costs anything.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "description": "What both sides call it.",
+              "type": "string"
+            },
+            "standing": {
+              "description": "Where it stands.",
+              "$ref": "#/$defs/Standing"
+            }
+          },
+          "required": [
+            "name",
+            "bytes",
+            "standing"
+          ]
+        },
+        "Category": {
+          "description": "What one line of the accounting is about.",
+          "oneOf": [
+            {
+              "description": "One directory beneath the data root, named as the operator named it.\n\nPer directory rather than one figure for the library, because several\nlibraries commonly share a volume and \"the library is large\" tells nobody\nwhich of them is growing.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "of": {
+                  "type": "string",
+                  "const": "tree"
+                }
+              },
+              "required": [
+                "of",
+                "name"
+              ]
+            },
+            {
+              "description": "What the download clients still have to write.",
+              "type": "object",
+              "properties": {
+                "of": {
+                  "type": "string",
+                  "const": "landing"
+                }
+              },
+              "required": [
+                "of"
+              ]
+            },
+            {
+              "description": "Completed downloads the client is still seeding.",
+              "type": "object",
+              "properties": {
+                "of": {
+                  "type": "string",
+                  "const": "seeding"
+                }
+              },
+              "required": [
+                "of"
+              ]
+            },
+            {
+              "description": "Downloads on disk that no service ever took.",
+              "type": "object",
+              "properties": {
+                "of": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "of"
+              ]
+            },
+            {
+              "description": "Archives whose extracted contents sit beside them.",
+              "type": "object",
+              "properties": {
+                "of": {
+                  "type": "string",
+                  "const": "extracted"
+                }
+              },
+              "required": [
+                "of"
+              ]
+            },
+            {
+              "description": "The services' own configuration and databases.",
+              "type": "object",
+              "properties": {
+                "of": {
+                  "type": "string",
+                  "const": "services"
+                }
+              },
+              "required": [
+                "of"
+              ]
+            },
+            {
+              "description": "What the operator said to leave alone.",
+              "type": "object",
+              "properties": {
+                "of": {
+                  "type": "string",
+                  "const": "unmanaged"
+                }
+              },
+              "required": [
+                "of"
+              ]
+            }
+          ]
+        },
+        "Consumption": {
+          "description": "One line of the accounting.",
+          "type": "object",
+          "properties": {
+            "category": {
+              "description": "What it is about.",
+              "$ref": "#/$defs/Category"
+            },
+            "reclaim": {
+              "description": "What getting it back would cost.",
+              "$ref": "#/$defs/Reclaim"
+            },
+            "tally": {
+              "description": "What it occupies, counted both ways.",
+              "$ref": "#/$defs/Tally"
+            }
+          },
+          "required": [
+            "category",
+            "tally",
+            "reclaim"
+          ]
+        },
+        "Freshness": {
+          "description": "How much a reading can be relied on.",
+          "oneOf": [
+            {
+              "description": "Read off a local disk, so it is true as of now.",
+              "type": "object",
+              "properties": {
+                "as": {
+                  "type": "string",
+                  "const": "live"
+                }
+              },
+              "required": [
+                "as"
+              ]
+            },
+            {
+              "description": "Read across a network share, which answers with what it was last told —\ncarrying the moment it was taken, in seconds since the epoch, so a figure\nnobody can refresh is at least dated.",
+              "type": "object",
+              "properties": {
+                "as": {
+                  "type": "string",
+                  "const": "as_of"
+                },
+                "at": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "as",
+                "at"
+              ]
+            }
+          ]
+        },
+        "Interrupted": {
+          "description": "An import that stopped part-way, in the words of whatever stopped it.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "What the service calls it.",
+              "type": "string"
+            },
+            "partial": {
+              "description": "What is on disk for it already, where the walk could find it.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "said": {
+              "description": "What the service said, verbatim.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "partial",
+            "said"
+          ]
+        },
+        "Left": {
+          "description": "Something a cleanup could not take.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "Where it is.",
+              "type": "string"
+            },
+            "why": {
+              "description": "What the platform said, verbatim.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "why"
+          ]
+        },
+        "Level": {
+          "description": "Where a volume stands.",
+          "oneOf": [
+            {
+              "description": "Usage cannot be determined.\n\nOrdered first so that it never wins a comparison against a level that was\nactually measured: a volume nobody could read must not make a stack that is\nvisibly full read as merely unknown.",
+              "type": "string",
+              "const": "unknown"
+            },
+            {
+              "description": "Comfortable headroom.",
+              "type": "string",
+              "const": "ample"
+            },
+            {
+              "description": "Below comfortable, not urgent.",
+              "type": "string",
+              "const": "advisory"
+            },
+            {
+              "description": "Projected to exhaust within the horizon.",
+              "type": "string",
+              "const": "warning"
+            },
+            {
+              "description": "Nearly exhausted.",
+              "type": "string",
+              "const": "critical"
+            },
+            {
+              "description": "Full; acquisitions halted.",
+              "type": "string",
+              "const": "exhausted"
+            }
+          ]
+        },
+        "Outsized": {
+          "description": "One file far larger than the rest.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "What it occupies.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "path": {
+              "description": "Where it is.",
+              "type": "string"
+            },
+            "times_typical": {
+              "description": "How many times the middle file of this walk it is.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "path",
+            "bytes",
+            "times_typical"
+          ]
+        },
+        "Reckoning": {
+          "description": "Where the disk stands, what is on it, and what could be got back.",
+          "type": "object",
+          "properties": {
+            "agreement": {
+              "description": "What this offer names itself, so an answer to it can say which offer it was\nanswering.",
+              "type": "string"
+            },
+            "candidates": {
+              "description": "The completed downloads, each with where it stands and what removing it\nwould cost.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Candidate"
+              }
+            },
+            "consumption": {
+              "description": "Where the room went, one line per tree plus the services' own files, and\none line for what is committed but has not landed yet.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Consumption"
+              }
+            },
+            "halted": {
+              "description": "Whether new acquisitions are halted to keep the services writable.",
+              "type": "boolean"
+            },
+            "interrupted": {
+              "description": "The imports that stopped part-way, with what is on disk for each.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Interrupted"
+              }
+            },
+            "level": {
+              "description": "Where the stack stands, which is where its worst volume stands.",
+              "$ref": "#/$defs/Level"
+            },
+            "outsized": {
+              "description": "The files far enough out of line with the rest to be worth pointing at.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Outsized"
+              }
+            },
+            "reclaimable": {
+              "description": "What of that room could be got back, and what each would cost.\n\nA second reading of bytes already counted above rather than more of them: a\nseeding torrent's file is in the tree it lives in *and* here. Summing the\ntwo lists together would double what is on the disk, which is the mistake\nthis whole module is arranged to avoid.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Consumption"
+              }
+            },
+            "reclaimed": {
+              "description": "What became of a confirmed cleanup, where one was asked for.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Reclaimed"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "volumes": {
+              "description": "The volumes watched. Either filling stops the stack, so both are reported\nwhether or not they are the same drive.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Volume"
+              }
+            }
+          },
+          "required": [
+            "volumes",
+            "level",
+            "halted",
+            "consumption",
+            "reclaimable",
+            "candidates",
+            "outsized",
+            "interrupted",
+            "agreement"
+          ]
+        },
+        "Reclaim": {
+          "description": "What getting a line's room back costs.",
+          "oneOf": [
+            {
+              "description": "Only by deciding to lose something you chose to keep.",
+              "type": "string",
+              "const": "by_losing_content"
+            },
+            {
+              "description": "Nothing to reclaim: it is being written right now.",
+              "type": "string",
+              "const": "in_progress"
+            },
+            {
+              "description": "Yes, and it costs standing with the trackers it came from.",
+              "type": "string",
+              "const": "at_the_cost_of_ratio"
+            },
+            {
+              "description": "Yes, and it costs nothing — the usual easy win.",
+              "type": "string",
+              "const": "the_easy_win"
+            },
+            {
+              "description": "Yes: the unpacked copy is the one being used.",
+              "type": "string",
+              "const": "already_have_it"
+            },
+            {
+              "description": "A little, and rarely worth it.",
+              "type": "string",
+              "const": "marginally"
+            },
+            {
+              "description": "No, because you said so.",
+              "type": "string",
+              "const": "you_said_not"
+            }
+          ]
+        },
+        "Reclaimed": {
+          "description": "What became of a confirmed cleanup.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "What they occupied.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "gone": {
+              "description": "The paths that were taken.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "left": {
+              "description": "What could not be taken, and what the platform said about it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Left"
+              }
+            }
+          },
+          "required": [
+            "gone",
+            "bytes",
+            "left"
+          ]
+        },
+        "Role": {
+          "description": "Which of the two volumes a reading is about.",
+          "oneOf": [
+            {
+              "description": "Where the media and the downloads live.",
+              "type": "string",
+              "const": "data"
+            },
+            {
+              "description": "Where the services keep their own configuration and databases.",
+              "type": "string",
+              "const": "services"
+            }
+          ]
+        },
+        "Standing": {
+          "description": "Where one completed download stands.",
+          "oneOf": [
+            {
+              "description": "Nothing ever linked it into a library: it was never imported, and removing\nit loses nothing.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "never_imported"
+                }
+              },
+              "required": [
+                "standing"
+              ]
+            },
+            {
+              "description": "It was imported and is still seeding, so removing it has a consequence\noutside this machine.",
+              "type": "object",
+              "properties": {
+                "ratio": {
+                  "description": "What it has uploaded against what it downloaded, in hundredths, as the\nclient reports it.\n\nA whole number rather than a fraction because every report this product\nmakes is compared for equality somewhere, and a fraction cannot be —\ntwo figures a client would call the same would not be. The hundredth is\nfiner than any decision made on a ratio.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "standing": {
+                  "type": "string",
+                  "const": "seeding"
+                }
+              },
+              "required": [
+                "standing",
+                "ratio"
+              ]
+            },
+            {
+              "description": "The operator asked for this one to be left alone.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "left_alone"
+                }
+              },
+              "required": [
+                "standing"
+              ]
+            }
+          ]
+        },
+        "Tally": {
+          "description": "What a set of files occupies, counted both ways.",
+          "type": "object",
+          "properties": {
+            "files": {
+              "description": "How many names were counted.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "logical": {
+              "description": "The bytes the names add up to — what this would take with nothing shared.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "physical": {
+              "description": "The bytes the underlying files add up to — what the volume has actually\nlost to them.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "shared": {
+              "description": "How many of those names pointed at a file already counted.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "logical",
+            "physical",
+            "files",
+            "shared"
+          ]
+        },
+        "Volume": {
+          "description": "One volume, as one run measured it.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "The path that was measured.",
+              "type": "string"
+            },
+            "committed": {
+              "description": "The bytes already committed to landing here.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "free": {
+              "description": "Bytes free, or nothing where the volume could not be read.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "level": {
+              "description": "Where it stands.",
+              "$ref": "#/$defs/Level"
+            },
+            "limit": {
+              "description": "The effective limit — the mount's own size, which on a dataset given a\nquota is the quota rather than the device beneath it.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "point": {
+              "description": "Where the volume holding it is mounted, which is what the limit belongs to.",
+              "type": "string"
+            },
+            "projected": {
+              "description": "What would be free once the committed content has landed.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "reading": {
+              "description": "What the reading is worth.",
+              "$ref": "#/$defs/Freshness"
+            },
+            "role": {
+              "description": "Which of the two this is.",
+              "$ref": "#/$defs/Role"
+            }
+          },
+          "required": [
+            "role",
+            "at",
+            "point",
+            "committed",
+            "level",
+            "reading"
+          ]
+        }
+      }
+    },
     "start": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
