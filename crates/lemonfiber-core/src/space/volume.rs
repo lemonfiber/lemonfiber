@@ -265,17 +265,15 @@ mod tests {
     #[test]
     fn each_volume_says_what_it_is_for_and_what_its_filling_costs() {
         for role in [Role::Data, Role::Services] {
-            assert!(!role.word().is_empty());
-            assert!(
-                role.costs().len() > 20,
-                "{} says what it costs",
-                role.word()
-            );
+            let word = role.word();
+            let costs = role.costs();
+            assert!(!word.is_empty());
+            assert!(costs.len() > 20, "{word} says what it costs: {costs}");
         }
+        let worse = Role::Services.costs();
         assert!(
-            Role::Services.costs().contains("corrupted"),
-            "the one that is worse says why: {}",
-            Role::Services.costs()
+            worse.contains("corrupted"),
+            "the one that is worse says why: {worse}"
         );
     }
 }

@@ -179,12 +179,10 @@ mod tests {
         let categories = every();
         assert_eq!(categories.len(), 7, "every line the accounting can carry");
         for category in categories {
-            assert!(!category.heading().is_empty());
-            assert!(
-                category.reclaim().says().len() > 15,
-                "{} says what it costs",
-                category.heading()
-            );
+            let heading = category.heading();
+            let says = category.reclaim().says();
+            assert!(!heading.is_empty());
+            assert!(says.len() > 15, "{heading} says what it costs: {says}");
         }
     }
 

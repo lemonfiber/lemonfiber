@@ -494,6 +494,22 @@ mod tests {
     }
 
     #[test]
+    fn what_the_operator_asked_to_be_left_alone_says_so_and_carries_no_ratio() {
+        let mut measured = a_stack();
+        measured.marked = BTreeSet::from(["Never.Taken".to_owned()]);
+        let text = said(&reckon(&measured));
+        assert!(
+            text.contains("you asked for this one to be left alone"),
+            "{text}"
+        );
+        assert!(text.contains("left alone at your request"), "{text}");
+        assert!(
+            !text.contains("what --confirm takes"),
+            "nothing on offer, so nothing is marked as taken: {text}"
+        );
+    }
+
+    #[test]
     fn a_torrent_that_downloaded_nothing_is_said_rather_than_shown_as_a_number() {
         let mut measured = a_stack();
         measured.held = vec![Seeded {

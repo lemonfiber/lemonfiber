@@ -253,10 +253,10 @@ mod tests {
             assert!(!level.halts(), "{} does not halt", level.word());
         }
         assert!(Level::Exhausted.halts());
+        let means = Level::Exhausted.means();
         assert!(
-            Level::Exhausted.means().contains("databases"),
-            "the halt says what it is protecting: {}",
-            Level::Exhausted.means()
+            means.contains("databases"),
+            "the halt says what it is protecting: {means}"
         );
     }
 
@@ -299,12 +299,10 @@ mod tests {
         ];
         assert_eq!(levels.len(), 6, "every state the report can be in");
         for level in levels {
-            assert!(!level.word().is_empty());
-            assert!(
-                level.means().len() > 20,
-                "{} says what it means",
-                level.word()
-            );
+            let word = level.word();
+            let means = level.means();
+            assert!(!word.is_empty());
+            assert!(means.len() > 20, "{word} says what it means: {means}");
         }
     }
 }

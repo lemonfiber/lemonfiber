@@ -732,11 +732,11 @@ mod tests {
             super::NOWHERE_TO_MEASURE,
             super::WALK_REFUSED,
         ] {
-            assert!(
-                code.as_str().starts_with("SPACE-"),
-                "{} is this feature's own",
-                code.as_str()
-            );
+            // Bound rather than called inside the message: an argument to a
+            // passing assertion is never evaluated, and a line nothing evaluates
+            // is one the coverage gate counts against a file that looks tested.
+            let named = code.as_str();
+            assert!(named.starts_with("SPACE-"), "{named} is this feature's own");
         }
     }
 

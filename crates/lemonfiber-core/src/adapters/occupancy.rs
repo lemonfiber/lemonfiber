@@ -41,45 +41,52 @@ impl Occupancy for Disk {
 
         let mut found = Vec::new();
         let mut pending = Vec::new();
-        for entry in top.flatten() {
-            gather(&entry, &mut pending, &mut found);
-        }
+        sort_into(top, &mut pending, &mut found);
         // Below the root, a directory that will not open is a gap in the count
         // rather than a failed reading: one unreadable folder must not lose the
         // answer for everything beside it, so what cannot be opened contributes
         // nothing and the walk carries on.
         while let Some(directory) = pending.pop() {
-            for entry in std::fs::read_dir(&directory)
-                .into_iter()
-                .flatten()
-                .flatten()
-            {
-                gather(&entry, &mut pending, &mut found);
-            }
+            let opened = std::fs::read_dir(&directory).into_iter().flatten();
+            sort_into(opened, &mut pending, &mut found);
         }
         found.sort_by(|left, right| left.path.cmp(&right.path));
         Ok(found)
     }
 }
 
-/// One directory entry: descended into where it is a directory of its own, and
-/// counted where it is anything else.
-fn gather(entry: &std::fs::DirEntry, pending: &mut Vec<PathBuf>, found: &mut Vec<Occupant>) {
-    // The metadata of the entry itself rather than of what it points at, so a
-    // symbolic link is the link and never the tree at the far end of it. An entry
-    // whose metadata will not read is passed over — it is a name that was there a
-    // moment ago and is not now, which is a gap in a count rather than a failure.
-    if let Ok(meta) = entry.metadata() {
-        if meta.is_dir() {
-            pending.push(entry.path());
-        } else {
-            found.push(Occupant {
-                path: entry.path(),
-                bytes: meta.len(),
-                identity: Some(super::filesystem::identity_of(&meta)),
-            });
+/// Put each entry where it belongs: a directory onto the list still to walk, a
+/// file onto the count.
+fn sort_into(
+    entries: impl Iterator<Item = std::io::Result<std::fs::DirEntry>>,
+    pending: &mut Vec<PathBuf>,
+    found: &mut Vec<Occupant>,
+) {
+    for gathered in entries.flatten().filter_map(|entry| gathered(&entry)) {
+        match gathered {
+            Ok(directory) => pending.push(directory),
+            Err(occupant) => found.push(occupant),
         }
     }
+}
+
+/// What one directory entry is: a directory to descend into, or a file to count.
+///
+/// The metadata of the entry itself rather than of what it points at, so a
+/// symbolic link is the link and never the tree at the far end of it. An entry
+/// whose metadata will not read is neither — a name that was there a moment ago
+/// and is not now, which is a gap in a count rather than a failure.
+fn gathered(entry: &std::fs::DirEntry) -> Option<Result<PathBuf, Occupant>> {
+    let meta = entry.metadata().ok()?;
+    Some(if meta.is_dir() {
+        Ok(entry.path())
+    } else {
+        Err(Occupant {
+            path: entry.path(),
+            bytes: meta.len(),
+            identity: Some(super::filesystem::identity_of(&meta)),
+        })
+    })
 }
 
 #[cfg(test)]
