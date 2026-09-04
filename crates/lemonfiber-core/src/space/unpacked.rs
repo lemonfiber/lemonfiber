@@ -32,7 +32,7 @@ const ARCHIVES: [&str; 5] = ["rar", "zip", "7z", "tar", "gz"];
 /// is there.
 #[must_use]
 pub fn is_archive(path: &Path) -> bool {
-    let Some(extension) = path.extension().and_then(|part| part.to_str()) else {
+    let Some(extension) = path.extension().and_then(std::ffi::OsStr::to_str) else {
         return false;
     };
     let lower = extension.to_ascii_lowercase();
