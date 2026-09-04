@@ -341,7 +341,7 @@ mod tests {
     use crate::ports::filesystem::{FsKind, Identity, StorageFacts};
     use crate::ports::occupancy::Occupant;
     use crate::space::{Level, Standing};
-    use crate::test_support::{a_context, env_at, nowhere, SeedFs};
+    use crate::test_support::{a_context, a_password, env_at, nowhere, SeedFs};
 
     /// A walked file with a given number of names pointing at it.
     fn file(path: &str, bytes: u64, inode: u64, links: u64) -> Occupant {
@@ -484,7 +484,7 @@ mod tests {
         ]);
         a_context()
             .settings(Settings {
-                env_file: Some(env_at(scratch, "a-recorded-password")),
+                env_file: Some(env_at(scratch, &a_password())),
                 ..measuring()
             })
             .build()
@@ -615,7 +615,7 @@ mod tests {
         ]);
         let ctx = a_context()
             .settings(Settings {
-                env_file: Some(env_at("space-stalled", "a-recorded-password")),
+                env_file: Some(env_at("space-stalled", &a_password())),
                 ..measuring()
             })
             .build()
