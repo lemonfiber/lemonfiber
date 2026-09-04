@@ -49,6 +49,13 @@ jobs:
     permissions:
       security-events: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # A gate nobody has watched fail is a gate nobody knows works, so it is put
+      # in front of an alert before it is trusted about their absence.
+      - name: The gate refuses a branch an alert stands against
+        run: python3 scripts/no_open_codeql_alert.py --self-test
       - name: No open CodeQL alert reaches main
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,15 +63,6 @@ jobs:
           RESULT_REF: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
         run: |
           set -euo pipefail
-          open=$(gh api --paginate \
+          gh api --paginate --slurp \
             "repos/${REPO}/code-scanning/alerts?state=open&tool_name=CodeQL&ref=${RESULT_REF}" \
-            --jq '.[] | "\(.rule.security_severity_level // .rule.severity)\t\(.rule.id)\t\(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line)"')
-          if [ -n "$open" ]; then
-            printf '%s\n' "$open" | while IFS= read -r line; do
-              echo "::error::open CodeQL alert — ${line}"
-            done
-            count=$(printf '%s\n' "$open" | wc -l | tr -d ' ')
-            echo "::error::${count} open alert(s) against this branch; dismiss with a reason or fix them."
-            exit 1
-          fi
-          echo "No open CodeQL alert against ${RESULT_REF}."
+            | python3 scripts/no_open_codeql_alert.py
