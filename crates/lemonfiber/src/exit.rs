@@ -116,17 +116,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // in words and which the commands that would fetch more refuse over. What is
         // a failure is a cleanup that was agreed to and could not finish.
         Outcome::Space(report) => accounting(report),
-        // An offer that was not answered removed nothing, and it is the one request
-        // here where a script reading that as done would go on believing a ratio had
-        // been given up. So it earns the same non-zero a reset that only previewed
-        // does: it is waiting on somebody to read what it costs and say the name.
-        Outcome::Letting(offer) => {
-            if offer.gone.is_some() {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(VALIDATION)
-            }
-        }
+        Outcome::Letting(offer) => letting_go(offer),
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.
@@ -193,6 +183,21 @@ fn accounting(report: &lemonfiber_core::space::Reckoning) -> ExitCode {
         None => ExitCode::SUCCESS,
         Some(taken) if taken.left.is_empty() => ExitCode::SUCCESS,
         Some(_) => ExitCode::from(FAILURE),
+    }
+}
+
+/// The exit code an offer to let one download go earns.
+///
+/// Named apart from the table for the reason the others here are: an arm that reads
+/// an answer is a reading, and a table of readings is one nobody can hold in their
+/// head. Unconfirmed is `VALIDATION` rather than success, because the command was
+/// asked to stop something seeding and stopped nothing, and a script that read that
+/// as done would go on believing a ratio had been given up.
+fn letting_go(offer: &lemonfiber_core::space::Letting) -> ExitCode {
+    if offer.gone.is_some() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(VALIDATION)
     }
 }
 
