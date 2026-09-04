@@ -310,6 +310,23 @@ pub enum Command {
         /// it, nothing is removed.
         confirm: bool,
     },
+    /// Ask the download client to let one completed download go, files and all.
+    ///
+    /// The one thing the account above names and leaves alone, taken on its own. It
+    /// is its own command rather than an argument to [`Command::Space`] because the
+    /// spec forbids bundling a torrent's removal with generic cleanup, and because
+    /// somebody agreeing to reclaim what costs nothing has not thereby agreed to lose
+    /// a ratio a private tracker keeps their account on.
+    ///
+    /// The agreement is the offer's own name and there is no blanket form of it, so
+    /// the only path to the removal runs through a run that stated the consequence.
+    StopSeeding {
+        /// Which completed download, by the name the client and the account both use.
+        download: String,
+        /// The offer being answered, as the run that made it named itself; without
+        /// one, the cost is stated and nothing is removed.
+        agreement: Option<String>,
+    },
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///

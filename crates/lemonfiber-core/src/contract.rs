@@ -132,6 +132,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<crate::space::Reckoning>),
     );
     describing(kinds, kind::STATUS, schema_for!(Envelope<StatusReport>));
+    describing(
+        kinds,
+        kind::STOP_SEEDING,
+        schema_for!(Envelope<crate::space::Letting>),
+    );
     describing(kinds, kind::STORED, schema_for!(Envelope<Stored>));
     describing(kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
     describing(kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
@@ -198,7 +203,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 33;
+    const OUTCOMES: usize = 34;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -373,6 +378,12 @@ mod tests {
                 },
             )),
             Outcome::Space(a_reckoning()),
+            Outcome::Letting(crate::space::letting::offering(crate::space::Candidate {
+                name: "A.Release".to_owned(),
+                bytes: 90_000_000_000,
+                standing: crate::space::Standing::Seeding { ratio: 175 },
+                consequence: Some(crate::space::RATIO_CONSEQUENCE.to_owned()),
+            })),
             Outcome::Wizard(a_setup_part_way()),
             Outcome::Archives(crate::app::archives::Listing {
                 archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],

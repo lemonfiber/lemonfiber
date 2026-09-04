@@ -53,6 +53,7 @@ pub const OFFERED: &[&str] = &[
     "reset",
     "forget",
     "space",
+    "stop-seeding",
     "backup",
     "invite",
     "remove",
@@ -203,6 +204,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         unrated,
         term,
         season,
+        download,
     } = given;
     match action {
         // Starting named services and bringing a form up are different requests
@@ -236,6 +238,17 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // account `/api/space` answers with, and confirmed it takes only what that
         // account named as costing nothing.
         "space" => Ok(Command::Space { confirm }),
+        // The one thing that account names and leaves alone, asked for on its own. It
+        // takes no `confirm`: the yes is the offer's own name, so the only way to
+        // reach the removal is through the run that said what it costs a private
+        // tracker's opinion of the operator.
+        "stop-seeding" => match download {
+            Some(download) => Ok(Command::StopSeeding {
+                download,
+                agreement: offer,
+            }),
+            None => Err(needs("download")),
+        },
         "backup" => Ok(Command::Backup { service }),
         // The three addressed to a person rather than a form, a file or a service.
         // Unconfirmed, a removal says what it takes — their watch history, and every

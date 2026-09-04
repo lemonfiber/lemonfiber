@@ -12,7 +12,7 @@
 
 use lemonfiber_core::bytes::humanize;
 use lemonfiber_core::space::{
-    ratio_reads, Candidate, Consumption, Freshness, Reckoning, Reclaimed, Standing, Volume,
+    ratio_reads, Candidate, Consumption, Freshness, Letting, Reckoning, Reclaimed, Standing, Volume,
 };
 
 use super::Lines;
@@ -149,6 +149,44 @@ fn named(candidates: &[Candidate]) -> Lines {
     lines
 }
 
+/// What letting one completed download go would cost, and what became of it.
+///
+/// The cost first and the answer last, which is the order the account beside it is
+/// read in and the order that matters most here: the name to answer with is under the
+/// consequence, so nobody reaches it without passing what it costs.
+pub(crate) fn letting(offer: &Letting) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!(
+        "{} — {}",
+        offer.download.name,
+        humanize(offer.download.bytes)
+    ));
+    lines.put(format!("  {}", stands(&offer.download)));
+    if let Some(consequence) = &offer.download.consequence {
+        lines.put(format!("  {consequence}"));
+    }
+    lines.put(format!("  {}", offer.goes));
+    match &offer.gone {
+        Some(gone) if gone.rehearsed => lines.spaced(format!(
+            "Nothing was asked. {} and its {} would go.",
+            gone.name,
+            humanize(gone.bytes)
+        )),
+        Some(gone) => lines.spaced(format!(
+            "The client has let {} go, and it is no longer seeding.",
+            gone.name
+        )),
+        None => {
+            lines.spaced("Nothing has been removed. To go ahead, answer this offer by name:");
+            lines.put(format!(
+                "  lemonfiber stop-seeding \"{}\" --offer {}",
+                offer.download.name, offer.agreement
+            ));
+        }
+    }
+    lines
+}
+
 /// Where one download stands, in the words its standing is always said in.
 fn stands(candidate: &Candidate) -> String {
     match candidate.standing {
@@ -257,10 +295,11 @@ mod tests {
     use lemonfiber_core::ports::occupancy::Occupant;
     use lemonfiber_core::ports::service::Seeded;
     use lemonfiber_core::space::{
-        reckon, Left, Measured, Reckoning, Reclaimed, Role, Stalled, Volume,
+        reckon, Candidate, Gone, Left, Measured, Reckoning, Reclaimed, Role, Stalled, Standing,
+        Volume, RATIO_CONSEQUENCE,
     };
 
-    use super::reckoning;
+    use super::{letting, reckoning};
 
     /// A walked file with a given number of names pointing at it.
     fn file(path: &str, bytes: u64, inode: u64, links: u64) -> Occupant {
@@ -576,5 +615,86 @@ mod tests {
         let mut measured = a_stack();
         measured.volumes = vec![unreadable];
         assert!(said(&reckon(&measured)).contains("nobody could work out"));
+    }
+
+    /// The offer over one seeding download, which is what every case below reads.
+    fn an_offer() -> lemonfiber_core::space::Letting {
+        lemonfiber_core::space::letting::offering(Candidate {
+            name: "Imported".to_owned(),
+            bytes: 8_000,
+            standing: Standing::Seeding { ratio: 175 },
+            consequence: Some(RATIO_CONSEQUENCE.to_owned()),
+        })
+    }
+
+    /// What an unanswered offer says, as one string.
+    fn said(offer: &lemonfiber_core::space::Letting) -> String {
+        letting(offer).text()
+    }
+
+    /// The cost comes before the way to answer, and the way to answer is the name.
+    #[test]
+    fn an_offer_puts_what_it_costs_above_the_only_way_to_agree_to_it() {
+        let offer = an_offer();
+        let printed = said(&offer);
+        let cost = printed.find("ratio");
+        let answer = printed.find(offer.agreement.as_str());
+
+        assert!(
+            printed.contains("still seeding at a ratio of 1.75"),
+            "{printed}"
+        );
+        assert!(
+            printed.contains("library"),
+            "what stays is said too: {printed}"
+        );
+        assert!(printed.contains("stop-seeding"), "{printed}");
+        assert!(
+            cost.is_some() && answer.is_some() && cost < answer,
+            "nobody reaches the name to answer with without passing the cost: {printed}"
+        );
+        assert!(
+            printed.contains("Nothing has been removed"),
+            "an offer is not a removal: {printed}"
+        );
+    }
+
+    /// A rehearsal says what would go and is not read as a download that went.
+    #[test]
+    fn a_rehearsal_and_a_removal_do_not_read_alike() {
+        let rehearsed = lemonfiber_core::space::Letting {
+            gone: Some(Gone {
+                name: "Imported".to_owned(),
+                bytes: 8_000,
+                rehearsed: true,
+            }),
+            ..an_offer()
+        };
+        let taken = lemonfiber_core::space::Letting {
+            gone: Some(Gone {
+                name: "Imported".to_owned(),
+                bytes: 8_000,
+                rehearsed: false,
+            }),
+            ..an_offer()
+        };
+
+        assert!(said(&rehearsed).contains("Nothing was asked"));
+        assert!(said(&taken).contains("no longer seeding"));
+        assert_ne!(said(&rehearsed), said(&taken));
+    }
+
+    /// A download nothing ever imported is offered without a consequence to weigh.
+    #[test]
+    fn one_that_costs_nothing_is_offered_with_nothing_to_weigh() {
+        let free = lemonfiber_core::space::letting::offering(Candidate {
+            name: "Never.Taken".to_owned(),
+            bytes: 3_000,
+            standing: Standing::NeverImported,
+            consequence: None,
+        });
+        let printed = said(&free);
+        assert!(printed.contains("loses nothing"), "{printed}");
+        assert!(!printed.contains("ratio"), "{printed}");
     }
 }

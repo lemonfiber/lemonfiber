@@ -17,8 +17,8 @@ pub(crate) use lemonfiber_api::actions;
 pub(crate) use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED, TAKES_AGREED,
     TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT,
-    TAKES_DISRUPTION, TAKES_FORMS, TAKES_ITEM, TAKES_NAME, TAKES_NARROWING, TAKES_PRESET,
-    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_TERM, TAKES_WAITING,
+    TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_NAME, TAKES_NARROWING,
+    TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_TERM, TAKES_WAITING,
 };
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::guard::Token;
@@ -124,6 +124,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         unrated: takes(TAKES_ALLOWANCE).then(|| UNRATED.to_owned()),
         term: takes(TAKES_TERM).then(|| FOLLOWED.to_owned()),
         season: takes(TAKES_TERM).then_some(SEASON),
+        download: takes(TAKES_DOWNLOAD).then(|| DOWNLOAD.to_owned()),
     }
 }
 
@@ -170,3 +171,8 @@ pub(crate) const AGE: u32 = 12;
 /// *not* what a restriction defaults to, so a command carrying the choice cannot pass
 /// for one carrying the default.
 pub(crate) const UNRATED: &str = "allow";
+
+/// One completed download, as a client and the disk account both name it. Not the
+/// words a walk or a trace is given, so a command carrying this cannot pass for one
+/// carrying either of those.
+pub(crate) const DOWNLOAD: &str = "A.Show.S01E01.1080p";

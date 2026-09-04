@@ -43,7 +43,7 @@ use render::stack::Doing;
 use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
 use stopping::Choice;
-use translate::{bundling, configuration, invitation, quality, restarting, traced};
+use translate::{bundling, configuration, invitation, letting, quality, restarting, traced};
 
 /// Logs as a screen, or logs as a stream.
 ///
@@ -295,6 +295,7 @@ async fn main() -> ExitCode {
         Request::Remove { name, confirm } => Command::Remove { name, confirm },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Space { confirm } => Command::Space { confirm },
+        Request::StopSeeding { download, offer } => letting(download, offer),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },

@@ -96,6 +96,10 @@ pub const ACTS: &[Reach] = &[
         through: "space",
     },
     Reach {
+        request: "stop-seeding",
+        through: "stop-seeding",
+    },
+    Reach {
         request: "reset",
         through: "reset",
     },

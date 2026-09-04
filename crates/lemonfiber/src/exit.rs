@@ -116,6 +116,17 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // in words and which the commands that would fetch more refuse over. What is
         // a failure is a cleanup that was agreed to and could not finish.
         Outcome::Space(report) => accounting(report),
+        // An offer that was not answered removed nothing, and it is the one request
+        // here where a script reading that as done would go on believing a ratio had
+        // been given up. So it earns the same non-zero a reset that only previewed
+        // does: it is waiting on somebody to read what it costs and say the name.
+        Outcome::Letting(offer) => {
+            if offer.gone.is_some() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(VALIDATION)
+            }
+        }
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.
@@ -565,6 +576,33 @@ mod tests {
             format!("{:?}", settled(&Outcome::Upgrade(refused))),
             success()
         );
+    }
+
+    /// An offer nobody answered removed nothing, and it is the one answer here a
+    /// script must not read as done: believing a ratio was given up when it was not is
+    /// how the next run comes to expect room that is not there.
+    #[test]
+    fn an_offer_nobody_answered_is_not_a_download_that_went() {
+        let offer = lemonfiber_core::space::letting::offering(lemonfiber_core::space::Candidate {
+            name: "A.Show.S01E01".to_owned(),
+            bytes: 8_000,
+            standing: lemonfiber_core::space::Standing::Seeding { ratio: 175 },
+            consequence: Some(lemonfiber_core::space::RATIO_CONSEQUENCE.to_owned()),
+        });
+        assert_ne!(
+            format!("{:?}", settled(&Outcome::Letting(offer.clone()))),
+            success()
+        );
+
+        let gone = lemonfiber_core::space::Letting {
+            gone: Some(lemonfiber_core::space::Gone {
+                name: "A.Show.S01E01".to_owned(),
+                bytes: 8_000,
+                rehearsed: false,
+            }),
+            ..offer
+        };
+        assert_eq!(format!("{:?}", settled(&Outcome::Letting(gone))), success());
     }
 
     /// Accounting for the disk is a question, however bad the answer is; a cleanup

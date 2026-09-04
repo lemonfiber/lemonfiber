@@ -5,13 +5,14 @@
 //! agreed to and what the yes sends; this is what "what it was given" means on the way
 //! through.
 //!
-//! **One shape over four kinds of subject.** A restore takes the name a backup was
+//! **One shape over every kind of subject.** A restore takes the name a backup was
 //! written under, a capture takes one of the services the panels are showing, a bundle
-//! takes how much log and what becomes of media filenames, and three of the six take
-//! nothing at all. What follows any of them is the same path — the run that says what
-//! the errand would do, the question, and the errand itself — so what arrives at that
-//! path is one value rather than four, and the question is put in one voice rather
-//! than in four that drifted apart.
+//! takes how much log and what becomes of media filenames, letting a download go takes
+//! the name a client and the disk account both use for it, and the rest take nothing at
+//! all. What follows any of them is the same path — the run that says what the errand
+//! would do, the question, and the errand itself — so what arrives at that path is one
+//! value rather than one per subject, and the question is put in one voice rather than
+//! in several that drifted apart.
 //!
 //! **What is sent and what is said travel together.** The arguments are what the
 //! command carries and the sentence is what the operator agreed to, and they are built
@@ -25,12 +26,11 @@ use super::super::offer::Taken;
 
 /// What an errand has to be given before it can be sent.
 ///
-/// Two of the six take something, and which of the two shapes each takes is decided
-/// the way the questions on the other list decide it: by where the thing being named
-/// already is. An archive is written under a name nothing on this screen is holding,
-/// so it is typed. A service is on the panel this box is drawn over, so it is taken
-/// off a list — and a typed service name would be a name nothing checked before the
-/// capture ran.
+/// Which of the two shapes each takes is decided the way the questions on the other
+/// list decide it: by where the thing being named already is. An archive is written
+/// under a name nothing on this screen is holding, so it is typed. A service is on the
+/// panel this box is drawn over, so it is taken off a list — and a typed service name
+/// would be a name nothing checked before the capture ran.
 pub(crate) enum Needs {
     /// Nothing: it is sent as it stands.
     Nothing,
@@ -55,6 +55,12 @@ pub(crate) enum Needs {
     /// limit is taken off a list because the steps it is offered as are a table
     /// compiled into this binary, which is a list already in hand.
     Invitation(&'static str),
+    /// Which completed download, typed on a line of its own.
+    ///
+    /// Typed rather than taken, for the same reason an archive is: what a download
+    /// client is holding is not on this screen. The panels show what is *arriving*,
+    /// and this errand is about what has arrived and is still being given back.
+    Download(&'static str),
     /// What a bundle is to hold: how much of each service's log, typed on a line of
     /// its own, and then what becomes of media filenames, taken off a list.
     ///
@@ -114,6 +120,22 @@ impl Given {
         Self {
             asked: Arguments {
                 name: (!typed.is_empty()).then(|| typed.clone()),
+                ..Arguments::default()
+            },
+            said: typed,
+        }
+    }
+
+    /// The completed download to stop seeding, as it was typed.
+    ///
+    /// The same line and the same emptiness rule as [`Given::typed`]; what differs is
+    /// only which argument the word fills. A download named nothing is refused by the
+    /// translation rather than sent, which is the whole point of routing it through
+    /// the same table a browser is answered from.
+    pub(crate) fn downloaded(typed: String) -> Self {
+        Self {
+            asked: Arguments {
+                download: (!typed.is_empty()).then(|| typed.clone()),
                 ..Arguments::default()
             },
             said: typed,
@@ -209,6 +231,17 @@ impl Given {
             },
             said: format!("with the last {lines} lines of each service's log, and {shown}"),
         }
+    }
+
+    /// The same, carrying the name the offer this screen just read gave itself.
+    ///
+    /// The screen holds the question open in the process that asked it, so the name is
+    /// carried rather than typed — which is exactly what a browser cannot do, and why
+    /// the name exists at all. What is agreed to is still the reading that was shown:
+    /// this carries the offer that was read, not a standing yes to whatever stands.
+    pub(super) fn answering(mut self, offer: String) -> Self {
+        self.asked.offer = Some(offer);
+        self
     }
 
     /// The same, having accepted the re-point the archive's own account called for.

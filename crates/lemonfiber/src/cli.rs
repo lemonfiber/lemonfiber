@@ -388,6 +388,22 @@ pub enum Request {
         #[arg(long)]
         confirm: bool,
     },
+    /// Stop seeding one completed download, and let its files go with it.
+    ///
+    /// Everything the disk account names and deliberately leaves alone is asked for
+    /// here instead, one download at a time. Named on its own it says what that
+    /// download is, what it occupies, where it stands and, while it is still seeding,
+    /// what removing it does to a private tracker's opinion of you. It removes
+    /// nothing, and prints a name for that offer; answering with that name is the
+    /// yes. There is no other way to say it, because a blanket confirmation would be
+    /// agreement from somebody who had not read the cost.
+    StopSeeding {
+        /// The completed download, as the account and the client both name it.
+        download: String,
+        /// The offer being answered, as the run that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.
