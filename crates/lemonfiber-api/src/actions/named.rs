@@ -165,7 +165,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         services,
         wait,
         service,
-        name,
         key,
         value,
         preset,
