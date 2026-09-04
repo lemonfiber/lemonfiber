@@ -34,7 +34,9 @@ pub use failure::{
     Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
     SERVICE_UNSUPPORTED,
 };
-pub use household::{Access, Allowed, Household, Invited, Member, NamedLibrary};
+pub use household::{
+    Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Unrated,
+};
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
@@ -216,6 +218,22 @@ pub struct HouseholdRequest {
     pub media_status: u8,
 }
 
+/// What one member may ask for on the request service.
+///
+/// Only the half that bears on what a household chose. Everything else about the
+/// account — what they are called, what they may watch — is the media server's to say,
+/// and a second copy here would be a copy able to disagree with it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Requesting {
+    /// The identifier this service tells them apart by.
+    pub id: String,
+    /// Whether what they ask for arrives without anybody approving it.
+    ///
+    /// True is the state a restriction has to undo: it is the whole of how a limit on
+    /// watching and a lack of limit on requesting come apart.
+    pub approves_own: bool,
+}
+
 /// A request manager's identity setup and the household's own requests — Seerr,
 /// configured to authenticate its household against the media server rather than
 /// against accounts of its own.
@@ -298,6 +316,34 @@ pub trait Requests: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn member_for(&self, media_server_id: &str) -> Result<Option<String>, Failure>;
+
+    /// What one member may ask for here, by the media server's own identifier.
+    ///
+    /// `None` where this service holds no account for them, which is a member who has
+    /// never signed in here rather than a read that failed.
+    ///
+    /// Wanted because a limit on what somebody may *watch* says nothing about what they
+    /// may *ask for*, and the two disagreeing is the gap parental controls exist to
+    /// close: a child who cannot watch something but can pull it into the library is a
+    /// child whose parents' setting did half a job.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn requesting(&self, media_server_id: &str) -> Result<Option<Requesting>, Failure>;
+
+    /// Make what this member asks for wait for somebody to approve it.
+    ///
+    /// **The narrowest thing this service can be told about a restricted member.** It
+    /// has no notion of a content rating, so there is no limit here to mirror the media
+    /// server's — what there is instead is the difference between a request that lands
+    /// in the library unseen and one that an adult sees first. Taking the approval off
+    /// leaves everything else about the account exactly as it was.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn approval_first(&self, id: &str) -> Result<(), Failure>;
 
     /// Take that account away, and with it everything it asked for.
     ///

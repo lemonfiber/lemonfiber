@@ -536,6 +536,7 @@ mod tests {
                 members: Vec::new(),
                 available: true,
                 findings: Vec::new(),
+                filtering: None,
             }),
         };
 

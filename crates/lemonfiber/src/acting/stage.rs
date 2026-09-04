@@ -35,7 +35,7 @@ use super::bundling::Held;
 use super::chooser::Chooser;
 use super::disturbing::{Widened, Widening};
 use super::errand::{Errand, Given};
-use super::inviting::Limit;
+use super::inviting::{Limit, Unrated};
 use super::lasting::{Begun, Lasting};
 use super::mending::{Agreed, Mending, Offering, Warning};
 use super::narrowing::Subject;
@@ -171,6 +171,19 @@ pub(super) enum Stage {
         /// No limit and each step above it, one of them selected, each carrying the
         /// whole of what the invitation would then be asked for.
         chooser: Chooser<Limit>,
+    },
+    /// Choosing what happens to content the media server has no rating for, the
+    /// libraries and the limit having been answered.
+    ///
+    /// Reached only where something was actually narrowed. An offer that narrows
+    /// nothing writes no policy at all, so this would be a question about a setting
+    /// the run does not touch — and a keypress the ordinary case does not owe.
+    Unrated {
+        /// The errand being chosen for, which is the one that offers an account.
+        errand: &'static Errand,
+        /// The two answers, one of them selected, each carrying the whole of what the
+        /// invitation would then be asked for.
+        chooser: Chooser<Unrated>,
     },
     /// Asking the core what the errand would do, before anybody agrees to it.
     Weighing {

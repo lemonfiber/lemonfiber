@@ -67,6 +67,18 @@ pub fn steps() -> &'static [Step] {
     OFFERED
 }
 
+/// What a limit here is, and what it is not — said wherever one is set or reported.
+///
+/// **Overstating this is worse than an accurate modest claim**, because a parent may
+/// rely on it. What the media server does is decide what it offers an account; it is
+/// not a boundary anybody has to get past, and somebody with the run of the home
+/// network and a browser has other ways at the same files. Said in one place because
+/// two surfaces wording a promise differently is two surfaces making different
+/// promises, and this is the promise it matters least to get wrong.
+pub const A_FILTER_NOT_A_LOCK: &str = "These limits are a content filter, not a \
+    security boundary: they decide what the media server offers an account, and \
+    somebody with the run of the home network has other ways at the same files.";
+
 /// How an age limit reads, given the number the media server keeps it as.
 ///
 /// Nought is said in words rather than as a figure, because "nothing above about 0" is
@@ -83,7 +95,7 @@ pub fn reading(age: Option<u32>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{reading, steps};
+    use super::{reading, steps, A_FILTER_NOT_A_LOCK};
 
     /// No limit, the youngest step and an ordinary age each read as their own words.
     #[test]
@@ -119,6 +131,18 @@ mod tests {
             "the ladder does not start at nought"
         );
         assert!(ages.is_sorted(), "the steps do not rise: {ages:?}");
+    }
+
+    /// The one thing said about what a limit is says both halves: what it does, and
+    /// that it is not a lock.
+    #[test]
+    fn what_a_limit_is_says_what_it_is_not() {
+        assert!(A_FILTER_NOT_A_LOCK.contains("content filter"));
+        assert!(A_FILTER_NOT_A_LOCK.contains("not a "));
+        assert!(
+            A_FILTER_NOT_A_LOCK.contains("security boundary"),
+            "{A_FILTER_NOT_A_LOCK}"
+        );
     }
 
     /// Every step says who it suits, or a list of them is a column of numbers with a

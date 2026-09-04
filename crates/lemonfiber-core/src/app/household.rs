@@ -16,8 +16,10 @@ use super::targets::{jellyfin_reader, open_servarrs, seerr_reader};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
-use crate::model::{HouseholdMember, HouseholdReport, MemberAccess, MemberRequest};
-use crate::ports::service::{Access, Household as _, HouseholdRequest, Member, Pipeline, Requests};
+use crate::model::{HouseholdMember, HouseholdReport, MemberAccess, MemberRequest, Restriction};
+use crate::ports::service::{
+    Access, Certificate, Household as _, HouseholdRequest, Member, Pipeline, Requests,
+};
 use crate::recyclarr::Kind;
 
 /// Read the household's requests, grouped by the member who made each one.
@@ -89,9 +91,84 @@ pub(super) async fn household(
         );
     }
 
-    let mut report = assemble(accounts, requests, &libraries, &titles, member);
+    // The operator's own rating table, read once for the whole household: a limit is
+    // said in the certificates a family already recognises rather than as a bare number,
+    // and the same number carries different names in different countries. A table that
+    // will not read costs the names and not the limit.
+    let certificates = server.ratings().await.unwrap_or_default();
+    if certificates.is_empty() {
+        findings.push(
+            "the media server's own ratings could not be read, so an age limit is named \
+             from lemonfiber's own mapping rather than from this household's certificates"
+                .to_owned(),
+        );
+    }
+
+    // What each member may *ask for*, which is a second service's answer and the half a
+    // limit on watching says nothing about.
+    let requesting = asking(ctx, &manifest.services, &accounts).await;
+
+    let mut report = assemble(
+        accounts,
+        requests,
+        &Naming {
+            libraries: &libraries,
+            titles: &titles,
+            certificates: &certificates,
+            requesting: &requesting,
+        },
+        member,
+    );
     report.findings.append(&mut findings);
     Ok(report)
+}
+
+/// Whether each member's requests arrive without anybody seeing them, by the media
+/// server's own identifier.
+///
+/// **Absent is not false.** Somebody the request service could not be asked about is
+/// left out entirely, because an unread answer is not a disagreement — reporting one
+/// would send an operator looking for a defect in a service that is merely down.
+async fn asking(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    accounts: &[Member],
+) -> BTreeMap<String, bool> {
+    let mut asking = BTreeMap::new();
+    let Some(access) = seerr_reader(ctx, services) else {
+        return asking;
+    };
+    if access
+        .seerr
+        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
+        .await
+        .is_err()
+    {
+        return asking;
+    }
+    for account in accounts {
+        if let Ok(Some(requesting)) = access.seerr.requesting(&account.id).await {
+            asking.insert(account.id.clone(), requesting.approves_own);
+        }
+    }
+    asking
+}
+
+/// The tables every member's line is said in, gathered so the assembly takes one of
+/// them rather than four.
+///
+/// Read once for the whole household and used once per member: what a library is
+/// called, what an item is called, what a certificate is called and what somebody may
+/// ask for are the same four answers for everybody in the house.
+struct Naming<'a> {
+    /// Library identifier to the name the operator gave it.
+    libraries: &'a BTreeMap<String, String>,
+    /// The title each \*arr knows its items by.
+    titles: &'a BTreeMap<(&'static str, i64), String>,
+    /// The media server's own certificates, in the operator's country.
+    certificates: &'a [Certificate],
+    /// Whether each member's requests arrive unseen, by media-server identifier.
+    requesting: &'a BTreeMap<String, bool>,
 }
 
 /// What the household has asked for, or in plain words why it could not be read.
@@ -163,8 +240,7 @@ async fn library_titles(
 fn assemble(
     accounts: Vec<Member>,
     requests: Vec<HouseholdRequest>,
-    libraries: &BTreeMap<String, String>,
-    titles: &BTreeMap<(&'static str, i64), String>,
+    naming: &Naming<'_>,
     member: Option<&str>,
 ) -> HouseholdReport {
     let wanted = member.map(str::to_lowercase);
@@ -178,7 +254,7 @@ fn assemble(
             .entry(request.member.to_lowercase())
             .or_default()
             .push(MemberRequest {
-                title: title_of(&request, titles),
+                title: title_of(&request, naming.titles),
                 media: request.kind.map(Kind::noun).map(str::to_owned),
                 state: State::of(request.request_status, request.media_status),
             });
@@ -197,8 +273,16 @@ fn assemble(
         {
             continue;
         }
+        // An administrator is left out of the agreement: the request service treats
+        // one as holding every permission, so an owner approving their own requests is
+        // what an owner is rather than a household disagreeing with itself.
+        let approves_own = if account.access.administrator {
+            None
+        } else {
+            naming.requesting.get(&account.id).copied()
+        };
         members.push(HouseholdMember {
-            access: named_access(&account.access, libraries),
+            access: named_access(&account.access, naming, approves_own),
             last_seen: account.last_seen,
             claimed: account.claimed,
             name: account.name,
@@ -220,10 +304,32 @@ fn assemble(
         ));
     }
 
+    // The disagreement this reading exists to find, named rather than left to be
+    // spotted in a column: somebody who cannot watch something and can still ask for it
+    // has been given half a limit, and half a limit looks like a whole one.
+    for held in &members {
+        if held.access.restriction.disagrees() {
+            findings.push(format!(
+                "{} is held to what they may watch and not to what they may ask for, so \
+                 what they cannot watch they can still fetch",
+                held.name
+            ));
+        }
+    }
+
+    // Said the moment anybody carries a limit, and not before: there is no claim to be
+    // modest about on a household nobody has narrowed, and the reader who most needs
+    // the sentence is the parent who has just set one.
+    let filtering = members
+        .iter()
+        .any(|held| held.access.restriction != Restriction::Unrestricted)
+        .then(|| crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned());
+
     HouseholdReport {
         members,
         findings,
         available: true,
+        filtering,
     }
 }
 
@@ -232,18 +338,28 @@ fn assemble(
 /// An identifier the library list did not name is kept as it is rather than dropped: a
 /// library missing from the list is still a library this member can watch, and showing
 /// nothing there would read as access they do not have.
-fn named_access(access: &Access, libraries: &BTreeMap<String, String>) -> MemberAccess {
-    MemberAccess {
+fn named_access(access: &Access, naming: &Naming<'_>, approves_own: Option<bool>) -> MemberAccess {
+    let mut said = MemberAccess {
         every_library: access.every_library,
         libraries: access
             .libraries
             .iter()
-            .map(|id| libraries.get(id).unwrap_or(id).clone())
+            .map(|id| naming.libraries.get(id).unwrap_or(id).clone())
             .collect(),
         age_limit: access.age_limit,
+        rated: access
+            .age_limit
+            .map(|age| crate::rating::rated(naming.certificates, age)),
+        unrated_blocked: access.unrated_blocked,
+        restriction: Restriction::Unrestricted,
         administrator: access.administrator,
         disabled: access.disabled,
-    }
+    };
+    // Settled last because it is read off the rest of the shape: what somebody is held
+    // to is both halves of their access taken together with what a second service says
+    // they may ask for.
+    said.restriction = Restriction::of(&said, approves_own);
+    said
 }
 
 /// What a request is called, where the \*arr filing it has been told about it and its
@@ -265,6 +381,10 @@ fn unavailable(reason: &str) -> HouseholdReport {
         members: Vec::new(),
         findings: vec![reason.to_owned()],
         available: false,
+        // Nothing to be modest about: nobody was read, so nobody is limited as far as
+        // this answer knows, and a caution beside an empty list is a claim about a
+        // household nobody saw.
+        filtering: None,
     }
 }
 
@@ -274,8 +394,10 @@ mod tests {
 
     use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-    use super::{asked_for, assemble, household, title_of, Ctx};
+    use super::{asked_for, assemble, household, title_of, Ctx, Naming};
     use crate::household::State;
+    use crate::model::{HouseholdReport, Restriction};
+    use crate::ports::service::Certificate;
     use crate::ports::service::{Access, HouseholdRequest, Member};
     use crate::recyclarr::Kind;
     use crate::test_support::{a_context, a_password, SeedFs};
@@ -283,6 +405,196 @@ mod tests {
 
     /// A Servarr config that opens a target, carrying a readable key.
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+
+    /// The assembly, given the two tables these cases turn on and nothing for the two
+    /// they do not.
+    ///
+    /// The certificates and what each member may ask for get cases of their own below,
+    /// because each is about a second read rather than about the joining this wrapper
+    /// is here to exercise.
+    fn assembled(
+        accounts: Vec<Member>,
+        requests: Vec<HouseholdRequest>,
+        libraries: &BTreeMap<String, String>,
+        titles: &BTreeMap<(&'static str, i64), String>,
+        member: Option<&str>,
+    ) -> HouseholdReport {
+        assemble(
+            accounts,
+            requests,
+            &Naming {
+                libraries,
+                titles,
+                certificates: &[],
+                requesting: &BTreeMap::new(),
+            },
+            member,
+        )
+    }
+
+    /// The same, over this household's own certificates and what the request service
+    /// says about each member.
+    fn a_household_of(
+        accounts: Vec<Member>,
+        requesting: &BTreeMap<String, bool>,
+    ) -> HouseholdReport {
+        assemble(
+            accounts,
+            Vec::new(),
+            &Naming {
+                libraries: &unnamed(),
+                titles: &titles(),
+                certificates: &british(),
+                requesting,
+            },
+            None,
+        )
+    }
+
+    /// One account, held to a rating or held to nothing.
+    fn an_account_held_to(age: Option<u32>) -> Member {
+        Member {
+            access: Access {
+                every_library: true,
+                age_limit: age,
+                ..Access::default()
+            },
+            ..account("Ana", true)
+        }
+    }
+
+    /// A rating table as one country's media server answers it.
+    fn british() -> Vec<Certificate> {
+        [(0, "U"), (12, "12A"), (15, "15")]
+            .into_iter()
+            .map(|(age, name)| Certificate {
+                name: name.to_owned(),
+                age,
+            })
+            .collect()
+    }
+
+    /// A member held to what they may watch and not to what they may ask for is named,
+    /// not left to be spotted in a column.
+    ///
+    /// Half a limit looks exactly like a whole one. This is the state the whole feature
+    /// exists to close, so it is said in a sentence beside the list rather than carried
+    /// only as a word on a row.
+    #[test]
+    fn a_member_limited_on_one_service_and_not_the_other_is_named() {
+        let mut requesting = BTreeMap::new();
+        requesting.insert("id-ana".to_owned(), true);
+
+        let report = a_household_of(vec![an_account_held_to(Some(12))], &requesting);
+
+        assert_eq!(
+            report
+                .members
+                .first()
+                .map(|member| member.access.restriction),
+            Some(Restriction::Inconsistent),
+            "{report:?}"
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.contains("can still fetch")),
+            "the disagreement was not said in a sentence: {report:?}"
+        );
+    }
+
+    /// A request service that could not be asked leaves the member as the media server
+    /// found them, and raises no disagreement.
+    #[test]
+    fn a_service_that_could_not_be_asked_raises_no_disagreement() {
+        let report = a_household_of(vec![an_account_held_to(Some(12))], &BTreeMap::new());
+
+        assert_eq!(
+            report
+                .members
+                .first()
+                .map(|member| member.access.restriction),
+            Some(Restriction::RatingLimited),
+            "{report:?}"
+        );
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    /// Where anybody carries a limit, the list says what a limit here is not.
+    ///
+    /// Overstating protection is worse than an accurate modest claim, because a parent
+    /// may rely on it — and a household nobody narrowed has no claim to be modest about.
+    #[test]
+    fn a_household_where_anybody_is_limited_says_what_a_limit_is_not() {
+        let limited = a_household_of(vec![an_account_held_to(Some(12))], &BTreeMap::new());
+        let open = a_household_of(vec![an_account_held_to(None)], &BTreeMap::new());
+
+        assert!(
+            limited
+                .filtering
+                .as_deref()
+                .is_some_and(|said| said.contains("not a security boundary")),
+            "{limited:?}"
+        );
+        assert_eq!(
+            open.filtering, None,
+            "a household nobody narrowed was warned about a limit it does not have"
+        );
+    }
+
+    /// A limit reads in the certificates this household's own media server names.
+    ///
+    /// A bare number says nothing about what it actually holds back here, which is the
+    /// whole reason the table is read off the server rather than shipped.
+    #[test]
+    fn a_limit_carries_the_certificates_this_server_names() {
+        let report = a_household_of(vec![an_account_held_to(Some(12))], &BTreeMap::new());
+
+        let rated = report
+            .members
+            .first()
+            .and_then(|member| member.access.rated.clone())
+            .unwrap_or_default();
+
+        assert_eq!(rated.allows, vec!["12A".to_owned()], "{rated:?}");
+        assert_eq!(rated.holds_back, vec!["15".to_owned()], "{rated:?}");
+        assert!(
+            !rated.fell_back,
+            "the server's own table was reported as lemonfiber's: {rated:?}"
+        );
+    }
+
+    /// The owner is left out of the agreement rather than reported as disagreeing with
+    /// themselves.
+    ///
+    /// The request service treats an administrator as holding every permission, so an
+    /// owner approving their own requests is what an owner is.
+    #[test]
+    fn an_administrator_is_not_reported_as_a_household_in_disagreement() {
+        let mut requesting = BTreeMap::new();
+        requesting.insert("id-ana".to_owned(), true);
+        let owner = Member {
+            access: Access {
+                every_library: true,
+                age_limit: Some(12),
+                administrator: true,
+                ..Access::default()
+            },
+            ..account("Ana", true)
+        };
+
+        let report = a_household_of(vec![owner], &requesting);
+
+        assert_eq!(
+            report
+                .members
+                .first()
+                .map(|member| member.access.restriction),
+            Some(Restriction::RatingLimited),
+            "{report:?}"
+        );
+    }
 
     /// A request as the service records it, for the grouping tests.
     fn request(
@@ -401,7 +713,7 @@ mod tests {
 
     #[test]
     fn requests_are_grouped_by_who_asked_in_name_order() {
-        let report = assemble(
+        let report = assembled(
             vec![account("Sam", true), account("Alex", true)],
             vec![
                 request("Sam", Some(Kind::Radarr), Some(7), (2, 5)),
@@ -434,7 +746,7 @@ mod tests {
     /// list of members. Sourced from the accounts, they do.
     #[test]
     fn somebody_who_has_asked_for_nothing_is_still_in_the_household() {
-        let report = assemble(
+        let report = assembled(
             vec![account("Alex", true), account("Sam", true)],
             vec![request("Alex", Some(Kind::Sonarr), Some(11), (2, 4))],
             &unnamed(),
@@ -460,7 +772,7 @@ mod tests {
     /// how you do that — so the two facts always agree and neither is guessed.
     #[test]
     fn an_invitation_nobody_has_taken_up_is_listed_as_one() {
-        let report = assemble(
+        let report = assembled(
             vec![account("Ana", false)],
             Vec::new(),
             &unnamed(),
@@ -500,7 +812,7 @@ mod tests {
             ..account("Ana", true)
         };
 
-        let report = assemble(vec![limited], Vec::new(), &named, &titles(), None);
+        let report = assembled(vec![limited], Vec::new(), &named, &titles(), None);
 
         let access = report.members.first().map(|member| &member.access);
         assert_eq!(
@@ -518,7 +830,7 @@ mod tests {
     /// A request outliving the account that made it is said, not silently dropped.
     #[test]
     fn a_request_from_somebody_with_no_account_is_said_rather_than_dropped() {
-        let report = assemble(
+        let report = assembled(
             vec![account("Alex", true)],
             vec![request("Gone", Some(Kind::Radarr), Some(7), (2, 5))],
             &unnamed(),
@@ -541,7 +853,7 @@ mod tests {
     /// above stays about requests that really belong to nobody.
     #[test]
     fn narrowing_does_not_turn_everybody_else_into_a_missing_account() {
-        let report = assemble(
+        let report = assembled(
             vec![account("Alex", true), account("Sam", true)],
             vec![request("Sam", Some(Kind::Radarr), Some(7), (2, 5))],
             &unnamed(),
@@ -557,7 +869,7 @@ mod tests {
 
     #[test]
     fn a_request_is_named_by_the_library_the_service_handed_it_to() {
-        let report = assemble(
+        let report = assembled(
             vec![account("Alex", true)],
             vec![request("Alex", Some(Kind::Sonarr), Some(11), (2, 4))],
             &unnamed(),
@@ -579,7 +891,7 @@ mod tests {
     fn a_request_no_service_holds_yet_is_named_by_what_it_is() {
         // Nothing has been handed over, so there is no title to find — and none is
         // invented. What it is still reads, so the line is not blank.
-        let report = assemble(
+        let report = assembled(
             vec![account("Sam", true)],
             vec![request("Sam", Some(Kind::Radarr), None, (1, 1))],
             &unnamed(),
@@ -630,7 +942,7 @@ mod tests {
             request("Alex", Some(Kind::Sonarr), Some(11), (2, 4)),
             request("Sam", Some(Kind::Radarr), Some(7), (2, 5)),
         ];
-        let report = assemble(
+        let report = assembled(
             vec![account("Alex", true), account("Sam", true)],
             requests,
             &unnamed(),

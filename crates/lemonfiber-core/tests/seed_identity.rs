@@ -156,6 +156,19 @@ impl Requests for FakeReq {
         Ok(None)
     }
 
+    /// What somebody may ask for is not what this file is about — identity setup is —
+    /// so it answers as a service that has never heard of them.
+    async fn requesting(
+        &self,
+        _media_server_id: &str,
+    ) -> Result<Option<lemonfiber_core::ports::service::Requesting>, Failure> {
+        Ok(None)
+    }
+
+    async fn approval_first(&self, _id: &str) -> Result<(), Failure> {
+        Ok(())
+    }
+
     async fn remove_member(&self, _id: &str) -> Result<(), Failure> {
         Ok(())
     }

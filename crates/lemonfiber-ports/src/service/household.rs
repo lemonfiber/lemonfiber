@@ -78,6 +78,20 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure>;
 
+    /// The certificates this server's own rating table names, and the ages it holds
+    /// them against.
+    ///
+    /// **The table is the operator's, not this product's.** The media server keeps a
+    /// country and answers with that country's certificates, so the same age reads as
+    /// `12A` in one house and as nothing at all in another. An age limit is therefore
+    /// said in the names the household already recognises rather than as a bare
+    /// number — see [`Certificate`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn ratings(&self) -> Result<Vec<Certificate>, Failure>;
+
     /// Set what one account may watch.
     ///
     /// The only write in this port that changes an account rather than making or
@@ -106,6 +120,40 @@ pub struct NamedLibrary {
     pub name: String,
 }
 
+/// One certificate the media server's own rating table names.
+///
+/// Read off the server rather than shipped, because the table is regional: the same
+/// age carries different names in different countries, and half of them carry no
+/// number a person could read off them.
+///
+/// The server's table also carries an entry for content it has no rating for, and that
+/// entry carries no age. It is not a certificate and is not one of these — what to do
+/// about unrated content is a separate choice, carried separately by [`Allowed`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Certificate {
+    /// What the certificate is called where the operator lives.
+    pub name: String,
+    /// The age the media server holds it against.
+    pub age: u32,
+}
+
+/// What is to happen to content the media server has no rating for.
+///
+/// A choice rather than a default, because a great deal of content carries no rating
+/// and either answer is wrong for somebody: holding it back makes legitimate content
+/// invisible, and letting it through lets through the one thing nobody vetted.
+///
+/// Spelled `HeldBack` and `LetThrough` rather than blocked and allowed, because
+/// [`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would
+/// read as the opposite of what it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unrated {
+    /// Content with no rating is held back.
+    HeldBack,
+    /// Content with no rating is let through.
+    LetThrough,
+}
+
 /// What one household member is to be allowed to watch.
 ///
 /// The half of [`Access`] an operator chooses. The other two things an account carries
@@ -132,6 +180,10 @@ pub struct Allowed {
     ///
     /// `None` leaves the limit the account already has as it is.
     pub age_limit: Option<u32>,
+    /// What is to happen to content the server has no rating for.
+    ///
+    /// `None` leaves what the account already does with it as it is.
+    pub unrated: Option<Unrated>,
 }
 
 /// What one household member may watch.
@@ -149,6 +201,12 @@ pub struct Access {
     pub libraries: Vec<String>,
     /// The highest rating they may watch, where the operator set a limit.
     pub age_limit: Option<u32>,
+    /// Whether content the server has no rating for is held back from them.
+    ///
+    /// The server keeps this as the list of kinds of unrated thing to hold back, and
+    /// what a household means by it is all of them or none — so it is read as the one
+    /// bit that question actually has.
+    pub unrated_blocked: bool,
     /// Whether this account administers the server.
     pub administrator: bool,
     /// Whether the account is switched off — held, but unable to sign in.

@@ -33,7 +33,7 @@ pub(super) use reissuing::reissued;
 
 use crate::app::{Allowance, Ctx};
 use crate::invitation::{offered, run_out, Offered, HOURS_OF_RECORD, HOURS_TO_CLAIM};
-use crate::model::{Invitation, InvitationStanding, Linked};
+use crate::model::{Applied, Invitation, InvitationStanding, Linked};
 use crate::ports::service::{Household as _, Member, Requests as _};
 
 use allowing::{allowing, would_not_allow};
@@ -96,7 +96,7 @@ pub(super) async fn offer(
     // wrong is a refusal the operator is owed instead of an account, not after one —
     // and a rehearsal that skipped the check would say an invitation would be made
     // that the real run then refuses.
-    let allowed = allowing(&server, &allowance.libraries, allowance.age_limit).await?;
+    let allowed = allowing(&server, &allowance).await?;
 
     // A rehearsal makes no account and takes none back. Both halves of this command
     // change the household, and the one that removes accounts is the half nobody
@@ -114,6 +114,10 @@ pub(super) async fn offer(
             rehearsed: true,
             standing,
             linked: Linked::NotTried,
+            // Said in full on a rehearsal, because every part of it is known without
+            // writing anything: the certificates are a read, and what would be written
+            // has already been decided.
+            applied: applied(&server, &allowance, allowed.as_ref(), Linked::NotTried).await,
         });
     }
 
@@ -153,6 +157,15 @@ pub(super) async fn offer(
     }
 
     let linked = link(ctx, &services, &to_link(&held, &member)).await;
+    // After the link, because there has to be an account over there to hold. A member
+    // the request service has never heard of has no second permission to disagree with
+    // the first, which is not the same as one whose permissions could not be read.
+    let requesting = if allowed.is_some() {
+        holding(ctx, &services, &member.id).await
+    } else {
+        Linked::NotTried
+    };
+    let applied = applied(&server, &allowance, allowed.as_ref(), requesting).await;
 
     Ok(Invitation {
         name: member.name,
@@ -163,6 +176,78 @@ pub(super) async fn offer(
         rehearsed: false,
         standing,
         linked,
+        applied,
+    })
+}
+
+/// Hold what this person may ask for to the same decision as what they may watch.
+///
+/// **This is the hole the setting exists to close.** A limit on the media server decides
+/// what an account is offered; it says nothing at all about what that account may ask
+/// the request service to fetch, and a child who cannot watch something but can pull it
+/// into the library has been given half a limit. The request service has no notion of a
+/// content rating, so what it can be told instead is the difference that matters: what
+/// this person asks for waits for somebody to see it.
+///
+/// Best-effort for the reason the link is: the account on the media server is what an
+/// invitation *is*, and it stands whether or not a second service is up. What could not
+/// be held is reported rather than allowed to refuse the invitation.
+async fn holding(ctx: &Ctx, services: &[lemonfiber_manifest::Service], member: &str) -> Linked {
+    let Some(access) = crate::app::targets::seerr_reader(ctx, services) else {
+        return Linked::NotTried;
+    };
+    if access
+        .seerr
+        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
+        .await
+        .is_err()
+    {
+        return Linked::NotYet;
+    }
+    match access.seerr.requesting(member).await {
+        // Nothing to hold rather than a failure to hold something: a member this
+        // service has never heard of has no second permission to disagree with the
+        // first, and the next run makes the account and holds it then.
+        Ok(None) => Linked::NotTried,
+        Ok(Some(requesting)) if !requesting.approves_own => Linked::Made,
+        Ok(Some(requesting)) => match access.seerr.approval_first(&requesting.id).await {
+            Ok(()) => Linked::Made,
+            Err(_) => Linked::NotYet,
+        },
+        Err(_) => Linked::NotYet,
+    }
+}
+
+/// What was written on the account, said back in the household's own words.
+///
+/// **Said so an absence later is explicable.** A restricted member who cannot find half
+/// the library is either this setting working or a defect, and an operator with nothing
+/// on record cannot tell which — so what was applied travels back on the answer that
+/// applied it, including what happened to content the server has no rating for.
+///
+/// The certificates come off the media server, because the table is the operator's
+/// country's rather than this product's. A server that will not answer costs the names
+/// and not the limit: the words for the number still read, and what stands in for the
+/// names says it stood in.
+async fn applied(
+    server: &crate::jellyfin::Jellyfin,
+    allowance: &Allowance,
+    allowed: Option<&crate::ports::service::Allowed>,
+    requesting: Linked,
+) -> Option<Applied> {
+    let allowed = allowed?;
+    let certificates = server.ratings().await.unwrap_or_default();
+    Some(Applied {
+        limit: allowance
+            .age_limit
+            .map(|age| crate::rating::reading(&certificates, Some(age))),
+        libraries: allowance.libraries.clone(),
+        unrated_blocked: matches!(
+            allowed.unrated,
+            Some(crate::ports::service::Unrated::HeldBack)
+        ),
+        requesting,
+        filtering: crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned(),
     })
 }
 

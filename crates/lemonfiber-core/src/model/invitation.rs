@@ -60,6 +60,48 @@ pub enum Linked {
     NotTried,
 }
 
+/// What an invitation wrote on the account, in the household's own words.
+///
+/// **Said back so an absence later is explicable.** A member held to a rating who
+/// cannot find half the library is either this working or a defect, and an operator
+/// with nothing on record cannot tell which. So the limit, the libraries, what happened
+/// to content the media server has no rating for, and whether the request service was
+/// held to the same decision all travel back on the answer that applied them.
+///
+/// Absent where the offer set nothing at all, which is not the same as an offer that
+/// set no restrictions: naming neither a library nor a limit is saying nothing about
+/// access, and nothing is what gets written.
+///
+/// Serialised in the field names the household read uses for the same facts, rather
+/// than in the invitation's own spelling: one setting named two ways across two shapes
+/// is two shapes a client has to be told are about the same thing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Applied {
+    /// How far up the ratings they may watch, in the words and the certificates this
+    /// media server names in the operator's own country. Absent where no limit was set.
+    pub limit: Option<String>,
+    /// The libraries they may open, as the operator named them. Empty is every one.
+    pub libraries: Vec<String>,
+    /// Whether content the media server has no rating for is held back from them.
+    ///
+    /// Held back by default on somebody being narrowed, because a rating limit cannot
+    /// decide about a thing that carries no rating. The cost is real and is why this is
+    /// reported rather than assumed: some legitimate content becomes invisible to them.
+    pub unrated_blocked: bool,
+    /// Whether the request service was held to the same decision.
+    ///
+    /// The same three answers a link carries, and for the same reason: what somebody
+    /// may *ask for* is a second service's business, and that service can be down while
+    /// the media server is not. `NotTried` here is a service with no account for them
+    /// yet — nothing to hold rather than a failure to hold something.
+    pub requesting: Linked,
+    /// What a limit here is, and what it is not.
+    ///
+    /// Carried on the answer rather than left to a document, because the reader who
+    /// most needs it is the parent who has just set one.
+    pub filtering: String,
+}
+
 /// One invitation, as it was just made.
 ///
 /// Carries what the operator has to pass on and nothing else — a name to sign in
@@ -103,6 +145,8 @@ pub struct Invitation {
     pub rehearsed: bool,
     /// What was found where this was going.
     pub standing: InvitationStanding,
+    /// What this offer wrote on the account, where it wrote anything.
+    pub applied: Option<Applied>,
     /// Whether the request service knows about the household yet.
     ///
     /// Separate from `standing`, which is about the media-server account alone. The

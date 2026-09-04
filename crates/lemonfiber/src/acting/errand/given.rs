@@ -131,7 +131,15 @@ impl Given {
     /// The limit is said in the words a household read says the same limit back in,
     /// off [`lemonfiber_core::age_limit`], because it is one setting and two surfaces
     /// naming it differently is what that one place exists to prevent.
-    pub(crate) fn inviting(name: &str, libraries: Vec<String>, age_limit: Option<u32>) -> Self {
+    /// `unrated` is the word the request carries beside what the question says it as,
+    /// because they are not the same thing: `block` is how the other two surfaces spell
+    /// the choice, and it is not a sentence anybody would agree to.
+    pub(crate) fn inviting(
+        name: &str,
+        libraries: Vec<String>,
+        age_limit: Option<u32>,
+        unrated: Option<(&'static str, &'static str)>,
+    ) -> Self {
         let watching = if libraries.is_empty() {
             "who can watch everything".to_owned()
         } else {
@@ -140,14 +148,20 @@ impl Given {
         let limited = age_limit.map_or_else(String::new, |age| {
             format!(", and {}", lemonfiber_core::age_limit::reading(Some(age)))
         });
+        // Said only where it was asked. An offer that narrows nothing writes nothing,
+        // so what would happen to unrated content is a question about an account
+        // nobody is limiting — and a sentence answering it would be a promise about a
+        // setting this run does not touch.
+        let unrated_said = unrated.map_or_else(String::new, |(_, said)| format!(", {said}"));
         Self {
             asked: Arguments {
                 name: (!name.is_empty()).then(|| name.to_owned()),
                 libraries,
                 age_limit,
+                unrated: unrated.map(|(word, _)| word.to_owned()),
                 ..Arguments::default()
             },
-            said: format!("{name}, {watching}{limited}"),
+            said: format!("{name}, {watching}{limited}{unrated_said}"),
         }
     }
 

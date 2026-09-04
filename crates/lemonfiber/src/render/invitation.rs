@@ -151,6 +151,7 @@ mod tests {
             rehearsed: false,
             standing: InvitationStanding::Made,
             linked: Linked::Made,
+            applied: None,
         }
     }
 

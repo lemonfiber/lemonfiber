@@ -26,6 +26,7 @@ use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{Allowance, Command, QualityAction, Waiting};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
+use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
@@ -82,27 +83,59 @@ const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 ///
 /// What they may watch reaches only the one that makes an account. The other two are
 /// given it and drop it, which they may because the carrier refuses it to them first:
-/// a library or an age limit named to a reissue or a removal is turned away by name
-/// before this is reached.
+/// a library, an age limit or a choice about unrated content named to a reissue or a
+/// removal is turned away by name before this is reached.
 fn about_a_person(
     action: &str,
     name: Option<String>,
     confirm: bool,
-    libraries: Vec<String>,
-    age_limit: Option<u32>,
+    allowance: RawAllowance,
 ) -> Result<Command, Refused> {
     let name = name.ok_or_else(|| Refused::Missing {
         action: action.to_owned(),
         argument: "name".to_owned(),
     })?;
     let allowance = Allowance {
-        libraries,
-        age_limit,
+        libraries: allowance.libraries,
+        age_limit: allowance.age_limit,
+        unrated: unrated(allowance.unrated.as_deref())?,
     };
     match action {
         "invite" => Ok(Command::Invite { name, allowance }),
         "reissue" => Ok(Command::Reissue { name }),
         _ => Ok(Command::Remove { name, confirm }),
+    }
+}
+
+/// What an invitation was told to allow, as the three arguments carrying it.
+///
+/// Gathered rather than passed as three, because they are one decision taken at one
+/// moment and because a function taking three of one request's arguments beside two of
+/// another's is a signature a caller gets wrong silently.
+struct RawAllowance {
+    /// The libraries named, as the operator names them.
+    libraries: Vec<String>,
+    /// The age above which the media server holds things back.
+    age_limit: Option<u32>,
+    /// What is to happen to content the media server has no rating for, as written.
+    unrated: Option<String>,
+}
+
+/// What a word about unrated content means, or why it means nothing.
+///
+/// Nothing given is nothing said, which leaves the choice to the default a restriction
+/// carries. A word this build does not know is refused with the ones it does, rather
+/// than falling to whichever answer is safer — a caller who wrote `allow` and meant it
+/// must not be given `block` because of a spelling.
+fn unrated(written: Option<&str>) -> Result<Option<Unrated>, Refused> {
+    match written {
+        None => Ok(None),
+        Some("block") => Ok(Some(Unrated::HeldBack)),
+        Some("allow") => Ok(Some(Unrated::LetThrough)),
+        Some(other) => Err(Refused::Unrecognised {
+            argument: "unrated".to_owned(),
+            offered: format!("`{other}` is neither `block` nor `allow`"),
+        }),
     }
 }
 
@@ -167,6 +200,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         item,
         libraries,
         age_limit,
+        unrated,
         term,
         season,
     } = given;
@@ -209,9 +243,16 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // to is what it was shown, the way a forget's agreement is. A reissue asks
         // for no agreement: nothing is destroyed and nothing is listed first, and
         // what ends is a password nobody here knew.
-        "invite" | "reissue" | "remove" => {
-            about_a_person(action, name, confirm, libraries, age_limit)
-        }
+        "invite" | "reissue" | "remove" => about_a_person(
+            action,
+            name,
+            confirm,
+            RawAllowance {
+                libraries,
+                age_limit,
+                unrated,
+            },
+        ),
         // The two reads this surface serves twice, each reaching the same command its
         // own endpoint reaches and widened by the same word the command line widens
         // it with. Neither is a second reading of the stack; each is the reading that

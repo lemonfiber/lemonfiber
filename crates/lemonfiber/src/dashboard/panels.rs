@@ -522,6 +522,7 @@ mod tests {
             }],
             available: true,
             findings: Vec::new(),
+            filtering: None,
         })
     }
 
@@ -590,6 +591,7 @@ mod tests {
             members: Vec::new(),
             available: false,
             findings: vec!["seerr did not answer".to_owned()],
+            filtering: None,
         });
         let said = said(&household(&unread, WIDE));
 

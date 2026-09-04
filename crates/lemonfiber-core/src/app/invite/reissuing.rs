@@ -88,6 +88,10 @@ fn reissue(name: String, reachable: crate::door::Address, rehearsed: bool) -> In
         // Whoever it is was already known to the request service, or was never known to
         // it; taking a password away changes neither.
         linked: Linked::NotTried,
+        // A reset takes a password off an account whose access somebody already chose,
+        // and it changes none of it. Saying what that access is would be reporting a
+        // setting this run did not make, on a message about a password.
+        applied: None,
     }
 }
 /// Said where the media server will not say who holds an account.

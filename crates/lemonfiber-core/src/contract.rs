@@ -328,6 +328,13 @@ mod tests {
                 rehearsed: false,
                 standing: crate::model::InvitationStanding::Made,
                 linked: crate::model::Linked::Made,
+                applied: Some(crate::model::Applied {
+                    limit: Some("nothing above about 12".to_owned()),
+                    libraries: vec!["Films".to_owned()],
+                    unrated_blocked: true,
+                    requesting: crate::model::Linked::Made,
+                    filtering: crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned(),
+                }),
             }),
             Outcome::Removed(crate::model::HouseholdRemoval {
                 name: "ana".to_owned(),

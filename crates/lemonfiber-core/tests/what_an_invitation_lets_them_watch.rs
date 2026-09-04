@@ -33,6 +33,7 @@ use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
@@ -46,6 +47,39 @@ const ONE_ACCOUNT: &str = "/Users/9";
 
 /// Where an account is asked for.
 const NEW_ACCOUNT: &str = "/Users/New";
+
+/// Where the media server's own certificates are read.
+const RATINGS: &str = "/Localization/ParentalRatings";
+
+/// What the media server answers there, in one country.
+///
+/// The shape the pinned image answers with, including the row that carries no age at
+/// all — its name for content it has no rating for, which is not a certificate.
+const CERTIFICATES: &str = r#"[
+    {"Name":"Unrated"},
+    {"Name":"U","Value":0},
+    {"Name":"12A","Value":12},
+    {"Name":"15","Value":15},
+    {"Name":"18","Value":18}
+]"#;
+
+/// The kinds of unrated thing the media server holds back, all of them.
+///
+/// What a household means by holding back what has no rating is all of them: a policy
+/// naming some would hold back an unrated film and let an unrated series through.
+fn every_unrated_kind() -> serde_json::Value {
+    serde_json::json!([
+        "Movie",
+        "Trailer",
+        "Series",
+        "Music",
+        "Book",
+        "LiveTvChannel",
+        "LiveTvProgram",
+        "ChannelContent",
+        "Other"
+    ])
+}
 
 /// The library list the media server holds, as it names them.
 const LIBRARIES: &str = r#"{"Items":[
@@ -143,10 +177,21 @@ fn a_server(policy: &'static str, libraries: Answer, written: Answer) -> Arc<Fak
     Fake::by_path_in_turn(vec![
         (
             "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
+            vec![
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in,
+            ],
         ),
         ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
+        // The request service holds no account for anybody, which is nothing to hold
+        // rather than a failure to hold something.
+        ("/user/jellyfin/", vec![Answer::reply(404, "")]),
+        (RATINGS, vec![Answer::reply(200, CERTIFICATES)]),
         (
             "/System/ActivityLog",
             vec![Answer::reply(200, r#"{"Items":[]}"#)],
@@ -244,6 +289,7 @@ async fn an_age_limit_is_written_onto_the_policy_the_account_already_had() {
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(13),
+            unrated: None,
         },
     )
     .await;
@@ -255,6 +301,7 @@ async fn an_age_limit_is_written_onto_the_policy_the_account_already_had() {
             "EnableAllFolders": true,
             "EnabledFolders": [],
             "MaxParentalRating": 13,
+            "BlockUnratedItems": every_unrated_kind(),
             "IsAdministrator": false,
             "IsDisabled": false,
             "EnableMediaPlayback": false,
@@ -277,6 +324,7 @@ async fn named_libraries_reach_the_server_as_the_identifiers_it_holds_them_by() 
             // for its capitalisation is somebody refused for their shift key.
             libraries: vec!["films".to_owned()],
             age_limit: None,
+            unrated: None,
         },
     )
     .await;
@@ -334,6 +382,7 @@ async fn an_age_limit_alone_does_not_widen_the_libraries() {
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(15),
+            unrated: None,
         },
     )
     .await;
@@ -372,6 +421,7 @@ async fn a_library_nobody_holds_costs_no_account() {
         Allowance {
             libraries: vec!["Musicals".to_owned()],
             age_limit: None,
+            unrated: None,
         },
     )
     .await;
@@ -397,6 +447,7 @@ async fn a_library_list_that_will_not_answer_costs_no_account() {
         Allowance {
             libraries: vec!["Films".to_owned()],
             age_limit: None,
+            unrated: None,
         },
     )
     .await;
@@ -426,6 +477,7 @@ async fn a_policy_the_server_will_not_take_says_the_account_is_open() {
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(12),
+            unrated: None,
         },
     )
     .await;
@@ -437,5 +489,244 @@ async fn a_policy_the_server_will_not_take_says_the_account_is_open() {
     assert!(
         sent.iter().any(|request| request.url.contains(NEW_ACCOUNT)),
         "the account this refusal is about was never made"
+    );
+}
+
+/// Content the media server has no rating for is held back from anybody being narrowed,
+/// without the operator having to say so.
+///
+/// A rating limit cannot decide about a thing that carries no rating, so the choice has
+/// to be made — and the conservative one is the one to make for somebody who has just
+/// been narrowed. Driven on an offer that names only libraries, because a member held
+/// to a few libraries is restricted whether or not a rating came into it.
+#[tokio::test]
+async fn unrated_content_is_held_back_from_anybody_being_narrowed() {
+    let (sent, made) = offering(
+        "unrated-default",
+        AS_IT_OPENS,
+        Allowance {
+            libraries: vec!["Films".to_owned()],
+            age_limit: None,
+            unrated: None,
+        },
+    )
+    .await;
+
+    assert!(made.is_some(), "the invitation itself was refused");
+    let written = policies(&sent);
+    let first = written.first().cloned().unwrap_or_default();
+
+    assert_eq!(
+        first.get("BlockUnratedItems"),
+        Some(&every_unrated_kind()),
+        "somebody being narrowed was left able to watch what nobody rated: {written:?}"
+    );
+}
+
+/// An operator who says so lets it through, and what is written says nothing else.
+///
+/// The point of the choice being a choice: some households keep home video and
+/// recordings that carry no rating and are perfectly fine, and holding those back is a
+/// child who cannot find their own birthdays.
+#[tokio::test]
+async fn an_operator_who_says_so_lets_unrated_content_through() {
+    let (sent, made) = offering(
+        "unrated-allowed",
+        AS_IT_OPENS,
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: Some(Unrated::LetThrough),
+        },
+    )
+    .await;
+
+    assert!(made.is_some(), "the invitation itself was refused");
+    let written = policies(&sent);
+    let first = written.first().cloned().unwrap_or_default();
+
+    assert_eq!(
+        first.get("BlockUnratedItems"),
+        Some(&serde_json::json!([])),
+        "the operator's own answer was overruled: {written:?}"
+    );
+    assert_eq!(
+        first.get("MaxParentalRating"),
+        Some(&serde_json::json!(12)),
+        "{written:?}"
+    );
+}
+
+/// An offer that narrows nothing writes nothing about unrated content either.
+///
+/// Field by field, the same rule the libraries and the limit are held to: naming
+/// neither is saying nothing, and a value written for what nobody mentioned would take
+/// a household's own answer away behind their back.
+#[tokio::test]
+async fn an_offer_that_narrows_nothing_says_nothing_about_unrated_content() {
+    let (sent, made) = offering("unrated-untouched", AS_IT_OPENS, Allowance::default()).await;
+
+    assert!(made.is_some(), "the invitation itself was refused");
+    assert!(
+        policies(&sent).is_empty(),
+        "an invitation that chose nothing wrote a policy anyway: {:?}",
+        policies(&sent)
+    );
+}
+
+/// The account the request service holds for somebody who approves their own requests.
+///
+/// `128` is `AUTO_APPROVE`, read off the pinned image rather than recalled. It is the
+/// whole of how a limit on watching and no limit on requesting come apart.
+const APPROVES_OWN: &str = r#"{"id":4,"permissions":160}"#;
+
+/// Where what one member may ask for is written.
+const PERMISSIONS: &str = "/user/4/settings/permissions";
+
+/// A stack whose request service holds an account that approves its own requests.
+fn a_stack_where_requests_arrive_unseen() -> Arc<Fake> {
+    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+    Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in.clone(),
+                signed_in,
+            ],
+        ),
+        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
+        (
+            PERMISSIONS,
+            vec![
+                Answer::reply(200, APPROVES_OWN),
+                Answer::reply(200, APPROVES_OWN),
+            ],
+        ),
+        ("/user/jellyfin/", vec![Answer::reply(200, APPROVES_OWN)]),
+        (RATINGS, vec![Answer::reply(200, CERTIFICATES)]),
+        (
+            "/System/ActivityLog",
+            vec![Answer::reply(200, r#"{"Items":[]}"#)],
+        ),
+        ("/Library/MediaFolders", vec![Answer::reply(200, LIBRARIES)]),
+        (POLICY, vec![Answer::reply(204, "")]),
+        (
+            NEW_ACCOUNT,
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+            )],
+        ),
+        (ONE_ACCOUNT, vec![Answer::reply(200, AS_IT_OPENS)]),
+        ("/Users", vec![Answer::reply(200, "[]")]),
+    ])
+}
+
+/// The gap the setting exists to close: what a narrowed member may ask for is held to
+/// the same decision as what they may watch.
+///
+/// The request service has no notion of a content rating, so there is no limit to
+/// mirror. What it does have is the difference between a request that lands in the
+/// library unseen and one an adult sees first, and the approval bits come off — leaving
+/// everything else the account was given exactly as it was.
+#[tokio::test]
+async fn what_a_narrowed_member_may_ask_for_is_held_to_the_same_decision() {
+    let (sent, made) = driving(
+        "requests-held",
+        a_stack_where_requests_arrive_unseen(),
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: None,
+        },
+    )
+    .await;
+
+    assert!(made.is_some(), "the invitation itself was refused");
+    let held: Vec<serde_json::Value> = sent
+        .iter()
+        .filter(|request| request.url.contains(PERMISSIONS))
+        .filter_map(|request| request.body.as_deref())
+        .filter_map(|body| serde_json::from_str(body).ok())
+        .collect();
+
+    assert_eq!(
+        held,
+        vec![serde_json::json!({ "permissions": 32 })],
+        "what a narrowed member may ask for was left arriving unseen"
+    );
+}
+
+/// An offer that narrows nobody leaves what they may ask for alone.
+///
+/// The same rule the policy is held to, one service along: an offer that says nothing
+/// about access must not quietly take a permission off somebody's account.
+#[tokio::test]
+async fn an_offer_that_narrows_nobody_leaves_what_they_may_ask_for_alone() {
+    let (sent, made) = driving(
+        "requests-untouched",
+        a_stack_where_requests_arrive_unseen(),
+        Allowance::default(),
+    )
+    .await;
+
+    assert!(made.is_some(), "the invitation itself was refused");
+    assert!(
+        !sent.iter().any(|request| request.url.contains(PERMISSIONS)),
+        "an offer that narrowed nobody changed what they may ask for"
+    );
+}
+
+/// What was written travels back on the answer that wrote it, in the certificates this
+/// household's own media server names.
+///
+/// A member held to a rating who cannot find half the library is either this working or
+/// a defect, and an operator with nothing on record cannot tell which.
+#[tokio::test]
+async fn what_was_applied_travels_back_with_the_invitation() {
+    let (_, made) = offering(
+        "applied",
+        AS_IT_OPENS,
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: None,
+        },
+    )
+    .await;
+
+    // Flattened rather than unwrapped: an invitation that said nothing about access
+    // has to fail the assertions below rather than end the run before them.
+    let (limit, unrated_blocked, filtering) = match made {
+        Some(Outcome::Invited(invitation)) => {
+            invitation
+                .applied
+                .map_or_else(<(String, bool, String)>::default, |applied| {
+                    (
+                        applied.limit.unwrap_or_default(),
+                        applied.unrated_blocked,
+                        applied.filtering,
+                    )
+                })
+        }
+        _ => <(String, bool, String)>::default(),
+    };
+
+    assert!(
+        limit.contains("12A"),
+        "the limit was not said in this household's own certificates: {limit}"
+    );
+    assert!(
+        unrated_blocked,
+        "unrated content was not held back: {limit}"
+    );
+    assert!(
+        filtering.contains("not a security boundary"),
+        "the answer did not say what a limit here is not: {filtering}"
     );
 }
