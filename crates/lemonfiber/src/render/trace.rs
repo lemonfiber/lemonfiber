@@ -689,6 +689,148 @@ mod tests {
         assert!(text.contains("! a library could not be read"));
     }
 
+    /// What a household may ask for reads under the list, with its limit beside it.
+    ///
+    /// The two are one arrangement: "everything arrives" and "within five a week" are
+    /// different promises, and a reader shown only the first has been told the wrong
+    /// one.
+    #[test]
+    fn what_the_household_may_ask_for_reads_with_its_limit_beside_it() {
+        let held = a_household(
+            Some(lemonfiber_core::asking::Policy::WithinALimit),
+            Some("5 requests a week"),
+        );
+
+        let text = household(&held).text();
+
+        assert!(
+            text.contains("Requests: everything arrives until"),
+            "{text}"
+        );
+        assert!(text.contains("5 requests a week"), "{text}");
+    }
+
+    /// A household under no limit says the policy and no figure.
+    #[test]
+    fn a_household_under_no_limit_says_the_policy_and_no_figure() {
+        let text = household(&a_household(
+            Some(lemonfiber_core::asking::Policy::Trusted),
+            None,
+        ))
+        .text();
+
+        assert!(
+            text.contains("Requests: everything anybody asks for"),
+            "{text}"
+        );
+    }
+
+    /// A request service that could not be asked says nothing about a policy.
+    ///
+    /// An unread arrangement rendered as a permissive one is the reading this whole
+    /// view refuses to produce.
+    #[test]
+    fn a_policy_that_could_not_be_read_is_not_rendered_as_a_permissive_one() {
+        let text = household(&a_household(None, None)).text();
+
+        assert!(!text.contains("Requests:"), "{text}");
+    }
+
+    /// A household whose limits and requests are read, for the lines about them.
+    fn a_household(
+        policy: Option<lemonfiber_core::asking::Policy>,
+        allows: Option<&str>,
+    ) -> HouseholdReport {
+        HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "Alex".to_owned(),
+                requests: vec![
+                    MemberRequest {
+                        id: 7,
+                        title: Some("Dune".to_owned()),
+                        media: Some("film".to_owned()),
+                        state: Some(lemonfiber_core::household::State::WaitingForApproval),
+                        waiting_days: Some(9),
+                        estimate: Some(lemonfiber_core::asking::Estimate::film(
+                            lemonfiber_core::quality::Preset::Balanced,
+                        )),
+                    },
+                    MemberRequest {
+                        id: 8,
+                        title: Some("The Expanse".to_owned()),
+                        media: Some("series".to_owned()),
+                        state: Some(lemonfiber_core::household::State::Here),
+                        waiting_days: None,
+                        estimate: Some(lemonfiber_core::asking::Estimate::season(
+                            lemonfiber_core::quality::Preset::Balanced,
+                        )),
+                    },
+                ],
+                access: MemberAccess {
+                    every_library: true,
+                    ..MemberAccess::default()
+                },
+                asking: Some(lemonfiber_core::model::MemberAsking {
+                    policy: lemonfiber_core::asking::Policy::WithinALimit,
+                    standing: lemonfiber_core::asking::Standing::NearQuota,
+                    films: lemonfiber_core::model::Counted {
+                        limit: Some(5),
+                        used: 4,
+                        remaining: Some(1),
+                        period: Some("a week".to_owned()),
+                    },
+                    television: lemonfiber_core::model::Counted {
+                        limit: None,
+                        used: 0,
+                        remaining: None,
+                        period: None,
+                    },
+                    frees_up: None,
+                }),
+                last_seen: None,
+                claimed: true,
+            }],
+            available: true,
+            findings: Vec::new(),
+            filtering: None,
+            policy,
+            allows: allows.map(str::to_owned),
+        }
+    }
+
+    /// A request nobody has ruled on carries how long it has waited and about what
+    /// it would cost; one already answered carries neither.
+    ///
+    /// The wait is over on an answered request and the cost is already being paid, so
+    /// both would be noise on its line.
+    #[test]
+    fn a_waiting_request_carries_its_wait_and_its_cost_and_a_settled_one_does_not() {
+        let text = household(&a_household(None, None)).text();
+
+        assert!(text.contains("#7 Dune"), "{text}");
+        assert!(text.contains("waiting 9 day(s)"), "{text}");
+        assert!(text.contains("about 4.7 GiB"), "{text}");
+        assert!(text.contains("#8 The Expanse   here"), "{text}");
+        assert!(
+            !text.contains("The Expanse   here   ("),
+            "a settled request carried a wait or a cost: {text}"
+        );
+    }
+
+    /// What a member may ask for reads beside what they may watch.
+    ///
+    /// The two are one question about the same person, and read apart they look like
+    /// two people.
+    #[test]
+    fn what_a_member_may_ask_for_reads_beside_what_they_may_watch() {
+        let text = household(&a_household(None, None)).text();
+
+        assert!(
+            text.contains("can watch everything · close to their limit"),
+            "{text}"
+        );
+    }
+
     /// An invitation nobody has taken up says that, and is counted apart.
     ///
     /// "Never signed in" would be true and useless — never signing in is what an

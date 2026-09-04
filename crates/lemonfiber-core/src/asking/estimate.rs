@@ -113,7 +113,7 @@ mod tests {
 
         assert!(!estimated.measured, "nothing here has measured anything");
         assert!(estimated.reading().starts_with("about "), "{estimated:?}");
-        assert!(estimated.reading().contains("GB"), "{estimated:?}");
+        assert!(estimated.reading().contains("GiB"), "{estimated:?}");
     }
 
     /// It serialises with the word beside the number, which is what a browser reads.
