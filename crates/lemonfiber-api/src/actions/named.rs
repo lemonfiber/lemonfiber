@@ -77,6 +77,41 @@ pub const OFFERED: &[&str] = &[
 /// refuses all four the same way.
 const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 
+/// The setting a change names, and what to change it to.
+///
+/// Named apart from the table for the reason the household three are: both halves are
+/// required, each is refused by its own name, and a reading that can refuse belongs
+/// beside its refusals rather than inside a list of arms.
+fn setting(key: Option<String>, value: Option<String>) -> Result<Command, Refused> {
+    let missing = |argument: &str| Refused::Missing {
+        action: "config-set".to_owned(),
+        argument: argument.to_owned(),
+    };
+    match (key, value) {
+        (Some(key), Some(value)) => Ok(Command::ConfigSet { key, value }),
+        (None, _) => Err(missing("key")),
+        (_, None) => Err(missing("value")),
+    }
+}
+
+/// Which completed download to stop seeding, and the offer being answered.
+///
+/// Named apart for the same reason, and it is the one where the subject matters most:
+/// this is the only request on this surface that destroys something outside the
+/// machine's own filesystem, and one naming no download has lost the thing that makes
+/// it safe. It takes no `confirm` — the yes is the offer's own name, so the only way
+/// to reach the removal is through the run that said what it costs.
+fn stopping(download: Option<String>, offer: Option<String>) -> Result<Command, Refused> {
+    let download = download.ok_or_else(|| Refused::Missing {
+        action: "stop-seeding".to_owned(),
+        argument: "download".to_owned(),
+    })?;
+    Ok(Command::StopSeeding {
+        download,
+        agreement: offer,
+    })
+}
+
 /// The command one of the three household actions names.
 ///
 /// All are addressed to a member rather than to a form, a file or a service, and all are
@@ -217,11 +252,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "switch" => Ok(Command::Switch { forms }),
         "restart" => Ok(Command::Restart { forms, services }),
         "pull" => Ok(Command::Pull { forms }),
-        "config-set" => match (key, value) {
-            (Some(key), Some(value)) => Ok(Command::ConfigSet { key, value }),
-            (None, _) => Err(needs("key")),
-            (_, None) => Err(needs("value")),
-        },
+        "config-set" => setting(key, value),
         "quality-set" => match preset {
             Some(preset) => quality(&preset, media_type, confirm),
             None => Err(needs("preset")),
@@ -238,17 +269,8 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // account `/api/space` answers with, and confirmed it takes only what that
         // account named as costing nothing.
         "space" => Ok(Command::Space { confirm }),
-        // The one thing that account names and leaves alone, asked for on its own. It
-        // takes no `confirm`: the yes is the offer's own name, so the only way to
-        // reach the removal is through the run that said what it costs a private
-        // tracker's opinion of the operator.
-        "stop-seeding" => match download {
-            Some(download) => Ok(Command::StopSeeding {
-                download,
-                agreement: offer,
-            }),
-            None => Err(needs("download")),
-        },
+        // The one thing that account names and leaves alone, asked for on its own.
+        "stop-seeding" => stopping(download, offer),
         "backup" => Ok(Command::Backup { service }),
         // The three addressed to a person rather than a form, a file or a service.
         // Unconfirmed, a removal says what it takes — their watch history, and every
