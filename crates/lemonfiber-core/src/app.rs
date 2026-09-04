@@ -263,6 +263,24 @@ async fn invited(ctx: &Ctx, name: String, allowance: Allowance) -> Result<Outcom
         .map(Outcome::Invited)
 }
 
+/// What the services themselves reach out for, which needs the stack read first.
+///
+/// Named apart for the reason [`acting`] is: every other row here passes what it was
+/// given straight along, and this one has a step before it. The stack has to be
+/// readable, because half the answer is about it: a manifest that could not be read
+/// would leave the services' own requests reading as none at all, which is a claim
+/// rather than a gap.
+fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .manifest()
+        .map_err(|err| Box::new(err.problem()))?;
+    Ok(Outcome::Outbound(crate::outbound::leaving(
+        &ctx.settings,
+        &manifest.services,
+    )))
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -312,19 +330,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Invite { name, allowance } => invited(ctx, name, allowance).await,
         Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
-        Command::Outbound => {
-            // The stack has to be readable, because half the answer is about it: a
-            // manifest that could not be read would leave the services' own requests
-            // reading as none at all, which is a claim rather than a gap.
-            let manifest = ctx
-                .stack
-                .manifest()
-                .map_err(|err| Box::new(err.problem()))?;
-            Ok(Outcome::Outbound(crate::outbound::leaving(
-                &ctx.settings,
-                &manifest.services,
-            )))
-        }
+        Command::Outbound => outbound(ctx),
         Command::QualityUpgrade { confirm } => {
             upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
         }
