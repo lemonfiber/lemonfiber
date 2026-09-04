@@ -773,13 +773,16 @@ pub(crate) mod tests {
             &Outcome::Letting(offer.clone()),
             vec!["what it costs".to_owned()],
         );
-        let given = match stage {
-            Stage::Agreeing { given, .. } => Some(given),
-            _ => None,
-        };
+        // Read out of the stage rather than matched with an arm for the case that
+        // cannot happen: an arm no run reaches is a line the coverage gate counts
+        // against a file every one of whose cases passed.
+        let mut answered = None;
+        if let Stage::Agreeing { errand, given, .. } = &stage {
+            answered = Some(errand.sent(given));
+        }
 
         assert_eq!(
-            given.map(|given| errand.sent(&given)),
+            answered,
             Some(Ok(Command::StopSeeding {
                 download: "A.Show.S01E01".to_owned(),
                 agreement: Some(offer.agreement),
