@@ -99,6 +99,17 @@ impl Fault {
 /// because a disk filling mid-import leaves partial files and a stalled queue.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageFacts {
+    /// Where the volume these figures describe is mounted, empty where the path
+    /// could not be attributed to one.
+    ///
+    /// Carried because the figures alone cannot answer either question that is
+    /// asked of two paths at once: whether they share a volume — so that a stack
+    /// whose data and whose service configuration fill together is told from one
+    /// where only half is at risk — and which boundary the total belongs to. A
+    /// dataset with a limit of its own, mounted inside a much larger device, is
+    /// the volume a path under it lives on, and naming the point is what lets a
+    /// report say the limit it gives is that dataset's rather than the disk's.
+    pub point: PathBuf,
     /// The filesystem type, as far as it can be recognised.
     pub kind: FsKind,
     /// Whether it sits on removable media.
@@ -211,9 +222,12 @@ pub struct Mount {
 ///
 /// The longest match is the right one: `/` is a prefix of everything, so a data
 /// root under `/mnt/media` must be attributed to `/mnt/media` and not to the
-/// root filesystem it also technically descends from. Where nothing matches —
-/// no mount was reported — the type is unknown and the capacity zero, which the
-/// caller treats as "nothing to name, nothing to measure" rather than a failure.
+/// root filesystem it also technically descends from. That is also what makes the
+/// total the *effective* limit rather than the device's size — a dataset given a
+/// quota is mounted at a point of its own, and the figures it reports are the
+/// quota's. Where nothing matches — no mount was reported — the type is unknown
+/// and the capacity zero, which the caller treats as "nothing to name, nothing to
+/// measure" rather than a failure.
 #[must_use]
 pub fn pick(mounts: &[Mount], path: &Path) -> StorageFacts {
     let chosen = mounts
@@ -223,12 +237,14 @@ pub fn pick(mounts: &[Mount], path: &Path) -> StorageFacts {
 
     match chosen {
         Some(mount) => StorageFacts {
+            point: mount.point.clone(),
             kind: FsKind::classify(&mount.kind),
             removable: mount.removable,
             available: mount.available,
             total: mount.total,
         },
         None => StorageFacts {
+            point: PathBuf::new(),
             kind: FsKind::Unknown(String::new()),
             removable: false,
             available: 0,
@@ -452,6 +468,37 @@ mod tests {
             facts.total, 1_000,
             "the chosen mount's capacity comes through"
         );
+        assert_eq!(
+            facts.point,
+            PathBuf::from("/Volumes/media"),
+            "the figures name the volume they belong to"
+        );
+    }
+
+    #[test]
+    fn a_limit_imposed_above_the_device_is_the_one_reported() {
+        // A dataset with a limit of its own sits inside a far larger device. The
+        // total that matters is the one the data will actually hit, and reporting
+        // the device's would tell an operator they have four terabytes of room in
+        // a place that stops accepting writes at fifty gigabytes.
+        let device = Mount {
+            point: PathBuf::from("/"),
+            kind: "zfs".to_owned(),
+            removable: false,
+            available: 4_000_000,
+            total: 4_000_000,
+        };
+        let dataset = Mount {
+            point: PathBuf::from("/tank/media"),
+            kind: "zfs".to_owned(),
+            removable: false,
+            available: 10_000,
+            total: 50_000,
+        };
+        let facts = pick(&[device, dataset], Path::new("/tank/media/tv/a-show"));
+        assert_eq!(facts.total, 50_000, "the effective limit, not the device");
+        assert_eq!(facts.available, 10_000);
+        assert_eq!(facts.point, PathBuf::from("/tank/media"));
     }
 
     #[test]
@@ -460,5 +507,10 @@ mod tests {
         assert_eq!(facts.kind, FsKind::Unknown(String::new()));
         assert!(!facts.removable);
         assert_eq!(facts.total, 0, "nothing to measure where nothing matched");
+        assert_eq!(
+            facts.point,
+            PathBuf::new(),
+            "no volume to name where none matched"
+        );
     }
 }

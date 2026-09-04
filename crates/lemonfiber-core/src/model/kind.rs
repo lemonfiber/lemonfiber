@@ -94,6 +94,8 @@ pub const RESTORE: Kind = Kind("restore");
 pub const SEED: Kind = Kind("seed");
 /// What setup settled on.
 pub const SETUP: Kind = Kind("setup");
+/// Where the disk stands, where the room went, and what could be got back.
+pub const SPACE: Kind = Kind("space");
 /// One line said while services are starting: what the container engine wrote, or
 /// what the wait after it is still waiting for.
 pub const START: Kind = Kind("start");
@@ -152,6 +154,7 @@ pub const ALL: &[Kind] = &[
     RESTORE,
     SEED,
     SETUP,
+    SPACE,
     START,
     STATUS,
     STEP,

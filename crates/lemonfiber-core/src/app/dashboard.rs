@@ -542,6 +542,7 @@ mod tests {
     /// Storage facts a volume with `total` bytes, `available` free, would report.
     fn facts(available: u64, total: u64) -> StorageFacts {
         StorageFacts {
+            point: PathBuf::from("/"),
             kind: FsKind::Linking("ext4".to_owned()),
             removable: false,
             available,

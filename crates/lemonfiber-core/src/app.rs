@@ -57,6 +57,7 @@ mod screen;
 mod seed;
 pub mod seeding;
 pub mod setup;
+mod space;
 mod stored;
 pub mod support;
 mod targets;
@@ -123,6 +124,8 @@ pub enum Outcome {
     Outbound(crate::outbound::Leaving),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
     Stored(crate::stored::Stored),
+    /// Where the disk stands, where the room went, and what could be got back.
+    Space(crate::space::Reckoning),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -175,6 +178,7 @@ impl Outcome {
             Self::Removed(_) => kind::REMOVAL,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Stored(_) => crate::model::kind::STORED,
+            Self::Space(_) => kind::SPACE,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Repair(_) => kind::REPAIR,
@@ -215,6 +219,7 @@ impl serde::Serialize for Outcome {
             Self::Removed(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
+            Self::Space(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Repair(report) => report.serialize(serializer),
@@ -374,6 +379,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
         Command::Forget { confirm } => stored::forgetting(ctx, confirm).await.map(Outcome::Stored),
+        // The same shape, over the operator's own disk rather than over lemonfiber's
+        // files: unconfirmed it accounts and offers, confirmed it takes what the
+        // account named as costing nothing.
+        Command::Space { confirm } => space::space(ctx, confirm).await.map(Outcome::Space),
         // Held open until the location is lost, which is what a guard is. The
         // interval is this command's own rather than the caller's: a surface that
         // could choose it could choose one that misses the moment it exists for.

@@ -95,6 +95,7 @@ pub mod secret;
 pub mod seed;
 pub mod seerr;
 pub mod servarr;
+pub mod space;
 pub mod stack;
 pub mod storage;
 pub mod stored;

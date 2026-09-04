@@ -111,6 +111,11 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // take a directory left something behind — a script that read either as
         // success would carry on as though the machine were clean.
         Outcome::Stored(report) => forgetting(&report.removal),
+        // Accounting for the disk is a question, and asking one is never a failure —
+        // including when the answer is that there is no room, which the report says
+        // in words and which the commands that would fetch more refuse over. What is
+        // a failure is a cleanup that was agreed to and could not finish.
+        Outcome::Space(report) => accounting(report),
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.
@@ -168,6 +173,15 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Watch(_)
         | Outcome::Archives(_)
         | Outcome::Support(_) => ExitCode::SUCCESS,
+    }
+}
+
+/// The exit code an accounting of the disk earns.
+fn accounting(report: &lemonfiber_core::space::Reckoning) -> ExitCode {
+    match &report.reclaimed {
+        None => ExitCode::SUCCESS,
+        Some(taken) if taken.left.is_empty() => ExitCode::SUCCESS,
+        Some(_) => ExitCode::from(FAILURE),
     }
 }
 
@@ -549,6 +563,42 @@ mod tests {
         };
         assert_ne!(
             format!("{:?}", settled(&Outcome::Upgrade(refused))),
+            success()
+        );
+    }
+
+    /// Accounting for the disk is a question, however bad the answer is; a cleanup
+    /// that was agreed to and left something behind is the one case a script has to
+    /// act on, because the machine is not in the state the operator asked for.
+    #[test]
+    fn accounting_for_the_disk_is_a_question_and_a_half_done_cleanup_is_not() {
+        let reckoned = lemonfiber_core::space::reckon(&lemonfiber_core::space::Measured::default());
+        let asked = |report| format!("{:?}", settled(&Outcome::Space(report)));
+
+        assert_eq!(asked(reckoned.clone()), success());
+        assert_eq!(
+            asked(lemonfiber_core::space::Reckoning {
+                reclaimed: Some(lemonfiber_core::space::Reclaimed {
+                    gone: vec!["/srv/media/downloads/Gone/a.rar".to_owned()],
+                    bytes: 400,
+                    left: Vec::new(),
+                }),
+                ..reckoned.clone()
+            }),
+            success()
+        );
+        assert_ne!(
+            asked(lemonfiber_core::space::Reckoning {
+                reclaimed: Some(lemonfiber_core::space::Reclaimed {
+                    gone: Vec::new(),
+                    bytes: 0,
+                    left: vec![lemonfiber_core::space::Left {
+                        at: "/srv/media/downloads/Held/a.rar".to_owned(),
+                        why: "permission denied".to_owned(),
+                    }],
+                }),
+                ..reckoned
+            }),
             success()
         );
     }

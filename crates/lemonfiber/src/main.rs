@@ -294,6 +294,7 @@ async fn main() -> ExitCode {
         Request::Reissue { name } => Command::Reissue { name },
         Request::Remove { name, confirm } => Command::Remove { name, confirm },
         Request::Forget { confirm } => Command::Forget { confirm },
+        Request::Space { confirm } => Command::Space { confirm },
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },

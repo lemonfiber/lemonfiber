@@ -34,6 +34,14 @@ pub(super) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
         .map_err(|err| Box::new(err.problem()))?;
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
 
+    // A confirmed run is the largest acquisition this product can start — the whole
+    // library re-fetched — so it is the one that must not start onto a disk with no
+    // room to write on. Asked only of a run that would act: stating the cost of an
+    // upgrade is worth doing whatever the disk is doing.
+    if confirm {
+        super::space::admits(ctx).await?;
+    }
+
     let mut media = Vec::new();
     for target in servarr_targets(&manifest.services, project.as_deref()) {
         let Some(kind) = Kind::for_section(&target.id) else {

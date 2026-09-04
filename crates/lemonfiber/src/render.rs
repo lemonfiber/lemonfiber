@@ -27,6 +27,7 @@ mod quality;
 mod removal;
 pub(crate) mod repair;
 mod seed;
+mod space;
 pub(crate) mod stack;
 mod stored;
 mod trace;
@@ -225,6 +226,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Removed(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Stored(report) => stored::kept(report),
+        Outcome::Space(report) => space::reckoning(report),
         Outcome::Lifecycle(report) => stack::lifecycle(report),
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),
@@ -766,6 +768,11 @@ mod tests {
                 revoked: lemonfiber_core::model::Revoked::Nothing,
                 findings: Vec::new(),
             }),
+            // Nothing measured and nothing taken, which is the answer with every
+            // optional paragraph absent — and still a report rather than a blank.
+            Outcome::Space(lemonfiber_core::space::reckon(
+                &lemonfiber_core::space::Measured::default(),
+            )),
         ]
     }
 

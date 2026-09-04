@@ -218,6 +218,46 @@ pub trait Transfers: Send + Sync {
     async fn transfers(&self) -> Result<Vec<Download>, Failure>;
 }
 
+/// One completed download the client is still holding.
+///
+/// The three things a decision about reclaiming it turns on and nothing else: what
+/// it is called, so it can be matched to what is on disk and to what a service is
+/// waiting for; what it occupies; and what standing removing it would cost. A
+/// client with no notion of ratio — Usenet has none to have — has nothing to
+/// answer here, which is why this is a port of its own rather than another method
+/// every download client would have to pretend to implement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Seeded {
+    /// What the client calls it, which is what both sides call it.
+    pub name: String,
+    /// What it occupies, as the client reports its size.
+    pub bytes: u64,
+    /// What it has uploaded against what it downloaded, in hundredths.
+    ///
+    /// Whole hundredths rather than a fraction, because what is done with this is
+    /// shown to a person and compared for equality between two runs, and a
+    /// fraction cannot be compared for equality. No decision made on a ratio is
+    /// finer than a hundredth.
+    pub ratio: u32,
+}
+
+/// Reading what a download client is still seeding.
+///
+/// Apart from [`Transfers`] because it is a different question with a different
+/// answer: that one asks what is arriving and this asks what has arrived and is
+/// still being given back. Only a torrent client has an answer, and a port that
+/// bundled the two would oblige every Usenet client to say something about seeding.
+#[async_trait]
+pub trait Seeding: Send + Sync {
+    /// The completed downloads the client is still holding, each with what it
+    /// occupies and the ratio it has earned.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the client is unreachable or refuses.
+    async fn seeding(&self) -> Result<Vec<Seeded>, Failure>;
+}
+
 /// Reading a service's queue for the dashboard.
 ///
 /// A port of its own, not a method on [`Client`], because it is a read-only

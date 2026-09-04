@@ -356,6 +356,20 @@ pub enum Request {
         #[arg(long)]
         confirm: bool,
     },
+    /// Account for the disk: where the room went, when it runs out, what can go.
+    ///
+    /// Says when the disk will be full rather than that it already is, counting what
+    /// is queued against what is left. Breaks the rest down by where it went, and
+    /// marks what could be got back — the downloads nothing ever imported and the
+    /// archives already unpacked cost nothing at all. Those two are what `--confirm`
+    /// takes, and nothing else ever is: a torrent still seeding is named with what
+    /// removing it does to your standing with the tracker and left with you, and
+    /// nothing you asked to be left alone is on offer at any level of fullness.
+    Space {
+        /// Go ahead and remove what was listed as costing nothing.
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.

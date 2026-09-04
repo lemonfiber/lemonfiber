@@ -336,6 +336,19 @@ async fn a_line_count_at_the_ceiling_is_still_asked_for() {
 }
 
 #[tokio::test]
+async fn accounting_for_the_disk_takes_nothing_and_refuses_a_parameter() {
+    // There is no argument choosing what to reclaim, because that choice is never a
+    // caller's — so there is nothing to narrow this by, and a name that reads as a
+    // narrowing is refused rather than ignored.
+    let refused = reads::wanted(reads::SPACE, Some("reclaim=seeding"));
+
+    assert_eq!(
+        refused.err().map(|problem| problem.code.as_str()),
+        Some("READ-1")
+    );
+}
+
+#[tokio::test]
 async fn the_enumeration_takes_nothing_and_refuses_a_parameter() {
     // An enumeration a caller could narrow is one an operator could be shown half
     // of, and half of everything that leaves this machine reads as the whole of it.

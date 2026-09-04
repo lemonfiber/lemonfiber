@@ -126,6 +126,7 @@ impl FileSystem for Files {
 
     async fn describe(&self, _path: &Path) -> StorageFacts {
         StorageFacts {
+            point: PathBuf::new(),
             kind: FsKind::Linking("test".to_owned()),
             removable: false,
             available: 0,

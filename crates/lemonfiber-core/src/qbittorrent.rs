@@ -21,7 +21,7 @@ use serde::Deserialize;
 use crate::dashboard::percent;
 use crate::endpoint::{describe, form_content_type, form_encoded, Endpoint};
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::{Download, Failure, Transfers};
+use crate::ports::service::{Download, Failure, Seeded, Seeding, Transfers};
 
 /// The service name a failure is reported against.
 const SERVICE: &str = "qbittorrent";
@@ -261,6 +261,71 @@ impl Transfers for Qbittorrent {
     }
 }
 
+/// One completed torrent as `torrents/info` reports it.
+///
+/// A separate shape from the one an active download is read as, because the two
+/// reads want different fields: what is arriving is read for its progress and its
+/// speed, and what has arrived is read for what it occupies and what it has given
+/// back. The many other fields qBittorrent sends are ignored by both.
+/// The ratio is worked out from the two byte counts rather than read from the
+/// `ratio` qBittorrent also sends, because that one is a floating-point number: it
+/// arrives with the noise a decimal fraction picks up in binary, it cannot be
+/// compared for equality between two runs, and qBittorrent writes `-1` in it for a
+/// torrent it considers to have an infinite ratio. The counts it divides are whole
+/// numbers and are the same answer without any of that.
+#[derive(Deserialize)]
+struct CompletedInfo {
+    name: String,
+    size: u64,
+    uploaded: u64,
+    downloaded: u64,
+}
+
+#[async_trait]
+impl Seeding for Qbittorrent {
+    async fn seeding(&self) -> Result<Vec<Seeded>, Failure> {
+        let Some(password) = self.password.as_deref() else {
+            return Err(self.endpoint.unauthorised());
+        };
+        self.login(password).await?;
+
+        let request = Request {
+            method: Method::Get,
+            url: self.endpoint.url("/api/v2/torrents/info?filter=completed"),
+            headers: Vec::new(),
+            body: None,
+        };
+        let response = self.endpoint.send(&request).await?;
+        let torrents: Vec<CompletedInfo> = self
+            .endpoint
+            .decode(&response, "the completed torrent list could not be read")?;
+        Ok(torrents.into_iter().map(seeded_of).collect())
+    }
+}
+
+/// One completed torrent as the reckoning's [`Seeded`].
+fn seeded_of(torrent: CompletedInfo) -> Seeded {
+    Seeded {
+        name: torrent.name,
+        bytes: torrent.size,
+        ratio: hundredths(torrent.uploaded, torrent.downloaded),
+    }
+}
+
+/// What was given back against what was taken, in whole hundredths.
+///
+/// A torrent that downloaded nothing — added from files already on disk — has
+/// given back everything against nothing, which is the case qBittorrent itself
+/// writes as an infinite ratio. It becomes the largest figure this can carry,
+/// which reads as what it means rather than as a division nobody can do.
+fn hundredths(uploaded: u64, downloaded: u64) -> u32 {
+    if downloaded == 0 {
+        return u32::MAX;
+    }
+    let scaled = uploaded.saturating_mul(100) / downloaded;
+    u32::try_from(scaled).unwrap_or(u32::MAX)
+}
+
 /// One torrent as the dashboard's [`Download`]: progress from its byte counts, its
 /// download speed as reported, and the ETA only where qBittorrent gave a real one.
 fn download_of(torrent: TorrentInfo) -> Download {
@@ -280,7 +345,7 @@ fn download_of(torrent: TorrentInfo) -> Download {
 mod tests {
     use std::time::Duration;
 
-    use crate::ports::service::{Failure, Transfers};
+    use crate::ports::service::{Failure, Seeding, Transfers};
     use crate::test_support::a_password;
     use lemonfiber_fixtures::http::Fake;
 
@@ -325,6 +390,32 @@ mod tests {
         ));
     }
 
+    /// Three completed torrents: one that has given back more than it took, one
+    /// that has given back almost nothing, and one added from files already on
+    /// disk, which downloaded nothing at all.
+    const THREE_COMPLETED: &str = r#"[
+        {"name":"Show.S01E01","size":1000,"uploaded":1750,"downloaded":1000},
+        {"name":"Movie.2024","size":4000,"uploaded":7,"downloaded":4000},
+        {"name":"Already.Here","size":9000,"uploaded":100,"downloaded":0}
+    ]"#;
+
+    #[tokio::test]
+    async fn each_completed_torrent_reads_what_it_holds_and_what_it_has_given_back() {
+        let qbit = client(vec![(200, "Ok."), (200, THREE_COMPLETED)]);
+        let held = qbit.seeding().await.unwrap_or_default();
+        assert_eq!(held.len(), 3);
+        assert!(matches!(
+            held.first(),
+            Some(one) if one.name == "Show.S01E01" && one.bytes == 1000 && one.ratio == 175
+        ));
+        // Worked out from the byte counts rather than read off the float beside
+        // them: a seventh of a percent is a figure, not noise.
+        assert!(matches!(held.get(1), Some(one) if one.ratio == 0));
+        // Nothing downloaded is a ratio nobody can divide, and it reads as having
+        // given back far more than it took rather than as an error.
+        assert!(matches!(held.get(2), Some(one) if one.ratio == u32::MAX));
+    }
+
     #[tokio::test]
     async fn a_client_holding_no_password_cannot_authenticate_a_read() {
         let qbit = Qbittorrent::new(Fake::scripted(Vec::new()), "http://127.0.0.1:8080");
@@ -332,6 +423,26 @@ mod tests {
             qbit.transfers().await,
             Err(Failure::Unauthorised { .. })
         ));
+        assert!(matches!(
+            qbit.seeding().await,
+            Err(Failure::Unauthorised { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_completed_read_that_is_refused_or_unanswered_says_which() {
+        let refused = client(vec![(200, "Fails.")]);
+        assert!(matches!(
+            refused.seeding().await,
+            Err(Failure::Unauthorised { .. })
+        ));
+        let silent = client(vec![(200, "Ok.")]);
+        assert!(matches!(
+            silent.seeding().await,
+            Err(Failure::Unavailable { .. })
+        ));
+        let nonsense = client(vec![(200, "Ok."), (200, "not a torrent list")]);
+        assert!(nonsense.seeding().await.is_err(), "unreadable is not empty");
     }
 
     #[tokio::test]

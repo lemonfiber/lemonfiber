@@ -16,6 +16,7 @@ pub mod filesystem;
 pub mod http;
 pub mod network;
 pub mod nntp;
+pub mod occupancy;
 pub mod process;
 pub mod random;
 pub mod recording;
