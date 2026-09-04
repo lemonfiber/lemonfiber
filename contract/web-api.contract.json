@@ -1058,6 +1058,13 @@
               "description": "Whether the household could be read at all. A false here is why the list is\nempty, and keeps an unread record from being mistaken for an empty house — the\nsame honesty a trace keeps about a silence it did not hear.",
               "type": "boolean"
             },
+            "filtering": {
+              "description": "What the limits on this household are and are not, where anybody carries one.\n\nAbsent on a household nobody has limited, because there is no claim to be modest\nabout. Present the moment there is one, because a parent who has set a limit is\nexactly the reader who might take it for a lock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "findings": {
               "description": "What could not be read, and anything else worth the operator's attention.",
               "type": "array",
@@ -1110,11 +1117,32 @@
               "items": {
                 "type": "string"
               }
+            },
+            "rated": {
+              "description": "What that limit comes to in the certificates this media server names, in the\noperator's own country. Absent where no limit is set.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Rated"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "restriction": {
+              "description": "What they are held to, in one word — including where what they may watch and\nwhat they may ask for disagree.",
+              "$ref": "#/$defs/Restriction"
+            },
+            "unrated_blocked": {
+              "description": "Whether content the media server has no rating for is held back from them.\n\nSaid whether or not it is, because an unexplained absence is the thing this\nanswers: a restricted member missing half the library is either this setting or\na defect, and an operator cannot tell which from silence.",
+              "type": "boolean"
             }
           },
           "required": [
             "every_library",
             "libraries",
+            "unrated_blocked",
+            "restriction",
             "administrator",
             "disabled"
           ]
@@ -1552,6 +1580,35 @@
             "stuck"
           ]
         },
+        "Rated": {
+          "description": "What one age limit comes to, in the certificates named for it.\n\nBoth sides, because either alone misleads. What is allowed without what is held\nback reads as a limit that stops nothing; what is held back without what is allowed\nreads as a limit that stops everything.",
+          "type": "object",
+          "properties": {
+            "allows": {
+              "description": "The certificates at the highest age this limit still lets through.\n\nEmpty where the table names nothing at or below the limit, which is a limit\nthat lets nothing rated through at all.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fell_back": {
+              "description": "Whether these came from lemonfiber's own mapping because the media server's\ntable named no certificates.\n\nCarried rather than hidden: a certificate said to be this household's when it\nis this program's is the kind of claim a parent would act on.",
+              "type": "boolean"
+            },
+            "holds_back": {
+              "description": "The certificates at the lowest age this limit holds back.\n\nEmpty where the table names nothing above the limit, which is a limit that\nholds nothing rated back at all.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "allows",
+            "holds_back",
+            "fell_back"
+          ]
+        },
         "Reading": {
           "description": "A figure a source reports, kept apart from the two ways it can be missing.\n\nZero is a value a source gave; stale is the last value a source that has since\ngone quiet gave; unknown is a source that never answered at all. Collapsing any\ntwo of them sends an operator after the wrong problem — a stalled download and\na dashboard that simply stopped polling look identical only if the code lets\nthem.",
           "oneOf": [
@@ -1624,6 +1681,36 @@
           "required": [
             "named",
             "because"
+          ]
+        },
+        "Restriction": {
+          "description": "What one member is held to, in the words a household would use.\n\nThe two restrictions are one decision and two services: the media server decides\nwhat may be *watched* and the request service what may be *asked for*. Setting one\nwithout the other is the hole this vocabulary exists to name — a child who cannot\nwatch something but can pull it into the library has parents who set a limit and got\nhalf of one.",
+          "oneOf": [
+            {
+              "description": "Nothing is held back from them.",
+              "type": "string",
+              "const": "unrestricted"
+            },
+            {
+              "description": "Held to a highest rating.",
+              "type": "string",
+              "const": "rating-limited"
+            },
+            {
+              "description": "Held to some of the libraries.",
+              "type": "string",
+              "const": "library-limited"
+            },
+            {
+              "description": "Held to both a rating and some of the libraries.",
+              "type": "string",
+              "const": "both"
+            },
+            {
+              "description": "What they may watch is limited and what they may ask for is not.",
+              "type": "string",
+              "const": "inconsistent"
+            }
           ]
         },
         "Service": {
@@ -3354,6 +3441,13 @@
               "description": "Whether the household could be read at all. A false here is why the list is\nempty, and keeps an unread record from being mistaken for an empty house — the\nsame honesty a trace keeps about a silence it did not hear.",
               "type": "boolean"
             },
+            "filtering": {
+              "description": "What the limits on this household are and are not, where anybody carries one.\n\nAbsent on a household nobody has limited, because there is no claim to be modest\nabout. Present the moment there is one, because a parent who has set a limit is\nexactly the reader who might take it for a lock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "findings": {
               "description": "What could not be read, and anything else worth the operator's attention.",
               "type": "array",
@@ -3406,11 +3500,32 @@
               "items": {
                 "type": "string"
               }
+            },
+            "rated": {
+              "description": "What that limit comes to in the certificates this media server names, in the\noperator's own country. Absent where no limit is set.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Rated"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "restriction": {
+              "description": "What they are held to, in one word — including where what they may watch and\nwhat they may ask for disagree.",
+              "$ref": "#/$defs/Restriction"
+            },
+            "unrated_blocked": {
+              "description": "Whether content the media server has no rating for is held back from them.\n\nSaid whether or not it is, because an unexplained absence is the thing this\nanswers: a restricted member missing half the library is either this setting or\na defect, and an operator cannot tell which from silence.",
+              "type": "boolean"
             }
           },
           "required": [
             "every_library",
             "libraries",
+            "unrated_blocked",
+            "restriction",
             "administrator",
             "disabled"
           ]
@@ -3445,6 +3560,65 @@
               ]
             }
           }
+        },
+        "Rated": {
+          "description": "What one age limit comes to, in the certificates named for it.\n\nBoth sides, because either alone misleads. What is allowed without what is held\nback reads as a limit that stops nothing; what is held back without what is allowed\nreads as a limit that stops everything.",
+          "type": "object",
+          "properties": {
+            "allows": {
+              "description": "The certificates at the highest age this limit still lets through.\n\nEmpty where the table names nothing at or below the limit, which is a limit\nthat lets nothing rated through at all.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fell_back": {
+              "description": "Whether these came from lemonfiber's own mapping because the media server's\ntable named no certificates.\n\nCarried rather than hidden: a certificate said to be this household's when it\nis this program's is the kind of claim a parent would act on.",
+              "type": "boolean"
+            },
+            "holds_back": {
+              "description": "The certificates at the lowest age this limit holds back.\n\nEmpty where the table names nothing above the limit, which is a limit that\nholds nothing rated back at all.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "allows",
+            "holds_back",
+            "fell_back"
+          ]
+        },
+        "Restriction": {
+          "description": "What one member is held to, in the words a household would use.\n\nThe two restrictions are one decision and two services: the media server decides\nwhat may be *watched* and the request service what may be *asked for*. Setting one\nwithout the other is the hole this vocabulary exists to name — a child who cannot\nwatch something but can pull it into the library has parents who set a limit and got\nhalf of one.",
+          "oneOf": [
+            {
+              "description": "Nothing is held back from them.",
+              "type": "string",
+              "const": "unrestricted"
+            },
+            {
+              "description": "Held to a highest rating.",
+              "type": "string",
+              "const": "rating-limited"
+            },
+            {
+              "description": "Held to some of the libraries.",
+              "type": "string",
+              "const": "library-limited"
+            },
+            {
+              "description": "Held to both a rating and some of the libraries.",
+              "type": "string",
+              "const": "both"
+            },
+            {
+              "description": "What they may watch is limited and what they may ask for is not.",
+              "type": "string",
+              "const": "inconsistent"
+            }
+          ]
         },
         "State": {
           "description": "Where one request stands, in the words the person who made it would use.\n\nDeliberately coarser than a [`crate::trace::Stage`]: a member does not need to know\nthat a release was grabbed but not imported, only that it is on its way. The trace is\nwhere that detail stays, and a request names the item so it can be asked for.",
@@ -3515,6 +3689,44 @@
         "data"
       ],
       "$defs": {
+        "Applied": {
+          "description": "What an invitation wrote on the account, in the household's own words.\n\n**Said back so an absence later is explicable.** A member held to a rating who\ncannot find half the library is either this working or a defect, and an operator\nwith nothing on record cannot tell which. So the limit, the libraries, what happened\nto content the media server has no rating for, and whether the request service was\nheld to the same decision all travel back on the answer that applied them.\n\nAbsent where the offer set nothing at all, which is not the same as an offer that\nset no restrictions: naming neither a library nor a limit is saying nothing about\naccess, and nothing is what gets written.\n\nSerialised in the field names the household read uses for the same facts, rather\nthan in the invitation's own spelling: one setting named two ways across two shapes\nis two shapes a client has to be told are about the same thing.",
+          "type": "object",
+          "properties": {
+            "filtering": {
+              "description": "What a limit here is, and what it is not.\n\nCarried on the answer rather than left to a document, because the reader who\nmost needs it is the parent who has just set one.",
+              "type": "string"
+            },
+            "libraries": {
+              "description": "The libraries they may open, as the operator named them. Empty is every one.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "limit": {
+              "description": "How far up the ratings they may watch, in the words and the certificates this\nmedia server names in the operator's own country. Absent where no limit was set.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "requesting": {
+              "description": "Whether the request service was held to the same decision.\n\nThe same three answers a link carries, and for the same reason: what somebody\nmay *ask for* is a second service's business, and that service can be down while\nthe media server is not. `NotTried` here is a service with no account for them\nyet — nothing to hold rather than a failure to hold something.",
+              "$ref": "#/$defs/Linked"
+            },
+            "unrated_blocked": {
+              "description": "Whether content the media server has no rating for is held back from them.\n\nHeld back by default on somebody being narrowed, because a rating limit cannot\ndecide about a thing that carries no rating. The cost is real and is why this is\nreported rather than assumed: some legitimate content becomes invisible to them.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "libraries",
+            "unrated_blocked",
+            "requesting",
+            "filtering"
+          ]
+        },
         "Invitation": {
           "description": "One invitation, as it was just made.\n\nCarries what the operator has to pass on and nothing else — a name to sign in\nwith, one address, and how long it stands. The address is the media server's,\nbecause setting a first password happens there.",
           "type": "object",
@@ -3522,6 +3734,17 @@
             "address": {
               "description": "The one address to send them.\n\nWhere a *person* reaches the media server: built from what this machine is\ncalled on the network, not from either of the hosts the stack wires itself\nwith — those resolve only on this machine or inside the stack, and an\ninvitation carrying one sends somebody an address that cannot open.",
               "type": "string"
+            },
+            "applied": {
+              "description": "What this offer wrote on the account, where it wrote anything.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Applied"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "caution": {
               "description": "What is worth knowing about the address itself, where anything is.\n\nAn address that is a number is one a router can hand elsewhere, so a bookmark\nmade from it stops working with nothing here having changed. Carried on the\ninvitation because that is the copy somebody keeps.",
