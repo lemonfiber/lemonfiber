@@ -350,7 +350,7 @@ fn named_access(access: &Access, naming: &Naming<'_>, approves_own: Option<bool>
         rated: access
             .age_limit
             .map(|age| crate::rating::rated(naming.certificates, age)),
-        unrated_blocked: access.unrated_blocked,
+        unrated: access.unrated,
         restriction: Restriction::Unrestricted,
         administrator: access.administrator,
         disabled: access.disabled,

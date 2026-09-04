@@ -702,27 +702,28 @@ async fn what_was_applied_travels_back_with_the_invitation() {
 
     // Flattened rather than unwrapped: an invitation that said nothing about access
     // has to fail the assertions below rather than end the run before them.
-    let (limit, unrated_blocked, filtering) = match made {
+    let (limit, unrated, filtering) = match made {
         Some(Outcome::Invited(invitation)) => {
             invitation
                 .applied
-                .map_or_else(<(String, bool, String)>::default, |applied| {
+                .map_or_else(<(String, Unrated, String)>::default, |applied| {
                     (
                         applied.limit.unwrap_or_default(),
-                        applied.unrated_blocked,
+                        applied.unrated,
                         applied.filtering,
                     )
                 })
         }
-        _ => <(String, bool, String)>::default(),
+        _ => <(String, Unrated, String)>::default(),
     };
 
     assert!(
         limit.contains("12A"),
         "the limit was not said in this household's own certificates: {limit}"
     );
-    assert!(
-        unrated_blocked,
+    assert_eq!(
+        unrated,
+        Unrated::HeldBack,
         "unrated content was not held back: {limit}"
     );
     assert!(

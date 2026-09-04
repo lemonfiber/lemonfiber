@@ -6,6 +6,7 @@
 use lemonfiber_core::model::{
     HouseholdMember, HouseholdReport, MemberRequest, Restriction, StuckReport, TraceReport,
 };
+use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
 use lemonfiber_core::PRODUCT;
 
@@ -161,10 +162,9 @@ fn standing(member: &HouseholdMember) -> String {
     // silence does not tell an operator which. Nobody unnarrowed is missing anything,
     // so the line stays off theirs.
     if member.access.restriction != Restriction::Unrestricted {
-        said.push(if member.access.unrated_blocked {
-            "nothing unrated".to_owned()
-        } else {
-            "including what has no rating".to_owned()
+        said.push(match member.access.unrated {
+            Unrated::HeldBack => "nothing unrated".to_owned(),
+            Unrated::LetThrough => "including what has no rating".to_owned(),
         });
     }
     // The gap the setting exists to close, on the member's own line rather than only
@@ -854,7 +854,7 @@ mod tests {
     fn held(
         age_limit: Option<u32>,
         rated: Option<Rated>,
-        unrated_blocked: bool,
+        unrated: Unrated,
         restriction: Restriction,
     ) -> HouseholdReport {
         HouseholdReport {
@@ -865,7 +865,7 @@ mod tests {
                     every_library: true,
                     age_limit,
                     rated,
-                    unrated_blocked,
+                    unrated,
                     restriction,
                     ..MemberAccess::default()
                 },
@@ -890,7 +890,7 @@ mod tests {
                 holds_back: vec!["15".to_owned()],
                 fell_back: false,
             }),
-            true,
+            Unrated::HeldBack,
             Restriction::RatingLimited,
         );
 
@@ -907,7 +907,12 @@ mod tests {
     /// which is the one reading a household list must never invite.
     #[test]
     fn a_limit_with_no_reading_still_says_the_number() {
-        let report = held(Some(12), None, true, Restriction::RatingLimited);
+        let report = held(
+            Some(12),
+            None,
+            Unrated::HeldBack,
+            Restriction::RatingLimited,
+        );
 
         let text = household(&report).text();
 
@@ -920,8 +925,18 @@ mod tests {
     /// silence does not tell an operator which.
     #[test]
     fn what_happens_to_unrated_content_is_said_either_way() {
-        let holding = held(Some(12), None, true, Restriction::RatingLimited);
-        let letting = held(Some(12), None, false, Restriction::RatingLimited);
+        let holding = held(
+            Some(12),
+            None,
+            Unrated::HeldBack,
+            Restriction::RatingLimited,
+        );
+        let letting = held(
+            Some(12),
+            None,
+            Unrated::LetThrough,
+            Restriction::RatingLimited,
+        );
 
         assert!(
             household(&holding).text().contains("nothing unrated"),
@@ -941,7 +956,7 @@ mod tests {
     /// their library is missing.
     #[test]
     fn nobody_narrowed_is_told_nothing_about_unrated_content() {
-        let report = held(None, None, false, Restriction::Unrestricted);
+        let report = held(None, None, Unrated::LetThrough, Restriction::Unrestricted);
 
         let text = household(&report).text();
 
@@ -955,7 +970,7 @@ mod tests {
     /// only in a finding at the foot of the list.
     #[test]
     fn a_disagreement_is_on_the_members_own_line() {
-        let report = held(Some(12), None, true, Restriction::Inconsistent);
+        let report = held(Some(12), None, Unrated::HeldBack, Restriction::Inconsistent);
 
         let text = household(&report).text();
 
@@ -968,10 +983,15 @@ mod tests {
     /// What a limit here is not is printed under the list where anybody carries one.
     #[test]
     fn what_a_limit_is_not_is_printed_under_the_list() {
-        let limited = held(Some(12), None, true, Restriction::RatingLimited);
+        let limited = held(
+            Some(12),
+            None,
+            Unrated::HeldBack,
+            Restriction::RatingLimited,
+        );
         let open = HouseholdReport {
             filtering: None,
-            ..held(None, None, false, Restriction::Unrestricted)
+            ..held(None, None, Unrated::LetThrough, Restriction::Unrestricted)
         };
 
         assert!(

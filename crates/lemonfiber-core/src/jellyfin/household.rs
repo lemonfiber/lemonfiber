@@ -72,7 +72,11 @@ impl UserResource {
                 every_library: policy.every_library,
                 libraries: policy.libraries,
                 age_limit: policy.age_limit,
-                unrated_blocked: !policy.unrated_blocked.is_empty(),
+                unrated: if policy.unrated_blocked.is_empty() {
+                    Unrated::LetThrough
+                } else {
+                    Unrated::HeldBack
+                },
                 administrator: policy.administrator,
                 disabled: policy.disabled,
             },

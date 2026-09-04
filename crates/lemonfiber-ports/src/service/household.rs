@@ -146,11 +146,21 @@ pub struct Certificate {
 /// Spelled `HeldBack` and `LetThrough` rather than blocked and allowed, because
 /// [`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would
 /// read as the opposite of what it is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// A word rather than a flag on both the read and the write, so the setting is named
+/// the same in the answer that reports it as in the call that made it — and so neither
+/// [`Access`] nor the report built from it becomes a row of four unlabelled booleans.
+///
+/// Letting it through is the default because it is the media server's: a new account
+/// is made holding nothing back, so that is the state an account is found in rather
+/// than a decision anybody took.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum Unrated {
     /// Content with no rating is held back.
     HeldBack,
     /// Content with no rating is let through.
+    #[default]
     LetThrough,
 }
 
@@ -201,12 +211,12 @@ pub struct Access {
     pub libraries: Vec<String>,
     /// The highest rating they may watch, where the operator set a limit.
     pub age_limit: Option<u32>,
-    /// Whether content the server has no rating for is held back from them.
+    /// What becomes of content the server has no rating for.
     ///
     /// The server keeps this as the list of kinds of unrated thing to hold back, and
     /// what a household means by it is all of them or none — so it is read as the one
-    /// bit that question actually has.
-    pub unrated_blocked: bool,
+    /// answer that question actually has.
+    pub unrated: Unrated,
     /// Whether this account administers the server.
     pub administrator: bool,
     /// Whether the account is switched off — held, but unable to sign in.

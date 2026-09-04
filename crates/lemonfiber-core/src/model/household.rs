@@ -38,12 +38,12 @@ pub struct MemberAccess {
     /// What that limit comes to in the certificates this media server names, in the
     /// operator's own country. Absent where no limit is set.
     pub rated: Option<crate::rating::Rated>,
-    /// Whether content the media server has no rating for is held back from them.
+    /// What becomes of content the media server has no rating for.
     ///
-    /// Said whether or not it is, because an unexplained absence is the thing this
-    /// answers: a restricted member missing half the library is either this setting or
-    /// a defect, and an operator cannot tell which from silence.
-    pub unrated_blocked: bool,
+    /// Said either way, because an unexplained absence is the thing this answers: a
+    /// restricted member missing half the library is either this setting or a defect,
+    /// and an operator cannot tell which from silence.
+    pub unrated: crate::ports::service::Unrated,
     /// What they are held to, in one word — including where what they may watch and
     /// what they may ask for disagree.
     pub restriction: Restriction,

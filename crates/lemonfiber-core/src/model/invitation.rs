@@ -82,12 +82,12 @@ pub struct Applied {
     pub limit: Option<String>,
     /// The libraries they may open, as the operator named them. Empty is every one.
     pub libraries: Vec<String>,
-    /// Whether content the media server has no rating for is held back from them.
+    /// What becomes of content the media server has no rating for.
     ///
     /// Held back by default on somebody being narrowed, because a rating limit cannot
     /// decide about a thing that carries no rating. The cost is real and is why this is
     /// reported rather than assumed: some legitimate content becomes invisible to them.
-    pub unrated_blocked: bool,
+    pub unrated: crate::ports::service::Unrated,
     /// Whether the request service was held to the same decision.
     ///
     /// The same three answers a link carries, and for the same reason: what somebody

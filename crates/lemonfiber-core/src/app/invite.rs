@@ -242,10 +242,7 @@ async fn applied(
             .age_limit
             .map(|age| crate::rating::reading(&certificates, Some(age))),
         libraries: allowance.libraries.clone(),
-        unrated_blocked: matches!(
-            allowed.unrated,
-            Some(crate::ports::service::Unrated::HeldBack)
-        ),
+        unrated: allowed.unrated.unwrap_or_default(),
         requesting,
         filtering: crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned(),
     })
