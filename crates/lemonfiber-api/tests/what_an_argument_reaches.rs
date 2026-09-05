@@ -467,17 +467,16 @@ fn give_policy(given: &mut Arguments) {
     given.policy = Some(POLICY.to_owned());
 }
 
-// Both halves, because one alone is not a limit and is refused as the half that is
-// missing rather than as the half that was given — which is a refusal about the other
-// argument, and would read here as this one having been refused for something else.
+// One field each, as every other giver here sets one. The action that takes them was
+// handed both already, so overwriting one leaves the pair complete; an action that
+// takes neither is given one, and is refused for the one it was given rather than for
+// its companion.
 fn give_requests(given: &mut Arguments) {
     given.requests = Some(ALLOWED);
-    given.days = Some(PERIOD);
 }
 
 fn give_days(given: &mut Arguments) {
     given.days = Some(PERIOD);
-    given.requests = Some(ALLOWED);
 }
 
 fn give_request(given: &mut Arguments) {

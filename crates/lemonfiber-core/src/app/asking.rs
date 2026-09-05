@@ -236,6 +236,7 @@ mod tests {
     use super::{allowing, deciding, now_reads, settled, theirs, Ctx};
     use crate::app::command::{Answer as Ruling, Chosen, Decision};
     use crate::asking::Policy;
+    use crate::ports::http::Method;
     use crate::ports::service::{Asking, Quota};
     use crate::test_support::{a_context, a_password, SeedFs};
 
@@ -265,21 +266,50 @@ mod tests {
     /// answer here is the household read *again* — so the same paths are asked twice
     /// and a queue would run out halfway through the second reading.
     fn a_household(tag: &str) -> Ctx {
-        let transport = Fake::by_path(vec![
+        answering(tag, Vec::new())
+    }
+
+    /// The same household, with the named calls answering a refusal instead.
+    ///
+    /// One rule per call rather than one transport per case: what each of these holds
+    /// is that a service which will not answer *that* leaves the household as it was,
+    /// and a fixture that broke everything at once could not say which call it was.
+    fn refusing(tag: &str, broken: Vec<(Method, &'static str)>) -> Ctx {
+        answering(
+            tag,
+            broken
+                .into_iter()
+                .map(|(method, route)| (Some(method), route, Answer::reply(500, "no")))
+                .collect(),
+        )
+    }
+
+    /// The transport these run against, with the broken rules ahead of the working
+    /// ones — the first rule whose fragment the address holds is the one that answers.
+    fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx {
+        let mut routes = broken;
+        routes.extend(vec![
             // Ahead of `/Users`, whose text it contains: a route matched by prefix
             // would answer the sign-in with the list of accounts.
             (
+                None,
                 "/Users/AuthenticateByName",
                 Answer::reply(200, r#"{"AccessToken":"token"}"#),
             ),
             (
+                None,
                 "/Library/MediaFolders",
                 Answer::reply(200, r#"{"Items":[]}"#),
             ),
-            ("/Localization/ParentalRatings", Answer::reply(200, "[]")),
-            ("/Users", Answer::reply(200, ACCOUNTS)),
-            ("/auth/jellyfin", Answer::reply(200, "{}")),
             (
+                None,
+                "/Localization/ParentalRatings",
+                Answer::reply(200, "[]"),
+            ),
+            (None, "/Users", Answer::reply(200, ACCOUNTS)),
+            (None, "/auth/jellyfin", Answer::reply(200, "{}")),
+            (
+                None,
                 "/settings/main",
                 Answer::reply(
                     200,
@@ -288,10 +318,12 @@ mod tests {
                 ),
             ),
             (
+                None,
                 "/user/jellyfin/",
                 Answer::reply(200, r#"{"id":4,"permissions":160}"#),
             ),
             (
+                None,
                 "/user/4/quota",
                 Answer::reply(
                     200,
@@ -299,13 +331,15 @@ mod tests {
                 ),
             ),
             (
+                None,
                 "settings/permissions",
                 Answer::reply(200, r#"{"permissions":160}"#),
             ),
-            ("/request/7/", Answer::reply(200, "{}")),
-            ("/api/v1/request", Answer::reply(200, WAITING)),
-            ("", Answer::reply(200, "[]")),
+            (None, "/request/7/", Answer::reply(200, "{}")),
+            (None, "/api/v1/request", Answer::reply(200, WAITING)),
+            (None, "", Answer::reply(200, "[]")),
         ]);
+        let transport = Fake::by_rules(routes);
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-asking-{tag}-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
@@ -464,6 +498,148 @@ mod tests {
 
         let said = report.findings.first().cloned().unwrap_or_default();
         assert!(said.contains("nothing was decided"), "{said}");
+    }
+
+    /// A call that will not answer leaves the household as it was, and says so.
+    ///
+    /// Every write here reaches the service more than once — read what is held, write
+    /// what was chosen — and each of those is a separate way for it to go quiet. What
+    /// they share is the answer: nothing was changed, which is the one thing an
+    /// operator has to be able to believe.
+    #[tokio::test]
+    async fn a_call_that_will_not_answer_leaves_the_household_as_it_was() {
+        let chosen = Chosen {
+            member: None,
+            policy: Some(Policy::Trusted),
+            quota: None,
+        };
+        let broken = [
+            ("read", vec![(Method::Get, "/settings/main")]),
+            ("write", vec![(Method::Post, "/settings/main")]),
+        ];
+
+        for (tag, rules) in broken {
+            let refused = allowing(&refusing(tag, rules), &chosen).await;
+
+            assert_eq!(
+                refused.err().map(|problem| problem.code),
+                Some(crate::asking::UNREACHABLE),
+                "the {tag} half claimed a change it did not make"
+            );
+        }
+    }
+
+    /// The same for a choice about one person, on each of the three calls it makes.
+    #[tokio::test]
+    async fn a_choice_about_one_person_refuses_on_any_of_its_three_calls() {
+        let chosen = Chosen {
+            member: Some("alex".to_owned()),
+            policy: Some(Policy::WithinALimit),
+            quota: Some(FIVE_A_WEEK),
+        };
+        let broken = [
+            ("held", vec![(Method::Get, "/user/jellyfin/")]),
+            ("left", vec![(Method::Get, "/user/4/quota")]),
+            ("quota", vec![(Method::Post, "/user/4/settings/main")]),
+            ("approval", vec![(Method::Post, "settings/permissions")]),
+        ];
+
+        for (tag, rules) in broken {
+            let refused = allowing(&refusing(tag, rules), &chosen).await;
+
+            assert_eq!(
+                refused.err().map(|problem| problem.code),
+                Some(crate::asking::UNREACHABLE),
+                "the {tag} call claimed a change it did not make"
+            );
+        }
+    }
+
+    /// Somebody the request service has never heard of is an invitation nobody used.
+    ///
+    /// Not a fault and not a member who is missing: the service learns of somebody the
+    /// first time they sign in, so until then there is nobody there to hold to a limit.
+    #[tokio::test]
+    async fn somebody_the_request_service_never_heard_of_has_no_limit_to_set() {
+        let ctx = answering(
+            "unknown",
+            vec![(None, "/user/jellyfin/", Answer::reply(404, "no such user"))],
+        );
+
+        let refused = allowing(
+            &ctx,
+            &Chosen {
+                member: Some("alex".to_owned()),
+                policy: Some(Policy::Trusted),
+                quota: None,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::NEVER_HERE)
+        );
+    }
+
+    /// A media server that will not say who is here changes nothing.
+    #[tokio::test]
+    async fn a_media_server_that_will_not_say_who_is_here_changes_nothing() {
+        let ctx = answering(
+            "nohousehold",
+            vec![(Some(Method::Get), "/Users?", Answer::reply(500, "no"))],
+        );
+
+        let refused = allowing(
+            &ctx,
+            &Chosen {
+                member: Some("alex".to_owned()),
+                policy: Some(Policy::Trusted),
+                quota: None,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::UNREACHABLE)
+        );
+    }
+
+    /// A request service that will not list what was asked for decides nothing.
+    #[tokio::test]
+    async fn a_service_that_will_not_list_what_was_asked_for_decides_nothing() {
+        let refused = deciding(
+            &refusing("nolist", vec![(Method::Get, "/api/v1/request")]),
+            &Decision {
+                request: 7,
+                answer: Ruling::LetThrough,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::UNREACHABLE)
+        );
+    }
+
+    /// A service that will not rule on it says so rather than reporting it decided.
+    #[tokio::test]
+    async fn a_service_that_will_not_rule_says_so() {
+        let refused = deciding(
+            &refusing("norule2", vec![(Method::Post, "/request/7/")]),
+            &Decision {
+                request: 7,
+                answer: Ruling::LetThrough,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::UNREACHABLE)
+        );
     }
 
     /// A request nobody is waiting on is named rather than ruled on twice.
