@@ -24,6 +24,7 @@ mod notices;
 mod providers;
 mod quality;
 mod subtitles;
+mod telling;
 mod throttling;
 mod trace;
 
@@ -51,6 +52,7 @@ pub use providers::{
 };
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
 pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
+pub use telling::{Address, Telling};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 

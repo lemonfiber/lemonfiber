@@ -42,6 +42,10 @@ pub struct MemberRequest {
     /// exactly the point it begins. Absent on a request nobody has refused, and on one
     /// refused in the request service itself, where there are no words to report and
     /// inventing some would put them in somebody's mouth.
+    ///
+    /// Whether the words were carried to the person who asked is the record's own
+    /// `told`, which is why the two travel together: what an operator does next turns
+    /// on it, and a reason read without it is a reason of unknown standing.
     pub refused: Option<crate::asking::Refused>,
 }
 

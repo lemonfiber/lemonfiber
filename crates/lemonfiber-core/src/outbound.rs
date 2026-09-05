@@ -1,6 +1,6 @@
 //! Everything that leaves this machine, why, and what stops if you refuse it.
 //!
-//! Two lists, and keeping them apart is most of the point. lemonfiber makes five
+//! Two lists, and keeping them apart is most of the point. lemonfiber makes six
 //! requests on its own account and they are enumerated here in full; the services
 //! in the stack make a great many more, and those are **theirs** — an indexer
 //! query is Prowlarr asking an indexer, a poster is Radarr asking a metadata
@@ -27,14 +27,22 @@ use serde::Serialize;
 use crate::config::Settings;
 use lemonfiber_manifest::Service;
 
-pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE};
+pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER};
 pub use theirs::ELSEWHERE;
 
 /// One of the requests lemonfiber makes on its own account.
 ///
-/// Five, and the closed set is the claim. A sixth is a decision somebody makes by
+/// Six, and the closed set is the claim. A seventh is a decision somebody makes by
 /// adding a variant here and answering four questions about it, rather than one
 /// that happens by somebody building a request.
+///
+/// The sixth is the one that carries somebody's words rather than a credential or a
+/// name, and it was added deliberately and late: five of these prove or fetch
+/// something and could say what travels in a phrase, and this one travels to a
+/// person. What that costs is the same four answers as the rest, and one more thing
+/// the others do not owe — it is the only entry whose destination is somebody else's
+/// choice, so the list names the two services it can reach and the sender is handed
+/// them rather than holding addresses of its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Reach {
@@ -48,6 +56,8 @@ pub enum Reach {
     Indexer,
     /// Proving a Usenet login against the provider.
     Usenet,
+    /// Telling a household member the one thing the request service cannot carry.
+    Household,
 }
 
 impl Reach {
@@ -60,6 +70,7 @@ impl Reach {
             Self::Echo => "echo",
             Self::Indexer => "indexer",
             Self::Usenet => "usenet",
+            Self::Household => "household",
         }
     }
 }
@@ -215,7 +226,14 @@ mod tests {
         let named: Vec<&str> = EVERY.iter().map(|reach| reach.as_str()).collect();
         assert_eq!(
             named,
-            vec!["registry", "guides", "echo", "indexer", "usenet"]
+            vec![
+                "registry",
+                "guides",
+                "echo",
+                "indexer",
+                "usenet",
+                "household"
+            ]
         );
     }
 }

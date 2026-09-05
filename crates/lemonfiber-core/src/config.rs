@@ -32,8 +32,8 @@ use lemonfiber_manifest::Protocol;
 use serde::{Deserialize, Serialize};
 
 pub use reaching::{
-    offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_INDEXER_KEY, REACH_REGISTRY_KEY,
-    REACH_USENET_KEY, SWITCHES,
+    offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
+    REACH_REGISTRY_KEY, REACH_USENET_KEY, SWITCHES,
 };
 
 /// Which download protocols the operator actually has accounts for.
@@ -269,6 +269,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_GUIDES_KEY,
     REACH_INDEXER_KEY,
     REACH_USENET_KEY,
+    REACH_HOUSEHOLD_KEY,
     EXPLANATIONS_KEY,
     EXPOSED_KEY,
     DATA_ROOT_KEY,
