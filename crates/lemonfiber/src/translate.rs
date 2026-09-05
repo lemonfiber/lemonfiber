@@ -94,7 +94,7 @@ pub(crate) fn household(
             policy,
             requests,
             days,
-        } => allowing(member, policy, requests, days),
+        } => allowing(member, policy.as_deref(), requests, days),
         HouseholdCommand::Approve { request } => Ok(Command::Deciding(Decision {
             request,
             answer: Answer::LetThrough,
@@ -115,23 +115,21 @@ pub(crate) fn household(
 /// must not be given a different arrangement because of a spelling.
 fn allowing(
     member: Option<String>,
-    policy: Option<String>,
+    policy: Option<&str>,
     requests: Option<u32>,
     days: Option<u32>,
 ) -> Result<Command, u8> {
-    let chosen = match policy.as_deref() {
-        None => None,
-        Some(written) => match Policy::from_label(written) {
-            Some(policy) => Some(policy),
-            None => {
-                complain!(
-                    "error: no policy named `{written}` (try {})",
-                    Policy::labels()
-                );
-                return Err(USAGE);
-            }
-        },
-    };
+    let mut chosen = None;
+    if let Some(written) = policy {
+        let Some(named) = Policy::from_label(written) else {
+            complain!(
+                "error: no policy named `{written}` (try {})",
+                Policy::labels()
+            );
+            return Err(USAGE);
+        };
+        chosen = Some(named);
+    }
     Ok(Command::Allowing(Chosen {
         member,
         policy: chosen,
