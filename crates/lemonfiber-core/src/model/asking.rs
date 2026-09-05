@@ -129,20 +129,46 @@ mod tests {
         assert!(!said.contains("from "), "{said}");
     }
 
-    /// What a member may ask for is data a panel can hold a copy of.
+    /// A limit with no period is a count of everything they have ever asked for.
     ///
-    /// The dashboard keeps the household report inside a panel and hands copies of it
-    /// to whatever is drawing; nothing about this is worth a hand-written impl, and the
-    /// derived ones are only true while something takes them at their word.
+    /// The service carries a member's window as an option, so a limit can stand without
+    /// one — and the sentence has to say what that means rather than leave a gap where
+    /// the period would be.
     #[test]
-    fn what_a_member_may_ask_for_is_data_a_panel_can_hold_a_copy_of() {
-        let held = held(Some("2026-09-16T21:04:09"));
+    fn a_limit_with_no_period_counts_everything_they_have_asked_for() {
+        let ever = MemberAsking {
+            films: Counted {
+                limit: Some(5),
+                used: 2,
+                remaining: Some(3),
+                period: None,
+            },
+            ..held(None)
+        };
 
-        let copy = held.clone();
+        let said = ever.sentence().unwrap_or_default();
 
-        assert_eq!(copy, held);
-        assert_eq!(copy.films, held.films);
-        assert_ne!(copy.films, held.television);
+        assert!(said.contains("2 of 5 so far used"), "{said}");
+    }
+
+    /// What a member may ask for goes out as exactly this document.
+    ///
+    /// Nothing else in this workspace serialises one: the contract describes the shape
+    /// and the household sample it describes it from has nobody in it. So a field
+    /// renamed here would pass everything and break whoever reads `--json`.
+    #[test]
+    fn what_a_member_may_ask_for_goes_out_as_exactly_this_document() {
+        let written = serde_json::to_string(&held(Some("2026-09-16T21:04:09"))).unwrap_or_default();
+
+        assert_eq!(
+            written,
+            concat!(
+                r#"{"policy":"within-a-limit","standing":"quota-exhausted","#,
+                r#""films":{"limit":5,"used":5,"remaining":0,"period":"a week"},"#,
+                r#""television":{"limit":null,"used":0,"remaining":null,"period":null},"#,
+                r#""frees_up":"2026-09-16T21:04:09"}"#
+            )
+        );
     }
 
     /// A member nothing limits has no sentence, because there is nothing to say.
