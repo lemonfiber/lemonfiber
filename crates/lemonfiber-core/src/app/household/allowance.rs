@@ -202,12 +202,21 @@ fn waited_too_long(held: &crate::model::HouseholdMember) -> Option<String> {
 /// exists to keep honest.
 #[must_use]
 pub(super) fn estimated(kind: Option<Kind>, quality: &Selection) -> Option<Estimate> {
-    let kind = kind?;
+    Some(for_kind(kind?, quality))
+}
+
+/// About how much room one thing of this kind will want, at the quality in force for it.
+///
+/// The one place a kind is turned into a length, so what is said beside a request and
+/// what is said to somebody deciding what to ask for cannot come out as different
+/// figures for the same thing.
+#[must_use]
+pub(super) fn for_kind(kind: Kind, quality: &Selection) -> Estimate {
     let preset = quality.for_type(kind.media_type());
-    Some(match kind {
+    match kind {
         Kind::Sonarr => Estimate::season(preset),
         Kind::Radarr => Estimate::film(preset),
-    })
+    }
 }
 
 /// How long a request has been waiting on somebody, where it is waiting at all.
@@ -257,6 +266,7 @@ mod tests {
                     state: Some(State::WaitingForApproval),
                     waiting_days: Some(*days),
                     estimate: None,
+                    refused: None,
                 })
                 .collect(),
             asking: asking.map(|held| reported(&held, &[ASKED], now())),

@@ -600,6 +600,90 @@ async fn a_request_that_is_ruled_on_answers_with_the_household() {
     assert!(said.contains("yours to pass on"), "{said}");
 }
 
+/// The reason a refusal carried survives it, and reaches whoever asked for the thing.
+///
+/// **The request service holds none.** Its endpoint reads no body and its record has no
+/// column, so a reason said once on the way past would be gone by the next reading — and
+/// the person told only that they were declined is in the same place as one told nothing.
+/// Driven from end to end rather than asserted on the record: what matters is that the
+/// words come back on the household the *next* time it is read, on a different context
+/// over a different transport, which is the only proof they were written down at all.
+#[tokio::test]
+async fn a_reason_survives_the_refusal_and_reaches_whoever_asked() {
+    let ruling = answering("passed-on");
+    let decided = dispatch(
+        Command::Deciding(Decision {
+            request: 7,
+            answer: Ruling::TurnedDown {
+                reason: "we already have it dubbed".to_owned(),
+            },
+        }),
+        &ruling,
+    )
+    .await;
+    assert!(decided.is_ok(), "the refusal itself did not go through");
+
+    // The same install read again, with the service now reporting the request as
+    // refused — which is what it does once somebody has ruled on it.
+    let said = dispatch(
+        Command::Household { member: None },
+        &with(
+            "passed-on",
+            vec![(
+                None,
+                "/api/v1/request",
+                Answer::reply(
+                    200,
+                    r#"{"pageInfo":{"results":1},"results":[{"id":7,
+                        "createdAt":"2026-08-17T21:04:09.000Z","status":3,"type":"movie",
+                        "media":{"status":2,"externalServiceId":3},
+                        "requestedBy":{"displayName":"Alex"}}]}"#,
+                ),
+            )],
+        ),
+    )
+    .await
+    .ok()
+    .map(Outcome::envelope)
+    .and_then(|envelope| envelope.to_json())
+    .unwrap_or_default();
+
+    assert!(
+        said.contains(r#""reason":"we already have it dubbed""#),
+        "the words were not kept: {said}"
+    );
+    assert!(
+        said.contains("Turned down"),
+        "the words were kept and not written to the person they are for: {said}"
+    );
+    assert!(
+        said.contains("lemonfiber's own record"),
+        "a reason this program holds was reported as the service's: {said}"
+    );
+}
+
+/// Everything a household member is owed at the moment of asking is written to them.
+///
+/// The four the requirements ask for and the request service cannot show: what happens
+/// to what they ask for, what their period has left and when it makes room, roughly what
+/// a thing costs before they choose one, and what is still waiting on an answer.
+#[tokio::test]
+async fn what_a_member_is_owed_when_they_ask_is_written_to_them() {
+    let said = dispatch(Command::Household { member: None }, &answering("owed"))
+        .await
+        .ok()
+        .map(Outcome::envelope)
+        .and_then(|envelope| envelope.to_json())
+        .unwrap_or_default();
+
+    assert!(said.contains("to_hand_over"), "{said}");
+    assert!(said.contains("What you may ask for:"), "{said}");
+    assert!(said.contains("5 of 5 a week used"), "{said}");
+    assert!(said.contains("Before you ask"), "{said}");
+    assert!(said.contains("Waiting on an answer:"), "{said}");
+    assert!(said.contains("Nothing expires it"), "{said}");
+}
+
 /// Both writes are reachable through the dispatcher, and both refuse rather than
 /// claim a change nobody could make.
 ///

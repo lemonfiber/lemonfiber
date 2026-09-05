@@ -25,10 +25,12 @@
 //! would disagree is the sentence somebody reads when they cannot ask for anything.
 
 mod estimate;
+mod reasons;
 mod refusal;
 mod window;
 
 pub use estimate::{Estimate, FILM_HOURS, SEASON_HOURS};
+pub use reasons::{Reasons, Refused};
 pub use refusal::{
     never_asked_here, no_limit_named, no_reason_given, no_such_policy, nobody_called,
     nothing_to_decide, unreachable, NEVER_HERE, NOBODY, NOT_WAITING, NO_LIMIT, NO_REASON,

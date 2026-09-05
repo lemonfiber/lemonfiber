@@ -1837,13 +1837,21 @@
               "items": {
                 "$ref": "#/$defs/MemberRequest"
               }
+            },
+            "to_hand_over": {
+              "description": "What this member would be told, in the words they would read it in.\n\nEverything a household member is owed at the moment of asking and cannot be\nshown where they ask: what happens to what they ask for, what their period has\nleft and when it makes room, roughly what a thing costs before they choose one,\nwhat is still waiting on an answer, and what was refused and why. Written to\nthem rather than about them, so it can be handed over as it stands.\n\nEmpty where there is nothing to tell them — a member the request service holds\nno account for has no standing to report and nothing waiting.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [
             "name",
             "requests",
             "access",
-            "claimed"
+            "claimed",
+            "to_hand_over"
           ]
         },
         "HouseholdReport": {
@@ -2021,6 +2029,17 @@
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "refused": {
+              "description": "Why it was turned down, where it was turned down from here.\n\n**The request service keeps none**, so this is lemonfiber's own record and is\nsaid to be — a reason presented as delivered would end the operator's job at\nexactly the point it begins. Absent on a request nobody has refused, and on one\nrefused in the request service itself, where there are no words to report and\ninventing some would put them in somebody's mouth.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Refused"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "state": {
@@ -2578,6 +2597,26 @@
           "required": [
             "named",
             "because"
+          ]
+        },
+        "Refused": {
+          "description": "What was said when one request was turned down.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When it was turned down, so somebody reading it later knows which answer this\nwas rather than assuming it is the newest.\n\nAbsent where the machine's clock could not be written as a date, which is a\nrefusal worth keeping the words of and not worth losing them over.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "description": "Why, in the words it was turned down in.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason"
           ]
         },
         "Restriction": {
@@ -4432,13 +4471,21 @@
               "items": {
                 "$ref": "#/$defs/MemberRequest"
               }
+            },
+            "to_hand_over": {
+              "description": "What this member would be told, in the words they would read it in.\n\nEverything a household member is owed at the moment of asking and cannot be\nshown where they ask: what happens to what they ask for, what their period has\nleft and when it makes room, roughly what a thing costs before they choose one,\nwhat is still waiting on an answer, and what was refused and why. Written to\nthem rather than about them, so it can be handed over as it stands.\n\nEmpty where there is nothing to tell them — a member the request service holds\nno account for has no standing to report and nothing waiting.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [
             "name",
             "requests",
             "access",
-            "claimed"
+            "claimed",
+            "to_hand_over"
           ]
         },
         "HouseholdReport": {
@@ -4618,6 +4665,17 @@
                 "null"
               ]
             },
+            "refused": {
+              "description": "Why it was turned down, where it was turned down from here.\n\n**The request service keeps none**, so this is lemonfiber's own record and is\nsaid to be — a reason presented as delivered would end the operator's job at\nexactly the point it begins. Absent on a request nobody has refused, and on one\nrefused in the request service itself, where there are no words to report and\ninventing some would put them in somebody's mouth.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Refused"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "state": {
               "description": "Where the request stands, or absent where the request service reports a status\nthis build does not know rather than guessing it into the nearest word.",
               "anyOf": [
@@ -4697,6 +4755,26 @@
             "allows",
             "holds_back",
             "fell_back"
+          ]
+        },
+        "Refused": {
+          "description": "What was said when one request was turned down.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When it was turned down, so somebody reading it later knows which answer this\nwas rather than assuming it is the newest.\n\nAbsent where the machine's clock could not be written as a date, which is a\nrefusal worth keeping the words of and not worth losing them over.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "description": "Why, in the words it was turned down in.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason"
           ]
         },
         "Restriction": {

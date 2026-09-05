@@ -519,6 +519,7 @@ mod tests {
                         id: 0,
                         waiting_days: None,
                         estimate: None,
+                        refused: None,
                     })
                     .collect(),
                 ..HouseholdMember::default()

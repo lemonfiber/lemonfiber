@@ -134,6 +134,16 @@ impl Paths {
         self.config.join("bandwidth.json")
     }
 
+    /// Why a request was turned down, by the number the request service files it
+    /// under. Kept with configuration because it is a record of something the operator
+    /// decided and the request service has nowhere to hold — a restore that lost it
+    /// would leave every refusal bare again, which is the state this record exists to
+    /// get a household out of.
+    #[must_use]
+    pub fn refusals(&self) -> PathBuf {
+        self.config.join("refusals.json")
+    }
+
     /// The choices the operator answered whose cost was stated to them once —
     /// running with no VPN, or with a provider that forwards no port. Kept with
     /// configuration because it records a decision, and a backup that restored the
@@ -241,6 +251,7 @@ mod tests {
             paths.notifications(),
             paths.bandwidth(),
             paths.accepted(),
+            paths.refusals(),
             paths.admission(),
         ];
         let data: Vec<PathBuf> = vec![

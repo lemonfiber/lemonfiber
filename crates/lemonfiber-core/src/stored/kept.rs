@@ -135,6 +135,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::accepted,
     },
     Entry {
+        accessor: "refusals",
+        what: "why you turned a request down",
+        why: "The request service has nowhere to keep a reason, so a refusal it sends carries \
+              none. This is lemonfiber's own note of what you said, so the person who asked can \
+              still be told why.",
+        secret: false,
+        at: Paths::refusals,
+    },
+    Entry {
         accessor: "acknowledged",
         what: "the words you have gone and looked up",
         why: "So a report names a word you already know instead of explaining it again. What \

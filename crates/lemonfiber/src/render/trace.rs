@@ -76,7 +76,43 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
     for finding in &report.findings {
         lines.put(format!("  ! {finding}"));
     }
+    // Last, because it is the one part of this screen meant to leave it: everything
+    // above is about the list, and a block to copy out reads worst with the list's own
+    // notes after it.
+    for line in to_hand_over(report) {
+        lines.put(line);
+    }
     lines
+}
+
+/// The answer written to one member, where the list is about one member.
+///
+/// **Nobody in the house has a way to read any of this.** They ask at the request
+/// service, which shows no cost, names neither the limit nor the reset when it refuses,
+/// and sends a decline with nothing beside it — so the figures that would answer them are
+/// gathered here, in front of the one person who is not asking. This is the block that
+/// closes that gap the only way this program can: words ready to send, rather than four
+/// numbers an operator has to compose into a message.
+///
+/// Only where the list holds exactly one member. On a whole household it would be the
+/// same block per person and the list itself would be lost between them — and a list
+/// narrowed to one person is precisely when somebody is about to answer them.
+fn to_hand_over(report: &HouseholdReport) -> Vec<String> {
+    let [member] = report.members.as_slice() else {
+        return Vec::new();
+    };
+    if member.to_hand_over.is_empty() {
+        return Vec::new();
+    }
+    let mut said = vec![
+        String::new(),
+        format!(
+            "  To hand to {} — none of this is visible where they ask:",
+            member.name
+        ),
+    ];
+    said.extend(member.to_hand_over.iter().map(|line| format!("    {line}")));
+    said
 }
 
 /// One request, as its own line: what it is called, and where it stands.
@@ -632,6 +668,7 @@ mod tests {
         let report = HouseholdReport {
             members: vec![HouseholdMember {
                 name: "Alex".to_owned(),
+                to_hand_over: Vec::new(),
                 requests: vec![
                     MemberRequest {
                         title: Some("The Expanse".to_owned()),
@@ -640,6 +677,7 @@ mod tests {
                         id: 0,
                         waiting_days: None,
                         estimate: None,
+                        refused: None,
                     },
                     // No service holds it yet, so it is named by what it is.
                     MemberRequest {
@@ -649,6 +687,7 @@ mod tests {
                         id: 0,
                         waiting_days: None,
                         estimate: None,
+                        refused: None,
                     },
                     // Neither a title nor a kind this build knows.
                     MemberRequest {
@@ -658,6 +697,7 @@ mod tests {
                         id: 0,
                         waiting_days: None,
                         estimate: None,
+                        refused: None,
                     },
                 ],
                 access: MemberAccess {
@@ -744,6 +784,7 @@ mod tests {
         HouseholdReport {
             members: vec![HouseholdMember {
                 name: "Alex".to_owned(),
+                to_hand_over: Vec::new(),
                 requests: vec![
                     MemberRequest {
                         id: 7,
@@ -754,6 +795,7 @@ mod tests {
                         estimate: Some(lemonfiber_core::asking::Estimate::film(
                             lemonfiber_core::quality::Preset::Balanced,
                         )),
+                        refused: None,
                     },
                     MemberRequest {
                         id: 8,
@@ -764,6 +806,7 @@ mod tests {
                         estimate: Some(lemonfiber_core::asking::Estimate::season(
                             lemonfiber_core::quality::Preset::Balanced,
                         )),
+                        refused: None,
                     },
                 ],
                 access: MemberAccess {
@@ -829,6 +872,77 @@ mod tests {
             text.contains("can watch everything · close to their limit"),
             "{text}"
         );
+    }
+
+    /// The answer for the person who asked is drawn where the list is about them.
+    ///
+    /// Everything they are owed at the moment of asking is gathered on this screen and
+    /// none of it is visible where they ask, so it is written to them and put somewhere
+    /// the operator can copy it out of.
+    #[test]
+    fn the_answer_for_whoever_asked_is_drawn_under_their_own_list() {
+        let report = HouseholdReport {
+            members: vec![HouseholdMember {
+                name: "Ana".to_owned(),
+                to_hand_over: vec![
+                    "Your limit: 4 of 5 a week used.".to_owned(),
+                    "Turned down: Dune — we already have it.".to_owned(),
+                ],
+                ..HouseholdMember::default()
+            }],
+            available: true,
+            findings: Vec::new(),
+            filtering: None,
+            policy: None,
+            allows: None,
+        };
+
+        let text = household(&report).text();
+
+        assert!(
+            text.contains("To hand to Ana — none of this is visible where they ask:"),
+            "{text}"
+        );
+        assert!(
+            text.contains("    Your limit: 4 of 5 a week used."),
+            "{text}"
+        );
+        assert!(
+            text.contains("    Turned down: Dune — we already have it."),
+            "{text}"
+        );
+    }
+
+    /// A list about the whole house draws no message, and neither does a member with
+    /// nothing to be told.
+    ///
+    /// The same block under every name would bury the list it is meant to explain, and
+    /// a heading over nothing reads as an answer that failed to arrive.
+    #[test]
+    fn a_whole_household_is_handed_nothing_to_pass_on() {
+        let one = |name: &str, told: Vec<String>| HouseholdMember {
+            name: name.to_owned(),
+            to_hand_over: told,
+            ..HouseholdMember::default()
+        };
+        let report = |members: Vec<HouseholdMember>| HouseholdReport {
+            members,
+            available: true,
+            findings: Vec::new(),
+            filtering: None,
+            policy: None,
+            allows: None,
+        };
+
+        let house = household(&report(vec![
+            one("Ana", vec!["Your limit: 4 of 5.".to_owned()]),
+            one("Bo", vec!["Your limit: 1 of 5.".to_owned()]),
+        ]))
+        .text();
+        let silent = household(&report(vec![one("Ana", Vec::new())])).text();
+
+        assert!(!house.contains("To hand to"), "{house}");
+        assert!(!silent.contains("To hand to"), "{silent}");
     }
 
     /// An invitation nobody has taken up says that, and is counted apart.
