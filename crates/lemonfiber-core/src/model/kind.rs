@@ -42,6 +42,8 @@ pub const ADMISSION: Kind = Kind("admission");
 pub const ARCHIVES: Kind = Kind("archives");
 /// Where a backup archive was written, and what it covers.
 pub const BACKUP: Kind = Kind("backup");
+/// How the line is shared, what that costs, and whether the clients keep to it.
+pub const BANDWIDTH: Kind = Kind("bandwidth");
 /// What a support bundle would hold, or where one went.
 pub const BUNDLE: Kind = Kind("bundle");
 /// The settings asked about, and what a change did to them.
@@ -131,6 +133,7 @@ pub const ALL: &[Kind] = &[
     ADMISSION,
     ARCHIVES,
     BACKUP,
+    BANDWIDTH,
     BUNDLE,
     CONFIG,
     DASHBOARD,

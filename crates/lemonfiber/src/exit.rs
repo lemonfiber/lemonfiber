@@ -117,6 +117,11 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // a failure is a cleanup that was agreed to and could not finish.
         Outcome::Space(report) => accounting(report),
         Outcome::Letting(offer) => letting_go(offer),
+        // Accounting for the line is a question too, and one answer to it is a
+        // failure a script has to be able to see: a limit that was handed to a
+        // client and did not take is a setting the operator believes is in force
+        // while the household's evening goes on being ruined.
+        Outcome::Bandwidth(report) => sharing(report),
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.
@@ -175,6 +180,25 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Archives(_)
         | Outcome::Support(_) => ExitCode::SUCCESS,
     }
+}
+
+/// The exit code an accounting of the line earns.
+///
+/// A reading is always a success, however constrained the line is: being at a cap
+/// is a fact about a household's plan and not a fault of the run that said so. A
+/// *run that applied limits* is a failure where any client did not take one or is
+/// not keeping to it, because that is the case where the operator has a setting
+/// they believe in and a household that cannot feel it.
+fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode {
+    if report.applied
+        && report
+            .clients
+            .iter()
+            .any(lemonfiber_core::bandwidth::Holding::worth_saying)
+    {
+        return ExitCode::from(FAILURE);
+    }
+    ExitCode::SUCCESS
 }
 
 /// The exit code an accounting of the disk earns.
@@ -641,6 +665,46 @@ mod tests {
                     }],
                 }),
                 ..reckoned
+            }),
+            success()
+        );
+    }
+
+    /// Accounting for the line is a question too, however constrained the line is.
+    /// The one case a script has to act on is a run that *applied* limits and found
+    /// a client that did not take one: the operator then has a setting they believe
+    /// in and a household that cannot feel it.
+    #[test]
+    fn accounting_for_the_line_is_a_question_and_a_limit_that_did_not_take_is_not() {
+        use lemonfiber_core::bandwidth::{weigh, Answer, Held, Holding, Measured};
+
+        let ignoring = || Holding {
+            client: "qbittorrent".to_owned(),
+            answer: Answer::Held {
+                down: Held::of(Some(1_000), Some(9_000), Some(0), true),
+                up: Held::of(None, None, None, true),
+                period: None,
+            },
+        };
+        let asked =
+            |measured: &Measured| format!("{:?}", settled(&Outcome::Bandwidth(weigh(measured))));
+
+        assert_eq!(asked(&Measured::default()), success());
+
+        // Read but not applied: the client's own settings are its own business
+        // until lemonfiber has put something to it.
+        assert_eq!(
+            asked(&Measured {
+                clients: vec![ignoring()],
+                ..Measured::default()
+            }),
+            success()
+        );
+        assert_ne!(
+            asked(&Measured {
+                clients: vec![ignoring()],
+                applied: true,
+                ..Measured::default()
             }),
             success()
         );

@@ -2,9 +2,11 @@
 //!
 //! An action is named, the name is turned into one of the core's own commands, and
 //! the command is carried out or handed to the runtime. Which name reaches which
-//! command lives in [`named`], what a caller may say alongside it in [`asked`], and
-//! why one was turned away in [`refused`]; what is here is the route itself and the
-//! one decision that belongs to neither — when the answer arrives.
+//! command lives in [`named`], what one of its arguments has to be before that
+//! command can take it in [`reading`], what a caller may say alongside it in
+//! [`asked`], and why one was turned away in [`refused`]; what is here is the route
+//! itself and the one decision that belongs to none of them — when the answer
+//! arrives.
 //!
 //! An action that reaches the container engine or the services runs for minutes,
 //! and a request that waited for it would tie the work to a connection. So those
@@ -21,6 +23,7 @@
 
 mod asked;
 mod named;
+mod reading;
 mod refused;
 
 use std::sync::Arc;
@@ -43,7 +46,8 @@ pub use asked::{
     Arguments, Disturbing, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
     TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
     TAKES_ITEM, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
-    TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_TERM, TAKES_WAITING,
+    TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM,
+    TAKES_WAITING,
 };
 pub use named::{named, OFFERED};
 pub use refused::Refused;

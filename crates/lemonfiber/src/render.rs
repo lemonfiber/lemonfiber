@@ -15,6 +15,7 @@
 pub(crate) mod fixtures;
 
 mod archive;
+mod bandwidth;
 mod clients;
 mod doctor;
 pub(crate) mod door;
@@ -228,6 +229,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Stored(report) => stored::kept(report),
         Outcome::Space(report) => space::reckoning(report),
         Outcome::Letting(offer) => space::letting(offer),
+        Outcome::Bandwidth(report) => bandwidth::sharing(report),
         Outcome::Lifecycle(report) => stack::lifecycle(report),
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),
@@ -787,6 +789,12 @@ mod tests {
                     standing: lemonfiber_core::space::Standing::Seeding { ratio: 175 },
                     consequence: Some(lemonfiber_core::space::RATIO_CONSEQUENCE.to_owned()),
                 },
+            )),
+            // The same, over the line: nothing declared, nothing measured and no
+            // client answering, which is the answer with every optional paragraph
+            // absent and still a report rather than a blank.
+            Outcome::Bandwidth(lemonfiber_core::bandwidth::weigh(
+                &lemonfiber_core::bandwidth::Measured::default(),
             )),
         ]
     }

@@ -17,8 +17,9 @@
 mod acting;
 
 use acting::{
-    exactly_what, AGE, ALLOWED, ARCHIVE, DOWNLOAD, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER,
-    PERIOD, POLICY, REASON, SEASON, UNRATED, WAITING, WARNED,
+    exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CARRIES, DOWNLOAD, FOLLOWED, HOURS, ITEM,
+    LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON, SEASON, SHARE,
+    UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
@@ -356,6 +357,77 @@ fn give_season(given: &mut Arguments) {
     given.season = Some(SEASON);
 }
 
+/// Whether the command has what the line may be shared as in it.
+///
+/// One test per field of the declaration rather than one for the whole of it: the
+/// seven arrive together and are dropped one at a time, and a sweep that checked
+/// only that *something* arrived would pass on a command that lost six of them.
+/// Every field is compared against the exact text it was given, because what the
+/// core does with these is read them — a value that arrived changed is a value that
+/// went through somebody's idea of what it meant on the way.
+fn shared(command: &Command) -> Option<&lemonfiber_core::app::BandwidthAsked> {
+    match command {
+        Command::Bandwidth(asked) => Some(asked),
+        _ => None,
+    }
+}
+
+fn carries_down(command: &Command) -> bool {
+    shared(command).is_some_and(|asked| asked.down.as_deref() == Some(SHARE))
+}
+
+fn give_down(given: &mut Arguments) {
+    given.down = Some(SHARE.to_owned());
+}
+
+fn carries_up(command: &Command) -> bool {
+    shared(command).is_some_and(|asked| asked.up.as_deref() == Some(SHARE))
+}
+
+fn give_up(given: &mut Arguments) {
+    given.up = Some(SHARE.to_owned());
+}
+
+fn carries_active(command: &Command) -> bool {
+    shared(command).is_some_and(|asked| asked.active.as_deref() == Some(HOURS))
+}
+
+fn give_active(given: &mut Arguments) {
+    given.active = Some(HOURS.to_owned());
+}
+
+fn carries_line(command: &Command) -> bool {
+    shared(command).is_some_and(|asked| asked.line.as_deref() == Some(CARRIES))
+}
+
+fn give_line(given: &mut Arguments) {
+    given.line = Some(CARRIES.to_owned());
+}
+
+fn carries_cap(command: &Command) -> bool {
+    shared(command).is_some_and(|asked| asked.cap.as_deref() == Some(MONTHLY))
+}
+
+fn give_cap(given: &mut Arguments) {
+    given.cap = Some(MONTHLY.to_owned());
+}
+
+fn carries_exceeded(command: &Command) -> bool {
+    shared(command).is_some_and(|asked| asked.exceeded.as_deref() == Some(AT_THE_CAP))
+}
+
+fn give_exceeded(given: &mut Arguments) {
+    given.exceeded = Some(AT_THE_CAP.to_owned());
+}
+
+fn carries_unrestricted_for(command: &Command) -> bool {
+    shared(command).is_some_and(|asked| asked.unrestricted_for == Some(MINUTES))
+}
+
+fn give_unrestricted_for(given: &mut Arguments) {
+    given.unrestricted_for = Some(MINUTES);
+}
+
 /// Whether the command has the libraries it was told they may open in it.
 fn carries_libraries(command: &Command) -> bool {
     matches!(command, Command::Invite { allowance, .. }
@@ -497,7 +569,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 32] = [
+const SWEEPS: [Sweep; 39] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -530,6 +602,17 @@ const SWEEPS: [Sweep; 32] = [
     ("days", give_days, carries_limit),
     ("request", give_request, carries_request),
     ("reason", give_reason, carries_reason),
+    ("down", give_down, carries_down),
+    ("up", give_up, carries_up),
+    ("active", give_active, carries_active),
+    ("line", give_line, carries_line),
+    ("cap", give_cap, carries_cap),
+    ("exceeded", give_exceeded, carries_exceeded),
+    (
+        "unrestricted_for",
+        give_unrestricted_for,
+        carries_unrestricted_for,
+    ),
 ];
 
 /// Every offered action given one argument on top of what it takes, gathering what

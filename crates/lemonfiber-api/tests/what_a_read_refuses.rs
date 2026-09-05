@@ -336,6 +336,20 @@ async fn a_line_count_at_the_ceiling_is_still_asked_for() {
 }
 
 #[tokio::test]
+async fn accounting_for_the_line_takes_nothing_and_refuses_a_parameter() {
+    // A read never declares a limit. Something that named one here would be a read
+    // that changes what everybody in the house experiences, so it is refused by
+    // name rather than quietly ignored — and the action beside it is where a
+    // declaration goes.
+    let refused = reads::wanted(reads::BANDWIDTH, Some("down=50%"));
+
+    assert_eq!(
+        refused.err().map(|problem| problem.code.as_str()),
+        Some("READ-1")
+    );
+}
+
+#[tokio::test]
 async fn accounting_for_the_disk_takes_nothing_and_refuses_a_parameter() {
     // There is no argument choosing what to reclaim, because that choice is never a
     // caller's — so there is nothing to narrow this by, and a name that reads as a

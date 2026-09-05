@@ -224,29 +224,20 @@ pub(crate) fn recorded_quota(quota: &str, usage_at_start: i64) -> Option<Recorde
 /// disagrees with the client is worse than no figure. The fraction is folded in by
 /// integer arithmetic rather than a float, so a size the client accepts is not
 /// rounded on the way through.
+///
+/// Both of those are true of every size this product reads, so the reading itself is
+/// [`crate::bytes::read`] and this is the name it goes under here.
 pub(crate) fn size_of(text: &str) -> Option<u64> {
-    let text = text.trim();
-    let split = text
-        .find(|character: char| character.is_ascii_alphabetic())
-        .unwrap_or(text.len());
-    let (number, unit) = text.split_at(split);
-    let scale: u64 = match unit.trim().to_ascii_uppercase().as_str() {
-        "" => 1,
-        "K" => 1 << 10,
-        "M" => 1 << 20,
-        "G" => 1 << 30,
-        "T" => 1 << 40,
-        "P" => 1 << 50,
-        _ => return None,
-    };
-    let (whole, fraction) = number.trim().split_once('.').unwrap_or((number.trim(), ""));
-    let bytes = whole.trim().parse::<u64>().ok()?.checked_mul(scale)?;
-    if fraction.is_empty() {
-        return Some(bytes);
-    }
-    let places = u32::try_from(fraction.len()).ok()?;
-    let scaled = fraction.parse::<u64>().ok()?.checked_mul(scale)?;
-    bytes.checked_add(scaled / 10_u64.checked_pow(places)?)
+    crate::bytes::read(text)
+}
+
+/// Every account's per-day figures together, which is what the stack pulled.
+///
+/// Across accounts rather than per account, because a cap belongs to the line and
+/// not to any one provider on it: two blocks bought from two providers are two
+/// allowances and one connection.
+pub(crate) fn daily_across(stats: &StatsResponse) -> Vec<(Date, u64)> {
+    stats.servers.values().flat_map(daily_totals).collect()
 }
 
 /// The per-day figures, as dates. A key that is not a date is dropped rather than

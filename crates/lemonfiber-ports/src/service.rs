@@ -18,9 +18,11 @@ mod catalogue;
 mod clients;
 mod failure;
 mod household;
+mod metering;
 mod providers;
 mod quality;
 mod subtitles;
+mod throttling;
 mod trace;
 
 pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
@@ -39,11 +41,13 @@ pub use failure::{
 pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Unrated,
 };
+pub use metering::{Metering, Moved};
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
 pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
+pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 
 /// Who a service says it is, once it answers.

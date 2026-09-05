@@ -389,6 +389,14 @@ pub enum Command {
         /// one, the cost is stated and nothing is removed.
         agreement: Option<String>,
     },
+    /// Account for the line: what it carries, what the stack may take of it, and
+    /// whether the clients are keeping to that.
+    ///
+    /// The same two halves the disk accounting has. Asked nothing it reads and
+    /// reports; asked for a limit it declares one and hands it to every download
+    /// client, then reads back what each says — because a client that accepts a
+    /// setting and does not apply it looks exactly like one that did.
+    Bandwidth(BandwidthAsked),
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///
@@ -464,6 +472,47 @@ pub enum Command {
     /// answers gathered so far live in the resumable progress file between them,
     /// which is where a terminal run keeps them too.
     Setup(SetupAction),
+}
+
+/// What a bandwidth request is asking for.
+///
+/// Every field is what the operator wrote rather than what it means, and is read
+/// in the core: a surface that parsed a limit would be a second place the rule
+/// about what `50%` means could change, and the three surfaces would then disagree
+/// about a household's evening.
+///
+/// All of it absent is a reading, which is the request every surface makes first
+/// and the one nothing is written by.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BandwidthAsked {
+    /// The download limit, as a share or a figure.
+    pub down: Option<String>,
+    /// The upload limit, declared apart from the download's and defaulting lower.
+    pub up: Option<String>,
+    /// The household's hours, as `HH:MM-HH:MM` on the wall clock.
+    pub active: Option<String>,
+    /// What the line carries, as `<down>/<up>`, where the operator knows.
+    pub line: Option<String>,
+    /// A monthly cap on what the stack itself moves.
+    pub cap: Option<String>,
+    /// What is to happen when that cap is reached, decided in advance.
+    pub exceeded: Option<String>,
+    /// Lift the limits for this many minutes, and no longer.
+    pub unrestricted_for: Option<u64>,
+}
+
+impl BandwidthAsked {
+    /// Whether this request changes anything, or only asks.
+    #[must_use]
+    pub const fn anything(&self) -> bool {
+        self.down.is_some()
+            || self.up.is_some()
+            || self.active.is_some()
+            || self.line.is_some()
+            || self.cap.is_some()
+            || self.exceeded.is_some()
+            || self.unrestricted_for.is_some()
+    }
 }
 
 /// What a quality command asks for.

@@ -367,13 +367,23 @@ pub const TAKES_ITEM: &[&str] = &["walkthrough"];
 /// season narrows.
 pub const TAKES_TERM: &[&str] = &["search"];
 
+/// The action whose command carries what the line may be shared as.
+///
+/// One action, seven arguments, and they are one group because they are one
+/// declaration: what each direction may take, when that applies, what the line
+/// carries to take a share of, what a month may cost, what happens at that cost,
+/// and how long the whole thing may be lifted for. Every one of them is optional
+/// and all of them absent is the reading, which is the request every surface makes
+/// first and the one nothing is written by.
+pub const TAKES_SHARING: &[&str] = &["bandwidth"];
+
 /// The argument this action's command has nowhere to put, where one was given.
 ///
 /// Only for a name this surface offers — a name it does not offer is absent before
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 33] = [
+    let carried: [(&str, bool, &[&str]); 40] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -415,6 +425,17 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("days", given.days.is_some(), TAKES_POLICY),
         ("request", given.request.is_some(), TAKES_REQUEST),
         ("reason", given.reason.is_some(), TAKES_REASON),
+        ("down", given.down.is_some(), TAKES_SHARING),
+        ("up", given.up.is_some(), TAKES_SHARING),
+        ("active", given.active.is_some(), TAKES_SHARING),
+        ("line", given.line.is_some(), TAKES_SHARING),
+        ("cap", given.cap.is_some(), TAKES_SHARING),
+        ("exceeded", given.exceeded.is_some(), TAKES_SHARING),
+        (
+            "unrestricted_for",
+            given.unrestricted_for.is_some(),
+            TAKES_SHARING,
+        ),
     ];
     if !offered.contains(&action) {
         return None;

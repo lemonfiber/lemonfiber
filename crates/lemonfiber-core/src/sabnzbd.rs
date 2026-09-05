@@ -92,7 +92,9 @@ impl Sabnzbd {
 }
 
 mod accounts;
+mod metering;
 mod queue;
+mod throttling;
 
 #[cfg(test)]
 mod tests {

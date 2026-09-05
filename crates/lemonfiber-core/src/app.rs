@@ -26,6 +26,7 @@ pub mod apply;
 pub mod archives;
 mod asking;
 pub mod backup;
+mod bandwidth;
 pub mod bundle;
 mod command;
 pub mod conditions;
@@ -68,7 +69,7 @@ mod upgrade;
 mod walkthrough;
 pub mod watch;
 
-pub use command::{Allowance, Answer, Chosen, Command, Decision, QualityAction};
+pub use command::{Allowance, Answer, BandwidthAsked, Chosen, Command, Decision, QualityAction};
 pub use ctx::Ctx;
 pub use setup::SetupAction;
 
@@ -130,6 +131,8 @@ pub enum Outcome {
     Space(crate::space::Reckoning),
     /// What letting one completed download go would cost, and what became of it.
     Letting(crate::space::Letting),
+    /// How the line is shared, what that costs, and whether the clients keep to it.
+    Bandwidth(crate::bandwidth::Sharing),
     /// What each service is doing.
     Status(StatusReport),
     /// What the diagnostic checks found.
@@ -184,6 +187,7 @@ impl Outcome {
             Self::Stored(_) => crate::model::kind::STORED,
             Self::Space(_) => kind::SPACE,
             Self::Letting(_) => kind::STOP_SEEDING,
+            Self::Bandwidth(_) => kind::BANDWIDTH,
             Self::Status(_) => crate::model::kind::STATUS,
             Self::Doctor(_) => kind::DOCTOR,
             Self::Repair(_) => kind::REPAIR,
@@ -226,6 +230,7 @@ impl serde::Serialize for Outcome {
             Self::Stored(report) => report.serialize(serializer),
             Self::Space(report) => report.serialize(serializer),
             Self::Letting(offer) => offer.serialize(serializer),
+            Self::Bandwidth(report) => report.serialize(serializer),
             Self::Status(report) => report.serialize(serializer),
             Self::Doctor(report) => report.serialize(serializer),
             Self::Repair(report) => report.serialize(serializer),
@@ -415,6 +420,11 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             download,
             agreement,
         } => letting(ctx, download, agreement).await,
+        // And the same shape over the line rather than the disk: asked nothing it
+        // reads, asked for a limit it declares one and tells every client.
+        Command::Bandwidth(asked) => bandwidth::bandwidth(ctx, &asked)
+            .await
+            .map(Outcome::Bandwidth),
         // Held open until the location is lost, which is what a guard is. The
         // interval is this command's own rather than the caller's: a surface that
         // could choose it could choose one that misses the moment it exists for.
@@ -454,8 +464,8 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Allowance, Answer as Ruling, Chosen, Command, Ctx, Decision,
-        Outcome, QualityAction, SetupAction, VersionReport, Waiting,
+        dispatch, pull_progress, Allowance, Answer as Ruling, BandwidthAsked, Chosen, Command, Ctx,
+        Decision, Outcome, QualityAction, SetupAction, VersionReport, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -2189,6 +2199,22 @@ mod tests {
         );
     }
 
+    /// Asking about the line arrives at the command that answers about it.
+    ///
+    /// Dispatched here as well as from `tests/`: this file is compiled twice, and
+    /// the arm joining a command to its handler is a line of each copy — so the
+    /// copy that never dispatched it counts the arm as never run. What the command
+    /// does is settled beside the command itself; this is about arriving there.
+    #[tokio::test]
+    async fn asking_about_the_line_reaches_the_command_that_reads_it() {
+        let ctx = a_context().build();
+        let read = dispatch(Command::Bandwidth(BandwidthAsked::default()), &ctx).await;
+        assert!(
+            matches!(&read, Ok(Outcome::Bandwidth(shared)) if !shared.applied),
+            "a run that asked for nothing wrote nothing: {read:?}"
+        );
+    }
+
     /// A context that runs against the checked-out stack, in rehearsal.
     fn rehearsing(protocols: crate::config::Protocols) -> Ctx {
         let settings = Settings {
@@ -2228,6 +2254,7 @@ mod tests {
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
+                | Outcome::Bandwidth(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -2273,6 +2300,7 @@ mod tests {
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
+                | Outcome::Bandwidth(_)
                 | Outcome::Status(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)
@@ -3098,6 +3126,7 @@ mod tests {
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
+                | Outcome::Bandwidth(_)
                 | Outcome::Status(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
@@ -4097,6 +4126,7 @@ mod tests {
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
+                | Outcome::Bandwidth(_)
                 | Outcome::Doctor(_)
                 | Outcome::Repair(_)
                 | Outcome::Undo(_)

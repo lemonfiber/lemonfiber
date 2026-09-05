@@ -77,6 +77,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::outbound,
     },
     Entry {
+        accessor: "bandwidth",
+        what: "what the line was declared to carry",
+        why: "The share of the connection the stack was told to keep to, the hours it keeps \
+              them, and what the line has been seen to carry. Nothing about what was moved \
+              over it — only how much, and when.",
+        secret: false,
+        at: Paths::bandwidth,
+    },
+    Entry {
         accessor: "journal",
         what: "the change journal",
         why: "What the last run wrote, so a repair can be put back. The fields that changed and \

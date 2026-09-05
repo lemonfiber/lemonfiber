@@ -124,6 +124,16 @@ impl Paths {
         self.config.join("notifications.json")
     }
 
+    /// What the household declared about its line: the limits, the hours, the cap,
+    /// and what the line has been seen to carry. Kept with configuration for the
+    /// same reasons the quality choice is, and for one of its own — the measured
+    /// capacity is learned by watching over weeks, so a restore that lost it would
+    /// leave every share resolving to nothing until the stack had watched again.
+    #[must_use]
+    pub fn bandwidth(&self) -> PathBuf {
+        self.config.join("bandwidth.json")
+    }
+
     /// The choices the operator answered whose cost was stated to them once —
     /// running with no VPN, or with a provider that forwards no port. Kept with
     /// configuration because it records a decision, and a backup that restored the
@@ -229,6 +239,7 @@ mod tests {
             paths.materialised(),
             paths.quality(),
             paths.notifications(),
+            paths.bandwidth(),
             paths.accepted(),
             paths.admission(),
         ];
@@ -313,6 +324,19 @@ mod tests {
     }
 
     #[test]
+    fn what_the_household_declared_about_its_line_sits_beside_the_env_file() {
+        // The bandwidth command derives where it keeps the declaration the same way
+        // the quality command does, and this ties that formula to the layout's own
+        // `bandwidth()` — so a backup that captures the configuration directory
+        // carries it, and a restore does not throw away weeks of watching the line.
+        let paths = paths();
+        assert_eq!(
+            paths.env_file().with_file_name("bandwidth.json"),
+            paths.bandwidth()
+        );
+    }
+
+    #[test]
     fn every_location_is_distinct() {
         let paths = paths();
         let all = [
@@ -322,6 +346,7 @@ mod tests {
             paths.baseline(),
             paths.materialised(),
             paths.quality(),
+            paths.bandwidth(),
             paths.admission(),
             paths.stack(),
             paths.service_config(),
