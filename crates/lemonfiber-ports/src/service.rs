@@ -20,6 +20,7 @@ mod failure;
 mod fetching;
 mod household;
 mod metering;
+mod notices;
 mod providers;
 mod quality;
 mod subtitles;
@@ -44,6 +45,7 @@ pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Unrated,
 };
 pub use metering::{Metering, Moved};
+pub use notices::Noticing;
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };

@@ -19,6 +19,7 @@ use serde::Deserialize;
 
 mod asking;
 mod members;
+mod notices;
 mod records;
 
 use members::{approves_own, MemberResource, LINK_MEMBERS, MEMBERS, NOT_FOUND};
