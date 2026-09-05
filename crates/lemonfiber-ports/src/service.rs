@@ -17,6 +17,7 @@ mod asking;
 mod catalogue;
 mod clients;
 mod failure;
+mod fetching;
 mod household;
 mod metering;
 mod providers;
@@ -38,6 +39,7 @@ pub use failure::{
     Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
     SERVICE_UNSUPPORTED,
 };
+pub use fetching::{Fetching, Pulling};
 pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Unrated,
 };

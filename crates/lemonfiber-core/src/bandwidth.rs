@@ -44,9 +44,9 @@ pub mod limit;
 pub mod respite;
 pub mod rhythm;
 
-pub use cap::{Cap, Metered, Reached, WhenExceeded};
+pub use cap::{Cap, Metered, Reached, WhenExceeded, CRAWL};
 pub use capacity::Capacity;
-pub use holding::{Answer, Held, Holding, Verdict};
+pub use holding::{Answer, Held, Holding, Pulling, Verdict};
 pub use limit::{Limit, Resolved};
 pub use respite::Respite;
 pub use rhythm::{Period, Rhythm, Wall};
@@ -182,7 +182,8 @@ impl Restraint {
     }
 }
 
-/// Everything the operator has declared about the line, kept between runs.
+/// Everything the operator has declared about the line, kept between runs — and
+/// the one thing lemonfiber records about itself.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Declared {
     /// The download limit, where one was declared.
@@ -203,6 +204,15 @@ pub struct Declared {
     /// A temporary override, where one is outstanding.
     #[serde(default)]
     pub respite: Option<Respite>,
+    /// Whether the last run stopped the clients because the cap was spent.
+    ///
+    /// The one field here nobody declared. It exists so that what lemonfiber
+    /// stopped is the only thing lemonfiber starts again: an operator who paused a
+    /// client by hand for reasons of their own must not find it running because a
+    /// month turned over, and a run that started everything it found stopped would
+    /// do exactly that.
+    #[serde(default)]
+    pub stopped: bool,
 }
 
 impl Declared {
@@ -310,6 +320,8 @@ pub struct Sharing {
     pub clients: Vec<Holding>,
     /// What throttling the upload costs, where an upload limit is in force.
     pub ratio: Option<&'static str>,
+    /// What a spent cap is doing to the figures above, where one is spent.
+    pub acting: Option<&'static str>,
     /// What is outside every limit here.
     pub untouched: Vec<&'static str>,
     /// Whether this run wrote the limits to the clients or only read them.
@@ -325,22 +337,20 @@ pub struct Sharing {
 pub fn weigh(measured: &Measured) -> Sharing {
     let declared = &measured.declared;
     let capacity = declared.capacity;
-    let down = Reading::of(
-        Declared::or_unlimited(declared.down),
-        capacity.map(|line| line.down),
-    );
-    let up = Reading::of(
-        Declared::or_unlimited(declared.up),
-        capacity.map(|line| line.up),
-    );
-
-    let respite = declared.respite.map_or(respite::Standing::None, |asked| {
-        asked.standing(measured.now)
-    });
     let reached = declared
         .cap
         .zip(measured.metered.as_ref())
         .map(|(cap, month)| cap.reached(month.moved()));
+    // The figures a spent cap leaves in force rather than the ones declared, so
+    // that what the report shows and what the clients were handed are the same
+    // pair — read off one function so they cannot come apart.
+    let (down, up) = in_force(declared, reached);
+    let down = Reading::of(down, capacity.map(|line| line.down));
+    let up = Reading::of(up, capacity.map(|line| line.up));
+
+    let respite = declared.respite.map_or(respite::Standing::None, |asked| {
+        asked.standing(measured.now)
+    });
 
     let restraint = Restraint::reached(
         declared.limited(),
@@ -359,6 +369,7 @@ pub fn weigh(measured: &Measured) -> Sharing {
         // The consequence is read off the limit rather than set beside it, so a
         // throttled upload can never be reported without what it costs.
         ratio: (up.limit != Limit::Unlimited).then_some(SLOWED_SEEDING),
+        acting: at_the_cap(declared, reached).map(WhenExceeded::at_the_cap),
         down,
         up,
         rhythm: declared.rhythm,
@@ -371,6 +382,52 @@ pub fn weigh(measured: &Measured) -> Sharing {
         clients: measured.clients.clone(),
         untouched: UNTOUCHED.to_vec(),
         applied: measured.applied,
+    }
+}
+
+/// What was chosen for a cap, where one is declared and spent.
+///
+/// The one place that decides a cap is being acted on, so the report, the limits
+/// handed to the clients and the request to stop them cannot disagree about
+/// whether the month is over.
+#[must_use]
+pub fn at_the_cap(declared: &Declared, reached: Option<Reached>) -> Option<WhenExceeded> {
+    matches!(reached, Some(Reached::Exceeded))
+        .then(|| declared.cap.map(|cap| cap.exceeded))
+        .flatten()
+}
+
+/// What both directions come to once a spent cap has had its say.
+#[must_use]
+pub fn in_force(declared: &Declared, reached: Option<Reached>) -> (Limit, Limit) {
+    let spent = at_the_cap(declared, reached);
+    let capacity = declared.capacity;
+    (
+        crawling(
+            Declared::or_unlimited(declared.down),
+            capacity.map(|line| line.down),
+            spent,
+        ),
+        crawling(
+            Declared::or_unlimited(declared.up),
+            capacity.map(|line| line.up),
+            spent,
+        ),
+    )
+}
+
+/// One direction's limit once a spent cap has had its say.
+///
+/// Only throttling moves a figure, and only downwards. A crawl written over a
+/// limit already below it would be a spent cap making the stack faster, which is
+/// the one direction a cap may never move anything.
+fn crawling(limit: Limit, carried: Option<u64>, spent: Option<WhenExceeded>) -> Limit {
+    if spent != Some(WhenExceeded::Throttle) {
+        return limit;
+    }
+    match limit.against(carried) {
+        Resolved::At(bytes) if bytes <= CRAWL => limit,
+        Resolved::At(_) | Resolved::Unlimited | Resolved::Unmeasured => Limit::Absolute(CRAWL),
     }
 }
 
@@ -441,7 +498,7 @@ fn period(measured: &Measured) -> Option<Period> {
 #[cfg(test)]
 mod tests {
     use super::{
-        cap::{Cap, Metered, Reached, WhenExceeded},
+        cap::{Cap, Metered, Reached, WhenExceeded, CRAWL},
         capacity::{Capacity, Source},
         holding::{Answer, Held, Holding},
         limit::Limit,
@@ -474,6 +531,7 @@ mod tests {
                 cap: None,
                 capacity: Some(a_line()),
                 respite: None,
+                stopped: false,
             },
             now: NOW,
             zone: Some("Europe/Amsterdam".to_owned()),
@@ -490,6 +548,7 @@ mod tests {
             answer: Answer::Silent {
                 said: "connection refused".to_owned(),
             },
+            pulling: None,
         }
     }
 
@@ -502,6 +561,7 @@ mod tests {
                 up: Held::of(Some(100), Some(100), Some(50), true),
                 period,
             },
+            pulling: None,
         }
     }
 
@@ -623,6 +683,67 @@ mod tests {
         assert_eq!(weigh(&metered).restraint, Restraint::ScheduledActive);
     }
 
+    /// The same household, with a cap of a hundred bytes already spent.
+    fn a_spent_month(exceeded: WhenExceeded) -> Measured {
+        let mut spent = a_household();
+        spent.declared.cap = Some(Cap {
+            monthly: 100,
+            exceeded,
+        });
+        spent.metered = Some(Metered::of("2026-09", 100, 0, Vec::new()));
+        spent
+    }
+
+    #[test]
+    fn a_spent_cap_that_chose_a_crawl_is_what_the_report_shows_in_force() {
+        // The figures shown are the ones the clients were handed, off the same
+        // function, so the report cannot describe a limit nothing is keeping.
+        let shared = weigh(&a_spent_month(WhenExceeded::Throttle));
+        assert_eq!(shared.down.resolved, Resolved::At(CRAWL));
+        assert_eq!(shared.up.resolved, Resolved::At(CRAWL));
+        assert!(
+            shared
+                .acting
+                .is_some_and(|said| said.contains("crawl")
+                    && said.contains("rather than the ones you declared")),
+            "and it says the figures are not the declared ones"
+        );
+    }
+
+    #[test]
+    fn a_crawl_never_speeds_up_a_limit_that_was_already_slower() {
+        // The one direction a spent cap may never move anything.
+        let mut slow = a_spent_month(WhenExceeded::Throttle);
+        slow.declared.down = Some(Limit::Absolute(1_024));
+        assert_eq!(weigh(&slow).down.resolved, Resolved::At(1_024));
+    }
+
+    #[test]
+    fn a_share_of_a_line_nothing_measured_still_becomes_a_crawl_at_a_spent_cap() {
+        // Tightening, which is the only direction this may err in: a share that
+        // resolved to nothing would otherwise leave a spent month unlimited.
+        let mut unmeasured = a_spent_month(WhenExceeded::Throttle);
+        unmeasured.declared.capacity = None;
+        assert_eq!(weigh(&unmeasured).down.resolved, Resolved::At(CRAWL));
+    }
+
+    #[test]
+    fn the_other_two_answers_to_a_spent_cap_leave_every_figure_where_it_was() {
+        for choice in [WhenExceeded::Pause, WhenExceeded::Continue] {
+            let shared = weigh(&a_spent_month(choice));
+            assert_eq!(
+                shared.down.resolved,
+                Resolved::At(5 * 1024 * 1024),
+                "{choice:?}"
+            );
+            assert!(shared.acting.is_some(), "{choice:?}");
+        }
+        assert!(
+            weigh(&a_household()).acting.is_none(),
+            "and a month nothing is over says nothing about a cap"
+        );
+    }
+
     #[test]
     fn a_cap_with_nothing_counting_against_it_is_not_a_verdict() {
         // Declaring a cap on a stack whose clients cannot be read is not the same
@@ -682,6 +803,7 @@ mod tests {
                 up: Held::of(None, None, Some(2 * 1024 * 1024), true),
                 period: None,
             },
+            pulling: None,
         };
         assert!(super::observed(&[free], NOW, false)
             .is_some_and(|seen| seen.down == 20 * 1024 * 1024 && seen.up == 2 * 1024 * 1024));

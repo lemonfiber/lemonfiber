@@ -151,6 +151,31 @@ pub enum Answer {
     },
 }
 
+/// Whether a client is fetching at all, where a cap made it a question.
+///
+/// Apart from the limits above rather than folded in with them, because it answers
+/// a different question and a client held to a crawl is not a client that stopped.
+/// A word that named both would be the vocabulary this whole path exists to avoid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Pulling {
+    /// It is fetching, or would start on the next thing handed to it.
+    Fetching,
+    /// Nothing is moving and nothing new would start.
+    Stopped,
+}
+
+impl Pulling {
+    /// What this means for the household, in the words it is shown in.
+    #[must_use]
+    pub const fn means(self) -> &'static str {
+        match self {
+            Self::Fetching => "fetching",
+            Self::Stopped => "stopped, and taking nothing new",
+        }
+    }
+}
+
 /// One download client, and what became of the limits it was given.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Holding {
@@ -158,12 +183,21 @@ pub struct Holding {
     pub client: String,
     /// What it said.
     pub answer: Answer,
+    /// Whether it is fetching at all, where a declared cap made that a question.
+    ///
+    /// Absent on a stack with no cap rather than assumed to be fetching: asking
+    /// every client whether it has stopped, on a stack where nothing would ever
+    /// stop it, is traffic spent on a figure nothing would act on.
+    pub pulling: Option<Pulling>,
 }
 
 impl Holding {
     /// Whether anything about this client is worth putting in front of an operator.
     #[must_use]
     pub fn worth_saying(&self) -> bool {
+        if self.pulling == Some(Pulling::Stopped) {
+            return true;
+        }
         match &self.answer {
             Answer::Silent { .. } => true,
             Answer::Held { down, up, .. } => {
@@ -175,7 +209,7 @@ impl Holding {
 
 #[cfg(test)]
 mod tests {
-    use super::{Answer, Held, Holding, Verdict, TOLERANCE};
+    use super::{Answer, Held, Holding, Pulling, Verdict, TOLERANCE};
     use crate::bandwidth::rhythm::Period;
 
     /// A megabyte a second, which every case here is measured against.
@@ -274,8 +308,35 @@ mod tests {
             answer: Answer::Silent {
                 said: "connection refused".to_owned(),
             },
+            pulling: None,
         };
         assert!(silent.worth_saying());
+    }
+
+    #[test]
+    fn a_client_that_has_been_stopped_is_always_worth_saying_however_well_it_holds() {
+        // Its limits are perfect because it is not fetching, and a report that
+        // showed only the limits would be a stack silently doing nothing.
+        let stopped = Holding {
+            client: "sabnzbd".to_owned(),
+            answer: Answer::Held {
+                down: Held::of(Some(LIMIT), Some(LIMIT), Some(0), true),
+                up: Held::of(None, None, None, false),
+                period: None,
+            },
+            pulling: Some(Pulling::Stopped),
+        };
+        assert!(stopped.worth_saying());
+        assert!(stopped
+            .pulling
+            .is_some_and(|held| held.means().contains("nothing new")));
+
+        let going = Holding {
+            pulling: Some(Pulling::Fetching),
+            ..stopped
+        };
+        assert!(!going.worth_saying());
+        assert!(going.pulling.is_some_and(|held| held.means() == "fetching"));
     }
 
     #[test]
@@ -287,6 +348,7 @@ mod tests {
                 up: Held::of(Some(LIMIT), Some(LIMIT), Some(0), true),
                 period: Some(Period::Quiet),
             },
+            pulling: None,
         };
         assert!(!quiet.worth_saying());
     }

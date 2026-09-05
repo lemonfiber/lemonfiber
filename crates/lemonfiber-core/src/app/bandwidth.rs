@@ -18,9 +18,17 @@
 //! What the line carries is raised as it goes. A client that was moving with
 //! nothing holding it back has just measured the line, at no cost and disturbing
 //! nobody, and that reading is better than any figure this could ask for.
+//!
+//! One thing besides a request makes this write, and it is a decision the operator
+//! already took: a month spent against a declared cap. What to do at a cap is
+//! chosen when the cap is, precisely so that nobody has to choose at two in the
+//! morning — and a run that read the figure, found the month over and handed the
+//! clients the declared limits anyway would be that decision taken and never
+//! carried out.
 
 use crate::bandwidth::{
-    weigh, Declared, Metered, Reading, Sharing, NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE,
+    at_the_cap, in_force, weigh, Declared, Metered, Reached, Reading, Sharing, WhenExceeded,
+    NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE,
 };
 use crate::config::store;
 use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
@@ -29,6 +37,7 @@ use crate::ports::service::{Rates, Wanted, Window};
 use super::command::BandwidthAsked as Asked;
 use super::targets::{download_targets, project_directory};
 use super::Ctx;
+use reaching::Fetch;
 
 mod reaching;
 mod revising;
@@ -51,7 +60,6 @@ const ZONE: &str = "TZ";
 /// stack with no zone, or where there is no download client to limit.
 pub(super) async fn bandwidth(ctx: &Ctx, asked: &Asked) -> Result<Sharing, Box<Problem>> {
     let now = now(ctx);
-    let changing = asked.anything();
     let declared = revising::revised(now, recorded(ctx), asked)?;
 
     let stack = ctx
@@ -63,25 +71,46 @@ pub(super) async fn bandwidth(ctx: &Ctx, asked: &Asked) -> Result<Sharing, Box<P
     let clients = reaching::opened(ctx, &targets).await;
     let zone = zone(ctx);
 
-    if changing {
+    let metered = counting(ctx, &clients, &declared).await;
+    let reached = declared
+        .cap
+        .zip(metered.as_ref())
+        .map(|(cap, month)| cap.reached(month.moved()));
+    let spent = at_the_cap(&declared, reached);
+
+    // The three refusals are about the request, so only a request answers for
+    // them. A run that asked for nothing and found a month over has nothing to
+    // turn away — and refusing to report a spent cap because the clients could not
+    // be opened would withhold exactly the reading somebody needed.
+    if asked.anything() {
         possible(&declared, &clients, zone.as_deref())?;
     }
+
+    // A spent cap turns a run that asked for nothing into one that writes, and it
+    // is the only thing that does. The whole of what declaring a cap buys is that
+    // the answer was settled in advance and is carried out when the month runs out
+    // rather than argued about then — so a run that read the figure, found the
+    // month over and handed the clients the declared limits anyway would be a
+    // decision taken and never applied.
+    let changing = asked.anything() || spent.is_some();
 
     // A respite lifts the limits rather than changing them, so what the clients
     // are told is nothing at all until it runs out.
     let lifted = declared
         .respite
         .is_some_and(|respite| respite.standing(now).lifting());
-    let wanted = wanted(&declared, lifted);
+    let wanted = wanted(&declared, lifted, reached);
 
     let writing = changing && !ctx.dry_run;
+    let fetch = declared
+        .cap
+        .map(|_| fetch(spent, declared.stopped, writing));
     let mut holding = Vec::new();
     for client in &clients {
-        holding.push(reaching::holding(client, &wanted, writing).await);
+        holding.push(reaching::holding(client, &wanted, fetch, writing).await);
     }
 
-    let metered = counting(ctx, &clients, &declared).await;
-    let declared = settled(declared, &holding, now, tunnelled(&stack));
+    let declared = settled(declared, &holding, now, tunnelled(&stack), spent, writing);
     // A rehearsal reports what it would declare and records nothing, which is the
     // promise every other write in this product makes. Every other run keeps the
     // record, including one that only read: what the line was seen to carry is
@@ -140,8 +169,12 @@ fn possible(
 /// what the household's day is *for*: the whole point of declaring one is to have
 /// the line back when nobody is using it, and a stack that stayed throttled
 /// overnight would be a stack somebody switches the limits off on.
-fn wanted(declared: &Declared, lifted: bool) -> Wanted {
-    if lifted {
+fn wanted(declared: &Declared, lifted: bool, reached: Option<Reached>) -> Wanted {
+    let spent = at_the_cap(declared, reached);
+    // A spent cap outranks an override, the same way it outranks everything else
+    // true of a metered line: it is the one with a bill behind it, and lifting the
+    // limits for an hour is not a thing to do to a month that is already over.
+    if lifted && spent.is_none() {
         return Wanted {
             active: Rates::default(),
             quiet: Rates::default(),
@@ -149,19 +182,22 @@ fn wanted(declared: &Declared, lifted: bool) -> Wanted {
         };
     }
     let capacity = declared.capacity;
-    let down = Reading::of(
-        Declared::or_unlimited(declared.down),
-        capacity.map(|line| line.down),
-    );
-    let up = Reading::of(
-        Declared::or_unlimited(declared.up),
-        capacity.map(|line| line.up),
-    );
+    let (down, up) = in_force(declared, reached);
+    let rates = Rates {
+        down: Reading::of(down, capacity.map(|line| line.down)).bytes(),
+        up: Reading::of(up, capacity.map(|line| line.up)).bytes(),
+    };
+    // A crawl runs around the clock. The month is over whatever hour it is, and a
+    // household's quiet hours are not extra allowance.
+    if spent == Some(WhenExceeded::Throttle) {
+        return Wanted {
+            active: rates,
+            quiet: rates,
+            window: None,
+        };
+    }
     Wanted {
-        active: Rates {
-            down: down.bytes(),
-            up: up.bytes(),
-        },
+        active: rates,
         quiet: Rates::default(),
         window: declared.rhythm.map(|rhythm| Window {
             from_hour: rhythm.from.hour(),
@@ -172,14 +208,45 @@ fn wanted(declared: &Declared, lifted: bool) -> Wanted {
     }
 }
 
+/// What this run is to do about the clients' fetching.
+///
+/// Stopping never consults the record: while the cap says stop, every run says so
+/// again, so a client somebody started by hand in the middle of a spent month is
+/// stopped rather than left as the one exception nobody remembers making.
+///
+/// Starting always consults it. A client lemonfiber never stopped is one an
+/// operator stopped for reasons of their own, and a run that started everything it
+/// found stopped would undo a deliberate act on the strength of a month turning
+/// over.
+fn fetch(spent: Option<WhenExceeded>, stopped: bool, writing: bool) -> Fetch {
+    if !writing {
+        return Fetch::Ask;
+    }
+    if spent.is_some_and(WhenExceeded::stops) {
+        return Fetch::Stop;
+    }
+    if stopped {
+        return Fetch::Resume;
+    }
+    Fetch::Ask
+}
+
 /// The declaration with whatever this run learned about the line folded into it.
 fn settled(
     declared: Declared,
     holding: &[crate::bandwidth::Holding],
     now: u64,
     tunnelled: bool,
+    spent: Option<WhenExceeded>,
+    writing: bool,
 ) -> Declared {
     let mut settled = declared;
+    // Only a run that told the clients something records what it told them. A
+    // rehearsal that wrote this down would leave the next run starting clients
+    // nothing had ever stopped.
+    if writing {
+        settled.stopped = spent.is_some_and(WhenExceeded::stops);
+    }
     if let Some(seen) = crate::bandwidth::observed(holding, now, tunnelled) {
         settled.capacity = Some(settled.capacity.map_or(seen, |held| held.raised_by(seen)));
     }
@@ -326,11 +393,11 @@ fn no_zone() -> Problem {
 mod tests {
     use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
-    use super::{bandwidth, counting, possible, settled, wanted, zone, Asked};
+    use super::{bandwidth, counting, fetch, possible, settled, wanted, zone, Asked, Fetch};
     use crate::bandwidth::capacity::Source;
     use crate::bandwidth::{
-        Answer, Cap, Capacity, Declared, Held, Holding, Limit, Respite, Restraint, Rhythm,
-        WhenExceeded, NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE, UNREADABLE,
+        Answer, Cap, Capacity, Declared, Held, Holding, Limit, Pulling, Reached, Respite,
+        Restraint, Rhythm, WhenExceeded, NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE, UNREADABLE,
     };
     use crate::config::Settings;
     use crate::ports::service::Rates;
@@ -346,6 +413,11 @@ mod tests {
     /// are written to a real disk and these cases run at the same time, so two
     /// sharing a directory would be one wiping the other's while it read it.
     fn a_stack(scratch: &str, tz: Option<&str>) -> crate::app::Ctx {
+        stacked(scratch, tz, a_transport())
+    }
+
+    /// The same stack, over a transport the case can read its requests back from.
+    fn stacked(scratch: &str, tz: Option<&str>, http: std::sync::Arc<Fake>) -> crate::app::Ctx {
         let env = env_at(&format!("bandwidth-{scratch}"), &a_password());
         if let Some(zone) = tz {
             assert!(crate::config::store::set(&env, "TZ", zone).is_ok());
@@ -356,30 +428,39 @@ mod tests {
                 ..Settings::default()
             })
             .build()
-            .with_http(Fake::by_path(vec![
-                ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
-                (
-                    "/api/v2/app/setPreferences",
-                    Replies::reply(200, String::new()),
+            .with_http(http)
+    }
+
+    /// What the torrent client answers every question this command asks it.
+    fn a_transport() -> std::sync::Arc<Fake> {
+        Fake::by_path(vec![
+            ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
+            (
+                "/api/v2/app/setPreferences",
+                Replies::reply(200, String::new()),
+            ),
+            (
+                "/api/v2/app/preferences",
+                Replies::reply(
+                    200,
+                    r#"{"dl_limit":0,"up_limit":0,"alt_dl_limit":0,
+                            "alt_up_limit":0,"scheduler_enabled":false,
+                            "add_stopped_enabled":true}"#,
                 ),
-                (
-                    "/api/v2/app/preferences",
-                    Replies::reply(
-                        200,
-                        r#"{"dl_limit":0,"up_limit":0,"alt_dl_limit":0,
-                            "alt_up_limit":0,"scheduler_enabled":false}"#,
-                    ),
+            ),
+            ("/api/v2/torrents/info", Replies::reply(200, "[]")),
+            ("/api/v2/torrents/stop", Replies::reply(200, String::new())),
+            ("/api/v2/torrents/start", Replies::reply(200, String::new())),
+            ("/api/v2/transfer/speedLimitsMode", Replies::reply(200, "0")),
+            (
+                "/api/v2/transfer/info",
+                Replies::reply(
+                    200,
+                    r#"{"dl_info_speed":20971520,"up_info_speed":2097152,
+                        "dl_info_data":900,"up_info_data":80}"#,
                 ),
-                ("/api/v2/transfer/speedLimitsMode", Replies::reply(200, "0")),
-                (
-                    "/api/v2/transfer/info",
-                    Replies::reply(
-                        200,
-                        r#"{"dl_info_speed":20971520,"up_info_speed":2097152,
-                            "dl_info_data":900,"up_info_data":80}"#,
-                    ),
-                ),
-            ]))
+            ),
+        ])
     }
 
     /// A request naming one thing.
@@ -409,6 +490,7 @@ mod tests {
                 up,
                 period: None,
             },
+            pulling: None,
         }
     }
 
@@ -424,13 +506,113 @@ mod tests {
             capacity: Some(a_line()),
             ..Declared::default()
         };
-        let told = wanted(&declared, false);
+        let told = wanted(&declared, false, None);
         assert_eq!(told.active.down, Some(5 * 1024 * 1024));
         assert_eq!(told.active.up, Some(256 * 1024));
         assert_eq!(told.quiet, Rates::default());
         assert!(told.window.is_some_and(|window| window.from_hour == 7
             && window.to_hour == 23
             && window.to_minute == 0));
+    }
+
+    /// A cap of a hundred bytes with this chosen at it, which the fake client's
+    /// nine hundred and eighty moved bytes are well past.
+    fn spent(exceeded: WhenExceeded) -> Declared {
+        Declared {
+            down: Some(Limit::Share(50)),
+            up: Some(Limit::Share(25)),
+            rhythm: Rhythm::read("07:00-23:00"),
+            capacity: Some(a_line()),
+            cap: Some(Cap {
+                monthly: 100,
+                exceeded,
+            }),
+            ..Declared::default()
+        }
+    }
+
+    #[test]
+    fn a_spent_cap_that_chose_a_crawl_hands_the_clients_the_crawl_around_the_clock() {
+        // The month is over whatever hour it is, so there is no window left to
+        // switch on: a household's quiet hours are not extra allowance.
+        let told = wanted(
+            &spent(WhenExceeded::Throttle),
+            false,
+            Some(Reached::Exceeded),
+        );
+        assert_eq!(told.active.down, Some(crate::bandwidth::CRAWL));
+        assert_eq!(told.quiet.down, Some(crate::bandwidth::CRAWL));
+        assert!(told.window.is_none());
+    }
+
+    #[test]
+    fn a_spent_cap_that_chose_to_pause_leaves_the_declared_rate_where_it_was() {
+        // Stopping is not a rate, and writing one in its name is how `pause` comes
+        // to mean a very slow download. What the clients are told about speed is
+        // exactly what was declared; the stopping is a second request.
+        let told = wanted(&spent(WhenExceeded::Pause), false, Some(Reached::Exceeded));
+        assert_eq!(told.active.down, Some(5 * 1024 * 1024));
+        assert!(told.window.is_some());
+    }
+
+    #[test]
+    fn a_spent_cap_outranks_an_override_that_would_lift_the_limits() {
+        // The same order the headline is decided in: the cap is the one with a
+        // bill behind it, and an hour's amnesty is not a thing to grant a month
+        // that is already over.
+        let told = wanted(
+            &spent(WhenExceeded::Throttle),
+            true,
+            Some(Reached::Exceeded),
+        );
+        assert_eq!(told.active.down, Some(crate::bandwidth::CRAWL));
+
+        let inside = wanted(&spent(WhenExceeded::Throttle), true, Some(Reached::Within));
+        assert_eq!(
+            inside.active,
+            Rates::default(),
+            "an override still lifts them"
+        );
+    }
+
+    #[test]
+    fn stopping_never_consults_the_record_and_starting_always_does() {
+        // A client somebody started by hand in the middle of a spent month is
+        // stopped again; a client lemonfiber never stopped is one an operator
+        // stopped for reasons of their own, and is left exactly as they left it.
+        assert_eq!(fetch(Some(WhenExceeded::Pause), true, true), Fetch::Stop);
+        assert_eq!(fetch(Some(WhenExceeded::Pause), false, true), Fetch::Stop);
+        assert_eq!(
+            fetch(Some(WhenExceeded::Throttle), true, true),
+            Fetch::Resume
+        );
+        assert_eq!(fetch(None, true, true), Fetch::Resume);
+        assert_eq!(fetch(None, false, true), Fetch::Ask);
+        assert_eq!(
+            fetch(Some(WhenExceeded::Pause), false, false),
+            Fetch::Ask,
+            "a run that writes nothing asks and no more"
+        );
+    }
+
+    #[test]
+    fn only_a_run_that_told_the_clients_something_records_what_it_told_them() {
+        // A rehearsal that wrote this down would leave the next run starting
+        // clients nothing had ever stopped.
+        let stopped = settled(
+            Declared::default(),
+            &[],
+            NOW,
+            false,
+            Some(WhenExceeded::Pause),
+            true,
+        );
+        assert!(stopped.stopped);
+        assert!(!settled(stopped.clone(), &[], NOW, false, None, true).stopped);
+        assert!(
+            settled(stopped, &[], NOW, false, None, false).stopped,
+            "and a run that wrote nothing leaves the record as it found it"
+        );
     }
 
     #[test]
@@ -441,7 +623,7 @@ mod tests {
             rhythm: Rhythm::read("07:00-23:00"),
             ..Declared::default()
         };
-        let told = wanted(&declared, true);
+        let told = wanted(&declared, true, None);
         assert_eq!(told.active, Rates::default());
         assert_eq!(told.quiet, Rates::default());
         assert!(
@@ -500,7 +682,7 @@ mod tests {
             Held::of(None, None, Some(20 * 1024 * 1024), true),
             Held::of(None, None, Some(2 * 1024 * 1024), true),
         );
-        let settled = settled(Declared::default(), &[unrestrained], NOW, true);
+        let settled = settled(Declared::default(), &[unrestrained], NOW, true, None, false);
         assert!(settled
             .capacity
             .is_some_and(|line| line.down == 20 * 1024 * 1024
@@ -518,9 +700,11 @@ mod tests {
             Held::of(Some(1_000), Some(1_000), Some(1_000), true),
             Held::of(Some(100), Some(100), Some(100), true),
         );
-        assert!(settled(Declared::default(), &[held], NOW, false)
-            .capacity
-            .is_none());
+        assert!(
+            settled(Declared::default(), &[held], NOW, false, None, false)
+                .capacity
+                .is_none()
+        );
     }
 
     #[test]
@@ -529,13 +713,17 @@ mod tests {
             respite: Some(Respite { until: NOW - 1 }),
             ..Declared::default()
         };
-        assert!(settled(declared, &[], NOW, false).respite.is_none());
+        assert!(settled(declared, &[], NOW, false, None, false)
+            .respite
+            .is_none());
 
         let running = Declared {
             respite: Some(Respite { until: NOW + 1 }),
             ..Declared::default()
         };
-        assert!(settled(running, &[], NOW, false).respite.is_some());
+        assert!(settled(running, &[], NOW, false, None, false)
+            .respite
+            .is_some());
     }
 
     #[tokio::test]
@@ -804,6 +992,78 @@ mod tests {
         )
         .await;
         assert!(refused.is_err_and(|problem| problem.code == UNREADABLE));
+    }
+
+    #[tokio::test]
+    async fn a_spent_cap_is_acted_on_by_a_run_that_asked_for_nothing() {
+        // The whole of what declaring a cap buys. The choice was made in the calm;
+        // the month runs out at two in the morning, and the run that next reads the
+        // line is the one that carries it out — rather than reporting the month as
+        // over and handing the clients the declared limits anyway.
+        let ctx = a_stack("spent", None);
+        assert!(bandwidth(
+            &ctx,
+            &asking(|asked| {
+                asked.cap = Some("100".to_owned());
+                asked.exceeded = Some("pause".to_owned());
+            })
+        )
+        .await
+        .is_ok());
+
+        let shared = bandwidth(&ctx, &Asked::default()).await;
+        assert!(
+            shared.is_ok_and(|shared| shared.restraint == Restraint::CapExceeded
+                && shared.applied
+                && shared
+                    .acting
+                    .is_some_and(|said| said.contains("nothing new is fetched"))
+                && shared
+                    .clients
+                    .iter()
+                    .all(|client| client.pulling == Some(Pulling::Stopped))),
+            "a run that asked for nothing found the month over and stopped the clients"
+        );
+    }
+
+    #[tokio::test]
+    async fn what_lemonfiber_stopped_is_what_it_lets_fetch_again() {
+        let transport = a_transport();
+        let ctx = stacked("cap-lifted", None, transport.clone());
+        assert!(bandwidth(
+            &ctx,
+            &asking(|asked| {
+                asked.cap = Some("100".to_owned());
+                asked.exceeded = Some("pause".to_owned());
+            })
+        )
+        .await
+        .is_ok());
+        assert!(transport.asked_for("/torrents/stop"));
+
+        // The allowance is raised, so the month is no longer over and what was
+        // stopped for that reason is let go again.
+        let shared = bandwidth(&ctx, &asking(|asked| asked.cap = Some("1TiB".to_owned()))).await;
+        assert!(
+            shared.is_ok_and(
+                |shared| shared.reached == Some(Reached::Within) && shared.acting.is_none()
+            )
+        );
+        assert!(transport.asked_for("/torrents/start"));
+    }
+
+    #[tokio::test]
+    async fn a_stack_with_no_cap_is_never_asked_whether_it_is_fetching() {
+        // Traffic spent on a figure nothing would act on, and a question that
+        // would put a word in the report nothing on this stack could ever change.
+        let transport = a_transport();
+        let ctx = stacked("uncapped", None, transport.clone());
+        let shared = bandwidth(&ctx, &asking(|asked| asked.down = Some("2MiB".to_owned()))).await;
+        assert!(
+            shared.is_ok_and(|shared| shared.clients.iter().all(|client| client.pulling.is_none()))
+        );
+        assert!(!transport.asked_for("/torrents/stop"));
+        assert!(!transport.asked_for("filter=running"));
     }
 
     #[test]

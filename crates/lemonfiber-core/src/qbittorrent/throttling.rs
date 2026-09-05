@@ -24,7 +24,6 @@
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::ports::http::{Method, Request, Response};
 use crate::ports::service::{
     Failure, Hours, Metering, Moved, Rates, Throttled, Throttling, Wanted,
 };
@@ -72,26 +71,6 @@ struct Moving {
 }
 
 impl Qbittorrent {
-    /// Sign in with the recorded password, or say there is none to sign in with.
-    async fn signed_in(&self) -> Result<(), Failure> {
-        let password = self
-            .password
-            .as_deref()
-            .ok_or_else(|| self.endpoint.unauthorised())?;
-        self.login(password).await
-    }
-
-    /// A GET under the web UI API, sent and returned whole.
-    async fn get(&self, path: &str) -> Result<Response, Failure> {
-        let request = Request {
-            method: Method::Get,
-            url: self.endpoint.url(&format!("/api/v2{path}")),
-            headers: Vec::new(),
-            body: None,
-        };
-        self.endpoint.send(&request).await
-    }
-
     /// Whether the alternative limits — the household's active hours — are the
     /// ones in force this moment.
     ///

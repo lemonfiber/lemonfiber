@@ -209,6 +209,26 @@ impl Qbittorrent {
         }
     }
 
+    /// Sign in with the recorded password, or say there is none to sign in with.
+    async fn signed_in(&self) -> Result<(), Failure> {
+        let password = self
+            .password
+            .as_deref()
+            .ok_or_else(|| self.endpoint.unauthorised())?;
+        self.login(password).await
+    }
+
+    /// A GET under the web UI API, sent and returned whole.
+    async fn get(&self, path: &str) -> Result<crate::ports::http::Response, Failure> {
+        let request = Request {
+            method: Method::Get,
+            url: self.endpoint.url(&format!("/api/v2{path}")),
+            headers: Vec::new(),
+            body: None,
+        };
+        self.endpoint.send(&request).await
+    }
+
     /// Every completed torrent the client is holding, as it reports them.
     ///
     /// One listing behind both the read of what is being seeded and the removal of
@@ -408,6 +428,7 @@ fn download_of(torrent: TorrentInfo) -> Download {
     }
 }
 
+mod fetching;
 mod throttling;
 
 #[cfg(test)]

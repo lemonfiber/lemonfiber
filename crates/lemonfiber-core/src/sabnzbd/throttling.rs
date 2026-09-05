@@ -1,19 +1,21 @@
-//! Holding `SABnzbd` to a share of the line.
+//! Holding `SABnzbd` to a share of the line, on the household's own hours.
 //!
-//! Two things are true of this client and not of the torrent one, and both are
-//! reported rather than papered over.
+//! Two things are true of this client and not of the torrent one.
 //!
 //! **It does not upload.** Usenet is a download and nothing else, so an upload
 //! limit on it is not a limit it ignored — it is a limit with nothing to apply to,
 //! and the port carries the difference so a report can say which it met.
 //!
-//! **lemonfiber writes it no schedule.** `SABnzbd` has a scheduler of its own, but
-//! it is a list of dated instruction lines rather than a window, and writing one
-//! blind would mean rewriting whatever the operator already put there. So this
-//! client is held to the household's *active* rate around the clock. That is the
-//! conservative direction — the house is protected during the hours it is awake,
-//! and the stack gives up some of the small hours it could have had — and it is
-//! said in the report rather than left for somebody to notice from the throughput.
+//! **Its schedule is a list rather than a window.** qBittorrent keeps two sets of
+//! limits and switches between them; this client keeps dated instruction lines and
+//! switches the one limit it has. So the household's day becomes two lines — the
+//! active rate at the hour people get up, no limit at the hour they stop — written
+//! through [`super::scheduling`], which leaves every line the operator wrote alone.
+//!
+//! A window and a standing limit are the same setting reached two ways, so only one
+//! of them is ever in force: with a window the client's own scheduler owns the rate
+//! and nothing here writes it directly, and without one the rate is written directly
+//! and the schedule is emptied of anything that would move it.
 
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -21,7 +23,8 @@ use serde::Deserialize;
 use crate::ports::service::{Failure, Rates, Throttled, Throttling, Wanted};
 
 use super::queue::bytes_per_second;
-use super::Sabnzbd;
+use super::scheduling::{side, Turn};
+use super::{Sabnzbd, Wrote};
 
 /// `SABnzbd`'s `mode=queue` answer, read for the limit rather than the slots.
 ///
@@ -51,31 +54,25 @@ impl Throttling for Sabnzbd {
         let held: Limited = self
             .read("queue", "the rate limit could not be read")
             .await?;
+        let down = absolute(&held.queue.speedlimit_abs);
         Ok(Throttled {
-            rates: Rates {
-                down: absolute(&held.queue.speedlimit_abs),
-                up: None,
-            },
+            rates: Rates { down, up: None },
             uploads: false,
-            hours: None,
+            // Which side of the day it is on is read off its own schedule and its
+            // own limit, both as they stand this moment, rather than worked out
+            // from a clock this product does not have.
+            hours: side(&self.schedule_lines().await?, down.is_some()),
         })
     }
 
     async fn restrain(&self, wanted: &Wanted) -> Result<Throttled, Failure> {
-        // The active rate around the clock. There is no window to switch on,
-        // so the household's awake hours are the ones that hold — see the note
-        // at the top of this file for why that is the safe direction.
-        let value = kilobytes(wanted.active.down);
-        let wrote: Wrote = self
-            .read(
-                &format!("config&name=speedlimit&value={value}"),
-                "the rate limit could not be set",
-            )
-            .await?;
-        if !wrote.status {
-            return Err(self
-                .endpoint
-                .refused("the client answered that it did not take the rate limit"));
+        let turns = turns(wanted);
+        let scheduled = !turns.is_empty();
+        self.keeping(&turns).await?;
+        if !scheduled {
+            // Nothing switches the rate, so the rate is this client's standing one.
+            self.set_rate(kilobytes(wanted.active.down).as_str())
+                .await?;
         }
 
         // Read back rather than trusting that answer, the same as every other
@@ -95,15 +92,50 @@ impl Throttling for Sabnzbd {
     }
 }
 
-/// `SABnzbd`'s answer to a configuration write.
+impl Sabnzbd {
+    /// Write the standing rate limit, for a client with no window to switch on.
+    async fn set_rate(&self, value: &str) -> Result<(), Failure> {
+        let wrote: Wrote = self
+            .read(
+                &format!("config&name=speedlimit&value={value}"),
+                "the rate limit could not be set",
+            )
+            .await?;
+        if wrote.status {
+            return Ok(());
+        }
+        Err(self
+            .endpoint
+            .refused("the client answered that it did not take the rate limit"))
+    }
+}
+
+/// The schedule lines the household's day comes to, or none at all.
 ///
-/// The client answers a setting it would not take with a `false` here and a `200`
-/// around it, so the status is read rather than the request being called done
-/// because it arrived.
-#[derive(Deserialize)]
-struct Wrote {
-    #[serde(default)]
-    status: bool,
+/// None wherever there is nothing for a schedule to do: no window declared, or a
+/// window whose two sides come to the same limit. A pair of instructions that set
+/// one figure twice is a schedule that switches nothing while looking like a
+/// household's day, and it would report the client as keeping hours it does not.
+fn turns(wanted: &Wanted) -> Vec<Turn> {
+    let Some(window) = wanted.window else {
+        return Vec::new();
+    };
+    let (active, quiet) = (kilobytes(wanted.active.down), kilobytes(wanted.quiet.down));
+    if active == quiet {
+        return Vec::new();
+    }
+    vec![
+        Turn {
+            hour: window.from_hour,
+            minute: window.from_minute,
+            figure: active,
+        },
+        Turn {
+            hour: window.to_hour,
+            minute: window.to_minute,
+            figure: quiet,
+        },
+    ]
 }
 
 /// The client's `speedlimit_abs` as a limit, where it is one.
@@ -114,17 +146,19 @@ fn absolute(figure: &str) -> Option<u64> {
     figure.trim().parse::<u64>().ok().filter(|held| *held > 0)
 }
 
-/// A limit as the value `SABnzbd`'s own setting takes.
+/// A limit as the value `SABnzbd`'s own settings take.
 ///
 /// Written with its unit rather than as a bare number, which the client would read
 /// as a percentage where the operator has told it what their line carries — the
 /// one reading that would turn a two-megabyte limit into two per cent of the line.
 /// Rounded up, so a limit under a kilobyte becomes the smallest the client can
-/// hold rather than none at all.
+/// hold rather than none at all. Lower case, because a schedule line is stored in
+/// the case the client puts it in and a figure written any other way never matches
+/// what comes back.
 fn kilobytes(limit: Option<u64>) -> String {
     limit.map_or_else(
         || "0".to_owned(),
-        |bytes| format!("{}K", bytes.div_ceil(1024).max(1)),
+        |bytes| format!("{}k", bytes.div_ceil(1024).max(1)),
     )
 }
 
@@ -132,8 +166,8 @@ fn kilobytes(limit: Option<u64>) -> String {
 mod tests {
     use lemonfiber_fixtures::http::Fake;
 
-    use super::{absolute, kilobytes, Sabnzbd, Throttling, Wanted};
-    use crate::ports::service::Rates;
+    use super::{absolute, kilobytes, turns, Sabnzbd, Throttling, Wanted};
+    use crate::ports::service::{Hours, Rates, Window};
 
     /// A client whose transport answers each call from `replies` in order.
     fn client(replies: Vec<(u16, &'static str)>) -> Sabnzbd {
@@ -146,55 +180,141 @@ mod tests {
     /// The same client with nothing holding it back and nothing moving.
     const FREE: &str = r#"{"queue":{"speedlimit_abs":"","kbpersec":"0.00"}}"#;
 
-    #[tokio::test]
-    async fn a_usenet_client_has_a_download_limit_and_no_upload_to_have_one() {
-        // Not an upload limit it ignored — a limit with nothing to apply to, which
-        // is a different thing and reads differently in the report.
-        let held = client(vec![(200, LIMITED)]).throttled().await;
-        assert!(
-            held.is_ok_and(|held| held.rates.down == Some(1_048_576)
-                && held.rates.up.is_none()
-                && !held.uploads
-                && held.hours.is_none()),
-            "and it keeps no schedule lemonfiber writes, so it is on neither side of the day"
-        );
-    }
+    /// A schedule with nothing in it, and one holding the household's day.
+    const UNSCHEDULED: &str = r#"{"config":{"misc":{"schedlines":[]}}}"#;
+    const SCHEDULED: &str = r#"{"config":{"misc":{"schedlines":[
+        "1 0 7 1234567 speedlimit 1024k","1 0 23 1234567 speedlimit 0"]}}}"#;
 
-    #[tokio::test]
-    async fn nothing_holding_it_back_reads_as_no_limit_rather_than_a_limit_of_nothing() {
-        let held = client(vec![(200, FREE)]).throttled().await;
-        assert!(held.is_ok_and(|held| held.rates == Rates::default()));
-    }
+    /// What the client answers a write it carried out.
+    const DID: &str = r#"{"status":true}"#;
 
-    #[tokio::test]
-    async fn the_active_rate_is_what_it_is_held_to_and_the_answer_is_read_back() {
-        // There is no window to switch on, so the hours the household is awake are
-        // the ones that hold — the conservative direction.
-        let wanted = Wanted {
+    /// The household's day, as the command hands it over.
+    fn a_household() -> Wanted {
+        Wanted {
             active: Rates {
                 down: Some(1_048_576),
                 up: Some(1),
             },
             quiet: Rates::default(),
+            window: Some(Window {
+                from_hour: 7,
+                from_minute: 0,
+                to_hour: 23,
+                to_minute: 0,
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_usenet_client_has_a_download_limit_and_no_upload_to_have_one() {
+        // Not an upload limit it ignored — a limit with nothing to apply to, which
+        // is a different thing and reads differently in the report.
+        let held = client(vec![(200, LIMITED), (200, UNSCHEDULED)])
+            .throttled()
+            .await;
+        assert!(
+            held.is_ok_and(|held| held.rates.down == Some(1_048_576)
+                && held.rates.up.is_none()
+                && !held.uploads
+                && held.hours.is_none()),
+            "and with nothing switching its rate it is on neither side of the day"
+        );
+    }
+
+    #[tokio::test]
+    async fn nothing_holding_it_back_reads_as_no_limit_rather_than_a_limit_of_nothing() {
+        let held = client(vec![(200, FREE), (200, UNSCHEDULED)])
+            .throttled()
+            .await;
+        assert!(held.is_ok_and(|held| held.rates == Rates::default()));
+    }
+
+    #[tokio::test]
+    async fn a_client_keeping_the_household_s_hours_says_which_side_of_them_it_is_on() {
+        let awake = client(vec![(200, LIMITED), (200, SCHEDULED)])
+            .throttled()
+            .await;
+        assert!(awake.is_ok_and(|held| held.hours == Some(Hours::Active)));
+
+        let asleep = client(vec![(200, FREE), (200, SCHEDULED)])
+            .throttled()
+            .await;
+        assert!(asleep.is_ok_and(|held| held.hours == Some(Hours::Quiet)));
+    }
+
+    #[tokio::test]
+    async fn a_window_is_written_into_the_client_s_own_scheduler_and_no_rate_is_set() {
+        // The scheduler owns the rate once there is one, and a rate written beside
+        // it would be a second setting fighting the first at an hour nobody chose.
+        let transport = Fake::scripted(vec![
+            (200, UNSCHEDULED),
+            (200, "<html/>"),
+            (200, "<html/>"),
+            (200, SCHEDULED),
+            (200, LIMITED),
+            (200, SCHEDULED),
+        ]);
+        let held = Sabnzbd::new(transport.clone(), "http://127.0.0.1:8080", "the-key")
+            .restrain(&a_household())
+            .await;
+        assert!(held.is_ok_and(|held| held.hours == Some(Hours::Active)));
+
+        let sent: Vec<String> = transport
+            .requests()
+            .iter()
+            .map(|request| request.url.clone())
+            .collect();
+        let asked = sent.join(" ");
+        assert!(asked.contains("addSchedule"), "{asked}");
+        assert!(
+            !asked.contains("name=speedlimit"),
+            "the standing rate is left alone where a schedule sets it: {asked}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_client_with_no_window_is_held_to_the_active_rate_around_the_clock() {
+        // The conservative direction, and the only honest one where nothing says
+        // when the household is awake.
+        let wanted = Wanted {
             window: None,
+            ..a_household()
         };
-        let held = client(vec![(200, r#"{"status":true}"#), (200, LIMITED)])
+        let transport = Fake::scripted(vec![
+            (200, UNSCHEDULED),
+            (200, UNSCHEDULED),
+            (200, DID),
+            (200, LIMITED),
+            (200, UNSCHEDULED),
+        ]);
+        let held = Sabnzbd::new(transport.clone(), "http://127.0.0.1:8080", "the-key")
             .restrain(&wanted)
             .await;
-        assert!(held.is_ok_and(|held| held.rates.down == Some(1_048_576) && !held.uploads));
+        assert!(held.is_ok_and(|held| held.rates.down == Some(1_048_576) && held.hours.is_none()));
+        assert!(transport.asked_for("name=speedlimit&value=1024k"));
     }
 
     #[tokio::test]
     async fn a_client_that_answers_that_it_did_not_take_the_limit_is_a_failure() {
         // It says so with a `false` and a `200` around it, so the status is read
         // rather than the request being called done because it arrived.
-        let refused = client(vec![(200, r#"{"status":false}"#)])
-            .restrain(&Wanted {
-                active: Rates::default(),
-                quiet: Rates::default(),
-                window: None,
-            })
-            .await;
+        let refused = client(vec![
+            (200, UNSCHEDULED),
+            (200, UNSCHEDULED),
+            (200, r#"{"status":false}"#),
+        ])
+        .restrain(&Wanted {
+            active: Rates::default(),
+            quiet: Rates::default(),
+            window: None,
+        })
+        .await;
+        assert!(refused.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_schedule_that_could_not_be_written_is_a_failure_before_any_rate_is_set() {
+        let refused = client(vec![(403, "no")]).restrain(&a_household()).await;
         assert!(refused.is_err());
     }
 
@@ -213,6 +333,24 @@ mod tests {
     }
 
     #[test]
+    fn a_window_whose_two_sides_come_to_one_figure_is_no_schedule_at_all() {
+        // Two instructions setting one rate switch nothing while looking like a
+        // household's day, and the client would be reported as keeping hours it
+        // does not keep.
+        let flat = Wanted {
+            active: Rates::default(),
+            ..a_household()
+        };
+        assert!(turns(&flat).is_empty());
+        assert_eq!(turns(&a_household()).len(), 2);
+        assert!(turns(&Wanted {
+            window: None,
+            ..a_household()
+        })
+        .is_empty());
+    }
+
+    #[test]
     fn the_clients_own_zero_is_no_limit_rather_than_a_limit_of_nothing() {
         assert_eq!(absolute(""), None);
         assert_eq!(absolute("0"), None);
@@ -225,7 +363,7 @@ mod tests {
         // A bare number is a percentage of the line to this client wherever the
         // operator has told it what the line carries, which would turn a
         // two-megabyte limit into two per cent of one.
-        assert_eq!(kilobytes(Some(2 * 1024 * 1024)), "2048K");
+        assert_eq!(kilobytes(Some(2 * 1024 * 1024)), "2048k");
         assert_eq!(kilobytes(None), "0", "and nothing at all lifts it");
     }
 
@@ -233,8 +371,8 @@ mod tests {
     fn a_limit_below_the_smallest_the_client_holds_becomes_that_rather_than_none() {
         // Rounding it to zero would lift the limit entirely, which is the
         // opposite of what somebody asking for a very small one meant.
-        assert_eq!(kilobytes(Some(1)), "1K");
-        assert_eq!(kilobytes(Some(1023)), "1K");
-        assert_eq!(kilobytes(Some(1025)), "2K");
+        assert_eq!(kilobytes(Some(1)), "1k");
+        assert_eq!(kilobytes(Some(1023)), "1k");
+        assert_eq!(kilobytes(Some(1025)), "2k");
     }
 }

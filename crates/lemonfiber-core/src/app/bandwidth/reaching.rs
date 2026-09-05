@@ -12,12 +12,28 @@
 
 use crate::app::targets::{DownloadKind, DownloadTarget};
 use crate::app::Ctx;
-use crate::bandwidth::{Answer, Held, Holding, Period};
+use crate::bandwidth::{Answer, Held, Holding, Period, Pulling};
 use crate::ports::service::{
-    Failure, Hours, Metering, Moved, Rates, Throttled, Throttling, Wanted,
+    Failure, Fetching, Hours, Metering, Moved, Rates, Throttled, Throttling, Wanted,
 };
 use crate::qbittorrent::Qbittorrent;
 use crate::sabnzbd::Sabnzbd;
+
+/// What a run is to do about one client's fetching.
+///
+/// Three requests rather than a flag, because "leave it alone" is a third answer
+/// and not the absence of the other two: a run with nothing to change still has to
+/// say whether the client is fetching, and a flag would make that question
+/// impossible to ask without answering it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Fetch {
+    /// Only ask, and report what it says.
+    Ask,
+    /// Stop it, because a spent cap says so.
+    Stop,
+    /// Let it fetch again, because lemonfiber stopped it and no longer has cause.
+    Resume,
+}
 
 /// A download client this command can reach.
 ///
@@ -50,6 +66,14 @@ impl Client {
 
     /// What it has moved.
     fn metering(&self) -> &dyn Metering {
+        match self {
+            Self::Torrent(client) => client.as_ref(),
+            Self::Usenet(client) => client.as_ref(),
+        }
+    }
+
+    /// Whether it is fetching at all.
+    fn fetching(&self) -> &dyn Fetching {
         match self {
             Self::Torrent(client) => client.as_ref(),
             Self::Usenet(client) => client.as_ref(),
@@ -106,11 +130,20 @@ pub(super) async fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client>
 /// The read-back is the same call in both cases, so the answer an unconfirmed run
 /// reports and the answer an applying run reports come from one place — which is
 /// what stops a rehearsal describing something the real thing would not do.
-pub(super) async fn holding(client: &Client, wanted: &Wanted, writing: bool) -> Holding {
+pub(super) async fn holding(
+    client: &Client,
+    wanted: &Wanted,
+    fetch: Option<Fetch>,
+    writing: bool,
+) -> Holding {
     let answered = if writing {
         client.throttling().restrain(wanted).await
     } else {
         client.throttling().throttled().await
+    };
+    let pulling = match fetch {
+        Some(fetch) => pulling(client, fetch).await,
+        None => None,
     };
     Holding {
         client: client.name().to_owned(),
@@ -123,7 +156,27 @@ pub(super) async fn holding(client: &Client, wanted: &Wanted, writing: bool) -> 
                 said: said(&failure),
             },
         },
+        pulling,
     }
+}
+
+/// What one client is doing about fetching, once it has been told.
+///
+/// A client that would not answer reports nothing rather than a guess. "Stopped"
+/// is exactly the wrong thing to say about a client nobody could reach, because it
+/// is the answer that reads as a cap being kept — and the limits beside it already
+/// say the client was silent.
+async fn pulling(client: &Client, fetch: Fetch) -> Option<Pulling> {
+    let asking = client.fetching();
+    let answered = match fetch {
+        Fetch::Ask => asking.pulling().await,
+        Fetch::Stop => asking.stop().await,
+        Fetch::Resume => asking.resume().await,
+    };
+    answered.ok().map(|pulling| match pulling {
+        crate::ports::service::Pulling::Fetching => Pulling::Fetching,
+        crate::ports::service::Pulling::Stopped => Pulling::Stopped,
+    })
 }
 
 /// What one client's answer amounts to in both directions.
@@ -164,8 +217,8 @@ mod tests {
 
     use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
-    use super::{answer, holding, opened, said, DownloadKind, DownloadTarget};
-    use crate::bandwidth::{Answer, Held, Period, Verdict};
+    use super::{answer, holding, opened, said, DownloadKind, DownloadTarget, Fetch};
+    use crate::bandwidth::{Answer, Held, Period, Pulling, Verdict};
     use crate::config::Settings;
     use crate::ports::service::{Failure, Hours, Rates, Throttled, Wanted};
     use crate::test_support::{a_context, a_password, env_at, SeedFs};
@@ -341,7 +394,7 @@ mod tests {
         assert_eq!(clients.len(), 1, "the torrent client opened");
 
         for client in &clients {
-            let reported = holding(client, &wanted(), false).await;
+            let reported = holding(client, &wanted(), None, false).await;
             let refusal = &reported.answer;
             assert!(
                 parts(refusal).is_none(),
@@ -350,6 +403,106 @@ mod tests {
             );
             assert!(matches!(refusal, Answer::Silent { said } if said.contains("not answering")));
             assert!(reported.worth_saying());
+        }
+    }
+
+    /// A torrent client answering every question, with `running` torrents and this
+    /// standing on whether it would start another.
+    fn a_client_that_answers(running: &'static str, would_start: &'static str) -> Arc<Fake> {
+        Fake::by_path(vec![
+            ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
+            ("/api/v2/torrents/info", Replies::reply(200, running)),
+            (
+                "/api/v2/app/setPreferences",
+                Replies::reply(200, String::new()),
+            ),
+            (
+                "/api/v2/app/preferences",
+                Replies::reply(
+                    200,
+                    format!(
+                        r#"{{"dl_limit":0,"up_limit":0,"alt_dl_limit":0,"alt_up_limit":0,
+                            "scheduler_enabled":false,"add_stopped_enabled":{would_start}}}"#
+                    ),
+                ),
+            ),
+            ("/api/v2/transfer/speedLimitsMode", Replies::reply(200, "0")),
+            (
+                "/api/v2/transfer/info",
+                Replies::reply(200, r#"{"dl_info_speed":0,"up_info_speed":0}"#),
+            ),
+            ("/api/v2/torrents/stop", Replies::reply(200, String::new())),
+            ("/api/v2/torrents/start", Replies::reply(200, String::new())),
+        ])
+    }
+
+    /// The stack that client belongs to.
+    fn a_stack(scratch: &str, http: Arc<Fake>) -> crate::app::Ctx {
+        a_context()
+            .settings(Settings {
+                env_file: Some(env_at(scratch, &a_password())),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http)
+    }
+
+    #[tokio::test]
+    async fn a_cap_makes_whether_the_client_is_fetching_part_of_what_it_answers() {
+        // Both readings, because the two are what a spent cap is judged by: a
+        // client still running something has not stopped, and one running nothing
+        // that would start the next thing handed to it has not either.
+        let ctx = a_stack("bandwidth-pulling", a_client_that_answers("[{}]", "false"));
+        for client in &opened(&ctx, &[torrent()]).await {
+            let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
+            assert_eq!(asked.pulling, Some(Pulling::Fetching));
+        }
+
+        let idle = a_stack("bandwidth-idle", a_client_that_answers("[]", "true"));
+        for client in &opened(&idle, &[torrent()]).await {
+            let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
+            assert_eq!(asked.pulling, Some(Pulling::Stopped));
+            assert!(
+                asked.worth_saying(),
+                "a stopped client is always worth saying"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn stopping_and_starting_are_two_named_requests_rather_than_one_flag() {
+        let http = a_client_that_answers("[]", "true");
+        let ctx = a_stack("bandwidth-stopping", http.clone());
+        for client in &opened(&ctx, &[torrent()]).await {
+            assert_eq!(
+                holding(client, &wanted(), Some(Fetch::Stop), false)
+                    .await
+                    .pulling,
+                Some(Pulling::Stopped)
+            );
+            assert_eq!(
+                holding(client, &wanted(), Some(Fetch::Resume), false)
+                    .await
+                    .pulling,
+                Some(Pulling::Stopped),
+                "what it reports afterwards, not what it was asked for"
+            );
+        }
+        assert!(http.asked_for("/torrents/stop"));
+        assert!(http.asked_for("/torrents/start"));
+    }
+
+    #[tokio::test]
+    async fn a_client_that_will_not_say_whether_it_is_fetching_reports_nothing_rather_than_a_guess()
+    {
+        // "Stopped" is exactly the wrong thing to say about a client nobody could
+        // reach: it is the answer that reads as a cap being kept.
+        let ctx = a_stack("bandwidth-unfetchable", Fake::silent());
+        for client in &opened(&ctx, &[torrent()]).await {
+            assert!(holding(client, &wanted(), Some(Fetch::Ask), false)
+                .await
+                .pulling
+                .is_none());
         }
     }
 
@@ -373,6 +526,9 @@ mod tests {
     /// Its account statistics, kept by the day rather than as a running total.
     const DAILY: &str = r#"{"servers":{"one":{"total":9000,"daily":{"2026-09-01":2000}}}}"#;
 
+    /// Its schedule, with nothing in it that would switch the rate.
+    const UNSCHEDULED: &str = r#"{"config":{"misc":{"schedlines":[]}}}"#;
+
     #[tokio::test]
     async fn the_usenet_client_is_asked_on_its_own_shape_rather_than_the_torrent_one() {
         // It answers about a limit and a month through entirely different calls,
@@ -384,13 +540,14 @@ mod tests {
             .with_filesystem(Arc::new(SeedFs::keyed(None, Some(KEYED))))
             .with_http(Fake::by_path(vec![
                 ("mode=queue", Replies::reply(200, QUEUED)),
+                ("mode=get_config", Replies::reply(200, UNSCHEDULED)),
                 ("mode=server_stats", Replies::reply(200, DAILY)),
             ]));
         let clients = opened(&ctx, &[usenet()]).await;
         assert_eq!(clients.len(), 1, "the Usenet client opened");
 
         for client in &clients {
-            let reported = holding(client, &wanted(), false).await;
+            let reported = holding(client, &wanted(), None, false).await;
             assert_eq!(reported.client, "sabnzbd");
             let answered = parts(&reported.answer);
             assert!(

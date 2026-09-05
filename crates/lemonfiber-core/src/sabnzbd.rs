@@ -89,11 +89,51 @@ impl Sabnzbd {
         let response = self.endpoint.send(&request).await?;
         self.endpoint.decode(&response, whenever)
     }
+
+    /// One call to a configuration page, which is where the scheduler is written.
+    ///
+    /// Apart from the `mode=` API because it is a different door: the schedule is
+    /// the one setting this client will not take through the API without damage —
+    /// see [`scheduling`] — and its own pages take a change one line at a time and
+    /// reload the running scheduler afterwards, which the API door does not.
+    ///
+    /// The page answers a write with a redirect to the page it was reached from,
+    /// and nothing behind that redirect says what became of the request. So this
+    /// reads the status and no more; every caller settles what happened by reading
+    /// the schedule back.
+    async fn page(&self, path: &str, fields: &[(&str, &str)]) -> Result<(), Failure> {
+        let mut fields = fields.to_vec();
+        fields.push(("apikey", self.key.as_str()));
+        let request = Request {
+            method: Method::Get,
+            url: self.endpoint.url(&format!(
+                "/config/{path}?{}",
+                crate::endpoint::form_encoded(&fields)
+            )),
+            headers: Vec::new(),
+            body: None,
+        };
+        let response = self.endpoint.send(&request).await?;
+        self.endpoint.expect_success(&response)
+    }
+}
+
+/// `SABnzbd`'s answer to a write.
+///
+/// The client answers a setting it would not take with a `false` here and a `200`
+/// around it, so the status is read rather than the request being called done
+/// because it arrived.
+#[derive(serde::Deserialize)]
+struct Wrote {
+    #[serde(default)]
+    status: bool,
 }
 
 mod accounts;
+mod fetching;
 mod metering;
 mod queue;
+mod scheduling;
 mod throttling;
 
 #[cfg(test)]
