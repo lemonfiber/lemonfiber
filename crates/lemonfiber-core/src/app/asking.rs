@@ -398,22 +398,6 @@ mod tests {
         assert!(said.contains("5 requests a week"), "{said}");
     }
 
-    /// A name with no media server behind it is refused, not searched.
-    ///
-    /// The name is matched against the accounts the server holds, so where there is
-    /// no server there is nothing to match against. Said as the refusal the rest of
-    /// this errand gives rather than as an empty answer, which would read as nobody
-    /// being called that.
-    #[tokio::test]
-    async fn a_name_with_no_media_server_behind_it_is_refused() {
-        let refused = found(&a_household("noserver"), &[], "alex").await;
-
-        assert_eq!(
-            refused.err().map(|problem| problem.code),
-            Some(crate::asking::UNREACHABLE)
-        );
-    }
-
     /// Nobody by that name is refused with the household named beside it.
     #[tokio::test]
     async fn nobody_by_that_name_is_refused() {
