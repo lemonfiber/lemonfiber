@@ -464,8 +464,8 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Allowance, Answer as Ruling, Chosen, Command, Ctx, Decision,
-        Outcome, QualityAction, SetupAction, VersionReport, Waiting,
+        dispatch, pull_progress, Allowance, Answer as Ruling, BandwidthAsked, Chosen, Command, Ctx,
+        Decision, Outcome, QualityAction, SetupAction, VersionReport, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -2196,6 +2196,22 @@ mod tests {
             refusal,
             Some(crate::stack::STACK_UNREADABLE),
             "an operator's own --stack-dir mistake reaches them"
+        );
+    }
+
+    /// Asking about the line arrives at the command that answers about it.
+    ///
+    /// Dispatched here as well as from `tests/`: this file is compiled twice, and
+    /// the arm joining a command to its handler is a line of each copy — so the
+    /// copy that never dispatched it counts the arm as never run. What the command
+    /// does is settled beside the command itself; this is about arriving there.
+    #[tokio::test]
+    async fn asking_about_the_line_reaches_the_command_that_reads_it() {
+        let ctx = a_context().build();
+        let read = dispatch(Command::Bandwidth(BandwidthAsked::default()), &ctx).await;
+        assert!(
+            matches!(&read, Ok(Outcome::Bandwidth(shared)) if !shared.applied),
+            "a run that asked for nothing wrote nothing: {read:?}"
         );
     }
 
