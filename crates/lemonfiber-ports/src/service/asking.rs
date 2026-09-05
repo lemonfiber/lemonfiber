@@ -94,6 +94,35 @@ pub struct Asking {
     pub quota: Option<Quota>,
 }
 
+/// What taking one member's asking away came to, kept only so it can be given back.
+///
+/// **Opaque on purpose.** A request service tells several kinds of "may ask" apart — a
+/// plain one, one for each kind of thing, one for the higher quality — and this product
+/// has no vocabulary for that set. Naming them here would be a second reading of somebody
+/// else's permission model, able to disagree with the one that actually refuses a
+/// request; carrying the service's own answer back out unread cannot. So a member who
+/// could only ask for one kind of thing is given that back rather than a plain grant this
+/// side decided was equivalent.
+///
+/// Written down between runs by whoever holds it, because what is taken while a disk is
+/// full has to survive until there is room again.
+#[derive(Debug, Default)]
+pub struct Holding {
+    /// What was taken, in the service's own numbering.
+    pub taken: u64,
+}
+
+impl Holding {
+    /// Whether anything was taken at all.
+    ///
+    /// Nothing taken is nobody to give anything back to, which is a different thing from
+    /// a member held back with no bits to their name.
+    #[must_use]
+    pub const fn anything(&self) -> bool {
+        self.taken != 0
+    }
+}
+
 /// Deciding what the household may ask for, and deciding one request that is waiting.
 ///
 /// Apart from [`Requests`](super::Requests) because setting a service up and ruling on
@@ -157,11 +186,63 @@ pub trait Approving: Send + Sync {
     /// Returns [`Failure`] when the service is unreachable, holds no such request, or
     /// refuses.
     async fn decide(&self, request: i64, approve: bool) -> Result<(), Failure>;
+
+    /// Take away what lets this member ask for anything at all, and answer with what
+    /// was taken.
+    ///
+    /// **Not a quota, and deliberately not reachable through one.** A limit of nought is
+    /// not a state a request service can be put into, and one that could would refuse in
+    /// the words of a limit — which is the one sentence a disk with no room must not be
+    /// mistaken for. This stops the asking itself, so what refuses says permission and
+    /// never says quota.
+    ///
+    /// **Nothing else about the account is touched**, and nothing is taken from an
+    /// account the service treats as holding every permission: the gate reads that first
+    /// and answers yes whatever else is set, so a bit taken off the owner would block
+    /// nothing and a bit given back would be a change made for no effect.
+    ///
+    /// Answers with nothing taken where there was nothing to take — a member already
+    /// held back, an owner, or somebody this service has never heard of.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn hold_requests(&self, id: &str) -> Result<Holding, Failure>;
+
+    /// Give back exactly what [`Approving::hold_requests`] took, and nothing else.
+    ///
+    /// Exactly what was taken rather than a grant composed here, so a permission an
+    /// operator narrowed by hand comes back the shape they left it. Anything they took
+    /// away *since* stays taken away: this puts back, it does not restore.
+    ///
+    /// A member this service no longer holds an account for is nothing to give back to
+    /// rather than a failure to give something back — otherwise a household would carry
+    /// a record of somebody who left for as long as it existed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    async fn release_requests(&self, id: &str, holding: Holding) -> Result<(), Failure>;
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Left;
+    use super::{Holding, Left};
+
+    /// Taking nothing is told from taking something, which is what decides whether
+    /// anybody is written down as held back at all.
+    #[test]
+    fn taking_nothing_is_not_a_member_held_back() {
+        let nothing = Holding::default();
+        let something = Holding { taken: 32 };
+
+        assert!(!nothing.anything());
+        assert!(something.anything());
+        // Formatted rather than left to an assertion's message, which is evaluated only
+        // where the assertion fails: what carries the service's own number has to be
+        // readable in a report, and a rendering nothing runs is not.
+        assert_eq!(format!("{something:?}"), "Holding { taken: 32 }");
+    }
 
     /// What is left is the limit less what has been spent.
     #[test]
