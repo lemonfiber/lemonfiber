@@ -5,13 +5,13 @@
 # `main` requires has passed, and the reusable reads this same list back out of
 # this file to know what it must see finish first — so a workflow missing from it
 # is a workflow the gate never waits for and never re-evaluates on. `main`
-# requires eighteen checks and they come from five workflows:
+# requires nineteen checks and they come from five workflows:
 #
 #   ci                spec-check / spec-check, dco / dco, commitlint / commitlint,
 #                     hygiene / {actionlint, invite, links, markdown, pins, typos},
 #                     security / {gitleaks, osv-scanner}
 #   build             check, deny
-#   codeql            analyze (rust), analyze (actions)
+#   codeql            analyze (rust), analyze (actions), alerts
 #   sonar             sonar, gate / gate
 #   release-workflow  release-workflow
 #
@@ -35,6 +35,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/awaiting-maintainer.yml@624dad022478d0c445bf2b985a30de5be38428f9 # main
+    uses: lemonfiber/spec/.github/workflows/awaiting-maintainer.yml@16ea93a65559ac2ab209940ebfd45fdb6885e635 # main
     secrets:
       DISCORD_MAINTAINERS_WEBHOOK: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
