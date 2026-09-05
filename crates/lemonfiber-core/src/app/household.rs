@@ -11,13 +11,14 @@
 //! password seeding already minted and recorded.
 
 mod allowance;
+mod handing_over;
 
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
 use super::targets::{jellyfin_reader, open_servarrs, seerr_reader};
 use super::Ctx;
-use crate::asking::Policy;
+use crate::asking::{Policy, Reasons};
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::{HouseholdMember, HouseholdReport, MemberAccess, MemberRequest, Restriction};
@@ -59,20 +60,7 @@ pub(super) async fn household(
     };
 
     let mut findings = Vec::new();
-    // One read for the whole household rather than one per member: what a library is
-    // called is the same answer for everybody.
-    let libraries = if let Ok(held) = server.libraries().await {
-        held.into_iter()
-            .map(|library| (library.id, library.name))
-            .collect()
-    } else {
-        findings.push(
-            "the media server's libraries could not be read, so access limited to \
-             some of them names them by the server's own identifiers"
-                .to_owned(),
-        );
-        BTreeMap::new()
-    };
+    let (libraries, certificates) = named_by_the_server(&server, &mut findings).await;
 
     // A request service that will not answer costs the requests, not the household.
     // Who is here is the media server's fact, and reporting nobody because a second
@@ -130,18 +118,11 @@ pub(super) async fn household(
         );
     }
 
-    // The operator's own rating table, read once for the whole household: a limit is
-    // said in the certificates a family already recognises rather than as a bare number,
-    // and the same number carries different names in different countries. A table that
-    // will not read costs the names and not the limit.
-    let certificates = server.ratings().await.unwrap_or_default();
-    if certificates.is_empty() {
-        findings.push(
-            "the media server's own ratings could not be read, so an age limit is named \
-             from lemonfiber's own mapping rather than from this household's certificates"
-                .to_owned(),
-        );
-    }
+    // The disk is asked once for the whole household, and asked at all because a member
+    // deciding what to ask for is owed the same refusal an approval would meet — in the
+    // disk's own words, so nobody reads a full disk as their own limit and waits for a
+    // period to roll over instead of freeing some room.
+    let no_room = super::space::admits(ctx).await.is_err();
 
     let mut report = assemble(
         accounts,
@@ -153,11 +134,48 @@ pub(super) async fn household(
             asked: &asked,
             quality: &super::quality::recorded_selection(ctx),
             now: ctx.clock.now(),
+            reasons: &super::refusals::load(ctx),
+            no_room,
         },
         member,
     );
     report.findings.append(&mut findings);
     Ok(report)
+}
+
+/// The two tables the media server names things in, read once for the whole household.
+///
+/// One read each rather than one per member: what a library is called and what a
+/// certificate is called are the same answers for everybody in the house. Each failure
+/// costs its own names and nothing else — a library list that will not read leaves access
+/// named by the server's own identifiers, and a rating table that will not read leaves an
+/// age limit named from this program's own mapping rather than from the certificates this
+/// household already recognises — so each says so rather than quietly reading as absent.
+async fn named_by_the_server(
+    server: &crate::jellyfin::Jellyfin,
+    findings: &mut Vec<String>,
+) -> (BTreeMap<String, String>, Vec<Certificate>) {
+    let libraries = if let Ok(held) = server.libraries().await {
+        held.into_iter()
+            .map(|library| (library.id, library.name))
+            .collect()
+    } else {
+        findings.push(
+            "the media server's libraries could not be read, so access limited to \
+             some of them names them by the server's own identifiers"
+                .to_owned(),
+        );
+        BTreeMap::new()
+    };
+    let certificates = server.ratings().await.unwrap_or_default();
+    if certificates.is_empty() {
+        findings.push(
+            "the media server's own ratings could not be read, so an age limit is named \
+             from lemonfiber's own mapping rather than from this household's certificates"
+                .to_owned(),
+        );
+    }
+    (libraries, certificates)
 }
 
 /// The tables every member's line is said in, gathered so the assembly takes one of
@@ -180,6 +198,12 @@ struct Naming<'a> {
     quality: &'a Selection,
     /// Now, against which a request that is waiting is measured.
     now: SystemTime,
+    /// Why each request that was turned down from here was turned down. The request
+    /// service keeps none, so this is the only place the words survive.
+    reasons: &'a Reasons,
+    /// Whether the disk has no room left, which refuses an acquisition in the disk's
+    /// own words and is a different answer from anybody's limit.
+    no_room: bool,
 }
 
 /// The request service, signed in — or in plain words why it could not be asked.
@@ -277,6 +301,7 @@ fn assemble(
             state,
             waiting_days: allowance::waiting(state, made.as_deref(), naming.now),
             estimate: allowance::estimated(request.kind, naming.quality),
+            refused: naming.reasons.of(request.id).cloned(),
         });
     }
 
@@ -303,14 +328,19 @@ fn assemble(
             held.map(|held| held.approves_own)
         };
         let made: Vec<&str> = theirs.made.iter().map(String::as_str).collect();
-        members.push(HouseholdMember {
+        let mut member = HouseholdMember {
             access: named_access(&account.access, naming, approves_own),
             asking: held.map(|held| allowance::reported(held, &made, naming.now)),
             last_seen: account.last_seen,
             claimed: account.claimed,
             name: account.name,
             requests: theirs.requests,
-        });
+            to_hand_over: Vec::new(),
+        };
+        // Composed from the finished member rather than from the parts, so the message
+        // and the line above it cannot report different figures for one person.
+        member.to_hand_over = handing_over::to_hand_over(&member, naming.quality, naming.no_room);
+        members.push(member);
     }
     members.sort_by(|one, two| one.name.cmp(&two.name));
 
@@ -481,6 +511,8 @@ mod tests {
                 asked: &nothing_asked(),
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
+                reasons: &crate::asking::Reasons::default(),
+                no_room: false,
             },
             member,
         )
@@ -532,6 +564,8 @@ mod tests {
                 asked: &asked_of(requesting),
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
+                reasons: &crate::asking::Reasons::default(),
+                no_room: false,
             },
             None,
         )
@@ -679,6 +713,87 @@ mod tests {
                 .map(|member| member.access.restriction),
             Some(Restriction::RatingLimited),
             "{report:?}"
+        );
+    }
+
+    /// The reason this machine holds reaches the request it belongs to, and the answer
+    /// written to whoever asked for it.
+    ///
+    /// The join is the seam: the record is keyed by the request service's own number and
+    /// nothing else, so a reason attached to the wrong request would be words put in
+    /// somebody's mouth about something they never asked about.
+    #[test]
+    fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
+        let mut reasons = crate::asking::Reasons::default();
+        reasons.keep(0, "we already have it dubbed", None);
+
+        let report = assemble(
+            vec![account("Ana", true)],
+            vec![request("Ana", Some(Kind::Radarr), Some(7), (3, 2))],
+            &Naming {
+                libraries: &unnamed(),
+                titles: &titles(),
+                certificates: &[],
+                asked: &nothing_asked(),
+                quality: &Selection::everywhere(crate::quality::Preset::Balanced),
+                now: SystemTime::UNIX_EPOCH,
+                reasons: &reasons,
+                no_room: false,
+            },
+            None,
+        );
+
+        let member = report.members.first().cloned().unwrap_or_default();
+        assert_eq!(
+            member
+                .requests
+                .first()
+                .and_then(|asked| asked.refused.as_ref())
+                .map(|refused| refused.reason.as_str()),
+            Some("we already have it dubbed"),
+            "{report:?}"
+        );
+        assert!(
+            member
+                .to_hand_over
+                .iter()
+                .any(|line| line.contains("we already have it dubbed")),
+            "{member:?}"
+        );
+    }
+
+    /// A full disk reaches the same answer, as the disk rather than as a limit.
+    ///
+    /// Somebody deciding what to ask for is owed the refusal an approval would meet, and
+    /// owed it in the words that say which of the two it is: a member who read a full
+    /// disk as their own limit would wait for a period to roll over and change nothing.
+    #[test]
+    fn a_full_disk_reaches_whoever_is_about_to_ask() {
+        let report = assemble(
+            vec![account("Ana", true)],
+            vec![request("Ana", Some(Kind::Radarr), Some(7), (1, 2))],
+            &Naming {
+                libraries: &unnamed(),
+                titles: &titles(),
+                certificates: &[],
+                asked: &nothing_asked(),
+                quality: &Selection::everywhere(crate::quality::Preset::Balanced),
+                now: SystemTime::UNIX_EPOCH,
+                reasons: &crate::asking::Reasons::default(),
+                no_room: true,
+            },
+            None,
+        );
+
+        let said = report
+            .members
+            .first()
+            .map(|member| member.to_hand_over.join("\n"))
+            .unwrap_or_default();
+        assert!(said.contains("no room left on the disk"), "{said}");
+        assert!(
+            said.contains("that is the disk rather than anything of yours"),
+            "{said}"
         );
     }
 

@@ -11,11 +11,19 @@
 //! apart in the code as well as in the sentence: an operator who read the first as the
 //! second would go and raise a quota and watch the same refusal happen again.
 //!
-//! **A reason is required and does not reach the requester.** The request service's own
-//! endpoint carries the decision in the path and reads no body at all, and its record has
-//! no field for one — so what it sends the person who asked is that it was declined, and
-//! the reason stays here for the operator to pass on. Checked against the pinned image
-//! rather than assumed; see [`crate::ports::service::Approving::decide`].
+//! **A reason is required and the service has nowhere to put it.** Its own endpoint
+//! carries the decision in the path and reads no body at all, and its record has no field
+//! for one — so what it sends the person who asked is that it was declined, and nothing
+//! beside it. Checked against the pinned image rather than assumed; see
+//! [`crate::ports::service::Approving::decide`].
+//!
+//! So the reason is **written down here** rather than said once and dropped. A reason
+//! that lived only in the line the operator saw is the silent decline this is here to
+//! prevent, arriving one step after the blank field that is refused outright — and the
+//! answer to whoever asked is composed from that record, on every reading of the
+//! household from then on.
+
+use std::collections::BTreeSet;
 
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
@@ -53,28 +61,69 @@ pub(in crate::app) async fn deciding(
     }
 
     let said = said_of(waiting, reason);
+    let mut note = None;
     if !ctx.dry_run {
         access
             .seerr
             .decide(decision.request, approve)
             .await
             .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_DECIDED)))?;
+        note = recorded(ctx, decision.request, reason, &asked);
     }
 
     let mut report = super::super::household::household(ctx, None).await?;
-    report.findings.insert(
-        0,
-        if ctx.dry_run {
-            format!("{said} — rehearsed, and nothing was decided")
-        } else {
-            said
-        },
-    );
+    // The decision first and what became of its note directly under it, ahead of whatever
+    // the reading itself could not do: an operator opened this to rule on something, and
+    // the answer to that is the line they are looking for.
+    let mut leading = vec![if ctx.dry_run {
+        format!("{said} — rehearsed, and nothing was decided")
+    } else {
+        said
+    }];
+    leading.extend(note);
+    leading.append(&mut report.findings);
+    report.findings = leading;
     Ok(report)
 }
 
 /// What is said where the service could not be asked or would not rule.
 const NOTHING_DECIDED: &str = "nothing was decided";
+
+/// Write down why this one was turned down, and forget the ones the service has let go.
+///
+/// Only after the service has taken the decision: a reason recorded for a refusal that
+/// never happened would be shown to somebody beside a request that is still waiting.
+///
+/// Nothing on an approval — there is no reason to keep, and clearing the record on one
+/// would lose the words for every *other* refusal in the same breath.
+///
+/// The pruning rides along because this is the one path that holds both halves at once:
+/// the record, and the service's own list of what still exists. A note beside a line that
+/// has gone is only a way to grow a file forever.
+fn recorded(
+    ctx: &Ctx,
+    request: i64,
+    reason: Option<&str>,
+    asked: &[HouseholdRequest],
+) -> Option<String> {
+    let reason = reason?;
+    let still_held: BTreeSet<i64> = asked.iter().map(|held| held.id).collect();
+    let mut reasons = crate::app::refusals::load(ctx);
+    reasons.keep(request, reason, crate::instant::written(ctx.clock.now()));
+    reasons.only(&still_held);
+    crate::app::refusals::keep(ctx, &reasons)
+        .is_err()
+        .then(|| NOT_KEPT.to_owned())
+}
+
+/// What is said where the words could not be written down.
+///
+/// The decision itself went through, so this is not a failure to report as one — but the
+/// reason is now in this answer and nowhere else, and an operator who closed the window
+/// believing it was kept would find the next reading of the household bare.
+const NOT_KEPT: &str = "the reason could not be written down here, so it is in this answer \
+                        and nowhere else — copy it before you close this, because the \
+                        request service keeps none either";
 
 /// The reason a decline carries, refused where it says nothing.
 ///
@@ -105,23 +154,25 @@ fn still_waiting(asked: &[HouseholdRequest], request: i64) -> Option<&HouseholdR
 
 /// What the decision comes to, as the line an operator reads it back in.
 ///
-/// The reason is repeated back on a decline. It reaches nobody else — the service
-/// carries none — so the operator is the one who has to pass it on, and a line that
-/// dropped it would leave them with nothing to pass on.
+/// The reason is repeated back on a decline, and said to be kept: the service carries
+/// none, so the operator is the one who has to pass it on, and a line that dropped it
+/// would leave them with nothing to pass on. Saying it is kept is what stops them
+/// writing it down twice — the answer for whoever asked is built from that record.
 fn said_of(waiting: &HouseholdRequest, reason: Option<&str>) -> String {
     let who = &waiting.member;
     match reason {
         None => format!("what {who} asked for was approved and is being fetched"),
         Some(reason) => format!(
             "what {who} asked for was turned down: {reason} — the request service tells \
-             them it was declined and carries no reason, so this is yours to pass on"
+             them it was declined and carries no reason, so this is kept here and is \
+             yours to pass on"
         ),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{deciding, reason_given, said_of, still_waiting};
+    use super::{deciding, reason_given, recorded, said_of, still_waiting};
     use crate::app::command::{Answer, Decision};
     use crate::ports::service::HouseholdRequest;
     use crate::test_support::a_context;
@@ -165,6 +216,34 @@ mod tests {
             Some(crate::asking::UNREACHABLE),
             "a stack that would not read was reported as a service that would not answer"
         );
+    }
+
+    /// A reason nowhere could hold is said to be in this answer alone.
+    ///
+    /// The decision itself went through, so this is not a failure — but an operator who
+    /// closed the window believing the words were kept would find the next reading of
+    /// the household bare, and the person who asked would never hear why.
+    #[test]
+    fn a_reason_that_could_not_be_kept_says_where_it_now_lives() {
+        let nowhere = a_context().build();
+
+        let note = recorded(&nowhere, 7, Some("no room this month"), &[asked(7, 1, 2)]);
+
+        assert!(
+            note.is_some_and(|note| note.contains("nowhere else")),
+            "a reason nothing kept was reported as kept"
+        );
+    }
+
+    /// An approval writes nothing down, because there is nothing to write.
+    ///
+    /// Clearing the record on one would lose the words for every other refusal in the
+    /// same breath, and what an approval owes the person who asked is the thing itself.
+    #[test]
+    fn an_approval_writes_nothing_down() {
+        let nowhere = a_context().build();
+
+        assert_eq!(recorded(&nowhere, 7, None, &[asked(7, 1, 2)]), None);
     }
 
     /// A request nobody has ruled on is the one that can be ruled on.

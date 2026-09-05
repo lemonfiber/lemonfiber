@@ -51,6 +51,7 @@ pub mod queue;
 mod quiesced;
 mod record;
 pub mod recover;
+mod refusals;
 mod remove;
 pub mod repair;
 mod repairs;
