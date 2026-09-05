@@ -342,14 +342,13 @@ mod tests {
 
         for client in &clients {
             let reported = holding(client, &wanted(), false).await;
+            let refusal = &reported.answer;
             assert!(
-                parts(&reported.answer).is_none(),
+                parts(refusal).is_none(),
                 "no figures came back, and an unknown limit rendered as no limit \
                  is a report reading better than the stack is"
             );
-            if let Answer::Silent { said } = &reported.answer {
-                assert!(said.contains("not answering"), "{said}");
-            }
+            assert!(matches!(refusal, Answer::Silent { said } if said.contains("not answering")));
             assert!(reported.worth_saying());
         }
     }
