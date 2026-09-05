@@ -40,8 +40,8 @@ mod shape;
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
-    named, Wanted as Asking, BANDWIDTH, CHECKS, CLIENTS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND,
-    QUALITY, REQUESTS, STORED, STUCK, TRACE, VERSION,
+    named, BANDWIDTH, CHECKS, CLIENTS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND, QUALITY, REQUESTS,
+    STORED, STUCK, TRACE, VERSION,
 };
 use lemonfiber_core::app::Command;
 

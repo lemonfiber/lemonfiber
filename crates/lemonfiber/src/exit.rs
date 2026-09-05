@@ -190,7 +190,12 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
 /// not keeping to it, because that is the case where the operator has a setting
 /// they believe in and a household that cannot feel it.
 fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode {
-    if report.applied && report.clients.iter().any(|client| client.worth_saying()) {
+    if report.applied
+        && report
+            .clients
+            .iter()
+            .any(lemonfiber_core::bandwidth::Holding::worth_saying)
+    {
         return ExitCode::from(FAILURE);
     }
     ExitCode::SUCCESS

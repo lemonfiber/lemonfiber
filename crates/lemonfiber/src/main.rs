@@ -257,12 +257,8 @@ async fn main() -> ExitCode {
             if mending.acts() {
                 return repairing(ctx, mending, cli.json).await;
             }
-            match narrowed(only.as_deref()) {
-                Ok(narrowing) => Command::Doctor {
-                    narrowing,
-                    disruptive,
-                    accept,
-                },
+            match diagnosing(only, disruptive, accept) {
+                Ok(command) => command,
                 Err(code) => return code,
             }
         }
@@ -415,6 +411,23 @@ async fn answered(command: Command, ctx: &Ctx, json: bool) -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// The diagnosis a plain run asks for, narrowed as it was asked to be.
+///
+/// Named apart because the arm it came from carries a fork of its own — a run that
+/// mends returns before this is reached — and the two together are longer than the
+/// table has room for.
+fn diagnosing(
+    only: Option<String>,
+    disruptive: bool,
+    accept: Option<String>,
+) -> Result<Command, ExitCode> {
+    narrowed(only.as_deref()).map(|narrowing| Command::Doctor {
+        narrowing,
+        disruptive,
+        accept,
+    })
 }
 
 /// What a diagnosis was narrowed to, or the code to exit with for a name that is
