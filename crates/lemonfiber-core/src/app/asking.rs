@@ -233,7 +233,7 @@ mod tests {
 
     use lemonfiber_fixtures::http::{Answer, Fake};
 
-    use super::{allowing, deciding, now_reads, settled, theirs, Ctx};
+    use super::{allowing, deciding, found, now_reads, settled, theirs, Ctx};
     use crate::app::command::{Answer as Ruling, Chosen, Decision};
     use crate::asking::Policy;
     use crate::ports::http::Method;
@@ -559,45 +559,18 @@ mod tests {
         }
     }
 
-    /// A stack with no media server has nobody to match a name against.
+    /// A name with no media server behind it is refused rather than searched.
     ///
-    /// Built by taking the shipped stack and removing the one service the household is
-    /// read from, so what is under test is the absence rather than a hand-written
-    /// manifest that might differ in some other way too.
+    /// Who is in the household is that server's fact, so where there is none there is
+    /// nothing to match a name against.
+    ///
+    /// Driven straight at the reading rather than through the whole request: a stack
+    /// with no media server has no request service to sign into either, so a run that
+    /// went the long way round would be refused before it ever arrived — the same
+    /// refusal, from somewhere else, which is a case that proves nothing about here.
     #[tokio::test]
-    async fn a_stack_with_no_media_server_has_nobody_to_name() {
-        static WITHOUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-        let dir = WITHOUT.get_or_init(|| {
-            let from = std::path::Path::new(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../assets/media-stack"
-            ));
-            let to = std::env::temp_dir().join(format!(
-                "lemonfiber-asking-no-server-{}",
-                std::process::id()
-            ));
-            let _ = std::fs::create_dir_all(&to);
-            let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-            let kept: String = read
-                .split("[[service]]")
-                .filter(|block| !block.contains("id = \"jellyfin\""))
-                .collect::<Vec<_>>()
-                .join("[[service]]");
-            let _ = std::fs::write(to.join("stack.toml"), kept);
-            to
-        });
-        let mut ctx = a_household("noserver");
-        ctx.stack = crate::stack::Source::External(Box::leak(dir.clone().into_boxed_path()));
-
-        let refused = allowing(
-            &ctx,
-            &Chosen {
-                member: Some("alex".to_owned()),
-                policy: Some(Policy::Trusted),
-                quota: None,
-            },
-        )
-        .await;
+    async fn a_name_with_no_media_server_behind_it_is_refused() {
+        let refused = found(&a_household("noserver"), &[], "alex").await;
 
         assert_eq!(
             refused.err().map(|problem| problem.code),
@@ -656,6 +629,31 @@ mod tests {
         assert_eq!(
             refused.err().map(|problem| problem.code),
             Some(crate::asking::UNREACHABLE)
+        );
+    }
+
+    /// A member whose counts will not read is left out rather than reported open.
+    ///
+    /// The household is still listed — who is here is the media server's fact — and the
+    /// one member it could not be asked about carries nothing, because an unread answer
+    /// is not a member nothing limits.
+    #[tokio::test]
+    async fn a_member_whose_counts_will_not_read_is_left_out() {
+        let report = allowing(
+            &refusing("nocounts", vec![(Method::Get, "/user/4/quota")]),
+            &Chosen {
+                member: None,
+                policy: Some(Policy::Trusted),
+                quota: None,
+            },
+        )
+        .await
+        .unwrap_or_default();
+
+        assert!(report.available, "{report:?}");
+        assert!(
+            report.members.iter().all(|held| held.asking.is_none()),
+            "a member nobody could ask about was reported anyway: {report:?}"
         );
     }
 
