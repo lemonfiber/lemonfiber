@@ -106,6 +106,7 @@ impl Fetching for Qbittorrent {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_support::a_password;
     use lemonfiber_fixtures::http::{Answer, Fake};
 
     use super::{Fetching, Pulling, Qbittorrent};
@@ -128,7 +129,7 @@ mod tests {
         Qbittorrent::authenticated(
             Fake::scripted(replies),
             "http://127.0.0.1:8080",
-            "the-password",
+            a_password(),
         )
     }
 
@@ -172,7 +173,7 @@ mod tests {
             (200, WAITS),
         ]);
         let stopped =
-            Qbittorrent::authenticated(transport.clone(), "http://127.0.0.1:8080", "the-password")
+            Qbittorrent::authenticated(transport.clone(), "http://127.0.0.1:8080", a_password())
                 .stop()
                 .await;
         assert_eq!(stopped.ok(), Some(Pulling::Stopped));
@@ -220,7 +221,7 @@ mod tests {
             (200, STARTS),
         ]);
         let going =
-            Qbittorrent::authenticated(transport.clone(), "http://127.0.0.1:8080", "the-password")
+            Qbittorrent::authenticated(transport.clone(), "http://127.0.0.1:8080", a_password())
                 .resume()
                 .await;
         assert_eq!(going.ok(), Some(Pulling::Fetching));
