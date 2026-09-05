@@ -130,7 +130,10 @@ impl Needed {
     }
 
     /// Where an entry taken off a listing is asked, and which argument it fills.
-    pub(super) const fn picking(&self) -> Option<(&'static str, Narrows)> {
+    ///
+    /// Visible to the whole of `acting`, because `narrowing` reads it and is a
+    /// sibling of `question` rather than a child of it.
+    pub(in crate::acting) const fn picking(&self) -> Option<(&'static str, Narrows)> {
         match self {
             Self::Nothing | Self::Typed(_) => None,
             Self::Picked { at, narrows } => Some((*at, *narrows)),

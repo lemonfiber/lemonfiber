@@ -22,10 +22,11 @@
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{BandwidthAsked, Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::doctor::Narrowing;
 
 mod household;
+mod sharing;
 
 use super::asked::{unwanted, Arguments, Disturbing};
 use super::reading::{consent, diagnosing, following, listing, quality, widening};
@@ -154,6 +155,11 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     if household::about_the_household(action) {
         return household::asked_for(action, given);
     }
+    // Apart for the same reason: seven fields no other row reads, and nothing here to
+    // refuse — what a share or a window means is the core's answer for every surface.
+    if sharing::about_the_line(action) {
+        return Ok(sharing::asked_for(given));
+    }
     let needs = |argument: &str| Refused::Missing {
         action: action.to_owned(),
         argument: argument.to_owned(),
@@ -183,13 +189,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         term,
         season,
         download,
-        down,
-        up,
-        active,
-        line,
-        cap,
-        exceeded,
-        unrestricted_for,
         ..
     } = given;
     match action {
@@ -222,19 +221,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "space" => Ok(Command::Space { confirm }),
         // The one thing that account names and leaves alone, asked for on its own.
         "stop-seeding" => stopping(download, offer),
-        // And the same reading twice over the line: given nothing it is the account
-        // `/api/bandwidth` answers with, and given a limit it declares one and hands
-        // it to every download client. Not one of the seven is read here — what a
-        // share means is the core's answer for all three surfaces at once.
-        "bandwidth" => Ok(Command::Bandwidth(BandwidthAsked {
-            down,
-            up,
-            active,
-            line,
-            cap,
-            exceeded,
-            unrestricted_for,
-        })),
         "backup" => Ok(Command::Backup { service }),
         // The two reads this surface serves twice, each reaching the same command its
         // own endpoint reaches and widened by the same word the command line widens
