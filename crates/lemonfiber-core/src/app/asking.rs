@@ -391,7 +391,11 @@ mod tests {
 
         let said = report.findings.first().cloned().unwrap_or_default();
         assert!(said.starts_with("Alex"), "{said}");
-        assert!(said.contains("until you have said yes"), "{said}");
+        assert!(said.contains("waits for you"), "{said}");
+        // Their own limit and not the household's. This fixture's household has none
+        // and this member has five a week, so the figure in the line is the whole of
+        // what says which of the two was read before anything was written.
+        assert!(said.contains("5 requests a week"), "{said}");
     }
 
     /// Nobody by that name is refused with the household named beside it.
