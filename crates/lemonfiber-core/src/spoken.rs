@@ -16,8 +16,10 @@
 pub fn duration(seconds: u64) -> String {
     let (count, unit) = match seconds {
         0..=5399 => (seconds.max(60) / 60, "minute"),
-        5400..=172_799 => ((seconds + 1_800) / 3_600, "hour"),
-        _ => ((seconds + 43_200) / 86_400, "day"),
+        5400..=172_799 => ((seconds.saturating_add(1_800)) / 3_600, "hour"),
+        // Saturating for the same reason the count below is: rounding a clock that
+        // has gone wrong must not be the thing that brings the run down.
+        _ => ((seconds.saturating_add(43_200)) / 86_400, "day"),
     };
     // Saturating rather than `as`: a count large enough to truncate is a clock
     // that has gone wrong, and reporting "1 minute" for it would be worse than
