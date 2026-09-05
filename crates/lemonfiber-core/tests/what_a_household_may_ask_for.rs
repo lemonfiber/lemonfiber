@@ -599,47 +599,53 @@ async fn both_writes_refuse_rather_than_claiming_a_change() {
     }
 }
 
+/// A household whose settings name neither half is a household with no limit.
+///
+/// The service's own defaults hold `defaultQuotas` as two empty objects, and a build
+/// that omitted one would be answering the same question with less. Either way it is
+/// no limit rather than an answer this cannot read — which is what it was reported as
+/// until this pinned it, and the two send an operator to different services.
+#[tokio::test]
+async fn a_settings_document_missing_a_half_is_still_no_limit() {
+    for held in [
+        r#"{"defaultPermissions":32,"defaultQuotas":{}}"#,
+        r#"{"defaultPermissions":32,"defaultQuotas":{"movie":{}}}"#,
+        r#"{"defaultPermissions":32}"#,
+    ] {
+        let fake = Fake::by_route(vec![(
+            Method::Get,
+            "/settings/main",
+            Answer::reply(200, held),
+        )]);
+
+        let read = seerr(&fake).asking().await;
+
+        assert_eq!(
+            read.ok(),
+            Some(Asking {
+                approves_own: false,
+                quota: None,
+            }),
+            "{held}"
+        );
+    }
+}
+
 /// A choice that names a policy needing a limit, with none anywhere, is refused
 /// before anything is written.
 #[tokio::test]
 async fn a_limit_that_was_never_named_is_refused_before_anything_is_written() {
-    let fake = Fake::by_path(vec![
-        (
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        ("/auth/jellyfin", Answer::reply(200, "{}")),
-        (
-            "/settings/main",
-            Answer::reply(200, r#"{"defaultPermissions":32,"defaultQuotas":{}}"#),
-        ),
-        ("", Answer::reply(200, "[]")),
-    ]);
-    let ctx = Ctx::new(
-        Arc::new(Scripted(Ok(spoke("")))),
-        Arc::new(Reporting::holding(
-            &["jellyfin", "seerr"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )),
-        Stopped::today(),
-        Arc::new(lemonfiber_core::adapters::Disk),
-        stack(),
-        Settings {
-            env_file: Some(recorded_admin("nolimit")),
-            ..Settings::default()
-        },
-        Environment::MacOs,
-    )
-    .with_http(fake);
-
     let refused = dispatch(
         Command::Allowing(Chosen {
             member: None,
             policy: Some(Policy::WithinALimit),
             quota: None,
         }),
-        &ctx,
+        // The household this answers with holds no limit on either half, so there is
+        // none in force to fall back on and none was named — which is the case being
+        // refused. Reached through the same fixture the writes use, because the
+        // refusal has to happen after the service was asked, not instead of asking.
+        &answering("nolimit"),
     )
     .await;
 
