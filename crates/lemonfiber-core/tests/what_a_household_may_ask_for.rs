@@ -440,6 +440,83 @@ fn silent(name: &str) -> Ctx {
     .with_http(Fake::silent())
 }
 
+/// A rehearsal leaves the household's own page exactly as it found it.
+///
+/// The household reading now writes: the two things true of the whole house — what a
+/// thing costs and whether there is room — are hung where the house will read them,
+/// because there is nowhere else they could reach anybody. A reading that wrote them
+/// during a rehearsal would rearrange a household's home page to answer a question
+/// somebody asked without meaning to change anything.
+#[tokio::test]
+async fn a_rehearsal_leaves_the_households_own_page_alone() {
+    let (ctx, transport) = watched("rehearsed");
+
+    let said = dispatch(Command::Household { member: None }, &ctx.rehearsing()).await;
+
+    assert!(said.is_ok(), "a rehearsed reading did not answer");
+    let written: Vec<String> = transport
+        .requests()
+        .iter()
+        .filter(|request: &&Request| request.url.contains("/settings/discover"))
+        .map(|request| format!("{:?} {}", request.method, request.url))
+        .collect();
+    assert!(
+        written.is_empty(),
+        "a rehearsal rearranged the household's own page: {written:?}"
+    );
+}
+
+/// A reading that is not a rehearsal hangs what the house is owed where they ask.
+#[tokio::test]
+async fn a_reading_hangs_what_the_house_is_owed_where_they_ask() {
+    let (ctx, transport) = watched("hung");
+
+    let said = dispatch(Command::Household { member: None }, &ctx).await;
+
+    assert!(said.is_ok(), "the reading did not answer");
+    let filed: Vec<String> = transport
+        .requests()
+        .iter()
+        .filter(|request: &&Request| request.url.contains("/settings/discover/add"))
+        .filter_map(|request| request.body.clone())
+        .collect();
+    // What is hung rather than how many: whether the disk of the machine running this
+    // has room is not this test's business, and asserting a count would make it so.
+    assert!(
+        filed
+            .iter()
+            .any(|notice| notice.contains("A film about") && notice.contains("a season about")),
+        "the reading hung nothing saying what a thing costs: {filed:?}"
+    );
+}
+
+/// A request service that will not carry the notice costs the notice, not the reading.
+///
+/// The household list is what somebody typed a command to see. A page that refused to
+/// hold a line for the house is worth saying out loud and worth nothing at all if the
+/// price of saying it is that nobody is told who is waiting on what.
+#[tokio::test]
+async fn a_page_that_will_not_hold_a_notice_costs_the_notice_and_not_the_reading() {
+    let said = dispatch(
+        Command::Household { member: None },
+        &refusing("unhung", Method::Get, "/settings/discover"),
+    )
+    .await
+    .ok()
+    .map(Outcome::envelope)
+    .and_then(|envelope| envelope.to_json())
+    .unwrap_or_default();
+
+    assert!(
+        said.contains("would not carry what the household is told"),
+        "a page that refused the notice was passed over in silence: {said}"
+    );
+    assert!(
+        said.contains("to_hand_over"),
+        "a refused notice cost the reading itself: {said}"
+    );
+}
+
 /// A context over a transport that answers everything both writes ask.
 ///
 /// The refusing case next door proves the dispatcher reaches these commands; this one
@@ -448,6 +525,15 @@ fn silent(name: &str) -> Ctx {
 /// tests is counted as never run in the copy these binaries link.
 fn answering(name: &str) -> Ctx {
     with(name, Vec::new())
+}
+
+/// The same, with the transport kept so what it was sent can be read back.
+///
+/// Wanted for one question only — whether a rehearsal writes — and a question about
+/// what did *not* go out cannot be asked of a context that swallowed its transport.
+fn watched(name: &str) -> (Ctx, Arc<Fake>) {
+    let transport = table(Vec::new());
+    (context(name, &transport), transport)
 }
 
 /// The same, with one call answering a refusal instead.
@@ -462,6 +548,11 @@ fn refusing(name: &str, method: Method, route: &'static str) -> Ctx {
 
 /// The transport these run against, with any broken rule ahead of the working ones.
 fn with(name: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx {
+    context(name, &table(broken))
+}
+
+/// The routes, with any broken rule ahead of the working ones.
+fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
     let mut routes = broken;
     routes.extend(vec![
         // Ahead of `/Users`, whose text it contains: a route matched by prefix would
@@ -533,7 +624,11 @@ fn with(name: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx 
         ),
         (None, "", Answer::reply(200, "[]")),
     ]);
-    let transport = Fake::by_rules(routes);
+    Fake::by_rules(routes)
+}
+
+/// An install reached over the given transport.
+fn context(name: &str, transport: &Arc<Fake>) -> Ctx {
     Ctx::new(
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(Reporting::holding(
@@ -550,7 +645,7 @@ fn with(name: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx 
         },
         Environment::MacOs,
     )
-    .with_http(transport)
+    .with_http(transport.clone())
 }
 
 /// A choice that is written comes back as the household, under its own kind.

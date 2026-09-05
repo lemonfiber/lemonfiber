@@ -12,6 +12,7 @@
 
 mod allowance;
 mod handing_over;
+mod notices;
 
 use std::collections::BTreeMap;
 use std::time::SystemTime;
@@ -69,8 +70,19 @@ pub(super) async fn household(
     // Reached once for both questions it is asked — what the household requested, and
     // what each member may request — because a second reach would be a second chance
     // to disagree about whether it answered at all.
-    let (requests, asked) = match reaching(ctx, &manifest.services).await {
-        Ok(access) => {
+    //
+    // Kept rather than consumed, because the same session is what hangs the house's
+    // notices further down — and hanging them is the only half of this reading the
+    // household itself ever sees.
+    let reached = match reaching(ctx, &manifest.services).await {
+        Ok(access) => Some(access),
+        Err(reason) => {
+            findings.push(reason);
+            None
+        }
+    };
+    let (requests, asked) = match &reached {
+        Some(access) => {
             let asked = access.seerr.requests().await.map_err(|_| {
                 "the request service's own record could not be read, so what the \
                  household has asked for is not shown"
@@ -88,16 +100,13 @@ pub(super) async fn household(
                 allowance::gathered(&access.seerr, &accounts).await,
             )
         }
-        Err(reason) => {
-            findings.push(reason);
-            (
-                Vec::new(),
-                allowance::Asked {
-                    household: None,
-                    members: BTreeMap::new(),
-                },
-            )
-        }
+        None => (
+            Vec::new(),
+            allowance::Asked {
+                household: None,
+                members: BTreeMap::new(),
+            },
+        ),
     };
     if asked.household.is_none() {
         findings.push(
@@ -123,6 +132,20 @@ pub(super) async fn household(
     // disk's own words, so nobody reads a full disk as their own limit and waits for a
     // period to roll over instead of freeing some room.
     let no_room = super::space::admits(ctx).await.is_err();
+    let quality = super::quality::recorded_selection(ctx);
+
+    // The two facts that are true of the house rather than of anybody in it go where the
+    // house will read them, which is the request service's own page. This is the one
+    // moment both are in hand at once — what a thing costs comes from the quality above,
+    // whether there is room from the disk — and the household has no other way to hear
+    // either of them, having no account here on purpose.
+    if let Some(access) = &reached {
+        if let Some(finding) =
+            notices::put_where_they_ask(&access.seerr, &quality, no_room, ctx.dry_run).await
+        {
+            findings.push(finding);
+        }
+    }
 
     let mut report = assemble(
         accounts,
@@ -132,7 +155,7 @@ pub(super) async fn household(
             titles: &titles,
             certificates: &certificates,
             asked: &asked,
-            quality: &super::quality::recorded_selection(ctx),
+            quality: &quality,
             now: ctx.clock.now(),
             reasons: &super::refusals::load(ctx),
             no_room,
