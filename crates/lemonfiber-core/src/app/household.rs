@@ -135,25 +135,8 @@ pub(super) async fn household(
     let no_room = super::space::admits(ctx).await.is_err();
     let quality = super::quality::recorded_selection(ctx);
 
-    // The two facts that are true of the house rather than of anybody in it go where the
-    // house will read them, which is the request service's own page. This is the one
-    // moment both are in hand at once — what a thing costs comes from the quality above,
-    // whether there is room from the disk — and the household has no other way to hear
-    // either of them, having no account here on purpose.
-    //
-    // And the block the second of them is about, taken and given back on this same
-    // reading — so the sentence saying why nothing can be fetched and the reason nothing
-    // can be asked for are written in one pass and cannot outlive one another.
     if let Some(access) = &reached {
-        if let Some(finding) =
-            notices::put_where_they_ask(&access.seerr, &quality, no_room, ctx.dry_run).await
-        {
-            findings.push(finding);
-        }
-        findings.extend(
-            holding::as_the_disk_stands(ctx, &access.seerr, &asked.known(), no_room, ctx.dry_run)
-                .await,
-        );
+        findings.extend(shown_to_the_household(ctx, access, &asked, &quality, no_room).await);
     }
 
     let mut report = assemble(
@@ -173,6 +156,44 @@ pub(super) async fn household(
     );
     report.findings.append(&mut findings);
     Ok(report)
+}
+
+/// The half of this reading the household itself sees, and the block that goes with it.
+///
+/// Everything else here is written for the operator. This is the only part anybody in the
+/// house ever meets, and it reaches them on the request service's own page because they
+/// have no account here on purpose — what a thing costs, whether the disk has room, and
+/// whether anything is counted over a period at all, which is the one moment all three are
+/// in hand at once.
+///
+/// **The notices and the block are one pass deliberately.** The sentence saying why nothing
+/// can be fetched and the permission that stops anything being asked for go up and come
+/// down together; in two passes they would be two chances for one to outlive the other,
+/// which is a house told the disk is full and still able to ask, or one refused with
+/// nothing on the page to say why.
+async fn shown_to_the_household(
+    ctx: &Ctx,
+    access: &crate::app::targets::HouseholdAccess,
+    asked: &allowance::Asked,
+    quality: &Selection,
+    no_room: bool,
+) -> Vec<String> {
+    let mut findings = Vec::new();
+    if let Some(finding) = notices::put_where_they_ask(
+        &access.seerr,
+        quality,
+        no_room,
+        asked.under_a_limit(),
+        ctx.dry_run,
+    )
+    .await
+    {
+        findings.push(finding);
+    }
+    findings.extend(
+        holding::as_the_disk_stands(ctx, &access.seerr, &asked.known(), no_room, ctx.dry_run).await,
+    );
+    findings
 }
 
 /// The two tables the media server names things in, read once for the whole household.

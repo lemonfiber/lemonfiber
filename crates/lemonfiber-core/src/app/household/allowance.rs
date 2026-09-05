@@ -43,6 +43,22 @@ impl Asked {
     pub(super) fn known(&self) -> Vec<&str> {
         self.members.values().map(|held| held.id.as_str()).collect()
     }
+
+    /// Whether anything in this house is counted over a period at all.
+    ///
+    /// The household's own setting **or** any one person's, because a limit set on one
+    /// member is a limit in force here — and a house that holds nobody to anything by
+    /// default still owes that member the sentence about how a period frees up.
+    ///
+    /// Read off what actually holds each of them rather than off the household setting
+    /// alone, for the reason the report beside it reads the same field: a member under a
+    /// limit of their own is under a different policy from the house.
+    pub(super) fn under_a_limit(&self) -> bool {
+        self.household.is_some_and(|asking| asking.quota.is_some())
+            || self.members.values().any(|held| {
+                held.headroom.films.limit.is_some() || held.headroom.television.limit.is_some()
+            })
+    }
 }
 
 /// What the request service holds for one person.
@@ -255,7 +271,7 @@ mod tests {
     use crate::asking::{Policy, Standing};
     use crate::household::State;
     use crate::model::{HouseholdMember, MemberRequest};
-    use crate::ports::service::{Headroom, Left};
+    use crate::ports::service::{Asking, Headroom, Left, Quota};
     use crate::quality::{Preset, Selection};
     use crate::recyclarr::Kind;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -380,6 +396,61 @@ mod tests {
             nobody.known().is_empty(),
             "a service that answered about nobody named somebody"
         );
+    }
+
+    /// A limit on one person is a limit in force here, whatever the house's own is.
+    ///
+    /// The sentence about how a period frees up is owed to whoever is held to one, and a
+    /// house that holds nobody to anything by default still has them in it.
+    #[test]
+    fn a_limit_on_one_person_is_a_limit_in_force_in_the_house() {
+        let one_member = Asked {
+            household: Some(Asking {
+                approves_own: true,
+                quota: None,
+            }),
+            members: [("ana".to_owned(), holding(true, Some(2), 0))]
+                .into_iter()
+                .collect(),
+        };
+        assert!(one_member.under_a_limit());
+
+        let the_house = Asked {
+            household: Some(Asking {
+                approves_own: true,
+                quota: Some(Quota {
+                    requests: 5,
+                    days: 7,
+                }),
+            }),
+            members: std::collections::BTreeMap::new(),
+        };
+        assert!(the_house.under_a_limit());
+    }
+
+    /// A house holding nobody to anything is under no limit, and so is an unread one.
+    ///
+    /// An unread answer is not a house nothing limits — but it is not one to hang a
+    /// sentence about a period on either, and inventing one would be a line the whole
+    /// house reads about something nobody here is under.
+    #[test]
+    fn a_house_holding_nobody_to_anything_is_under_no_limit() {
+        let trusted = Asked {
+            household: Some(Asking {
+                approves_own: true,
+                quota: None,
+            }),
+            members: [("ana".to_owned(), holding(true, None, 9))]
+                .into_iter()
+                .collect(),
+        };
+        assert!(!trusted.under_a_limit());
+
+        let unread = Asked {
+            household: None,
+            members: std::collections::BTreeMap::new(),
+        };
+        assert!(!unread.under_a_limit());
     }
 
     /// A member held to a limit reads as living inside one, whatever the house is on.
