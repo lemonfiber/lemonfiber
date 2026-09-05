@@ -186,6 +186,18 @@ mod tests {
         let held = Held::of(Some(LIMIT), Some(LIMIT), Some(LIMIT / 2), true);
         assert_eq!(held.verdict, Verdict::Holding);
         assert!(!held.verdict.worth_saying());
+        assert!(held.verdict.means().contains("accepted"));
+    }
+
+    #[test]
+    fn a_client_that_took_the_limit_and_will_not_say_what_it_is_moving_is_not_an_overrun() {
+        // The throughput is a second call and it fails on its own — a client can
+        // report the limit it took and then not answer about its rate at all.
+        // Calling that an overrun would put a client's name in front of an
+        // operator over a reading nobody took.
+        let held = Held::of(Some(LIMIT), Some(LIMIT), None, true);
+        assert_eq!(held.verdict, Verdict::Holding);
+        assert!(!held.verdict.worth_saying());
     }
 
     #[test]

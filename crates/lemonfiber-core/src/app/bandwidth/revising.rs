@@ -231,8 +231,9 @@ fn unreadable(what: &str, given: &str, shape: &str) -> Problem {
 #[cfg(test)]
 mod tests {
     use super::{defaulted_upload, revised, Asked};
+    use crate::bandwidth::capacity::Source;
     use crate::bandwidth::limit::UPLOAD_SHARE;
-    use crate::bandwidth::{Cap, Declared, Limit, WhenExceeded, UNREADABLE};
+    use crate::bandwidth::{Cap, Capacity, Declared, Limit, WhenExceeded, UNREADABLE};
 
     /// A moment every case here reads against.
     const NOW: u64 = 1_790_812_800;
@@ -416,24 +417,72 @@ mod tests {
 
     #[test]
     fn a_setting_can_be_taken_away_again_by_saying_so() {
+        // One of the three words each, so none of them is a word only the reader
+        // of this function knows about. A measured line that survived being taken
+        // away is the worst of the three: it would go on backing shares of a
+        // figure the operator has withdrawn.
         let held = Declared {
             rhythm: crate::bandwidth::Rhythm::read("07:00-23:00"),
             cap: Some(Cap {
                 monthly: 100,
                 exceeded: WhenExceeded::Pause,
             }),
-            capacity: None,
+            capacity: Some(Capacity {
+                down: 60 * 1024 * 1024,
+                up: 6 * 1024 * 1024,
+                source: Source::Declared,
+                taken: NOW,
+                through_tunnel: false,
+            }),
             ..Declared::default()
         };
         let asked = Asked {
             active: Some("none".to_owned()),
             cap: Some("off".to_owned()),
+            line: Some("unset".to_owned()),
             ..Asked::default()
         };
         let cleared = revised(NOW, held, &asked).ok();
         assert!(cleared
             .as_ref()
-            .is_some_and(|declared| declared.rhythm.is_none() && declared.cap.is_none()));
+            .is_some_and(|declared| declared.rhythm.is_none()
+                && declared.cap.is_none()
+                && declared.capacity.is_none()));
+    }
+
+    #[test]
+    fn a_word_this_build_does_not_know_never_falls_back_to_the_cap_s_own_answer() {
+        // An operator who typed `stop` meant something by it. Keeping `continue`
+        // because the new word did not read is the cap doing the opposite of what
+        // they asked, at two in the morning on a stack nobody is watching — so
+        // the whole request is refused rather than half of it taken.
+        let held = Declared {
+            cap: Some(Cap {
+                monthly: 100,
+                exceeded: WhenExceeded::Continue,
+            }),
+            ..Declared::default()
+        };
+        let asked = Asked {
+            cap: Some("1TiB".to_owned()),
+            exceeded: Some("stop".to_owned()),
+            ..Asked::default()
+        };
+        // The remedy ends where it does on purpose: the refusal for a word named
+        // at a cap nobody declared adds *and only where a cap is declared* to the
+        // same three words, and one was declared here — so sending the operator
+        // to fix that would send them to fix something that is not wrong.
+        let refused = revised(NOW, held, &asked);
+        assert!(
+            refused.is_err_and(|problem| {
+                problem.code == UNREADABLE
+                    && problem.summary.contains("`stop`")
+                    && problem.remedies.first().is_some_and(|remedy| {
+                        remedy.action.ends_with("pause, throttle or continue")
+                    })
+            }),
+            "the word they typed is quoted back, and the three it could have been"
+        );
     }
 
     #[test]

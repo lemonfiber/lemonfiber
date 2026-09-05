@@ -268,6 +268,29 @@ mod tests {
     }
 
     #[test]
+    fn a_client_reporting_nothing_in_force_and_no_rate_is_not_rendered_as_a_figure() {
+        // Two absences, and neither of them is a zero. A client reporting no limit
+        // has not taken the setting, and one whose throughput read failed has not
+        // been measured at all — rendering either as a rate would invent the one
+        // number the operator opened this report to check.
+        let mut unsaid = a_household();
+        unsaid.clients = vec![Holding {
+            client: "qbittorrent".to_owned(),
+            answer: Answer::Held {
+                down: Held::of(Some(5_242_880), None, None, true),
+                up: Held::of(Some(262_144), None, None, true),
+                period: None,
+            },
+        }];
+        let said = shown(&unsaid);
+        assert!(said.contains("held to nothing, moving unknown"), "{said}");
+        assert!(
+            said.contains("own configuration"),
+            "and a figure it did not take is still a setting that did not take: {said}"
+        );
+    }
+
+    #[test]
     fn what_is_never_limited_is_said_on_every_report() {
         for measured in [a_household(), Measured::default()] {
             let said = shown(&measured);

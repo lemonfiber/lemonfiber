@@ -550,14 +550,73 @@ mod tests {
         // A month reported as untouched on a stack whose clients would not answer
         // is the one reading that would let a cap be passed in silence.
         let ctx = a_context().build();
-        let declared = Declared {
+        assert!(counting(&ctx, &[], &a_cap()).await.is_none());
+    }
+
+    /// A cap, so the clients are asked what they have moved at all.
+    fn a_cap() -> Declared {
+        Declared {
             cap: Some(Cap {
                 monthly: 100,
                 exceeded: WhenExceeded::Pause,
             }),
             ..Declared::default()
-        };
-        assert!(counting(&ctx, &[], &declared).await.is_none());
+        }
+    }
+
+    /// The torrent client, answering what it has moved from a transport of its
+    /// own so the client beside it can be given a different one.
+    fn a_client_that_says_what_it_moved() -> super::reaching::Client {
+        super::reaching::Client::Torrent(Box::new(crate::qbittorrent::Qbittorrent::authenticated(
+            Fake::by_path(vec![
+                ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
+                (
+                    "/api/v2/transfer/info",
+                    Replies::reply(
+                        200,
+                        r#"{"dl_info_speed":0,"up_info_speed":0,
+                                "dl_info_data":900,"up_info_data":80}"#,
+                    ),
+                ),
+            ]),
+            "http://127.0.0.1:8081",
+            a_password(),
+        )))
+    }
+
+    /// The Usenet client on the same stack, which is not there.
+    fn a_client_that_will_not_say() -> super::reaching::Client {
+        super::reaching::Client::Usenet(Box::new(crate::sabnzbd::Sabnzbd::new(
+            Fake::silent(),
+            "http://127.0.0.1:8080",
+            "the-key",
+        )))
+    }
+
+    #[tokio::test]
+    async fn a_client_that_will_not_say_what_it_has_moved_is_named_rather_than_counted_as_nothing()
+    {
+        // Taken as a zero it would be a month reading emptier than it is, which is
+        // how a cap gets passed in silence. So the figure is what answered, and
+        // the operator is told whose traffic it is short by rather than left to
+        // work out why the number looks low.
+        let ctx = a_context().build();
+        let month = counting(
+            &ctx,
+            &[
+                a_client_that_says_what_it_moved(),
+                a_client_that_will_not_say(),
+            ],
+            &a_cap(),
+        )
+        .await;
+        assert!(
+            month.is_some_and(|month| month.moved() == 980
+                && month.incomplete.iter().any(|missing| missing
+                    .contains("sabnzbd would not say what it has moved")
+                    && missing.contains("none of it is in this figure"))),
+            "the figure is the client that answered, and the one that did not is named"
+        );
     }
 
     #[test]

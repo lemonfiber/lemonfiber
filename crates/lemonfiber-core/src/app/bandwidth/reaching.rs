@@ -162,7 +162,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use lemonfiber_fixtures::http::Fake;
+    use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
     use super::{answer, holding, opened, said, DownloadKind, DownloadTarget};
     use crate::bandwidth::{Answer, Held, Period, Verdict};
@@ -338,13 +338,19 @@ mod tests {
             .build()
             .with_http(Fake::silent());
         let clients = opened(&ctx, &[torrent()]).await;
-        let first = clients.first();
-        assert!(first.is_some(), "the torrent client opened");
+        assert_eq!(clients.len(), 1, "the torrent client opened");
 
         for client in &clients {
-            let said = holding(client, &wanted(), false).await;
-            assert!(matches!(said.answer, Answer::Silent { .. }));
-            assert!(said.worth_saying());
+            let reported = holding(client, &wanted(), false).await;
+            assert!(
+                parts(&reported.answer).is_none(),
+                "no figures came back, and an unknown limit rendered as no limit \
+                 is a report reading better than the stack is"
+            );
+            if let Answer::Silent { said } = &reported.answer {
+                assert!(said.contains("not answering"), "{said}");
+            }
+            assert!(reported.worth_saying());
         }
     }
 
@@ -359,6 +365,53 @@ mod tests {
             .with_http(Fake::silent());
         for client in &opened(&ctx, &[torrent()]).await {
             assert!(client.moved("2026-09").await.is_none());
+        }
+    }
+
+    /// `SABnzbd`'s queue, holding at a quarter of a megabyte and pulling under it.
+    const QUEUED: &str = r#"{"queue":{"speedlimit_abs":"262144","kbpersec":"128.0"}}"#;
+
+    /// Its account statistics, kept by the day rather than as a running total.
+    const DAILY: &str = r#"{"servers":{"one":{"total":9000,"daily":{"2026-09-01":2000}}}}"#;
+
+    #[tokio::test]
+    async fn the_usenet_client_is_asked_on_its_own_shape_rather_than_the_torrent_one() {
+        // It answers about a limit and a month through entirely different calls,
+        // and it has no upload and keeps no hours. A stack that reached it the
+        // torrent client's way would report a working client as silent, and the
+        // household would be held to a limit nothing had ever put on it.
+        let ctx = a_context()
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(None, Some(KEYED))))
+            .with_http(Fake::by_path(vec![
+                ("mode=queue", Replies::reply(200, QUEUED)),
+                ("mode=server_stats", Replies::reply(200, DAILY)),
+            ]));
+        let clients = opened(&ctx, &[usenet()]).await;
+        assert_eq!(clients.len(), 1, "the Usenet client opened");
+
+        for client in &clients {
+            let reported = holding(client, &wanted(), false).await;
+            assert_eq!(reported.client, "sabnzbd");
+            let answered = parts(&reported.answer);
+            assert!(
+                answered.is_some_and(|(down, up, period)| down.accepted == Some(SLOW)
+                    && down.verdict == Verdict::Holding
+                    && up.verdict == Verdict::NothingToLimit
+                    && period.is_none()),
+                "it took the download figure, has no upload to have refused one, \
+                 and keeps no hours of its own"
+            );
+            assert!(
+                client
+                    .moved("2026-09")
+                    .await
+                    .is_some_and(|moved| moved.down == 2_000
+                        && moved.up == 0
+                        && !moved.since_start),
+                "a month it can answer for properly, rather than a total since it \
+                 last started"
+            );
         }
     }
 
