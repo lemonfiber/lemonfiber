@@ -440,6 +440,131 @@ fn silent(name: &str) -> Ctx {
     .with_http(Fake::silent())
 }
 
+/// A context over a transport that answers everything both writes ask.
+///
+/// The refusing case next door proves the dispatcher reaches these commands; this one
+/// proves what they do when the service answers. Both are wanted from *outside* the
+/// crate: the app layer is compiled twice, and a branch driven only from the in-crate
+/// tests is counted as never run in the copy these binaries link.
+fn answering(name: &str) -> Ctx {
+    let transport = Fake::by_path(vec![
+        // Ahead of `/Users`, whose text it contains: a route matched by prefix would
+        // answer the sign-in with the list of accounts.
+        (
+            "/Users/AuthenticateByName",
+            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+        ),
+        (
+            "/Library/MediaFolders",
+            Answer::reply(200, r#"{"Items":[]}"#),
+        ),
+        ("/Localization/ParentalRatings", Answer::reply(200, "[]")),
+        (
+            "/Users",
+            Answer::reply(
+                200,
+                r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
+                    "Policy":{"EnableAllFolders":true}}]"#,
+            ),
+        ),
+        ("/auth/jellyfin", Answer::reply(200, "{}")),
+        (
+            "/settings/main",
+            Answer::reply(
+                200,
+                r#"{"defaultPermissions":160,"defaultQuotas":{"movie":{},"tv":{}}}"#,
+            ),
+        ),
+        (
+            "/user/jellyfin/",
+            Answer::reply(200, r#"{"id":4,"permissions":160}"#),
+        ),
+        (
+            "/user/4/quota",
+            Answer::reply(
+                200,
+                r#"{"movie":{"days":7,"limit":5,"used":1},"tv":{"days":7,"limit":0,"used":0}}"#,
+            ),
+        ),
+        ("/request/7/", Answer::reply(200, "{}")),
+        (
+            "/api/v1/request",
+            Answer::reply(
+                200,
+                r#"{"pageInfo":{"results":1},"results":[{"id":7,
+                    "createdAt":"2026-08-17T21:04:09.000Z","status":1,"type":"movie",
+                    "media":{"status":2,"externalServiceId":3},
+                    "requestedBy":{"displayName":"Alex"}}]}"#,
+            ),
+        ),
+        ("", Answer::reply(200, "[]")),
+    ]);
+    Ctx::new(
+        Arc::new(Scripted(Ok(spoke("")))),
+        Arc::new(Reporting::holding(
+            &["jellyfin", "seerr"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )),
+        Stopped::today(),
+        Arc::new(lemonfiber_core::adapters::Disk),
+        stack(),
+        Settings {
+            env_file: Some(recorded_admin(name)),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_http(transport)
+}
+
+/// A choice that is written comes back as the household, under its own kind.
+#[tokio::test]
+async fn a_choice_that_is_written_answers_with_the_household() {
+    let said = dispatch(
+        Command::Allowing(Chosen {
+            member: None,
+            policy: Some(Policy::WithinALimit),
+            quota: Some(Quota {
+                requests: 5,
+                days: 7,
+            }),
+        }),
+        &answering("written"),
+    )
+    .await
+    .ok()
+    .map(Outcome::envelope)
+    .and_then(|envelope| envelope.to_json())
+    .unwrap_or_default();
+
+    assert!(said.contains(r#""kind":"household""#), "{said}");
+    assert!(said.contains("5 requests a week"), "{said}");
+}
+
+/// A request that is ruled on comes back the same way, and says what was done.
+#[tokio::test]
+async fn a_request_that_is_ruled_on_answers_with_the_household() {
+    let said = dispatch(
+        Command::Deciding(Decision {
+            request: 7,
+            answer: Ruling::TurnedDown {
+                reason: "no room this month".to_owned(),
+            },
+        }),
+        &answering("ruled"),
+    )
+    .await
+    .ok()
+    .map(Outcome::envelope)
+    .and_then(|envelope| envelope.to_json())
+    .unwrap_or_default();
+
+    assert!(said.contains(r#""kind":"household""#), "{said}");
+    assert!(said.contains("no room this month"), "{said}");
+    assert!(said.contains("yours to pass on"), "{said}");
+}
+
 /// Both writes are reachable through the dispatcher, and both refuse rather than
 /// claim a change nobody could make.
 ///
