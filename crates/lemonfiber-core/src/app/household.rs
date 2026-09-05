@@ -10,16 +10,21 @@
 //! their behalf. Nothing new is stored to make that work: the sign-in uses the media-server
 //! password seeding already minted and recorded.
 
+mod allowance;
+
 use std::collections::BTreeMap;
+use std::time::SystemTime;
 
 use super::targets::{jellyfin_reader, open_servarrs, seerr_reader};
 use super::Ctx;
+use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::{HouseholdMember, HouseholdReport, MemberAccess, MemberRequest, Restriction};
 use crate::ports::service::{
     Access, Certificate, Household as _, HouseholdRequest, Member, Pipeline, Requests,
 };
+use crate::quality::Selection;
 use crate::recyclarr::Kind;
 
 /// Read the household's requests, grouped by the member who made each one.
@@ -76,7 +81,7 @@ pub(super) async fn household(
     // Reached once for both questions it is asked — what the household requested, and
     // what each member may request — because a second reach would be a second chance
     // to disagree about whether it answered at all.
-    let (requests, requesting) = match reaching(ctx, &manifest.services).await {
+    let (requests, asked) = match reaching(ctx, &manifest.services).await {
         Ok(access) => {
             let asked = access.seerr.requests().await.map_err(|_| {
                 "the request service's own record could not be read, so what the \
@@ -90,13 +95,29 @@ pub(super) async fn household(
                     Vec::new()
                 }
             };
-            (requests, asking(&access, &accounts).await)
+            (
+                requests,
+                allowance::gathered(&access.seerr, &accounts).await,
+            )
         }
         Err(reason) => {
             findings.push(reason);
-            (Vec::new(), BTreeMap::new())
+            (
+                Vec::new(),
+                allowance::Asked {
+                    household: None,
+                    members: BTreeMap::new(),
+                },
+            )
         }
     };
+    if asked.household.is_none() {
+        findings.push(
+            "what the household may ask for could not be read, so no policy and no \
+             limit are shown — reported as unread rather than as unlimited"
+                .to_owned(),
+        );
+    }
 
     // One library read per service names every request that has been handed over, rather
     // than a lookup per request: the same read either way, made once.
@@ -129,31 +150,14 @@ pub(super) async fn household(
             libraries: &libraries,
             titles: &titles,
             certificates: &certificates,
-            requesting: &requesting,
+            asked: &asked,
+            quality: &super::quality::recorded_selection(ctx),
+            now: ctx.clock.now(),
         },
         member,
     );
     report.findings.append(&mut findings);
     Ok(report)
-}
-
-/// Whether each member's requests arrive without anybody seeing them, by the media
-/// server's own identifier.
-///
-/// **Absent is not false.** Somebody the request service could not be asked about is
-/// left out entirely, because an unread answer is not a disagreement — reporting one
-/// would send an operator looking for a defect in a service that is merely down.
-async fn asking(
-    access: &crate::app::targets::HouseholdAccess,
-    accounts: &[Member],
-) -> BTreeMap<String, bool> {
-    let mut asking = BTreeMap::new();
-    for account in accounts {
-        if let Ok(Some(requesting)) = access.seerr.requesting(&account.id).await {
-            asking.insert(account.id.clone(), requesting.approves_own);
-        }
-    }
-    asking
 }
 
 /// The tables every member's line is said in, gathered so the assembly takes one of
@@ -169,15 +173,20 @@ struct Naming<'a> {
     titles: &'a BTreeMap<(&'static str, i64), String>,
     /// The media server's own certificates, in the operator's country.
     certificates: &'a [Certificate],
-    /// Whether each member's requests arrive unseen, by media-server identifier.
-    requesting: &'a BTreeMap<String, bool>,
+    /// Whether each member's requests arrive unseen, how much of their period is
+    /// spent, and what the household is under where nobody chose otherwise.
+    asked: &'a allowance::Asked,
+    /// The quality in force, which is what an estimate of a request's cost turns on.
+    quality: &'a Selection,
+    /// Now, against which a request that is waiting is measured.
+    now: SystemTime,
 }
 
 /// The request service, signed in — or in plain words why it could not be asked.
 ///
 /// A reason rather than an error: none of these stops the household being listed, and
 /// each is something the operator can act on.
-async fn reaching(
+pub(super) async fn reaching(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Result<crate::app::targets::HouseholdAccess, String> {
@@ -246,23 +255,36 @@ fn assemble(
     // Keyed by the lower-cased name: the media server treats two names differing only
     // in case as the same person, so a join on the exact string would file a member's
     // own requests under nobody.
-    let mut by_name: BTreeMap<String, Vec<MemberRequest>> = BTreeMap::new();
+    let mut by_name: BTreeMap<String, Theirs> = BTreeMap::new();
     for request in requests {
-        by_name
-            .entry(request.member.to_lowercase())
-            .or_default()
-            .push(MemberRequest {
-                title: title_of(&request, naming.titles),
-                media: request.kind.map(Kind::noun).map(str::to_owned),
-                state: State::of(request.request_status, request.media_status),
-            });
+        let state = State::of(request.request_status, request.media_status);
+        let made = request.made.clone();
+        let theirs = by_name.entry(request.member.to_lowercase()).or_default();
+        // Kept beside the requests rather than read back off them: what a period counts
+        // is when something was asked for, and a request already fetched is still inside
+        // the window that counted it.
+        //
+        // A request that was turned down is not, which is the service's own arithmetic
+        // and not a choice made here: it excludes a declined one from the count, so
+        // counting its date would name a day the window is not waiting on.
+        if let Some(made) = made.clone().filter(|_| state != Some(State::Declined)) {
+            theirs.made.push(made);
+        }
+        theirs.requests.push(MemberRequest {
+            id: request.id,
+            title: title_of(&request, naming.titles),
+            media: request.kind.map(Kind::noun).map(str::to_owned),
+            state,
+            waiting_days: allowance::waiting(state, made.as_deref(), naming.now),
+            estimate: allowance::estimated(request.kind, naming.quality),
+        });
     }
 
     let mut members: Vec<HouseholdMember> = Vec::new();
     for account in accounts {
         // Taken before the narrowing below, so asking about one person does not leave
         // everybody else's requests looking like requests belonging to nobody.
-        let asked = by_name
+        let theirs = by_name
             .remove(&account.name.to_lowercase())
             .unwrap_or_default();
         if wanted
@@ -274,17 +296,20 @@ fn assemble(
         // An administrator is left out of the agreement: the request service treats
         // one as holding every permission, so an owner approving their own requests is
         // what an owner is rather than a household disagreeing with itself.
+        let held = naming.asked.members.get(&account.id);
         let approves_own = if account.access.administrator {
             None
         } else {
-            naming.requesting.get(&account.id).copied()
+            held.map(|held| held.approves_own)
         };
+        let made: Vec<&str> = theirs.made.iter().map(String::as_str).collect();
         members.push(HouseholdMember {
             access: named_access(&account.access, naming, approves_own),
+            asking: held.map(|held| allowance::reported(held, &made, naming.now)),
             last_seen: account.last_seen,
             claimed: account.claimed,
             name: account.name,
-            requests: asked,
+            requests: theirs.requests,
         });
     }
     members.sort_by(|one, two| one.name.cmp(&two.name));
@@ -323,12 +348,35 @@ fn assemble(
         .any(|held| held.access.restriction != Restriction::Unrestricted)
         .then(|| crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned());
 
+    findings.extend(allowance::worth_saying(&members));
+
     HouseholdReport {
+        policy: naming.asked.household.as_ref().map(Policy::of),
+        allows: naming
+            .asked
+            .household
+            .as_ref()
+            .and_then(|held| held.quota)
+            .map(crate::asking::limit),
         members,
         findings,
         available: true,
         filtering,
     }
+}
+
+/// One member's requests, and when each was asked for.
+///
+/// The dates are gathered beside the requests rather than carried on them, because they
+/// answer a different question: a report says how long something has been *waiting*,
+/// and a period counts when it was *asked for* — which includes everything already
+/// fetched.
+#[derive(Default)]
+struct Theirs {
+    /// What they asked for, as the report carries it.
+    requests: Vec<MemberRequest>,
+    /// When each was asked for, as the request service timestamps it.
+    made: Vec<String>,
 }
 
 /// The same access, with the libraries said in the words the operator gave them.
@@ -379,6 +427,11 @@ fn unavailable(reason: &str) -> HouseholdReport {
         members: Vec::new(),
         findings: vec![reason.to_owned()],
         available: false,
+        // Nothing was read, so there is no policy to report and no limit to state. A
+        // household shown as trusting everybody because nobody could be asked is the
+        // same defect as one shown as having asked for nothing.
+        policy: None,
+        allows: None,
         // Nothing to be modest about: nobody was read, so nobody is limited as far as
         // this answer knows, and a caution beside an empty list is a claim about a
         // household nobody saw.
@@ -392,7 +445,7 @@ mod tests {
 
     use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-    use super::{assemble, household, reaching, title_of, Ctx, Naming};
+    use super::{allowance, assemble, household, reaching, title_of, Ctx, Naming, Selection};
     use crate::household::State;
     use crate::model::{HouseholdReport, Restriction};
     use crate::ports::service::Certificate;
@@ -400,6 +453,7 @@ mod tests {
     use crate::recyclarr::Kind;
     use crate::test_support::{a_context, a_password, SeedFs};
     use std::collections::BTreeMap;
+    use std::time::SystemTime;
 
     /// A Servarr config that opens a target, carrying a readable key.
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -424,10 +478,42 @@ mod tests {
                 libraries,
                 titles,
                 certificates: &[],
-                requesting: &BTreeMap::new(),
+                asked: &nothing_asked(),
+                quality: &Selection::everywhere(crate::quality::Preset::Balanced),
+                now: SystemTime::UNIX_EPOCH,
             },
             member,
         )
+    }
+
+    /// A request service that answered nothing, which is what these cases are about.
+    fn nothing_asked() -> allowance::Asked {
+        allowance::Asked {
+            household: None,
+            members: BTreeMap::new(),
+        }
+    }
+
+    /// A request service that answered about each member named, and about nobody else.
+    ///
+    /// Absent is not false here either: somebody left out is somebody it could not be
+    /// asked about, which is what these cases turn on.
+    fn asked_of(requesting: &BTreeMap<String, bool>) -> allowance::Asked {
+        allowance::Asked {
+            household: None,
+            members: requesting
+                .iter()
+                .map(|(id, approves_own)| {
+                    (
+                        id.clone(),
+                        allowance::Held {
+                            approves_own: *approves_own,
+                            headroom: crate::ports::service::Headroom::default(),
+                        },
+                    )
+                })
+                .collect(),
+        }
     }
 
     /// The same, over this household's own certificates and what the request service
@@ -443,7 +529,9 @@ mod tests {
                 libraries: &unnamed(),
                 titles: &titles(),
                 certificates: &british(),
-                requesting,
+                asked: &asked_of(requesting),
+                quality: &Selection::everywhere(crate::quality::Preset::Balanced),
+                now: SystemTime::UNIX_EPOCH,
             },
             None,
         )
@@ -602,6 +690,8 @@ mod tests {
         statuses: (u8, u8),
     ) -> HouseholdRequest {
         HouseholdRequest {
+            id: 0,
+            made: None,
             member: member.to_owned(),
             kind,
             item,
@@ -1013,8 +1103,14 @@ mod tests {
         let first = report.members.first().and_then(|m| m.requests.first());
         assert_eq!(first.and_then(|request| request.title.clone()), None);
         assert_eq!(first.and_then(|request| request.state), Some(State::Here));
-        // Skipped, not failed: no unreadable-library finding is raised.
-        assert!(report.findings.is_empty());
+        // Skipped, not failed: no unreadable-library finding is raised. Asserted on
+        // the subject rather than on the count, because this fixture answers nothing
+        // about what the household may *ask* for either, and that gap has a line of
+        // its own — one whose arrival here would otherwise read as the library's.
+        assert!(
+            !report.findings.iter().any(|said| said.contains("librar")),
+            "{report:?}"
+        );
     }
 
     #[tokio::test]

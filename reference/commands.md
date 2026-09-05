@@ -25,7 +25,7 @@ Commands:
   doctor        Run the checks that prove the stack is doing what it should
   watch         Guard the data location while forms run, stopping them if it disappears
   trace         Follow one show or film across the services — "where is my show?"
-  household     Show who is in the household, what each may watch, and what each asked for
+  household     Show who is in the household, what each may watch and ask for, and what each asked for
   walkthrough   Add one thing, end to end, and watch every step of it happen
   explain       Say what one of this product's words means
   stuck         List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
@@ -815,11 +815,21 @@ Options:
 ## `lemonfiber household`
 
 ```text
-Show who is in the household, what each may watch, and what each asked for.
+Show who is in the household, what each may watch and ask for, and what each asked for.
 
 Everybody the media server holds an account for — including those who have asked for nothing, and the invitations nobody has taken up yet. Each person carries what they may watch and when they were last seen; their requests read in the words they would use rather than the services' own, and each named one links to its full trace.
 
-Usage: lemonfiber household [OPTIONS]
+Each person also carries what they may ask for: how much a period allows them, how much of it is gone, and when there is room again. A request nobody has ruled on shows how long it has been waiting and about how much room it would want.
+
+Name one of the three things underneath to change any of that, or to answer one request that is waiting.
+
+Usage: lemonfiber household [OPTIONS] [COMMAND]
+
+Commands:
+  allow    Choose what happens to what the household asks for, and how much it may ask
+  approve  Let one waiting request through, by the number the household list gives it
+  decline  Turn one waiting request down, saying why
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --json
@@ -827,6 +837,109 @@ Options:
 
       --member <MEMBER>
           Narrow to one member, named the way you would say it
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber household allow`
+
+```text
+Choose what happens to what the household asks for, and how much it may ask.
+
+Naming only a limit leaves the policy alone, and naming only a policy leaves the limit alone — saying nothing about something is not choosing it.
+
+Television is counted a season at a time, because that is how the request service counts it: one ask for a six-season series spends six.
+
+Usage: lemonfiber household allow [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --member <MEMBER>
+          Set it for one person instead of for the whole household
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --policy <POLICY>
+          What happens to a request: trusted, within-a-limit, or everything-waits
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --requests <REQUESTS>
+          How many requests a period allows. Needs `--days` beside it
+
+      --days <DAYS>
+          How long that period is, in days. Needs `--requests` beside it
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber household approve`
+
+```text
+Let one waiting request through, by the number the household list gives it.
+
+Refused where there is no room left on the disk, and said as the disk rather than as anybody's limit — raising a limit would change nothing.
+
+Usage: lemonfiber household approve [OPTIONS] <REQUEST>
+
+Arguments:
+  <REQUEST>
+          The request, by the number beside it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber household decline`
+
+```text
+Turn one waiting request down, saying why.
+
+The reason is required and it does not travel: the request service tells whoever asked that it was declined and carries no reason with it, so what you write here is yours to pass on.
+
+Usage: lemonfiber household decline [OPTIONS] --reason <REASON> <REQUEST>
+
+Arguments:
+  <REQUEST>
+          The request, by the number beside it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --reason <REASON>
+          Why, in a few words
 
       --dry-run
           Say what would happen, and change nothing

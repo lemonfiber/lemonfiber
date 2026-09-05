@@ -23,12 +23,13 @@ use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::{self, Kept};
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Allowance, Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
-use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
+
+mod household;
 
 use super::asked::{unwanted, Arguments, Disturbing};
 use super::Refused;
@@ -58,6 +59,9 @@ pub const OFFERED: &[&str] = &[
     "invite",
     "remove",
     "reissue",
+    "household-allow",
+    "household-approve",
+    "household-decline",
     "support",
     "restore",
     "watch",
@@ -112,69 +116,6 @@ fn stopping(download: Option<String>, offer: Option<String>) -> Result<Command, 
     })
 }
 
-/// The command one of the three household actions names.
-///
-/// All are addressed to a member rather than to a form, a file or a service, and all are
-/// refused the same way when nobody is named — so the refusal is written once.
-///
-/// What they may watch reaches only the one that makes an account. The other two are
-/// given it and drop it, which they may because the carrier refuses it to them first:
-/// a library, an age limit or a choice about unrated content named to a reissue or a
-/// removal is turned away by name before this is reached.
-fn about_a_person(
-    action: &str,
-    name: Option<String>,
-    confirm: bool,
-    allowance: RawAllowance,
-) -> Result<Command, Refused> {
-    let name = name.ok_or_else(|| Refused::Missing {
-        action: action.to_owned(),
-        argument: "name".to_owned(),
-    })?;
-    let allowance = Allowance {
-        libraries: allowance.libraries,
-        age_limit: allowance.age_limit,
-        unrated: unrated(allowance.unrated.as_deref())?,
-    };
-    match action {
-        "invite" => Ok(Command::Invite { name, allowance }),
-        "reissue" => Ok(Command::Reissue { name }),
-        _ => Ok(Command::Remove { name, confirm }),
-    }
-}
-
-/// What an invitation was told to allow, as the three arguments carrying it.
-///
-/// Gathered rather than passed as three, because they are one decision taken at one
-/// moment and because a function taking three of one request's arguments beside two of
-/// another's is a signature a caller gets wrong silently.
-struct RawAllowance {
-    /// The libraries named, as the operator names them.
-    libraries: Vec<String>,
-    /// The age above which the media server holds things back.
-    age_limit: Option<u32>,
-    /// What is to happen to content the media server has no rating for, as written.
-    unrated: Option<String>,
-}
-
-/// What a word about unrated content means, or why it means nothing.
-///
-/// Nothing given is nothing said, which leaves the choice to the default a restriction
-/// carries. A word this build does not know is refused with the ones it does, rather
-/// than falling to whichever answer is safer — a caller who wrote `allow` and meant it
-/// must not be given `block` because of a spelling.
-fn unrated(written: Option<&str>) -> Result<Option<Unrated>, Refused> {
-    match written {
-        None => Ok(None),
-        Some("block") => Ok(Some(Unrated::HeldBack)),
-        Some("allow") => Ok(Some(Unrated::LetThrough)),
-        Some(other) => Err(Refused::Unrecognised {
-            argument: "unrated".to_owned(),
-            offered: format!("`{other}` is neither `block` nor `allow`"),
-        }),
-    }
-}
-
 /// The command a warning being answered names, or why it names none.
 ///
 /// Over the whole suite. Only something a run warns about can be answered, and a
@@ -207,6 +148,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     if let Some(refused) = beforehand(action, &given) {
         return Err(refused);
     }
+    // Everything addressed to somebody who lives here goes next door before this
+    // takes the carrier apart: an account offered, a password taken off, an account
+    // taken away, what the household may ask for, and one thing it already asked for.
+    // Each of them has to say what it lacks before it can name a command, which is
+    // longer than a row — and none of the fields they use is one this table reads.
+    if household::about_the_household(action) {
+        return household::asked_for(action, given);
+    }
     let needs = |argument: &str| Refused::Missing {
         action: action.to_owned(),
         argument: argument.to_owned(),
@@ -216,7 +165,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         services,
         wait,
         service,
-        name,
         key,
         value,
         preset,
@@ -234,12 +182,10 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         agreed,
         confirm,
         item,
-        libraries,
-        age_limit,
-        unrated,
         term,
         season,
         download,
+        ..
     } = given;
     match action {
         // Starting named services and bringing a form up are different requests
@@ -272,22 +218,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // The one thing that account names and leaves alone, asked for on its own.
         "stop-seeding" => stopping(download, offer),
         "backup" => Ok(Command::Backup { service }),
-        // The three addressed to a person rather than a form, a file or a service.
-        // Unconfirmed, a removal says what it takes — their watch history, and every
-        // request they made — and touches neither service, so what a browser agrees
-        // to is what it was shown, the way a forget's agreement is. A reissue asks
-        // for no agreement: nothing is destroyed and nothing is listed first, and
-        // what ends is a password nobody here knew.
-        "invite" | "reissue" | "remove" => about_a_person(
-            action,
-            name,
-            confirm,
-            RawAllowance {
-                libraries,
-                age_limit,
-                unrated,
-            },
-        ),
         // The two reads this surface serves twice, each reaching the same command its
         // own endpoint reaches and widened by the same word the command line widens
         // it with. Neither is a second reading of the stack; each is the reading that

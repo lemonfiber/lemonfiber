@@ -18,7 +18,8 @@ pub(crate) use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED, TAKES_AGREED,
     TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_NAME, TAKES_NARROWING,
-    TAKES_PRESET, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_TERM, TAKES_WAITING,
+    TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES,
+    TAKES_SETTING, TAKES_TERM, TAKES_WAITING,
 };
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::guard::Token;
@@ -27,7 +28,10 @@ pub(crate) use lemonfiber_api::router::Serving;
 pub(crate) use lemonfiber_core::app::bundle::Wanted;
 pub(crate) use lemonfiber_core::app::repair::Consent;
 pub(crate) use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
-pub(crate) use lemonfiber_core::app::{Command, Ctx, QualityAction, Waiting};
+pub(crate) use lemonfiber_core::app::{
+    Answer, Chosen, Command, Ctx, Decision, QualityAction, Waiting,
+};
+pub(crate) use lemonfiber_core::asking::Policy;
 pub(crate) use lemonfiber_core::bundle::Filenames;
 pub(crate) use lemonfiber_core::config::Settings;
 pub(crate) use lemonfiber_core::doctor::Narrowing;
@@ -125,6 +129,14 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         term: takes(TAKES_TERM).then(|| FOLLOWED.to_owned()),
         season: takes(TAKES_TERM).then_some(SEASON),
         download: takes(TAKES_DOWNLOAD).then(|| DOWNLOAD.to_owned()),
+        policy: takes(TAKES_POLICY).then(|| POLICY.to_owned()),
+        // Both halves or neither: one alone is half a limit, which the translation
+        // refuses — so an action given only one would be refused for the argument it
+        // was *not* given, and every sweep over it would read as something else.
+        requests: takes(TAKES_POLICY).then_some(ALLOWED),
+        days: takes(TAKES_POLICY).then_some(PERIOD),
+        request: takes(TAKES_REQUEST).then_some(WAITING),
+        reason: takes(TAKES_REASON).then(|| REASON.to_owned()),
     }
 }
 
@@ -176,3 +188,21 @@ pub(crate) const UNRATED: &str = "allow";
 /// words a walk or a trace is given, so a command carrying this cannot pass for one
 /// carrying either of those.
 pub(crate) const DOWNLOAD: &str = "A.Show.S01E01.1080p";
+/// A policy, as a request body writes it. The one that lives inside a limit, so the
+/// limit beside it is not an argument the translation could drop without noticing.
+pub(crate) const POLICY: &str = "within-a-limit";
+
+/// How many requests a period allows. Not one, so a command carrying it cannot pass
+/// for one carrying a figure anything might have defaulted to.
+pub(crate) const ALLOWED: u32 = 5;
+
+/// How long that period is. Not seven, so the two numbers cannot be swapped without
+/// a case noticing.
+pub(crate) const PERIOD: u32 = 30;
+
+/// One waiting request, by the number the request service would file it under. Not
+/// nought, so a command carrying it cannot pass for one carrying nothing.
+pub(crate) const WAITING: i64 = 7;
+
+/// Why a request was turned down, in the operator's own words.
+pub(crate) const REASON: &str = "there is no room this month";

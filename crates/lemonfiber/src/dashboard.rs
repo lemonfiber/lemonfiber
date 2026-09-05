@@ -262,6 +262,8 @@ pub(crate) mod tests {
                 available: true,
                 findings: Vec::new(),
                 filtering: None,
+                policy: None,
+                allows: None,
             }),
         }
     }

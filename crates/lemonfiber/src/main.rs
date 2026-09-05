@@ -43,7 +43,9 @@ use render::stack::Doing;
 use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
 use stopping::Choice;
-use translate::{bundling, configuration, invitation, letting, quality, restarting, traced};
+use translate::{
+    bundling, configuration, household, invitation, letting, quality, restarting, traced,
+};
 
 /// Logs as a screen, or logs as a stream.
 ///
@@ -284,7 +286,10 @@ async fn main() -> ExitCode {
         // Naming a word says what it means and naming none lists them, and both are
         // answered from a table compiled into the binary rather than from a stack.
         Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
-        Request::Household { member } => Command::Household { member },
+        Request::Household { member, action } => match household(member, action) {
+            Ok(command) => command,
+            Err(code) => return ExitCode::from(code),
+        },
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
         Request::Outbound => Command::Outbound,

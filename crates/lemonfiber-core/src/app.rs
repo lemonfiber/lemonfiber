@@ -24,6 +24,7 @@ pub mod accepted;
 pub mod appetite;
 pub mod apply;
 pub mod archives;
+mod asking;
 pub mod backup;
 pub mod bundle;
 mod command;
@@ -67,7 +68,7 @@ mod upgrade;
 mod walkthrough;
 pub mod watch;
 
-pub use command::{Allowance, Command, QualityAction};
+pub use command::{Allowance, Answer, Chosen, Command, Decision, QualityAction};
 pub use ctx::Ctx;
 pub use setup::SetupAction;
 
@@ -362,6 +363,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Household { member } => household::household(ctx, member.as_deref())
             .await
             .map(Outcome::Household),
+        // Both answer with the household as it now stands rather than with a report of
+        // their own, the way a forget answers with what is left: what an operator wants
+        // to see after changing a limit is the limit, on the people it applies to.
+        Command::Allowing(chosen) => asking::allowing(ctx, &chosen).await.map(Outcome::Household),
+        Command::Deciding(decision) => asking::deciding(ctx, &decision)
+            .await
+            .map(Outcome::Household),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Explain { word } => crate::glossary::explain(&word)
@@ -446,8 +454,8 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Allowance, Command, Ctx, Outcome, QualityAction, SetupAction,
-        VersionReport, Waiting,
+        dispatch, pull_progress, Allowance, Answer as Ruling, Chosen, Command, Ctx, Decision,
+        Outcome, QualityAction, SetupAction, VersionReport, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -1741,6 +1749,65 @@ mod tests {
         assert!(
             json.contains("\"kind\":\"household\""),
             "envelope names the kind"
+        );
+    }
+
+    /// Both writes about what a household may ask for answer with the household.
+    ///
+    /// Nothing is recorded to sign in with, so each refuses rather than writing — which
+    /// is the answer worth having here: the refusal names what was *not* changed, and a
+    /// command that reported a limit it had failed to set would be the worse of the two
+    /// ways to be wrong.
+    #[tokio::test]
+    async fn choosing_and_deciding_refuse_rather_than_claim_a_change() {
+        let context = ctx(Ok(spoke("")));
+        let chosen = dispatch(
+            Command::Allowing(Chosen {
+                member: None,
+                policy: Some(crate::asking::Policy::Trusted),
+                quota: None,
+            }),
+            &context,
+        )
+        .await;
+        let decided = dispatch(
+            Command::Deciding(Decision {
+                request: 7,
+                answer: Ruling::TurnedDown {
+                    reason: "no room this month".to_owned(),
+                },
+            }),
+            &context,
+        )
+        .await;
+
+        for refused in [chosen, decided] {
+            let code = refused.err().map(|problem| problem.code);
+            assert_eq!(code, Some(crate::asking::UNREACHABLE), "{code:?}");
+        }
+    }
+
+    /// A refusal with no reason is refused before anything is reached.
+    ///
+    /// It never gets as far as the service, which is the point: a blank reason is the
+    /// silent decline this exists to prevent, and it is stopped where it is written
+    /// rather than after somebody's request has already been turned down.
+    #[tokio::test]
+    async fn a_decline_with_a_blank_reason_never_reaches_the_service() {
+        let refused = dispatch(
+            Command::Deciding(Decision {
+                request: 7,
+                answer: Ruling::TurnedDown {
+                    reason: "   ".to_owned(),
+                },
+            }),
+            &ctx(Ok(spoke(""))),
+        )
+        .await;
+
+        assert_eq!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::NO_REASON)
         );
     }
 

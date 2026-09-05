@@ -11,7 +11,11 @@ mod setup;
 use std::path::PathBuf;
 
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+
+mod under;
+
 use include_dir::{include_dir, Dir};
+pub use under::{ConfigAction, HouseholdCommand, QualityCommand};
 
 // Re-exported rather than reached for through the module they now live in: where a
 // flag is declared is this file's business and nobody else's, and moving one would
@@ -262,17 +266,28 @@ pub enum Request {
         #[arg(long)]
         search: bool,
     },
-    /// Show who is in the household, what each may watch, and what each asked for.
+    /// Show who is in the household, what each may watch and ask for, and what each
+    /// asked for.
     ///
     /// Everybody the media server holds an account for — including those who have
     /// asked for nothing, and the invitations nobody has taken up yet. Each person
     /// carries what they may watch and when they were last seen; their requests read
     /// in the words they would use rather than the services' own, and each named one
     /// links to its full trace.
+    ///
+    /// Each person also carries what they may ask for: how much a period allows them,
+    /// how much of it is gone, and when there is room again. A request nobody has ruled
+    /// on shows how long it has been waiting and about how much room it would want.
+    ///
+    /// Name one of the three things underneath to change any of that, or to answer one
+    /// request that is waiting.
     Household {
         /// Narrow to one member, named the way you would say it.
         #[arg(long)]
         member: Option<String>,
+        /// Decide what the household may ask for, or answer one waiting request.
+        #[command(subcommand)]
+        action: Option<HouseholdCommand>,
     },
     /// Add one thing, end to end, and watch every step of it happen.
     ///
@@ -465,59 +480,6 @@ pub enum Request {
         #[arg(long)]
         repoint: bool,
     },
-}
-
-/// What to do with settings.
-#[derive(Debug, Subcommand)]
-pub enum QualityCommand {
-    /// Show the quality choice in force, and what each preset means and costs.
-    Show,
-    /// Choose a preset — for everything, or for one media type.
-    Set {
-        /// The preset: space-saving, balanced, high-quality, or maximum.
-        preset: String,
-        /// Apply it to one media type (tv or movies) rather than everything.
-        #[arg(long = "for", value_name = "MEDIA_TYPE")]
-        media_type: Option<String>,
-        /// Confirm a choice this machine would have to transcode in software.
-        #[arg(long)]
-        confirm: bool,
-    },
-    /// Re-assert the recorded preset over a Recyclarr config you have hand-edited.
-    ///
-    /// An ordinary run keeps your edits; this is the explicit consent to let the
-    /// preset win instead.
-    Reapply,
-    /// Upgrade existing content to the chosen quality — re-download what is already
-    /// here at the higher quality.
-    ///
-    /// A large, bandwidth-expensive operation, separate from a preset change (which
-    /// only affects future acquisitions). States the cost and does nothing until
-    /// `--confirm`.
-    Upgrade {
-        /// Go ahead and trigger the re-search, having seen the cost.
-        #[arg(long)]
-        confirm: bool,
-    },
-}
-
-/// What to do with one setting, or with all of them.
-#[derive(Debug, Subcommand)]
-pub enum ConfigAction {
-    /// Read one setting.
-    Get {
-        /// The setting to read.
-        key: String,
-    },
-    /// Change one setting.
-    Set {
-        /// The setting to change.
-        key: String,
-        /// What to change it to.
-        value: String,
-    },
-    /// Show every setting, with credentials withheld.
-    Show,
 }
 
 #[cfg(test)]

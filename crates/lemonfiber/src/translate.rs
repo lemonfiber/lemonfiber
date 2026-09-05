@@ -7,15 +7,18 @@
 
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Allowance, Command, QualityAction};
+use lemonfiber_core::app::{Allowance, Answer, Chosen, Command, Decision, QualityAction};
+use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
-use lemonfiber_core::ports::service::Unrated;
+use lemonfiber_core::ports::service::{Quota, Unrated};
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 
 use crate::exit::USAGE;
 use crate::say::complain;
-use lemonfiber::cli::{Asked, ConfigAction, QualityCommand, RawAllowance, RawUnrated};
+use lemonfiber::cli::{
+    Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawUnrated,
+};
 
 /// What a support bundle was asked to hold, and where it goes.
 ///
@@ -60,6 +63,80 @@ pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
             }),
         },
     }
+}
+
+/// What is being asked about the household: who is here, or what they may ask for.
+///
+/// One word with four things under it, because they are one subject. Naming nothing is
+/// the reading; naming one of the three is a decision about what that reading shows.
+///
+/// **The narrowing and the decisions do not mix.** `--member` on the word itself narrows
+/// the *reading* to one person, and a decision about one person carries its own — so the
+/// two together are two requests in one line, and the pair is refused rather than one
+/// half being dropped.
+pub(crate) fn household(
+    member: Option<String>,
+    action: Option<HouseholdCommand>,
+) -> Result<Command, u8> {
+    let Some(action) = action else {
+        return Ok(Command::Household { member });
+    };
+    if member.is_some() {
+        complain!(
+            "error: `--member` narrows who is listed and cannot be given to a decision \
+             (name the person on the decision instead)"
+        );
+        return Err(USAGE);
+    }
+    match action {
+        HouseholdCommand::Allow {
+            member,
+            policy,
+            requests,
+            days,
+        } => allowing(member, policy.as_deref(), requests, days),
+        HouseholdCommand::Approve { request } => Ok(Command::Deciding(Decision {
+            request,
+            answer: Answer::LetThrough,
+        })),
+        HouseholdCommand::Decline { request, reason } => Ok(Command::Deciding(Decision {
+            request,
+            answer: Answer::TurnedDown { reason },
+        })),
+    }
+}
+
+/// What the household is to be allowed to ask for, from the words it was chosen in.
+///
+/// The policy is a word here and a value there; the limit is two numbers that only mean
+/// something together, which is why the command line refuses either without the other
+/// before this is reached. A word this build does not know is refused by name rather
+/// than falling to whichever policy is safer — somebody who wrote a word and meant it
+/// must not be given a different arrangement because of a spelling.
+fn allowing(
+    member: Option<String>,
+    policy: Option<&str>,
+    requests: Option<u32>,
+    days: Option<u32>,
+) -> Result<Command, u8> {
+    let mut chosen = None;
+    if let Some(written) = policy {
+        let Some(named) = Policy::from_label(written) else {
+            complain!(
+                "error: no policy named `{written}` (try {})",
+                Policy::labels()
+            );
+            return Err(USAGE);
+        };
+        chosen = Some(named);
+    }
+    Ok(Command::Allowing(Chosen {
+        member,
+        policy: chosen,
+        quota: requests
+            .zip(days)
+            .map(|(requests, days)| Quota { requests, days }),
+    }))
 }
 
 /// Which setting the operator is reading or changing.
@@ -168,13 +245,139 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{
-        bundling, configuration, invitation, letting, quality, restarting, traced, Destination,
-        Wanted,
+        bundling, configuration, household, invitation, letting, quality, restarting, traced,
+        Answer, Chosen, Decision, Destination, Policy, Quota, Wanted,
     };
     use crate::exit::USAGE;
-    use lemonfiber::cli::{Asked, ConfigAction, QualityCommand, RawAllowance, RawUnrated};
+    use lemonfiber::cli::{
+        Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawUnrated,
+    };
     use lemonfiber_core::bundle::Filenames;
     use lemonfiber_core::ports::service::Unrated;
+
+    /// One choice about what the household may ask for, as the command line took it.
+    fn allowing(
+        member: Option<&str>,
+        policy: Option<&str>,
+        requests: Option<u32>,
+        days: Option<u32>,
+    ) -> Result<Command, u8> {
+        household(
+            None,
+            Some(HouseholdCommand::Allow {
+                member: member.map(str::to_owned),
+                policy: policy.map(str::to_owned),
+                requests,
+                days,
+            }),
+        )
+    }
+
+    /// Naming nothing under the word is the reading, narrowed or whole.
+    #[test]
+    fn naming_nothing_under_the_word_is_the_reading() {
+        assert_eq!(
+            household(None, None),
+            Ok(Command::Household { member: None })
+        );
+        assert_eq!(
+            household(Some("ana".to_owned()), None),
+            Ok(Command::Household {
+                member: Some("ana".to_owned())
+            })
+        );
+    }
+
+    /// The narrowing and a decision are two requests in one line, so the pair is
+    /// refused rather than one half being dropped.
+    #[test]
+    fn the_narrowing_and_a_decision_are_refused_together() {
+        assert_eq!(
+            household(
+                Some("ana".to_owned()),
+                Some(HouseholdCommand::Approve { request: 7 })
+            ),
+            Err(USAGE)
+        );
+    }
+
+    /// A policy and a limit reach the choice as one value, for the house or one person.
+    #[test]
+    fn a_policy_and_a_limit_reach_the_choice_as_one_value() {
+        assert_eq!(
+            allowing(Some("ana"), Some("within-a-limit"), Some(5), Some(7)),
+            Ok(Command::Allowing(Chosen {
+                member: Some("ana".to_owned()),
+                policy: Some(Policy::WithinALimit),
+                quota: Some(Quota {
+                    requests: 5,
+                    days: 7
+                }),
+            }))
+        );
+    }
+
+    /// Saying nothing about something carries nothing.
+    ///
+    /// A run that named only a limit is not a run that chose to trust everybody, and a
+    /// value written here for a word nobody typed would be this surface deciding on the
+    /// household's behalf.
+    #[test]
+    fn saying_nothing_about_something_carries_nothing() {
+        assert_eq!(
+            allowing(None, None, Some(3), Some(30)),
+            Ok(Command::Allowing(Chosen {
+                member: None,
+                policy: None,
+                quota: Some(Quota {
+                    requests: 3,
+                    days: 30
+                }),
+            }))
+        );
+        assert_eq!(
+            allowing(None, Some("trusted"), None, None),
+            Ok(Command::Allowing(Chosen {
+                member: None,
+                policy: Some(Policy::Trusted),
+                quota: None,
+            }))
+        );
+    }
+
+    /// A policy this build does not know is a usage error naming the ones there are.
+    #[test]
+    fn a_policy_this_build_does_not_know_is_a_usage_error() {
+        assert_eq!(allowing(None, Some("generous"), None, None), Err(USAGE));
+    }
+
+    /// Approving and declining are the same command with different answers, and only
+    /// one of them carries a reason.
+    #[test]
+    fn approving_and_declining_are_one_command_with_two_answers() {
+        assert_eq!(
+            household(None, Some(HouseholdCommand::Approve { request: 7 })),
+            Ok(Command::Deciding(Decision {
+                request: 7,
+                answer: Answer::LetThrough,
+            }))
+        );
+        assert_eq!(
+            household(
+                None,
+                Some(HouseholdCommand::Decline {
+                    request: 8,
+                    reason: "no room".to_owned(),
+                })
+            ),
+            Ok(Command::Deciding(Decision {
+                request: 8,
+                answer: Answer::TurnedDown {
+                    reason: "no room".to_owned()
+                },
+            }))
+        );
+    }
 
     /// Three flags at the command line are one choice in the core.
     #[test]

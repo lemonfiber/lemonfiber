@@ -9,6 +9,9 @@ use serde::Serialize;
 /// One thing a household member asked for, and where it stands in their words.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MemberRequest {
+    /// The number the request service files it under, which is how one is named again
+    /// when somebody rules on it.
+    pub id: i64,
     /// What it is called, where the service filing it has been told about it and its
     /// library could be read. Absent for a request no service holds yet — one still
     /// awaiting approval has been handed to nobody, so there is no title to find.
@@ -19,6 +22,19 @@ pub struct MemberRequest {
     /// Where the request stands, or absent where the request service reports a status
     /// this build does not know rather than guessing it into the nearest word.
     pub state: Option<crate::household::State>,
+    /// How many whole days it has been waiting on somebody, where it is waiting at all
+    /// and the service's own date could be read.
+    ///
+    /// Only on the ones nobody has ruled on. A request already answered has not been
+    /// waiting since it was made, and a figure beside one would be counting the wrong
+    /// thing.
+    pub waiting_days: Option<u64>,
+    /// About how much room it will want, at the quality in force.
+    ///
+    /// A guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the
+    /// request service names a kind this build does not know, since there is nothing to
+    /// guess the length of.
+    pub estimate: Option<crate::asking::Estimate>,
 }
 
 /// What one member may watch, in the household's own words.
@@ -133,6 +149,12 @@ pub struct HouseholdMember {
     /// Whether somebody has set a password on the account. False is an invitation
     /// nobody has taken up rather than a member who is not here.
     pub claimed: bool,
+    /// What they may ask for, and what their period has left of it.
+    ///
+    /// Absent where the request service holds no account for them, and where it could
+    /// not be asked — an unread answer is not an unlimited member, and reporting one as
+    /// the other would tell an operator their quota was never applied.
+    pub asking: Option<crate::model::MemberAsking>,
 }
 
 /// Who is in the household, what each may watch, and what each has asked for.
@@ -154,6 +176,14 @@ pub struct HouseholdReport {
     /// about. Present the moment there is one, because a parent who has set a limit is
     /// exactly the reader who might take it for a lock.
     pub filtering: Option<String>,
+    /// What happens to what the household asks for where nobody chose otherwise for
+    /// one person. Absent where the request service could not be asked.
+    pub policy: Option<crate::asking::Policy>,
+    /// What that policy allows in a period, in the words a household says it in.
+    ///
+    /// Absent where nothing limits the household, which is not the same as a policy
+    /// that could not be read: that one leaves [`Self::policy`] absent too.
+    pub allows: Option<String>,
 }
 
 #[cfg(test)]

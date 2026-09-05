@@ -17,13 +17,14 @@
 mod acting;
 
 use acting::{
-    exactly_what, AGE, ARCHIVE, DOWNLOAD, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER, SEASON,
-    UNRATED, WARNED,
+    exactly_what, AGE, ALLOWED, ARCHIVE, DOWNLOAD, FOLLOWED, ITEM, LIBRARY, LOGS, NARROWED, OFFER,
+    PERIOD, POLICY, REASON, SEASON, UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
+use lemonfiber_core::app::{Answer, Chosen, Decision};
 use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
@@ -422,6 +423,70 @@ fn give_agreed(given: &mut Arguments) {
     given.agreed = vec![WARNED.to_owned()];
 }
 
+/// Whether the command carries the policy it was given in it.
+fn carries_policy(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Allowing(Chosen {
+            policy: Some(_),
+            ..
+        })
+    )
+}
+
+/// Whether the command carries the limit it was given in it.
+///
+/// One reading for both numbers, because neither is a limit on its own: the two arrive
+/// as a pair or the translation refuses them, so what "arrived" means for either of
+/// them is that the pair did.
+fn carries_limit(command: &Command) -> bool {
+    matches!(command, Command::Allowing(Chosen { quota: Some(_), .. }))
+}
+
+/// Whether the command carries the request it was told to rule on.
+fn carries_request(command: &Command) -> bool {
+    matches!(command, Command::Deciding(Decision { request, .. }) if *request == WAITING)
+}
+
+/// Whether the command carries the reason a request was turned down.
+///
+/// The reason is the variant rather than a field beside it, so a decision carrying one
+/// is a decision that turned something down — which is what makes an approval unable to
+/// carry one at all.
+fn carries_reason(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Deciding(Decision {
+            answer: Answer::TurnedDown { reason },
+            ..
+        }) if reason == REASON
+    )
+}
+
+fn give_policy(given: &mut Arguments) {
+    given.policy = Some(POLICY.to_owned());
+}
+
+// One field each, as every other giver here sets one. The action that takes them was
+// handed both already, so overwriting one leaves the pair complete; an action that
+// takes neither is given one, and is refused for the one it was given rather than for
+// its companion.
+fn give_requests(given: &mut Arguments) {
+    given.requests = Some(ALLOWED);
+}
+
+fn give_days(given: &mut Arguments) {
+    given.days = Some(PERIOD);
+}
+
+fn give_request(given: &mut Arguments) {
+    given.request = Some(WAITING);
+}
+
+fn give_reason(given: &mut Arguments) {
+    given.reason = Some(REASON.to_owned());
+}
+
 /// One argument the carrier holds: its name, how to give it, and what it looks like
 /// to have arrived on the command the action reached.
 type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
@@ -432,7 +497,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 27] = [
+const SWEEPS: [Sweep; 32] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -460,6 +525,11 @@ const SWEEPS: [Sweep; 27] = [
     ("term", give_term, carries_term),
     ("season", give_season, carries_season),
     ("download", give_download, carries_download),
+    ("policy", give_policy, carries_policy),
+    ("requests", give_requests, carries_limit),
+    ("days", give_days, carries_limit),
+    ("request", give_request, carries_request),
+    ("reason", give_reason, carries_reason),
 ];
 
 /// Every offered action given one argument on top of what it takes, gathering what

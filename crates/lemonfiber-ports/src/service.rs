@@ -13,6 +13,7 @@ use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 mod aggregators;
 mod applications;
+mod asking;
 mod catalogue;
 mod clients;
 mod failure;
@@ -24,6 +25,7 @@ mod trace;
 
 pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
+pub use asking::{Approving, Asking, Headroom, Left, Quota};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
     Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, FulfilmentTarget,
@@ -202,6 +204,12 @@ pub trait MediaServer: Send + Sync {
 /// model above this, not for the code that reads them off the wire.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HouseholdRequest {
+    /// The number the request service files this request under, which is how one is
+    /// named to it again when somebody rules on it.
+    pub id: i64,
+    /// When it was asked for, as the service timestamps it — what a request waiting
+    /// on somebody is measured against, and what a counting period runs from.
+    pub made: Option<String>,
     /// The member who asked, by the name the request service shows them under.
     pub member: String,
     /// Which service files the media — television or film — or `None` where the

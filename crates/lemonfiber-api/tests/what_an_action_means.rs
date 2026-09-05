@@ -680,3 +680,129 @@ async fn work_that_cannot_be_named_is_not_started() {
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR.as_u16());
     assert!(body.contains("randomness"), "{body}");
 }
+
+/// A policy this build does not know is refused with the ones it does.
+///
+/// A caller who wrote a word and meant it must not be given a different arrangement
+/// because of a spelling — which on this argument would be a household trusted where
+/// it asked to be held to something.
+#[test]
+fn a_policy_this_build_does_not_know_is_refused_with_the_ones_it_does() {
+    let mistaken = Arguments {
+        policy: Some("generous".to_owned()),
+        ..Arguments::default()
+    };
+
+    let refused = refusal("household-allow", mistaken);
+
+    assert!(
+        matches!(&refused, Some(Refused::Unrecognised { argument, offered })
+            if argument == "policy"
+                && offered.contains("trusted")
+                && offered.contains("everything-waits")),
+        "{refused:?}"
+    );
+}
+
+/// Half a limit is refused as the half that is missing, not completed for the caller.
+///
+/// A number over no period, and a period allowing no number, are each a household
+/// held to something nobody chose.
+#[test]
+fn half_a_limit_is_refused_as_the_half_that_is_missing() {
+    for (requests, days, wanted) in [(Some(5_u32), None, "days"), (None, Some(7_u32), "requests")] {
+        let given = Arguments {
+            requests,
+            days,
+            ..Arguments::default()
+        };
+
+        let refused = refusal("household-allow", given);
+
+        assert!(
+            matches!(&refused, Some(Refused::Missing { action, argument })
+                if action == "household-allow" && argument == wanted),
+            "{requests:?}/{days:?}: {refused:?}"
+        );
+    }
+}
+
+/// Naming nobody is the household's own choice rather than an omission.
+///
+/// The one action addressed to a person that does not require one: a choice with
+/// nobody named is about the house, which is a request in its own right.
+#[test]
+fn a_choice_naming_nobody_is_the_households_own() {
+    let given = Arguments {
+        policy: Some("trusted".to_owned()),
+        ..Arguments::default()
+    };
+
+    let reached = named("household-allow", given);
+
+    assert!(
+        matches!(&reached, Ok(Command::Allowing(chosen))
+            if chosen.member.is_none()
+                && chosen.policy == Some(lemonfiber_core::asking::Policy::Trusted)),
+        "{reached:?}"
+    );
+}
+
+/// A decision with no request has lost its subject, and is refused rather than
+/// answered with every waiting request.
+#[test]
+fn a_decision_with_no_request_is_refused() {
+    for action in ["household-approve", "household-decline"] {
+        let given = Arguments {
+            reason: (action == "household-decline").then(|| "no room".to_owned()),
+            ..Arguments::default()
+        };
+
+        let refused = refusal(action, given);
+
+        assert!(
+            matches!(&refused, Some(Refused::Missing { argument, .. }) if argument == "request"),
+            "{action}: {refused:?}"
+        );
+    }
+}
+
+/// Turning a request down without a reason is refused by name.
+///
+/// A refusal with nothing beside it is indistinguishable from being ignored, which
+/// is the whole of what the reason is for.
+#[test]
+fn turning_a_request_down_without_a_reason_is_refused() {
+    let given = Arguments {
+        request: Some(7),
+        ..Arguments::default()
+    };
+
+    let refused = refusal("household-decline", given);
+
+    assert!(
+        matches!(&refused, Some(Refused::Missing { action, argument })
+            if action == "household-decline" && argument == "reason"),
+        "{refused:?}"
+    );
+}
+
+/// An approval cannot carry a reason at all, and is refused for it by name.
+///
+/// What an approval owes the person who asked is the thing they asked for, so a
+/// reason named to one is an argument its command has nowhere to put.
+#[test]
+fn an_approval_cannot_carry_a_reason() {
+    let given = Arguments {
+        request: Some(7),
+        reason: Some("no room".to_owned()),
+        ..Arguments::default()
+    };
+
+    let refused = refusal("household-approve", given);
+
+    assert!(
+        matches!(&refused, Some(Refused::Unwanted { argument, .. }) if argument == "reason"),
+        "{refused:?}"
+    );
+}
