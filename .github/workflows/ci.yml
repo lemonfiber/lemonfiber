@@ -6,17 +6,17 @@ permissions:
 
 jobs:
   spec-check:
-    uses: lemonfiber/spec/.github/workflows/spec-check.yml@a32ee06e5b7eb5366a0a50db1ed2b0c5f380303a # main
+    uses: lemonfiber/spec/.github/workflows/spec-check.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
   hygiene:
-    uses: lemonfiber/spec/.github/workflows/hygiene.yml@61f5205b9db1699ba58dc007b23924a7e566de76 # main
+    uses: lemonfiber/spec/.github/workflows/hygiene.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
   security:
-    uses: lemonfiber/spec/.github/workflows/security.yml@61f5205b9db1699ba58dc007b23924a7e566de76 # main
+    uses: lemonfiber/spec/.github/workflows/security.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
   dco:
-    uses: lemonfiber/spec/.github/workflows/dco.yml@61f5205b9db1699ba58dc007b23924a7e566de76 # main
+    uses: lemonfiber/spec/.github/workflows/dco.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
   commitlint:
-    uses: lemonfiber/spec/.github/workflows/commitlint.yml@61f5205b9db1699ba58dc007b23924a7e566de76 # main
+    uses: lemonfiber/spec/.github/workflows/commitlint.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
   labeler:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/labeler.yml@61f5205b9db1699ba58dc007b23924a7e566de76 # main
+    uses: lemonfiber/spec/.github/workflows/labeler.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
