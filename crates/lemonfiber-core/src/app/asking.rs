@@ -583,11 +583,14 @@ mod tests {
     }
 
     /// A media server that will not say who is here changes nothing.
+    ///
+    /// Who is in the household is that server's fact, and a choice about one person
+    /// cannot be written against a name nobody confirmed is here.
     #[tokio::test]
     async fn a_media_server_that_will_not_say_who_is_here_changes_nothing() {
-        let ctx = answering(
+        let ctx = refusing(
             "nohousehold",
-            vec![(Some(Method::Get), "/Users?", Answer::reply(500, "no"))],
+            vec![(Method::Post, "/Users/AuthenticateByName")],
         );
 
         let refused = allowing(
