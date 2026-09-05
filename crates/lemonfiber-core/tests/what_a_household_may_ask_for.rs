@@ -447,19 +447,42 @@ fn silent(name: &str) -> Ctx {
 /// crate: the app layer is compiled twice, and a branch driven only from the in-crate
 /// tests is counted as never run in the copy these binaries link.
 fn answering(name: &str) -> Ctx {
-    let transport = Fake::by_path(vec![
+    with(name, Vec::new())
+}
+
+/// The same, with one call answering a refusal instead.
+///
+/// One rule rather than a whole transport per case: every write here reaches the
+/// service more than once, and what each of these holds is that the *later* calls
+/// leave the household as it was — which a fixture that refused everything could not
+/// tell apart from never having been asked.
+fn refusing(name: &str, method: Method, route: &'static str) -> Ctx {
+    with(name, vec![(Some(method), route, Answer::reply(500, "no"))])
+}
+
+/// The transport these run against, with any broken rule ahead of the working ones.
+fn with(name: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx {
+    let mut routes = broken;
+    routes.extend(vec![
         // Ahead of `/Users`, whose text it contains: a route matched by prefix would
         // answer the sign-in with the list of accounts.
         (
+            None,
             "/Users/AuthenticateByName",
             Answer::reply(200, r#"{"AccessToken":"token"}"#),
         ),
         (
+            None,
             "/Library/MediaFolders",
             Answer::reply(200, r#"{"Items":[]}"#),
         ),
-        ("/Localization/ParentalRatings", Answer::reply(200, "[]")),
         (
+            None,
+            "/Localization/ParentalRatings",
+            Answer::reply(200, "[]"),
+        ),
+        (
+            None,
             "/Users",
             Answer::reply(
                 200,
@@ -467,8 +490,9 @@ fn answering(name: &str) -> Ctx {
                     "Policy":{"EnableAllFolders":true}}]"#,
             ),
         ),
-        ("/auth/jellyfin", Answer::reply(200, "{}")),
+        (None, "/auth/jellyfin", Answer::reply(200, "{}")),
         (
+            None,
             "/settings/main",
             Answer::reply(
                 200,
@@ -476,22 +500,28 @@ fn answering(name: &str) -> Ctx {
             ),
         ),
         (
+            None,
             "/user/jellyfin/",
             Answer::reply(200, r#"{"id":4,"permissions":160}"#),
         ),
         (
+            None,
             "/user/4/quota",
+            // At their limit, so the line saying so — and the sentence that says what
+            // they have left and when there is room again — is built here too.
             Answer::reply(
                 200,
-                r#"{"movie":{"days":7,"limit":5,"used":1},"tv":{"days":7,"limit":0,"used":0}}"#,
+                r#"{"movie":{"days":7,"limit":5,"used":5},"tv":{"days":7,"limit":0,"used":0}}"#,
             ),
         ),
         (
+            None,
             "settings/permissions",
             Answer::reply(200, r#"{"permissions":160}"#),
         ),
-        ("/request/7/", Answer::reply(200, "{}")),
+        (None, "/request/7/", Answer::reply(200, "{}")),
         (
+            None,
             "/api/v1/request",
             Answer::reply(
                 200,
@@ -501,8 +531,9 @@ fn answering(name: &str) -> Ctx {
                     "requestedBy":{"displayName":"Alex"}}]}"#,
             ),
         ),
-        ("", Answer::reply(200, "[]")),
+        (None, "", Answer::reply(200, "[]")),
     ]);
+    let transport = Fake::by_rules(routes);
     Ctx::new(
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(Reporting::holding(
@@ -707,6 +738,46 @@ async fn a_request_let_through_answers_with_the_household() {
     assert!(said.contains(r#""kind":"household""#), "{said}");
     assert!(said.contains("approved"), "{said}");
     assert!(!said.contains("yours to pass on"), "{said}");
+}
+
+/// A write the service will not take leaves the household as it was.
+///
+/// The read succeeded and the write did not, which is the case a fixture that refuses
+/// everything cannot tell apart from never having asked at all.
+#[tokio::test]
+async fn a_write_the_service_will_not_take_changes_nothing() {
+    let refused = dispatch(
+        Command::Allowing(Chosen {
+            member: None,
+            policy: Some(Policy::Trusted),
+            quota: None,
+        }),
+        &refusing("nowrite", Method::Post, "/settings/main"),
+    )
+    .await;
+
+    assert_eq!(
+        refused.err().map(|problem| problem.code),
+        Some(lemonfiber_core::asking::UNREACHABLE)
+    );
+}
+
+/// A decision the service will not rule on says so rather than reporting it decided.
+#[tokio::test]
+async fn a_decision_the_service_will_not_rule_on_says_so() {
+    let refused = dispatch(
+        Command::Deciding(Decision {
+            request: 7,
+            answer: Ruling::LetThrough,
+        }),
+        &refusing("norule", Method::Post, "/request/7/"),
+    )
+    .await;
+
+    assert_eq!(
+        refused.err().map(|problem| problem.code),
+        Some(lemonfiber_core::asking::UNREACHABLE)
+    );
 }
 
 /// What a household may ask for reaches the machine-readable answer under the
