@@ -848,6 +848,46 @@
             }
           ]
         },
+        "Counted": {
+          "description": "One of the two counts the request service keeps, and what it has left.",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "How many the period allows. Absent where nothing limits them, which is a\ndifferent answer from a limit of nought.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "period": {
+              "description": "How long the period is, in the words a household says it in — absent where\nthe count runs from the beginning rather than over a window.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "remaining": {
+              "description": "How many more they may ask for. Absent where nothing limits them.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "used": {
+              "description": "How many the period has already counted against them.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "used"
+          ]
+        },
         "Criticality": {
           "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
           "oneOf": [
@@ -895,6 +935,26 @@
           "required": [
             "secs",
             "nanos"
+          ]
+        },
+        "Estimate": {
+          "description": "About how much room one request will want.\n\nCarried as a number and a word rather than as a rendered string, so a surface can\nput it in a column and still say what it is. The word is not decoration: a figure\nwith nothing hedging it is a promise, and this cannot keep one.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "About how many bytes it will take.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "measured": {
+              "description": "Whether this was measured. Always false — nothing here has measured anything,\nand the field is present so that a surface rendering it cannot forget to say so.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bytes",
+            "measured"
           ]
         },
         "Facing": {
@@ -1020,6 +1080,17 @@
               "description": "What they may watch.",
               "$ref": "#/$defs/MemberAccess"
             },
+            "asking": {
+              "description": "What they may ask for, and what their period has left of it.\n\nAbsent where the request service holds no account for them, and where it could\nnot be asked — an unread answer is not an unlimited member, and reporting one as\nthe other would tell an operator their quota was never applied.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MemberAsking"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "claimed": {
               "description": "Whether somebody has set a password on the account. False is an invitation\nnobody has taken up rather than a member who is not here.",
               "type": "boolean"
@@ -1054,6 +1125,13 @@
           "description": "Who is in the household, what each may watch, and what each has asked for.",
           "type": "object",
           "properties": {
+            "allows": {
+              "description": "What that policy allows in a period, in the words a household says it in.\n\nAbsent where nothing limits the household, which is not the same as a policy\nthat could not be read: that one leaves [`Self::policy`] absent too.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "available": {
               "description": "Whether the household could be read at all. A false here is why the list is\nempty, and keeps an unread record from being mistaken for an empty house — the\nsame honesty a trace keeps about a silence it did not hear.",
               "type": "boolean"
@@ -1078,6 +1156,17 @@
               "items": {
                 "$ref": "#/$defs/HouseholdMember"
               }
+            },
+            "policy": {
+              "description": "What happens to what the household asks for where nobody chose otherwise for\none person. Absent where the request service could not be asked.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Policy"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -1147,10 +1236,61 @@
             "disabled"
           ]
         },
+        "MemberAsking": {
+          "description": "What one member may ask for, where the request service could be asked.\n\nBoth counts, because the service keeps them apart and folding them would report a\nhousehold as within its limit while the half that matters is spent: television is\ncounted a season at a time, so one ask for a six-season series spends six.",
+          "type": "object",
+          "properties": {
+            "films": {
+              "description": "Films, counted one to a request.",
+              "$ref": "#/$defs/Counted"
+            },
+            "frees_up": {
+              "description": "When the count next lets go of something, so one more becomes possible.\n\nAbsent where nothing limits them, and where the request service's own dates\ncould not be read — an invented one would be a promise about a day on which\nnothing happens. The period is a window that rolls rather than a month that\nends, so this is the moment their earliest counted request ages out.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "policy": {
+              "description": "What happens to what they ask for.",
+              "$ref": "#/$defs/Policy"
+            },
+            "standing": {
+              "description": "Where they stand against what their period allows, taken over both counts.",
+              "$ref": "#/$defs/Standing3"
+            },
+            "television": {
+              "description": "Television, counted one to a season.",
+              "$ref": "#/$defs/Counted"
+            }
+          },
+          "required": [
+            "policy",
+            "standing",
+            "films",
+            "television"
+          ]
+        },
         "MemberRequest": {
           "description": "One thing a household member asked for, and where it stands in their words.",
           "type": "object",
           "properties": {
+            "estimate": {
+              "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Estimate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "description": "The number the request service files it under, which is how one is named again\nwhen somebody rules on it.",
+              "type": "integer",
+              "format": "int64"
+            },
             "media": {
               "description": "What kind of thing it is — a series, a film — in the household's own words.\nAbsent where the request service names a kind this build does not know.",
               "type": [
@@ -1175,8 +1315,20 @@
                 "string",
                 "null"
               ]
+            },
+            "waiting_days": {
+              "description": "How many whole days it has been waiting on somebody, where it is waiting at all\nand the service's own date could be read.\n\nOnly on the ones nobody has ruled on. A request already answered has not been\nwaiting since it was made, and a figure beside one would be counting the wrong\nthing.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
             }
-          }
+          },
+          "required": [
+            "id"
+          ]
         },
         "Moment": {
           "description": "Which way a condition went.\n\nBoth directions are worth saying and neither is worth saying twice. An operator\ntold a disk filled up and never told it was resolved goes on believing it — so\nresolution is an alert in its own right rather than the absence of one.",
@@ -1535,6 +1687,26 @@
                 "panel",
                 "data"
               ]
+            }
+          ]
+        },
+        "Policy": {
+          "description": "What happens to what a household member asks for.\n\nThree, and they are the three the request service can actually be put into. A\nhousehold is in one of them because of two settings taken together — whether requests\narrive unseen, and whether a period limits how many — so the words here are a reading\nof that pair rather than a fourth setting kept beside it.\n\nChoosing per person is not a fourth policy. It is one of these three chosen for one\nmember rather than for the house, which is why what a surface offers is a policy and,\nseparately, who it is for.",
+          "oneOf": [
+            {
+              "description": "Everything asked for arrives, and nothing is counted against anybody.",
+              "type": "string",
+              "const": "trusted"
+            },
+            {
+              "description": "Everything asked for arrives until the period's limit is spent, and what\nwould go past it is refused at the moment of asking.",
+              "type": "string",
+              "const": "within-a-limit"
+            },
+            {
+              "description": "Everything asked for waits for the operator to rule on it.",
+              "type": "string",
+              "const": "everything-waits"
             }
           ]
         },
@@ -1974,6 +2146,31 @@
               "description": "Nothing at all is published to the household: an operator-only configuration.",
               "type": "string",
               "const": "none"
+            }
+          ]
+        },
+        "Standing3": {
+          "description": "Where one member stands against what a period allows them.\n\nFour, and the one worth having is the middle: somebody told only when they have run\nout has been told too late to do anything but wait, which is the answer this whole\nfeature exists to avoid handing anybody.",
+          "oneOf": [
+            {
+              "description": "Nothing is counted against them.",
+              "type": "string",
+              "const": "unlimited"
+            },
+            {
+              "description": "There is room, and comfortably.",
+              "type": "string",
+              "const": "within-quota"
+            },
+            {
+              "description": "A fifth of the period's limit or less is left, and at least one of it.",
+              "type": "string",
+              "const": "near-quota"
+            },
+            {
+              "description": "Nothing is left, so the next thing they ask for is refused as they ask.",
+              "type": "string",
+              "const": "quota-exhausted"
             }
           ]
         },
@@ -3410,6 +3607,66 @@
         "data"
       ],
       "$defs": {
+        "Counted": {
+          "description": "One of the two counts the request service keeps, and what it has left.",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "How many the period allows. Absent where nothing limits them, which is a\ndifferent answer from a limit of nought.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "period": {
+              "description": "How long the period is, in the words a household says it in — absent where\nthe count runs from the beginning rather than over a window.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "remaining": {
+              "description": "How many more they may ask for. Absent where nothing limits them.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "used": {
+              "description": "How many the period has already counted against them.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "used"
+          ]
+        },
+        "Estimate": {
+          "description": "About how much room one request will want.\n\nCarried as a number and a word rather than as a rendered string, so a surface can\nput it in a column and still say what it is. The word is not decoration: a figure\nwith nothing hedging it is a promise, and this cannot keep one.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "About how many bytes it will take.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "measured": {
+              "description": "Whether this was measured. Always false — nothing here has measured anything,\nand the field is present so that a surface rendering it cannot forget to say so.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bytes",
+            "measured"
+          ]
+        },
         "HouseholdMember": {
           "description": "One household member: who they are, what they may watch, when they were last\nseen, and everything they have asked for.",
           "type": "object",
@@ -3417,6 +3674,17 @@
             "access": {
               "description": "What they may watch.",
               "$ref": "#/$defs/MemberAccess"
+            },
+            "asking": {
+              "description": "What they may ask for, and what their period has left of it.\n\nAbsent where the request service holds no account for them, and where it could\nnot be asked — an unread answer is not an unlimited member, and reporting one as\nthe other would tell an operator their quota was never applied.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MemberAsking"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "claimed": {
               "description": "Whether somebody has set a password on the account. False is an invitation\nnobody has taken up rather than a member who is not here.",
@@ -3452,6 +3720,13 @@
           "description": "Who is in the household, what each may watch, and what each has asked for.",
           "type": "object",
           "properties": {
+            "allows": {
+              "description": "What that policy allows in a period, in the words a household says it in.\n\nAbsent where nothing limits the household, which is not the same as a policy\nthat could not be read: that one leaves [`Self::policy`] absent too.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "available": {
               "description": "Whether the household could be read at all. A false here is why the list is\nempty, and keeps an unread record from being mistaken for an empty house — the\nsame honesty a trace keeps about a silence it did not hear.",
               "type": "boolean"
@@ -3476,6 +3751,17 @@
               "items": {
                 "$ref": "#/$defs/HouseholdMember"
               }
+            },
+            "policy": {
+              "description": "What happens to what the household asks for where nobody chose otherwise for\none person. Absent where the request service could not be asked.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Policy"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -3545,10 +3831,61 @@
             "disabled"
           ]
         },
+        "MemberAsking": {
+          "description": "What one member may ask for, where the request service could be asked.\n\nBoth counts, because the service keeps them apart and folding them would report a\nhousehold as within its limit while the half that matters is spent: television is\ncounted a season at a time, so one ask for a six-season series spends six.",
+          "type": "object",
+          "properties": {
+            "films": {
+              "description": "Films, counted one to a request.",
+              "$ref": "#/$defs/Counted"
+            },
+            "frees_up": {
+              "description": "When the count next lets go of something, so one more becomes possible.\n\nAbsent where nothing limits them, and where the request service's own dates\ncould not be read — an invented one would be a promise about a day on which\nnothing happens. The period is a window that rolls rather than a month that\nends, so this is the moment their earliest counted request ages out.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "policy": {
+              "description": "What happens to what they ask for.",
+              "$ref": "#/$defs/Policy"
+            },
+            "standing": {
+              "description": "Where they stand against what their period allows, taken over both counts.",
+              "$ref": "#/$defs/Standing"
+            },
+            "television": {
+              "description": "Television, counted one to a season.",
+              "$ref": "#/$defs/Counted"
+            }
+          },
+          "required": [
+            "policy",
+            "standing",
+            "films",
+            "television"
+          ]
+        },
         "MemberRequest": {
           "description": "One thing a household member asked for, and where it stands in their words.",
           "type": "object",
           "properties": {
+            "estimate": {
+              "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Estimate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "description": "The number the request service files it under, which is how one is named again\nwhen somebody rules on it.",
+              "type": "integer",
+              "format": "int64"
+            },
             "media": {
               "description": "What kind of thing it is — a series, a film — in the household's own words.\nAbsent where the request service names a kind this build does not know.",
               "type": [
@@ -3573,8 +3910,40 @@
                 "string",
                 "null"
               ]
+            },
+            "waiting_days": {
+              "description": "How many whole days it has been waiting on somebody, where it is waiting at all\nand the service's own date could be read.\n\nOnly on the ones nobody has ruled on. A request already answered has not been\nwaiting since it was made, and a figure beside one would be counting the wrong\nthing.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
             }
-          }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "Policy": {
+          "description": "What happens to what a household member asks for.\n\nThree, and they are the three the request service can actually be put into. A\nhousehold is in one of them because of two settings taken together — whether requests\narrive unseen, and whether a period limits how many — so the words here are a reading\nof that pair rather than a fourth setting kept beside it.\n\nChoosing per person is not a fourth policy. It is one of these three chosen for one\nmember rather than for the house, which is why what a surface offers is a policy and,\nseparately, who it is for.",
+          "oneOf": [
+            {
+              "description": "Everything asked for arrives, and nothing is counted against anybody.",
+              "type": "string",
+              "const": "trusted"
+            },
+            {
+              "description": "Everything asked for arrives until the period's limit is spent, and what\nwould go past it is refused at the moment of asking.",
+              "type": "string",
+              "const": "within-a-limit"
+            },
+            {
+              "description": "Everything asked for waits for the operator to rule on it.",
+              "type": "string",
+              "const": "everything-waits"
+            }
+          ]
         },
         "Rated": {
           "description": "What one age limit comes to, in the certificates named for it.\n\nBoth sides, because either alone misleads. What is allowed without what is held\nback reads as a limit that stops nothing; what is held back without what is allowed\nreads as a limit that stops everything.",
@@ -3632,6 +4001,31 @@
               "description": "What they may watch is limited and what they may ask for is not.",
               "type": "string",
               "const": "inconsistent"
+            }
+          ]
+        },
+        "Standing": {
+          "description": "Where one member stands against what a period allows them.\n\nFour, and the one worth having is the middle: somebody told only when they have run\nout has been told too late to do anything but wait, which is the answer this whole\nfeature exists to avoid handing anybody.",
+          "oneOf": [
+            {
+              "description": "Nothing is counted against them.",
+              "type": "string",
+              "const": "unlimited"
+            },
+            {
+              "description": "There is room, and comfortably.",
+              "type": "string",
+              "const": "within-quota"
+            },
+            {
+              "description": "A fifth of the period's limit or less is left, and at least one of it.",
+              "type": "string",
+              "const": "near-quota"
+            },
+            {
+              "description": "Nothing is left, so the next thing they ask for is refused as they ask.",
+              "type": "string",
+              "const": "quota-exhausted"
             }
           ]
         },

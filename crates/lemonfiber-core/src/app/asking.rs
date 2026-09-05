@@ -398,6 +398,22 @@ mod tests {
         assert!(said.contains("5 requests a week"), "{said}");
     }
 
+    /// A name with no media server behind it is refused, not searched.
+    ///
+    /// The name is matched against the accounts the server holds, so where there is
+    /// no server there is nothing to match against. Said as the refusal the rest of
+    /// this errand gives rather than as an empty answer, which would read as nobody
+    /// being called that.
+    #[tokio::test]
+    async fn a_name_with_no_media_server_behind_it_is_refused() {
+        let refused = found(&a_household("noserver"), &[], "alex").await;
+
+        assert_eq!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::UNREACHABLE)
+        );
+    }
+
     /// Nobody by that name is refused with the household named beside it.
     #[tokio::test]
     async fn nobody_by_that_name_is_refused() {
@@ -557,6 +573,52 @@ mod tests {
                 "the {tag} call claimed a change it did not make"
             );
         }
+    }
+
+    /// A stack with no media server has nobody to match a name against.
+    ///
+    /// Built by taking the shipped stack and removing the one service the household is
+    /// read from, so what is under test is the absence rather than a hand-written
+    /// manifest that might differ in some other way too.
+    #[tokio::test]
+    async fn a_stack_with_no_media_server_has_nobody_to_name() {
+        static WITHOUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+        let dir = WITHOUT.get_or_init(|| {
+            let from = std::path::Path::new(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../assets/media-stack"
+            ));
+            let to = std::env::temp_dir().join(format!(
+                "lemonfiber-asking-no-server-{}",
+                std::process::id()
+            ));
+            let _ = std::fs::create_dir_all(&to);
+            let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
+            let kept: String = read
+                .split("[[service]]")
+                .filter(|block| !block.contains("id = \"jellyfin\""))
+                .collect::<Vec<_>>()
+                .join("[[service]]");
+            let _ = std::fs::write(to.join("stack.toml"), kept);
+            to
+        });
+        let mut ctx = a_household("noserver");
+        ctx.stack = crate::stack::Source::External(Box::leak(dir.clone().into_boxed_path()));
+
+        let refused = allowing(
+            &ctx,
+            &Chosen {
+                member: Some("alex".to_owned()),
+                policy: Some(Policy::Trusted),
+                quota: None,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::UNREACHABLE)
+        );
     }
 
     /// Somebody the request service has never heard of is an invitation nobody used.
