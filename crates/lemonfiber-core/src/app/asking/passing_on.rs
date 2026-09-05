@@ -20,7 +20,7 @@ use std::collections::BTreeSet;
 
 use crate::asking::Reasons;
 use crate::config::REACH_HOUSEHOLD_KEY;
-use crate::ports::service::{HouseholdRequest, Telling as _};
+use crate::ports::service::{Addressing as _, HouseholdRequest};
 use crate::telling::{tell, Told};
 
 use crate::app::targets::HouseholdAccess;

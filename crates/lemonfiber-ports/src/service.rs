@@ -11,6 +11,7 @@ use async_trait::async_trait;
 
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
+mod addressing;
 mod aggregators;
 mod applications;
 mod asking;
@@ -24,10 +25,10 @@ mod notices;
 mod providers;
 mod quality;
 mod subtitles;
-mod telling;
 mod throttling;
 mod trace;
 
+pub use addressing::{Address, Addressing};
 pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
 pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
@@ -52,7 +53,6 @@ pub use providers::{
 };
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
 pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
-pub use telling::{Address, Telling};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 

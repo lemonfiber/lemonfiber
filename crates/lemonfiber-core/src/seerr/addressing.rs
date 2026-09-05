@@ -28,7 +28,7 @@ use serde::Deserialize;
 use super::members::MEMBERS;
 use super::Seerr;
 use crate::ports::http::Method;
-use crate::ports::service::{Address, Failure, Telling};
+use crate::ports::service::{Address, Addressing, Failure};
 
 /// Where one request's own record is read.
 const REQUESTS: &str = "/request";
@@ -152,7 +152,7 @@ fn given(field: Option<&str>) -> Option<String> {
 }
 
 #[async_trait]
-impl Telling for Seerr {
+impl Addressing for Seerr {
     async fn reachable(&self, request: i64) -> Result<Vec<Address>, Failure> {
         let path = format!("{REQUESTS}/{request}");
         let filed = self

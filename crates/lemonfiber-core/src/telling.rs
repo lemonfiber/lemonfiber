@@ -16,7 +16,7 @@
 //! **Where it goes is not decided here.** The two addresses are declared in the
 //! enumeration an operator reads and handed to the request built below, so a message
 //! cannot reach anywhere the list does not name. The member's own address and token come
-//! from the request service, read through [`crate::ports::service::Telling`].
+//! from the request service, read through [`crate::ports::service::Addressing`].
 //!
 //! **Nothing is retried and a refusal is not a failure.** The decision it accompanies has
 //! already been taken at the request service, and a message that would not go is a thing

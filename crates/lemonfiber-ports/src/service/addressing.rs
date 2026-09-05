@@ -70,7 +70,7 @@ impl std::fmt::Debug for Address {
 
 /// Reading where the person who made one request can be reached.
 #[async_trait]
-pub trait Telling: Send + Sync {
+pub trait Addressing: Send + Sync {
     /// Where whoever asked for this already receives what the service sends them.
     ///
     /// Keyed by the request rather than by the person, because the request is the name
