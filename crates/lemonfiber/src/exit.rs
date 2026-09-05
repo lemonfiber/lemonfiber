@@ -685,6 +685,7 @@ mod tests {
                 up: Held::of(None, None, None, true),
                 period: None,
             },
+            pulling: None,
         };
         let asked =
             |measured: &Measured| format!("{:?}", settled(&Outcome::Bandwidth(weigh(measured))));

@@ -36,6 +36,15 @@ pub const ONLY_THE_STACK: &str =
      is on the same line and is not counted here, so the meter your provider keeps \
      will read higher than this.";
 
+/// The rate a spent cap holds the stack to where throttling was chosen, in bytes
+/// a second.
+///
+/// Slow enough that a month's remainder is measured in gigabytes rather than
+/// tens of them, and fast enough that a film already three quarters fetched
+/// finishes overnight instead of being abandoned — which is the whole difference
+/// between this choice and stopping.
+pub const CRAWL: u64 = 64 * 1024;
+
 /// What to do when a declared cap is reached.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -56,6 +65,41 @@ impl WhenExceeded {
             Self::Pause => "nothing new is fetched until the month turns over",
             Self::Throttle => "fetching continues at a crawl, so what is half-finished can finish",
             Self::Continue => "nothing changes, because some caps cost speed rather than money",
+        }
+    }
+
+    /// Whether this choice stops the clients fetching at all.
+    ///
+    /// Only one of the three does, and it is the one whose word promises it. A
+    /// crawl is a rate and carrying on is nothing, and neither may ever be carried
+    /// out by stopping something.
+    #[must_use]
+    pub const fn stops(self) -> bool {
+        matches!(self, Self::Pause)
+    }
+
+    /// What this choice comes to once the cap is actually spent, said where the
+    /// figures it changes are shown.
+    ///
+    /// Said always, and not only where a figure moved. The limits a report shows
+    /// once a cap is spent are not the ones the operator declared, and a report
+    /// that shows them without saying so is one that reads as having forgotten the
+    /// declaration.
+    #[must_use]
+    pub const fn at_the_cap(self) -> &'static str {
+        match self {
+            Self::Pause => {
+                "The cap is spent, so the download clients are stopped: nothing new is \
+                 fetched until the month turns over."
+            }
+            Self::Throttle => {
+                "The cap is spent, so the limits in force are the crawl you chose rather \
+                 than the ones you declared."
+            }
+            Self::Continue => {
+                "The cap is spent, and carrying on is what you chose, so nothing about \
+                 the limits changes."
+            }
         }
     }
 

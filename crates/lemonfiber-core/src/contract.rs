@@ -521,6 +521,7 @@ mod tests {
                 respite: Some(crate::bandwidth::Respite {
                     until: taken - 3_600,
                 }),
+                stopped: false,
             },
             now: taken,
             zone: Some("Europe/Amsterdam".to_owned()),
@@ -536,6 +537,7 @@ mod tests {
                     up: crate::bandwidth::Held::of(Some(256_000), Some(1_000), Some(900), true),
                     period: Some(crate::bandwidth::Period::Active),
                 },
+                pulling: Some(crate::bandwidth::Pulling::Stopped),
             }],
             metered: Some(crate::bandwidth::Metered::of(
                 "2026-09",

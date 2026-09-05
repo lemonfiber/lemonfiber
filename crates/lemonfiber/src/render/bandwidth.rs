@@ -93,6 +93,9 @@ fn against_the_cap(report: &Sharing) -> Lines {
         return lines;
     };
     lines.extend(spent(cap, month, report.reached));
+    if let Some(acting) = report.acting {
+        lines.put(format!("  {acting}"));
+    }
     lines
 }
 
@@ -142,6 +145,12 @@ fn keeping(clients: &[Holding]) -> Lines {
                 lines.extend(direction("up", up));
             }
         }
+        // Beneath the limits rather than beside the name, because it is the
+        // louder fact: a client that is not fetching at all is one whose limits
+        // are being kept by having nothing to keep them on.
+        if let Some(pulling) = client.pulling {
+            lines.put(format!("    fetching  {}", pulling.means()));
+        }
     }
     lines
 }
@@ -179,7 +188,7 @@ mod tests {
     use super::sharing;
     use lemonfiber_core::bandwidth::{
         weigh, Answer, Cap, Capacity, Declared, Held, Holding, Limit, Measured, Metered, Period,
-        Respite, Rhythm, WhenExceeded,
+        Pulling, Respite, Rhythm, WhenExceeded,
     };
 
     /// A moment every case here reads against.
@@ -204,6 +213,7 @@ mod tests {
                     through_tunnel: true,
                 }),
                 respite: None,
+                stopped: false,
             },
             now: NOW,
             zone: Some("Europe/Amsterdam".to_owned()),
@@ -214,6 +224,7 @@ mod tests {
                     up: Held::of(Some(262_144), Some(262_144), Some(100), true),
                     period: Some(Period::Active),
                 },
+                pulling: None,
             }],
             metered: Some(Metered::of(
                 "2026-09",
@@ -223,6 +234,20 @@ mod tests {
             )),
             applied: true,
         }
+    }
+
+    /// The same household with its month spent and its clients stopped for it.
+    fn a_spent_month() -> Measured {
+        let mut spent = a_household();
+        spent.declared.cap = Some(Cap {
+            monthly: 100,
+            exceeded: WhenExceeded::Pause,
+        });
+        spent.metered = Some(Metered::of("2026-09", 100, 0, Vec::new()));
+        for client in &mut spent.clients {
+            client.pulling = Some(Pulling::Stopped);
+        }
+        spent
     }
 
     /// The whole report as one string, for reading claims out of.
@@ -258,6 +283,7 @@ mod tests {
             answer: Answer::Silent {
                 said: "connection refused".to_owned(),
             },
+            pulling: None,
         }];
         let said = shown(&silent);
         assert!(
@@ -281,6 +307,7 @@ mod tests {
                 up: Held::of(Some(262_144), None, None, true),
                 period: None,
             },
+            pulling: None,
         }];
         let said = shown(&unsaid);
         assert!(said.contains("held to nothing, moving unknown"), "{said}");
@@ -358,5 +385,27 @@ mod tests {
         let said = shown(&lifted);
         assert!(said.contains("45 minutes"), "{said}");
         assert!(said.contains("come back on their own"), "{said}");
+    }
+
+    #[test]
+    fn a_spent_cap_says_what_was_done_about_it_and_which_clients_it_was_done_to() {
+        // Both, because neither is the other: the choice says what should be
+        // happening and the clients say what is. A report with only the first is
+        // one an operator has to take on faith.
+        let said = shown(&a_spent_month());
+        assert!(said.contains("The cap is spent."), "{said}");
+        assert!(
+            said.contains("the download clients are stopped"),
+            "the choice is not only named, it is said to be in force: {said}"
+        );
+        assert!(said.contains("stopped, and taking nothing new"), "{said}");
+    }
+
+    #[test]
+    fn a_month_that_is_not_over_says_nothing_about_stopping_anything() {
+        let said = shown(&a_household());
+        assert!(!said.contains("The cap is spent"), "{said}");
+        assert!(!said.contains("nothing new is fetched"), "{said}");
+        assert!(!said.contains("stopped, and taking nothing new"), "{said}");
     }
 }

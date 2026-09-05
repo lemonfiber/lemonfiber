@@ -383,6 +383,17 @@
             "client": {
               "description": "The client, by the name the stack knows it under.",
               "type": "string"
+            },
+            "pulling": {
+              "description": "Whether it is fetching at all, where a declared cap made that a question.\n\nAbsent on a stack with no cap rather than assumed to be fetching: asking\nevery client whether it has stopped, on a stack where nothing would ever\nstop it, is traffic spent on a figure nothing would act on.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Pulling"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -499,6 +510,21 @@
               "description": "The house is asleep and the line is the stack's.",
               "type": "string",
               "const": "quiet"
+            }
+          ]
+        },
+        "Pulling": {
+          "description": "Whether a client is fetching at all, where a cap made it a question.\n\nApart from the limits above rather than folded in with them, because it answers\na different question and a client held to a crawl is not a client that stopped.\nA word that named both would be the vocabulary this whole path exists to avoid.",
+          "oneOf": [
+            {
+              "description": "It is fetching, or would start on the next thing handed to it.",
+              "type": "string",
+              "const": "fetching"
+            },
+            {
+              "description": "Nothing is moving and nothing new would start.",
+              "type": "string",
+              "const": "stopped"
             }
           ]
         },
@@ -657,6 +683,13 @@
           "description": "How the line is shared, and what that costs.",
           "type": "object",
           "properties": {
+            "acting": {
+              "description": "What a spent cap is doing to the figures above, where one is spent.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "applied": {
               "description": "Whether this run wrote the limits to the clients or only read them.",
               "type": "boolean"
