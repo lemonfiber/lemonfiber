@@ -331,6 +331,42 @@ async fn walked(ctx: &Ctx, item: Option<String>) -> Result<Outcome, Box<Problem>
         .map(Outcome::Walkthrough)
 }
 
+/// What a trace follows, and whether it reaches past this machine to find it.
+async fn traced(
+    ctx: &Ctx,
+    term: String,
+    season: Option<u32>,
+    searching: bool,
+) -> Result<Outcome, Box<Problem>> {
+    trace::trace(ctx, &term, season, searching)
+        .await
+        .map(Outcome::Trace)
+}
+
+/// The bundle a support request asks for, gathered and put where it was asked for.
+async fn bundled(
+    ctx: &Ctx,
+    wanted: crate::app::bundle::Wanted,
+    write_it: bool,
+    dest: crate::app::support::Destination,
+) -> Result<Outcome, Box<Problem>> {
+    support::run(ctx, &wanted, write_it, &dest)
+        .await
+        .map(Outcome::Support)
+}
+
+/// What an archive would put back, or the putting back of it.
+async fn restored(
+    ctx: &Ctx,
+    archive: crate::app::restore::Kept,
+    repoint: bool,
+    consent: crate::app::restore::Consent,
+) -> Result<Outcome, Box<Problem>> {
+    restore::run(ctx, &archive, repoint, &consent)
+        .await
+        .map(Outcome::Restore)
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -362,9 +398,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             term,
             season,
             searching,
-        } => trace::trace(ctx, &term, season, searching)
-            .await
-            .map(Outcome::Trace),
+        } => traced(ctx, term, season, searching).await,
         Command::Household { member } => household::household(ctx, member.as_deref())
             .await
             .map(Outcome::Household),
@@ -443,17 +477,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             write,
             wanted,
             dest,
-        } => support::run(ctx, &wanted, write, &dest)
-            .await
-            .map(Outcome::Support),
+        } => bundled(ctx, wanted, write, dest).await,
         Command::Archives => archives::run(ctx).await.map(Outcome::Archives),
         Command::Restore {
             archive,
             repoint,
             consent,
-        } => restore::run(ctx, &archive, repoint, &consent)
-            .await
-            .map(Outcome::Restore),
+        } => restored(ctx, archive, repoint, consent).await,
     }
 }
 
