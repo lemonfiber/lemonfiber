@@ -29,7 +29,7 @@ mod trace;
 
 pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
-pub use asking::{Approving, Asking, Headroom, Left, Quota};
+pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
     Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, FulfilmentTarget,

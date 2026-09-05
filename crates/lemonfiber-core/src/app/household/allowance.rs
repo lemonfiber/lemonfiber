@@ -33,8 +33,22 @@ pub(super) struct Asked {
     pub(super) members: BTreeMap<String, Held>,
 }
 
+impl Asked {
+    /// The request service's own identifier for everybody it answered about.
+    ///
+    /// Its identifier and not the media server's, because these are the names the
+    /// writes go to. Nobody it could not be asked about is here, which is the same
+    /// courtesy the rest of this module extends: an unread answer is not a member with
+    /// nothing to say about them.
+    pub(super) fn known(&self) -> Vec<&str> {
+        self.members.values().map(|held| held.id.as_str()).collect()
+    }
+}
+
 /// What the request service holds for one person.
 pub(super) struct Held {
+    /// The identifier this service tells them apart by, which is what a write goes to.
+    pub(super) id: String,
     /// Whether what they ask for arrives without anybody seeing it first.
     pub(super) approves_own: bool,
     /// What their period has counted and what it still allows.
@@ -57,6 +71,7 @@ pub(super) async fn gathered(seerr: &crate::seerr::Seerr, accounts: &[Member]) -
         members.insert(
             account.id.clone(),
             Held {
+                id: requesting.id,
                 approves_own: requesting.approves_own,
                 headroom,
             },
@@ -236,7 +251,7 @@ pub(super) fn waiting(
 
 #[cfg(test)]
 mod tests {
-    use super::{counted, estimated, limited, reported, waiting, worth_saying, Held};
+    use super::{counted, estimated, limited, reported, waiting, worth_saying, Asked, Held};
     use crate::asking::{Policy, Standing};
     use crate::household::State;
     use crate::model::{HouseholdMember, MemberRequest};
@@ -326,6 +341,7 @@ mod tests {
     /// One member, as the request service holds them.
     fn holding(approves_own: bool, limit: Option<u32>, used: u32) -> Held {
         Held {
+            id: "7".to_owned(),
             approves_own,
             headroom: Headroom {
                 films: Left {
@@ -336,6 +352,34 @@ mod tests {
                 television: Left::default(),
             },
         }
+    }
+
+    /// The names a write goes to are the request service's own, and only those it
+    /// answered about.
+    ///
+    /// Keyed here by the media server's identifier, because that is what the household
+    /// list is built from; written to by the request service's own, because that is
+    /// what its endpoints take. Handing the wrong one out would take a permission from
+    /// somebody else, or from nobody at all.
+    #[test]
+    fn the_names_a_write_goes_to_are_the_request_services_own() {
+        let asked = Asked {
+            household: None,
+            members: [("media-server-id".to_owned(), holding(true, Some(2), 0))]
+                .into_iter()
+                .collect(),
+        };
+
+        assert_eq!(asked.known(), vec!["7"]);
+
+        let nobody = Asked {
+            household: None,
+            members: std::collections::BTreeMap::new(),
+        };
+        assert!(
+            nobody.known().is_empty(),
+            "a service that answered about nobody named somebody"
+        );
     }
 
     /// A member held to a limit reads as living inside one, whatever the house is on.

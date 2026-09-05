@@ -23,14 +23,25 @@
 //! falsy and counts nothing against it, so nought and absent are the same answer there
 //! and both read as no limit here. A member who may ask for nothing at all is not a
 //! state it can be put into, and one written as nought would be read back as unlimited.
+//!
+//! **Which is why a disk with no room goes through the permissions and not the quota.**
+//! There is no limit that stops somebody, and a limit that could would refuse in the
+//! words of a limit — the service says `Movie Quota exceeded.` for one and `You do not
+//! have permission to make movie requests.` for the other, both read off
+//! `/app/dist/routes/request.js` in the pinned image. Two different sentences for two
+//! different reasons is the distinction the disk requires, so the way to stop asking is
+//! to stop the asking.
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use super::members::{with_approval, without_approval, PermissionsResource, MEMBERS, PERMISSIONS};
+use super::members::{
+    with_approval, with_asking, without_approval, without_asking, PermissionsResource, MEMBERS,
+    NOT_FOUND, PERMISSIONS,
+};
 use super::Seerr;
 use crate::ports::http::Method;
-use crate::ports::service::{Approving, Asking, Failure, Headroom, Left, Quota};
+use crate::ports::service::{Approving, Asking, Failure, Headroom, Holding, Left, Quota};
 
 /// Where the whole household's own settings are read and written.
 const MAIN: &str = "/settings/main";
@@ -334,12 +345,7 @@ impl Approving for Seerr {
         } else {
             without_approval(held.permissions)
         };
-        let body = serde_json::json!({ "permissions": permissions }).to_string();
-        let written = self
-            .endpoint
-            .send(&self.request(Method::Post, &path, Some(body)))
-            .await?;
-        self.endpoint.expect_success(&written)
+        self.set_permissions(id, permissions).await
     }
 
     async fn decide(&self, request: i64, approve: bool) -> Result<(), Failure> {
@@ -352,6 +358,66 @@ impl Approving for Seerr {
             .send(&self.request(Method::Post, &path, None))
             .await?;
         self.endpoint.expect_success(&ruled)
+    }
+
+    async fn hold_requests(&self, id: &str) -> Result<Holding, Failure> {
+        let Some(held) = self.asking_of(id).await? else {
+            return Ok(Holding::default());
+        };
+        let (left, taken) = without_asking(held);
+        let holding = Holding { taken };
+        if !holding.anything() {
+            return Ok(holding);
+        }
+        self.set_permissions(id, left).await?;
+        Ok(holding)
+    }
+
+    async fn release_requests(&self, id: &str, holding: Holding) -> Result<(), Failure> {
+        let Some(held) = self.asking_of(id).await? else {
+            return Ok(());
+        };
+        self.set_permissions(id, with_asking(held, holding.taken))
+            .await
+    }
+}
+
+impl Seerr {
+    /// What one member may do here, or nothing where this service holds no account.
+    ///
+    /// Never having heard of somebody is an answer on both of the calls that use this:
+    /// a member gone from the service is nothing to hold back and nothing to give back
+    /// to, and a household that carried a record of somebody who left would carry it for
+    /// as long as it existed. Read apart from the one the approval makes for exactly
+    /// that reason — there, an account the service does not hold is a restriction that
+    /// did not happen, and reporting it as done would be the defect.
+    async fn asking_of(&self, id: &str) -> Result<Option<u64>, Failure> {
+        let path = format!("{MEMBERS}/{id}/{PERMISSIONS}");
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, &path, None))
+            .await?;
+        if response.status == NOT_FOUND {
+            return Ok(None);
+        }
+        let held: PermissionsResource = self
+            .endpoint
+            .decode(&response, "what this member may ask for could not be read")?;
+        Ok(Some(held.permissions))
+    }
+
+    /// Write what one member may do here, as the one number the service keeps it in.
+    ///
+    /// The narrow endpoint, whose body is that field and nothing else — so unlike the
+    /// settings write next door there is nothing here to blank by not naming it.
+    async fn set_permissions(&self, id: &str, permissions: u64) -> Result<(), Failure> {
+        let path = format!("{MEMBERS}/{id}/{PERMISSIONS}");
+        let body = serde_json::json!({ "permissions": permissions }).to_string();
+        let written = self
+            .endpoint
+            .send(&self.request(Method::Post, &path, Some(body)))
+            .await?;
+        self.endpoint.expect_success(&written)
     }
 }
 

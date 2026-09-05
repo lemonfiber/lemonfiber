@@ -12,6 +12,7 @@
 
 mod allowance;
 mod handing_over;
+mod holding;
 mod notices;
 
 use std::collections::BTreeMap;
@@ -139,12 +140,20 @@ pub(super) async fn household(
     // moment both are in hand at once — what a thing costs comes from the quality above,
     // whether there is room from the disk — and the household has no other way to hear
     // either of them, having no account here on purpose.
+    //
+    // And the block the second of them is about, taken and given back on this same
+    // reading — so the sentence saying why nothing can be fetched and the reason nothing
+    // can be asked for are written in one pass and cannot outlive one another.
     if let Some(access) = &reached {
         if let Some(finding) =
             notices::put_where_they_ask(&access.seerr, &quality, no_room, ctx.dry_run).await
         {
             findings.push(finding);
         }
+        findings.extend(
+            holding::as_the_disk_stands(ctx, &access.seerr, &asked.known(), no_room, ctx.dry_run)
+                .await,
+        );
     }
 
     let mut report = assemble(
@@ -562,6 +571,7 @@ mod tests {
                     (
                         id.clone(),
                         allowance::Held {
+                            id: format!("seerr-{id}"),
                             approves_own: *approves_own,
                             headroom: crate::ports::service::Headroom::default(),
                         },
@@ -856,6 +866,16 @@ mod tests {
         requests: &'static str,
         library: &'static str,
         refuse: bool,
+        /// The account the request service holds for a member, where it holds one.
+        ///
+        /// Absent by default, which is a household nobody has signed into the request
+        /// service — the state the cases about joining and naming are written against.
+        account: Option<&'static str>,
+        /// What the narrow permissions endpoint answers, to the read and to the write.
+        ///
+        /// One answer for both because the write only has to succeed: what it was sent
+        /// is read back off the transport rather than out of its reply.
+        permissions: (u16, &'static str),
     }
 
     impl Default for Fake {
@@ -873,14 +893,19 @@ mod tests {
                 requests: "",
                 library: "[]",
                 refuse: false,
+                account: None,
+                permissions: (200, r#"{"permissions":32}"#),
             }
         }
     }
 
+    /// What one member's period has counted, as the request service works it out.
+    const COUNTS: &str = r#"{"movie":{"days":7,"limit":2,"used":0},"tv":{}}"#;
+
     impl Fake {
         /// The scripted answers as a transport, routed by what each call asks for.
         fn transport(&self) -> Arc<Transport> {
-            Transport::by_path(vec![
+            let mut routes = vec![
                 // Ahead of `/Users`, whose text it contains: the media server signs
                 // this program in before it will answer anything about accounts, and
                 // a route matched by prefix would answer the sign-in with the list.
@@ -898,9 +923,19 @@ mod tests {
                     "/auth/jellyfin",
                     Answer::reply(if self.refuse { 500 } else { 200 }, self.sign_in),
                 ),
-                ("/api/v1/request", Answer::reply(200, self.requests)),
-                ("", Answer::reply(200, self.library)),
-            ])
+            ];
+            if let Some(account) = self.account {
+                // Ahead of the catch-all, which would answer an account with a library.
+                routes.push(("/user/jellyfin/", Answer::reply(200, account)));
+                routes.push(("/quota", Answer::reply(200, COUNTS)));
+                routes.push((
+                    "/settings/permissions",
+                    Answer::reply(self.permissions.0, self.permissions.1),
+                ));
+            }
+            routes.push(("/api/v1/request", Answer::reply(200, self.requests)));
+            routes.push(("", Answer::reply(200, self.library)));
+            Transport::by_path(routes)
         }
     }
 
@@ -930,20 +965,303 @@ mod tests {
     /// recorded, so `seerr_reader` resolves a client. Tagged so each test keeps its own
     /// env file rather than racing on a shared one.
     fn ctx_with(fake: &Fake, tag: &str) -> Ctx {
+        ctx_over(fake.transport(), tag, false)
+    }
+
+    /// The same, on a volume with no room left, keeping the transport so what was
+    /// written to the request service can be read back off it.
+    fn no_room_with(fake: &Fake, tag: &str) -> (Ctx, Arc<Transport>) {
+        let transport = fake.transport();
+        (ctx_over(Arc::clone(&transport), tag, true), transport)
+    }
+
+    /// What a volume with nothing left on it reports.
+    ///
+    /// A total that was read and nothing free, which is the one reading that halts
+    /// acquisitions — a total of nought reads as a volume nobody could measure.
+    fn exhausted() -> crate::ports::filesystem::StorageFacts {
+        crate::ports::filesystem::StorageFacts {
+            point: std::path::PathBuf::new(),
+            kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
+            removable: false,
+            available: 0,
+            total: 4 * 1024 * 1024 * 1024 * 1024,
+        }
+    }
+
+    /// A context over the given transport, with or without room on its disk.
+    fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
         let dir =
             std::env::temp_dir().join(format!("lemonfiber-household-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         let _ = std::fs::create_dir_all(&dir);
+        let disk = SeedFs::keyed(Some(KEYED), None);
         let mut context = a_context()
             .build()
-            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-            .with_http(fake.transport());
+            .with_filesystem(Arc::new(if no_room {
+                disk.with_facts(exhausted())
+            } else {
+                disk
+            }))
+            .with_http(transport);
         context.settings.env_file = Some(dir.join(".env"));
+        if no_room {
+            // Measured at all only where there is somewhere to measure, so the reading
+            // that halts needs a data location as much as it needs a full volume.
+            context.settings.data_root = Some(dir);
+        }
         crate::app::targets::record_secret(
             &context,
             crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
             &a_password(),
         );
         context
+    }
+
+    /// Where this context keeps what the disk is holding back.
+    fn record_of(ctx: &Ctx) -> std::path::PathBuf {
+        ctx.settings
+            .env_file
+            .as_ref()
+            .map(|env| env.with_file_name("held-back.json"))
+            .unwrap_or_default()
+    }
+
+    /// A household the request service holds an account for, able to ask for things.
+    fn asking_household(permissions: (u16, &'static str)) -> Fake {
+        Fake {
+            account: Some(r#"{"id":5,"permissions":32}"#),
+            permissions,
+            ..Fake::default()
+        }
+    }
+
+    /// Every body written to the narrow permissions endpoint, in order.
+    fn permissions_written(transport: &Arc<Transport>) -> Vec<String> {
+        transport
+            .requests()
+            .into_iter()
+            .filter(|request| {
+                request.url.contains("/settings/permissions")
+                    && request.method == crate::ports::http::Method::Post
+            })
+            .filter_map(|request| request.body)
+            .collect()
+    }
+
+    /// A full disk stops the household asking, and writes down what it took.
+    ///
+    /// The block a full disk needs and the sentence explaining it go out on the one
+    /// reading. What is taken has to be written down because giving it back is not a
+    /// grant: what a household may ask for is the operator's to decide.
+    #[tokio::test]
+    async fn a_full_disk_stops_the_household_asking_and_writes_down_what_it_took() {
+        let (context, transport) = no_room_with(
+            &asking_household((200, r#"{"permissions":32}"#)),
+            "held-back",
+        );
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|said| !said.contains("would not stop")),
+            "{report:?}"
+        );
+        assert_eq!(
+            permissions_written(&transport),
+            vec![r#"{"permissions":0}"#.to_owned()],
+            "the household was left able to ask for what cannot be fetched"
+        );
+        let kept = std::fs::read_to_string(record_of(&context)).unwrap_or_default();
+        assert!(
+            kept.contains(r#""5":32"#),
+            "what was taken was not written down: {kept}"
+        );
+    }
+
+    /// A disk with room again gives back exactly what was taken, and nothing else.
+    ///
+    /// The permission the operator narrowed while the disk was full stays narrowed:
+    /// this puts back the number that came off rather than restoring an account.
+    #[tokio::test]
+    async fn a_disk_with_room_gives_back_exactly_what_was_taken() {
+        let transport = asking_household((200, r#"{"permissions":4194304}"#)).transport();
+        let context = ctx_over(Arc::clone(&transport), "given-back", false);
+        let _ = std::fs::write(record_of(&context), r#"{"5":32}"#);
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(report.available, "{report:?}");
+        assert_eq!(
+            permissions_written(&transport),
+            vec![r#"{"permissions":4194336}"#.to_owned()],
+            "what was given back was not what was taken"
+        );
+        let kept = std::fs::read_to_string(record_of(&context)).unwrap_or_default();
+        assert_eq!(
+            kept, "{}",
+            "somebody stayed written down as held back: {kept}"
+        );
+    }
+
+    /// A service that will not stop the asking says so, rather than reporting a block.
+    #[tokio::test]
+    async fn a_service_that_will_not_stop_the_asking_says_so() {
+        let (context, _) = no_room_with(&asking_household((500, "no")), "unstoppable");
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|said| said.contains("would not stop the household asking")),
+            "{report:?}"
+        );
+        assert!(
+            !record_of(&context).exists(),
+            "nothing was taken and somebody was written down as held back anyway"
+        );
+    }
+
+    /// An owner is not written down as held back, because nothing was taken from them.
+    ///
+    /// The request service reads that permission first and answers yes whatever else
+    /// is set, so a bit taken off would block nothing and a bit given back would be a
+    /// change made to their account for no effect.
+    #[tokio::test]
+    async fn an_owner_is_not_written_down_as_held_back() {
+        let (context, transport) = no_room_with(
+            &asking_household((200, r#"{"permissions":2}"#)),
+            "the-owner",
+        );
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(report.available, "{report:?}");
+        assert!(
+            permissions_written(&transport).is_empty(),
+            "the owner's own account was written to"
+        );
+        assert!(
+            !record_of(&context).exists(),
+            "the owner was written down as held back"
+        );
+    }
+
+    /// A service that will not give it back keeps the record, so the next reading tries.
+    #[tokio::test]
+    async fn a_service_that_will_not_give_it_back_keeps_the_record() {
+        let context = ctx_over(
+            asking_household((500, "no")).transport(),
+            "still-held",
+            false,
+        );
+        let _ = std::fs::write(record_of(&context), r#"{"5":32}"#);
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|said| said.contains("give the household back")),
+            "{report:?}"
+        );
+        let kept = std::fs::read_to_string(record_of(&context)).unwrap_or_default();
+        assert!(
+            kept.contains(r#""5":32"#),
+            "the record was forgotten: {kept}"
+        );
+    }
+
+    /// A record that cannot be written is said out loud rather than swallowed.
+    ///
+    /// Silence there would leave an operator believing a household could be let go
+    /// again from a note that was never made.
+    #[tokio::test]
+    async fn a_record_that_cannot_be_written_is_said_out_loud() {
+        let (context, _) = no_room_with(
+            &asking_household((200, r#"{"permissions":32}"#)),
+            "unwritable",
+        );
+        // A directory standing where the record goes, which is the one way to make the
+        // write fail without making the settings unreachable as well.
+        let _ = std::fs::create_dir_all(record_of(&context));
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|said| said.contains("could not be written down")),
+            "{report:?}"
+        );
+    }
+
+    /// A member the request service no longer holds is forgotten rather than carried.
+    ///
+    /// An account that has gone is nothing to give anything back to, and a record that
+    /// kept the line would carry somebody who left for as long as the household did.
+    #[tokio::test]
+    async fn a_member_the_service_no_longer_holds_is_forgotten() {
+        let transport = asking_household((404, r#"{"message":"User not found."}"#)).transport();
+        let context = ctx_over(Arc::clone(&transport), "gone", false);
+        let _ = std::fs::write(record_of(&context), r#"{"5":32}"#);
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(report.available, "{report:?}");
+        assert!(
+            permissions_written(&transport).is_empty(),
+            "an account that is gone was written to"
+        );
+        let kept = std::fs::read_to_string(record_of(&context)).unwrap_or_default();
+        assert_eq!(kept, "{}", "somebody who left stayed written down: {kept}");
+    }
+
+    /// Nothing is taken from a member the request service no longer holds either.
+    #[tokio::test]
+    async fn nothing_is_taken_from_a_member_who_is_gone() {
+        let (context, transport) = no_room_with(
+            &asking_household((404, r#"{"message":"User not found."}"#)),
+            "gone-full",
+        );
+
+        let report = household(&context, None).await.unwrap_or_default();
+
+        assert!(report.available, "{report:?}");
+        assert!(
+            permissions_written(&transport).is_empty(),
+            "an account that is gone was written to"
+        );
+        assert!(
+            !record_of(&context).exists(),
+            "an account that is gone was written down as held back"
+        );
+    }
+
+    /// A rehearsal takes nothing away from anybody, however full the disk is.
+    #[tokio::test]
+    async fn a_rehearsal_takes_nothing_away() {
+        let (context, transport) = no_room_with(
+            &asking_household((200, r#"{"permissions":32}"#)),
+            "rehearsed",
+        );
+
+        let report = household(&context.rehearsing(), None)
+            .await
+            .unwrap_or_default();
+
+        assert!(report.available, "{report:?}");
+        assert!(
+            permissions_written(&transport).is_empty(),
+            "a rehearsal stopped a household asking"
+        );
     }
 
     #[test]

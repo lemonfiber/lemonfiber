@@ -63,6 +63,25 @@ const APPROVES_OWN: u64 = 2 | 128 | 256 | 512 | 32_768 | 65_536 | 131_072;
 /// household means and leaves the narrower answers to whoever wanted them.
 const GRANTS_APPROVAL: u64 = 128;
 
+/// The permissions under which somebody may ask for anything here at all.
+///
+/// Read off the gate in `/app/dist/entity/MediaRequest.js` inside the pinned image
+/// rather than off the names in the table beside it: a film is refused unless the
+/// account holds `REQUEST` **or** `REQUEST_MOVIE`, a series unless it holds `REQUEST` or
+/// `REQUEST_TV`, and the higher quality has three more of its own. So the plain one is
+/// not the whole of asking, and taking only it would leave a household still asking
+/// through any of the other five.
+///
+/// The watchlist is the same gate. What it synchronises is filed through the same call,
+/// so what is taken here stops a request nobody typed as well as one somebody did.
+const ASKS_AT_ALL: u64 = 32 | 1_024 | 2_048 | 4_096 | 262_144 | 524_288;
+
+/// The permission this service treats as holding every other one.
+///
+/// `ADMIN`. Named apart from the set above because it is not one of the ways to ask —
+/// it is the reason taking those away from one account would achieve nothing.
+const ADMINISTERS: u64 = 2;
+
 /// One account this service holds, in the spelling it answers with.
 #[derive(Deserialize)]
 pub(super) struct MemberResource {
@@ -115,9 +134,120 @@ pub(super) const fn with_approval(permissions: u64) -> u64 {
     permissions | GRANTS_APPROVAL
 }
 
+/// The same permissions with every way of asking taken off, and what came off with them.
+///
+/// Both halves rather than the first, because what is taken is what will be given back:
+/// a set composed later from what this side thinks asking means would hand back a
+/// different account from the one it took.
+///
+/// **An account this service treats as holding every permission is left exactly as it
+/// is**, and for two reasons rather than one. The request gate reads that bit first and
+/// answers yes whatever else is set, so taking these off the owner would block nothing.
+/// And the write would be refused anyway: `POST /user/{id}/settings/permissions` answers
+/// `403` for the account it files first and for the account asking, which in this stack
+/// are the same account and are the one lemonfiber signs in as — so a reading that tried
+/// would report the same failure on every glance at the household, for ever.
+#[must_use]
+pub(super) const fn without_asking(permissions: u64) -> (u64, u64) {
+    if permissions & ADMINISTERS != 0 {
+        return (permissions, 0);
+    }
+    (permissions & !ASKS_AT_ALL, permissions & ASKS_AT_ALL)
+}
+
+/// The same permissions with exactly what was taken put back.
+///
+/// Not the mirror of the above and not a grant: it puts back the number it is given and
+/// nothing else, so an account narrowed by hand in the meantime stays narrowed, and one
+/// that only ever held the higher quality gets the higher quality back.
+#[must_use]
+pub(super) const fn with_asking(permissions: u64, taken: u64) -> u64 {
+    permissions | taken
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{approves_own, with_approval, without_approval, APPROVES_OWN};
+    use super::{
+        approves_own, with_approval, with_asking, without_approval, without_asking, APPROVES_OWN,
+        ASKS_AT_ALL,
+    };
+
+    /// Taking the asking away takes every way of asking, not only the plain one.
+    ///
+    /// The gate reads the plain permission *or* the one for that kind of thing, so an
+    /// account left holding either is an account still asking — which is the whole of
+    /// what a full disk has to stop.
+    #[test]
+    fn taking_the_asking_away_takes_every_way_of_asking() {
+        // Films only, plus a vote and an issue, which are neither.
+        let held = 262_144 | 64 | 4_194_304;
+
+        let (left, taken) = without_asking(held);
+
+        assert_eq!(taken, 262_144, "what came off was not what could ask");
+        assert_eq!(
+            left,
+            64 | 4_194_304,
+            "something that is not asking came off"
+        );
+        assert_eq!(without_asking(left).1, 0, "there was still a way to ask");
+    }
+
+    /// An owner is left exactly as they are, because taking a bit off one does nothing.
+    #[test]
+    fn an_owner_is_left_exactly_as_they_are() {
+        // `ADMIN` beside the plain way of asking.
+        let held = 2 | 32;
+
+        let (left, taken) = without_asking(held);
+
+        assert_eq!(left, held, "the owner's account was changed");
+        assert_eq!(
+            taken, 0,
+            "something was written down as taken from the owner"
+        );
+    }
+
+    /// What is given back is exactly what was taken, and nothing composed here.
+    ///
+    /// A member who could only ask for the higher quality gets the higher quality back,
+    /// rather than the plain grant this side would otherwise have decided on.
+    #[test]
+    fn what_is_given_back_is_what_was_taken() {
+        let held = 2_048 | 64;
+
+        let (left, taken) = without_asking(held);
+
+        assert_eq!(with_asking(left, taken), held);
+    }
+
+    /// Giving back puts nothing else back with it.
+    ///
+    /// A permission an operator narrowed while the disk was full stays narrowed: this
+    /// puts back a number it was handed rather than restoring an account.
+    #[test]
+    fn giving_back_restores_nothing_the_operator_took_meanwhile() {
+        let narrowed = 4_194_304;
+
+        assert_eq!(with_asking(narrowed, 32), 32 | 4_194_304);
+    }
+
+    /// Every bit named as a way of asking is one, and the count is held.
+    ///
+    /// Counted rather than asserted one at a time, so a bit dropped from the set is a
+    /// failure here rather than a household that quietly went on asking.
+    #[test]
+    fn every_way_of_asking_named_is_one_that_comes_off() {
+        let named: Vec<u64> = (0..64)
+            .map(|bit| 1_u64 << bit)
+            .filter(|bit| ASKS_AT_ALL & bit != 0)
+            .collect();
+
+        assert_eq!(named.len(), 6, "{named:?}");
+        for bit in named {
+            assert_eq!(without_asking(bit), (0, bit), "{bit} did not come off");
+        }
+    }
 
     /// An account holding the plain approval bit approves its own requests.
     #[test]
