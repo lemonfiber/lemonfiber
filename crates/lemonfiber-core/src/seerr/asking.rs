@@ -72,11 +72,18 @@ struct MainSettings {
 }
 
 /// The two counts the service keeps apart, as it holds their settings.
+///
+/// Either half may be missing from what it answers with, and a half that is missing is
+/// a half nothing limits — not a document this cannot read. A stricter shape here would
+/// report a household whose settings it merely could not parse as one whose request
+/// service would not answer, which are different things to be told.
 #[derive(Default, Deserialize, Serialize)]
 struct DefaultQuotas {
     /// Films, counted one to a request.
+    #[serde(default)]
     movie: QuotaSetting,
     /// Television, counted one to a season.
+    #[serde(default)]
     tv: QuotaSetting,
 }
 
