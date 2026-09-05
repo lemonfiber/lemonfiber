@@ -631,38 +631,6 @@ async fn a_settings_document_missing_a_half_is_still_no_limit() {
     }
 }
 
-/// A household whose settings name neither half is a household with no limit.
-///
-/// The service's own defaults hold `defaultQuotas` as two empty objects, and a build
-/// that omitted one would be answering the same question with less. Either way it is
-/// no limit rather than an answer this cannot read — which is what it was reported as
-/// until this pinned it, and the two send an operator to different services.
-#[tokio::test]
-async fn a_settings_document_missing_a_half_is_still_no_limit() {
-    for held in [
-        r#"{"defaultPermissions":32,"defaultQuotas":{}}"#,
-        r#"{"defaultPermissions":32,"defaultQuotas":{"movie":{}}}"#,
-        r#"{"defaultPermissions":32}"#,
-    ] {
-        let fake = Fake::by_route(vec![(
-            Method::Get,
-            "/settings/main",
-            Answer::reply(200, held),
-        )]);
-
-        let read = seerr(&fake).asking().await;
-
-        assert_eq!(
-            read.ok(),
-            Some(Asking {
-                approves_own: false,
-                quota: None,
-            }),
-            "{held}"
-        );
-    }
-}
-
 /// A choice that names a policy needing a limit, with none anywhere, is refused
 /// before anything is written.
 #[tokio::test]
