@@ -549,6 +549,12 @@ mod tests {
         for client in &clients {
             let reported = holding(client, &wanted(), None, false).await;
             assert_eq!(reported.client, "sabnzbd");
+            // Asked whether it is fetching at all, which is what a spent cap is
+            // judged by. It answers from its own queue flag rather than the
+            // torrent client's pair of readings, and a stack that never asked it
+            // would judge a Usenet-only household's cap on nothing.
+            let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
+            assert_eq!(asked.pulling, Some(Pulling::Fetching));
             let answered = parts(&reported.answer);
             assert!(
                 answered.is_some_and(|(down, up, period)| down.accepted == Some(SLOW)
