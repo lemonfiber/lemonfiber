@@ -257,7 +257,7 @@ async fn main() -> ExitCode {
             if mending.acts() {
                 return repairing(ctx, mending, cli.json).await;
             }
-            match diagnosing(only, disruptive, accept) {
+            match diagnosing(only.as_deref(), disruptive, accept) {
                 Ok(command) => command,
                 Err(code) => return code,
             }
@@ -419,11 +419,11 @@ async fn answered(command: Command, ctx: &Ctx, json: bool) -> ExitCode {
 /// mends returns before this is reached — and the two together are longer than the
 /// table has room for.
 fn diagnosing(
-    only: Option<String>,
+    only: Option<&str>,
     disruptive: bool,
     accept: Option<String>,
 ) -> Result<Command, ExitCode> {
-    narrowed(only.as_deref()).map(|narrowing| Command::Doctor {
+    narrowed(only).map(|narrowing| Command::Doctor {
         narrowing,
         disruptive,
         accept,
