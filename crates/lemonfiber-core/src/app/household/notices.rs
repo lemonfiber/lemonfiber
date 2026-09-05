@@ -103,12 +103,11 @@ mod tests {
             "a house with room on the disk showed something other than the one notice \
              it has to show: {showing:?}"
         );
-        let Some(first) = showing.first() else {
-            unreachable!("a list of one has a first");
-        };
         assert!(
-            first.contains("A film") && first.contains("a season"),
-            "the notice about what things cost named neither kind: {first}"
+            showing
+                .first()
+                .is_some_and(|first| first.contains("A film") && first.contains("a season")),
+            "the notice about what things cost named neither kind: {showing:?}"
         );
     }
 
@@ -169,21 +168,16 @@ mod tests {
                 .iter()
                 .map(|notice| notice.chars().take(NARROW).collect())
                 .collect();
-            let Some(costs) = read.first() else {
-                unreachable!("a house with no room shows two notices");
-            };
             assert!(
-                costs.chars().any(|letter| letter.is_ascii_digit()),
+                read.first()
+                    .is_some_and(|costs| costs.chars().any(|letter| letter.is_ascii_digit())),
                 "the notice about what things cost names no figure in the {NARROW} \
-                 characters a telephone shows: {costs}"
+                 characters a telephone shows: {read:?}"
             );
-            let Some(disk) = read.get(1) else {
-                unreachable!("a house with no room shows two notices");
-            };
             assert!(
-                disk.contains("disk"),
+                read.get(1).is_some_and(|disk| disk.contains("disk")),
                 "the notice about the disk does not name the disk in the {NARROW} \
-                 characters a telephone shows: {disk}"
+                 characters a telephone shows: {read:?}"
             );
         }
     }
@@ -191,15 +185,10 @@ mod tests {
     /// The two kinds are told apart, so a bigger preset reads as bigger.
     #[test]
     fn a_costlier_quality_reads_as_costlier() {
-        let Some(thrifty) = for_the_house(&Selection::everywhere(Preset::SpaceSaving), false).pop()
-        else {
-            unreachable!("a list of one has a last");
-        };
-        let Some(lavish) = for_the_house(&Selection::everywhere(Preset::Maximum), false).pop()
-        else {
-            unreachable!("a list of one has a last");
-        };
+        let thrifty = for_the_house(&Selection::everywhere(Preset::SpaceSaving), false).pop();
+        let lavish = for_the_house(&Selection::everywhere(Preset::Maximum), false).pop();
 
+        assert!(thrifty.is_some() && lavish.is_some(), "both were quoted");
         assert_ne!(
             thrifty, lavish,
             "two qualities a household would choose between were quoted the same price"
