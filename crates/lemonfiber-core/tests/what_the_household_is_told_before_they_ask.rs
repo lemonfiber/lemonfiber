@@ -176,8 +176,7 @@ async fn hanging_a_notice_leaves_every_other_row_as_it_was() {
 
     let Some(written) = sent_to(&fake, Method::Post, "/settings/discover")
         .into_iter()
-        .filter(|request| !request.url.contains("/add"))
-        .next_back()
+        .rfind(|request| !request.url.contains("/add"))
         .and_then(|request| request.body)
     else {
         unreachable!("the whole list is written back once the rows are filed");

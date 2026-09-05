@@ -259,12 +259,20 @@ mod tests {
 
         let written = row.written(3, true);
 
-        assert_eq!(written["id"], 7);
-        assert_eq!(written["type"], 17);
-        assert_eq!(written["isBuiltIn"], false);
-        assert_eq!(written["enabled"], true);
-        assert_eq!(written["order"], 3);
-        assert_eq!(written["title"], "a notice");
-        assert_eq!(written["data"], OURS);
+        // The whole document rather than field by field: what the service is sent
+        // is the shape as well as the values, and a field that should not be there
+        // is as wrong as one that is missing.
+        assert_eq!(
+            written,
+            serde_json::json!({
+                "id": 7,
+                "type": 17,
+                "isBuiltIn": false,
+                "enabled": true,
+                "order": 3,
+                "title": "a notice",
+                "data": OURS,
+            })
+        );
     }
 }
