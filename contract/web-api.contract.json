@@ -189,6 +189,731 @@
         }
       }
     },
+    "bandwidth": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Sharing"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Answer": {
+          "description": "How one download client answered about the limits on it.",
+          "oneOf": [
+            {
+              "description": "It answered, in both directions.",
+              "type": "object",
+              "properties": {
+                "answered": {
+                  "type": "string",
+                  "const": "held"
+                },
+                "down": {
+                  "description": "What became of the download limit.",
+                  "$ref": "#/$defs/Held"
+                },
+                "period": {
+                  "description": "Which side of the household's day it says it is on, where it keeps the\nhours itself.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Period"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "up": {
+                  "description": "And of the upload one.",
+                  "$ref": "#/$defs/Held"
+                }
+              },
+              "required": [
+                "answered",
+                "down",
+                "up"
+              ]
+            },
+            {
+              "description": "It did not answer, and this is what it said.\n\nIts own line rather than an absence, because a client nobody could reach is\na client whose limits are unknown, and an unknown limit rendered as no\nlimit is the report reading better than the stack is.",
+              "type": "object",
+              "properties": {
+                "answered": {
+                  "type": "string",
+                  "const": "silent"
+                },
+                "said": {
+                  "description": "What went wrong, in the words of whatever refused.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "answered",
+                "said"
+              ]
+            }
+          ]
+        },
+        "Cap": {
+          "description": "A monthly allowance, and what to do at the end of it.",
+          "type": "object",
+          "properties": {
+            "exceeded": {
+              "description": "What happens when it is reached, chosen when the cap was declared.",
+              "$ref": "#/$defs/WhenExceeded"
+            },
+            "monthly": {
+              "description": "The allowance, in bytes.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "monthly",
+            "exceeded"
+          ]
+        },
+        "Capacity": {
+          "description": "What the line was measured to carry.",
+          "type": "object",
+          "properties": {
+            "down": {
+              "description": "Bytes a second down.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "source": {
+              "description": "Where the figure came from.",
+              "$ref": "#/$defs/Source"
+            },
+            "taken": {
+              "description": "When it was taken, in seconds since the epoch.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "through_tunnel": {
+              "description": "Whether the path it was measured over goes through the VPN tunnel.",
+              "type": "boolean"
+            },
+            "up": {
+              "description": "Bytes a second up.\n\nMeasured apart from the download, because a home connection is asymmetric\nand a single figure for both would make every upload share far larger than\nthe operator meant.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "down",
+            "up",
+            "source",
+            "taken",
+            "through_tunnel"
+          ]
+        },
+        "Held": {
+          "description": "One direction on one client: what it was asked for, took, and is doing.",
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "description": "What it reports as in force.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "asked": {
+              "description": "What it was asked to hold to, in bytes a second, where anything was.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "moving": {
+              "description": "What it is moving right now, where it reported a figure.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "verdict": {
+              "description": "What that adds up to.",
+              "$ref": "#/$defs/Verdict"
+            }
+          },
+          "required": [
+            "verdict"
+          ]
+        },
+        "Holding": {
+          "description": "One download client, and what became of the limits it was given.",
+          "type": "object",
+          "properties": {
+            "answer": {
+              "description": "What it said.",
+              "$ref": "#/$defs/Answer"
+            },
+            "client": {
+              "description": "The client, by the name the stack knows it under.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client",
+            "answer"
+          ]
+        },
+        "Limit": {
+          "description": "How much of the line something may take.",
+          "oneOf": [
+            {
+              "description": "Nothing holds it back.",
+              "type": "object",
+              "properties": {
+                "as": {
+                  "type": "string",
+                  "const": "unlimited"
+                }
+              },
+              "required": [
+                "as"
+              ]
+            },
+            {
+              "description": "A proportion of what the line was measured to carry, in whole per cent.",
+              "type": "object",
+              "properties": {
+                "as": {
+                  "type": "string",
+                  "const": "share"
+                },
+                "at": {
+                  "type": "integer",
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "as",
+                "at"
+              ]
+            },
+            {
+              "description": "A figure in bytes a second, as it was given.",
+              "type": "object",
+              "properties": {
+                "as": {
+                  "type": "string",
+                  "const": "absolute"
+                },
+                "at": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "as",
+                "at"
+              ]
+            }
+          ]
+        },
+        "Metered": {
+          "description": "What the stack itself moved in a calendar month, and what that leaves out.",
+          "type": "object",
+          "properties": {
+            "down": {
+              "description": "Bytes pulled down, as far as the clients count them.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "excludes": {
+              "description": "What this count does not include, always said.",
+              "type": "string"
+            },
+            "incomplete": {
+              "description": "What is known to be missing from the count itself, where anything is.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "month": {
+              "description": "The month, as the client that dated the figures dates them.",
+              "type": "string"
+            },
+            "up": {
+              "description": "Bytes given back.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "month",
+            "down",
+            "up",
+            "excludes",
+            "incomplete"
+          ]
+        },
+        "Period": {
+          "description": "Which side of the household's day a moment falls on.",
+          "oneOf": [
+            {
+              "description": "People are up and using the line, so the stack is held back.",
+              "type": "string",
+              "const": "active"
+            },
+            {
+              "description": "The house is asleep and the line is the stack's.",
+              "type": "string",
+              "const": "quiet"
+            }
+          ]
+        },
+        "Reached": {
+          "description": "Where a month stands against a declared cap.",
+          "oneOf": [
+            {
+              "description": "Comfortably inside it.",
+              "type": "string",
+              "const": "within"
+            },
+            {
+              "description": "Close enough that there is still time to do something.",
+              "type": "string",
+              "const": "warning"
+            },
+            {
+              "description": "Reached, and the declared behaviour applies.",
+              "type": "string",
+              "const": "exceeded"
+            }
+          ]
+        },
+        "Reading": {
+          "description": "One direction's limit, as declared and as it comes to.",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "The limit as it was expressed.",
+              "$ref": "#/$defs/Limit"
+            },
+            "resolved": {
+              "description": "What it comes to against the measured line.",
+              "$ref": "#/$defs/Resolved"
+            },
+            "says": {
+              "description": "The limit and the line it was measured against, in one sentence.\n\nCarried rather than left to each surface, so the rule that a share is never\nshown without the figure it is a share of is kept in one place instead of\nthree.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "limit",
+            "resolved",
+            "says"
+          ]
+        },
+        "Resolved": {
+          "description": "What a limit comes to once it is weighed against a measured line.",
+          "oneOf": [
+            {
+              "description": "Nothing holds it back.",
+              "type": "object",
+              "properties": {
+                "is": {
+                  "type": "string",
+                  "const": "unlimited"
+                }
+              },
+              "required": [
+                "is"
+              ]
+            },
+            {
+              "description": "This many bytes a second.",
+              "type": "object",
+              "properties": {
+                "bytes_per_second": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                },
+                "is": {
+                  "type": "string",
+                  "const": "at"
+                }
+              },
+              "required": [
+                "is",
+                "bytes_per_second"
+              ]
+            },
+            {
+              "description": "A proportion was asked for and nothing has measured the line.\n\nDeliberately not folded into [`Self::Unlimited`]. \"Half of an unknown\nnumber\" resolving to \"no limit at all\" is the shape of a setting an\noperator believes is in force while the stack takes the whole line.",
+              "type": "object",
+              "properties": {
+                "is": {
+                  "type": "string",
+                  "const": "unmeasured"
+                }
+              },
+              "required": [
+                "is"
+              ]
+            }
+          ]
+        },
+        "Restraint": {
+          "description": "Where the line stands.",
+          "oneOf": [
+            {
+              "description": "Nothing is configured.",
+              "type": "string",
+              "const": "unlimited"
+            },
+            {
+              "description": "Limits are in force, with no schedule to switch them.",
+              "type": "string",
+              "const": "limited"
+            },
+            {
+              "description": "Inside the household's active hours, so the limits apply.",
+              "type": "string",
+              "const": "scheduled-active"
+            },
+            {
+              "description": "Outside them, so the line is the stack's.",
+              "type": "string",
+              "const": "scheduled-quiet"
+            },
+            {
+              "description": "A temporary override is lifting the limits, and will expire.",
+              "type": "string",
+              "const": "overridden"
+            },
+            {
+              "description": "The month is close enough to a declared cap to say so.",
+              "type": "string",
+              "const": "cap-warning"
+            },
+            {
+              "description": "The cap has been reached and the declared behaviour applies.",
+              "type": "string",
+              "const": "cap-exceeded"
+            }
+          ]
+        },
+        "Rhythm": {
+          "description": "The hours the household is awake, declared once for every download client.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "When the household's day starts.",
+              "type": "string"
+            },
+            "to": {
+              "description": "When it ends, which may be the next morning.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        },
+        "Sharing": {
+          "description": "How the line is shared, and what that costs.",
+          "type": "object",
+          "properties": {
+            "applied": {
+              "description": "Whether this run wrote the limits to the clients or only read them.",
+              "type": "boolean"
+            },
+            "cap": {
+              "description": "The monthly cap, where one was declared.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Cap"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "capacity": {
+              "description": "What the line was measured to carry.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Capacity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cautions": {
+              "description": "What is worth knowing about that reading before trusting it.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "clients": {
+              "description": "What each download client was asked and what it is doing about it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Holding"
+              }
+            },
+            "down": {
+              "description": "The download limit.",
+              "$ref": "#/$defs/Reading"
+            },
+            "means": {
+              "description": "What that means for the household.",
+              "type": "string"
+            },
+            "metered": {
+              "description": "What the stack itself moved this month.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Metered"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ratio": {
+              "description": "What throttling the upload costs, where an upload limit is in force.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reached": {
+              "description": "Where the month stands against it.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Reached"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "respite": {
+              "description": "The override, where one is running or has just run out.",
+              "$ref": "#/$defs/Standing"
+            },
+            "respite_says": {
+              "description": "What the override amounts to, in words.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "restraint": {
+              "description": "Where the line stands.",
+              "$ref": "#/$defs/Restraint"
+            },
+            "rhythm": {
+              "description": "The household's hours, where any were declared.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Rhythm"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "untouched": {
+              "description": "What is outside every limit here.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "up": {
+              "description": "The upload limit, which is declared apart and defaults lower.",
+              "$ref": "#/$defs/Reading"
+            },
+            "zone": {
+              "description": "The zone the clients read those hours in, where the stack says.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "restraint",
+            "means",
+            "cautions",
+            "down",
+            "up",
+            "respite",
+            "clients",
+            "untouched",
+            "applied"
+          ]
+        },
+        "Source": {
+          "description": "Where a figure for the line came from.",
+          "oneOf": [
+            {
+              "description": "The operator gave it, presumably off the plan they pay for.",
+              "type": "string",
+              "const": "declared"
+            },
+            {
+              "description": "The fastest the stack has been seen to move, which is what it achieved\nrather than what the line is sold as.",
+              "type": "string",
+              "const": "observed"
+            }
+          ]
+        },
+        "Standing": {
+          "description": "Where a respite stands against the clock.",
+          "oneOf": [
+            {
+              "description": "None was asked for.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "none"
+                }
+              },
+              "required": [
+                "standing"
+              ]
+            },
+            {
+              "description": "In force, with this long left.",
+              "type": "object",
+              "properties": {
+                "seconds": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                },
+                "standing": {
+                  "type": "string",
+                  "const": "in-force"
+                }
+              },
+              "required": [
+                "standing",
+                "seconds"
+              ]
+            },
+            {
+              "description": "It ran out, this long ago. Said once, then cleared.",
+              "type": "object",
+              "properties": {
+                "seconds": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                },
+                "standing": {
+                  "type": "string",
+                  "const": "expired"
+                }
+              },
+              "required": [
+                "standing",
+                "seconds"
+              ]
+            }
+          ]
+        },
+        "Verdict": {
+          "description": "What became of one limit, in one direction, on one client.",
+          "oneOf": [
+            {
+              "description": "Nothing was asked for, so there is nothing to hold to.",
+              "type": "string",
+              "const": "unasked"
+            },
+            {
+              "description": "This client has no such direction to limit at all.\n\nApart from a limit that was ignored, and deliberately: a Usenet client does\nnot upload, so an upload limit on one is not a setting it refused.",
+              "type": "string",
+              "const": "nothing-to-limit"
+            },
+            {
+              "description": "It took the limit and is inside it.",
+              "type": "string",
+              "const": "holding"
+            },
+            {
+              "description": "It reports a figure other than the one it was given.",
+              "type": "string",
+              "const": "ignored"
+            },
+            {
+              "description": "It reports the right figure and is moving faster than it.",
+              "type": "string",
+              "const": "overrunning"
+            }
+          ]
+        },
+        "WhenExceeded": {
+          "description": "What to do when a declared cap is reached.",
+          "oneOf": [
+            {
+              "description": "Stop fetching until the month turns over.",
+              "type": "string",
+              "const": "pause"
+            },
+            {
+              "description": "Keep going, slowly, so what is half-finished can finish.",
+              "type": "string",
+              "const": "throttle"
+            },
+            {
+              "description": "Carry on. Some caps cost money and some only cost speed.",
+              "type": "string",
+              "const": "continue"
+            }
+          ]
+        }
+      }
+    },
     "bundle": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
