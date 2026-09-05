@@ -72,6 +72,13 @@ what to do about it, is written for operators at
 - `QUAL-1`
 - `QUAL-2`
 - `QUAL-3`
+- `QUOTA-1`
+- `QUOTA-2`
+- `QUOTA-3`
+- `QUOTA-4`
+- `QUOTA-5`
+- `QUOTA-6`
+- `QUOTA-7`
 - `READ-1`
 - `READ-2`
 - `REISSUE-1`
