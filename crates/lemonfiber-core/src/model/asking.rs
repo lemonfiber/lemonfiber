@@ -129,6 +129,22 @@ mod tests {
         assert!(!said.contains("from "), "{said}");
     }
 
+    /// What a member may ask for is data a panel can hold a copy of.
+    ///
+    /// The dashboard keeps the household report inside a panel and hands copies of it
+    /// to whatever is drawing; nothing about this is worth a hand-written impl, and the
+    /// derived ones are only true while something takes them at their word.
+    #[test]
+    fn what_a_member_may_ask_for_is_data_a_panel_can_hold_a_copy_of() {
+        let held = held(Some("2026-09-16T21:04:09"));
+
+        let copy = held.clone();
+
+        assert_eq!(copy, held);
+        assert_eq!(copy.films, held.films);
+        assert_ne!(copy.films, held.television);
+    }
+
     /// A member nothing limits has no sentence, because there is nothing to say.
     #[test]
     fn a_member_nothing_limits_has_no_sentence() {
