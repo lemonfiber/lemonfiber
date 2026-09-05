@@ -121,9 +121,10 @@ fn said_of(waiting: &HouseholdRequest, reason: Option<&str>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{reason_given, said_of, still_waiting};
-    use crate::app::command::Answer;
+    use super::{deciding, reason_given, said_of, still_waiting};
+    use crate::app::command::{Answer, Decision};
     use crate::ports::service::HouseholdRequest;
+    use crate::test_support::a_context;
 
     /// One request as the service records it, at the two statuses that decide its state.
     fn asked(id: i64, request_status: u8, media_status: u8) -> HouseholdRequest {
@@ -136,6 +137,34 @@ mod tests {
             request_status,
             media_status,
         }
+    }
+
+    /// A stack that cannot be read rules on nothing, and says so as a stack.
+    ///
+    /// The manifest is read before the request service is reached at all, so a stack
+    /// nobody could read is its own answer rather than a service that would not speak.
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_rules_on_nothing() {
+        let ctx = a_context().over(crate::test_support::nowhere()).build();
+
+        let refused = deciding(
+            &ctx,
+            &Decision {
+                request: 7,
+                answer: Answer::LetThrough,
+            },
+        )
+        .await;
+
+        assert!(
+            refused.is_err(),
+            "a stack nobody could read was ruled against"
+        );
+        assert_ne!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::UNREACHABLE),
+            "a stack that would not read was reported as a service that would not answer"
+        );
     }
 
     /// A request nobody has ruled on is the one that can be ruled on.

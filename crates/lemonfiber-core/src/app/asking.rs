@@ -398,6 +398,33 @@ mod tests {
         assert!(said.contains("5 requests a week"), "{said}");
     }
 
+    /// A stack that cannot be read changes nothing, and says so as a stack.
+    ///
+    /// Both writes start by reading the manifest, and what a stack it could not read
+    /// is has nothing to do with the request service — so it is reported as itself
+    /// rather than folded into the refusal about a service that would not answer.
+    #[tokio::test]
+    async fn a_stack_that_cannot_be_read_changes_nothing() {
+        let ctx = a_context().over(crate::test_support::nowhere()).build();
+
+        let refused = allowing(
+            &ctx,
+            &Chosen {
+                member: None,
+                policy: Some(Policy::Trusted),
+                quota: None,
+            },
+        )
+        .await;
+
+        assert!(refused.is_err(), "a stack nobody could read was acted on");
+        assert_ne!(
+            refused.err().map(|problem| problem.code),
+            Some(crate::asking::UNREACHABLE),
+            "a stack that would not read was reported as a service that would not answer"
+        );
+    }
+
     /// Nobody by that name is refused with the household named beside it.
     #[tokio::test]
     async fn nobody_by_that_name_is_refused() {
