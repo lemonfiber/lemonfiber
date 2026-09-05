@@ -189,7 +189,13 @@ fn defaulted_upload(asked: &Asked, down: Option<Limit>) -> Option<Limit> {
     match down? {
         Limit::Unlimited => None,
         Limit::Share(share) => Some(Limit::Share(share.min(UPLOAD_SHARE))),
-        Limit::Absolute(_) => Some(Limit::Share(UPLOAD_SHARE)),
+        // In the same terms the download was given in, rather than as a share. A
+        // share of a line nobody has measured is refused, and refusing somebody who
+        // asked for a figure in bytes — because of an upload figure they never
+        // mentioned — is a refusal they did not cause and cannot act on.
+        Limit::Absolute(bytes) => Some(Limit::Absolute(
+            (bytes.saturating_mul(u64::from(UPLOAD_SHARE)) / 100).max(1),
+        )),
     }
 }
 
@@ -277,14 +283,29 @@ mod tests {
         }
     }
 
+    /// A figure asked for in bytes defaults an upload in bytes, not a share.
+    ///
+    /// The refusal for a share of an unmeasured line offers exactly this as the way
+    /// out — *give a figure instead of a share*, `--down 2MiB`. Defaulting that to a
+    /// share of the same unmeasured line refused the operator for an upload they had
+    /// not mentioned, and made the remedy unfollowable: doing what it said reproduced
+    /// the error it said it would avoid.
     #[test]
-    fn an_absolute_download_limit_still_leaves_the_upload_a_careful_share() {
+    fn an_absolute_download_limit_leaves_the_upload_careful_in_the_same_terms() {
         assert_eq!(
             defaulted_upload(
                 &asking(|asked| asked.down = Some("2MiB".to_owned())),
                 Some(Limit::Absolute(2 * 1024 * 1024))
             ),
-            Some(Limit::Share(UPLOAD_SHARE))
+            Some(Limit::Absolute(2 * 1024 * 1024 / 4))
+        );
+        // Never nothing, however small the figure it is a quarter of.
+        assert_eq!(
+            defaulted_upload(
+                &asking(|asked| asked.down = Some("1".to_owned())),
+                Some(Limit::Absolute(1))
+            ),
+            Some(Limit::Absolute(1))
         );
     }
 
