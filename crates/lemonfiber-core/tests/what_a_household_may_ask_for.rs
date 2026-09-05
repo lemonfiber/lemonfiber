@@ -486,6 +486,10 @@ fn answering(name: &str) -> Ctx {
                 r#"{"movie":{"days":7,"limit":5,"used":1},"tv":{"days":7,"limit":0,"used":0}}"#,
             ),
         ),
+        (
+            "settings/permissions",
+            Answer::reply(200, r#"{"permissions":160}"#),
+        ),
         ("/request/7/", Answer::reply(200, "{}")),
         (
             "/api/v1/request",
