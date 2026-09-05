@@ -655,6 +655,56 @@ async fn a_limit_that_was_never_named_is_refused_before_anything_is_written() {
     );
 }
 
+/// A choice about one person is written against them and read back.
+///
+/// The other half of the choice above, and it is a different path: it looks the member
+/// up on the media server, asks the request service what they are already held to, and
+/// writes against their account rather than against the household's default.
+#[tokio::test]
+async fn a_choice_about_one_person_is_written_and_read_back() {
+    let said = dispatch(
+        Command::Allowing(Chosen {
+            member: Some("alex".to_owned()),
+            policy: Some(Policy::Trusted),
+            quota: None,
+        }),
+        &answering("oneperson"),
+    )
+    .await
+    .ok()
+    .map(Outcome::envelope)
+    .and_then(|envelope| envelope.to_json())
+    .unwrap_or_default();
+
+    assert!(said.contains(r#""kind":"household""#), "{said}");
+    assert!(said.contains("Alex"), "{said}");
+}
+
+/// A request let through says so, and is not asked for a reason.
+///
+/// The other half of the decision above. It is the half the disk can refuse, so it is
+/// the one that goes past the reading of the volumes every command that brings content
+/// onto the disk shares.
+#[tokio::test]
+async fn a_request_let_through_answers_with_the_household() {
+    let said = dispatch(
+        Command::Deciding(Decision {
+            request: 7,
+            answer: Ruling::LetThrough,
+        }),
+        &answering("letthrough"),
+    )
+    .await
+    .ok()
+    .map(Outcome::envelope)
+    .and_then(|envelope| envelope.to_json())
+    .unwrap_or_default();
+
+    assert!(said.contains(r#""kind":"household""#), "{said}");
+    assert!(said.contains("approved"), "{said}");
+    assert!(!said.contains("yours to pass on"), "{said}");
+}
+
 /// What a household may ask for reaches the machine-readable answer under the
 /// household's own kind, because it is part of who is in the household.
 #[tokio::test]
