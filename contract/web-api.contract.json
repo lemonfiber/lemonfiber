@@ -2679,7 +2679,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "default": null
             }
           },
           "required": [
@@ -4871,7 +4872,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "default": null
             }
           },
           "required": [
