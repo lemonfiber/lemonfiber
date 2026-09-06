@@ -201,6 +201,49 @@ async fn a_platform_with_no_manager_is_instructed_rather_than_told_it_is_install
     assert!(refused.is_err_and(|problem| problem.code.as_str() == "HOST-1"));
 }
 
+/// The manager a context nobody told carries, driven rather than described.
+///
+/// `Ctx::new` defaults to the one that configures nothing, and every reading in
+/// this workspace that has not been handed a manager goes through it — so what it
+/// does is worth driving rather than assuming. It is also the only way to reach
+/// that implementation from the crate's ordinary compilation: the tests beside the
+/// code drive a fake, and a path exercised only there is counted as never run here.
+#[tokio::test]
+async fn a_context_nobody_told_hosts_nothing_and_refuses_to_pretend() {
+    let bare = || {
+        Ctx::new(
+            Arc::new(Local),
+            Arc::new(Daemon::local()),
+            Arc::new(System),
+            Arc::new(Disk),
+            Source::External(project()),
+            Settings::default(),
+            Environment::MacOs,
+        )
+    };
+
+    let read = reading(&bare(), Keeping::Read).await;
+    assert_eq!(read.manager, Manager::Unsupported);
+    assert!(read
+        .commands
+        .iter()
+        .all(|command| command.standing == Hosting::Unsupported));
+
+    for asked in [
+        Keeping::Install {
+            what: Hostable::Expiring,
+            forms: Vec::new(),
+        },
+        Keeping::Remove {
+            what: Hostable::Expiring,
+        },
+    ] {
+        assert!(dispatch(Command::Hosting(asked), &bare())
+            .await
+            .is_err_and(|problem| problem.code.as_str() == "HOST-1"));
+    }
+}
+
 /// A guard installed against nothing is refused before anything is written.
 #[tokio::test]
 async fn a_guard_with_nothing_to_guard_is_refused_and_installs_nothing() {
