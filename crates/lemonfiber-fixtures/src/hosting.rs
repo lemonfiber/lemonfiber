@@ -263,12 +263,12 @@ mod tests {
     #[tokio::test]
     async fn a_manager_that_refuses_still_answers_what_it_holds() {
         let hosting = Hosting::refusing(Manager::Launchd, "Load failed: 5");
-        let refused = Err(Failure::Refused {
+        let refusal = || Failure::Refused {
             manager: "launchd",
             reason: "Load failed: 5".to_owned(),
-        });
-        assert_eq!(hosting.place(&a_command()).await, refused);
-        assert_eq!(hosting.withdraw("watch").await, refused);
+        };
+        assert_eq!(hosting.place(&a_command()).await, Err(refusal()));
+        assert_eq!(hosting.withdraw("watch").await, Err(refusal()));
         assert_eq!(hosting.standing("watch").await, Ok(Held::absent()));
     }
 

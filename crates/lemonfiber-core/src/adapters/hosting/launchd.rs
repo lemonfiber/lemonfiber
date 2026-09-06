@@ -279,9 +279,7 @@ mod tests {
     }
 
     fn agents(name: &str) -> PathBuf {
-        let dir = crate::app::fixtures::scratch(name);
-        let _ = std::fs::remove_dir_all(&dir);
-        dir
+        super::super::scratch(name)
     }
 
     fn over(

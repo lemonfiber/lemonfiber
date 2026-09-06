@@ -257,9 +257,7 @@ mod tests {
     }
 
     fn units(name: &str) -> PathBuf {
-        let dir = crate::app::fixtures::scratch(name);
-        let _ = std::fs::remove_dir_all(&dir);
-        dir
+        super::super::scratch(name)
     }
 
     fn over(

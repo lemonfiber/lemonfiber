@@ -106,6 +106,19 @@ fn after(text: &str, key: &str) -> Option<String> {
         .next()
 }
 
+/// A directory of this file's own, unique to one test and to one process.
+///
+/// Written here rather than reached for in the app layer's fixtures: an adapter is
+/// below that layer and reaching up into it would be the dependency this seam
+/// exists to prevent — and the fixture is private to it in any case.
+#[cfg(test)]
+pub(super) fn scratch(name: &str) -> PathBuf {
+    let dir =
+        std::env::temp_dir().join(format!("lemonfiber-hosting-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    dir
+}
+
 #[cfg(test)]
 mod tests {
     use super::{after, complaint, definition, put, status, take, Host, Unhosted};
@@ -144,7 +157,7 @@ mod tests {
 
     #[test]
     fn a_definition_is_written_read_back_and_taken_away_again() {
-        let at = crate::app::fixtures::scratch("hosting-round-trip").join("nested/one.service");
+        let at = super::scratch("round-trip").join("nested/one.service");
         assert_eq!(definition(&at), None);
         assert_eq!(put(&at, "[Service]\n"), Ok(()));
         assert_eq!(definition(&at).as_deref(), Some("[Service]\n"));
@@ -154,7 +167,7 @@ mod tests {
 
     #[test]
     fn a_definition_that_will_not_be_written_carries_the_platforms_words() {
-        let at = crate::app::fixtures::scratch("hosting-unwritable").join("one.service");
+        let at = super::scratch("unwritable").join("one.service");
         assert!(put(&at, "[Service]\n").is_ok());
         // A directory cannot be written over as a file, which is the shape of every
         // refusal here: the platform says why, and its words travel unchanged.

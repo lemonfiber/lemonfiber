@@ -833,6 +833,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &reasons,
+                hosted: false,
                 expiring: None,
                 no_room: false,
             },
