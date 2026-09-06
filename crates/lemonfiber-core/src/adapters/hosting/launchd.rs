@@ -383,11 +383,11 @@ mod tests {
                 spoke(0, "501\n"),
                 spoke(0, "501\n"),
                 spoke(0, ""),
-                Ok(Output {
+                Output {
                     status: Some(5),
                     stdout: String::new(),
                     stderr: "Load failed: 5: Input/output error".to_owned(),
-                }),
+                },
             ],
         );
         assert_eq!(

@@ -11,7 +11,7 @@
 
 mod common;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use common::stack::project;
@@ -95,8 +95,8 @@ async fn installing_the_guard_hands_over_the_command_and_then_reads_it_back() {
     assert_eq!(placed.len(), 1, "one service, and one only");
     assert!(placed.first().is_some_and(|one| {
         one.arguments == vec!["watch".to_owned(), "tv".to_owned(), "films".to_owned()]
-            && one.program == PathBuf::from("/usr/local/bin/lemonfiber")
-            && one.output == PathBuf::from("/records/watch.log")
+            && one.program == Path::new("/usr/local/bin/lemonfiber")
+            && one.output == Path::new("/records/watch.log")
     }));
     assert_eq!(standing(&report, "watch"), Some(Hosting::Hosted));
     assert!(report

@@ -320,11 +320,11 @@ mod tests {
             &dir,
             vec![
                 spoke(0, ""),
-                Ok(Output {
+                Output {
                     status: Some(1),
                     stdout: String::new(),
                     stderr: "Failed to enable unit: Unit file is masked".to_owned(),
-                }),
+                },
                 spoke(0, ""),
             ],
         );
