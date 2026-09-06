@@ -27,7 +27,10 @@ use crate::ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed};
 use crate::ports::process::Output;
 
 /// A machine whose platform lemonfiber does not configure.
-#[derive(Debug, Clone, Copy)]
+///
+/// No derives. It carries nothing, it is held as `Arc<dyn Host>` everywhere it is
+/// used, and nothing formats or copies it — so a derived implementation here would
+/// be a function the coverage gate counts and no test can reach.
 pub struct Unhosted;
 
 #[async_trait]
