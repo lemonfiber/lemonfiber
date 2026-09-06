@@ -22,7 +22,7 @@
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Command, Hostable, Keeping, QualityAction, Waiting, HOSTABLE};
 use lemonfiber_core::doctor::Narrowing;
 
 mod household;
@@ -64,6 +64,8 @@ pub const OFFERED: &[&str] = &[
     "support",
     "restore",
     "watch",
+    "hosting-install",
+    "hosting-remove",
     "walkthrough",
     "diagnose",
     "repair",
@@ -189,6 +191,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         term,
         season,
         download,
+        kept,
         ..
     } = given;
     match action {
@@ -263,6 +266,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
             None => Err(needs("archive")),
         },
         "watch" => Ok(Command::Watch { forms }),
+        // Which one is required of both halves, and a word naming none of them is
+        // refused by name rather than taken for whichever came first in the list.
+        "hosting-install" => {
+            keeping(action, kept).map(|what| Command::Hosting(Keeping::Install { what, forms }))
+        }
+        "hosting-remove" => {
+            keeping(action, kept).map(|what| Command::Hosting(Keeping::Remove { what }))
+        }
         // Naming nothing is a request rather than an omission: a walk asked for
         // nothing in particular suggests something likely to work, which is what an
         // operator with an empty library needs. Blank is nothing named, not an
@@ -275,6 +286,29 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
             name: action.to_owned(),
         }),
     }
+}
+
+/// Which long-running command was named, or why the word names none.
+///
+/// Named apart from the table for the reason the setting is: it can refuse, and a
+/// reading that can refuse belongs beside its refusal rather than inside a list of
+/// arms. What it offers is built from the list itself, so a command that becomes
+/// hostable is offered here without anybody remembering to say so.
+fn keeping(action: &str, kept: Option<String>) -> Result<Hostable, Refused> {
+    let Some(named) = kept else {
+        return Err(Refused::Missing {
+            action: action.to_owned(),
+            argument: "kept".to_owned(),
+        });
+    };
+    Hostable::named(&named).ok_or_else(|| Refused::Unrecognised {
+        argument: named,
+        offered: HOSTABLE
+            .iter()
+            .map(|one| one.name())
+            .collect::<Vec<_>>()
+            .join(", "),
+    })
 }
 
 /// Why a request is refused before the command it names is looked for.

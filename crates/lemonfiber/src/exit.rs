@@ -158,6 +158,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Config(_)
         | Outcome::Trace(_)
         | Outcome::Household(_)
+        // What is hosted is a reading, and an install or a removal that could not be
+        // carried out already comes back as a problem — so a report here is one that
+        // arrived, whatever it says stands.
+        | Outcome::Hosting(_)
         | Outcome::FrontDoor(_)
         | Outcome::Stuck(_)
         | Outcome::Status(_)

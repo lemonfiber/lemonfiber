@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::time::SystemTime;
 
 use super::targets::{jellyfin_reader, open_servarrs, seerr_reader};
-use super::Ctx;
+use super::{Ctx, Hostable};
 use crate::asking::{Policy, Reasons};
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
@@ -152,6 +152,7 @@ pub(super) async fn household(
             reasons: &super::refusals::load(ctx),
             expiring: super::arrangement::load(ctx).after(),
             no_room,
+            hosted: super::hosting::keeping(ctx, Hostable::Expiring).await,
         },
         member,
     );
@@ -267,6 +268,13 @@ struct Naming<'a> {
     /// Whether the disk has no room left, which refuses an acquisition in the disk's
     /// own words and is a different answer from anybody's limit.
     no_room: bool,
+    /// Whether this machine is running the clock that closes what nobody rules on.
+    ///
+    /// Carried for one sentence, and it is the sentence this reading would otherwise
+    /// get wrong in whichever direction the machine happened to be in: a reminder
+    /// naming a period and saying nothing runs it, on a machine that is running it, is
+    /// as misleading as one implying a background that is not there.
+    hosted: bool,
 }
 
 /// The request service, signed in — or in plain words why it could not be asked.
@@ -442,7 +450,11 @@ fn assemble(
         .any(|held| held.access.restriction != Restriction::Unrestricted)
         .then(|| crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned());
 
-    findings.extend(allowance::worth_saying(&members, naming.expiring));
+    findings.extend(allowance::worth_saying(
+        &members,
+        naming.expiring,
+        naming.hosted,
+    ));
 
     HouseholdReport {
         policy: naming.asked.household.as_ref().map(Policy::of),
@@ -576,6 +588,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                hosted: false,
                 expiring: None,
                 no_room: false,
             },
@@ -631,6 +644,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                hosted: false,
                 expiring: None,
                 no_room: false,
             },
@@ -805,6 +819,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &reasons,
+                hosted: false,
                 expiring: None,
                 no_room: false,
             },
@@ -848,6 +863,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                hosted: false,
                 expiring: None,
                 no_room: true,
             },

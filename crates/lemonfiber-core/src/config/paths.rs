@@ -173,6 +173,17 @@ impl Paths {
         self.data.join("stack")
     }
 
+    /// Where a command this machine keeps running writes what it would otherwise
+    /// have said on a terminal.
+    ///
+    /// Under the data directory rather than beside the settings, because it is
+    /// regenerated output rather than something a backup should carry — and a
+    /// month of a clock's words is not a thing to restore onto another machine.
+    #[must_use]
+    pub fn hosted(&self) -> PathBuf {
+        self.data.join("hosted")
+    }
+
     /// The record of what lemonfiber last wrote to the stack directory — a checksum
     /// per file, so a later run tells an operator's edit from a version it has not
     /// upgraded yet. Kept with configuration, not beside the stack it describes: it
@@ -260,6 +271,7 @@ mod tests {
             paths.backups(),
             paths.bundles(),
             paths.storage_state(),
+            paths.hosted(),
         ];
 
         // The failure message uses an inline capture rather than a call such as
@@ -363,6 +375,7 @@ mod tests {
             paths.service_config(),
             paths.backups(),
             paths.storage_state(),
+            paths.hosted(),
         ];
         for (index, path) in all.iter().enumerate() {
             for other in all.iter().skip(index + 1) {

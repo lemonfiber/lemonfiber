@@ -15,6 +15,7 @@ use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
 use crate::ports::docker::Engine;
 use crate::ports::filesystem::{Eraser, Volume};
+use crate::ports::hosting::Host;
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
@@ -56,6 +57,14 @@ pub struct Ctx {
     /// that asks needs nothing else of a filesystem, and every other implementation
     /// of the wider trait would gain a method it never calls.
     pub occupancy: Arc<dyn Occupancy>,
+    /// How this machine is asked to keep a long-running command running.
+    ///
+    /// A port because which service manager a platform has, and what it says when
+    /// asked to load something, are the two facts a test can never settle for
+    /// itself — and because a run that decided them by asking the operating system
+    /// directly would have exactly one of its three answers reachable from any one
+    /// machine.
+    pub hosting: Arc<dyn Host>,
     /// How services are reached over HTTP, for the checks and seeding that ask
     /// one what it is or wire it to another.
     pub http: Arc<dyn Http>,
@@ -176,6 +185,7 @@ impl Ctx {
             // And the real walk: a run asked where the disk went is asking about
             // this machine's own.
             occupancy: Arc::new(crate::adapters::Disk),
+            hosting: Arc::new(crate::adapters::Unhosted),
             validator: live(&http, settings.reaching.clone()),
             http,
             random: Arc::new(crate::adapters::Os),
@@ -329,6 +339,18 @@ impl Ctx {
     #[must_use]
     pub fn with_volume(mut self, volume: Arc<dyn Volume>) -> Self {
         self.volume = volume;
+        self
+    }
+
+    /// The same context, handing long-running commands to the given manager.
+    ///
+    /// The default is the one that configures nothing, because which manager this
+    /// machine has is resolved where the platform is read and handed in — leaving
+    /// a context nobody told answering honestly that it hosts nothing rather than
+    /// guessing at a manager.
+    #[must_use]
+    pub fn hosting_with(mut self, hosting: Arc<dyn Host>) -> Self {
+        self.hosting = hosting;
         self
     }
 

@@ -26,6 +26,7 @@
 pub mod downloads;
 pub mod erasing;
 pub mod files;
+pub mod hosting;
 pub mod http;
 pub mod ports;
 pub mod support;

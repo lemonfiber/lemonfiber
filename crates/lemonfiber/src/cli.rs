@@ -16,7 +16,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 mod under;
 
 use include_dir::{include_dir, Dir};
-pub use under::{ConfigAction, HouseholdCommand, QualityCommand};
+pub use under::{ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand};
 
 // Re-exported rather than reached for through the module they now live in: where a
 // flag is declared is this file's business and nobody else's, and moving one would
@@ -246,6 +246,25 @@ pub enum Request {
         /// The forms to stop if the data location is lost.
         #[arg(required = true)]
         forms: Vec<String>,
+    },
+    /// Say what this machine keeps running when no terminal is open.
+    ///
+    /// Two of this program's commands have to keep running to be worth anything — the
+    /// guard on the data location, and the clock that closes requests nobody rules on —
+    /// and both stop when the window they were started in closes. This is what hands
+    /// them to the machine instead.
+    ///
+    /// Asked nothing it reports what stands between each of them and this machine:
+    /// whether one is installed, whether the system is actually running it, where its
+    /// words are written, and — on a platform this program cannot configure — what to
+    /// do instead of it. Installed is not running, and the two are never reported as
+    /// one thing.
+    ///
+    /// Name one of the two words underneath to install one or take it back.
+    Hosting {
+        /// What to do about one of them, or nothing to read what stands.
+        #[command(subcommand)]
+        action: Option<HostingCommand>,
     },
     /// Follow one show or film across the services — "where is my show?".
     ///

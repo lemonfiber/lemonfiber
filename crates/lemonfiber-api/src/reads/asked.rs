@@ -22,8 +22,9 @@
 use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
 
 use super::{
-    Wanted, BACKUPS, BANDWIDTH, BUNDLE, CHECKS, CLIENTS, CONFIG, EXPLAIN, FORMS, FRONT_DOOR, LOGS,
-    OUTBOUND, QUALITY, REQUESTS, SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK, TRACE, VERSION,
+    Wanted, BACKUPS, BANDWIDTH, BUNDLE, CHECKS, CLIENTS, CONFIG, EXPLAIN, FORMS, FRONT_DOOR,
+    HOSTING, LOGS, OUTBOUND, QUALITY, REQUESTS, SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK,
+    TRACE, VERSION,
 };
 
 /// Raised where a read was given a parameter its answer has nowhere to put.
@@ -85,6 +86,7 @@ const TAKEN: &[(&str, &[&str])] = &[
     (CHECKS, &[ONLY]),
     (STORAGE, &[]),
     (REQUESTS, &[MEMBER]),
+    (HOSTING, &[]),
     (FRONT_DOOR, &[]),
     (TRACE, &[TERM, SEASON]),
     (STUCK, &[]),

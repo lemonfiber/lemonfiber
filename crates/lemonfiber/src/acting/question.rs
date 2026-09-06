@@ -40,8 +40,8 @@ mod shape;
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
-    named, BANDWIDTH, CHECKS, CLIENTS, CONFIG, FORMS, FRONT_DOOR, OUTBOUND, QUALITY, REQUESTS,
-    STORED, STUCK, TRACE, VERSION,
+    named, BANDWIDTH, CHECKS, CLIENTS, CONFIG, FORMS, FRONT_DOOR, HOSTING, OUTBOUND, QUALITY,
+    REQUESTS, STORED, STUCK, TRACE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -148,6 +148,12 @@ static AFTER: &[Question] = &[
             asks: "Which member, as you would say their name",
             narrows: Narrows::Member,
         }]),
+    },
+    Question {
+        name: "what keeps running without you",
+        about: "which long commands this machine keeps going, and whether it says it is",
+        read: HOSTING,
+        needs: Needed::Nothing,
     },
     Question {
         name: "where the household begins",

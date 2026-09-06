@@ -119,6 +119,39 @@ fn a_guard_reaches_the_command_and_the_forms_it_will_stop() {
     );
 }
 
+/// Both halves of hosting need to be told which command, and by a word that names one.
+///
+/// The two refusals are different and both matter: installing without saying which
+/// would install whichever this program felt like, and a word naming none of them is
+/// a mistake in the request rather than a request for something that does not exist.
+/// The second names what it could have said, built from the list itself, so a command
+/// that becomes hostable is offered here without anybody remembering to say so.
+#[test]
+fn hosting_is_told_which_command_or_refused_by_the_name_it_was_given() {
+    for action in ["hosting-install", "hosting-remove"] {
+        assert!(
+            matches!(
+                refusal(action, nothing()),
+                Some(Refused::Missing { argument, .. }) if argument == "kept"
+            ),
+            "{action} was not told which command"
+        );
+
+        let named = Arguments {
+            kept: Some("doctor".to_owned()),
+            ..Arguments::default()
+        };
+        assert!(
+            matches!(
+                refusal(action, named),
+                Some(Refused::Unrecognised { argument, offered })
+                    if argument == "doctor" && offered.contains("watch") && offered.contains("expiring")
+            ),
+            "{action} took a word that names no long-running command"
+        );
+    }
+}
+
 #[test]
 fn a_walk_reaches_the_command_and_the_one_thing_it_was_told_to_add() {
     let given = Arguments {

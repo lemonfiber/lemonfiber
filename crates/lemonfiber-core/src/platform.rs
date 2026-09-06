@@ -13,6 +13,8 @@
 
 use serde::Serialize;
 
+use crate::ports::hosting::Manager;
+
 /// The operating system this build targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -45,6 +47,25 @@ pub const HOST_OS: HostOs = HostOs::Windows;
 /// The operating system this binary was built for.
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 pub const HOST_OS: HostOs = HostOs::Other;
+
+impl HostOs {
+    /// Which service manager keeps a long-running command going here.
+    ///
+    /// A function over the target rather than a test of it, for the reason
+    /// [`Environment::resolve`] is one: all three answers are reachable from one
+    /// laptop, so what a report says on a platform this machine is not is proven
+    /// here rather than hoped for.
+    #[must_use]
+    pub const fn manager(self) -> Manager {
+        match self {
+            Self::MacOs => Manager::Launchd,
+            Self::Linux => Manager::Systemd,
+            // Windows has a way to start something at login and lemonfiber does not
+            // configure it, which is a thing to say rather than a thing to guess at.
+            Self::Windows | Self::Other => Manager::Unsupported,
+        }
+    }
+}
 
 /// One of the four environments lemonfiber supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -127,7 +148,7 @@ impl Environment {
 
 #[cfg(test)]
 mod tests {
-    use super::{Environment, HostOs, HOST_OS};
+    use super::{Environment, HostOs, Manager, HOST_OS};
 
     #[test]
     fn linux_splits_on_whether_the_daemon_is_desktop() {
@@ -228,6 +249,18 @@ mod tests {
         assert!(Environment::LinuxDesktop.resolves_host_gateway());
         assert!(Environment::Windows.resolves_host_gateway());
         assert!(!Environment::Unsupported.resolves_host_gateway());
+    }
+
+    #[test]
+    fn each_platform_names_the_service_manager_it_actually_has() {
+        assert_eq!(HostOs::MacOs.manager(), Manager::Launchd);
+        assert_eq!(HostOs::Linux.manager(), Manager::Systemd);
+        for host in [HostOs::Windows, HostOs::Other] {
+            assert!(
+                !host.manager().configurable(),
+                "{host:?} has nothing lemonfiber configures"
+            );
+        }
     }
 
     #[test]

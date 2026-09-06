@@ -13,6 +13,7 @@
 
 pub mod docker;
 pub mod filesystem;
+pub mod hosting;
 pub mod http;
 pub mod network;
 pub mod nntp;
@@ -25,6 +26,9 @@ pub mod time;
 
 pub use docker::Daemon;
 pub use filesystem::Disk;
+pub use hosting::launchd::Launchd;
+pub use hosting::systemd::Systemd;
+pub use hosting::Unhosted;
 pub use http::Web;
 pub use network::Here;
 pub use nntp::Dialer;

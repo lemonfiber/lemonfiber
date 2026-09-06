@@ -63,6 +63,8 @@ pub const GLOSSARY: Kind = Kind("glossary");
 /// Which app to use on which device.
 pub const CLIENTS: Kind = Kind("clients");
 
+/// What this machine keeps running for lemonfiber.
+pub const HOSTING: Kind = Kind("hosting");
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
 /// An account offered to somebody in the house.
@@ -143,6 +145,7 @@ pub const ALL: &[Kind] = &[
     FRONT_DOOR,
     GLOSSARY,
     CLIENTS,
+    HOSTING,
     HOUSEHOLD,
     INVITATION,
     REMOVAL,

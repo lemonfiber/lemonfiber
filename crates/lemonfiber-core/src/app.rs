@@ -13,9 +13,10 @@ use crate::doctor::Narrowing;
 use crate::error::{Code, Diagnose, Problem};
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
-    kind, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HouseholdReport,
-    LifecycleReport, MusicReport, QualityReport, ResetReport, StatusReport, StuckReport,
-    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
+    kind, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HostingReport,
+    HouseholdReport, LifecycleReport, MusicReport, QualityReport, ResetReport, StatusReport,
+    StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
+    WizardReport,
 };
 use crate::stack::closure::Plan;
 use crate::stack::compose::Action;
@@ -41,6 +42,7 @@ mod expiring;
 #[cfg(test)]
 mod fixtures;
 pub mod forwarding;
+mod hosting;
 mod household;
 mod invite;
 mod letting;
@@ -73,7 +75,8 @@ mod walkthrough;
 pub mod watch;
 
 pub use command::{
-    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, QualityAction,
+    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
+    QualityAction, HOSTABLE,
 };
 pub use ctx::Ctx;
 pub use setup::SetupAction;
@@ -114,6 +117,8 @@ pub enum Outcome {
     Trace(TraceReport),
     /// What the household asked for, member by member.
     Household(HouseholdReport),
+    /// What this machine keeps running for lemonfiber, and what a change to it did.
+    Hosting(HostingReport),
     /// The one address to hand somebody who lives here.
     FrontDoor(FrontDoorReport),
     /// The items whose downloads are stuck, each linkable to its trace.
@@ -181,6 +186,7 @@ impl Outcome {
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
             Self::Household(_) => kind::HOUSEHOLD,
+            Self::Hosting(_) => kind::HOSTING,
             Self::FrontDoor(_) => kind::FRONT_DOOR,
             Self::Stuck(_) => kind::STUCK,
             Self::Word(_) => kind::WORD,
@@ -224,6 +230,7 @@ impl serde::Serialize for Outcome {
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),
             Self::Household(report) => report.serialize(serializer),
+            Self::Hosting(report) => report.serialize(serializer),
             Self::FrontDoor(report) => report.serialize(serializer),
             Self::Stuck(report) => report.serialize(serializer),
             Self::Word(term) => term.serialize(serializer),
@@ -421,6 +428,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Expiring(arranged) => expiring::expiring(ctx, arranged, expiring::SWEEPING)
             .await
             .map(Outcome::Household),
+        // The short command that decides what becomes of the two long ones. It reads
+        // after it writes rather than reporting what a write claimed, because a written
+        // definition is not a running command and this exists to tell the two apart.
+        Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Explain { word } => crate::glossary::explain(&word)
@@ -2284,6 +2295,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Hosting(_)
                 | Outcome::Household(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
@@ -2330,6 +2342,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Hosting(_)
                 | Outcome::Household(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
@@ -3156,6 +3169,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Hosting(_)
                 | Outcome::Household(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
@@ -4156,6 +4170,7 @@ mod tests {
                 | Outcome::Upgrade(_)
                 | Outcome::Music(_)
                 | Outcome::Trace(_)
+                | Outcome::Hosting(_)
                 | Outcome::Household(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)

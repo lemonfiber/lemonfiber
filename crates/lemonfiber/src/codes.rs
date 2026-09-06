@@ -152,6 +152,7 @@ mod tests {
             "RESTORE-1",
             "BUNDLE-1",
             "WATCH-1",
+            "HOST-1",
             "ACK-1",
             "WORD-1",
             "TUI-1",

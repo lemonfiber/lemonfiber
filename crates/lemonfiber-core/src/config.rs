@@ -426,6 +426,18 @@ pub struct Settings {
     /// The host alone and never the account beside it: what reads this is the list
     /// of where this machine's requests go, and where is a hostname.
     pub provider_host: Option<String>,
+    /// Where this binary is on this machine, which a hosted service has to name.
+    ///
+    /// Absent where the platform would not say, which is why hosting refuses by
+    /// name rather than installing a service against a guessed path — a service
+    /// naming the wrong program is one that fails at every login and says nothing.
+    pub program: Option<PathBuf>,
+    /// The directory a hosted command's words are written into.
+    ///
+    /// A hosted run has no terminal to say them in. Absent where the surface
+    /// could not find the platform's data directory, which is the same absence
+    /// every other location here handles.
+    pub hosted: Option<PathBuf>,
 }
 
 /// An indexer credential as configuration holds it: where it is, and the key.
@@ -458,6 +470,8 @@ impl Default for Settings {
             explanations: true,
             reaching: Reaching::default(),
             provider_host: None,
+            program: None,
+            hosted: None,
         }
     }
 }
