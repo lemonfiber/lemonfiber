@@ -1,4 +1,4 @@
-//! The twenty-one reads: one endpoint per question a command already answers, plus
+//! The twenty-two reads: one endpoint per question a command already answers, plus
 //! the two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -19,7 +19,8 @@
 //! reads that take nothing at all. What is left here is the carrying out. The
 //! endpoints themselves are grouped beside it by what they are about: the stack,
 //! the diagnosis, one item, where the household begins, the choices in force, the
-//! words, the files lemonfiber keeps of its own, and where the disk went.
+//! words, the files lemonfiber keeps of its own, where the disk went, and what this
+//! machine keeps running when nobody is watching.
 
 mod archives;
 mod bandwidth;
