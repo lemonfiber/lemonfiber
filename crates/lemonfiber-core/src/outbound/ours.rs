@@ -1,4 +1,4 @@
-//! The five requests lemonfiber makes on its own account.
+//! The six requests lemonfiber makes on its own account.
 //!
 //! Each answers four questions, and the answers are prose because the reader is a
 //! person deciding whether they are comfortable with it. *Where* it goes is read
@@ -12,19 +12,21 @@
 
 use super::{Outbound, Reach};
 use crate::config::{
-    Settings, IP_ECHO_KEY, REACH_GUIDES_KEY, REACH_INDEXER_KEY, REACH_REGISTRY_KEY,
-    REACH_USENET_KEY,
+    Settings, IP_ECHO_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
+    REACH_REGISTRY_KEY, REACH_USENET_KEY,
 };
 use lemonfiber_manifest::Service;
 
 /// Every request lemonfiber makes, in the order an operator meets them: what the
-/// stack is built from, what keeps it current, and the three that prove something.
+/// stack is built from, what keeps it current, the three that prove something, and
+/// the one that carries a sentence to somebody who lives here.
 pub const EVERY: &[Reach] = &[
     Reach::Registry,
     Reach::Guides,
     Reach::Echo,
     Reach::Indexer,
     Reach::Usenet,
+    Reach::Household,
 ];
 
 /// The repository the community quality guides are synced from, probed for
@@ -35,6 +37,19 @@ pub const EVERY: &[Reach] = &[
 /// moves, or both the probe and the list below name a source unrelated to what
 /// actually syncs.
 pub const GUIDE_SOURCE: &str = "https://github.com/TRaSH-Guides/Guides";
+
+/// Where a member who is reached on Pushover is reached.
+///
+/// Declared here for the reason the guide source is, and with one more reason of its
+/// own: this is the only entry whose destination is somebody else's choice, so the
+/// sender is handed these two rather than holding addresses the list does not name.
+/// Both are the addresses the request service's own agents post to, read off
+/// `ghcr.io/seerr-team/seerr:v3.3.0` — so what arrives, arrives where that service
+/// already sends the same person.
+pub const PUSHOVER: &str = "https://api.pushover.net/1/messages.json";
+
+/// Where a member who is reached on Pushbullet is reached.
+pub const PUSHBULLET: &str = "https://api.pushbullet.com/v2/pushes";
 
 /// What an image with no registry in its name is fetched from.
 const DOCKER_HUB: &str = "docker.io";
@@ -71,6 +86,7 @@ fn destination(reach: Reach, settings: &Settings, services: &[Service]) -> Vec<S
             .provider_host
             .as_ref()
             .map_or_else(Vec::new, |host| vec![host.clone()]),
+        Reach::Household => vec![PUSHOVER.to_owned(), PUSHBULLET.to_owned()],
     }
 }
 
@@ -135,6 +151,12 @@ pub fn purpose(reach: Reach) -> &'static str {
             "Prove the Usenet login works by making it, so a password that will not work is \
              caught at setup rather than as downloads that never start."
         }
+        Reach::Household => {
+            "Carry the reason a request was turned down to the person who asked for it, \
+             because the request service tells them it was declined and has nowhere to put \
+             a reason — so a refusal that reached them alone is the silent one this exists \
+             to prevent."
+        }
     }
 }
 
@@ -164,6 +186,14 @@ pub fn sends(reach: Reach) -> &'static str {
             "The username and password the operator gave, over TLS. A plaintext connection is \
              refused rather than downgraded, so the password is never sent in the clear."
         }
+        Reach::Household => {
+            "One short message and the member's own token for the service it goes to. The \
+             message is the word \"Why\" and the reason you typed, and nothing else: not this \
+             program's name, not an address, not what was asked for — the request service \
+             keeps no title — and nothing about this machine or the household. It goes only \
+             where that member already told the request service to reach them, and only if \
+             they left refusals switched on there."
+        }
     }
 }
 
@@ -175,6 +205,7 @@ pub fn switch(reach: Reach) -> &'static str {
         Reach::Echo => IP_ECHO_KEY,
         Reach::Indexer => REACH_INDEXER_KEY,
         Reach::Usenet => REACH_USENET_KEY,
+        Reach::Household => REACH_HOUSEHOLD_KEY,
     }
 }
 
@@ -202,6 +233,12 @@ pub fn cost(reach: Reach) -> &'static str {
         Reach::Usenet => {
             "A Usenet login is recorded as unverified rather than proven, and a wrong password \
              shows up as downloads that never start rather than as an answer at setup."
+        }
+        Reach::Household => {
+            "A reason reaches nobody but you. The refusal itself still arrives — the request \
+             service sends that — so somebody is told no and never told why, and passing the \
+             words on becomes yours to do by hand. The reason is still written down here and \
+             still said back to you when you turn a request down."
         }
     }
 }
@@ -326,8 +363,26 @@ mod tests {
         assert!(!allowed(Reach::Echo, &switched_off));
     }
 
+    /// The two the sender may post to are the two the list names, and no others.
+    ///
+    /// Read from here by [`crate::telling`], which is what makes the enumeration a
+    /// property rather than a description: a message can only go where an operator
+    /// reading this was told it could go.
     #[test]
-    fn each_of_the_other_four_answers_its_own_switch() {
+    fn where_a_household_member_is_told_is_the_two_the_list_names() {
+        let named = destination(Reach::Household, &Settings::default(), &[]);
+
+        assert_eq!(named.len(), 2, "{named:?}");
+        assert!(
+            named.iter().all(|at| at.starts_with("https://")),
+            "{named:?}"
+        );
+        assert!(named.contains(&super::PUSHOVER.to_owned()), "{named:?}");
+        assert!(named.contains(&super::PUSHBULLET.to_owned()), "{named:?}");
+    }
+
+    #[test]
+    fn each_of_the_others_answers_its_own_switch() {
         for reach in EVERY.iter().filter(|reach| **reach != Reach::Echo) {
             let refused = Settings {
                 reaching: Reaching::none(),

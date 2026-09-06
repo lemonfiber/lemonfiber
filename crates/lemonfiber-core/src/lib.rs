@@ -103,6 +103,7 @@ pub mod spoken;
 pub mod stack;
 pub mod storage;
 pub mod stored;
+pub mod telling;
 #[cfg(test)]
 mod test_support;
 pub mod text;

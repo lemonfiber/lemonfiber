@@ -212,6 +212,10 @@ mod tests {
             refused: refused.map(|reason| Refused {
                 reason: reason.to_owned(),
                 at: (id != 2).then(|| "2026-08-17T21:04:09".to_owned()),
+                // What became of the words does not reach this message. It is written
+                // to the member, and telling somebody how they were told is a sentence
+                // for the operator rather than for them.
+                told: None,
             }),
         }
     }

@@ -84,6 +84,11 @@ pub const SHOWN: &[(&str, &str)] = &[
         "whether a Usenet login may be proven against the provider, for the same reason",
     ),
     (
+        super::REACH_HOUSEHOLD_KEY,
+        "whether the reason a request was turned down may be carried to the person who \
+         asked, which decides whether passing it on is yours to do by hand",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

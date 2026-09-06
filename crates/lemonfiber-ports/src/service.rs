@@ -11,6 +11,7 @@ use async_trait::async_trait;
 
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
+mod addressing;
 mod aggregators;
 mod applications;
 mod asking;
@@ -27,6 +28,7 @@ mod subtitles;
 mod throttling;
 mod trace;
 
+pub use addressing::{Address, Addressing};
 pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
 pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};

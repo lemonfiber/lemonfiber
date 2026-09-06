@@ -2065,7 +2065,7 @@
               ]
             },
             "refused": {
-              "description": "Why it was turned down, where it was turned down from here.\n\n**The request service keeps none**, so this is lemonfiber's own record and is\nsaid to be — a reason presented as delivered would end the operator's job at\nexactly the point it begins. Absent on a request nobody has refused, and on one\nrefused in the request service itself, where there are no words to report and\ninventing some would put them in somebody's mouth.",
+              "description": "Why it was turned down, where it was turned down from here.\n\n**The request service keeps none**, so this is lemonfiber's own record and is\nsaid to be — a reason presented as delivered would end the operator's job at\nexactly the point it begins. Absent on a request nobody has refused, and on one\nrefused in the request service itself, where there are no words to report and\ninventing some would put them in somebody's mouth.\n\nWhether the words were carried to the person who asked is the record's own\n`told`, which is why the two travel together: what an operator does next turns\non it, and a reason read without it is a reason of unknown standing.",
               "anyOf": [
                 {
                   "$ref": "#/$defs/Refused"
@@ -2467,6 +2467,29 @@
             }
           ]
         },
+        "Passed": {
+          "description": "Where a refusal's words were carried, and when.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When the attempt was made, absent where the clock could not be written down.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "description": "The services they reached, by the names the member knows them by. Empty where\nthere was nowhere this could send.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "to"
+          ]
+        },
         "Policy": {
           "description": "What happens to what a household member asks for.\n\nThree, and they are the three the request service can actually be put into. A\nhousehold is in one of them because of two settings taken together — whether requests\narrive unseen, and whether a period limits how many — so the words here are a reading\nof that pair rather than a fourth setting kept beside it.\n\nChoosing per person is not a fourth policy. It is one of these three chosen for one\nmember rather than for the house, which is why what a surface offers is a policy and,\nseparately, who it is for.",
           "oneOf": [
@@ -2646,6 +2669,18 @@
             "reason": {
               "description": "Why, in the words it was turned down in.",
               "type": "string"
+            },
+            "told": {
+              "description": "Whether the words have been carried to whoever asked, and where to.\n\nAbsent until the one attempt has been made. **This is what makes a second one\nimpossible rather than unlikely**: carrying happens only where this is absent,\nand it is written whether anything was reached or not — so a member with nowhere\nto send to is asked about once, and a household is never told the same thing\ntwice by a run that happened to be started twice.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Passed"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             }
           },
           "required": [
@@ -4699,7 +4734,7 @@
               ]
             },
             "refused": {
-              "description": "Why it was turned down, where it was turned down from here.\n\n**The request service keeps none**, so this is lemonfiber's own record and is\nsaid to be — a reason presented as delivered would end the operator's job at\nexactly the point it begins. Absent on a request nobody has refused, and on one\nrefused in the request service itself, where there are no words to report and\ninventing some would put them in somebody's mouth.",
+              "description": "Why it was turned down, where it was turned down from here.\n\n**The request service keeps none**, so this is lemonfiber's own record and is\nsaid to be — a reason presented as delivered would end the operator's job at\nexactly the point it begins. Absent on a request nobody has refused, and on one\nrefused in the request service itself, where there are no words to report and\ninventing some would put them in somebody's mouth.\n\nWhether the words were carried to the person who asked is the record's own\n`told`, which is why the two travel together: what an operator does next turns\non it, and a reason read without it is a reason of unknown standing.",
               "anyOf": [
                 {
                   "$ref": "#/$defs/Refused"
@@ -4739,6 +4774,29 @@
           },
           "required": [
             "id"
+          ]
+        },
+        "Passed": {
+          "description": "Where a refusal's words were carried, and when.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "When the attempt was made, absent where the clock could not be written down.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "description": "The services they reached, by the names the member knows them by. Empty where\nthere was nowhere this could send.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "to"
           ]
         },
         "Policy": {
@@ -4804,6 +4862,18 @@
             "reason": {
               "description": "Why, in the words it was turned down in.",
               "type": "string"
+            },
+            "told": {
+              "description": "Whether the words have been carried to whoever asked, and where to.\n\nAbsent until the one attempt has been made. **This is what makes a second one\nimpossible rather than unlikely**: carrying happens only where this is absent,\nand it is written whether anything was reached or not — so a member with nowhere\nto send to is asked about once, and a household is never told the same thing\ntwice by a run that happened to be started twice.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Passed"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             }
           },
           "required": [
@@ -5937,7 +6007,7 @@
           ]
         },
         "Reach": {
-          "description": "One of the requests lemonfiber makes on its own account.\n\nFive, and the closed set is the claim. A sixth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.",
+          "description": "One of the requests lemonfiber makes on its own account.\n\nSix, and the closed set is the claim. A seventh is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.",
           "oneOf": [
             {
               "description": "Fetching the service images the stack runs.",
@@ -5963,6 +6033,11 @@
               "description": "Proving a Usenet login against the provider.",
               "type": "string",
               "const": "usenet"
+            },
+            {
+              "description": "Telling a household member the one thing the request service cannot carry.",
+              "type": "string",
+              "const": "household"
             }
           ]
         }

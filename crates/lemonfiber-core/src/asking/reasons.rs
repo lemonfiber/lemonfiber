@@ -33,6 +33,25 @@ pub struct Refused {
     /// Absent where the machine's clock could not be written as a date, which is a
     /// refusal worth keeping the words of and not worth losing them over.
     pub at: Option<String>,
+    /// Whether the words have been carried to whoever asked, and where to.
+    ///
+    /// Absent until the one attempt has been made. **This is what makes a second one
+    /// impossible rather than unlikely**: carrying happens only where this is absent,
+    /// and it is written whether anything was reached or not — so a member with nowhere
+    /// to send to is asked about once, and a household is never told the same thing
+    /// twice by a run that happened to be started twice.
+    #[serde(default)]
+    pub told: Option<Passed>,
+}
+
+/// Where a refusal's words were carried, and when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct Passed {
+    /// The services they reached, by the names the member knows them by. Empty where
+    /// there was nowhere this could send.
+    pub to: Vec<String>,
+    /// When the attempt was made, absent where the clock could not be written down.
+    pub at: Option<String>,
 }
 
 /// Every reason this machine holds, by the request the service files it under.
@@ -68,8 +87,31 @@ impl Reasons {
             Refused {
                 reason: reason.trim().to_owned(),
                 at,
+                told: None,
             },
         );
+    }
+
+    /// Whether whoever asked for this has still to hear the words.
+    ///
+    /// Nothing kept is nothing owed: a request refused somewhere else leaves no reason
+    /// here, and there is nothing to carry.
+    #[must_use]
+    pub fn owed(&self, request: i64) -> bool {
+        self.given
+            .get(&request)
+            .is_some_and(|kept| kept.told.is_none())
+    }
+
+    /// Write down that the words were carried, and which services took them.
+    ///
+    /// Written even where nothing was reached, because what this records is that the
+    /// one attempt happened. Nothing for a request no reason is held for — there was
+    /// nothing to carry, so there is nothing to say was carried.
+    pub fn passed_on(&mut self, request: i64, to: Vec<String>, at: Option<String>) {
+        if let Some(kept) = self.given.get_mut(&request) {
+            kept.told = Some(Passed { to, at });
+        }
     }
 
     /// Forget every reason whose request the service no longer holds.
@@ -186,5 +228,72 @@ mod tests {
         let read: Reasons = serde_json::from_str("not a record").unwrap_or_default();
 
         assert!(read.is_empty());
+    }
+
+    /// The words are owed until they have been carried, and then never again.
+    ///
+    /// This is the whole of what stops a household hearing the same thing twice: the
+    /// attempt is written down whether it reached anybody or not, so a member with
+    /// nowhere to send to is asked about once.
+    #[test]
+    fn words_are_owed_once_and_then_never_again() {
+        let mut held = Reasons::default();
+        held.keep(7, "no room this month", Some(AT.to_owned()));
+        assert!(held.owed(7), "a fresh refusal owes nobody anything");
+
+        held.passed_on(7, vec!["Pushover".to_owned()], Some(AT.to_owned()));
+
+        assert!(!held.owed(7), "the same words are owed a second time");
+        assert_eq!(
+            held.of(7).and_then(|kept| kept.told.clone()),
+            Some(super::Passed {
+                to: vec!["Pushover".to_owned()],
+                at: Some(AT.to_owned()),
+            })
+        );
+    }
+
+    /// Nowhere to send is still an attempt made, and still not owed again.
+    #[test]
+    fn nowhere_to_send_is_still_an_attempt_that_happened() {
+        let mut held = Reasons::default();
+        held.keep(7, "not this month", None);
+
+        held.passed_on(7, Vec::new(), None);
+
+        assert!(!held.owed(7));
+        assert_eq!(
+            held.of(7)
+                .and_then(|kept| kept.told.clone())
+                .map(|passed| passed.to),
+            Some(Vec::new())
+        );
+    }
+
+    /// A request nothing was kept for is owed nothing and records nothing.
+    #[test]
+    fn a_request_with_no_reason_kept_is_owed_nothing() {
+        let mut held = Reasons::default();
+        assert!(!held.owed(7), "a request nobody refused here owes words");
+
+        held.passed_on(7, vec!["Pushover".to_owned()], None);
+
+        assert_eq!(held.of(7), None, "a delivery invented a refusal");
+    }
+
+    /// A second answer to the same request owes its own words afresh.
+    ///
+    /// Nothing can reach this today — a request already decided is refused by name
+    /// before a second answer is taken — and if that ever changed, the new words would
+    /// be new words rather than ones already carried.
+    #[test]
+    fn a_second_answer_owes_its_own_words() {
+        let mut held = Reasons::default();
+        held.keep(7, "not this month", None);
+        held.passed_on(7, vec!["Pushover".to_owned()], None);
+
+        held.keep(7, "on second thoughts, the disk", None);
+
+        assert!(held.owed(7));
     }
 }

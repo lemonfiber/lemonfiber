@@ -20,8 +20,8 @@ use common::stack::project;
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::{
-    Reaching, Settings, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_INDEXER_KEY, REACH_REGISTRY_KEY,
-    REACH_USENET_KEY, SWITCHES,
+    Reaching, Settings, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
+    REACH_REGISTRY_KEY, REACH_USENET_KEY, SWITCHES,
 };
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::stack::Source;
@@ -57,7 +57,7 @@ async fn listed(settings: Settings) -> lemonfiber_core::outbound::Leaving {
 async fn every_request_this_product_makes_is_listed_with_a_way_to_stop_it() {
     let report = listed(Settings::default()).await;
 
-    assert_eq!(report.ours.len(), 5);
+    assert_eq!(report.ours.len(), 6);
     let switches: Vec<&str> = report
         .ours
         .iter()
@@ -68,6 +68,7 @@ async fn every_request_this_product_makes_is_listed_with_a_way_to_stop_it() {
         REACH_GUIDES_KEY,
         REACH_INDEXER_KEY,
         REACH_USENET_KEY,
+        REACH_HOUSEHOLD_KEY,
     ] {
         assert!(switches.contains(&key), "{key} switches nothing off");
     }
@@ -91,7 +92,7 @@ async fn where_the_images_come_from_is_read_from_the_stack() {
         .iter()
         .find(|entry| entry.reach.as_str() == "registry")
     else {
-        unreachable!("the registry is one of the five")
+        unreachable!("the registry is one of the six")
     };
     assert!(
         registry.destination.contains(&"lscr.io".to_owned()),
@@ -102,6 +103,51 @@ async fn where_the_images_come_from_is_read_from_the_stack() {
         registry.destination.contains(&"docker.io".to_owned()),
         "{:?}",
         registry.destination
+    );
+}
+
+/// The one request that carries somebody's words says where they go and what stops
+/// if it is refused.
+///
+/// The sixth entry is the only one that reaches a person rather than a service, and it
+/// is the one an operator is most likely to want off — so what it costs to switch off
+/// has to be a sentence rather than a shrug, and where it can reach has to be named
+/// before anything is sent.
+#[tokio::test]
+async fn telling_a_household_member_is_listed_with_where_it_reaches_and_what_it_costs() {
+    let report = listed(Settings::default()).await;
+
+    let Some(household) = report
+        .ours
+        .iter()
+        .find(|entry| entry.reach.as_str() == "household")
+    else {
+        unreachable!("carrying a refusal's reason is one of the six")
+    };
+    assert_eq!(household.switch, REACH_HOUSEHOLD_KEY);
+    assert!(household.allowed, "a fresh install refuses to say why");
+    assert_eq!(household.destination.len(), 2, "{household:?}");
+    // What travels is the operator's own sentence, so an operator reading this is owed
+    // the two things nothing else here has to promise: that the words go nowhere but to
+    // the person, and that nothing of this product's own goes with them.
+    assert!(household.sends.contains("Why"), "{}", household.sends);
+    assert!(
+        household.cost.contains("reaches nobody but you"),
+        "{}",
+        household.cost
+    );
+
+    let refused = listed(Settings {
+        reaching: Reaching::without(REACH_HOUSEHOLD_KEY),
+        ..Settings::default()
+    })
+    .await;
+    assert!(
+        refused
+            .ours
+            .iter()
+            .any(|entry| entry.reach.as_str() == "household" && !entry.allowed),
+        "the one entry that reaches a person could not be switched off"
     );
 }
 

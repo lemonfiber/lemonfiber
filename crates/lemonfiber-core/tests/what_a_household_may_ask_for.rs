@@ -9,6 +9,10 @@
 //! before they write and a third reads a document to write it back whole, so a queue
 //! would prove only that the right number of requests went out — and the defect worth
 //! catching here is a *narrow* body, which a queue cannot see at all.
+//!
+//! The scripted service and the installs that reach it are shared with the file next
+//! door, which drives the other half of the same exchange: what becomes of the reason
+//! a refusal carried.
 
 use std::sync::Arc;
 
@@ -19,11 +23,14 @@ use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::http::{Http, Method, Request};
 use lemonfiber_core::ports::service::{Approving, Asking, Quota};
 use lemonfiber_core::seerr::Seerr;
-use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Stopped;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 use lemonfiber_ports::docker::{Health, Lifecycle};
+
+mod common;
+
+use common::household::{answering, recorded_admin, refusing, stack, watched, with};
 
 fn seerr(fake: &Arc<Fake>) -> Seerr {
     let http: Arc<dyn Http> = fake.clone();
@@ -394,27 +401,6 @@ async fn an_unreadable_answer_is_not_a_household_with_no_limit() {
 
 // ── Through the dispatcher, as every surface reaches it ──────────────────────
 
-/// The stack this repository ships.
-fn stack() -> Source {
-    Source::External(std::path::Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    )))
-}
-
-/// A scratch environment file holding the media server's recorded password.
-fn recorded_admin(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-asking-{}-{name}", std::process::id()));
-    let _ = std::fs::create_dir_all(&dir);
-    let env = dir.join(".env");
-    let _ = lemonfiber_core::config::store::set(
-        &env,
-        lemonfiber_core::config::JELLYFIN_ADMIN_PASSWORD_KEY,
-        &["minted", "-earlier"].concat(),
-    );
-    env
-}
-
 /// A context over the shipped stack with the media server up and nothing answering.
 ///
 /// Nothing answering is the point: what is held here is that the dispatcher reaches
@@ -517,137 +503,6 @@ async fn a_page_that_will_not_hold_a_notice_costs_the_notice_and_not_the_reading
     );
 }
 
-/// A context over a transport that answers everything both writes ask.
-///
-/// The refusing case next door proves the dispatcher reaches these commands; this one
-/// proves what they do when the service answers. Both are wanted from *outside* the
-/// crate: the app layer is compiled twice, and a branch driven only from the in-crate
-/// tests is counted as never run in the copy these binaries link.
-fn answering(name: &str) -> Ctx {
-    with(name, Vec::new())
-}
-
-/// The same, with the transport kept so what it was sent can be read back.
-///
-/// Wanted for one question only — whether a rehearsal writes — and a question about
-/// what did *not* go out cannot be asked of a context that swallowed its transport.
-fn watched(name: &str) -> (Ctx, Arc<Fake>) {
-    let transport = table(Vec::new());
-    (context(name, &transport), transport)
-}
-
-/// The same, with one call answering a refusal instead.
-///
-/// One rule rather than a whole transport per case: every write here reaches the
-/// service more than once, and what each of these holds is that the *later* calls
-/// leave the household as it was — which a fixture that refused everything could not
-/// tell apart from never having been asked.
-fn refusing(name: &str, method: Method, route: &'static str) -> Ctx {
-    with(name, vec![(Some(method), route, Answer::reply(500, "no"))])
-}
-
-/// The transport these run against, with any broken rule ahead of the working ones.
-fn with(name: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx {
-    context(name, &table(broken))
-}
-
-/// The routes, with any broken rule ahead of the working ones.
-fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
-    let mut routes = broken;
-    routes.extend(vec![
-        // Ahead of `/Users`, whose text it contains: a route matched by prefix would
-        // answer the sign-in with the list of accounts.
-        (
-            None,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        (
-            None,
-            "/Library/MediaFolders",
-            Answer::reply(200, r#"{"Items":[]}"#),
-        ),
-        (
-            None,
-            "/Localization/ParentalRatings",
-            Answer::reply(200, "[]"),
-        ),
-        (
-            None,
-            "/Users",
-            Answer::reply(
-                200,
-                r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                    "Policy":{"EnableAllFolders":true}}]"#,
-            ),
-        ),
-        (None, "/auth/jellyfin", Answer::reply(200, "{}")),
-        (
-            None,
-            "/settings/main",
-            Answer::reply(
-                200,
-                r#"{"defaultPermissions":160,"defaultQuotas":{"movie":{},"tv":{}}}"#,
-            ),
-        ),
-        (
-            None,
-            "/user/jellyfin/",
-            Answer::reply(200, r#"{"id":4,"permissions":160}"#),
-        ),
-        (
-            None,
-            "/user/4/quota",
-            // At their limit, so the line saying so — and the sentence that says what
-            // they have left and when there is room again — is built here too.
-            Answer::reply(
-                200,
-                r#"{"movie":{"days":7,"limit":5,"used":5},"tv":{"days":7,"limit":0,"used":0}}"#,
-            ),
-        ),
-        (
-            None,
-            "settings/permissions",
-            Answer::reply(200, r#"{"permissions":160}"#),
-        ),
-        (None, "/request/7/", Answer::reply(200, "{}")),
-        (
-            None,
-            "/api/v1/request",
-            Answer::reply(
-                200,
-                r#"{"pageInfo":{"results":1},"results":[{"id":7,
-                    "createdAt":"2026-08-17T21:04:09.000Z","status":1,"type":"movie",
-                    "media":{"status":2,"externalServiceId":3},
-                    "requestedBy":{"displayName":"Alex"}}]}"#,
-            ),
-        ),
-        (None, "", Answer::reply(200, "[]")),
-    ]);
-    Fake::by_rules(routes)
-}
-
-/// An install reached over the given transport.
-fn context(name: &str, transport: &Arc<Fake>) -> Ctx {
-    Ctx::new(
-        Arc::new(Scripted(Ok(spoke("")))),
-        Arc::new(Reporting::holding(
-            &["jellyfin", "seerr"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )),
-        Stopped::today(),
-        Arc::new(lemonfiber_core::adapters::Disk),
-        stack(),
-        Settings {
-            env_file: Some(recorded_admin(name)),
-            ..Settings::default()
-        },
-        Environment::MacOs,
-    )
-    .with_http(transport.clone())
-}
-
 /// A choice that is written comes back as the household, under its own kind.
 #[tokio::test]
 async fn a_choice_that_is_written_answers_with_the_household() {
@@ -692,7 +547,7 @@ async fn a_request_that_is_ruled_on_answers_with_the_household() {
 
     assert!(said.contains(r#""kind":"household""#), "{said}");
     assert!(said.contains("no room this month"), "{said}");
-    assert!(said.contains("yours to pass on"), "{said}");
+    assert!(said.contains("they have been told why"), "{said}");
 }
 
 /// The reason a refusal carried survives it, and reaches whoever asked for the thing.

@@ -17,6 +17,7 @@
 //! two settings fighting.
 
 mod deciding;
+mod passing_on;
 
 pub(super) use deciding::deciding;
 
@@ -254,6 +255,22 @@ mod tests {
     const ACCOUNTS: &str = r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
         "Policy":{"EnableAllFolders":true},"LastActivityDate":"2026-08-30T10:00:00Z"}]"#;
 
+    /// Where the member who asked already hears from the request service.
+    ///
+    /// Both agents carrying the bit a refusal is filed under, because a member who gave
+    /// two addresses and asked to hear on both is the case where every arm of the
+    /// sending runs. The one who switched an agent off is a case of its own below.
+    const REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
+        "pushoverApplicationToken":"the-application-token","pushoverSound":"bike",
+        "pushbulletAccessToken":"the-access-token",
+        "notificationTypes":{"pushover":64,"pushbullet":64}}"#;
+
+    /// The same member, with one of the two agents left switched off.
+    const HALF_REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
+        "pushoverApplicationToken":"the-application-token",
+        "pushbulletAccessToken":"the-access-token",
+        "notificationTypes":{"pushover":64,"pushbullet":0}}"#;
+
     /// One request nobody has ruled on, as the request service records it.
     const WAITING: &str = r#"{"pageInfo":{"results":1},"results":[{"id":7,
         "createdAt":"2026-08-17T21:04:09.000Z","status":1,"type":"movie",
@@ -334,6 +351,18 @@ mod tests {
                 None,
                 "settings/permissions",
                 Answer::reply(200, r#"{"permissions":160}"#),
+            ),
+            (
+                None,
+                "/user/4/settings/notifications",
+                Answer::reply(200, REACHED_AT),
+            ),
+            // Named by method as well as by path: the decision below posts to an
+            // address this fragment is a prefix of.
+            (
+                Some(Method::Get),
+                "/request/7",
+                Answer::reply(200, r#"{"id":7,"requestedBy":{"id":4}}"#),
             ),
             (None, "/request/7/", Answer::reply(200, "{}")),
             (None, "/api/v1/request", Answer::reply(200, WAITING)),
@@ -494,9 +523,14 @@ mod tests {
         assert!(said.contains("approved"), "{said}");
     }
 
-    /// Turning one down says the reason back, and says who has to carry it.
+    /// Turning one down says the reason back, and says what became of the words.
+    ///
+    /// Two lines rather than one, and the second is the one that changes: whether the
+    /// person who asked heard the reason depends on whether they left an address for
+    /// it, so a decision that claimed either way would be claiming something it cannot
+    /// know until it has tried.
     #[tokio::test]
-    async fn turning_one_down_says_the_reason_back() {
+    async fn turning_one_down_says_the_reason_back_and_where_it_went() {
         let report = deciding(
             &a_household("decline"),
             &Decision {
@@ -511,7 +545,152 @@ mod tests {
 
         let said = report.findings.first().cloned().unwrap_or_default();
         assert!(said.contains("no room this month"), "{said}");
-        assert!(said.contains("yours to pass on"), "{said}");
+        assert!(said.contains("kept here"), "{said}");
+
+        let carried = report.findings.get(1).cloned().unwrap_or_default();
+        assert!(
+            carried.contains("told why, on Pushover and Pushbullet"),
+            "{carried}"
+        );
+        assert!(!carried.contains("yours to pass on"), "{carried}");
+    }
+
+    /// An agent the member switched off is not somewhere a message may go.
+    ///
+    /// Their own switch says which of the request service's events reach them where, and
+    /// a message sent to an agent they turned off is one they said they did not want.
+    #[tokio::test]
+    async fn an_agent_the_member_switched_off_is_left_alone() {
+        let carried = turning_down(
+            "half",
+            vec![(
+                None,
+                "/user/4/settings/notifications",
+                Answer::reply(200, HALF_REACHED_AT),
+            )],
+        )
+        .await;
+
+        assert!(carried.contains("told why, on Pushover"), "{carried}");
+        assert!(!carried.contains("Pushbullet"), "{carried}");
+    }
+
+    /// A member with no address of these two kinds is an absence, not a fault.
+    #[tokio::test]
+    async fn a_member_with_nowhere_to_reach_them_is_not_a_fault() {
+        let carried = turning_down(
+            "nowhere",
+            vec![(
+                None,
+                "/user/4/settings/notifications",
+                Answer::reply(200, "{}"),
+            )],
+        )
+        .await;
+
+        assert!(carried.contains("no address"), "{carried}");
+        assert!(carried.contains("yours to pass on"), "{carried}");
+    }
+
+    /// A service that would not say where they are reached leaves the words behind.
+    #[tokio::test]
+    async fn where_they_are_reached_that_cannot_be_read_is_said_as_that() {
+        let carried = turning_down(
+            "unreadable",
+            vec![(
+                Some(Method::Get),
+                "/user/4/settings/notifications",
+                Answer::reply(500, "no"),
+            )],
+        )
+        .await;
+
+        assert!(carried.contains("could not be read"), "{carried}");
+        assert!(carried.contains("yours to pass on"), "{carried}");
+    }
+
+    /// Every address refusing names them all and leaves the words with the operator.
+    #[tokio::test]
+    async fn every_address_refusing_names_them_and_keeps_the_words_here() {
+        let carried = turning_down(
+            "refused",
+            vec![
+                (None, "pushover.net", Answer::reply(500, "no")),
+                (None, "pushbullet.com", Answer::reply(500, "no")),
+            ],
+        )
+        .await;
+
+        assert!(
+            carried.starts_with("Pushover and Pushbullet would not take it"),
+            "{carried}"
+        );
+        assert!(carried.contains("yours to pass on"), "{carried}");
+    }
+
+    /// One taking it and one refusing is told once, and said as told once.
+    #[tokio::test]
+    async fn one_address_taking_it_and_one_refusing_is_told_once() {
+        let carried = turning_down(
+            "mixed",
+            vec![(None, "pushbullet.com", Answer::reply(500, "no"))],
+        )
+        .await;
+
+        assert!(carried.contains("told why, on Pushover"), "{carried}");
+        assert!(
+            carried.contains("Pushbullet would not take it"),
+            "{carried}"
+        );
+        assert!(carried.contains("once rather than twice"), "{carried}");
+    }
+
+    /// An operator who switched this off is told so, and nothing leaves the machine.
+    #[tokio::test]
+    async fn a_household_this_machine_may_not_reach_is_said_rather_than_reached() {
+        let mut ctx = a_household("switched-off");
+        ctx.settings.reaching =
+            crate::config::Reaching::without(crate::config::REACH_HOUSEHOLD_KEY);
+        let report = deciding(
+            &ctx,
+            &Decision {
+                request: 7,
+                answer: Ruling::TurnedDown {
+                    reason: "no room this month".to_owned(),
+                },
+            },
+        )
+        .await
+        .unwrap_or_default();
+
+        let carried = report.findings.get(1).cloned().unwrap_or_default();
+        assert!(
+            carried.contains(crate::config::REACH_HOUSEHOLD_KEY),
+            "{carried}"
+        );
+        assert!(carried.contains("yours to pass on"), "{carried}");
+    }
+
+    /// One request turned down, answered with the line saying what became of the words.
+    async fn turning_down(
+        tag: &str,
+        routes: Vec<(Option<Method>, &'static str, Answer)>,
+    ) -> String {
+        deciding(
+            &answering(tag, routes),
+            &Decision {
+                request: 7,
+                answer: Ruling::TurnedDown {
+                    reason: "no room this month".to_owned(),
+                },
+            },
+        )
+        .await
+        .unwrap_or_default()
+        .findings
+        .get(1)
+        .cloned()
+        .unwrap_or_default()
     }
 
     /// A rehearsed decision says what it would do and rules on nothing.
@@ -528,7 +707,7 @@ mod tests {
         .unwrap_or_default();
 
         let said = report.findings.first().cloned().unwrap_or_default();
-        assert!(said.contains("nothing was decided"), "{said}");
+        assert!(said.contains("nothing was sent or decided"), "{said}");
     }
 
     /// A call that will not answer leaves the household as it was, and says so.

@@ -1,15 +1,15 @@
 //! Which of the requests lemonfiber makes on its own account this operator allows.
 //!
 //! Every one of them is off by one setting, and all of them are off by one more.
-//! The blanket switch is not a convenience over the four: an operator who wants
-//! nothing to leave this machine wants *nothing* to, and asking them to find four
+//! The blanket switch is not a convenience over the five: an operator who wants
+//! nothing to leave this machine wants *nothing* to, and asking them to find five
 //! settings is asking them to miss one — which they would then find out about from
 //! a packet capture rather than from here.
 //!
 //! Held as the settings that were switched off rather than as a field per request.
 //! What a caller asks is *may I make this request*, and it asks by naming the
-//! setting the operator would have typed, so a fifth request costs a constant and a
-//! row in the enumeration rather than a field, a default, a reader and four tests.
+//! setting the operator would have typed, so a further request costs a constant and
+//! a row in the enumeration rather than a field, a default, a reader and four tests.
 //!
 //! Absence is on. That is the right way round for the same reason the explanations
 //! are: each of these exists because something useful stops without it, and
@@ -38,6 +38,10 @@ pub const REACH_INDEXER_KEY: &str = "LEMONFIBER_REACH_INDEXER";
 /// The setting that stops lemonfiber proving a Usenet login against the provider.
 pub const REACH_USENET_KEY: &str = "LEMONFIBER_REACH_USENET";
 
+/// The setting that stops lemonfiber carrying a refusal's reason to the household
+/// member who asked, at the address they gave the request service.
+pub const REACH_HOUSEHOLD_KEY: &str = "LEMONFIBER_REACH_HOUSEHOLD";
+
 /// Every setting that switches one request off.
 ///
 /// The leak check's own source is not among them: it is named rather than switched,
@@ -49,6 +53,7 @@ pub const SWITCHES: &[&str] = &[
     REACH_GUIDES_KEY,
     REACH_INDEXER_KEY,
     REACH_USENET_KEY,
+    REACH_HOUSEHOLD_KEY,
 ];
 
 /// Whether this operator has asked that nothing leave the machine.

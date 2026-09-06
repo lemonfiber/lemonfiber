@@ -73,6 +73,20 @@ enum Reach {
 /// whoever is in a hurry.
 const NAMED: &[(&str, Reach, &str)] = &[
     (
+        "api.pushbullet.com",
+        Reach::Asked,
+        "the second of the two places a household member may already receive what the request \
+         service sends them, written to only where that member gave it an address and left \
+         refusals switched on there, and carrying the reason their request was turned down \
+         and nothing about them or this machine",
+    ),
+    (
+        "api.pushover.net",
+        Reach::Asked,
+        "the first of those two, reached the same way and under the member's own application \
+         rather than any of this household's",
+    ),
+    (
         "docs.docker.com",
         Reach::Printed,
         "where a remedy sends an operator who has no container engine; the sentence is printed \

@@ -17,6 +17,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+mod addressing;
 mod asking;
 mod members;
 mod notices;

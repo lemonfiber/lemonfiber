@@ -9,6 +9,7 @@
 
 #![allow(dead_code)]
 
+pub mod household;
 pub mod service;
 pub mod stack;
 pub mod tunnel;
