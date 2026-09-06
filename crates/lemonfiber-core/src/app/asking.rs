@@ -707,7 +707,7 @@ mod tests {
         .unwrap_or_default();
 
         let said = report.findings.first().cloned().unwrap_or_default();
-        assert!(said.contains("nothing was decided"), "{said}");
+        assert!(said.contains("nothing was sent or decided"), "{said}");
     }
 
     /// A call that will not answer leaves the household as it was, and says so.

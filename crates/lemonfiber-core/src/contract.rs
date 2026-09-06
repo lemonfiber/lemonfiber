@@ -693,6 +693,31 @@ mod tests {
         (named, fields)
     }
 
+    /// How much of each rendering is shown either side of the first difference.
+    const AROUND: usize = 140;
+
+    /// Where two renderings of the contract first part company, in words.
+    ///
+    /// Nothing where they agree. A gate saying only that the artefact is stale costs
+    /// whoever reads it a whole regeneration to find out what moved, and the answer is
+    /// already in the two strings it is holding.
+    fn differing(stored: &str, fresh: &str) -> String {
+        let alike = stored
+            .chars()
+            .zip(fresh.chars())
+            .take_while(|(held, made)| held == made)
+            .count();
+        if alike == stored.chars().count() && alike == fresh.chars().count() {
+            return String::new();
+        }
+        let held: String = stored.chars().skip(alike).take(AROUND).collect();
+        let made: String = fresh.chars().skip(alike).take(AROUND).collect();
+        format!(
+            " — they part company {alike} characters in: the file has {held:?} where the \
+             types make {made:?}"
+        )
+    }
+
     /// The committed artefact and the types must agree.
     ///
     /// A change to a serialised shape that forgets to regenerate fails here
@@ -701,11 +726,29 @@ mod tests {
     fn the_committed_contract_still_matches_the_types() {
         let fresh = Contract::describe().to_json().unwrap_or_default();
         let stored = committed().unwrap_or_default();
+        // Bound rather than written into the assertion's own message, which is
+        // evaluated only where the assertion fails — and a rendering nothing runs is
+        // a rendering nothing holds to being readable.
+        let apart = differing(&stored, &fresh);
 
         assert_eq!(
             stored, fresh,
-            "the contract is out of date — regenerate it with `just contract`"
+            "the contract is out of date — regenerate it with `just contract`{apart}"
         );
+    }
+
+    /// Two renderings that agree say nothing, and two that do not say where.
+    #[test]
+    fn what_a_stale_artefact_is_told_is_where_it_went_wrong() {
+        assert_eq!(differing("the same", "the same"), String::new());
+
+        let apart = differing("the same up to here", "the same up to there");
+        assert!(apart.contains("15 characters in"), "{apart}");
+        assert!(apart.contains("\"here\""), "{apart}");
+        assert!(apart.contains("\"there\""), "{apart}");
+
+        let shorter = differing("the same", "the same and more");
+        assert!(shorter.contains("8 characters in"), "{shorter}");
     }
 
     /// The contract and the emitters must name the same set of kinds.
