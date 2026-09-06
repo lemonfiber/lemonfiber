@@ -189,6 +189,25 @@ mod tests {
         ));
     }
 
+    /// The two ways writing a definition fails are different failures.
+    ///
+    /// One is the directory it goes in and the other is the file itself, and only
+    /// the second is reached where the directory was made without complaint — so a
+    /// test that only ever blocked the directory left the write's own refusal
+    /// carrying words nothing had read.
+    #[test]
+    fn a_definition_the_file_itself_refuses_carries_the_platforms_words() {
+        let dir = super::scratch("write-refused");
+        let at = dir.join("one.service");
+        // A directory standing where the file goes: the directory above it is made
+        // without complaint, and the write is what refuses.
+        let _ = std::fs::create_dir_all(&at);
+        assert!(matches!(
+            put(&at, "[Service]\n"),
+            Err(Failure::Unwritable { at: refused, .. }) if refused == at
+        ));
+    }
+
     #[test]
     fn a_refusal_quotes_the_error_channel_first_and_the_rest_after() {
         assert_eq!(
