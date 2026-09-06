@@ -4417,6 +4417,228 @@
         }
       }
     },
+    "hosting": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/HostingReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Changed": {
+          "description": "What one run of this command did to the machine.",
+          "type": "object",
+          "properties": {
+            "installed": {
+              "description": "Whether it installed it, rather than took it back.",
+              "type": "boolean"
+            },
+            "name": {
+              "description": "The command it acted on.",
+              "type": "string"
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal, in which case nothing above happened.",
+              "type": "boolean"
+            },
+            "started": {
+              "description": "Whether it started the command, which only installing does.",
+              "type": "boolean"
+            },
+            "touched": {
+              "description": "Everything it wrote or removed, so nothing goes unnamed in either direction.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "installed",
+            "touched",
+            "started",
+            "rehearsed"
+          ]
+        },
+        "HostedCommand": {
+          "description": "One long-running command, and what stands between it and this machine.",
+          "type": "object",
+          "properties": {
+            "command": {
+              "description": "How it is typed in a terminal, which is what hosting installs.",
+              "type": "string"
+            },
+            "definition": {
+              "description": "The service definition installed for it, where there is one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "guarantees": {
+              "description": "What it does for as long as it runs, in one sentence.",
+              "type": "string"
+            },
+            "missing": {
+              "description": "The program the definition names, where nothing is there any more.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "description": "lemonfiber's own name for it.",
+              "type": "string"
+            },
+            "output": {
+              "description": "Where a hosted run writes the words it would have said on a terminal.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runs": {
+              "description": "The whole command line that definition runs.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "standing": {
+              "description": "What stands between it and the machine.",
+              "$ref": "#/$defs/Hosting"
+            }
+          },
+          "required": [
+            "name",
+            "guarantees",
+            "command",
+            "standing"
+          ]
+        },
+        "Hosting": {
+          "description": "What stands between one long-running command and the machine.\n\nWritten with hyphens because these are the words the operator reads and the\nrequirement names, and a reading that spelled them differently would be a\nsecond vocabulary for one set of facts.",
+          "oneOf": [
+            {
+              "description": "Nothing is installed; it runs only while a terminal holds it.",
+              "type": "string",
+              "const": "not-hosted"
+            },
+            {
+              "description": "Installed, and the manager confirms it is running.",
+              "type": "string",
+              "const": "hosted"
+            },
+            {
+              "description": "Installed, and the manager would not say whether it is running.",
+              "type": "string",
+              "const": "installed-unverified"
+            },
+            {
+              "description": "Installed, and the manager says it is not running.",
+              "type": "string",
+              "const": "stopped"
+            },
+            {
+              "description": "Installed against a program that is no longer there.",
+              "type": "string",
+              "const": "orphaned"
+            },
+            {
+              "description": "This platform has no service manager lemonfiber configures.",
+              "type": "string",
+              "const": "unsupported"
+            }
+          ]
+        },
+        "HostingReport": {
+          "description": "What this machine keeps running on lemonfiber's behalf.\n\nDefaultable so a test can read one out of a `Result` without a branch it can\nnever take: a closure standing in for the impossible arm is a region no\npassing run enters, and the coverage gate counts those.",
+          "type": "object",
+          "properties": {
+            "caveat": {
+              "description": "What is true of this manager and worth knowing before it is relied on.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "changed": {
+              "description": "What this run changed, where it was asked to change something.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Changed"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "commands": {
+              "description": "Every long-running command there is, hosted or not.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HostedCommand"
+              }
+            },
+            "instruction": {
+              "description": "What to do instead, where lemonfiber cannot configure this platform.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "manager": {
+              "description": "The service manager this platform has, or the absence of one.",
+              "$ref": "#/$defs/Manager"
+            }
+          },
+          "required": [
+            "manager",
+            "commands"
+          ]
+        },
+        "Manager": {
+          "description": "The service manager a machine has, or the absence of one lemonfiber configures.\n\nThe absence is the default, because a machine nobody has told is a machine\nnothing is known about, and guessing at a manager is how a report comes to\nclaim a platform it never asked.",
+          "oneOf": [
+            {
+              "description": "macOS, through a launch agent in the operator's own login session.",
+              "type": "string",
+              "const": "launchd"
+            },
+            {
+              "description": "Linux, through a user service in the operator's own session.",
+              "type": "string",
+              "const": "systemd"
+            },
+            {
+              "description": "A platform lemonfiber does not configure.",
+              "type": "string",
+              "const": "unsupported"
+            }
+          ]
+        }
+      }
+    },
     "household": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
