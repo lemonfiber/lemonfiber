@@ -2666,6 +2666,11 @@
                 "null"
               ]
             },
+            "expired": {
+              "description": "Whether nobody ruled on it and the period the household agreed to closed it,\nrather than an operator turning it down.\n\nThe words are then this program's own, which is why the two are told apart here\nand not left to be read off the sentence: an operator scanning for what happened\nwhile they were away is looking for exactly the ones nobody answered, and a\nmember is owed the difference between having been refused and having run out.\n\nAbsent from every record written before a household could arrange this, which is\nthe right reading of them — they are all somebody's own refusals.",
+              "type": "boolean",
+              "default": false
+            },
             "reason": {
               "description": "Why, in the words it was turned down in.",
               "type": "string"
@@ -4858,6 +4863,11 @@
                 "string",
                 "null"
               ]
+            },
+            "expired": {
+              "description": "Whether nobody ruled on it and the period the household agreed to closed it,\nrather than an operator turning it down.\n\nThe words are then this program's own, which is why the two are told apart here\nand not left to be read off the sentence: an operator scanning for what happened\nwhile they were away is looking for exactly the ones nobody answered, and a\nmember is owed the difference between having been refused and having run out.\n\nAbsent from every record written before a household could arrange this, which is\nthe right reading of them — they are all somebody's own refusals.",
+              "type": "boolean",
+              "default": false
             },
             "reason": {
               "description": "Why, in the words it was turned down in.",

@@ -24,6 +24,7 @@ pub mod accepted;
 pub mod appetite;
 pub mod apply;
 pub mod archives;
+mod arrangement;
 mod asking;
 pub mod backup;
 mod bandwidth;
@@ -36,6 +37,7 @@ pub mod dashboard;
 mod door;
 pub mod egress;
 mod engine;
+mod expiring;
 #[cfg(test)]
 mod fixtures;
 pub mod forwarding;
@@ -70,7 +72,9 @@ mod upgrade;
 mod walkthrough;
 pub mod watch;
 
-pub use command::{Allowance, Answer, BandwidthAsked, Chosen, Command, Decision, QualityAction};
+pub use command::{
+    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, QualityAction,
+};
 pub use ctx::Ctx;
 pub use setup::SetupAction;
 
@@ -408,6 +412,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         // to see after changing a limit is the limit, on the people it applies to.
         Command::Allowing(chosen) => asking::allowing(ctx, &chosen).await.map(Outcome::Household),
         Command::Deciding(decision) => asking::deciding(ctx, &decision)
+            .await
+            .map(Outcome::Household),
+        // The one command here that acts while nobody is watching, and so the one whose
+        // period is named rather than defaulted. Naming one records it and stops; running
+        // on it holds until the arrangement changes under it, and how often it wakes is
+        // this command's own because a period in whole days has no moment to miss.
+        Command::Expiring(arranged) => expiring::expiring(ctx, arranged, expiring::SWEEPING)
             .await
             .map(Outcome::Household),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),

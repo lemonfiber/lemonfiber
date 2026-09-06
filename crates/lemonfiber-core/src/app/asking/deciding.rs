@@ -71,7 +71,10 @@ pub(in crate::app) async fn deciding(
             .decide(decision.request, approve)
             .await
             .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_DECIDED)))?;
-        notes = super::passing_on::carried(ctx, &access, decision.request, reason, &asked).await;
+        // The operator's own, always: what closes a request nobody ruled on comes through
+        // the same door and says whose words it carries there rather than here.
+        let words = reason.map(super::passing_on::Said::Operators);
+        notes = super::passing_on::carried(ctx, &access, decision.request, words, &asked).await;
     }
 
     let mut report = super::super::household::household(ctx, None).await?;

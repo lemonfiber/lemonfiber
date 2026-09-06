@@ -8,7 +8,7 @@
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
-    Allowance, Answer, BandwidthAsked, Chosen, Command, Decision, QualityAction,
+    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, QualityAction,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -105,6 +105,24 @@ pub(crate) fn household(
             request,
             answer: Answer::TurnedDown { reason },
         })),
+        HouseholdCommand::Expiring { after, never } => {
+            Ok(Command::Expiring(arranging(after, never)))
+        }
+    }
+}
+
+/// What is being arranged about the requests nobody rules on.
+///
+/// **Naming nothing is a request in its own right rather than an omission**, and it is the
+/// one that runs: an operator who has already said how long is too long is not saying it
+/// again to act on it. That is why there is no shape here for a default — a period this
+/// invented would close somebody's request on lemonfiber's authority, and the run that
+/// names none is asking to act on the household's own.
+const fn arranging(after: Option<u32>, never: bool) -> Arranged {
+    match (after, never) {
+        (Some(days), _) => Arranged::After(days),
+        (None, true) => Arranged::Never,
+        (None, false) => Arranged::AsAgreed,
     }
 }
 
@@ -266,7 +284,7 @@ mod tests {
 
     use super::{
         bundling, configuration, household, invitation, letting, quality, restarting, sharing,
-        traced, Answer, Chosen, Decision, Destination, Policy, Quota, Wanted,
+        traced, Answer, Arranged, Chosen, Decision, Destination, Policy, Quota, Wanted,
     };
     use crate::exit::USAGE;
     use lemonfiber::cli::{
@@ -398,6 +416,46 @@ mod tests {
                     reason: "no room".to_owned()
                 },
             }))
+        );
+    }
+
+    /// Arranging an expiry, withdrawing it, and running on it are three requests.
+    ///
+    /// **Naming nothing is the one that acts**, and it is a request rather than an
+    /// omission: an operator who has already said how long is too long is not saying it
+    /// again in order to act on it, and there is no period this surface would supply for
+    /// a run that named none.
+    #[test]
+    fn arranging_an_expiry_and_running_on_it_are_different_requests() {
+        assert_eq!(
+            household(
+                None,
+                Some(HouseholdCommand::Expiring {
+                    after: Some(30),
+                    never: false,
+                })
+            ),
+            Ok(Command::Expiring(Arranged::After(30)))
+        );
+        assert_eq!(
+            household(
+                None,
+                Some(HouseholdCommand::Expiring {
+                    after: None,
+                    never: true,
+                })
+            ),
+            Ok(Command::Expiring(Arranged::Never))
+        );
+        assert_eq!(
+            household(
+                None,
+                Some(HouseholdCommand::Expiring {
+                    after: None,
+                    never: false,
+                })
+            ),
+            Ok(Command::Expiring(Arranged::AsAgreed))
         );
     }
 

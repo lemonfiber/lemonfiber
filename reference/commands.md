@@ -822,15 +822,16 @@ Everybody the media server holds an account for — including those who have ask
 
 Each person also carries what they may ask for: how much a period allows them, how much of it is gone, and when there is room again. A request nobody has ruled on shows how long it has been waiting and about how much room it would want.
 
-Name one of the three things underneath to change any of that, or to answer one request that is waiting.
+Name one of the four things underneath to change any of that, to answer one request that is waiting, or to arrange what becomes of the ones nobody answers.
 
 Usage: lemonfiber household [OPTIONS] [COMMAND]
 
 Commands:
-  allow    Choose what happens to what the household asks for, and how much it may ask
-  approve  Let one waiting request through, by the number the household list gives it
-  decline  Turn one waiting request down, saying why
-  help     Print this message or the help of the given subcommand(s)
+  allow     Choose what happens to what the household asks for, and how much it may ask
+  approve   Let one waiting request through, by the number the household list gives it
+  decline   Turn one waiting request down, saying why
+  expiring  Close the requests nobody has ruled on, once they have waited too long
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
       --json
@@ -944,6 +945,40 @@ Options:
 
       --dry-run
           Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber household expiring`
+
+```text
+Close the requests nobody has ruled on, once they have waited too long.
+
+Nothing is closed until you say how long is too long, and there is no period this chooses for you. Naming one records it and stops: the household is told about it, on the list you read and in the message each member is handed, before anything is closed.
+
+Run with nothing named, it does the closing — and it holds this terminal until you stop it or arrange something else, because lemonfiber starts nothing by itself. Whoever asked is told why, at the address they already gave the request service.
+
+Usage: lemonfiber household expiring [OPTIONS]
+
+Options:
+      --after <AFTER>
+          How many days a request may wait before it is closed. Records it and stops
+
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --never
+          Stop closing anything for waiting, whatever was arranged before
 
       --force
           Take the stack from a run that claimed it and did not give it back
