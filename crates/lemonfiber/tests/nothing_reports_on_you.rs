@@ -62,6 +62,14 @@ enum Reach {
     Asked,
     /// The name appears in something an operator reads and nothing fetches it.
     Printed,
+    /// The name is part of a document format lemonfiber writes, and nothing fetches
+    /// it — not this program, and not the thing that reads the document either.
+    ///
+    /// Apart from [`Reach::Printed`] because the two are different promises. A
+    /// printed one is a place somebody is being sent; this is a word in a file
+    /// format, and the reason it is on this list at all is that a sweep which let
+    /// one through would let through the update check somebody writes next year.
+    Written,
 }
 
 /// Every host outside this machine that the shipped half of this workspace names,
@@ -123,6 +131,13 @@ const NAMED: &[(&str, Reach, &str)] = &[
         Reach::Printed,
         "named in a comment as where the community profiles come from; Recyclarr syncs them \
          on its own schedule and lemonfiber never reads that site",
+    ),
+    (
+        "www.apple.com",
+        Reach::Written,
+        "the schema identifier in the header of every launch agent this program writes, which \
+         is a word in the plist format rather than an address — nothing here fetches it, and \
+         the property-list reader that loads the agent does not fetch it either",
     ),
 ];
 
