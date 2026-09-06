@@ -23,13 +23,13 @@ use super::command::{Hostable, Keeping, HOSTABLE};
 use super::Ctx;
 
 /// Raised when this machine will not say where it keeps its own files.
-pub const NOWHERE_TO_WRITE: Code = Code::new("HOST-5");
+pub const NOWHERE_TO_WRITE: Code = Code::new("HOST-4");
 
 /// Raised when this run cannot say where its own program is.
-pub const NO_PROGRAM: Code = Code::new("HOST-6");
+pub const NO_PROGRAM: Code = Code::new("HOST-5");
 
 /// Raised when the guard is to be hosted against nothing.
-pub const NOTHING_NAMED_TO_GUARD: Code = Code::new("HOST-7");
+pub const NOTHING_NAMED_TO_GUARD: Code = Code::new("HOST-6");
 
 /// What a systemd user session does not do, said before it is relied on.
 const UNTIL_LOGOUT: &str = "A user service runs while you are logged in. Surviving a logout \
@@ -364,7 +364,7 @@ mod tests {
             },
         )
         .await;
-        assert!(refused.is_err_and(|problem| problem.code.as_str() == "HOST-7"));
+        assert!(refused.is_err_and(|problem| problem.code.as_str() == "HOST-6"));
     }
 
     #[tokio::test]
@@ -384,7 +384,7 @@ mod tests {
             }
         )
         .await
-        .is_err_and(|problem| problem.code.as_str() == "HOST-6"));
+        .is_err_and(|problem| problem.code.as_str() == "HOST-5"));
 
         let without_records = machine(
             Settings {
@@ -401,7 +401,7 @@ mod tests {
             }
         )
         .await
-        .is_err_and(|problem| problem.code.as_str() == "HOST-5"));
+        .is_err_and(|problem| problem.code.as_str() == "HOST-4"));
     }
 
     #[tokio::test]

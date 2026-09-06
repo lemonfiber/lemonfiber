@@ -214,6 +214,6 @@ async fn a_guard_with_nothing_to_guard_is_refused_and_installs_nothing() {
     )
     .await;
 
-    assert!(refused.is_err_and(|problem| problem.code.as_str() == "HOST-7"));
+    assert!(refused.is_err_and(|problem| problem.code.as_str() == "HOST-6"));
     assert!(manager.placed().is_empty());
 }

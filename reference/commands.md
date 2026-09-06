@@ -24,6 +24,7 @@ Commands:
   quality       Choose how good your media should look, in plain language
   doctor        Run the checks that prove the stack is doing what it should
   watch         Guard the data location while forms run, stopping them if it disappears
+  hosting       Say what this machine keeps running when no terminal is open
   trace         Follow one show or film across the services — "where is my show?"
   household     Show who is in the household, what each may watch and ask for, and what each asked for
   walkthrough   Add one thing, end to end, and watch every step of it happen
@@ -773,6 +774,112 @@ Options:
 
   -h, --help
           Print help
+```
+
+## `lemonfiber hosting`
+
+```text
+Say what this machine keeps running when no terminal is open.
+
+Two of this program's commands have to keep running to be worth anything — the guard on the data location, and the clock that closes requests nobody rules on — and both stop when the window they were started in closes. This is what hands them to the machine instead.
+
+Asked nothing it reports what stands between each of them and this machine: whether one is installed, whether the system is actually running it, where its words are written, and — on a platform this program cannot configure — what to do instead of it. Installed is not running, and the two are never reported as one thing.
+
+Name one of the two words underneath to install one or take it back.
+
+Usage: lemonfiber hosting [OPTIONS] [COMMAND]
+
+Commands:
+  install  Have this machine keep one of them running, now and after a restart
+  remove   Take one back off this machine, leaving nothing behind
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber hosting install`
+
+```text
+Have this machine keep one of them running, now and after a restart.
+
+Installs it into your own account — no administrator rights, and nothing another account on this machine inherits. It starts it as well as installing it, and says so, along with where a command with no terminal writes what it would have said in one.
+
+Usage: lemonfiber hosting install [OPTIONS] <WHAT> [FORMS]...
+
+Arguments:
+  <WHAT>
+          Which one: the guard on the data location, or the clock on requests
+
+          Possible values:
+          - watch:    The guard on the data location
+          - expiring: The clock that closes requests nobody has ruled on
+
+  [FORMS]...
+          The forms the guard stops if the data location is lost. The guard alone takes them, and it will not be installed without them
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber hosting remove`
+
+```text
+Take one back off this machine, leaving nothing behind.
+
+The service definition, its registration, and its place in your login items. Asked about one that is not installed, it says so rather than failing.
+
+Usage: lemonfiber hosting remove [OPTIONS] <WHAT>
+
+Arguments:
+  <WHAT>
+          Which one
+
+          Possible values:
+          - watch:    The guard on the data location
+          - expiring: The clock that closes requests nobody has ruled on
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```
 
 ## `lemonfiber trace`
