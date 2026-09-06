@@ -231,7 +231,7 @@ fn refused(reason: &str) -> Failure {
 #[cfg(test)]
 mod tests {
     use super::{quoted, quoting, written, Host, Hosted, Standing, Systemd};
-    use crate::ports::hosting::{Failure, Held, Placed, Program};
+    use crate::ports::hosting::{Failure, Held, Manager, Placed, Program};
     use crate::ports::process::Output;
     use crate::ports::Runner;
     use lemonfiber_fixtures::support::Sequenced;
@@ -353,6 +353,12 @@ mod tests {
             })
         );
         assert!(!dir.join("lemonfiber-expiring.service").exists());
+    }
+
+    #[tokio::test]
+    async fn this_says_which_manager_it_speaks_to() {
+        let (systemd, _) = over(&units("systemd-manager"), Vec::new());
+        assert_eq!(systemd.manager(), Manager::Systemd);
     }
 
     #[tokio::test]

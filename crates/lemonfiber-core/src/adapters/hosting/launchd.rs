@@ -257,7 +257,7 @@ fn refused(reason: &str) -> Failure {
 #[cfg(test)]
 mod tests {
     use super::{arguments, escaped, inside, plain, under, Host, Hosted, Launchd, Standing, OUT};
-    use crate::ports::hosting::{Failure, Held, Program};
+    use crate::ports::hosting::{Failure, Held, Manager, Program};
     use crate::ports::process::Output;
     use crate::ports::Runner;
     use lemonfiber_fixtures::support::Sequenced;
@@ -421,6 +421,34 @@ mod tests {
             })
         );
         assert!(!gone.join("com.lemonfiber.watch.plist").exists());
+    }
+
+    #[tokio::test]
+    async fn this_says_which_manager_it_speaks_to() {
+        let (launchd, _) = over(&agents("launchd-manager"), Vec::new());
+        assert_eq!(launchd.manager(), Manager::Launchd);
+    }
+
+    /// A session nothing can name unloads nothing, and the definition still goes.
+    ///
+    /// Removing it is what stops it coming back at the next login, which is the
+    /// whole of what an installation was; and nothing here is restarted, so a run
+    /// still going is one that ends on its own terms. Refusing would be refusing on
+    /// a reading this machine declined to give.
+    #[tokio::test]
+    async fn a_session_that_cannot_be_named_unloads_nothing_and_still_takes_it_back() {
+        let dir = agents("launchd-nameless-session");
+        let _ = std::fs::create_dir_all(&dir);
+        let at = dir.join("com.lemonfiber.watch.plist");
+        let _ = std::fs::write(&at, "<dict>\n</dict>\n");
+        let (launchd, runner) = over(&dir, vec![spoke(1, ""), spoke(1, "")]);
+
+        assert_eq!(launchd.withdraw("watch").await, Ok(vec![at.clone()]));
+        assert!(
+            !runner.ran("bootout"),
+            "it addressed a session nothing had named"
+        );
+        assert!(!at.exists());
     }
 
     #[tokio::test]

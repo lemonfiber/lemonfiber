@@ -51,10 +51,14 @@ impl Host for Unhosted {
 
 /// Write a definition where the manager reads them, making the directory if it
 /// is not there yet.
+///
+/// Every definition is a file inside the manager's own directory, so the parent is
+/// the directory to make. A path with no parent at all is the filesystem root,
+/// which is there already — said as a fallback rather than as a branch, because a
+/// branch nothing can reach is a line no test can cover.
 fn put(at: &Path, text: &str) -> Result<(), Failure> {
-    if let Some(parent) = at.parent() {
-        std::fs::create_dir_all(parent).map_err(|error| unwritable(at, &error))?;
-    }
+    let parent = at.parent().unwrap_or(at);
+    std::fs::create_dir_all(parent).map_err(|error| unwritable(at, &error))?;
     std::fs::write(at, text).map_err(|error| unwritable(at, &error))
 }
 
