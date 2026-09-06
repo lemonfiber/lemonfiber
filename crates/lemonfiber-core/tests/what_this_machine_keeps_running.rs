@@ -203,6 +203,10 @@ async fn a_platform_with_no_manager_is_instructed_rather_than_told_it_is_install
 
 /// The manager a context nobody told carries, driven rather than described.
 ///
+/// Told where it is and what it is, because a run that could not say either is
+/// refused for that before a manager is ever reached — and the refusal under test
+/// here is the manager's own.
+///
 /// `Ctx::new` defaults to the one that configures nothing, and every reading in
 /// this workspace that has not been handed a manager goes through it — so what it
 /// does is worth driving rather than assuming. It is also the only way to reach
@@ -217,7 +221,11 @@ async fn a_context_nobody_told_hosts_nothing_and_refuses_to_pretend() {
             Arc::new(System),
             Arc::new(Disk),
             Source::External(project()),
-            Settings::default(),
+            Settings {
+                program: Some(PathBuf::from("/usr/local/bin/lemonfiber")),
+                hosted: Some(PathBuf::from("/records")),
+                ..Settings::default()
+            },
             Environment::MacOs,
         )
     };
