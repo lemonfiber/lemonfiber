@@ -30,7 +30,7 @@
 
 mod asked;
 
-use lemonfiber_core::app::{BandwidthAsked, Command, QualityAction};
+use lemonfiber_core::app::{BandwidthAsked, Command, Keeping, QualityAction};
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
 
@@ -60,6 +60,9 @@ pub const STORAGE: &str = "/api/storage";
 /// by the contract rather than by the path, and a published path renamed outruns its
 /// own redirect.
 pub const REQUESTS: &str = "/api/requests";
+
+/// What this machine keeps running when no terminal is open.
+pub const HOSTING: &str = "/api/hosting";
 
 /// The one address to hand somebody who lives here.
 pub const FRONT_DOOR: &str = "/api/front-door";
@@ -147,8 +150,8 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// would be asking the core something no browser can ask it, which is the whole
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
-    VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, FRONT_DOOR, TRACE, STUCK, CONFIG,
-    QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, SPACE, BANDWIDTH, CLIENTS,
+    VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, HOSTING, FRONT_DOOR, TRACE, STUCK,
+    CONFIG, QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, SPACE, BANDWIDTH, CLIENTS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -234,6 +237,11 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         CHECKS => narrowed(only.as_deref()).ok_or(NO_SUCH_GROUP),
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
         REQUESTS => household(member),
+        // Nothing asked of it, because what is hosted is a property of the machine
+        // rather than of the caller: the two words that change it are actions, at the
+        // other door, and a parameter here would let one surface be told a different
+        // answer from another.
+        HOSTING => Ok(Command::Hosting(Keeping::Read)),
         FRONT_DOOR => Ok(Command::FrontDoor),
         TRACE => following(term, season.as_deref()),
         STUCK => Ok(Command::Stuck),

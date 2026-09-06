@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use lemonfiber_core::acknowledged::{self, Acknowledged};
-use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
+use lemonfiber_core::adapters::{Daemon, Disk, Launchd, Local, System, Systemd, Unhosted};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::archive::Archiving;
 use lemonfiber_core::config::paths::Paths;
@@ -19,6 +19,8 @@ use lemonfiber_core::config::{
     reads_as_off, service_user_from_env, store, Protocols, Reaching, Settings, EXPLANATIONS_KEY,
 };
 use lemonfiber_core::platform::{Environment, HOST_OS};
+use lemonfiber_core::ports::hosting::Manager;
+use lemonfiber_core::ports::{Host, Runner};
 use lemonfiber_core::stack::Source;
 
 use lemonfiber::cli::STACK;
@@ -48,8 +50,9 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     // here, and nothing yet depends on the difference.
     let environment = Environment::resolve(HOST_OS, false);
 
+    let runner: Arc<dyn Runner> = Arc::new(Local);
     let ctx = Ctx::new(
-        Arc::new(Local),
+        Arc::clone(&runner),
         Arc::new(Daemon::local()),
         Arc::new(System),
         Arc::new(Disk),
@@ -57,6 +60,11 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
         settings,
         environment,
     )
+    // Which service manager this machine has is decided from the target it was built
+    // for and handed in, so the core asks a port rather than the operating system —
+    // and a machine whose home directory cannot be found hosts nothing rather than
+    // writing a definition into a directory nothing could later find to remove.
+    .hosting_with(manager(&runner))
     // A wait says what it is waiting for, and this is where those words go on a
     // terminal. The web surface replaces it with one that says them on the stream a
     // browser holds open, which is the only reason this is a value rather than a
@@ -93,6 +101,30 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     ctx
 }
 
+/// This machine's own service manager, reached where it keeps its definitions.
+///
+/// The directories are the platforms' own rather than lemonfiber's: a launch agent
+/// is only loaded from `~/Library/LaunchAgents`, and a user unit only from the XDG
+/// configuration directory, so neither is somewhere this program gets to choose.
+fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
+    use etcetera::BaseStrategy as _;
+
+    let Ok(strategy) = etcetera::choose_base_strategy() else {
+        return Arc::new(Unhosted);
+    };
+    match HOST_OS.manager() {
+        Manager::Launchd => Arc::new(Launchd::over(
+            strategy.home_dir().join("Library/LaunchAgents"),
+            Arc::clone(runner),
+        )),
+        Manager::Systemd => Arc::new(Systemd::over(
+            strategy.config_dir().join("systemd/user"),
+            Arc::clone(runner),
+        )),
+        Manager::Unsupported => Arc::new(Unhosted),
+    }
+}
+
 /// The operator's settings, read from their file as it stands now.
 ///
 /// Read fresh rather than passed around, because setup writes the file mid-run:
@@ -119,6 +151,11 @@ pub(crate) fn read_settings() -> Settings {
         front_door: front_door_from_env(&recorded),
         reaching: Reaching::from_env(&recorded),
         provider_host: provider_host_from_env(&recorded),
+        // What a hosted service names as the program to run, which only this process
+        // can say. Absent where the platform will not, which hosting refuses on rather
+        // than installing a service against a guessed path.
+        program: std::env::current_exe().ok(),
+        hosted: here().map(|paths| paths.hosted()),
         // On unless it is explicitly turned off: somebody meeting this vocabulary
         // does not know there is a setting to look for, and somebody who wants the
         // explanations gone knows exactly what they want to stop.

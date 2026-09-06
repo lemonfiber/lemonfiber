@@ -18,14 +18,14 @@ mod acting;
 
 use acting::{
     exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CARRIES, DOWNLOAD, FOLLOWED, HOURS, ITEM,
-    LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON, SEASON, SHARE,
+    KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON, SEASON, SHARE,
     UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
-use lemonfiber_core::app::{Answer, Chosen, Decision};
+use lemonfiber_core::app::{Answer, Chosen, Decision, Keeping};
 use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
@@ -496,6 +496,19 @@ fn give_agreed(given: &mut Arguments) {
 }
 
 /// Whether the command carries the policy it was given in it.
+/// Whether the command names one of the commands this machine can keep running.
+///
+/// Both halves of the errand read the same way, because which one was named is the
+/// same fact whichever direction it is being asked in — and an action that carried it
+/// in one and dropped it in the other would be one that installed the guard and
+/// removed the clock.
+fn carries_kept(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Hosting(Keeping::Install { .. } | Keeping::Remove { .. })
+    )
+}
+
 fn carries_policy(command: &Command) -> bool {
     matches!(
         command,
@@ -539,6 +552,10 @@ fn give_policy(given: &mut Arguments) {
     given.policy = Some(POLICY.to_owned());
 }
 
+fn give_kept(given: &mut Arguments) {
+    given.kept = Some(KEPT.to_owned());
+}
+
 // One field each, as every other giver here sets one. The action that takes them was
 // handed both already, so overwriting one leaves the pair complete; an action that
 // takes neither is given one, and is refused for the one it was given rather than for
@@ -569,7 +586,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 39] = [
+const SWEEPS: [Sweep; 40] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -602,6 +619,7 @@ const SWEEPS: [Sweep; 39] = [
     ("days", give_days, carries_limit),
     ("request", give_request, carries_request),
     ("reason", give_reason, carries_reason),
+    ("kept", give_kept, carries_kept),
     ("down", give_down, carries_down),
     ("up", give_up, carries_up),
     ("active", give_active, carries_active),

@@ -12,8 +12,10 @@ use crate::quality::Preset;
 
 use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
+mod hosting;
 mod household;
 
+pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
 
 /// What an invitation lets the person it is for watch.
@@ -376,6 +378,20 @@ pub enum Command {
         /// The forms to stop if the data location is lost.
         forms: Vec<String>,
     },
+    /// Say what this machine keeps running for lemonfiber, or change it.
+    ///
+    /// The short command that decides what happens to the two long ones. Asked
+    /// nothing it reports what stands between each of them and this machine —
+    /// installed or not, running or not, and what to do where this is a platform
+    /// lemonfiber configures nothing on. Asked to install one, it hands the
+    /// operating system's own service manager the command that would otherwise
+    /// have needed a terminal held open; asked to remove it, it takes back
+    /// everything installing made.
+    ///
+    /// Never reached from anywhere else. Installation is an act of its own,
+    /// because something that starts at every login is not a thing to acquire as
+    /// a side effect of an afternoon's guard.
+    Hosting(Keeping),
     /// Add one thing end to end, saying each step as it happens.
     ///
     /// Naming nothing asks for something safe to be suggested, because a first

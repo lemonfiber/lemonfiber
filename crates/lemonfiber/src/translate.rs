@@ -8,7 +8,8 @@
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, QualityAction,
+    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
+    QualityAction,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -19,7 +20,8 @@ use lemonfiber_core::recyclarr::Kind;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawBandwidth, RawUnrated,
+    Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
+    RawBandwidth, RawUnrated,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -108,6 +110,30 @@ pub(crate) fn household(
         HouseholdCommand::Expiring { after, never } => {
             Ok(Command::Expiring(arranging(after, never)))
         }
+    }
+}
+
+/// What was asked about what this machine keeps running.
+///
+/// **Naming nothing is a reading rather than an omission.** The two words underneath
+/// change what this machine does at every login, and a bare word that installed
+/// something would be exactly the side effect this feature refuses to be.
+pub(crate) fn hosting(action: Option<HostingCommand>) -> Command {
+    Command::Hosting(match action {
+        None => Keeping::Read,
+        Some(HostingCommand::Install { what, forms }) => Keeping::Install {
+            what: kept(what),
+            forms,
+        },
+        Some(HostingCommand::Remove { what }) => Keeping::Remove { what: kept(what) },
+    })
+}
+
+/// The command line's word for one of them, as the core names it.
+const fn kept(what: Kept) -> Hostable {
+    match what {
+        Kept::Watch => Hostable::Watch,
+        Kept::Expiring => Hostable::Expiring,
     }
 }
 
@@ -283,13 +309,14 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{
-        bundling, configuration, household, invitation, letting, quality, restarting, sharing,
-        traced, Answer, Arranged, Chosen, Decision, Destination, Policy, Quota, Wanted,
+        bundling, configuration, hosting, household, invitation, letting, quality, restarting,
+        sharing, traced, Answer, Arranged, Chosen, Decision, Destination, Hostable, Keeping,
+        Policy, Quota, Wanted,
     };
     use crate::exit::USAGE;
     use lemonfiber::cli::{
-        Asked, ConfigAction, HouseholdCommand, QualityCommand, RawAllowance, RawBandwidth,
-        RawUnrated,
+        Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
+        RawBandwidth, RawUnrated,
     };
     use lemonfiber_core::app::BandwidthAsked;
     use lemonfiber_core::bundle::Filenames;
@@ -805,6 +832,52 @@ mod tests {
                 download: HELD.to_owned(),
                 agreement: None
             }
+        );
+    }
+
+    /// Asking about what is hosted is a reading, and only the words underneath change it.
+    #[test]
+    fn a_bare_word_reads_and_does_not_install_anything() {
+        assert_eq!(hosting(None), Command::Hosting(Keeping::Read));
+    }
+
+    /// Both of the two long commands are reachable through one word, and the guard
+    /// carries the forms it was named against.
+    #[test]
+    fn either_of_them_can_be_installed_and_taken_back_again() {
+        assert_eq!(
+            hosting(Some(HostingCommand::Install {
+                what: Kept::Watch,
+                forms: vec!["tv".to_owned()],
+            })),
+            Command::Hosting(Keeping::Install {
+                what: Hostable::Watch,
+                forms: vec!["tv".to_owned()],
+            })
+        );
+        assert_eq!(
+            hosting(Some(HostingCommand::Install {
+                what: Kept::Expiring,
+                forms: Vec::new(),
+            })),
+            Command::Hosting(Keeping::Install {
+                what: Hostable::Expiring,
+                forms: Vec::new(),
+            })
+        );
+        assert_eq!(
+            hosting(Some(HostingCommand::Remove { what: Kept::Watch })),
+            Command::Hosting(Keeping::Remove {
+                what: Hostable::Watch
+            })
+        );
+        assert_eq!(
+            hosting(Some(HostingCommand::Remove {
+                what: Kept::Expiring
+            })),
+            Command::Hosting(Keeping::Remove {
+                what: Hostable::Expiring
+            })
         );
     }
 }

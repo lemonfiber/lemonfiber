@@ -32,7 +32,15 @@ use lemonfiber_core::bundle::Filenames;
 /// location goes, which is why the command line makes them the one thing it will
 /// not run without — a watch over nothing would notice a drive vanish and have
 /// nothing to do about it.
-pub const TAKES_FORMS: &[&str] = &["up", "down", "switch", "restart", "pull", "watch"];
+pub const TAKES_FORMS: &[&str] = &[
+    "up",
+    "down",
+    "switch",
+    "restart",
+    "pull",
+    "watch",
+    "hosting-install",
+];
 
 /// The actions whose command carries the operator's agreement.
 ///
@@ -377,13 +385,22 @@ pub const TAKES_TERM: &[&str] = &["search"];
 /// first and the one nothing is written by.
 pub const TAKES_SHARING: &[&str] = &["bandwidth"];
 
+/// The actions whose command names one of the commands this machine can keep running.
+///
+/// Both halves of one errand, and the number is required of both: installing without
+/// saying which would be installing whichever this program felt like, and removing
+/// without saying which would take back more than was asked for. The reading beside
+/// them takes none, because what is hosted is a property of the machine — a parameter
+/// there would let a surface show one row and call it the answer.
+pub const TAKES_KEPT: &[&str] = &["hosting-install", "hosting-remove"];
+
 /// The argument this action's command has nowhere to put, where one was given.
 ///
 /// Only for a name this surface offers — a name it does not offer is absent before
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 40] = [
+    let carried: [(&str, bool, &[&str]); 41] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -425,6 +442,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("days", given.days.is_some(), TAKES_POLICY),
         ("request", given.request.is_some(), TAKES_REQUEST),
         ("reason", given.reason.is_some(), TAKES_REASON),
+        ("kept", given.kept.is_some(), TAKES_KEPT),
         ("down", given.down.is_some(), TAKES_SHARING),
         ("up", given.up.is_some(), TAKES_SHARING),
         ("active", given.active.is_some(), TAKES_SHARING),

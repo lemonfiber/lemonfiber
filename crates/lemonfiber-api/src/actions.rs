@@ -45,7 +45,7 @@ use crate::serve::{carrying, SENTENCE};
 pub use asked::{
     Arguments, Disturbing, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
     TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
-    TAKES_ITEM, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
+    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
     TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM,
     TAKES_WAITING,
 };
@@ -79,6 +79,12 @@ pub const fn answering(command: &Command) -> Answering {
         Command::ConfigSet { .. }
         | Command::Quality(_)
         | Command::Setup(_)
+        // Handing a command to this machine's service manager reaches neither the
+        // container engine nor a service: it writes one small file into the
+        // operator's own account and asks the manager to read it. Behind a job name
+        // the answer that matters — whether the machine says it is running it — would
+        // arrive after the moment somebody was looking.
+        | Command::Hosting(_)
         | Command::Restore {
             consent: RestoreConsent::List,
             ..

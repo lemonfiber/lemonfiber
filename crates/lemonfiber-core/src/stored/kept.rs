@@ -187,6 +187,16 @@ pub const EVERY: &[Entry] = &[
         at: Paths::bundles,
     },
     Entry {
+        accessor: "hosted",
+        what: "what a command this machine keeps running has said",
+        why: "A command handed to this machine's service manager has no terminal to speak in, so \
+              what it would have said goes here instead — one file per command, appended to. It \
+              is the only record of what a guard or a clock did while nobody was watching. \
+              Removing it loses that history and stops nothing.",
+        secret: false,
+        at: Paths::hosted,
+    },
+    Entry {
         accessor: "storage_state",
         what: "what the disk could do last time",
         why: "Whether importing by hardlink worked when it was last looked at, so losing that \
@@ -209,7 +219,8 @@ pub(super) fn roots(paths: &Paths) -> Vec<Root> {
         Root {
             at: paths.data_dir().display().to_string(),
             what: "What can be made again: the materialised stack, each service's own \
-                   configuration, the archives and the bundles."
+                   configuration, the archives, the bundles, and what a command this machine \
+                   keeps running has said."
                 .to_owned(),
         },
     ]

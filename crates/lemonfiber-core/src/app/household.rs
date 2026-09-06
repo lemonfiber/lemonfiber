@@ -152,11 +152,26 @@ pub(super) async fn household(
             reasons: &super::refusals::load(ctx),
             expiring: super::arrangement::load(ctx).after(),
             no_room,
+            hosted: keeping_the_clock(ctx).await,
         },
         member,
     );
     report.findings.append(&mut findings);
     Ok(report)
+}
+
+/// Whether this machine is running the clock, rather than whether one is installed.
+///
+/// Installed and running are different facts everywhere else this is read, and they
+/// are different here for the reason that matters most: the sentence underneath is a
+/// promise to a household, and a definition sitting on disk that the manager is not
+/// running keeps none of it. A machine that will not say is not one to promise on
+/// either, so anything short of a confirmed run reads as nothing running it.
+async fn keeping_the_clock(ctx: &Ctx) -> bool {
+    ctx.hosting
+        .standing(super::Hostable::Expiring.name())
+        .await
+        .is_ok_and(|held| held.standing == crate::ports::hosting::Standing::Running)
 }
 
 /// The half of this reading the household itself sees, and the block that goes with it.
@@ -267,6 +282,13 @@ struct Naming<'a> {
     /// Whether the disk has no room left, which refuses an acquisition in the disk's
     /// own words and is a different answer from anybody's limit.
     no_room: bool,
+    /// Whether this machine is running the clock that closes what nobody rules on.
+    ///
+    /// Carried for one sentence, and it is the sentence this reading would otherwise
+    /// get wrong in whichever direction the machine happened to be in: a reminder
+    /// naming a period and saying nothing runs it, on a machine that is running it, is
+    /// as misleading as one implying a background that is not there.
+    hosted: bool,
 }
 
 /// The request service, signed in — or in plain words why it could not be asked.
@@ -442,7 +464,11 @@ fn assemble(
         .any(|held| held.access.restriction != Restriction::Unrestricted)
         .then(|| crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned());
 
-    findings.extend(allowance::worth_saying(&members, naming.expiring));
+    findings.extend(allowance::worth_saying(
+        &members,
+        naming.expiring,
+        naming.hosted,
+    ));
 
     HouseholdReport {
         policy: naming.asked.household.as_ref().map(Policy::of),
@@ -576,6 +602,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                hosted: false,
                 expiring: None,
                 no_room: false,
             },
@@ -631,6 +658,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                hosted: false,
                 expiring: None,
                 no_room: false,
             },
@@ -848,6 +876,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                hosted: false,
                 expiring: None,
                 no_room: true,
             },

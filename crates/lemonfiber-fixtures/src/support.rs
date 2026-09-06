@@ -90,6 +90,71 @@ fn echoed(answer: &Result<Output, Failure>) -> Result<Output, Failure> {
     }
 }
 
+/// A runner answering each call from a script, in the order the calls arrive.
+///
+/// [`Recording`] answers every call the same way, which is right where a test is
+/// about one program. An adapter driving a service manager runs three in a row —
+/// ask the session who it belongs to, load the definition, then ask whether it
+/// took — and the whole point of a test over one is that the three answers
+/// differ. So the answers are a queue.
+///
+/// A call the script did not cover is unreachable rather than helpfully
+/// defaulted: a run that spawned a fourth program has found something, and
+/// handing it a success would hide it.
+pub struct Sequenced {
+    answers: std::sync::Mutex<std::collections::VecDeque<Result<Output, Failure>>>,
+    seen: std::sync::Mutex<Vec<Vec<String>>>,
+}
+
+impl Sequenced {
+    /// A runner that answers these, in this order.
+    #[must_use]
+    pub fn answering(answers: Vec<Result<Output, Failure>>) -> Arc<Self> {
+        Arc::new(Self {
+            answers: std::sync::Mutex::new(answers.into()),
+            seen: std::sync::Mutex::new(Vec::new()),
+        })
+    }
+
+    /// Every argument vector it was handed, in order.
+    ///
+    /// A poisoned lock reads as nothing having run, which fails a test asserting
+    /// something did rather than passing one asserting nothing did.
+    #[must_use]
+    pub fn seen(&self) -> Vec<Vec<String>> {
+        self.seen
+            .lock()
+            .map(|seen| seen.clone())
+            .unwrap_or_default()
+    }
+
+    /// Whether any call it was handed contained this word.
+    #[must_use]
+    pub fn ran(&self, word: &str) -> bool {
+        self.seen()
+            .iter()
+            .any(|argv| argv.iter().any(|said| said == word))
+    }
+}
+
+#[async_trait]
+impl Runner for Sequenced {
+    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+        if let Ok(mut seen) = self.seen.lock() {
+            seen.push(argv.to_vec());
+        }
+        self.answers
+            .lock()
+            .ok()
+            .and_then(|mut answers| answers.pop_front())
+            .unwrap_or_else(|| {
+                Err(Failure::NotFound {
+                    program: argv.first().cloned().unwrap_or_default(),
+                })
+            })
+    }
+}
+
 /// A randomness source answering with exactly the bytes a test scripts.
 pub struct FixedRandom(pub Option<Vec<u8>>);
 

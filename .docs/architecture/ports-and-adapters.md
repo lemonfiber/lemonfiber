@@ -41,6 +41,7 @@ Held as `Arc<dyn …>` and faked in every test that does not want the real thing
 | `ports::docker` | `Engine` | The Docker Engine API — state, stats, logs, exec |
 | `ports::filesystem` | `FileSystem` | The data root — resolving it, and proving it can hardlink |
 | `ports::filesystem` | `Volume` | Whether the data root is still present, and still the same volume |
+| `ports::hosting` | `Host` | The machine's own service manager, so a long-running command outlives its terminal |
 | `ports::http` | `Http` | Any HTTP request, which every service client is built on |
 | `ports::narration` | `Narrator` | Where a long wait says what it is waiting for, for a surface to render |
 | `ports::network` | `Site` | What this machine calls itself, which is the name another device on the network asks for it by |
@@ -143,6 +144,7 @@ would add over the real thing and the secret-file mode handling has to be real.
 | `adapters::filesystem::Disk` | Real. Standard-library I/O; `sysinfo` for the filesystem type. Implements `Volume`, `Eraser` and `Occupancy` too. |
 | `adapters::http::Web` | Real. `reqwest` + `rustls`, with connect and request timeouts and a host-scoped cookie store for session-auth services. |
 | `adapters::network::Here` | Real. `hostname` through the process port, so there stays one place in this workspace that spawns anything. |
+| `adapters::hosting::{Launchd, Systemd, Unhosted}` | Real. Both write a definition with `std::fs` and drive `launchctl` / `systemctl --user` through the process port, so neither spawns anything itself. Which one a run holds is decided at the edge from `HOST_OS`; `Unhosted` is the honest third, and is the default a context nobody told carries. |
 | `nntp` (binary crate) | Real. `tokio-rustls` for a TLS-wrapped NNTP dial; lives in the binary crate, not core. |
 | `archive` (binary crate) | Real. `flate2` + `tar` for backup/restore; lives in the binary crate, so core carries no archive dependency. |
 

@@ -8,7 +8,7 @@
 //! They are re-exported beside the requests, so `cli::QualityCommand` reads the same
 //! as it always did.
 
-use clap::Subcommand;
+use clap::{Subcommand, ValueEnum};
 
 /// What can be decided about what the household may ask for.
 ///
@@ -129,4 +129,46 @@ pub enum ConfigAction {
     },
     /// Show every setting, with credentials withheld.
     Show,
+}
+
+/// Which of the two commands that outlive the request that started them.
+///
+/// A closed list rather than a name typed, because a word that names none of them
+/// is a mistake worth catching where it was typed rather than three layers in.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum Kept {
+    /// The guard on the data location.
+    Watch,
+    /// The clock that closes requests nobody has ruled on.
+    Expiring,
+}
+
+/// What can be done about what this machine keeps running.
+///
+/// Two, and they are the same errand in both directions. Neither is reachable from
+/// anywhere else: something that starts at every login is asked for, never arrived
+/// at as a side effect of the afternoon's work.
+#[derive(Debug, Subcommand)]
+pub enum HostingCommand {
+    /// Have this machine keep one of them running, now and after a restart.
+    ///
+    /// Installs it into your own account — no administrator rights, and nothing
+    /// another account on this machine inherits. It starts it as well as installing
+    /// it, and says so, along with where a command with no terminal writes what it
+    /// would have said in one.
+    Install {
+        /// Which one: the guard on the data location, or the clock on requests.
+        what: Kept,
+        /// The forms the guard stops if the data location is lost. The guard alone
+        /// takes them, and it will not be installed without them.
+        forms: Vec<String>,
+    },
+    /// Take one back off this machine, leaving nothing behind.
+    ///
+    /// The service definition, its registration, and its place in your login items.
+    /// Asked about one that is not installed, it says so rather than failing.
+    Remove {
+        /// Which one.
+        what: Kept,
+    },
 }

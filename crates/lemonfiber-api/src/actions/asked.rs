@@ -16,8 +16,9 @@ mod takers;
 pub use takers::{
     unwanted, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING,
     TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM,
-    TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST,
-    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_WAITING,
+    TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
+    TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM,
+    TAKES_WAITING,
 };
 
 use lemonfiber_core::app::Waiting;
@@ -107,6 +108,12 @@ pub struct Arguments {
     pub request: Option<i64>,
     /// Why a request is being turned down.
     pub reason: Option<String>,
+    /// Which command this machine is being asked to keep running, or stop keeping.
+    ///
+    /// A word rather than a switch, for the reason `policy` is one: there is more than
+    /// one of them, and a word this build does not know is refused by name rather than
+    /// silently taken for whichever the shape happened to default to.
+    pub kept: Option<String>,
     /// How much of the line downloads may take, as a share or a rate.
     ///
     /// Carried as it was written and read in the core, like `unrated` above and for

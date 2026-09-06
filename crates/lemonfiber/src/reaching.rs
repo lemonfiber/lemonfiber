@@ -141,6 +141,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/requests",
     },
     Reach {
+        request: "hosting",
+        through: "/api/hosting",
+    },
+    Reach {
         request: "front-door",
         through: "/api/front-door",
     },

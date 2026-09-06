@@ -25,6 +25,7 @@
 pub mod docker;
 pub mod error;
 pub mod filesystem;
+pub mod hosting;
 pub mod http;
 pub mod media;
 pub mod narration;
@@ -40,6 +41,7 @@ pub mod withheld;
 
 pub use docker::Engine;
 pub use filesystem::{Eraser, FileSystem, Volume};
+pub use hosting::Host;
 pub use http::Http;
 pub use narration::Narrator;
 pub use network::Site;

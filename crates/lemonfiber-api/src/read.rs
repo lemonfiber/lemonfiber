@@ -28,6 +28,7 @@ mod clients;
 mod diagnosis;
 mod door;
 mod glossary;
+mod hosting;
 mod items;
 mod outbound;
 mod space;
@@ -70,6 +71,7 @@ pub fn routes() -> Router<Serving> {
         .merge(stored::routes())
         .merge(space::routes())
         .merge(bandwidth::routes())
+        .merge(hosting::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.

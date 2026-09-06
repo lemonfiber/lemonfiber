@@ -44,7 +44,7 @@ use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
 use stopping::Choice;
 use translate::{
-    bundling, configuration, household, invitation, letting, quality, restarting, traced,
+    bundling, configuration, hosting, household, invitation, letting, quality, restarting, traced,
 };
 
 /// Logs as a screen, or logs as a stream.
@@ -203,6 +203,7 @@ async fn main() -> ExitCode {
         // is one report, at the end. So it goes through dispatch like everything
         // that answers, and the waiting is the command's rather than this file's.
         Request::Watch { forms } => Command::Watch { forms },
+        Request::Hosting { action } => hosting(action),
         // Asking where setup stands is a value that arrives once, so unlike the
         // conversation below it goes through dispatch like every other question.
         Request::Setup { flags } if flags.status => Command::Setup(SetupAction::Where),

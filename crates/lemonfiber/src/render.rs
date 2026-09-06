@@ -21,6 +21,7 @@ mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
+mod hosting;
 mod invitation;
 mod outbound;
 mod qr;
@@ -218,6 +219,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Music(report) => quality::music(report),
         Outcome::Trace(report) => trace::trace(report),
         Outcome::Household(report) => trace::household(report),
+        Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Word(term) => glossary::explanation(term),
@@ -718,6 +720,7 @@ mod tests {
                 findings: Vec::new(),
             }),
             Outcome::Seed(seed_report(Vec::new())),
+            Outcome::Hosting(lemonfiber_core::model::HostingReport::default()),
             Outcome::Reset(ResetReport {
                 reverted: Vec::new(),
                 reverted_connections: Vec::new(),
