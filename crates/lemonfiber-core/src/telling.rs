@@ -175,10 +175,13 @@ mod tests {
         assert_eq!(allowed.len(), 2, "{allowed:?}");
         for address in [pushover(Some("bike")), pushbullet()] {
             let asked = carrying(&address, "no room this month");
+            // Bound rather than named inside the assertion's own message, which is
+            // evaluated only where the assertion fails: a call that lives there is a
+            // call nothing ever makes.
+            let service = address.service();
             assert!(
                 allowed.contains(&asked.url),
-                "{} is sent somewhere the operator was not told about: {}",
-                address.service(),
+                "{service} is sent somewhere the operator was not told about: {}",
                 asked.url
             );
             assert_eq!(asked.method, Method::Post);
