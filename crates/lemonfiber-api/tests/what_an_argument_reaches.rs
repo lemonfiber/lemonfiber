@@ -59,7 +59,8 @@ fn carries_forms(command: &Command) -> bool {
         | Command::Watch { forms }
         | Command::Start { forms, .. }
         | Command::Halt { forms, .. }
-        | Command::Restart { forms, .. } => !forms.is_empty(),
+        | Command::Restart { forms, .. }
+        | Command::Hosting(Keeping::Install { forms, .. }) => !forms.is_empty(),
         _ => false,
     }
 }

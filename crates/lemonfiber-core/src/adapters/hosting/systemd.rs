@@ -464,6 +464,48 @@ mod tests {
         assert!(!at.exists());
     }
 
+    /// Nothing here is ever asked of the system manager, in either direction.
+    ///
+    /// The requirement is that hosting needs no administrative rights, and the whole
+    /// of what keeps that true is one flag: `systemctl` without `--user` addresses
+    /// the system instance, which would need them and would run as somebody else.
+    /// Asserted over every call rather than at each site, because a flag that has to
+    /// be remembered at four call sites is one that will be forgotten at a fifth.
+    #[tokio::test]
+    async fn every_call_addresses_the_operators_own_session_and_never_the_system() {
+        let dir = units("systemd-own-session");
+        let _ = std::fs::create_dir_all(&dir);
+        let at = dir.join("lemonfiber-expiring.service");
+        let _ = std::fs::write(&at, "[Unit]\n");
+        let (systemd, runner) = over(
+            &dir,
+            vec![
+                spoke(0, ""),
+                spoke(0, ""),
+                spoke(0, "active\n"),
+                spoke(0, ""),
+                spoke(3, "inactive\n"),
+                spoke(0, ""),
+            ],
+        );
+        assert!(systemd
+            .place(&a_command(dir.join("expiring.log")))
+            .await
+            .is_ok());
+        assert!(systemd.standing("expiring").await.is_ok());
+        assert!(systemd.withdraw("expiring").await.is_ok());
+
+        let calls = runner.seen();
+        assert!(calls.len() >= 5, "the three operations ran: {calls:?}");
+        for argv in calls {
+            assert!(
+                argv.first().is_some_and(|program| program == "systemctl")
+                    && argv.iter().any(|word| word == "--user"),
+                "{argv:?} would have been addressed to the system manager"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn one_that_is_still_running_afterwards_is_refused_and_kept() {
         let dir = units("systemd-stubborn");

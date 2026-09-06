@@ -100,6 +100,7 @@ mod tests {
             "lemonfiber walkthrough",
             "lemonfiber config get",
             "lemonfiber quality upgrade",
+            "lemonfiber hosting install",
         ] {
             assert!(text.contains(&format!("## `{name}`")), "{name} missing");
         }

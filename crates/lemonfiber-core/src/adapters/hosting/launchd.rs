@@ -528,6 +528,39 @@ mod tests {
         assert!(!at.exists());
     }
 
+    /// Nothing here is ever asked of a domain the operator does not own.
+    ///
+    /// The requirement is that hosting needs no administrative rights, and on this
+    /// platform the whole of what keeps that true is which domain a target names:
+    /// `gui/<uid>` is the operator's own login session, and `system/` is the one
+    /// that would need them. Asserted over every target rather than at each site.
+    #[tokio::test]
+    async fn every_target_names_the_operators_own_login_session() {
+        let dir = agents("launchd-own-session");
+        let _ = std::fs::create_dir_all(&dir);
+        let at = dir.join("com.lemonfiber.watch.plist");
+        let _ = std::fs::write(&at, "<dict>\n</dict>\n");
+        let (launchd, runner) = over(
+            &dir,
+            vec![spoke(0, "501"), spoke(0, ""), spoke(0, "501"), spoke(1, "")],
+        );
+        assert!(launchd.withdraw("watch").await.is_ok());
+
+        let targets: Vec<String> = runner
+            .seen()
+            .into_iter()
+            .filter(|argv| argv.first().is_some_and(|program| program == "launchctl"))
+            .filter_map(|argv| argv.last().cloned())
+            .collect();
+        assert!(!targets.is_empty(), "launchctl was reached at all");
+        for target in targets {
+            assert!(
+                target.starts_with("gui/"),
+                "{target} is not the operator's own login session"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn one_that_is_still_running_afterwards_is_refused_and_kept() {
         let dir = agents("launchd-stubborn");

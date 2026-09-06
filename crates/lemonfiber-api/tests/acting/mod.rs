@@ -202,7 +202,11 @@ pub(crate) const DOWNLOAD: &str = "A.Show.S01E01.1080p";
 pub(crate) const POLICY: &str = "within-a-limit";
 
 /// The long-running command a hosting action names, as one is named.
-pub(crate) const KEPT: &str = "expiring";
+///
+/// The guard rather than the clock, because the guard is the one that also takes
+/// the forms it stops — so the sweep over `forms` is driven against an action that
+/// genuinely carries them rather than against one that would drop them.
+pub(crate) const KEPT: &str = "watch";
 
 /// How many requests a period allows. Not one, so a command carrying it cannot pass
 /// for one carrying a figure anything might have defaulted to.
