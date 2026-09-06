@@ -27,7 +27,7 @@ use crate::ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed};
 use crate::ports::process::Output;
 
 /// A machine whose platform lemonfiber does not configure.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Unhosted;
 
 #[async_trait]

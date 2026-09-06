@@ -247,7 +247,9 @@ fn nowhere_to_write() -> Problem {
 
 #[cfg(test)]
 mod tests {
-    use super::{hosting, settled, typed, Ctx, Held, Hostable, Hosting, Keeping, Standing};
+    use super::{
+        hosting, keeping, settled, typed, Ctx, Held, Hostable, Hosting, Keeping, Standing,
+    };
     use crate::config::Settings;
     use crate::model::HostingReport;
     use crate::ports::hosting::{Manager, Program};
@@ -605,6 +607,44 @@ mod tests {
                 && command.output == Some(PathBuf::from("/records/expiring.log"))
                 && command.missing.is_none()
         }));
+    }
+
+    /// The dispatcher reaches this, and from the copy of the app layer compiled here.
+    ///
+    /// Driven from `tests/` as well, because the layer is compiled twice and a path
+    /// exercised in one is counted as never run in the other. Both are the same arm
+    /// and neither stands in for the other.
+    #[tokio::test]
+    async fn the_dispatcher_reaches_the_reading() {
+        let asked = crate::app::dispatch(
+            crate::app::Command::Hosting(Keeping::Read),
+            &a_machine(Fake::with(Manager::Launchd)),
+        )
+        .await;
+        assert!(matches!(
+            asked,
+            Ok(crate::app::Outcome::Hosting(report)) if report.commands.len() == 2
+        ));
+    }
+
+    /// Only a manager that confirms a run counts as keeping one going.
+    ///
+    /// What reads this is a promise made to a household, so the three answers short
+    /// of a confirmed run — installed and stopped, installed and unsaid, and no
+    /// manager at all — each come back the same way, and it is the honest way.
+    #[tokio::test]
+    async fn a_machine_keeps_one_going_only_where_the_manager_says_it_is_running() {
+        let holding = |standing| {
+            Fake::holding(
+                Manager::Systemd,
+                "expiring",
+                Fake::installed("expiring", standing),
+            )
+        };
+        assert!(keeping(&a_machine(holding(Standing::Running)), Hostable::Expiring).await);
+        assert!(!keeping(&a_machine(holding(Standing::Stopped)), Hostable::Expiring).await);
+        assert!(!keeping(&a_machine(holding(Standing::Unsaid)), Hostable::Expiring).await);
+        assert!(!keeping(&a_machine(Fake::unsupported()), Hostable::Expiring).await);
     }
 
     #[test]
