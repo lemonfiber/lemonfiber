@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::time::SystemTime;
 
 use super::targets::{jellyfin_reader, open_servarrs, seerr_reader};
-use super::Ctx;
+use super::{Ctx, Hostable};
 use crate::asking::{Policy, Reasons};
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
@@ -152,26 +152,12 @@ pub(super) async fn household(
             reasons: &super::refusals::load(ctx),
             expiring: super::arrangement::load(ctx).after(),
             no_room,
-            hosted: keeping_the_clock(ctx).await,
+            hosted: super::hosting::keeping(ctx, Hostable::Expiring).await,
         },
         member,
     );
     report.findings.append(&mut findings);
     Ok(report)
-}
-
-/// Whether this machine is running the clock, rather than whether one is installed.
-///
-/// Installed and running are different facts everywhere else this is read, and they
-/// are different here for the reason that matters most: the sentence underneath is a
-/// promise to a household, and a definition sitting on disk that the manager is not
-/// running keeps none of it. A machine that will not say is not one to promise on
-/// either, so anything short of a confirmed run reads as nothing running it.
-async fn keeping_the_clock(ctx: &Ctx) -> bool {
-    ctx.hosting
-        .standing(super::Hostable::Expiring.name())
-        .await
-        .is_ok_and(|held| held.standing == crate::ports::hosting::Standing::Running)
 }
 
 /// The half of this reading the household itself sees, and the block that goes with it.

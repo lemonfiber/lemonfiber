@@ -100,6 +100,20 @@ async fn described(ctx: &Ctx, what: Hostable) -> HostedCommand {
     }
 }
 
+/// Whether this machine is running one of them, rather than whether one is installed.
+///
+/// The two are different facts everywhere in this module, and they are different
+/// here for the reason that matters most: what reads this is a promise made to a
+/// household, and a definition sitting on disk that the manager is not running
+/// keeps none of it. A manager that will not say is not one to promise on either,
+/// so anything short of a confirmed run reads as nothing running it.
+pub(super) async fn keeping(ctx: &Ctx, what: Hostable) -> bool {
+    ctx.hosting
+        .standing(what.name())
+        .await
+        .is_ok_and(|held| held.standing == Standing::Running)
+}
+
 /// What the manager's answer amounts to.
 fn settled(held: &Held) -> Hosting {
     match held.standing {
