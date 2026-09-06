@@ -104,6 +104,12 @@ impl Launchd {
 }
 
 /// The plist launchd reads, one value to a line so it can be read back.
+///
+/// No document-type header. The property-list reader identifies the format by its
+/// root element and has never fetched the schema that header names, so carrying it
+/// would put a host this program never reaches into the list of hosts it names, and
+/// three words no operator should have to meet into a string one could read. Two
+/// separate sweeps said so, which is two more than the header is worth.
 fn written(label: &str, hosted: &Hosted) -> String {
     let out = escaped(&hosted.output.to_string_lossy());
     let arguments: String = std::iter::once(hosted.program.to_string_lossy().into_owned())
@@ -112,8 +118,6 @@ fn written(label: &str, hosted: &Hosted) -> String {
         .collect();
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
-         <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \
-         \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
          <plist version=\"1.0\">\n\
          <dict>\n\
          <key>Label</key>\n\
