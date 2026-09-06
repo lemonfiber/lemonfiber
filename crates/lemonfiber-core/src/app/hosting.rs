@@ -255,7 +255,7 @@ mod tests {
     use crate::ports::hosting::{Manager, Program};
     use crate::ports::Host;
     use lemonfiber_fixtures::hosting::Hosting as Fake;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
     /// Settings for a machine that knows where it is and what it is.
@@ -344,8 +344,8 @@ mod tests {
         assert!(placed.first().is_some_and(|one| {
             one.name == "watch"
                 && one.arguments == vec!["watch".to_owned(), "tv".to_owned()]
-                && one.program == PathBuf::from("/usr/local/bin/lemonfiber")
-                && one.output == PathBuf::from("/records/watch.log")
+                && one.program == Path::new("/usr/local/bin/lemonfiber")
+                && one.output == Path::new("/records/watch.log")
         }));
         assert_eq!(standing(&report, "watch"), Some(Hosting::Hosted));
         assert!(report

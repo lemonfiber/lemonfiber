@@ -238,12 +238,12 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    fn spoke(status: i32, stdout: &str) -> Result<Output, crate::ports::process::Failure> {
-        Ok(Output {
+    fn spoke(status: i32, stdout: &str) -> Output {
+        Output {
             status: Some(status),
             stdout: stdout.to_owned(),
             stderr: String::new(),
-        })
+        }
     }
 
     fn a_command(output: PathBuf) -> Hosted {
@@ -260,11 +260,8 @@ mod tests {
         super::super::scratch(name)
     }
 
-    fn over(
-        dir: &Path,
-        answers: Vec<Result<Output, crate::ports::process::Failure>>,
-    ) -> (Systemd, Arc<Sequenced>) {
-        let runner = Sequenced::answering(answers);
+    fn over(dir: &Path, answers: Vec<Output>) -> (Systemd, Arc<Sequenced>) {
+        let runner = Sequenced::answering(answers.into_iter().map(Ok).collect());
         (
             Systemd::over(dir.to_path_buf(), Arc::clone(&runner) as Arc<dyn Runner>),
             runner,

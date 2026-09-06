@@ -114,7 +114,12 @@ fn written(label: &str, hosted: &Hosted) -> String {
     let out = escaped(&hosted.output.to_string_lossy());
     let arguments: String = std::iter::once(hosted.program.to_string_lossy().into_owned())
         .chain(hosted.arguments.iter().cloned())
-        .map(|word| format!("<string>{}</string>\n", escaped(&word)))
+        .map(|word| {
+            let mut line = String::from("<string>");
+            line.push_str(&escaped(&word));
+            line.push_str("</string>\n");
+            line
+        })
         .collect();
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
@@ -264,12 +269,12 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    fn spoke(status: i32, stdout: &str) -> Result<Output, crate::ports::process::Failure> {
-        Ok(Output {
+    fn spoke(status: i32, stdout: &str) -> Output {
+        Output {
             status: Some(status),
             stdout: stdout.to_owned(),
             stderr: String::new(),
-        })
+        }
     }
 
     fn a_command(output: PathBuf) -> Hosted {
@@ -286,11 +291,8 @@ mod tests {
         super::super::scratch(name)
     }
 
-    fn over(
-        dir: &Path,
-        answers: Vec<Result<Output, crate::ports::process::Failure>>,
-    ) -> (Launchd, Arc<Sequenced>) {
-        let runner = Sequenced::answering(answers);
+    fn over(dir: &Path, answers: Vec<Output>) -> (Launchd, Arc<Sequenced>) {
+        let runner = Sequenced::answering(answers.into_iter().map(Ok).collect());
         (
             Launchd::over(dir.to_path_buf(), Arc::clone(&runner) as Arc<dyn Runner>),
             runner,
