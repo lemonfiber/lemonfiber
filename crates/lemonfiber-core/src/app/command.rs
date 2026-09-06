@@ -12,6 +12,10 @@ use crate::quality::Preset;
 
 use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
+mod household;
+
+pub use household::{Answer, Arranged, Chosen, Decision};
+
 /// What an invitation lets the person it is for watch.
 ///
 /// One value over two answers because they are one decision taken at one moment: which
@@ -36,55 +40,6 @@ pub struct Allowance {
     /// What is to happen to content the media server has no rating for. `None` leaves
     /// it to the default a restriction carries — see [`crate::app::invite`].
     pub unrated: Option<crate::ports::service::Unrated>,
-}
-
-/// What a household is to be allowed to ask for, and who the choice is about.
-///
-/// One value over three answers because they are one decision: a policy without a limit
-/// is half of "within a limit", and a limit without somebody to hold to it is a number
-/// nobody is held to. Every surface asks all three at once for that reason.
-///
-/// **Nothing said is nothing changed.** A run that named only a limit is not a run that
-/// chose to trust everybody; it is a run that said nothing about the policy, which leaves
-/// whatever the household already had. A value written here for something nobody typed
-/// would be a surface deciding on the household's behalf.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Chosen {
-    /// Whose it is about, matched the way a name is typed — or the whole household
-    /// where absent.
-    pub member: Option<String>,
-    /// What is to happen to what they ask for. `None` leaves the policy in force.
-    pub policy: Option<crate::asking::Policy>,
-    /// How much a period allows. `None` leaves whatever limit is in force.
-    pub quota: Option<crate::ports::service::Quota>,
-}
-
-/// What is being done about one request that is waiting on somebody.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Decision {
-    /// The request, by the number the request service files it under.
-    ///
-    /// A number rather than a title: a household asks for the same film twice under two
-    /// spellings, and a decision that matched on words could rule on the wrong one.
-    pub request: i64,
-    /// Which way it goes.
-    pub answer: Answer,
-}
-
-/// The two ways a waiting request can go.
-///
-/// The reason sits inside the variant that needs one rather than beside both, so a
-/// refusal cannot be constructed without one — which is what a decline owes the person
-/// who asked, and is stronger here than a check somebody could forget to make.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Answer {
-    /// Let it through.
-    LetThrough,
-    /// Turn it down, with what the person who asked is owed.
-    TurnedDown {
-        /// Why, in the operator's own words.
-        reason: String,
-    },
 }
 
 /// What a surface is asking for.
@@ -265,6 +220,20 @@ pub enum Command {
     /// what a household may ask for from now on, and this settles one thing somebody
     /// already asked for. Answers with the household for the same reason that one does.
     Deciding(Decision),
+    /// Close the requests nobody has ruled on, once they have waited as long as the
+    /// household agreed to let them.
+    ///
+    /// **The second command with no ending of its own, and the only one that acts while
+    /// nobody is watching.** So what makes it something other than a policy nobody
+    /// consented to is that the period is named rather than defaulted, that it is written
+    /// down where the household reading and the message a member is handed both say it in
+    /// advance, and that this stops the moment the arrangement it began under stops being
+    /// the arrangement in force.
+    ///
+    /// Nothing starts it. Answers with the household for the same reason the two above
+    /// do — what an operator wants to see after something was closed is who is now
+    /// waiting on them and what became of the words.
+    Expiring(Arranged),
     /// List the items whose downloads are stuck, each named so it links to its own
     /// trace — the landing point for "N items stuck".
     Stuck,

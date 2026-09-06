@@ -15,6 +15,13 @@
 //! decides whether passing it on is still theirs to do, and that is not something to
 //! leave them guessing at: a refusal answered with silence about its own delivery reads
 //! as delivered.
+//!
+//! **Two things now come through here, and they carry the same message and a different
+//! record.** An operator turning something down, and a period the household agreed to
+//! closing something nobody ruled on. What travels to the person who asked is why, in both
+//! cases, because that is the one thing the request service has nowhere to put — but the
+//! record keeps which of the two it was, because having been refused and having run out
+//! are different things to have happened to somebody.
 
 use std::collections::BTreeSet;
 
@@ -28,6 +35,27 @@ use crate::app::Ctx;
 
 /// What is said where the words are the operator's to carry.
 const YOURS: &str = "so the reason is yours to pass on";
+
+/// What was said when one request was turned down, and whose words they are.
+///
+/// **Two shapes rather than a string beside a flag**, because the two combinations a flag
+/// would also allow are not things: an approval carries no reason at all, and a request
+/// that ran out cannot have carried somebody's own. Having none is the absence of one of
+/// these rather than a third kind of one, which is why an approval is `None` at the call
+/// below and not a variant here — a variant would be a state every reader had to rule out
+/// and no caller could ever construct past the check that returns early on it.
+///
+/// What travels to the person who asked is the same either way — the request service tells
+/// them it was declined and this carries only why — but what the record keeps is not, and
+/// neither is what the member is told afterwards.
+#[derive(Clone, Copy)]
+pub(in crate::app) enum Said<'a> {
+    /// The operator's own words, on a refusal they made.
+    Operators(&'a str),
+    /// This program's own, on a request nobody ruled on inside the period the household
+    /// agreed to let one wait.
+    RanOut(&'a str),
+}
 
 /// What is said where the words could not be written down.
 ///
@@ -46,23 +74,23 @@ const NOT_KEPT: &str = "the reason could not be written down here, so it is in t
 /// Nothing on an approval — there is no reason to keep, nothing to tell anybody, and
 /// clearing the record on one would lose the words for every *other* refusal in the same
 /// breath.
-pub(super) async fn carried(
+pub(in crate::app) async fn carried(
     ctx: &Ctx,
     access: &HouseholdAccess,
     request: i64,
-    reason: Option<&str>,
+    said: Option<Said<'_>>,
     asked: &[HouseholdRequest],
 ) -> Vec<String> {
-    let Some(reason) = reason else {
+    let Some(said) = said else {
         return Vec::new();
     };
-    let mut reasons = held(ctx, request, reason, asked);
-    let mut said: Vec<String> = passed_on(ctx, access, request, &mut reasons)
+    let mut reasons = held(ctx, request, said, asked);
+    let mut notes: Vec<String> = passed_on(ctx, access, request, &mut reasons)
         .await
         .into_iter()
         .collect();
-    said.extend(written(ctx, &reasons));
-    said
+    notes.extend(written(ctx, &reasons));
+    notes
 }
 
 /// Put the record where the next run will find it, and say so where it would not go.
@@ -77,10 +105,14 @@ fn written(ctx: &Ctx, reasons: &Reasons) -> Option<String> {
 /// The pruning rides along because this is the one path that holds both halves at once:
 /// the record, and the service's own list of what still exists. A note beside a line that
 /// has gone is only a way to grow a file forever.
-fn held(ctx: &Ctx, request: i64, reason: &str, asked: &[HouseholdRequest]) -> Reasons {
+fn held(ctx: &Ctx, request: i64, said: Said<'_>, asked: &[HouseholdRequest]) -> Reasons {
     let still_held: BTreeSet<i64> = asked.iter().map(|filed| filed.id).collect();
     let mut reasons = crate::app::refusals::load(ctx);
-    reasons.keep(request, reason, crate::instant::written(ctx.clock.now()));
+    let at = crate::instant::written(ctx.clock.now());
+    match said {
+        Said::Operators(reason) => reasons.keep(request, reason, at),
+        Said::RanOut(reason) => reasons.closed(request, reason, at),
+    }
     reasons.only(&still_held);
     reasons
 }
@@ -144,7 +176,7 @@ fn became_of(told: &Told) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{became_of, held, still_owed, written};
+    use super::{became_of, held, still_owed, written, Said};
     use crate::asking::Reasons;
     use crate::ports::service::HouseholdRequest;
     use crate::telling::Told;
@@ -237,16 +269,49 @@ mod tests {
     fn the_record_keeps_this_refusal_and_only_what_the_service_still_holds() {
         let nowhere = a_context().build();
 
-        let kept = held(&nowhere, 7, "  no room this month  ", &[asked(7)]);
+        let kept = held(
+            &nowhere,
+            7,
+            Said::Operators("  no room this month  "),
+            &[asked(7)],
+        );
         assert_eq!(
-            kept.of(7).map(|refusal| refusal.reason.as_str()),
-            Some("no room this month")
+            kept.of(7)
+                .map(|refusal| (refusal.reason.as_str(), refusal.expired)),
+            Some(("no room this month", false))
         );
 
-        let gone = held(&nowhere, 7, "no room this month", &[asked(9)]);
+        let gone = held(
+            &nowhere,
+            7,
+            Said::Operators("no room this month"),
+            &[asked(9)],
+        );
         assert!(
             gone.is_empty(),
             "a reason whose request the service does not hold was kept"
+        );
+    }
+
+    /// A request that ran out is written down as having run out, not as refused.
+    ///
+    /// The same path and the same record, and the one thing that differs is the one
+    /// thing the member and the operator each read it for.
+    #[test]
+    fn a_request_that_ran_out_is_written_down_as_having_run_out() {
+        let nowhere = a_context().build();
+
+        let kept = held(
+            &nowhere,
+            7,
+            Said::RanOut("nobody ruled on it within 30 days"),
+            &[asked(7)],
+        );
+
+        assert_eq!(
+            kept.of(7)
+                .map(|refusal| (refusal.reason.as_str(), refusal.expired)),
+            Some(("nobody ruled on it within 30 days", true))
         );
     }
 

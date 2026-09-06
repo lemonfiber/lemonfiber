@@ -58,6 +58,24 @@ pub enum HouseholdCommand {
         #[arg(long, required = true)]
         reason: String,
     },
+    /// Close the requests nobody has ruled on, once they have waited too long.
+    ///
+    /// Nothing is closed until you say how long is too long, and there is no period this
+    /// chooses for you. Naming one records it and stops: the household is told about it,
+    /// on the list you read and in the message each member is handed, before anything is
+    /// closed.
+    ///
+    /// Run with nothing named, it does the closing — and it holds this terminal until you
+    /// stop it or arrange something else, because lemonfiber starts nothing by itself.
+    /// Whoever asked is told why, at the address they already gave the request service.
+    Expiring {
+        /// How many days a request may wait before it is closed. Records it and stops.
+        #[arg(long, conflicts_with = "never")]
+        after: Option<u32>,
+        /// Stop closing anything for waiting, whatever was arranged before.
+        #[arg(long)]
+        never: bool,
+    },
 }
 
 /// What to do with settings.

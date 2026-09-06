@@ -17,7 +17,7 @@
 //! two settings fighting.
 
 mod deciding;
-mod passing_on;
+pub(super) mod passing_on;
 
 pub(super) use deciding::deciding;
 

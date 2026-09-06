@@ -34,9 +34,10 @@ use crate::recyclarr::Kind;
 pub(super) fn to_hand_over(
     member: &HouseholdMember,
     quality: &Selection,
+    expiring: Option<u32>,
     no_room: bool,
 ) -> Vec<String> {
-    let unanswered = waiting(&member.requests);
+    let unanswered = waiting(&member.requests, expiring);
     let refused = turned_down(&member.requests);
     if member.asking.is_none() && unanswered.is_empty() && refused.is_empty() {
         return Vec::new();
@@ -86,18 +87,30 @@ fn before_you_ask(quality: &Selection) -> String {
 
 /// What is still waiting on somebody, where anything is.
 ///
-/// Named as waiting on a person rather than as being worked on, and said to expire of
-/// nothing: a member who read "waiting" as "in progress" would go on waiting, and one who
-/// assumed something eventually clears it would never ask again.
-fn waiting(requests: &[MemberRequest]) -> Vec<String> {
+/// Named as waiting on a person rather than as being worked on: a member who read
+/// "waiting" as "in progress" would go on waiting, and one who assumed something
+/// eventually clears it would never ask again.
+///
+/// **What it says about the end of the wait is whichever is true of this house.** Where
+/// nothing is arranged it says nothing expires it, which is what it has always said and
+/// what is still true. Where a period is arranged it says the wait can end unanswered and
+/// that they will be told — and it names no figure, because the period is the operator's
+/// to change and nothing runs it on its own, so a date said here is one this could not
+/// keep.
+fn waiting(requests: &[MemberRequest], expiring: Option<u32>) -> Vec<String> {
+    let ends = if expiring.is_some() {
+        "It waits until somebody rules on it, or until it is closed for having waited too \
+         long — you will be told which"
+    } else {
+        "Nothing expires it — it waits until somebody rules on it"
+    };
     let mut said = Vec::new();
     for request in requests
         .iter()
         .filter(|request| request.state == Some(State::WaitingForApproval))
     {
         said.push(format!(
-            "Waiting on an answer: {}{}{}. Nothing expires it — it waits until somebody \
-             rules on it.",
+            "Waiting on an answer: {}{}{}. {ends}.",
             named(request),
             request
                 .estimate
@@ -118,6 +131,11 @@ fn waiting(requests: &[MemberRequest]) -> Vec<String> {
 /// The honesty line is said once and only where there is a reason to explain: repeated
 /// under every refusal it is a caveat nobody reads, and said where nothing was refused it
 /// is an apology for something that did not happen.
+///
+/// **A request nobody ruled on is not one somebody turned down**, and it does not say so.
+/// Being refused and having run out are different things to have happened to a person, and
+/// the second is the one where asking again is the sensible next move — which nobody reads
+/// off a line beginning with the word for the first.
 fn turned_down(requests: &[MemberRequest]) -> Vec<String> {
     let mut said: Vec<String> = requests
         .iter()
@@ -125,7 +143,12 @@ fn turned_down(requests: &[MemberRequest]) -> Vec<String> {
         .filter_map(|request| {
             request.refused.as_ref().map(|refused| {
                 format!(
-                    "Turned down{}: {} — {}.",
+                    "{}{}: {} — {}.",
+                    if refused.expired {
+                        "Closed unanswered"
+                    } else {
+                        "Turned down"
+                    },
                     refused.at.as_deref().map_or_else(String::new, |at| format!(
                         " on {}",
                         at.split('T').next().unwrap_or(at)
@@ -216,6 +239,7 @@ mod tests {
                 // to the member, and telling somebody how they were told is a sentence
                 // for the operator rather than for them.
                 told: None,
+                expired: false,
             }),
         }
     }
@@ -239,6 +263,7 @@ mod tests {
         let said = to_hand_over(
             &member(Some(asking(Some(5))), Vec::new()),
             &quality(),
+            None,
             false,
         );
         let whole = said.join("\n");
@@ -254,7 +279,12 @@ mod tests {
     /// and only one of them means they may ask for whatever they like.
     #[test]
     fn somebody_nothing_limits_is_told_so() {
-        let said = to_hand_over(&member(Some(asking(None)), Vec::new()), &quality(), false);
+        let said = to_hand_over(
+            &member(Some(asking(None)), Vec::new()),
+            &quality(),
+            None,
+            false,
+        );
 
         assert!(
             said.iter().any(|line| line.contains("Nothing limits")),
@@ -268,7 +298,12 @@ mod tests {
     /// before the choice rather than beside the approval.
     #[test]
     fn what_a_thing_costs_is_said_before_anybody_asks() {
-        let said = to_hand_over(&member(Some(asking(None)), Vec::new()), &quality(), false);
+        let said = to_hand_over(
+            &member(Some(asking(None)), Vec::new()),
+            &quality(),
+            None,
+            false,
+        );
         let whole = said.join("\n");
 
         assert!(whole.contains("Before you ask"), "{whole}");
@@ -289,6 +324,7 @@ mod tests {
                 ],
             ),
             &quality(),
+            None,
             false,
         );
 
@@ -328,11 +364,13 @@ mod tests {
                 ],
             ),
             &quality(),
+            None,
             false,
         );
         let nothing_refused = to_hand_over(
             &member(Some(asking(Some(5))), Vec::new()),
             &quality(),
+            None,
             false,
         );
 
@@ -376,6 +414,7 @@ mod tests {
                 vec![request(1, State::Declined, None)],
             ),
             &quality(),
+            None,
             false,
         );
 
@@ -389,7 +428,12 @@ mod tests {
     /// A full disk is said as the disk, and never as somebody's limit.
     #[test]
     fn a_full_disk_is_said_as_the_disk() {
-        let said = to_hand_over(&member(Some(asking(Some(5))), Vec::new()), &quality(), true);
+        let said = to_hand_over(
+            &member(Some(asking(Some(5))), Vec::new()),
+            &quality(),
+            None,
+            true,
+        );
         let line = said
             .iter()
             .find(|line| line.contains("no room left on the disk"))
@@ -410,7 +454,7 @@ mod tests {
     /// somebody would teach a household to ignore the next one.
     #[test]
     fn a_member_with_nothing_to_say_is_handed_nothing() {
-        assert!(to_hand_over(&member(None, Vec::new()), &quality(), false).is_empty());
+        assert!(to_hand_over(&member(None, Vec::new()), &quality(), None, false).is_empty());
     }
 
     /// A request nothing holds a title for is still named as something.
@@ -421,8 +465,8 @@ mod tests {
         let mut nameless = untitled.clone();
         nameless.media = None;
 
-        let by_kind = to_hand_over(&member(None, vec![untitled]), &quality(), false);
-        let by_number = to_hand_over(&member(None, vec![nameless]), &quality(), false);
+        let by_kind = to_hand_over(&member(None, vec![untitled]), &quality(), None, false);
+        let by_number = to_hand_over(&member(None, vec![nameless]), &quality(), None, false);
         assert!(
             !by_kind.is_empty() && !by_number.is_empty(),
             "no message at all"
@@ -449,7 +493,12 @@ mod tests {
         unread.waiting_days = None;
         unread.estimate = None;
 
-        let said = to_hand_over(&member(None, vec![overnight, unread]), &quality(), false);
+        let said = to_hand_over(
+            &member(None, vec![overnight, unread]),
+            &quality(),
+            None,
+            false,
+        );
 
         assert!(
             said.iter().any(|line| line.contains("1 day ago")),
@@ -462,13 +511,66 @@ mod tests {
         );
     }
 
+    /// Where a period is arranged, the member stops being promised nothing ends the wait.
+    ///
+    /// **And is promised no date instead.** The period is the operator's to change and
+    /// nothing runs it on its own, so a figure said here is one this could not keep —
+    /// what they are owed is that the wait can end unanswered and that they will hear.
+    #[test]
+    fn a_member_under_a_period_is_told_the_wait_can_end_unanswered() {
+        let said = to_hand_over(
+            &member(None, vec![request(1, State::WaitingForApproval, None)]),
+            &quality(),
+            Some(30),
+            false,
+        );
+        let line = said
+            .iter()
+            .find(|line| line.starts_with("Waiting"))
+            .cloned()
+            .unwrap_or_default();
+
+        assert!(line.contains("closed for having waited too long"), "{line}");
+        assert!(line.contains("you will be told which"), "{line}");
+        assert!(!line.contains("Nothing expires it"), "{line}");
+        assert!(!line.contains("30"), "a date this could not keep: {line}");
+    }
+
+    /// A request nobody ruled on is not said to have been turned down.
+    ///
+    /// Being refused and having run out are different things to have happened to
+    /// somebody, and only one of them makes asking again the sensible next move.
+    #[test]
+    fn a_request_that_ran_out_is_not_said_to_have_been_turned_down() {
+        let mut ran_out = request(
+            1,
+            State::Declined,
+            Some("nobody ruled on it within 30 days"),
+        );
+        if let Some(refused) = ran_out.refused.as_mut() {
+            refused.expired = true;
+        }
+
+        let said = to_hand_over(&member(None, vec![ran_out]), &quality(), Some(30), false);
+
+        assert!(
+            said.iter()
+                .any(|line| line.starts_with("Closed unanswered on 2026-08-17: ")),
+            "{said:?}"
+        );
+        assert!(
+            !said.iter().any(|line| line.starts_with("Turned down")),
+            "a request nobody ruled on was said to have been turned down: {said:?}"
+        );
+    }
+
     /// Every policy a household can be under has words to be told in.
     #[test]
     fn every_policy_has_words_to_be_told_in() {
         for policy in Policy::ALL {
             let mut held = asking(None);
             held.policy = policy;
-            let said = to_hand_over(&member(Some(held), Vec::new()), &quality(), false);
+            let said = to_hand_over(&member(Some(held), Vec::new()), &quality(), None, false);
             assert!(
                 said.first()
                     .is_some_and(|line| line.starts_with("What you may ask for: ")),

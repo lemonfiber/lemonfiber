@@ -150,6 +150,7 @@ pub(super) async fn household(
             quality: &quality,
             now: ctx.clock.now(),
             reasons: &super::refusals::load(ctx),
+            expiring: super::arrangement::load(ctx).after(),
             no_room,
         },
         member,
@@ -254,6 +255,15 @@ struct Naming<'a> {
     /// Why each request that was turned down from here was turned down. The request
     /// service keeps none, so this is the only place the words survive.
     reasons: &'a Reasons,
+    /// How many days a request may wait here before it is closed unanswered, where the
+    /// household has arranged that at all.
+    ///
+    /// Carried into the reading because it changes what is *true* of every request still
+    /// waiting, and both halves of this say so: the reminder to the operator names the
+    /// period and what runs it, and the message a member is handed stops promising that
+    /// nothing ends their wait. Nothing where nobody arranged one, which is what every
+    /// household is under until somebody says otherwise.
+    expiring: Option<u32>,
     /// Whether the disk has no room left, which refuses an acquisition in the disk's
     /// own words and is a different answer from anybody's limit.
     no_room: bool,
@@ -392,7 +402,8 @@ fn assemble(
         };
         // Composed from the finished member rather than from the parts, so the message
         // and the line above it cannot report different figures for one person.
-        member.to_hand_over = handing_over::to_hand_over(&member, naming.quality, naming.no_room);
+        member.to_hand_over =
+            handing_over::to_hand_over(&member, naming.quality, naming.expiring, naming.no_room);
         members.push(member);
     }
     members.sort_by(|one, two| one.name.cmp(&two.name));
@@ -431,7 +442,7 @@ fn assemble(
         .any(|held| held.access.restriction != Restriction::Unrestricted)
         .then(|| crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned());
 
-    findings.extend(allowance::worth_saying(&members));
+    findings.extend(allowance::worth_saying(&members, naming.expiring));
 
     HouseholdReport {
         policy: naming.asked.household.as_ref().map(Policy::of),
@@ -565,6 +576,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                expiring: None,
                 no_room: false,
             },
             member,
@@ -619,6 +631,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                expiring: None,
                 no_room: false,
             },
             None,
@@ -792,6 +805,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &reasons,
+                expiring: None,
                 no_room: false,
             },
             None,
@@ -834,6 +848,7 @@ mod tests {
                 quality: &Selection::everywhere(crate::quality::Preset::Balanced),
                 now: SystemTime::UNIX_EPOCH,
                 reasons: &crate::asking::Reasons::default(),
+                expiring: None,
                 no_room: true,
             },
             None,

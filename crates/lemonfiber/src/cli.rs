@@ -281,8 +281,8 @@ pub enum Request {
     /// how much of it is gone, and when there is room again. A request nobody has ruled
     /// on shows how long it has been waiting and about how much room it would want.
     ///
-    /// Name one of the three things underneath to change any of that, or to answer one
-    /// request that is waiting.
+    /// Name one of the four things underneath to change any of that, to answer one
+    /// request that is waiting, or to arrange what becomes of the ones nobody answers.
     Household {
         /// Narrow to one member, named the way you would say it.
         #[arg(long)]

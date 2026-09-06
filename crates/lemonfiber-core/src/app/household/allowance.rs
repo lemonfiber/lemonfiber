@@ -175,7 +175,10 @@ fn counted(left: Left) -> Counted {
 /// has been told too late to do anything but wait, which is the answer this reading
 /// exists to keep anybody from being handed.
 #[must_use]
-pub(super) fn worth_saying(members: &[crate::model::HouseholdMember]) -> Vec<String> {
+pub(super) fn worth_saying(
+    members: &[crate::model::HouseholdMember],
+    expiring: Option<u32>,
+) -> Vec<String> {
     let mut said = Vec::new();
     for held in members {
         if let Some(asking) = &held.asking {
@@ -190,7 +193,7 @@ pub(super) fn worth_saying(members: &[crate::model::HouseholdMember]) -> Vec<Str
                 ));
             }
         }
-        said.extend(waited_too_long(held));
+        said.extend(waited_too_long(held, expiring));
     }
     said
 }
@@ -201,7 +204,13 @@ pub(super) fn worth_saying(members: &[crate::model::HouseholdMember]) -> Vec<Str
 /// One line per member rather than one per request: an operator with a backlog wants to
 /// know whose answer is overdue, and a list of eleven lines about one person is a list
 /// nobody reads to the end.
-fn waited_too_long(held: &crate::model::HouseholdMember) -> Option<String> {
+///
+/// **What it says about the end of the wait depends on what the household arranged**, and
+/// on nothing else. A house that arranged nothing is told nothing expires them, which is
+/// true; one that named a period is told the period, what runs it, and that nothing runs
+/// it by itself — because a sentence naming the period alone would describe a background
+/// this product has not got.
+fn waited_too_long(held: &crate::model::HouseholdMember, expiring: Option<u32>) -> Option<String> {
     let longest = held
         .requests
         .iter()
@@ -217,9 +226,18 @@ fn waited_too_long(held: &crate::model::HouseholdMember) -> Option<String> {
                     .is_some_and(|days| days >= crate::asking::REMINDING_AFTER)
             })
             .count();
+        let ends = expiring.map_or_else(
+            || "nothing expires them, so they wait until you say".to_owned(),
+            |after| {
+                format!(
+                    "they are closed after {after} days while `lemonfiber household \
+                     expiring` is running, and nothing runs it for you"
+                )
+            },
+        );
         format!(
             "{} has {waiting} request{} waiting on you, the oldest for {longest} days — \
-             nothing expires them, so they wait until you say",
+             {ends}",
             held.name,
             crate::plural::s(waiting)
         )
@@ -311,7 +329,7 @@ mod tests {
     /// but wait, which is the answer this reading exists to keep anybody from getting.
     #[test]
     fn a_member_close_to_their_limit_is_named_before_they_run_out() {
-        let said = worth_saying(&[member(Some(holding(true, Some(5), 4)), &[])]);
+        let said = worth_saying(&[member(Some(holding(true, Some(5), 4)), &[])], None);
 
         assert_eq!(said.len(), 1, "{said:?}");
         let line = said.first().cloned().unwrap_or_default();
@@ -323,9 +341,9 @@ mod tests {
     /// A member with room, and one nothing limits, are not mentioned.
     #[test]
     fn a_member_with_room_is_not_mentioned() {
-        assert!(worth_saying(&[member(Some(holding(true, Some(20), 1)), &[])]).is_empty());
-        assert!(worth_saying(&[member(Some(holding(true, None, 9)), &[])]).is_empty());
-        assert!(worth_saying(&[member(None, &[])]).is_empty());
+        assert!(worth_saying(&[member(Some(holding(true, Some(20), 1)), &[])], None).is_empty());
+        assert!(worth_saying(&[member(Some(holding(true, None, 9)), &[])], None).is_empty());
+        assert!(worth_saying(&[member(None, &[])], None).is_empty());
     }
 
     /// A request that has waited long enough is a reminder, and it says nothing
@@ -335,7 +353,7 @@ mod tests {
     /// reasonably assume something eventually clears it.
     #[test]
     fn a_request_that_has_waited_long_enough_reminds_the_operator() {
-        let said = worth_saying(&[member(None, &[9, 2, 12])]);
+        let said = worth_saying(&[member(None, &[9, 2, 12])], None);
 
         assert_eq!(said.len(), 1, "{said:?}");
         let line = said.first().cloned().unwrap_or_default();
@@ -344,11 +362,35 @@ mod tests {
         assert!(line.contains("nothing expires them"), "{line}");
     }
 
+    /// A household that arranged a period is told the period, and told what runs it.
+    ///
+    /// **Both halves, and the second is the one that could be left out.** An operator
+    /// told only that requests close after thirty days would read it as something this
+    /// product does on its own, which it does not do and has no way to do — so the
+    /// sentence that names the period names the command and says nothing runs it.
+    #[test]
+    fn a_household_that_arranged_a_period_is_told_it_and_told_what_runs_it() {
+        let said = worth_saying(&[member(None, &[9, 2, 12])], Some(30));
+
+        let line = said.first().cloned().unwrap_or_default();
+        assert!(line.contains("oldest for 12 days"), "{line}");
+        assert!(line.contains("closed after 30 days"), "{line}");
+        assert!(
+            line.contains("lemonfiber household expiring"),
+            "the sentence does not say what closes them: {line}"
+        );
+        assert!(
+            line.contains("nothing runs it for you"),
+            "the sentence implies a background this product has not got: {line}"
+        );
+        assert!(!line.contains("nothing expires them"), "{line}");
+    }
+
     /// Nothing has waited long enough is nothing said.
     #[test]
     fn nothing_that_has_waited_long_enough_is_nothing_said() {
-        assert!(worth_saying(&[member(None, &[1, 6])]).is_empty());
-        assert!(worth_saying(&[member(None, &[])]).is_empty());
+        assert!(worth_saying(&[member(None, &[1, 6])], None).is_empty());
+        assert!(worth_saying(&[member(None, &[])], None).is_empty());
     }
 
     /// A moment the calendar holds, and the same moment nine days later.

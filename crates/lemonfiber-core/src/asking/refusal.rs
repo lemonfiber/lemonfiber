@@ -35,6 +35,13 @@ pub const NOBODY: Code = Code::new("QUOTA-6");
 /// Raised where the request service holds no account for somebody who has one here.
 pub const NEVER_HERE: Code = Code::new("QUOTA-7");
 
+/// Raised where a run was asked to close what has waited too long and the household has
+/// never said how long that is.
+pub const NOTHING_AGREED: Code = Code::new("QUOTA-8");
+
+/// Raised where the period named would close a request nobody was ever reminded about.
+pub const TOO_SOON: Code = Code::new("QUOTA-9");
+
 /// Said where the request service could not be asked or would not answer.
 ///
 /// Named as nothing having been changed rather than as a failure, because those are
@@ -158,12 +165,60 @@ pub fn never_asked_here(name: &str) -> Problem {
     .lies_in(Amiss::Naming)
 }
 
+/// Said where a run was asked to close old requests and nobody has said what old means.
+///
+/// **Refused rather than given a period of this program's choosing**, and it is the whole
+/// of what keeps an expiry from being a policy nobody consented to. A household that never
+/// arranged this loses nothing by being asked again; one held to a figure it never named
+/// would have somebody's request closed on this program's authority.
+#[must_use]
+pub fn nothing_agreed() -> Problem {
+    Problem::new(
+        NOTHING_AGREED,
+        Severity::Error,
+        "nothing is closed for waiting here, because no period has been agreed to",
+        "Requests wait until somebody rules on them unless this household has said how \
+         long is too long, and there is no figure this could choose on your behalf — a \
+         request closed against a period nobody named is one nobody agreed to close",
+        Remedy::new("Say how many days a request may wait, then start this again")
+            .with_detail("lemonfiber household expiring --after 30"),
+    )
+    .lies_in(Amiss::Asking)
+}
+
+/// Said where the period named is shorter than the reminder that comes before it.
+///
+/// The two are one arrangement rather than two settings. A request closed sooner than the
+/// operator is reminded of it is one they never saw waiting: what they would watch is
+/// requests disappearing, and the reminder — which exists so somebody can answer before it
+/// comes to this — would never once be reached.
+#[must_use]
+pub fn sooner_than_the_reminder(after: u32) -> Problem {
+    Problem::new(
+        TOO_SOON,
+        Severity::Error,
+        format!(
+            "{after} days is sooner than you are reminded that anything is waiting, so \
+             nothing was arranged"
+        ),
+        "You are told a request is waiting once it has waited a week; a period shorter \
+         than that closes it before any reading could put it in front of you, which \
+         leaves you watching requests vanish rather than answering them",
+        Remedy::new("Name a period of a week or more").with_detail(format!(
+            "the reminder arrives after {} days",
+            super::REMINDING_AFTER
+        )),
+    )
+    .lies_in(Amiss::Asking)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         never_asked_here, no_limit_named, no_reason_given, no_such_policy, nobody_called,
-        nothing_to_decide, unreachable, NEVER_HERE, NOBODY, NOT_WAITING, NO_LIMIT, NO_REASON,
-        NO_SUCH_POLICY, UNREACHABLE,
+        nothing_agreed, nothing_to_decide, sooner_than_the_reminder, unreachable, NEVER_HERE,
+        NOBODY, NOTHING_AGREED, NOT_WAITING, NO_LIMIT, NO_REASON, NO_SUCH_POLICY, TOO_SOON,
+        UNREACHABLE,
     };
     use crate::error::{Amiss, Severity};
 
@@ -254,5 +309,45 @@ mod tests {
         assert_eq!(problem.severity, Severity::Warning);
         assert!(problem.summary.contains("ana"), "{problem:?}");
         assert!(problem.meaning.contains("in the meantime"), "{problem:?}");
+    }
+
+    /// A household that never named a period is asked for one rather than given one.
+    #[test]
+    fn a_household_that_named_no_period_is_asked_for_one() {
+        let problem = nothing_agreed();
+
+        assert_eq!(problem.code, NOTHING_AGREED);
+        assert_eq!(problem.amiss, Amiss::Asking);
+        assert!(
+            problem.meaning.contains("nobody agreed to close"),
+            "{problem:?}"
+        );
+        assert!(
+            problem
+                .remedies
+                .first()
+                .and_then(|remedy| remedy.detail.clone())
+                .is_some_and(|detail| detail.contains("--after")),
+            "the remedy does not say how to name one: {problem:?}"
+        );
+    }
+
+    /// A period sooner than the reminder is refused, and refused with the reminder's
+    /// own figure beside it.
+    #[test]
+    fn a_period_sooner_than_the_reminder_is_refused_with_the_reminder_named() {
+        let problem = sooner_than_the_reminder(3);
+
+        assert_eq!(problem.code, TOO_SOON);
+        assert_eq!(problem.amiss, Amiss::Asking);
+        assert!(problem.summary.contains('3'), "{problem:?}");
+        assert!(
+            problem
+                .remedies
+                .first()
+                .and_then(|remedy| remedy.detail.clone())
+                .is_some_and(|detail| detail.contains("7 days")),
+            "the refusal does not say what the reminder's own period is: {problem:?}"
+        );
     }
 }

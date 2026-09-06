@@ -25,16 +25,18 @@
 //! would disagree is the sentence somebody reads when they cannot ask for anything.
 
 mod estimate;
+mod expiry;
 mod reasons;
 mod refusal;
 mod window;
 
 pub use estimate::{Estimate, FILM_HOURS, SEASON_HOURS};
+pub use expiry::Expiry;
 pub use reasons::{Reasons, Refused};
 pub use refusal::{
     never_asked_here, no_limit_named, no_reason_given, no_such_policy, nobody_called,
-    nothing_to_decide, unreachable, NEVER_HERE, NOBODY, NOT_WAITING, NO_LIMIT, NO_REASON,
-    NO_SUCH_POLICY, UNREACHABLE,
+    nothing_agreed, nothing_to_decide, sooner_than_the_reminder, unreachable, NEVER_HERE, NOBODY,
+    NOTHING_AGREED, NOT_WAITING, NO_LIMIT, NO_REASON, NO_SUCH_POLICY, TOO_SOON, UNREACHABLE,
 };
 pub use window::{earliest, frees_up, waiting_for, REMINDING_AFTER};
 

@@ -42,6 +42,18 @@ pub struct Refused {
     /// twice by a run that happened to be started twice.
     #[serde(default)]
     pub told: Option<Passed>,
+    /// Whether nobody ruled on it and the period the household agreed to closed it,
+    /// rather than an operator turning it down.
+    ///
+    /// The words are then this program's own, which is why the two are told apart here
+    /// and not left to be read off the sentence: an operator scanning for what happened
+    /// while they were away is looking for exactly the ones nobody answered, and a
+    /// member is owed the difference between having been refused and having run out.
+    ///
+    /// Absent from every record written before a household could arrange this, which is
+    /// the right reading of them — they are all somebody's own refusals.
+    #[serde(default)]
+    pub expired: bool,
 }
 
 /// Where a refusal's words were carried, and when.
@@ -76,18 +88,44 @@ impl Reasons {
         self.given.get(&request)
     }
 
-    /// Write down why this one was turned down.
+    /// Write down why an operator turned this one down.
+    pub fn keep(&mut self, request: i64, reason: &str, at: Option<String>) {
+        self.written(request, reason, at, false);
+    }
+
+    /// Write down that nobody ruled on it and the household's own period closed it.
+    ///
+    /// Apart from an operator's refusal in the record as well as in the sentence. The
+    /// two are the same shape and opposite events: one is an answer somebody gave, and
+    /// the other is an answer nobody gave — and a reading that could not tell them apart
+    /// would report a household as having been refused eleven things nobody refused.
+    ///
+    /// **A request this already closed is left exactly as it is**, which is the other
+    /// place the two part company. A second answer from an operator is a second decision
+    /// and owes its own words; a second closure is the same sentence about the same
+    /// silence, and a record rewritten here would owe it afresh to somebody who has
+    /// already had it. So what stops a household hearing this twice is this line, rather
+    /// than the request service having moved the request out of the clock's reach.
+    pub fn closed(&mut self, request: i64, reason: &str, at: Option<String>) {
+        if self.given.get(&request).is_some_and(|kept| kept.expired) {
+            return;
+        }
+        self.written(request, reason, at, true);
+    }
+
+    /// Put one refusal in the record, whichever of the two it is.
     ///
     /// The reason is trimmed on the way in because it is trimmed on the way past the
     /// check that refuses a blank one, and a record holding the untrimmed spelling would
     /// disagree with the line the operator was shown.
-    pub fn keep(&mut self, request: i64, reason: &str, at: Option<String>) {
+    fn written(&mut self, request: i64, reason: &str, at: Option<String>, expired: bool) {
         self.given.insert(
             request,
             Refused {
                 reason: reason.trim().to_owned(),
                 at,
                 told: None,
+                expired,
             },
         );
     }
@@ -279,6 +317,65 @@ mod tests {
         held.passed_on(7, vec!["Pushover".to_owned()], None);
 
         assert_eq!(held.of(7), None, "a delivery invented a refusal");
+    }
+
+    /// A request nobody ruled on is kept apart from one somebody refused.
+    ///
+    /// The same shape and opposite events. A reading that could not tell them apart
+    /// would report a household as having been refused things nobody refused, and would
+    /// tell the member they were turned down when what happened is that they ran out.
+    #[test]
+    fn a_request_that_ran_out_is_kept_apart_from_one_somebody_refused() {
+        let mut held = Reasons::default();
+        held.keep(7, "we already have it dubbed", Some(AT.to_owned()));
+        held.closed(9, "nobody ruled on it within 30 days", Some(AT.to_owned()));
+
+        assert_eq!(held.of(7).map(|kept| kept.expired), Some(false));
+        assert_eq!(held.of(9).map(|kept| kept.expired), Some(true));
+        assert!(
+            held.owed(9),
+            "a request that ran out owes its words like any other"
+        );
+    }
+
+    /// Closing the same request twice owes its words once.
+    ///
+    /// **The whole of what stops a clock telling a household the same thing every hour**,
+    /// and it is here rather than in the clock: a second closure is the same sentence
+    /// about the same silence, so the record it would rewrite is left alone and the words
+    /// stay carried. An operator's own second answer is the opposite case, below.
+    #[test]
+    fn closing_the_same_request_twice_owes_its_words_once() {
+        let mut held = Reasons::default();
+        held.closed(7, "nobody ruled on it within 30 days", Some(AT.to_owned()));
+        held.passed_on(7, vec!["Pushover".to_owned()], Some(AT.to_owned()));
+
+        held.closed(7, "nobody ruled on it within 30 days", Some(AT.to_owned()));
+
+        assert!(!held.owed(7), "the same words were owed a second time");
+        assert_eq!(
+            held.of(7).and_then(|kept| kept.told.clone()),
+            Some(super::Passed {
+                to: vec!["Pushover".to_owned()],
+                at: Some(AT.to_owned()),
+            })
+        );
+    }
+
+    /// An operator turning down what ran out is a decision, and owes its own words.
+    ///
+    /// The other side of the line above: what is refused a second telling is the same
+    /// silence said again, not somebody actually answering.
+    #[test]
+    fn somebody_answering_after_it_ran_out_owes_their_own_words() {
+        let mut held = Reasons::default();
+        held.closed(7, "nobody ruled on it within 30 days", None);
+        held.passed_on(7, vec!["Pushover".to_owned()], None);
+
+        held.keep(7, "and we already have it dubbed", None);
+
+        assert!(held.owed(7));
+        assert_eq!(held.of(7).map(|kept| kept.expired), Some(false));
     }
 
     /// A second answer to the same request owes its own words afresh.
