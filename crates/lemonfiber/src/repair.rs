@@ -24,14 +24,14 @@ use lemonfiber::cli::Mending;
 
 /// Offer the repairs and carry out the ones agreed to, or put back what the last one did.
 pub(crate) async fn run(
-    ctx: Ctx,
+    ctx: &Ctx,
     paths: Paths,
     asked: Mending,
     answers: &(dyn Answers + Sync),
     json: bool,
 ) -> ExitCode {
     if asked.undo {
-        return undone(&ctx, &paths, json).await;
+        return undone(ctx, &paths, json).await;
     }
     // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
     // repairs carried out says so with --yes. So one that did not gets the offer and no
@@ -62,8 +62,8 @@ pub(crate) async fn run(
     };
 
     let repaired = match &consent {
-        Some(consent) => putting_right(&ctx, consent, asked.fixing.disruptive).await,
-        None => mend(&ctx, Stance::Ask, asked.fixing.disruptive, &Asking(answers)).await,
+        Some(consent) => putting_right(ctx, consent, asked.fixing.disruptive).await,
+        None => mend(ctx, Stance::Ask, asked.fixing.disruptive, &Asking(answers)).await,
     };
     match repaired {
         Ok(report) => answered(&Outcome::Repair(report), json),
@@ -252,7 +252,7 @@ mod tests {
     #[tokio::test]
     async fn an_undo_with_nothing_repaired_puts_nothing_back() {
         let code = run(
-            ctx(),
+            &ctx(),
             paths("nothing-undone"),
             Mending {
                 fixing: Fixing {
@@ -302,7 +302,7 @@ mod tests {
         lemonfiber_core::config::store::set(&paths.env_file(), "QBITTORRENT_PORT", "51413").ok();
 
         let code = run(
-            ctx(),
+            &ctx(),
             paths.clone(),
             Mending {
                 fixing: Fixing {
@@ -350,7 +350,7 @@ mod tests {
         .ok();
 
         let code = run(
-            ctx(),
+            &ctx(),
             paths,
             Mending {
                 fixing: Fixing {
@@ -384,7 +384,7 @@ mod tests {
         );
 
         let code = run(
-            nowhere,
+            &nowhere,
             paths("unreadable"),
             Mending {
                 fixing: Fixing {
@@ -429,7 +429,7 @@ mod tests {
         // the question is ever put again.
         let nobody = Nobody::default();
         let code = run(
-            ctx(),
+            &ctx(),
             paths("nobody"),
             Mending {
                 fixing: Fixing {
@@ -466,7 +466,7 @@ mod tests {
     async fn asked_for(yes: bool, json: bool) -> String {
         shown(
             run(
-                ctx(),
+                &ctx(),
                 paths("offers"),
                 Mending {
                     fixing: Fixing {

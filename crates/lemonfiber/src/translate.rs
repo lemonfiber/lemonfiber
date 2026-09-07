@@ -13,6 +13,7 @@ use lemonfiber_core::app::{
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
+use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
@@ -302,6 +303,41 @@ pub(crate) fn letting(download: String, offer: Option<String>) -> Command {
     }
 }
 
+/// The diagnosis a plain run asks for, narrowed as it was asked to be.
+///
+/// Named apart because the arm it came from carries a fork of its own — a run that
+/// mends returns before this is reached — and the two together are longer than the
+/// table has room for.
+pub(crate) fn diagnosing(
+    only: Option<&str>,
+    disruptive: bool,
+    accept: Option<String>,
+) -> Result<Command, u8> {
+    narrowed(only).map(|narrowing| Command::Doctor {
+        narrowing,
+        disruptive,
+        accept,
+    })
+}
+
+/// What a diagnosis was narrowed to, or the code to exit with for a name that is
+/// neither a category nor a check inside one.
+///
+/// A name lemonfiber does not know is a mistake to correct rather than a request to
+/// run everything — refused here, before the core is reached. Whether a stack reports
+/// the check named is a question only the run can answer, and it answers it.
+fn narrowed(only: Option<&str>) -> Result<Narrowing, u8> {
+    match only.map(Narrowing::parse) {
+        Some(None) => {
+            let named = only.unwrap_or_default();
+            complain!("error: no diagnostic category or check named `{named}`");
+            Err(USAGE)
+        }
+        Some(Some(narrowing)) => Ok(narrowing),
+        None => Ok(Narrowing::Suite),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::app::{Allowance, Command, QualityAction};
@@ -313,6 +349,7 @@ mod tests {
         sharing, traced, Answer, Arranged, Chosen, Decision, Destination, Hostable, Keeping,
         Policy, Quota, Wanted,
     };
+    use super::{diagnosing, narrowed};
     use crate::exit::USAGE;
     use lemonfiber::cli::{
         Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
@@ -320,6 +357,7 @@ mod tests {
     };
     use lemonfiber_core::app::BandwidthAsked;
     use lemonfiber_core::bundle::Filenames;
+    use lemonfiber_core::doctor::Narrowing;
     use lemonfiber_core::ports::service::Unrated;
 
     /// One choice about what the household may ask for, as the command line took it.
@@ -877,6 +915,42 @@ mod tests {
             })),
             Command::Hosting(Keeping::Remove {
                 what: Hostable::Expiring
+            })
+        );
+    }
+
+    /// Naming no category at all asks for the whole suite rather than for nothing.
+    #[test]
+    fn naming_no_category_asks_for_the_whole_suite() {
+        assert_eq!(narrowed(None), Ok(Narrowing::Suite));
+    }
+
+    /// A check inside a category is narrowed to that check, under the name given.
+    #[test]
+    fn a_check_inside_a_category_is_narrowed_to_that_check() {
+        assert_eq!(
+            narrowed(Some("storage.space")),
+            Ok(Narrowing::Check("storage.space".to_owned()))
+        );
+    }
+
+    /// A name that is neither a category nor a check inside one is a usage error, so
+    /// that a mistyped narrowing is corrected rather than quietly running everything.
+    #[test]
+    fn a_name_that_is_neither_a_category_nor_a_check_is_a_usage_error() {
+        assert_eq!(narrowed(Some("nonsense")), Err(USAGE));
+    }
+
+    /// What a diagnosis was narrowed to reaches the command alongside what it was
+    /// asked to accept and whether it may disrupt.
+    #[test]
+    fn a_diagnosis_carries_what_it_was_narrowed_to() {
+        assert_eq!(
+            diagnosing(Some("storage.space"), true, Some("STORAGE-1".to_owned())),
+            Ok(Command::Doctor {
+                narrowing: Narrowing::Check("storage.space".to_owned()),
+                disruptive: true,
+                accept: Some("STORAGE-1".to_owned()),
             })
         );
     }

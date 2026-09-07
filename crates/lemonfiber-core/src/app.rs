@@ -379,6 +379,27 @@ async fn restored(
         .map(Outcome::Restore)
 }
 
+/// What became of one thing the household asked for.
+async fn decided(
+    ctx: &Ctx,
+    decision: crate::app::command::Decision,
+) -> Result<Outcome, Box<Problem>> {
+    asking::deciding(ctx, &decision)
+        .await
+        .map(Outcome::Household)
+}
+
+/// Putting right what the diagnosis found, at the operator's word.
+async fn mended(
+    ctx: &Ctx,
+    consent: &repair::Consent,
+    disruptive: bool,
+) -> Result<Outcome, Box<Problem>> {
+    repair::putting_right(ctx, consent, disruptive)
+        .await
+        .map(Outcome::Repair)
+}
+
 /// Carry out a command.
 ///
 /// # Errors
@@ -418,9 +439,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         // their own, the way a forget answers with what is left: what an operator wants
         // to see after changing a limit is the limit, on the people it applies to.
         Command::Allowing(chosen) => asking::allowing(ctx, &chosen).await.map(Outcome::Household),
-        Command::Deciding(decision) => asking::deciding(ctx, &decision)
-            .await
-            .map(Outcome::Household),
+        Command::Deciding(decision) => decided(ctx, decision).await,
         // The one command here that acts while nobody is watching, and so the one whose
         // period is named rather than defaulted. Naming one records it and stops; running
         // on it holds until the arrangement changes under it, and how often it wakes is
@@ -457,9 +476,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Repair {
             consent,
             disruptive,
-        } => repair::putting_right(ctx, &consent, disruptive)
-            .await
-            .map(Outcome::Repair),
+        } => mended(ctx, &consent, disruptive).await,
         Command::Undo => repair::reversing(ctx).await.map(Outcome::Undo),
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         // The one write here, and it is the same answer twice: unconfirmed it lists
