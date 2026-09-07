@@ -217,7 +217,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 37;
+    const OUTCOMES: usize = 38;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
