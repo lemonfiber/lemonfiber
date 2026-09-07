@@ -195,10 +195,10 @@ impl Live {
 
     /// What a transport failure amounts to: how long it was waited for, and whether
     /// the network itself is down — stated once rather than against each credential.
-    fn not_reached(&self, said: String, reason: &str, elapsed: Duration) -> Validation {
+    fn not_reached(&self, said: &str, reason: &str, elapsed: Duration) -> Validation {
         let network = reading::network_itself(reason);
         let already = network && self.network_said.swap(true, Ordering::Relaxed);
-        reading::not_reached(&said, elapsed, network, already)
+        reading::not_reached(said, elapsed, network, already)
     }
 
     /// Prove a Usenet provider by opening a connection and asking it to accept a
@@ -242,8 +242,7 @@ impl Live {
         match nntp.converse(&endpoint, &commands).await {
             Ok(replies) => interpret_usenet(&replies),
             Err(unreachable) => {
-                let reason = unreachable.reason.clone();
-                self.not_reached(unreachable.reason, &reason, started.elapsed())
+                self.not_reached(&unreachable.reason, &unreachable.reason, started.elapsed())
             }
         }
     }
@@ -267,11 +266,8 @@ impl Live {
         let response = match self.http.send(&request).await {
             Ok(response) => response,
             Err(unreachable) => {
-                return self.not_reached(
-                    persisting(&unreachable),
-                    &unreachable.reason,
-                    started.elapsed(),
-                )
+                let said = persisting(&unreachable);
+                return self.not_reached(&said, &unreachable.reason, started.elapsed());
             }
         };
 
@@ -305,11 +301,10 @@ impl Live {
         let started = Instant::now();
         match self.http.send(&request).await {
             Ok(response) => interpret_service(response.status, &response.body),
-            Err(unreachable) => self.not_reached(
-                persisting(&unreachable),
-                &unreachable.reason,
-                started.elapsed(),
-            ),
+            Err(unreachable) => {
+                let said = persisting(&unreachable);
+                self.not_reached(&said, &unreachable.reason, started.elapsed())
+            }
         }
     }
 }
