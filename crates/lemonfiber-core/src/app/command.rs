@@ -6,6 +6,7 @@
 //! without the routing in the way. The dispatcher lives beside it and matches on
 //! every variant here, so nothing can be added without somewhere to send it.
 
+use crate::alert::Appetite;
 use crate::audio::Format;
 use crate::doctor::Narrowing;
 use crate::quality::Preset;
@@ -173,6 +174,9 @@ pub enum Command {
     /// Show or change the quality preset — how good media should look, and how
     /// much disk it should cost — in plain language.
     Quality(QualityAction),
+    /// Show or change what the operator is told about, which setup asks for once
+    /// and nothing else could revise.
+    Alerts(AlertAction),
     /// Upgrade existing content to the chosen preset — a separate, explicit action
     /// whose bandwidth cost is stated, and which does nothing until confirmed. Its
     /// own command rather than a quality action because it reaches the services
@@ -518,6 +522,15 @@ impl BandwidthAsked {
             || self.exceeded.is_some()
             || self.unrestricted_for.is_some()
     }
+}
+
+/// What a notifications command asks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlertAction {
+    /// Show the preset in force, what it means, and anything set apart from it.
+    Show,
+    /// Take a preset, leaving the individual exceptions in place.
+    Set(Appetite),
 }
 
 /// What a quality command asks for.

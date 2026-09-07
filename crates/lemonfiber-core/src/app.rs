@@ -13,10 +13,10 @@ use crate::doctor::Narrowing;
 use crate::error::{Code, Diagnose, Problem};
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
-    kind, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HostingReport,
-    HouseholdReport, LifecycleReport, MusicReport, QualityReport, ResetReport, StatusReport,
-    StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
-    WizardReport,
+    kind, AlertReport, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport,
+    HostingReport, HouseholdReport, LifecycleReport, MusicReport, QualityReport, ResetReport,
+    StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
+    WalkthroughReport, WizardReport,
 };
 use crate::stack::closure::Plan;
 use crate::stack::compose::Action;
@@ -76,8 +76,8 @@ mod walkthrough;
 pub mod watch;
 
 pub use command::{
-    Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Hostable,
-    Keeping, QualityAction, Removing, HOSTABLE,
+    AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
+    Hostable, Keeping, QualityAction, Removing, HOSTABLE,
 };
 pub use ctx::Ctx;
 pub use setup::SetupAction;
@@ -110,6 +110,8 @@ pub enum Outcome {
     Config(ConfigReport),
     /// The quality choice, what it means, and what a command did with it.
     Quality(QualityReport),
+    /// What the operator is told about, and what changing it came to.
+    Alerts(AlertReport),
     /// What upgrading existing content did, or would do, and its stated cost.
     Upgrade(UpgradeReport),
     /// The music format chosen, and what became of applying it.
@@ -187,6 +189,7 @@ impl Outcome {
             Self::Lifecycle(_) => crate::model::kind::LIFECYCLE,
             Self::Config(_) => crate::model::kind::CONFIG,
             Self::Quality(_) => kind::QUALITY,
+            Self::Alerts(_) => kind::ALERTS,
             Self::Upgrade(_) => kind::UPGRADE,
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
@@ -233,6 +236,7 @@ impl serde::Serialize for Outcome {
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
+            Self::Alerts(report) => report.serialize(serializer),
             Self::Upgrade(report) => report.serialize(serializer),
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),
@@ -435,6 +439,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         }
         Command::ConfigShow => configuring::configuration(ctx, None, None),
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
+        Command::Alerts(action) => appetite::hearing(ctx, action),
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace {
             term,

@@ -166,6 +166,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Preview(_)
         | Outcome::Lifecycle(_)
         | Outcome::Config(_)
+        // What the operator is told about was reported or changed; a write that could
+        // not happen already comes back as a problem.
+        | Outcome::Alerts(_)
         | Outcome::Trace(_)
         | Outcome::Household(_)
         // What is hosted is a reading, and an install or a removal that could not be

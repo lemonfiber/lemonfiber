@@ -78,6 +78,18 @@ pub enum HouseholdCommand {
     },
 }
 
+/// What to do with what you are told about.
+#[derive(Debug, Subcommand)]
+pub enum AlertCommand {
+    /// Show what you are told about, and what else you could be.
+    Show,
+    /// Choose how much to be told.
+    Set {
+        /// How much to hear: problems-only, with-completions, or everything.
+        preset: String,
+    },
+}
+
 /// What to do with settings.
 #[derive(Debug, Subcommand)]
 pub enum QualityCommand {

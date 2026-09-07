@@ -57,6 +57,28 @@ impl Appetite {
         }
     }
 
+    /// The one-word form the operator types and the file stores.
+    ///
+    /// The same name in both places on purpose: a label reads as a sentence, which is
+    /// not a thing to ask anybody to type, and a second spelling for the file would be
+    /// one more thing that can disagree.
+    #[must_use]
+    pub const fn written(self) -> &'static str {
+        match self {
+            Self::ProblemsOnly => "problems-only",
+            Self::WithCompletions => "with-completions",
+            Self::Everything => "everything",
+        }
+    }
+
+    /// The preset that goes by `name`, where this build offers one.
+    #[must_use]
+    pub fn from_label(name: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|preset| preset.written() == name)
+    }
+
     /// What choosing it means, in the terms the choice is actually about.
     #[must_use]
     pub const fn describe(self) -> &'static str {

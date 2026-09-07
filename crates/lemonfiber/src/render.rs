@@ -38,7 +38,7 @@ mod uninstall;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{ConfigReport, FormsReport, VersionReport, WizardReport};
+use lemonfiber_core::model::{AlertReport, ConfigReport, FormsReport, VersionReport, WizardReport};
 use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
@@ -216,6 +216,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Forms(report) => forms(report),
         Outcome::Preview(plan) => stack::preview(plan),
         Outcome::Config(report) => settings(report),
+        Outcome::Alerts(report) => alerts(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
         Outcome::Music(report) => quality::music(report),
@@ -338,6 +339,36 @@ fn forms(report: &FormsReport) -> Lines {
 }
 
 /// What the operator has configured.
+/// What the operator is told about, what that means, and anything set apart from it.
+fn alerts(report: &AlertReport) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("telling you about: {}", report.preset));
+    lines.put(report.means.clone());
+    for exception in &report.exceptions {
+        // Named apart from the preset, so the operator can see why one kind does not
+        // follow the answer they just read.
+        lines.put(format!(
+            "  {} — {}",
+            exception.kind,
+            if exception.wanted {
+                "always told"
+            } else {
+                "never told"
+            }
+        ));
+    }
+    if report.changed {
+        lines.put(String::new());
+        // A rehearsal reports what it would do, so it must not claim it saved.
+        lines.put(if report.rehearsed {
+            "would save"
+        } else {
+            "saved"
+        });
+    }
+    lines
+}
+
 fn settings(report: &ConfigReport) -> Lines {
     let mut lines = Lines::default();
     for setting in &report.settings {
@@ -400,9 +431,9 @@ mod tests {
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::glossary::Vocabulary;
     use lemonfiber_core::model::{
-        ConfigReport, Disposition, DoctorReport, FormsReport, FrontDoorReport, HouseholdReport,
-        MusicReport, QualityReport, ResetReport, SettingReport, Standing, StatusReport,
-        StuckReport, UpgradeReport, VersionReport, WizardReport,
+        AlertReport, ConfigReport, Disposition, DoctorReport, ExceptionReport, FormsReport,
+        FrontDoorReport, HouseholdReport, MusicReport, QualityReport, ResetReport, SettingReport,
+        Standing, StatusReport, StuckReport, UpgradeReport, VersionReport, WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -669,6 +700,16 @@ mod tests {
                 changed: false,
                 rehearsed: false,
                 consequence: None,
+            }),
+            Outcome::Alerts(AlertReport {
+                preset: "problems-only".to_owned(),
+                means: "Told when something is wrong. Silence means healthy.".to_owned(),
+                exceptions: vec![ExceptionReport {
+                    kind: "storage.space".to_owned(),
+                    wanted: true,
+                }],
+                changed: true,
+                rehearsed: false,
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],

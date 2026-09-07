@@ -5,11 +5,12 @@
 //! so that what a request *means* can be read, and proven, without going through
 //! everything that happens to it afterwards.
 
+use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Hostable,
-    Keeping, QualityAction, Removing,
+    AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
+    Hostable, Keeping, QualityAction, Removing,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -22,8 +23,8 @@ use lemonfiber_core::uninstall::Tier;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
-    RawBandwidth, RawCredentials, RawRemoval, RawRemoving, RawUnrated,
+    AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
+    RawAllowance, RawBandwidth, RawCredentials, RawRemoval, RawRemoving, RawUnrated,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -194,6 +195,28 @@ pub(crate) fn configuration(action: ConfigAction) -> Command {
         ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
         ConfigAction::Show => Command::ConfigShow,
     }
+}
+
+/// How much the operator asked to be told, or the code to exit with for a preset this
+/// build does not offer.
+///
+/// A name it does not know is a mistake to correct rather than a reason to fall back to
+/// the quiet default, which would leave them believing they had changed something.
+pub(crate) fn alerts(action: AlertCommand) -> Result<Command, u8> {
+    let chosen = match action {
+        AlertCommand::Show => AlertAction::Show,
+        AlertCommand::Set { preset } => {
+            let Some(wanted) = Appetite::from_label(&preset) else {
+                complain!(
+                    "error: no notification preset named `{preset}` \
+                     (try problems-only, with-completions, or everything)"
+                );
+                return Err(USAGE);
+            };
+            AlertAction::Set(wanted)
+        }
+    };
+    Ok(Command::Alerts(chosen))
 }
 
 pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
@@ -390,18 +413,19 @@ mod tests {
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
+    use super::{alerts, diagnosing, narrowed};
     use super::{
         bundling, configuration, credentials, hosting, household, invitation, letting, quality,
         restarting, sharing, traced, Answer, Arranged, Asking, Chosen, Decision, Destination,
         Hostable, Keeping, Policy, Quota, Wanted,
     };
-    use super::{diagnosing, narrowed};
     use crate::exit::USAGE;
     use lemonfiber::cli::{
-        Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
-        RawBandwidth, RawCredentials, RawUnrated,
+        AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
+        RawAllowance, RawBandwidth, RawCredentials, RawUnrated,
     };
-    use lemonfiber_core::app::BandwidthAsked;
+    use lemonfiber_core::alert::Appetite;
+    use lemonfiber_core::app::{AlertAction, BandwidthAsked};
     use lemonfiber_core::bundle::Filenames;
     use lemonfiber_core::doctor::Narrowing;
     use lemonfiber_core::ports::service::Unrated;
@@ -985,6 +1009,35 @@ mod tests {
     #[test]
     fn a_name_that_is_neither_a_category_nor_a_check_is_a_usage_error() {
         assert_eq!(narrowed(Some("nonsense")), Err(USAGE));
+    }
+
+    /// A preset this build offers reaches the command; one it does not is a usage
+    /// error naming the ones there are, rather than a quiet fall back to the default
+    /// that would leave the operator believing they had changed something.
+    #[test]
+    fn a_notification_preset_is_taken_by_name_and_refused_by_name() {
+        assert_eq!(
+            alerts(AlertCommand::Show),
+            Ok(Command::Alerts(AlertAction::Show))
+        );
+        assert_eq!(
+            alerts(AlertCommand::Set {
+                preset: "everything".to_owned(),
+            }),
+            Ok(Command::Alerts(AlertAction::Set(Appetite::Everything)))
+        );
+        assert_eq!(
+            alerts(AlertCommand::Set {
+                preset: "with-completions".to_owned(),
+            }),
+            Ok(Command::Alerts(AlertAction::Set(Appetite::WithCompletions)))
+        );
+        assert_eq!(
+            alerts(AlertCommand::Set {
+                preset: "loud".to_owned(),
+            }),
+            Err(USAGE)
+        );
     }
 
     /// What a diagnosis was narrowed to reaches the command alongside what it was

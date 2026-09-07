@@ -18,7 +18,9 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 mod under;
 
 use include_dir::{include_dir, Dir};
-pub use under::{ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand};
+pub use under::{
+    AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
+};
 
 // Re-exported rather than reached for through the module they now live in: where a
 // flag is declared is this file's business and nobody else's, and moving one would
@@ -221,6 +223,12 @@ pub enum Request {
         /// Which of the three things to do with a setting.
         #[command(subcommand)]
         action: ConfigAction,
+    },
+    /// Choose how much lemonfiber tells you about, in plain language.
+    Alerts {
+        /// Show what you are told about, or change it.
+        #[command(subcommand)]
+        action: AlertCommand,
     },
     /// Choose how good your media should look, in plain language.
     Quality {

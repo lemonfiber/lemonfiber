@@ -267,6 +267,10 @@ async fn main() -> ExitCode {
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
         Request::Ps { forms } => Command::Ps { forms },
         Request::Config { action } => configuration(action),
+        Request::Alerts { action } => match translate::alerts(action) {
+            Ok(command) => command,
+            Err(code) => return ExitCode::from(code),
+        },
         Request::Quality { action } => match quality(action) {
             Ok(command) => command,
             Err(code) => return ExitCode::from(code),
