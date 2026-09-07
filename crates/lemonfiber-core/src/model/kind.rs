@@ -48,6 +48,8 @@ pub const BANDWIDTH: Kind = Kind("bandwidth");
 pub const BUNDLE: Kind = Kind("bundle");
 /// The settings asked about, and what a change did to them.
 pub const CONFIG: Kind = Kind("config");
+/// Every credential this stack holds, and what became of acting on one.
+pub const CREDENTIALS: Kind = Kind("credentials");
 /// One moment of what the stack is doing, as the dashboard assembles it.
 pub const DASHBOARD: Kind = Kind("dashboard");
 /// What the diagnostic checks found.
@@ -140,6 +142,7 @@ pub const ALL: &[Kind] = &[
     BANDWIDTH,
     BUNDLE,
     CONFIG,
+    CREDENTIALS,
     DASHBOARD,
     DOCTOR,
     ERROR,

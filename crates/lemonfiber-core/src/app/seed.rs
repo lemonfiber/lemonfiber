@@ -18,6 +18,7 @@ mod baseline;
 mod clients;
 mod fulfilment;
 mod published;
+pub(crate) use published::published_as;
 mod subtitles;
 use fulfilment::seed_fulfilment_targets;
 pub(super) mod identity;

@@ -11,9 +11,12 @@
 //! not mean to reach shows up as the skip it should be rather than as a fabricated
 //! file.
 //!
-//! Only `read` is meaningful. Every other capability answers as unused, because a
-//! path that reached for one would be a path this fake was never meant to stand in
-//! for — and a plausible answer there would hide it.
+//! Reading is meaningful, and so is the mode a path is guarded by — the second
+//! because a check about permissions has nothing else to look at. Every other
+//! capability answers as unused, because a path that reached for one would be a path
+//! this fake was never meant to stand in for, and a plausible answer there would hide
+//! it. A filesystem no test gave modes to reports none, which is what a file that is
+//! not there looks like.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -37,6 +40,14 @@ pub enum Held {
 /// A filesystem holding what a test placed in it.
 pub struct Files {
     held: Held,
+    /// The permission bits reported for a path ending in each fragment.
+    ///
+    /// A second field rather than another [`Held`], because what a file holds and how
+    /// it is guarded are two independent questions: a test about one should not have
+    /// to answer the other. Empty everywhere but the tests whose subject is
+    /// permissions, and a path with no entry reports no ownership at all — which is
+    /// what a file that is not there looks like.
+    modes: Vec<(&'static str, u32)>,
 }
 
 impl Files {
@@ -74,8 +85,21 @@ impl Files {
         ))
     }
 
+    /// A filesystem reporting these permission bits for paths ending in each
+    /// fragment, and holding no file anywhere.
+    #[must_use]
+    pub fn owning(modes: Vec<(&'static str, u32)>) -> Arc<Self> {
+        Arc::new(Self {
+            held: Held::Anywhere(None),
+            modes,
+        })
+    }
+
     fn new(held: Held) -> Arc<Self> {
-        Arc::new(Self { held })
+        Arc::new(Self {
+            held,
+            modes: Vec::new(),
+        })
     }
 }
 
@@ -120,8 +144,16 @@ impl FileSystem for Files {
 
     async fn write(&self, _path: &Path, _contents: &str) {}
 
-    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-        None
+    async fn ownership(&self, path: &Path) -> Option<Ownership> {
+        let path = path.to_string_lossy().replace('\\', "/");
+        self.modes
+            .iter()
+            .find(|(ending, _)| path.ends_with(ending))
+            .map(|(_, mode)| Ownership {
+                uid: 0,
+                gid: 0,
+                mode: *mode,
+            })
     }
 
     async fn describe(&self, _path: &Path) -> StorageFacts {
@@ -139,13 +171,29 @@ impl FileSystem for Files {
 mod tests {
     use super::*;
 
+    /// A filesystem given modes reports them for the paths it was given and for no
+    /// others, so a check about permissions can tell a widened file from an absent one.
+    #[tokio::test]
+    async fn a_mode_is_reported_for_a_path_it_was_given_and_for_no_other() {
+        let files = Files::owning(vec![(".env", 0o644)]);
+
+        let found = files
+            .ownership(Path::new("/somewhere/lemonfiber/.env"))
+            .await;
+        assert_eq!(found.map(|one| one.mode), Some(0o644));
+        assert!(files
+            .ownership(Path::new("/somewhere/lemonfiber/admission.json"))
+            .await
+            .is_none());
+    }
+
     /// The stub half of the contract, which the doc above states and nothing checked.
     ///
     /// A test that reaches one of these has reached for a capability this fake was
     /// never meant to stand in for, so each must refuse rather than answer plausibly.
     /// Asserting that here is also what keeps them reachable: nothing else calls them,
     /// and an unreached line is one the gate counts against a file it cannot see is
-    /// deliberate.
+    /// deliberate. A filesystem given no modes reports none for the same reason.
     #[tokio::test]
     async fn every_capability_but_reading_answers_as_unused() {
         let files = Files::anywhere("held");

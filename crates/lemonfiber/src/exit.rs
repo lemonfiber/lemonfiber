@@ -110,6 +110,12 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // not confirmed is waiting on the operator's say-so, and one that could not
         // take a directory left something behind — a script that read either as
         // success would carry on as though the machine were clean.
+        // Listing the credentials is a question, and asking one is never a failure —
+        // including when the answer is that several have gone stale, which is an
+        // advisory rather than a fault. What is a failure is a replacement that was
+        // asked for and did not happen: a script that read that as success would go on
+        // believing a credential had been rotated when the old one is still in force.
+        Outcome::Credentials(inventory) => rotating(inventory),
         Outcome::Stored(report) => forgetting(&report.removal),
         // Accounting for the disk is a question, and asking one is never a failure —
         // including when the answer is that there is no room, which the report says
@@ -207,6 +213,21 @@ fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode {
         return ExitCode::from(FAILURE);
     }
     ExitCode::SUCCESS
+}
+
+/// The exit code a question about the credentials earns.
+///
+/// Only a rotation that was asked for and did not land is a failure. A reading is a
+/// question; a reveal either printed or said why it did not; and a rotation that
+/// landed but left a consumer waiting on a restart is reported in words rather than
+/// as a failure, because nothing went wrong — the operator has one more command to
+/// run and the report names it.
+fn rotating(inventory: &lemonfiber_core::credential::Inventory) -> ExitCode {
+    match &inventory.rotated {
+        None => ExitCode::SUCCESS,
+        Some(rotated) if rotated.kept_the_existing() => ExitCode::from(FAILURE),
+        Some(_) => ExitCode::SUCCESS,
+    }
 }
 
 /// The exit code an accounting of the disk earns.
@@ -654,6 +675,41 @@ mod tests {
             ..offer
         };
         assert_eq!(format!("{:?}", settled(&Outcome::Letting(gone))), success());
+    }
+
+    /// Listing the credentials is a question; a replacement that was asked for and
+    /// did not happen is the one answer a script has to act on, because the operator
+    /// believes a credential has been rotated and the old one is still the one in
+    /// force. A rotation that landed but left a consumer waiting on a restart is not
+    /// a failure — nothing went wrong, and the report names the command that finishes
+    /// it.
+    #[test]
+    fn listing_the_credentials_is_a_question_and_a_replacement_that_did_not_happen_is_not() {
+        use lemonfiber_core::credential::{Inventory, Propagation, Rotation, Settled};
+
+        let asked = |inventory| format!("{:?}", settled(&Outcome::Credentials(inventory)));
+
+        assert_eq!(asked(Inventory::of(Vec::new())), success());
+        assert_eq!(
+            asked(Inventory::of(Vec::new()).after(Rotation::landed(
+                "qBittorrent web UI password",
+                "it signed in with the replacement",
+                vec![Propagation::pending(
+                    "the push",
+                    "lemonfiber restart torrent"
+                )],
+            ))),
+            success()
+        );
+        assert_ne!(
+            asked(Inventory::of(Vec::new()).after(Rotation::stopped(
+                "qBittorrent web UI password",
+                Settled::Refused {
+                    detail: "it refused the password lemonfiber holds".to_owned(),
+                },
+            ))),
+            success()
+        );
     }
 
     /// Accounting for the disk is a question, however bad the answer is; a cleanup

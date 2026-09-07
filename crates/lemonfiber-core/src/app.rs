@@ -33,6 +33,7 @@ pub mod bundle;
 mod command;
 pub mod conditions;
 mod configuring;
+mod credentials;
 mod ctx;
 pub mod dashboard;
 mod door;
@@ -75,8 +76,8 @@ mod walkthrough;
 pub mod watch;
 
 pub use command::{
-    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
-    QualityAction, Removing, HOSTABLE,
+    Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Hostable,
+    Keeping, QualityAction, Removing, HOSTABLE,
 };
 pub use ctx::Ctx;
 pub use setup::SetupAction;
@@ -135,6 +136,8 @@ pub enum Outcome {
     Removed(crate::model::HouseholdRemoval),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
+    /// Every credential this stack holds, and what became of acting on one.
+    Credentials(crate::credential::Inventory),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
     Stored(crate::stored::Stored),
     /// Where the disk stands, where the room went, and what could be got back.
@@ -197,6 +200,7 @@ impl Outcome {
             Self::Invited(_) => kind::INVITATION,
             Self::Removed(_) => kind::REMOVAL,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
+            Self::Credentials(_) => crate::model::kind::CREDENTIALS,
             Self::Stored(_) => crate::model::kind::STORED,
             Self::Space(_) => kind::SPACE,
             Self::Letting(_) => kind::STOP_SEEDING,
@@ -242,6 +246,7 @@ impl serde::Serialize for Outcome {
             Self::Invited(report) => report.serialize(serializer),
             Self::Removed(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
+            Self::Credentials(inventory) => inventory.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
             Self::Space(report) => report.serialize(serializer),
             Self::Letting(offer) => offer.serialize(serializer),
@@ -482,6 +487,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             disruptive,
         } => mended(ctx, &consent, disruptive).await,
         Command::Undo => repair::reversing(ctx).await.map(Outcome::Undo),
+        Command::Credentials(asked) => credentials::answer(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
@@ -2327,6 +2333,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
@@ -2375,6 +2382,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
@@ -3203,6 +3211,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
@@ -4205,6 +4214,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)

@@ -40,7 +40,7 @@ fn with_api(services: &[Service], kind: lemonfiber_manifest::ApiKind) -> Option<
 /// Upper-cased, with anything that cannot appear in an environment name replaced —
 /// a service id is a Compose name and may carry hyphens, which a shell would read
 /// as an operator rather than as part of the name.
-fn published_as(id: &str) -> String {
+pub(crate) fn published_as(id: &str) -> String {
     let name: String = id
         .to_uppercase()
         .chars()

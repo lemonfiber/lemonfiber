@@ -557,9 +557,19 @@ mod tests {
         }
     }
 
+    /// Rows the pane is drawn into here.
+    ///
+    /// Taller than any list this screen offers, because these tests are about what a
+    /// list *says* and not about what it does when it will not fit. A screen too short
+    /// for its list counts what it left out rather than showing part of it, and that
+    /// is proved where it belongs, in `words`. Left at the height of the longest list,
+    /// every test that walks to an entry near the end would start failing the day
+    /// somebody adds one — about the wrong thing.
+    const TALL: usize = 40;
+
     /// Everything the pane says, as one piece of text.
     fn showing(acting: &Acting) -> String {
-        acting.pane(20, 100).map_or_else(String::new, |pane| {
+        acting.pane(TALL, 100).map_or_else(String::new, |pane| {
             let mut said = vec![pane.title.clone()];
             said.extend(pane.lines.iter().map(text));
             said.join("\n")

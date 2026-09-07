@@ -167,6 +167,8 @@ pub const ASKS: &[Reach] = &[
     Reach {
         request: "uninstall",
         through: "/api/uninstall",
+        request: "credentials",
+        through: "/api/credentials",
     },
     Reach {
         request: "bandwidth",
