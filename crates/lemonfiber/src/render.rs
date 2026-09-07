@@ -908,6 +908,34 @@ mod tests {
         }
     }
 
+    /// A removal where every line goes says how many go and nothing about what is
+    /// kept, because there is nothing kept to say anything about.
+    #[test]
+    fn a_removal_that_keeps_none_of_what_it_lists_counts_only_what_goes() {
+        use lemonfiber_core::uninstall::{Item, Manifest, Uninstall};
+
+        let one = a_removal();
+        let whole = Uninstall {
+            manifest: Manifest {
+                items: one
+                    .manifest
+                    .items
+                    .iter()
+                    .map(|item| Item {
+                        kept: None,
+                        ..item.clone()
+                    })
+                    .collect(),
+                ..one.manifest.clone()
+            },
+            removal: one.removal.clone(),
+        };
+
+        let rendered = answer(&Outcome::Uninstall(whole), false).text();
+        assert!(rendered.contains("2 to remove —"), "{rendered}");
+        assert!(!rendered.contains("left where they are"), "{rendered}");
+    }
+
     /// A reading that found nothing still says so, rather than printing a heading
     /// over an empty list.
     #[test]

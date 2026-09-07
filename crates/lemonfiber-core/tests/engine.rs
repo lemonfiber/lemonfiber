@@ -12,7 +12,9 @@
 //! line coverage grows tests about the scaffolding.
 
 use lemonfiber_core::adapters::Daemon;
-use lemonfiber_core::ports::docker::{Engine as _, Failure, Health, Lifecycle, LogQuery};
+use lemonfiber_core::ports::docker::{
+    Engine as _, Failure, Health, Images as _, Lifecycle, LogQuery,
+};
 
 /// An engine of our own, answering only what the adapter asks.
 ///
@@ -289,6 +291,83 @@ async fn lists_what_the_engine_says_is_there_and_what_it_left_behind() {
         ])
     );
     engine.stop().await;
+}
+
+/// What the engine says it has pulled, and what is built on it.
+///
+/// One image two containers stand on — one of them this project's and one of them
+/// nothing's, which is the case a removal has to tell apart — and one image with no
+/// tag and a size the daemon never calculated.
+#[cfg(unix)]
+const IMAGES: &str = concat!(
+    r#"[{"Id":"sha256:aa","ParentId":"","RepoTags":["lscr.io/linuxserver/sonarr:4.0.15"],"#,
+    r#""RepoDigests":[],"Created":0,"Size":400,"SharedSize":-1,"Labels":{},"Containers":2},"#,
+    r#"{"Id":"sha256:bb","ParentId":"","RepoTags":[],"RepoDigests":[],"Created":0,"#,
+    r#""Size":-1,"SharedSize":-1,"Labels":{},"Containers":0}]"#
+);
+
+/// Every container on the machine, whatever project it is under — which is what the
+/// unfiltered listing answers with, and the only way to see the one outside Compose.
+#[cfg(unix)]
+const EVERYWHERE: &str = concat!(
+    r#"[{"Id":"c1","Image":"lscr.io/linuxserver/sonarr:4.0.15","ImageID":"sha256:aa","#,
+    r#""Labels":{"com.docker.compose.project":"lemonfiber","#,
+    r#""com.docker.compose.service":"sonarr"},"State":"running"},"#,
+    r#"{"Id":"c2","Image":"lscr.io/linuxserver/sonarr:4.0.15","ImageID":"sha256:aa","#,
+    r#""Labels":{},"State":"running"}]"#
+);
+
+/// The images the engine has, with who is standing on each.
+///
+/// The adapter asks two routes and joins them, which is the whole of what this
+/// proves: a name alone would not say whether removing an image takes something
+/// outside this project with it, and the join is where that answer comes from.
+#[cfg(unix)]
+#[tokio::test]
+async fn lists_the_images_it_has_pulled_and_who_is_standing_on_each() {
+    let engine = fake::engine(
+        "images",
+        vec![
+            ("images/json", fake::Reply::Body(200, IMAGES.to_owned())),
+            (
+                "containers/json",
+                fake::Reply::Body(200, EVERYWHERE.to_owned()),
+            ),
+        ],
+    );
+
+    let listed = Daemon::at(&engine.socket).images().await;
+    assert_eq!(
+        listed.ok().map(|images| images
+            .into_iter()
+            .map(|image| (image.tags, image.bytes, image.projects))
+            .collect::<Vec<_>>()),
+        Some(vec![
+            (
+                vec!["lscr.io/linuxserver/sonarr:4.0.15".to_owned()],
+                400,
+                // The empty one is the container under no Compose project, which is
+                // exactly as broken by a removal as another project's would be.
+                vec![String::new(), "lemonfiber".to_owned()],
+            ),
+            // Untagged, and a size the daemon says it never calculated — which
+            // becomes nothing rather than a wrapped figure.
+            (Vec::new(), 0, Vec::new()),
+        ])
+    );
+    engine.stop().await;
+}
+
+/// An engine that is not there cannot say what it has pulled, and says so rather
+/// than answering with none.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_absent_engine_will_not_say_what_it_has_pulled() {
+    let nowhere = std::path::PathBuf::from("/lemonfiber/no/such/engine.sock");
+
+    let refused = Daemon::at(&nowhere).images().await;
+
+    assert!(matches!(refused, Err(Failure::Unreachable { .. })));
 }
 
 #[cfg(unix)]

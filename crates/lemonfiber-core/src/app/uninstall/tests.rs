@@ -688,6 +688,118 @@ async fn a_path_the_platform_refused_is_named_with_what_it_said_and_how_to_finis
     assert!(unhelpful.is_empty(), "{unhelpful:?}");
 }
 
+/// A tree that is there and will not be read is a gap in the reading rather than a
+/// refusal, and the gap names the directory it is about.
+#[tokio::test]
+async fn a_directory_that_will_not_be_walked_is_named_and_the_reading_says_so() {
+    let ctx = a_machine().surveying(Walking::refusing("permission denied"));
+
+    let manifest = read(&ctx, Tier::Configuration).await;
+    let unread = manifest
+        .as_ref()
+        .map(|manifest| manifest.confidence.unread.clone())
+        .unwrap_or_default();
+
+    assert!(
+        unread.iter().any(|why| why.contains("/cfg/lemonfiber")),
+        "{unread:?}"
+    );
+    assert!(
+        unread.iter().any(|why| why.contains("permission denied")),
+        "{unread:?}"
+    );
+    assert_eq!(
+        manifest.map(|manifest| manifest.confidence.complete),
+        Some(false)
+    );
+}
+
+/// And so is a data location that will not be walked — which is a different gap in
+/// different words, because what it costs is different: no size, and no way to tell
+/// what beneath it is not the stack's.
+#[tokio::test]
+async fn a_data_location_that_will_not_be_walked_says_what_that_costs() {
+    let ctx = a_machine().surveying(Walking::refusing("permission denied"));
+
+    let manifest = read(&ctx, Tier::Media).await;
+
+    assert!(
+        manifest
+            .map(|manifest| manifest.confidence.unread)
+            .unwrap_or_default()
+            .iter()
+            .any(|why| why.contains("the data location is there")),
+        "a data location that would not be read says nothing about it"
+    );
+}
+
+/// A machine that never chose a data location has nothing beneath one to report,
+/// which is a reading rather than a gap: it has not filled anything yet.
+#[tokio::test]
+async fn a_machine_with_no_data_location_has_nothing_of_the_operators_to_list() {
+    let ctx = a_context()
+        .settings(Settings {
+            project: "lemonfiber".to_owned(),
+            env_file: Some(PathBuf::from("/cfg/lemonfiber/.env")),
+            stack_dir: Some(PathBuf::from("/data/lemonfiber/stack")),
+            ..Settings::default()
+        })
+        .build()
+        .with_filesystem(a_filesystem())
+        .with_images(Pulled::holding(Vec::new()))
+        .surveying(Walking::holding(only_ours()))
+        .erasing(Erasing::willing());
+
+    let manifest = read(&ctx, Tier::Media).await;
+
+    assert_eq!(
+        manifest.as_ref().map(|manifest| manifest.items.len()),
+        Some(0)
+    );
+    assert_eq!(
+        manifest.map(|manifest| manifest.confidence.complete),
+        Some(true),
+        "a location nobody chose is not a reading that failed"
+    );
+}
+
+/// A program that is not on this machine at all keeps its own words, which is a
+/// different answer from one that ran and refused.
+#[tokio::test]
+async fn a_program_that_is_not_installed_is_reported_in_its_own_words() {
+    let ctx = a_context()
+        .settings(settings())
+        .engine(Arc::new(Reporting::holding(
+            &["sonarr"],
+            Lifecycle::Exited,
+            Health::None,
+        )))
+        .runner(Arc::new(lemonfiber_fixtures::support::Scripted(Err(
+            crate::ports::process::Failure::NotFound {
+                program: "docker".to_owned(),
+            },
+        ))))
+        .build()
+        .with_filesystem(a_filesystem())
+        .with_images(Pulled::holding(vec![Pulled::image(
+            SONARR,
+            400,
+            &["lemonfiber"],
+        )]))
+        .surveying(Walking::holding(only_ours()))
+        .erasing(Erasing::willing());
+
+    let removal = confirmed(&ctx, Tier::Services).await;
+    let stuck = removal.as_ref().map(left).unwrap_or_default();
+
+    assert!(
+        stuck
+            .iter()
+            .any(|one| one.name == SONARR && one.why.contains("docker")),
+        "{stuck:?}"
+    );
+}
+
 // --- Images shared with other projects ---------------------------------------
 
 /// An image another project's container is standing on is listed, marked

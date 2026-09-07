@@ -980,4 +980,94 @@ mod tests {
             })
         );
     }
+
+    /// A removal as the command line accepted it.
+    fn removing_asked(
+        tier: lemonfiber::cli::RawRemoval,
+        agreed: Option<&str>,
+        wait: bool,
+    ) -> lemonfiber::cli::RawRemoving {
+        lemonfiber::cli::RawRemoving {
+            tier,
+            confirm: true,
+            agreed: agreed.map(str::to_owned),
+            wait,
+        }
+    }
+
+    /// The removal a request reaches, or nothing where it reached another command.
+    fn removal(given: lemonfiber::cli::RawRemoving) -> Option<lemonfiber_core::app::Removing> {
+        match super::removing(given) {
+            Command::Uninstall(asked) => Some(asked),
+            _ => None,
+        }
+    }
+
+    /// Each of the four words reaches the removal it names, and nothing else.
+    #[test]
+    fn each_word_reaches_the_removal_it_names() {
+        use lemonfiber::cli::RawRemoval;
+        use lemonfiber_core::uninstall::Tier;
+
+        let pairs = [
+            (RawRemoval::Stop, Tier::Stop),
+            (RawRemoval::Services, Tier::Services),
+            (RawRemoval::Configuration, Tier::Configuration),
+            (RawRemoval::Media, Tier::Media),
+        ];
+        for (written, meant) in pairs {
+            assert_eq!(
+                removal(removing_asked(written, None, false)).map(|asked| asked.tier),
+                Some(meant),
+                "{written:?}"
+            );
+        }
+    }
+
+    /// Nothing typed is nothing agreed to: a flag given empty is an answer to no
+    /// listing, and carrying it would be a name the core goes and fails to match.
+    #[test]
+    fn an_empty_answer_to_a_listing_is_dropped_rather_than_carried() {
+        assert_eq!(
+            removal(removing_asked(
+                lemonfiber::cli::RawRemoval::Media,
+                Some("  "),
+                false
+            ))
+            .and_then(|asked| asked.agreement),
+            None
+        );
+        assert_eq!(
+            removal(removing_asked(
+                lemonfiber::cli::RawRemoval::Media,
+                Some("deadbeef"),
+                false
+            ))
+            .and_then(|asked| asked.agreement),
+            Some("deadbeef".to_owned())
+        );
+    }
+
+    /// The wait is carried as the word the core knows it by rather than as a flag.
+    #[test]
+    fn asking_a_removal_to_wait_reaches_it_as_a_wait() {
+        assert_eq!(
+            removal(removing_asked(
+                lemonfiber::cli::RawRemoval::Stop,
+                None,
+                true
+            ))
+            .map(|asked| asked.waiting),
+            Some(lemonfiber_core::app::Waiting::ForTheDownloads)
+        );
+        assert_eq!(
+            removal(removing_asked(
+                lemonfiber::cli::RawRemoval::Stop,
+                None,
+                false
+            ))
+            .map(|asked| asked.waiting),
+            Some(lemonfiber_core::app::Waiting::Never)
+        );
+    }
 }

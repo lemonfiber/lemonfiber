@@ -57,6 +57,44 @@ use acting::*;
 
 // ── Every action is one of the command line's own ─────────────────────────────
 
+/// A removal with none named has lost the only part of it that decides what goes.
+///
+/// Required rather than defaulted, and the reason is the subject: a request that
+/// lost a word in transit must not become a removal nobody asked for.
+#[test]
+fn a_removal_with_no_tier_named_says_which_argument_it_needs() {
+    assert_eq!(
+        named("uninstall", Arguments::default()).err(),
+        Some(Refused::Missing {
+            action: "uninstall".to_owned(),
+            argument: "tier".to_owned(),
+        })
+    );
+}
+
+/// And a word naming none of the four is refused by name, with the four listed —
+/// never read as whichever the shape would default to.
+#[test]
+fn a_removal_this_build_does_not_know_is_refused_with_the_four_that_exist() {
+    let refused = named(
+        "uninstall",
+        Arguments {
+            tier: Some("everything".to_owned()),
+            ..Arguments::default()
+        },
+    )
+    .err();
+
+    assert!(
+        matches!(
+            refused,
+            Some(Refused::Unrecognised { ref argument, ref offered })
+                if argument == "everything" && offered.contains("media")
+        ),
+        "{refused:?}"
+    );
+}
+
 #[test]
 fn every_action_this_surface_offers_reaches_a_command() {
     // The whole guarantee, in one sweep: a name on the list that reached no
