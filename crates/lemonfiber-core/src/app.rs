@@ -389,12 +389,6 @@ async fn decided(
         .map(Outcome::Household)
 }
 
-/// Carry out a command.
-///
-/// # Errors
-///
-/// Returns the [`Problem`] a surface should render when the command could not
-/// be carried out.
 /// Putting right what the diagnosis found, at the operator's word.
 async fn mended(
     ctx: &Ctx,
@@ -406,6 +400,12 @@ async fn mended(
         .map(Outcome::Repair)
 }
 
+/// Carry out a command.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the command could not
+/// be carried out.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
