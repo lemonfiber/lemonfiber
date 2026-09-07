@@ -1081,6 +1081,61 @@ mod tests {
         });
         assert_eq!(shown(settled(&stranded)), success());
     }
+
+    /// A removal carrying nothing, so a case about its state is about its state.
+    fn a_removal(
+        removal: lemonfiber_core::uninstall::Removal,
+    ) -> lemonfiber_core::uninstall::Uninstall {
+        lemonfiber_core::uninstall::Uninstall {
+            manifest: lemonfiber_core::uninstall::Manifest {
+                tier: lemonfiber_core::uninstall::Tier::Stop,
+                removes: String::new(),
+                keeps: String::new(),
+                items: Vec::new(),
+                bytes: 0,
+                foreign: Vec::new(),
+                volume: None,
+                coming: Vec::new(),
+                outside: Vec::new(),
+                backup: None,
+                confidence: lemonfiber_core::uninstall::Confidence::whole(),
+                agreement: String::new(),
+            },
+            removal,
+        }
+    }
+
+    /// A reading and a rehearsal both succeed: neither was asked to remove anything,
+    /// so neither has failed to. A removal that ran and left something behind is the
+    /// one answer a script must not read as done.
+    #[test]
+    fn only_a_removal_that_left_something_behind_earns_a_failure() {
+        use lemonfiber_core::uninstall::{Left, Removal};
+
+        let code = |removal| super::settled(&Outcome::Uninstall(a_removal(removal)));
+
+        assert_eq!(code(Removal::Surveyed), std::process::ExitCode::SUCCESS);
+        assert_eq!(code(Removal::Confirmed), std::process::ExitCode::SUCCESS);
+        assert_eq!(
+            code(Removal::Complete {
+                gone: vec!["/srv/media".to_owned()],
+                credentials: Vec::new(),
+            }),
+            std::process::ExitCode::SUCCESS
+        );
+        assert_eq!(
+            code(Removal::Partial {
+                gone: Vec::new(),
+                credentials: Vec::new(),
+                left: vec![Left {
+                    name: "/srv/media".to_owned(),
+                    why: "permission denied".to_owned(),
+                    by_hand: "rm -rf '/srv/media'".to_owned(),
+                }],
+            }),
+            std::process::ExitCode::from(super::FAILURE)
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1163,61 +1218,6 @@ mod reporting {
         assert!(
             !said.contains("Words used here:"),
             "and nothing a person would want in it: {said}"
-        );
-    }
-
-    /// A removal carrying nothing, so a case about its state is about its state.
-    fn a_removal(
-        removal: lemonfiber_core::uninstall::Removal,
-    ) -> lemonfiber_core::uninstall::Uninstall {
-        lemonfiber_core::uninstall::Uninstall {
-            manifest: lemonfiber_core::uninstall::Manifest {
-                tier: lemonfiber_core::uninstall::Tier::Stop,
-                removes: String::new(),
-                keeps: String::new(),
-                items: Vec::new(),
-                bytes: 0,
-                foreign: Vec::new(),
-                volume: None,
-                coming: Vec::new(),
-                outside: Vec::new(),
-                backup: None,
-                confidence: lemonfiber_core::uninstall::Confidence::whole(),
-                agreement: String::new(),
-            },
-            removal,
-        }
-    }
-
-    /// A reading and a rehearsal both succeed: neither was asked to remove anything,
-    /// so neither has failed to. A removal that ran and left something behind is the
-    /// one answer a script must not read as done.
-    #[test]
-    fn only_a_removal_that_left_something_behind_earns_a_failure() {
-        use lemonfiber_core::uninstall::{Left, Removal};
-
-        let code = |removal| super::settled(&Outcome::Uninstall(a_removal(removal)));
-
-        assert_eq!(code(Removal::Surveyed), std::process::ExitCode::SUCCESS);
-        assert_eq!(code(Removal::Confirmed), std::process::ExitCode::SUCCESS);
-        assert_eq!(
-            code(Removal::Complete {
-                gone: vec!["/srv/media".to_owned()],
-                credentials: Vec::new(),
-            }),
-            std::process::ExitCode::SUCCESS
-        );
-        assert_eq!(
-            code(Removal::Partial {
-                gone: Vec::new(),
-                credentials: Vec::new(),
-                left: vec![Left {
-                    name: "/srv/media".to_owned(),
-                    why: "permission denied".to_owned(),
-                    by_hand: "rm -rf '/srv/media'".to_owned(),
-                }],
-            }),
-            std::process::ExitCode::from(super::FAILURE)
         );
     }
 }

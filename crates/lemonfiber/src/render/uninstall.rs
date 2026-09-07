@@ -9,6 +9,7 @@
 //! list is putting it where a long list buries it.
 
 use lemonfiber_core::bytes::humanize;
+use lemonfiber_core::plural::s;
 use lemonfiber_core::uninstall::{Item, Manifest, Removal, Uninstall};
 
 use super::Lines;
@@ -96,7 +97,7 @@ fn beside(manifest: &Manifest) -> Lines {
             "  {} — {} file{} ({})",
             found.at,
             found.files,
-            if found.files == 1 { "" } else { "s" },
+            s(usize::try_from(found.files).unwrap_or(usize::MAX)),
             humanize(found.bytes)
         ));
     }

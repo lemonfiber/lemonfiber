@@ -249,10 +249,7 @@ async fn the_tier_that_removes_nothing_still_lists_what_it_leaves() {
     let manifest = read(&a_machine(), Tier::Stop).await;
 
     assert_eq!(manifest.as_ref().map(|manifest| manifest.bytes), Some(0));
-    assert_eq!(
-        manifest.as_ref().map(|manifest| going(manifest)),
-        Some(Vec::new())
-    );
+    assert_eq!(manifest.as_ref().map(going), Some(Vec::new()));
     assert!(
         manifest.is_some_and(|manifest| !manifest.items.is_empty()),
         "it lists nothing at all, so there was nothing to check"
@@ -472,7 +469,7 @@ async fn removing_configuration_destroys_the_credentials_and_names_them() {
     let named = removal.as_ref().map(credentials).unwrap_or_default();
 
     assert!(
-        named.iter().any(|at| at.ends_with(".env")),
+        named.iter().any(|at| at.rsplit('/').next() == Some(".env")),
         "the settings file holds the VPN key and the provider password: {named:?}"
     );
     assert!(named.iter().any(|at| at.contains("admission")), "{named:?}");
@@ -653,7 +650,7 @@ async fn a_run_that_cannot_say_where_its_files_go_names_the_usual_places_and_tak
         Some(false)
     );
     assert_eq!(
-        answered.as_ref().map(|manifest| going(manifest)),
+        answered.as_ref().map(going),
         Some(Vec::new()),
         "a location this run had to fall back to is never taken"
     );

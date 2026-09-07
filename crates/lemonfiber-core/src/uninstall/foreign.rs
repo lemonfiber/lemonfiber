@@ -80,7 +80,7 @@ fn leads_to_ours(relative: &Path, ours: &[String]) -> bool {
 /// because there is no directory to name it by.
 fn credited(relative: &Path, ours: &[String]) -> String {
     let mut walked = std::path::PathBuf::new();
-    for name in relative.iter() {
+    for name in relative {
         walked.push(name);
         if !leads_to_ours(&walked, ours) && walked != relative {
             return walked.to_string_lossy().into_owned();
