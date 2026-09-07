@@ -21,8 +21,7 @@ use crate::config::{
 };
 
 /// What changing a decision costs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cost {
     /// Applied with a restart of the services it affects, and nothing else moves.
     Cheap,
