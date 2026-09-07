@@ -540,6 +540,28 @@ mod tests {
         assert!(!second.contains("Nothing on this machine"), "{second}");
     }
 
+    /// An indexer refusing a key quotes it back inside its own description, and that
+    /// sentence is carried here verbatim. It must not reach the outcome: the outcome
+    /// is serialised into a report and printed to a terminal, both during first-run
+    /// setup, which is the moment those credentials are being entered.
+    #[tokio::test]
+    async fn a_service_that_quotes_the_key_back_does_not_carry_it_into_the_outcome() {
+        let refusal = "apikey=the-secret-key is not a valid key";
+        let body = format!("<error code=\"100\" description=\"{refusal}\"/>");
+        let outcome = answering(&body).validate(&indexer()).await;
+        let said = format!("{outcome:?}");
+        // Deliberately not printing the outcome here: a guard that reports the leak by
+        // repeating it is the thing it watches for.
+        assert!(
+            !said.contains("the-secret-key"),
+            "the key reached the outcome"
+        );
+        // Withheld where the value was, rather than the sentence being dropped whole —
+        // the operator still needs to know which key was refused and why.
+        assert!(said.contains("apikey"), "{said}");
+        assert!(said.contains("not a valid key"), "{said}");
+    }
+
     #[tokio::test]
     async fn an_error_without_a_description_still_refuses_rather_than_panics() {
         let body = "<error code=\"101\"/>";
