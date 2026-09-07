@@ -299,21 +299,7 @@ pub(crate) async fn assembled(
         servarr_targets(&manifest.services, project.as_deref()),
         disruptive,
     );
-    // What the accounts underneath the stack have left, read from the services that
-    // use them — the download client that pulls through the Usenet accounts and the
-    // aggregator that queries the indexers, both of which keep their own records. So
-    // this costs the providers nothing: a check that spent the quota it measures would
-    // help cause the outage it is there to warn about.
-    let providers = ProvidersCheck::new(
-        crate::app::targets::usenet_client(ctx, &manifest.services, project.as_deref())
-            .await
-            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
-        crate::app::targets::indexer_aggregator(ctx, &manifest.services, project.as_deref())
-            .await
-            .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
-        ctx.today(),
-        ctx.clock.now(),
-    );
+    let providers = provider_accounts(ctx, &manifest.services, project.as_deref()).await;
     // Whether each download client still files where lemonfiber wired it — the one field
     // an operator and lemonfiber both write, so the only place a fix could write over
     // somebody's own change. Read-only here: it says which side of the field moved, and
@@ -363,4 +349,28 @@ pub(crate) async fn assembled(
         Box::new(permissions),
     ];
     Ok((manifest, checks))
+}
+
+/// What the accounts underneath the stack have left, read from the services that use
+/// them.
+///
+/// The download client pulls through the Usenet accounts and the aggregator queries the
+/// indexers, and both keep their own records — so this costs the providers nothing. A
+/// check that spent the quota it measures would help cause the outage it is there to
+/// warn about.
+async fn provider_accounts(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&std::path::Path>,
+) -> ProvidersCheck {
+    ProvidersCheck::new(
+        crate::app::targets::usenet_client(ctx, services, project)
+            .await
+            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
+        crate::app::targets::indexer_aggregator(ctx, services, project)
+            .await
+            .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
+        ctx.today(),
+        ctx.clock.now(),
+    )
 }

@@ -22,7 +22,7 @@ use crate::app::seed::published_as;
 use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for};
 use crate::app::Ctx;
 use crate::config;
-use crate::credential::{Held, Origin, Propagation, Rotation, Settled, CATALOGUE};
+use crate::credential::{Consumer, Held, Origin, Propagation, Rotation, Settled, CATALOGUE};
 use crate::ports::service::{Client, Failure};
 
 /// Replace the credential one inventory line names.
@@ -245,7 +245,7 @@ fn reached(setting: &str) -> Vec<Propagation> {
     CATALOGUE
         .iter()
         .find(|entry| entry.setting == setting)
-        .map(|entry| entry.consumers.iter().map(|one| one.reached()).collect())
+        .map(|entry| entry.consumers.iter().map(Consumer::reached).collect())
         .unwrap_or_default()
 }
 

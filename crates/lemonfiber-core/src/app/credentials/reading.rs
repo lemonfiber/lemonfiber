@@ -55,8 +55,8 @@ pub(super) async fn taken(ctx: &Ctx, services: &[Service], project: Option<&Path
             &service.name,
             &setting,
             &config,
-            held,
-            published,
+            held.as_deref(),
+            published.as_deref(),
         ));
     }
     taken
@@ -85,12 +85,13 @@ fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
     }
 }
 
+/// Where a service keeps the key it wrote for itself, and the reader that pulls it out
+/// of that file — the two are useless apart, so they travel together.
+type SelfWritten = (PathBuf, fn(&str) -> Option<String>);
+
 /// Where one service keeps the key it wrote for itself, and how to read it — where it
 /// is a service that writes one at all.
-fn writes_its_own(
-    service: &Service,
-    project: &Path,
-) -> Option<(PathBuf, fn(&str) -> Option<String>)> {
+fn writes_its_own(service: &Service, project: &Path) -> Option<SelfWritten> {
     let api = service.api.as_ref()?;
     let read = reader(api.kind)?;
     let path = config_path(project, service, api.path.as_deref())?;
@@ -181,10 +182,10 @@ fn service_key(
     name: &str,
     setting: &str,
     config: &Path,
-    held: Option<String>,
-    published: Option<String>,
+    held: Option<&str>,
+    published: Option<&str>,
 ) -> Held {
-    let (state, advisory) = key_standing(name, setting, held.as_deref(), published.as_deref());
+    let (state, advisory) = key_standing(name, setting, held, published);
     Held {
         name: format!("{name} API key"),
         setting: setting.to_owned(),
@@ -195,7 +196,7 @@ fn service_key(
         location: config.display().to_string(),
         origin: Origin::Service,
         state,
-        fingerprint: held.as_deref().map(fingerprint),
+        fingerprint: held.map(fingerprint),
         advisory,
     }
 }
@@ -339,8 +340,8 @@ mod tests {
             "Sonarr",
             "SONARR_API_KEY",
             Path::new("/stack/config/sonarr/config.xml"),
-            Some(held.clone()),
-            Some(held.clone()),
+            Some(held.as_str()),
+            Some(held.as_str()),
         );
 
         assert_eq!(entry.name, "Sonarr API key");
