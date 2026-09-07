@@ -50,8 +50,8 @@ pub struct Decision {
 ///
 /// The household and autostart are revised through their own commands. The notification
 /// appetite is not: setup writes it and nothing changes it afterwards, which is a
-/// decision made once and then unchangeable — the trap this feature exists to close,
-/// and the reason A4-R1 is not yet met.
+/// decision made once and then unchangeable, which is the trap this catalogue exists to
+/// close. It is listed as owed rather than quietly left out.
 pub const DECISIONS: [Decision; 15] = [
     Decision {
         key: DATA_ROOT_KEY,
