@@ -12,9 +12,11 @@ use crate::quality::Preset;
 
 use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
+mod credentials;
 mod hosting;
 mod household;
 
+pub use credentials::Asking;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
 
@@ -311,6 +313,14 @@ pub enum Command {
     /// narrow it by — and an enumeration a surface could narrow would be one an
     /// operator could be shown half of.
     Outbound,
+    /// Say which credentials this stack holds, or act on one of them.
+    ///
+    /// One inventory over every secret in the stack, whoever produced it: what each is,
+    /// what authenticates with it, where the value lives and where it stands — and never
+    /// the value itself. The two things that can be asked of a line of it travel under
+    /// the same word, because an operator reading that a credential has gone stale is
+    /// one keystroke from wanting to replace it.
+    Credentials(Asking),
     /// List what lemonfiber keeps on this machine: what each thing is, where it is,
     /// and why it is kept.
     ///

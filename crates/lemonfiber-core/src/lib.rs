@@ -62,6 +62,7 @@ pub mod clients;
 pub mod condition;
 pub mod config;
 pub mod contract;
+pub mod credential;
 pub mod dashboard;
 pub mod docker;
 pub mod doctor;

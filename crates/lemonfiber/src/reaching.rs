@@ -165,6 +165,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/stored",
     },
     Reach {
+        request: "credentials",
+        through: "/api/credentials",
+    },
+    Reach {
         request: "bandwidth",
         through: "/api/bandwidth",
     },

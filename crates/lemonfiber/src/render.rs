@@ -17,6 +17,7 @@ pub(crate) mod fixtures;
 mod archive;
 mod bandwidth;
 mod clients;
+mod credentials;
 mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
@@ -228,6 +229,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Invited(report) => invitation::invitation(report),
         Outcome::Removed(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
+        Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::Space(report) => space::reckoning(report),
         Outcome::Letting(offer) => space::letting(offer),
@@ -704,6 +706,7 @@ mod tests {
                 beside: Vec::new(),
             }),
             Outcome::Lifecycle(a_lifecycle("up", a_plan("media", Vec::new()))),
+            Outcome::Credentials(lemonfiber_core::credential::Inventory::of(Vec::new())),
         ]
     }
 

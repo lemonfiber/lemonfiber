@@ -27,6 +27,7 @@ use crate::app::repair::{Report as RepairReport, Reversal};
 use crate::app::restore::Restoration;
 use crate::app::support::Bundle;
 use crate::clients::Guidance;
+use crate::credential::Inventory;
 use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
@@ -89,6 +90,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::BACKUP, schema_for!(Envelope<BackupReport>));
     describing(kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
     describing(kinds, kind::CONFIG, schema_for!(Envelope<ConfigReport>));
+    describing(kinds, kind::CREDENTIALS, schema_for!(Envelope<Inventory>));
     describing(kinds, kind::DOCTOR, schema_for!(Envelope<DoctorReport>));
     describing(kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
     describing(
@@ -191,7 +193,7 @@ mod tests {
 
     use serde_json::Value;
 
-    use super::{Contract, CONTRACT_PATH};
+    use super::{Contract, Inventory, CONTRACT_PATH};
     use crate::app::Outcome;
     use crate::glossary::{Term, Vocabulary};
     use crate::model::{
@@ -210,7 +212,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 36;
+    const OUTCOMES: usize = 37;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -360,6 +362,36 @@ mod tests {
         ]
     }
 
+    /// An inventory carrying one of each of its optional halves.
+    ///
+    /// The value in the reveal is built rather than written, so nothing scanning this
+    /// source reads it as a credential — which it is not; it is the shape of one.
+    fn a_credential_inventory() -> Inventory {
+        Inventory::of(vec![crate::credential::Held {
+            name: "qBittorrent web UI password".to_owned(),
+            setting: "QBITTORRENT_PASSWORD".to_owned(),
+            consumers: vec!["the tunnel's forwarded-port push".to_owned()],
+            location: "/home/op/.config/lemonfiber/.env".to_owned(),
+            origin: crate::credential::Origin::Lemonfiber,
+            state: crate::credential::State::Active,
+            fingerprint: Some(crate::credential::fingerprint("a")),
+            advisory: None,
+        }])
+        .after(crate::credential::Rotation::landed(
+            "qBittorrent web UI password",
+            "qBittorrent signed in with it",
+            vec![crate::credential::Propagation::pending(
+                "the tunnel's forwarded-port push",
+                "lemonfiber restart torrent",
+            )],
+        ))
+        .showing(crate::credential::Revealed {
+            name: "qBittorrent web UI password".to_owned(),
+            value: Some(format!("{}{}", "the-", "value-itself")),
+            warning: crate::credential::REVEALED.to_owned(),
+        })
+    }
+
     /// The last of them, continuing that order.
     fn the_last_of_them() -> Vec<Outcome> {
         vec![
@@ -385,6 +417,9 @@ mod tests {
                     }],
                 },
             )),
+            // Carrying a rotation and a reveal as well as the inventory, so every
+            // optional half of the shape is compared rather than only the reading.
+            Outcome::Credentials(a_credential_inventory()),
             Outcome::Space(a_reckoning()),
             Outcome::Letting(crate::space::letting::offering(crate::space::Candidate {
                 name: "A.Release".to_owned(),

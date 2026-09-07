@@ -5,6 +5,7 @@
 //! own commands. A flag is added here; what it does is added next door.
 
 mod bandwidth;
+mod credentials;
 mod repair;
 mod serving;
 mod setup;
@@ -22,6 +23,7 @@ pub use under::{ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCom
 // flag is declared is this file's business and nobody else's, and moving one would
 // otherwise be a change at every call site that names it.
 pub use bandwidth::RawBandwidth;
+pub use credentials::RawCredentials;
 pub use repair::{Fixing, Mending};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
@@ -350,6 +352,14 @@ pub enum Request {
     /// when it is — then the requests the stack's own services make, which are
     /// theirs rather than lemonfiber's.
     Outbound,
+    /// Say which credentials this stack holds, or act on one of them.
+    ///
+    /// Every secret in the stack in one list, whoever produced it: what each is, what
+    /// authenticates with it, where the value lives and where it stands — never the
+    /// value itself — and what keeping them in files does and does not protect
+    /// against. `--rotate` replaces one, proving the replacement before the existing
+    /// value stops being in force; `--reveal` prints one, and asks first.
+    Credentials(RawCredentials),
     /// List what lemonfiber keeps on this machine, where it is, and why.
     ///
     /// Everything it writes sits under two directories. This names each thing under

@@ -307,6 +307,7 @@ async fn main() -> ExitCode {
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
         Request::Outbound => Command::Outbound,
+        Request::Credentials(asked) => translate::credentials(asked),
         Request::Stored => Command::Stored,
         Request::Clients => Command::Clients,
         Request::Invite { name, allowance } => invitation(name, allowance),

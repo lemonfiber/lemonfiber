@@ -40,8 +40,8 @@ mod shape;
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
-    named, BANDWIDTH, CHECKS, CLIENTS, CONFIG, FORMS, FRONT_DOOR, HOSTING, OUTBOUND, QUALITY,
-    REQUESTS, STORED, STUCK, TRACE, VERSION,
+    named, BANDWIDTH, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR, HOSTING, OUTBOUND,
+    QUALITY, REQUESTS, STORED, STUCK, TRACE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -165,6 +165,12 @@ static AFTER: &[Question] = &[
         name: "what is kept on this machine",
         about: "every file lemonfiber writes, where it is, and why it is kept",
         read: STORED,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "which credentials are held",
+        about: "every secret in the stack, what uses it, and where it stands — never its value",
+        read: CREDENTIALS,
         needs: Needed::Nothing,
     },
     Question {

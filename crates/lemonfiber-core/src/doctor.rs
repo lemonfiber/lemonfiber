@@ -22,6 +22,7 @@ pub mod guides;
 pub mod headroom;
 pub mod indexer;
 pub mod narrowing;
+pub mod permissions;
 pub mod providers;
 pub mod releases;
 pub mod storage;

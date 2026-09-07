@@ -8,8 +8,8 @@
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
-    QualityAction,
+    Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Hostable,
+    Keeping, QualityAction,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -22,7 +22,7 @@ use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
     Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
-    RawBandwidth, RawUnrated,
+    RawBandwidth, RawCredentials, RawUnrated,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -338,6 +338,26 @@ fn narrowed(only: Option<&str>) -> Result<Narrowing, u8> {
     }
 }
 
+/// What is being asked about the credentials this stack holds.
+///
+/// Naming nothing is the reading. Naming one to reveal or one to rotate is an act on
+/// a line of that reading, and the two cannot arrive together — the command line
+/// refuses the pair, so there is no order of precedence here to get wrong.
+///
+/// The confirmation belongs to the reveal and to nothing else. Carried through
+/// rather than acted on here, because what an unconfirmed reveal answers with is a
+/// warning that has to be written once, where the value would otherwise be.
+pub(crate) fn credentials(asked: RawCredentials) -> Command {
+    Command::Credentials(match (asked.reveal, asked.rotate) {
+        (Some(credential), _) => Asking::Reveal {
+            credential,
+            confirmed: asked.confirm,
+        },
+        (None, Some(credential)) => Asking::Rotate { credential },
+        (None, None) => Asking::Read,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::app::{Allowance, Command, QualityAction};
@@ -345,15 +365,15 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{
-        bundling, configuration, hosting, household, invitation, letting, quality, restarting,
-        sharing, traced, Answer, Arranged, Chosen, Decision, Destination, Hostable, Keeping,
-        Policy, Quota, Wanted,
+        bundling, configuration, credentials, hosting, household, invitation, letting, quality,
+        restarting, sharing, traced, Answer, Arranged, Asking, Chosen, Decision, Destination,
+        Hostable, Keeping, Policy, Quota, Wanted,
     };
     use super::{diagnosing, narrowed};
     use crate::exit::USAGE;
     use lemonfiber::cli::{
         Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
-        RawBandwidth, RawUnrated,
+        RawBandwidth, RawCredentials, RawUnrated,
     };
     use lemonfiber_core::app::BandwidthAsked;
     use lemonfiber_core::bundle::Filenames;
@@ -951,6 +971,51 @@ mod tests {
                 narrowing: Narrowing::Check("storage.space".to_owned()),
                 disruptive: true,
                 accept: Some("STORAGE-1".to_owned()),
+            })
+        );
+    }
+
+    /// Naming nothing is the reading, which is what people type.
+    #[test]
+    fn a_credentials_command_with_no_flags_is_the_reading() {
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: None,
+                rotate: None,
+                confirm: false,
+            }),
+            Command::Credentials(Asking::Read)
+        );
+    }
+
+    /// A reveal carries whether it was confirmed, unchanged.
+    #[test]
+    fn a_reveal_carries_the_name_and_whether_it_was_confirmed() {
+        for confirmed in [false, true] {
+            assert_eq!(
+                credentials(RawCredentials {
+                    reveal: Some("Indexer API key".to_owned()),
+                    rotate: None,
+                    confirm: confirmed,
+                }),
+                Command::Credentials(Asking::Reveal {
+                    credential: "Indexer API key".to_owned(),
+                    confirmed,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn a_rotation_carries_the_name_and_nothing_else() {
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: None,
+                rotate: Some("Indexer API key".to_owned()),
+                confirm: false,
+            }),
+            Command::Credentials(Asking::Rotate {
+                credential: "Indexer API key".to_owned(),
             })
         );
     }

@@ -30,7 +30,7 @@
 
 mod asked;
 
-use lemonfiber_core::app::{BandwidthAsked, Command, Keeping, QualityAction};
+use lemonfiber_core::app::{Asking, BandwidthAsked, Command, Keeping, QualityAction};
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
 
@@ -95,6 +95,15 @@ pub const OUTBOUND: &str = "/api/outbound";
 /// in front of it and cannot see the host at all.
 pub const STORED: &str = "/api/stored";
 
+/// Every credential this stack holds, with none of their values.
+///
+/// The reading half of the word and nothing else: the two things that can be asked
+/// of a line of it — replacing one, printing one — are not offered here at all. A
+/// reveal over this door would put a credential through a browser, a proxy log and
+/// whatever is caching in between, which is exactly the disclosure the inventory
+/// itself is shaped to make impossible.
+pub const CREDENTIALS: &str = "/api/credentials";
+
 /// Where the disk stands, where the room went, and what could be got back.
 ///
 /// A read rather than the action of the same name, and the two answer with the same
@@ -150,8 +159,27 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// would be asking the core something no browser can ask it, which is the whole
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
-    VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, HOSTING, FRONT_DOOR, TRACE, STUCK,
-    CONFIG, QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, SPACE, BANDWIDTH, CLIENTS,
+    VERSION,
+    FORMS,
+    STATUS,
+    SERVICES,
+    CHECKS,
+    STORAGE,
+    REQUESTS,
+    HOSTING,
+    FRONT_DOOR,
+    TRACE,
+    STUCK,
+    CONFIG,
+    QUALITY,
+    EXPLAIN,
+    BACKUPS,
+    OUTBOUND,
+    STORED,
+    SPACE,
+    BANDWIDTH,
+    CLIENTS,
+    CREDENTIALS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -253,6 +281,10 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         BACKUPS => Ok(Command::Archives),
         OUTBOUND => Ok(Command::Outbound),
         STORED => Ok(Command::Stored),
+        // The reading and nothing else. What is asked here is fixed rather than taken
+        // from the request, so no caller can turn this door into the one that prints a
+        // credential.
+        CREDENTIALS => Ok(Command::Credentials(Asking::Read)),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an
         // answer to that offer goes.

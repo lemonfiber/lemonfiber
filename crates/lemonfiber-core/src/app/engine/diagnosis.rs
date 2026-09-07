@@ -335,6 +335,17 @@ pub(crate) async fn assembled(
         ctx.environment,
         &ctx.settings.exposed,
     );
+    // Whether the files lemonfiber keeps credentials in are still readable only by
+    // their owner. Read from the layout this machine resolved rather than from a
+    // guessed path, and skipped where it resolved none — a check with nothing to look
+    // at must not report that it looked.
+    let permissions = crate::doctor::permissions::PermissionsCheck::new(
+        ctx.filesystem.clone(),
+        crate::app::targets::layout(ctx)
+            .as_ref()
+            .map(crate::doctor::permissions::guarded)
+            .unwrap_or_default(),
+    );
     let telling = household_telling(ctx, &manifest.services);
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
@@ -349,6 +360,7 @@ pub(crate) async fn assembled(
         Box::new(releases),
         Box::new(wiring),
         Box::new(telling),
+        Box::new(permissions),
     ];
     Ok((manifest, checks))
 }
