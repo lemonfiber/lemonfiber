@@ -11,7 +11,6 @@ use clap::Parser;
 use lemonfiber::cli::{Cli, Mending, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
-use lemonfiber_core::doctor::Narrowing;
 
 mod acting;
 mod archive;
@@ -44,7 +43,8 @@ use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
 use stopping::Choice;
 use translate::{
-    bundling, configuration, hosting, household, invitation, letting, quality, restarting, traced,
+    bundling, configuration, diagnosing, hosting, household, invitation, letting, quality,
+    restarting, traced,
 };
 
 /// Logs as a screen, or logs as a stream.
@@ -151,7 +151,7 @@ fn locale() -> Option<String> {
 /// value an envelope holds — so it answers for itself. With nowhere to keep its own
 /// files there is nothing to repair against, which is the one thing it cannot work
 /// around.
-async fn repairing(ctx: Ctx, mending: Mending, json: bool) -> ExitCode {
+async fn repairing(ctx: &Ctx, mending: Mending, json: bool) -> ExitCode {
     let Some(paths) = here() else {
         return no_config_home();
     };
@@ -166,6 +166,38 @@ fn narrating(ctx: Ctx, json: bool) -> Ctx {
     ctx.narrating_steps(walking(json))
 }
 
+/// What a bare `lemonfiber` says: where setup stands, or the plain pointer when there is
+/// nowhere to keep its files and so nothing to report on.
+async fn greeted(ctx: Ctx) -> ExitCode {
+    let Some(paths) = here() else {
+        // With nowhere to keep its files there is nothing to offer and nothing to point
+        // at, so the plain pointer is the only honest thing left.
+        say!("lemonfiber — run `lemonfiber --help` to see what it can do");
+        return ExitCode::SUCCESS;
+    };
+    greeting(ctx, &paths, &Console).await
+}
+
+/// The diagnosis a `doctor` run asked for, or the code a repairing one ended with.
+///
+/// Repairing is its own errand: it looks, offers, acts and looks again, and renders what
+/// became of each — not one value from dispatch — so it ends here, and the code it ended
+/// with comes back as the error. A plain run falls through to the diagnosis and changes
+/// nothing.
+async fn doctoring(
+    ctx: &Ctx,
+    only: Option<String>,
+    disruptive: bool,
+    accept: Option<String>,
+    mending: Mending,
+    json: bool,
+) -> Result<Command, ExitCode> {
+    if mending.acts() {
+        return Err(repairing(ctx, mending, json).await);
+    }
+    diagnosing(only.as_deref(), disruptive, accept).map_err(ExitCode::from)
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -176,14 +208,7 @@ async fn main() -> ExitCode {
     say::settle_audience(cli.json);
 
     let Some(request) = cli.command else {
-        let ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
-        let Some(paths) = here() else {
-            // With nowhere to keep its files there is nothing to offer and nothing
-            // to point at, so the plain pointer is the only honest thing left.
-            say!("lemonfiber — run `lemonfiber --help` to see what it can do");
-            return ExitCode::SUCCESS;
-        };
-        return greeting(ctx, &paths, &Console).await;
+        return greeted(context(cli.stack_dir.take(), cli.dry_run, cli.force)).await;
     };
 
     let mut ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
@@ -251,18 +276,10 @@ async fn main() -> ExitCode {
             disruptive,
             accept,
             mending,
-        } => {
-            // Repairing is its own errand: it looks, offers, acts and looks again, and
-            // renders what became of each — not one value from dispatch. A plain run falls
-            // through to the diagnosis below and changes nothing.
-            if mending.acts() {
-                return repairing(ctx, mending, cli.json).await;
-            }
-            match diagnosing(only.as_deref(), disruptive, accept) {
-                Ok(command) => command,
-                Err(code) => return code,
-            }
-        }
+        } => match doctoring(&ctx, only, disruptive, accept, mending, cli.json).await {
+            Ok(command) => command,
+            Err(code) => return code,
+        },
         Request::Trace {
             term,
             season,
@@ -411,41 +428,6 @@ async fn answered(command: Command, ctx: &Ctx, json: bool) -> ExitCode {
             settled(&outcome)
         }
         Err(problem) => complain(&problem),
-    }
-}
-
-/// The diagnosis a plain run asks for, narrowed as it was asked to be.
-///
-/// Named apart because the arm it came from carries a fork of its own — a run that
-/// mends returns before this is reached — and the two together are longer than the
-/// table has room for.
-fn diagnosing(
-    only: Option<&str>,
-    disruptive: bool,
-    accept: Option<String>,
-) -> Result<Command, ExitCode> {
-    narrowed(only).map(|narrowing| Command::Doctor {
-        narrowing,
-        disruptive,
-        accept,
-    })
-}
-
-/// What a diagnosis was narrowed to, or the code to exit with for a name that is
-/// neither a category nor a check inside one.
-///
-/// A name lemonfiber does not know is a mistake to correct rather than a request to
-/// run everything — refused here, before the core is reached. Whether a stack reports
-/// the check named is a question only the run can answer, and it answers it.
-fn narrowed(only: Option<&str>) -> Result<Narrowing, ExitCode> {
-    match only.map(Narrowing::parse) {
-        Some(None) => {
-            let named = only.unwrap_or_default();
-            complain!("error: no diagnostic category or check named `{named}`");
-            Err(ExitCode::from(USAGE))
-        }
-        Some(Some(narrowing)) => Ok(narrowing),
-        None => Ok(Narrowing::Suite),
     }
 }
 

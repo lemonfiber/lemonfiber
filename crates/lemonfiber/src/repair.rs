@@ -24,14 +24,14 @@ use lemonfiber::cli::Mending;
 
 /// Offer the repairs and carry out the ones agreed to, or put back what the last one did.
 pub(crate) async fn run(
-    ctx: Ctx,
+    ctx: &Ctx,
     paths: Paths,
     asked: Mending,
     answers: &(dyn Answers + Sync),
     json: bool,
 ) -> ExitCode {
     if asked.undo {
-        return undone(&ctx, &paths, json).await;
+        return undone(ctx, &paths, json).await;
     }
     // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
     // repairs carried out says so with --yes. So one that did not gets the offer and no
@@ -62,8 +62,8 @@ pub(crate) async fn run(
     };
 
     let repaired = match &consent {
-        Some(consent) => putting_right(&ctx, consent, asked.fixing.disruptive).await,
-        None => mend(&ctx, Stance::Ask, asked.fixing.disruptive, &Asking(answers)).await,
+        Some(consent) => putting_right(ctx, consent, asked.fixing.disruptive).await,
+        None => mend(ctx, Stance::Ask, asked.fixing.disruptive, &Asking(answers)).await,
     };
     match repaired {
         Ok(report) => answered(&Outcome::Repair(report), json),
