@@ -595,6 +595,43 @@ mod tests {
         }
     }
 
+    /// Installing a command that is already hosted leaves one agent, not two.
+    ///
+    /// The manager is told to take the old one out before the new one is put in, so
+    /// an operator who installs twice has one thing running their command. Two
+    /// agents under one name would each run it, and the second would be invisible in
+    /// a reading that names the command rather than the agent.
+    #[tokio::test]
+    async fn installing_what_is_already_hosted_leaves_one_of_it() {
+        let dir = agents("launchd-twice");
+        let (launchd, runner) = over(
+            &dir,
+            vec![
+                spoke(0, "501\n"),
+                spoke(0, "501\n"),
+                spoke(0, ""),
+                spoke(0, ""),
+                spoke(0, "501\n"),
+                spoke(0, "501\n"),
+                spoke(0, ""),
+                spoke(0, ""),
+            ],
+        );
+        let command = a_command(dir.join("watch.log"));
+
+        assert!(launchd.place(&command).await.is_ok(), "the first install");
+        assert!(launchd.place(&command).await.is_ok(), "and the second");
+
+        let definitions = std::fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|entry| entry.path().extension().is_some_and(|kind| kind == "plist"))
+            .count();
+        assert_eq!(definitions, 1, "installing twice left more than one agent");
+        assert!(runner.ran("bootout"), "the one already there was taken out");
+    }
+
     #[tokio::test]
     async fn one_that_is_still_running_afterwards_is_refused_and_kept() {
         let dir = agents("launchd-stubborn");
