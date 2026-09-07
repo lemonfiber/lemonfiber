@@ -18,7 +18,7 @@
 
 mod common;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use common::stack::project;
@@ -67,7 +67,7 @@ fn env_at(name: &str, settings: &[(&str, &str)]) -> PathBuf {
 }
 
 /// What one setting reads as now, straight off the file rather than off a report.
-fn recorded(path: &PathBuf, key: &str) -> Option<String> {
+fn recorded(path: &Path, key: &str) -> Option<String> {
     store::read(path)
         .ok()
         .and_then(|file| file.get(key).map(ToOwned::to_owned))
