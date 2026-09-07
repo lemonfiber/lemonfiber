@@ -45,8 +45,13 @@ pub struct Decision {
 ///
 /// The four questions setup asks that have no configuration home — the VPN's own
 /// prompt, the household, notifications and autostart — are applied by their own
-/// features and revised through their own commands. They are deliberately absent
-/// rather than duplicated into a second surface that could disagree with the first.
+/// features. They are deliberately absent rather than duplicated into a second surface
+/// that could disagree with the first.
+///
+/// The household and autostart are revised through their own commands. The notification
+/// appetite is not: setup writes it and nothing changes it afterwards, which is a
+/// decision made once and then unchangeable — the trap this feature exists to close,
+/// and the reason A4-R1 is not yet met.
 pub const DECISIONS: [Decision; 15] = [
     Decision {
         key: DATA_ROOT_KEY,
