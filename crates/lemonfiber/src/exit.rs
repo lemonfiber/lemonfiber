@@ -224,9 +224,10 @@ fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode {
 /// run and the report names it.
 fn rotating(inventory: &lemonfiber_core::credential::Inventory) -> ExitCode {
     match &inventory.rotated {
-        None => ExitCode::SUCCESS,
         Some(rotated) if rotated.kept_the_existing() => ExitCode::from(FAILURE),
-        Some(_) => ExitCode::SUCCESS,
+        // No rotation was asked for, or one was and it landed. Neither is a fault, so
+        // they answer alike rather than through two arms saying the same thing.
+        None | Some(_) => ExitCode::SUCCESS,
     }
 }
 
