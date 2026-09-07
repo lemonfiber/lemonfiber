@@ -984,6 +984,37 @@ async fn an_image_the_engine_would_not_remove_is_named_with_what_it_said() {
     );
 }
 
+/// A stop Compose refused is reported rather than read as done.
+///
+/// A lifecycle command answers with a report whichever way the process went, so a
+/// stop that failed and one that worked come back the same way — and a removal that
+/// read the first as the second would carry on removing the files of a service that
+/// is still running and still writing to them.
+#[tokio::test]
+async fn a_stop_that_compose_refused_is_reported_rather_than_read_as_done() {
+    let runner = Arc::new(Recording::answering(Ok(
+        lemonfiber_fixtures::support::refused("no configuration file provided"),
+    )));
+    let ctx = watching(&runner);
+
+    let removal = confirmed(&ctx, Tier::Stop).await;
+    let stuck = removal.as_ref().map(left).unwrap_or_default();
+
+    assert_eq!(stuck.len(), 1, "{stuck:?}");
+    assert!(
+        stuck
+            .iter()
+            .any(|one| one.name.contains("running services") && one.why.contains("did not succeed")),
+        "{stuck:?}"
+    );
+    assert!(
+        stuck
+            .iter()
+            .any(|one| one.by_hand == "docker compose --project-name lemonfiber stop"),
+        "{stuck:?}"
+    );
+}
+
 // --- No privilege escalation --------------------------------------------------
 
 /// Nothing this runs, and nothing it hands back about its own files, asks
