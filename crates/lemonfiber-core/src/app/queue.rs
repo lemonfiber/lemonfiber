@@ -255,8 +255,17 @@ fn fault_for(item: &Item, stall: Stall, shared: Option<(&str, usize)>) -> Fault 
     // download to fix something that is not about that download.
     let summary = shared.map_or_else(
         || match item.cause.as_deref() {
+            // What the service actually said beats what is usually the matter.
             Some(cause) => format!("{} — {}: {cause}", item.name, stall.word()),
-            None => format!("{} — {}", item.name, stall.word()),
+            // Nothing said why, so say what usually is: the operator learns where to
+            // look before they have opened anything, and a stall with no explanation
+            // at all is the one they are least equipped to start on.
+            None => format!(
+                "{} — {}, typically {}",
+                item.name,
+                stall.word(),
+                stall.typically()
+            ),
         },
         |(cause, items)| format!("{items} downloads are blocked: {cause}"),
     );
@@ -467,6 +476,28 @@ mod tests {
         let again = watched(&complaining, &stuck_at_100, &mut conditions, "100000");
         let reported: Vec<Stall> = again.stuck.iter().map(|stuck| stuck.stall).collect();
         assert_eq!(reported, vec![Stall::RepeatedImportFailure]);
+    }
+
+    #[test]
+    fn a_stall_nothing_explained_says_what_is_usually_behind_it() {
+        // The stall with no stated cause is the one an operator is least equipped to
+        // start on, so it is exactly the one that says where to look. Where the
+        // service did say why, that is carried instead — what actually happened beats
+        // what usually does.
+        let mut conditions = Conditions::new();
+        let answers = sonarr(vec![queued("Some.Release", "ok", None)]);
+        watched(
+            &answers,
+            &[("Some.Release".to_owned(), 42, false)],
+            &mut conditions,
+            "1000",
+        );
+        let said = conditions
+            .get("queue.stalled.Some.Release")
+            .map(|condition| condition.summary.clone())
+            .unwrap_or_default();
+        assert!(said.contains("Some.Release"), "{said}");
+        assert!(said.contains("typically"), "{said}");
     }
 
     #[test]
