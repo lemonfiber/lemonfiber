@@ -2290,8 +2290,12 @@ mod tests {
     async fn asking_about_the_line_reaches_the_command_that_reads_it() {
         let ctx = a_context().build();
         let read = dispatch(Command::Bandwidth(BandwidthAsked::default()), &ctx).await;
+        // Bound rather than asserted inline: a multi-line `matches!` inside an
+        // assertion that carries a message leaves the condition's own line counted as
+        // never run, which the coverage gate reads as dead code.
+        let wrote_nothing = matches!(&read, Ok(Outcome::Bandwidth(shared)) if !shared.applied);
         assert!(
-            matches!(&read, Ok(Outcome::Bandwidth(shared)) if !shared.applied),
+            wrote_nothing,
             "a run that asked for nothing wrote nothing: {read:?}"
         );
     }
