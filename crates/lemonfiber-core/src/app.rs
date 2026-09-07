@@ -36,7 +36,6 @@ mod configuring;
 mod ctx;
 pub mod dashboard;
 mod door;
-pub mod egress;
 mod engine;
 mod expiring;
 #[cfg(test)]
