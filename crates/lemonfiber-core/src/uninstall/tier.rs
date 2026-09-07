@@ -58,7 +58,9 @@ impl Tier {
             }
             Self::Configuration => {
                 "Each service's own configuration and databases, everything lemonfiber keeps \
-                 on this machine, and every credential in either."
+                 on this machine, and every credential in either — including the accounts \
+                 everybody in the house signs in with, and everything each of them has \
+                 watched."
             }
             Self::Media => "Your library and your downloads.",
         }
@@ -206,6 +208,18 @@ mod tests {
             .collect();
 
         assert_eq!(asking, vec![Tier::Services]);
+    }
+
+    /// The removal that takes the configuration takes the household with it, and
+    /// says so before anybody agrees to it. An operator who reads "configuration"
+    /// and loses every account in the house and every watch state has been told
+    /// something true and useless.
+    #[test]
+    fn the_configuration_removal_says_it_takes_the_household_with_it() {
+        let said = Tier::Configuration.removes().to_lowercase();
+
+        assert!(said.contains("signs in with"), "{said}");
+        assert!(said.contains("watched"), "{said}");
     }
 
     #[test]
