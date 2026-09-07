@@ -797,6 +797,73 @@ async fn a_program_that_is_not_installed_is_reported_in_its_own_words() {
     );
 }
 
+/// What lemonfiber keeps is sized from a walk of the two directories it keeps it
+/// in, not guessed at — so the figure an operator reads before agreeing is the one
+/// on their disk.
+#[tokio::test]
+async fn what_lemonfiber_keeps_is_sized_from_a_walk_of_where_it_keeps_it() {
+    let ctx = a_machine().surveying(Walking::holding(vec![
+        file("/cfg/lemonfiber/.env", 400),
+        file("/data/lemonfiber/config/sonarr/config.xml", 1_600),
+    ]));
+
+    let manifest = read(&ctx, Tier::Configuration).await;
+    let sized =
+        |manifest: &Manifest, at: &str| named(manifest, at).first().and_then(|item| item.bytes);
+
+    assert_eq!(
+        manifest
+            .as_ref()
+            .and_then(|manifest| sized(manifest, "/cfg/lemonfiber")),
+        Some(400)
+    );
+    assert_eq!(
+        manifest
+            .as_ref()
+            .and_then(|manifest| sized(manifest, "/data/lemonfiber")),
+        Some(1_600)
+    );
+    assert_eq!(manifest.map(|manifest| manifest.bytes), Some(2_000));
+}
+
+/// Where lemonfiber keeps its own files is the surface's answer where the surface
+/// gave one, and what the settings imply only where it did not.
+///
+/// The two can disagree — a run told where to keep its archives has been told where
+/// its layout is — and a removal that worked it out from the settings anyway would
+/// name a directory nobody pointed it at.
+#[tokio::test]
+async fn the_layout_a_surface_resolved_is_the_one_a_removal_names() {
+    let elsewhere = a_context()
+        .settings(Settings {
+            env_file: Some(PathBuf::from("/elsewhere/lemonfiber/.env")),
+            stack_dir: Some(PathBuf::from("/elsewhere/lemonfiber/stack")),
+            ..settings()
+        })
+        .build()
+        .with_filesystem(a_filesystem())
+        .with_images(Pulled::holding(Vec::new()))
+        .surveying(Walking::holding(only_ours()))
+        .erasing(Erasing::willing());
+    let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
+    let ctx = crate::app::fixtures::keeping(elsewhere, &vault);
+
+    let manifest = read(&ctx, Tier::Configuration).await;
+
+    assert_eq!(
+        manifest
+            .as_ref()
+            .map(|manifest| named(manifest, "/cfg/lemonfiber/.env").len()),
+        Some(1),
+        "the layout it was handed is not the one it named"
+    );
+    assert_eq!(
+        manifest.map(|manifest| named(&manifest, "/elsewhere").len()),
+        Some(0),
+        "it worked the layout out from the settings instead"
+    );
+}
+
 // --- Images shared with other projects ---------------------------------------
 
 /// An image another project's container is standing on is listed, marked
