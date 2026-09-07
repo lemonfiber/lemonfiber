@@ -147,7 +147,8 @@ mod tests {
 
     #[test]
     fn a_name_typed_exactly_as_it_is_printed_finds_its_line() {
-        let found = named(&inventory(), "qBittorrent web UI password");
+        let held = inventory();
+        let found = named(&held, "qBittorrent web UI password");
 
         assert_eq!(
             found.map(|one| one.setting.as_str()),
@@ -157,14 +158,16 @@ mod tests {
 
     #[test]
     fn the_setting_it_is_recorded_under_finds_it_too() {
-        let found = named(&inventory(), "sonarr_api_key");
+        let held = inventory();
+        let found = named(&held, "sonarr_api_key");
 
         assert_eq!(found.map(|one| one.name.as_str()), Some("Sonarr API key"));
     }
 
     #[test]
     fn a_word_out_of_the_name_finds_it_without_the_rest_of_the_sentence() {
-        let found = named(&inventory(), "  QBITTORRENT  ");
+        let held = inventory();
+        let found = named(&held, "  QBITTORRENT  ");
 
         assert_eq!(
             found.map(|one| one.name.as_str()),
@@ -174,12 +177,14 @@ mod tests {
 
     #[test]
     fn nothing_typed_names_nothing_rather_than_the_first_line() {
-        assert!(named(&inventory(), "   ").is_none());
+        let held = inventory();
+        assert!(named(&held, "   ").is_none());
     }
 
     #[test]
     fn a_name_nothing_answers_to_finds_nothing() {
-        assert!(named(&inventory(), "the wifi password").is_none());
+        let held = inventory();
+        assert!(named(&held, "the wifi password").is_none());
     }
 
     #[test]
