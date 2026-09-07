@@ -7,6 +7,8 @@
 //!
 //! Nothing here reaches a service, so every case runs in a test with no network.
 
+use std::time::Duration;
+
 use super::Validation;
 
 /// Read a service's answer to an authenticated identity request into an outcome.
@@ -48,6 +50,63 @@ fn untrusted_certificate(reason: &str) -> bool {
     ];
     let said = reason.to_ascii_lowercase();
     MARKERS.iter().any(|marker| said.contains(marker))
+}
+
+/// Whether a transport failure was this machine's own network rather than the service.
+///
+/// A name that cannot be resolved and a route that does not exist are not facts about
+/// the credential, nor about the host it names. They are facts about this machine, and
+/// they will hold for every credential asked about until the network is back.
+pub(crate) fn network_itself(reason: &str) -> bool {
+    const MARKERS: [&str; 5] = [
+        "dns error",
+        "failed to lookup address",
+        "no route to host",
+        "network is unreachable",
+        "temporary failure in name resolution",
+    ];
+    let said = reason.to_ascii_lowercase();
+    MARKERS.iter().any(|marker| said.contains(marker))
+}
+
+/// How long a service was waited for, at the precision the waiting is measured in.
+///
+/// Deliberately not [`crate::spoken::duration`], which rounds anything under a minute
+/// up to one: every validation timeout would then read the same, and the figure worth
+/// reporting is the one that tells a service which took nine seconds from one which
+/// took thirty.
+fn waited(elapsed: Duration) -> String {
+    let millis = elapsed.as_millis();
+    if millis < 1000 {
+        return format!("{millis}ms");
+    }
+    format!("{}.{}s", millis / 1000, millis % 1000 / 100)
+}
+
+/// A service that could not be reached, with how long it was given to answer.
+///
+/// Where the network itself is down the cause is stated once. Repeating it against
+/// every credential in turn reads as several bad credentials rather than one outage,
+/// and sends the operator checking keys that were never the problem.
+pub(crate) fn not_reached(
+    said: &str,
+    elapsed: Duration,
+    network: bool,
+    already_said: bool,
+) -> Validation {
+    if already_said {
+        return Validation::Unreachable {
+            detail: "the network is still down — the outage already reported, not a second credential gone wrong".to_owned(),
+        };
+    }
+    let detail = format!("{said} — after {}", waited(elapsed));
+    Validation::Unreachable {
+        detail: if network {
+            format!("{detail}. Nothing on this machine can reach anything, so this says nothing about the credential itself: every one will fail the same way until the network is back")
+        } else {
+            detail
+        },
+    }
 }
 
 /// A refusing status is the key being wrong; a well-formed identity proves it and

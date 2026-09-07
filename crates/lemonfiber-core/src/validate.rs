@@ -19,7 +19,9 @@
 //! Collapsing them into "validation failed" sends the operator after the wrong
 //! problem.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
@@ -162,6 +164,11 @@ pub struct Live {
     /// which may, supplies one. A `Usenet` credential with no transport is reported
     /// unreachable rather than pretended proven.
     nntp: Option<Arc<dyn Nntp>>,
+    /// Whether a total loss of network has already been reported by this validator.
+    ///
+    /// One outage, said once. Every credential proven afterwards would report the same
+    /// failure for the same reason, and a list of them reads as several bad keys.
+    network_said: AtomicBool,
 }
 
 impl Live {
@@ -169,7 +176,11 @@ impl Live {
     /// for a caller that proves only what HTTP answers.
     #[must_use]
     pub fn new(http: Arc<dyn Http>) -> Self {
-        Self { http, nntp: None }
+        Self {
+            http,
+            nntp: None,
+            network_said: AtomicBool::new(false),
+        }
     }
 
     /// The same, also able to prove a Usenet provider over `nntp`.
@@ -178,7 +189,16 @@ impl Live {
         Self {
             http,
             nntp: Some(nntp),
+            network_said: AtomicBool::new(false),
         }
+    }
+
+    /// What a transport failure amounts to: how long it was waited for, and whether
+    /// the network itself is down — stated once rather than against each credential.
+    fn not_reached(&self, said: String, reason: &str, elapsed: Duration) -> Validation {
+        let network = reading::network_itself(reason);
+        let already = network && self.network_said.swap(true, Ordering::Relaxed);
+        reading::not_reached(&said, elapsed, network, already)
     }
 
     /// Prove a Usenet provider by opening a connection and asking it to accept a
@@ -218,11 +238,13 @@ impl Live {
             format!("AUTHINFO USER {user}"),
             format!("AUTHINFO PASS {pass}"),
         ];
+        let started = Instant::now();
         match nntp.converse(&endpoint, &commands).await {
             Ok(replies) => interpret_usenet(&replies),
-            Err(unreachable) => Validation::Unreachable {
-                detail: unreachable.reason,
-            },
+            Err(unreachable) => {
+                let reason = unreachable.reason.clone();
+                self.not_reached(unreachable.reason, &reason, started.elapsed())
+            }
         }
     }
 
@@ -241,12 +263,15 @@ impl Live {
             body: None,
         };
 
+        let started = Instant::now();
         let response = match self.http.send(&request).await {
             Ok(response) => response,
             Err(unreachable) => {
-                return Validation::Unreachable {
-                    detail: persisting(&unreachable),
-                }
+                return self.not_reached(
+                    persisting(&unreachable),
+                    &unreachable.reason,
+                    started.elapsed(),
+                )
             }
         };
 
@@ -277,11 +302,14 @@ impl Live {
             body: None,
         };
 
+        let started = Instant::now();
         match self.http.send(&request).await {
             Ok(response) => interpret_service(response.status, &response.body),
-            Err(unreachable) => Validation::Unreachable {
-                detail: persisting(&unreachable),
-            },
+            Err(unreachable) => self.not_reached(
+                persisting(&unreachable),
+                &unreachable.reason,
+                started.elapsed(),
+            ),
         }
     }
 }
@@ -462,6 +490,54 @@ mod tests {
         assert!(named.contains("invalid peer certificate"), "{named}");
         assert!(named.contains("was not trusted"), "{named}");
         assert!(named.contains("trusted for that host"), "{named}");
+    }
+
+    /// A transport that fails every attempt with the given reason.
+    struct Failing(&'static str);
+
+    #[async_trait]
+    impl crate::ports::http::Http for Failing {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            Err(crate::ports::http::Unreachable::once(&request.url, self.0))
+        }
+    }
+
+    /// How long a service was given to answer is part of what could not be reached.
+    /// A wait that ran to the bound and an instant refusal are different facts, and
+    /// "unreachable" alone does not tell the operator which one happened.
+    #[tokio::test]
+    async fn a_service_that_did_not_answer_says_how_long_it_was_waited_for() {
+        let outcome = Live::new(Arc::new(Failing("connection refused")))
+            .validate(&indexer())
+            .await;
+        let said = format!("{outcome:?}");
+        assert!(said.contains("Unreachable"), "{said}");
+        // The transport's own words still lead.
+        assert!(said.contains("connection refused"), "{said}");
+        assert!(said.contains("after "), "{said}");
+        // A refused connection is the service, not the machine — no outage is claimed.
+        assert!(!said.contains("Nothing on this machine"), "{said}");
+    }
+
+    /// One outage is one thing that went wrong. Said against every credential in turn
+    /// it reads as several bad keys, and sends the operator checking the ones that
+    /// were never the problem.
+    #[tokio::test]
+    async fn a_network_that_is_down_is_said_once_and_not_against_each_credential() {
+        let validator = Live::new(Arc::new(Failing(
+            "dns error: failed to lookup address information",
+        )));
+
+        let first = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(first.contains("dns error"), "{first}");
+        assert!(first.contains("Nothing on this machine"), "{first}");
+
+        let second = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(second.contains("still down"), "{second}");
+        assert!(!second.contains("Nothing on this machine"), "{second}");
     }
 
     #[tokio::test]
