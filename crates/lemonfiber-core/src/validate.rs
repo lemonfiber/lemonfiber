@@ -19,7 +19,9 @@
 //! Collapsing them into "validation failed" sends the operator after the wrong
 //! problem.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
@@ -59,6 +61,19 @@ pub enum Credential {
         /// The account password.
         pass: String,
     },
+}
+
+/// A pasted credential with the whitespace around it removed.
+///
+/// A key copied from a provider's dashboard arrives with a trailing newline more often
+/// than not, and it authenticates nowhere. Refusing it teaches the operator nothing they
+/// can act on, so it is read as the key they meant.
+///
+/// Whitespace inside the value is left alone. That is not a paste artefact, and removing
+/// it would quietly change a value that legitimately contains one.
+#[must_use]
+pub fn pasted(value: &str) -> String {
+    value.trim().to_owned()
 }
 
 /// What proving a credential against its live service established — never the
@@ -149,6 +164,11 @@ pub struct Live {
     /// which may, supplies one. A `Usenet` credential with no transport is reported
     /// unreachable rather than pretended proven.
     nntp: Option<Arc<dyn Nntp>>,
+    /// Whether a total loss of network has already been reported by this validator.
+    ///
+    /// One outage, said once. Every credential proven afterwards would report the same
+    /// failure for the same reason, and a list of them reads as several bad keys.
+    network_said: AtomicBool,
 }
 
 impl Live {
@@ -156,7 +176,11 @@ impl Live {
     /// for a caller that proves only what HTTP answers.
     #[must_use]
     pub fn new(http: Arc<dyn Http>) -> Self {
-        Self { http, nntp: None }
+        Self {
+            http,
+            nntp: None,
+            network_said: AtomicBool::new(false),
+        }
     }
 
     /// The same, also able to prove a Usenet provider over `nntp`.
@@ -165,7 +189,16 @@ impl Live {
         Self {
             http,
             nntp: Some(nntp),
+            network_said: AtomicBool::new(false),
         }
+    }
+
+    /// What a transport failure amounts to: how long it was waited for, and whether
+    /// the network itself is down — stated once rather than against each credential.
+    fn not_reached(&self, said: &str, reason: &str, elapsed: Duration) -> Validation {
+        let network = reading::network_itself(reason);
+        let already = network && self.network_said.swap(true, Ordering::Relaxed);
+        reading::not_reached(said, elapsed, network, already)
     }
 
     /// Prove a Usenet provider by opening a connection and asking it to accept a
@@ -205,11 +238,12 @@ impl Live {
             format!("AUTHINFO USER {user}"),
             format!("AUTHINFO PASS {pass}"),
         ];
+        let started = Instant::now();
         match nntp.converse(&endpoint, &commands).await {
             Ok(replies) => interpret_usenet(&replies),
-            Err(unreachable) => Validation::Unreachable {
-                detail: unreachable.reason,
-            },
+            Err(unreachable) => {
+                self.not_reached(&unreachable.reason, &unreachable.reason, started.elapsed())
+            }
         }
     }
 
@@ -228,12 +262,12 @@ impl Live {
             body: None,
         };
 
+        let started = Instant::now();
         let response = match self.http.send(&request).await {
             Ok(response) => response,
             Err(unreachable) => {
-                return Validation::Unreachable {
-                    detail: persisting(&unreachable),
-                }
+                let said = persisting(&unreachable);
+                return self.not_reached(&said, &unreachable.reason, started.elapsed());
             }
         };
 
@@ -264,11 +298,13 @@ impl Live {
             body: None,
         };
 
+        let started = Instant::now();
         match self.http.send(&request).await {
             Ok(response) => interpret_service(response.status, &response.body),
-            Err(unreachable) => Validation::Unreachable {
-                detail: persisting(&unreachable),
-            },
+            Err(unreachable) => {
+                let said = persisting(&unreachable);
+                self.not_reached(&said, &unreachable.reason, started.elapsed())
+            }
         }
     }
 }
@@ -417,6 +453,108 @@ mod tests {
             super::persisting(&persisted),
             "connection refused — still failing after 3 attempts"
         );
+    }
+
+    /// The whitespace around a pasted key is a paste artefact; the whitespace inside
+    /// it is not, and a value that legitimately carries one keeps it.
+    #[test]
+    fn the_whitespace_around_a_pasted_key_is_not_part_of_the_key() {
+        assert_eq!(super::pasted("  abc123\n"), "abc123");
+        assert_eq!(super::pasted("\tabc123 "), "abc123");
+        assert_eq!(super::pasted("abc123"), "abc123");
+        assert_eq!(super::pasted("ab c123"), "ab c123");
+        assert_eq!(super::pasted("   "), "");
+    }
+
+    /// A certificate that was not trusted is a different problem from a connection
+    /// that was refused, and has a different remedy. Collapsed together, the operator
+    /// is sent to check a hostname and a port that were never wrong.
+    #[test]
+    fn a_certificate_that_was_not_trusted_is_told_apart_from_a_refused_connection() {
+        let refused =
+            crate::ports::http::Unreachable::once("https://indexer", "connection refused");
+        let plain = super::persisting(&refused);
+        assert!(!plain.contains("certificate"), "{plain}");
+
+        let untrusted = crate::ports::http::Unreachable::once(
+            "https://indexer",
+            "invalid peer certificate: UnknownIssuer",
+        );
+        let named = super::persisting(&untrusted);
+        // The transport's own words still lead — they are the account of what happened.
+        assert!(named.contains("invalid peer certificate"), "{named}");
+        assert!(named.contains("was not trusted"), "{named}");
+        assert!(named.contains("trusted for that host"), "{named}");
+    }
+
+    /// A transport that fails every attempt with the given reason.
+    struct Failing(&'static str);
+
+    #[async_trait]
+    impl crate::ports::http::Http for Failing {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            Err(crate::ports::http::Unreachable::once(&request.url, self.0))
+        }
+    }
+
+    /// How long a service was given to answer is part of what could not be reached.
+    /// A wait that ran to the bound and an instant refusal are different facts, and
+    /// "unreachable" alone does not tell the operator which one happened.
+    #[tokio::test]
+    async fn a_service_that_did_not_answer_says_how_long_it_was_waited_for() {
+        let outcome = Live::new(Arc::new(Failing("connection refused")))
+            .validate(&indexer())
+            .await;
+        let said = format!("{outcome:?}");
+        assert!(said.contains("Unreachable"), "{said}");
+        // The transport's own words still lead.
+        assert!(said.contains("connection refused"), "{said}");
+        assert!(said.contains("after "), "{said}");
+        // A refused connection is the service, not the machine — no outage is claimed.
+        assert!(!said.contains("Nothing on this machine"), "{said}");
+    }
+
+    /// One outage is one thing that went wrong. Said against every credential in turn
+    /// it reads as several bad keys, and sends the operator checking the ones that
+    /// were never the problem.
+    #[tokio::test]
+    async fn a_network_that_is_down_is_said_once_and_not_against_each_credential() {
+        let validator = Live::new(Arc::new(Failing(
+            "dns error: failed to lookup address information",
+        )));
+
+        let first = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(first.contains("dns error"), "{first}");
+        assert!(first.contains("Nothing on this machine"), "{first}");
+
+        let second = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(second.contains("still down"), "{second}");
+        assert!(!second.contains("Nothing on this machine"), "{second}");
+    }
+
+    /// An indexer refusing a key quotes it back inside its own description, and that
+    /// sentence is carried here verbatim. It must not reach the outcome: the outcome
+    /// is serialised into a report and printed to a terminal, both during first-run
+    /// setup, which is the moment those credentials are being entered.
+    #[tokio::test]
+    async fn a_service_that_quotes_the_key_back_does_not_carry_it_into_the_outcome() {
+        let refusal = "apikey=the-secret-key is not a valid key";
+        let body = format!("<error code=\"100\" description=\"{refusal}\"/>");
+        let outcome = answering(&body).validate(&indexer()).await;
+        let said = format!("{outcome:?}");
+        // Deliberately not printing the outcome here: a guard that reports the leak by
+        // repeating it is the thing it watches for.
+        assert!(
+            !said.contains("the-secret-key"),
+            "the key reached the outcome"
+        );
+        // Withheld where the value was, rather than the sentence being dropped whole —
+        // the operator still needs to know which key was refused and why.
+        assert!(said.contains("apikey"), "{said}");
+        assert!(said.contains("not a valid key"), "{said}");
     }
 
     #[tokio::test]

@@ -14,10 +14,10 @@ use std::path::{Path, PathBuf};
 
 use crate::ports::filesystem::FileSystem;
 use crate::storage::{self, Linked};
-use crate::validate::{Credential, Validation, Validator};
+use crate::validate::{pasted, Credential, Validation, Validator};
 use crate::wizard::{Answer, Indexer, Provider, Vpn};
 
-use super::{CredentialChoice, Prompt, StorageWarning};
+use super::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
 
 /// Ask whether a VPN carries the torrents, and where none does, make sure the
 /// operator chose that knowingly.
@@ -80,6 +80,10 @@ pub(super) async fn resolve_credentials(prompt: &dyn Prompt, validator: &dyn Val
         let Some((url, key)) = prompt.credential() else {
             return Answer::Credentials(None);
         };
+        // Trimmed before it is either proven or kept, so the value tested is the value
+        // stored. Trimming only at the point of testing would prove one string and
+        // record another.
+        let (url, key) = (pasted(&url), pasted(&key));
         // Tested once, the moment it is entered: the service is asked, and what it
         // answered is all the operator is shown or the answer records.
         let outcome = validator
@@ -119,6 +123,12 @@ pub(super) async fn resolve_provider(prompt: &dyn Prompt, validator: &dyn Valida
     loop {
         let Some(entry) = prompt.usenet_provider() else {
             return Answer::Provider(None);
+        };
+        let entry = ProviderEntry {
+            host: pasted(&entry.host),
+            user: pasted(&entry.user),
+            pass: pasted(&entry.pass),
+            ..entry
         };
         let outcome = validator
             .validate(&Credential::Usenet {

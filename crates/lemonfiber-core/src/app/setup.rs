@@ -481,6 +481,7 @@ mod tests {
     struct Proving {
         outcomes: Vec<Validation>,
         calls: AtomicUsize,
+        asked: std::sync::Mutex<Vec<Credential>>,
     }
 
     impl Proving {
@@ -488,13 +489,17 @@ mod tests {
             Self {
                 outcomes,
                 calls: AtomicUsize::new(0),
+                asked: std::sync::Mutex::new(Vec::new()),
             }
         }
     }
 
     #[async_trait]
     impl Validator for Proving {
-        async fn validate(&self, _credential: &Credential) -> Validation {
+        async fn validate(&self, credential: &Credential) -> Validation {
+            if let Ok(mut seen) = self.asked.lock() {
+                seen.push(credential.clone());
+            }
             let call = self.calls.fetch_add(1, Ordering::SeqCst);
             let index = call.min(self.outcomes.len() - 1);
             self.outcomes[index].clone()
@@ -503,6 +508,16 @@ mod tests {
 
     /// A validator whose outcome does not matter because the run never enters a
     /// credential — the credential-free tests skip that step.
+    impl Proving {
+        /// The credentials it was asked to prove, in the order it was asked.
+        fn asked(&self) -> Vec<Credential> {
+            self.asked
+                .lock()
+                .map(|seen| seen.clone())
+                .unwrap_or_default()
+        }
+    }
+
     fn proving() -> Proving {
         Proving::giving(vec![Validation::Valid {
             observed: "unused".to_owned(),
@@ -1452,6 +1467,57 @@ mod tests {
             on_failure,
             ..Scripted::workable(dir.join("data-root"))
         }
+    }
+
+    /// A key pasted with whitespace around it is trimmed before it is proven and
+    /// before it is kept, so the value tested is the value stored.
+    ///
+    /// Trimming at only one of the two would be worse than trimming at neither: the
+    /// operator would watch the key prove itself and then find the stored one does not
+    /// work, which is the silent failure this whole feature exists to prevent.
+    #[tokio::test]
+    async fn a_pasted_key_is_trimmed_before_it_is_proven_and_before_it_is_kept() {
+        let dir = scratch("cred-pasted");
+        let paths = layout(&dir);
+        let mut wizard = Wizard::new(Environment::LinuxNative);
+        let prompt = Scripted {
+            credential: Some((
+                "  http://indexer.test/api\n".to_owned(),
+                "\tthe-key \n".to_owned(),
+            )),
+            on_failure: CredentialChoice::Skip,
+            ..Scripted::workable(dir.join("data-root"))
+        };
+        let validator = Proving::giving(vec![Validation::Valid {
+            observed: "answered a search — 12 result(s) offered".to_owned(),
+        }]);
+
+        let outcome = run(
+            &mut wizard,
+            &prompt,
+            &ProbeFs::links(),
+            &validator,
+            &paths,
+            external(),
+            "t",
+        )
+        .await;
+        assert!(matches!(outcome, Ok(Outcome::Applied)));
+
+        // What the service was actually asked about — not merely that a call was made.
+        let asked = validator.asked();
+        assert_eq!(
+            asked.as_slice(),
+            [Credential::Indexer {
+                url: "http://indexer.test/api".to_owned(),
+                key: "the-key".to_owned(),
+            }]
+        );
+
+        // ...and the same string is what was written down.
+        let file = store::read(&paths.env_file()).unwrap_or_default();
+        assert_eq!(file.get("INDEXER_APIKEY"), Some("the-key"));
+        assert_eq!(file.get("INDEXER_URL"), Some("http://indexer.test/api"));
     }
 
     #[tokio::test]
