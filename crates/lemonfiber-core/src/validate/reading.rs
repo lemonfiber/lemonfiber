@@ -19,10 +19,35 @@ use super::Validation;
 /// answer every time it was asked is down, and those are different things to do
 /// about.
 pub(crate) fn persisting(unreachable: &crate::ports::http::Unreachable) -> String {
-    match crate::retry::said(unreachable.attempts) {
+    let said = match crate::retry::said(unreachable.attempts) {
         Some(persisted) => format!("{} — {persisted}", unreachable.reason),
         None => unreachable.reason.clone(),
+    };
+    if untrusted_certificate(&unreachable.reason) {
+        return format!(
+            "{said} — the certificate was not trusted, so the credential was never sent to prove it; verification is not skipped on its own, and a service presenting its own certificate has to be trusted for that host first"
+        );
     }
+    said
+}
+
+/// Whether a transport failure was the certificate rather than the connection.
+///
+/// A private indexer behind its own certificate fails during the handshake, which
+/// arrives here indistinguishable from a refused connection — and sends the operator to
+/// check the hostname, the port and their own connectivity, none of which is wrong. The
+/// remedy is a different one, so where the transport names a certificate, so does this.
+fn untrusted_certificate(reason: &str) -> bool {
+    const MARKERS: [&str; 6] = [
+        "certificate",
+        "unknownissuer",
+        "self-signed",
+        "self signed",
+        "certnotvalidfor",
+        "tls handshake",
+    ];
+    let said = reason.to_ascii_lowercase();
+    MARKERS.iter().any(|marker| said.contains(marker))
 }
 
 /// A refusing status is the key being wrong; a well-formed identity proves it and

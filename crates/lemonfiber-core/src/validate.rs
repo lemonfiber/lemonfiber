@@ -61,6 +61,19 @@ pub enum Credential {
     },
 }
 
+/// A pasted credential with the whitespace around it removed.
+///
+/// A key copied from a provider's dashboard arrives with a trailing newline more often
+/// than not, and it authenticates nowhere. Refusing it teaches the operator nothing they
+/// can act on, so it is read as the key they meant.
+///
+/// Whitespace inside the value is left alone. That is not a paste artefact, and removing
+/// it would quietly change a value that legitimately contains one.
+#[must_use]
+pub fn pasted(value: &str) -> String {
+    value.trim().to_owned()
+}
+
 /// What proving a credential against its live service established — never the
 /// input, only the outcome.
 ///
@@ -417,6 +430,38 @@ mod tests {
             super::persisting(&persisted),
             "connection refused — still failing after 3 attempts"
         );
+    }
+
+    /// The whitespace around a pasted key is a paste artefact; the whitespace inside
+    /// it is not, and a value that legitimately carries one keeps it.
+    #[test]
+    fn the_whitespace_around_a_pasted_key_is_not_part_of_the_key() {
+        assert_eq!(super::pasted("  abc123\n"), "abc123");
+        assert_eq!(super::pasted("\tabc123 "), "abc123");
+        assert_eq!(super::pasted("abc123"), "abc123");
+        assert_eq!(super::pasted("ab c123"), "ab c123");
+        assert_eq!(super::pasted("   "), "");
+    }
+
+    /// A certificate that was not trusted is a different problem from a connection
+    /// that was refused, and has a different remedy. Collapsed together, the operator
+    /// is sent to check a hostname and a port that were never wrong.
+    #[test]
+    fn a_certificate_that_was_not_trusted_is_told_apart_from_a_refused_connection() {
+        let refused =
+            crate::ports::http::Unreachable::once("https://indexer", "connection refused");
+        let plain = super::persisting(&refused);
+        assert!(!plain.contains("certificate"), "{plain}");
+
+        let untrusted = crate::ports::http::Unreachable::once(
+            "https://indexer",
+            "invalid peer certificate: UnknownIssuer",
+        );
+        let named = super::persisting(&untrusted);
+        // The transport's own words still lead — they are the account of what happened.
+        assert!(named.contains("invalid peer certificate"), "{named}");
+        assert!(named.contains("was not trusted"), "{named}");
+        assert!(named.contains("trusted for that host"), "{named}");
     }
 
     #[tokio::test]
