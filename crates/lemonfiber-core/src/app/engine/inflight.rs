@@ -41,7 +41,7 @@ use crate::dashboard::Protocol;
 use crate::error::Problem;
 use crate::plural::s;
 use crate::ports::service::Download;
-use crate::stack::closure::resolve;
+use crate::stack::closure::{everything, resolve};
 use crate::stack::compose::Action;
 
 /// Whether a teardown lets what is still coming down finish before it stops.
@@ -98,7 +98,16 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
         let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
             return Vec::new();
         };
-        let Ok(plan) = resolve(&manifest, forms, ctx.settings.protocols) else {
+        // Naming no form asks about everything, which is what an empty list means
+        // everywhere else a plan is resolved. It did not mean it here, and the cost
+        // was silent: `lemonfiber down --wait` with no form named waited for the
+        // downloads inside no services at all and stopped immediately.
+        let resolved = if forms.is_empty() {
+            everything(&manifest, ctx.settings.protocols)
+        } else {
+            resolve(&manifest, forms, ctx.settings.protocols)
+        };
+        let Ok(plan) = resolved else {
             return Vec::new();
         };
         let profiles: Vec<String> = plan.profiles.into_iter().collect();
@@ -173,7 +182,7 @@ pub(in crate::app) async fn teardown(
 /// Said again only when the count changes, because a line repeated every ten seconds
 /// is one whoever is reading scrolls past — and the one moment it has news is the
 /// moment another download finishes.
-async fn drained(ctx: &Ctx, forms: &[String]) {
+pub(in crate::app) async fn drained(ctx: &Ctx, forms: &[String]) {
     let mut counted = usize::MAX;
     loop {
         let active = in_flight(ctx, forms).await;

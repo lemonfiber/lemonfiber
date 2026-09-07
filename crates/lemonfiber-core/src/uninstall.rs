@@ -36,9 +36,6 @@ pub const NEEDS_AGREEING: Code = Code::new("GONE-1");
 /// standing now.
 pub const ANOTHER_READING: Code = Code::new("GONE-2");
 
-/// Raised when a word names none of the four removals.
-pub const NO_SUCH_TIER: Code = Code::new("GONE-3");
-
 /// What sort of thing one line of a manifest is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]

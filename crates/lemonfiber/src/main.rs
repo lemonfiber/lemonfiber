@@ -44,7 +44,7 @@ use setup::{greeting, setting_up};
 use stopping::Choice;
 use translate::{
     bundling, configuration, diagnosing, hosting, household, invitation, letting, quality,
-    restarting, traced,
+    removing, restarting, traced,
 };
 
 /// Logs as a screen, or logs as a stream.
@@ -313,6 +313,7 @@ async fn main() -> ExitCode {
         Request::Reissue { name } => Command::Reissue { name },
         Request::Remove { name, confirm } => Command::Remove { name, confirm },
         Request::Forget { confirm } => Command::Forget { confirm },
+        Request::Uninstall(asked) => removing(asked),
         Request::Space { confirm } => Command::Space { confirm },
         Request::StopSeeding { download, offer } => letting(download, offer),
         Request::Bandwidth(asked) => translate::sharing(asked),

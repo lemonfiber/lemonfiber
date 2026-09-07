@@ -18,7 +18,7 @@ pub use takers::{
     TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM,
     TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
     TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM,
-    TAKES_WAITING,
+    TAKES_TIER, TAKES_WAITING,
 };
 
 use lemonfiber_core::app::Waiting;
@@ -108,6 +108,13 @@ pub struct Arguments {
     pub request: Option<i64>,
     /// Why a request is being turned down.
     pub reason: Option<String>,
+    /// Which of the four removals an uninstall was asked for.
+    ///
+    /// A word rather than a level, for the reason `policy` is a word: they are four
+    /// decisions and not a scale, and one this build does not know is refused by
+    /// name rather than falling to whichever removal the shape happened to default
+    /// to — which on this subject would be a library gone.
+    pub tier: Option<String>,
     /// Which command this machine is being asked to keep running, or stop keeping.
     ///
     /// A word rather than a switch, for the reason `policy` is one: there is more than

@@ -117,6 +117,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // a failure is a cleanup that was agreed to and could not finish.
         Outcome::Space(report) => accounting(report),
         Outcome::Letting(offer) => letting_go(offer),
+        // A reading is a question and asking one is never a failure. A removal that
+        // could not take everything left something behind, and a script that read
+        // that as success would carry on believing the machine was clean.
+        Outcome::Uninstall(report) => removing_it(&report.removal),
         // Accounting for the line is a question too, and one answer to it is a
         // failure a script has to be able to see: a limit that was handed to a
         // client and did not take is a setting the operator believes is in force
@@ -226,6 +230,20 @@ fn letting_go(offer: &lemonfiber_core::space::Letting) -> ExitCode {
         ExitCode::SUCCESS
     } else {
         ExitCode::from(VALIDATION)
+    }
+}
+
+/// The exit code an uninstall earns.
+///
+/// A reading and a rehearsal both succeed: neither was asked to remove anything, so
+/// neither has failed to. What earns a failure is the one answer a script must not
+/// read as done — a removal that ran and left something behind.
+fn removing_it(removal: &lemonfiber_core::uninstall::Removal) -> ExitCode {
+    match removal {
+        lemonfiber_core::uninstall::Removal::Surveyed
+        | lemonfiber_core::uninstall::Removal::Confirmed
+        | lemonfiber_core::uninstall::Removal::Complete { .. } => ExitCode::SUCCESS,
+        lemonfiber_core::uninstall::Removal::Partial { .. } => ExitCode::from(FAILURE),
     }
 }
 

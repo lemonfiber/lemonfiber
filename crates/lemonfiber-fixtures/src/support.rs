@@ -60,6 +60,21 @@ impl Recording {
                 .any(|argv| argv.iter().any(|word| word == subcommand))
         })
     }
+
+    /// Every argument vector it was handed, in the order it was handed them.
+    ///
+    /// [`Self::ran`] answers about one word, which is what a test about one command
+    /// wants. A test whose claim is about *everything* that ran — that no invocation
+    /// anywhere asked to become another account — cannot be made from a question
+    /// asked one word at a time, because the word it forgot to ask about is the one
+    /// that would have failed it.
+    #[must_use]
+    pub fn seen(&self) -> Vec<Vec<String>> {
+        self.seen
+            .lock()
+            .map(|seen| seen.clone())
+            .unwrap_or_default()
+    }
 }
 
 #[async_trait]

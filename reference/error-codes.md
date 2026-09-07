@@ -45,6 +45,8 @@ what to do about it, is written for operators at
 - `FORM-2`
 - `FORM-3`
 - `FORM-4`
+- `GONE-1`
+- `GONE-2`
 - `HOST-1`
 - `HOST-2`
 - `HOST-3`

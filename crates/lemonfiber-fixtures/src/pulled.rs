@@ -69,10 +69,9 @@ mod tests {
             .images()
             .await;
 
-        assert_eq!(
-            listed.map(|images| images.len()),
-            Ok(1),
-            "the scripted image is the one that comes back"
+        assert!(
+            listed.is_ok_and(|images| images.len() == 1),
+            "the scripted image is not the one that comes back"
         );
     }
 

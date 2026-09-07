@@ -68,7 +68,10 @@ impl Tier {
     #[must_use]
     pub const fn keeps(self) -> &'static str {
         match self {
-            Self::Stop => "Everything. Nothing is removed at all.",
+            Self::Stop => {
+                "Everything, your library included. Nothing is removed at all — the \
+                 services are stopped and can be started again."
+            }
             Self::Services => {
                 "Every setting, every service's own configuration, and your whole library."
             }
@@ -80,10 +83,24 @@ impl Tier {
         }
     }
 
-    /// Whether this tier reaches the container engine.
+    /// Whether this tier asks the engine what containers it is holding.
+    ///
+    /// The two that stop or remove them. A removal of files has no question for a
+    /// daemon, and one that asked anyway would report a machine as half-unreadable
+    /// over something it was never going to touch.
     #[must_use]
-    pub const fn touches_engine(self) -> bool {
+    pub const fn touches_containers(self) -> bool {
         matches!(self, Self::Stop | Self::Services)
+    }
+
+    /// Whether this tier asks the engine what it has pulled.
+    ///
+    /// One of them. Stopping the services leaves every image where it is, so what was
+    /// pulled is not part of what a stop is agreeing to — and asking would be a
+    /// listing of the whole machine's images for a command that removes none of them.
+    #[must_use]
+    pub const fn touches_images(self) -> bool {
+        matches!(self, Self::Services)
     }
 
     /// Whether this tier removes anything lemonfiber or a service wrote down.
@@ -172,10 +189,23 @@ mod tests {
     /// daemon from being in the way of removing files.
     #[test]
     fn only_the_tiers_that_need_the_engine_reach_it() {
-        assert!(Tier::Stop.touches_engine() && Tier::Services.touches_engine());
-        assert!(!Tier::Configuration.touches_engine() && !Tier::Media.touches_engine());
+        assert!(Tier::Stop.touches_containers() && Tier::Services.touches_containers());
+        assert!(!Tier::Configuration.touches_containers() && !Tier::Media.touches_containers());
         assert!(Tier::Configuration.touches_configuration());
         assert!(!Tier::Services.touches_configuration());
+    }
+
+    /// Only the removal that takes the images asks what was pulled. Stopping leaves
+    /// every one of them where it is, so a listing of the whole machine's images is
+    /// not part of what a stop is agreed to.
+    #[test]
+    fn only_the_tier_that_removes_images_asks_what_was_pulled() {
+        let asking: Vec<Tier> = EVERY
+            .into_iter()
+            .filter(|tier| tier.touches_images())
+            .collect();
+
+        assert_eq!(asking, vec![Tier::Services]);
     }
 
     #[test]

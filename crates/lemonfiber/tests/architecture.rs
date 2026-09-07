@@ -270,7 +270,11 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         ("std::process::Command", &["adapters/process.rs"]),
         (
             "bollard",
-            &["adapters/docker.rs", "adapters/docker/translate.rs"],
+            &[
+                "adapters/docker.rs",
+                "adapters/docker/translate.rs",
+                "adapters/docker/images.rs",
+            ],
         ),
         ("reqwest", &["adapters/http.rs"]),
         ("sysinfo", &["adapters/filesystem.rs"]),

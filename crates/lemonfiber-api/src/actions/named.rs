@@ -22,8 +22,11 @@
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, Hostable, Keeping, QualityAction, Waiting, HOSTABLE};
+use lemonfiber_core::app::{
+    Command, Hostable, Keeping, QualityAction, Removing, Waiting, HOSTABLE,
+};
 use lemonfiber_core::doctor::Narrowing;
+use lemonfiber_core::uninstall::{Tier, TIERS};
 
 mod household;
 mod sharing;
@@ -51,6 +54,7 @@ pub const OFFERED: &[&str] = &[
     "adopt",
     "reset",
     "forget",
+    "uninstall",
     "space",
     "stop-seeding",
     "bandwidth",
@@ -192,6 +196,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         season,
         download,
         kept,
+        tier,
         ..
     } = given;
     match action {
@@ -224,6 +229,10 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "space" => Ok(Command::Space { confirm }),
         // The one thing that account names and leaves alone, asked for on its own.
         "stop-seeding" => stopping(download, offer),
+        // Unconfirmed it is the listing `/api/uninstall` answers with, so what a
+        // browser agrees to is what it was shown. Which removal is required: one
+        // with none named has lost the only part of it that decides what goes.
+        "uninstall" => removing(tier, confirm, offer, wait),
         "backup" => Ok(Command::Backup { service }),
         // The two reads this surface serves twice, each reaching the same command its
         // own endpoint reaches and widened by the same word the command line widens
@@ -293,6 +302,43 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
 /// Named apart from the table for the reason the setting is: it can refuse, and a
 /// reading that can refuse belongs beside its refusal rather than inside a list of
 /// arms. What it offers is built from the list itself, so a command that becomes
+/// Which of the four removals was asked for, and what was answered about it.
+///
+/// The removal is required: one with none named has lost the only part of it that
+/// decides what goes, and defaulting it would mean a request that lost a word in
+/// transit removing something nobody asked about. A word that names none of the four
+/// is refused by name, with the four listed — for the reason a hostable is.
+///
+/// Nothing typed is nothing agreed to, which is why an empty name is dropped rather
+/// than carried: a listing answered with an empty name is an answer to no listing.
+fn removing(
+    tier: Option<String>,
+    confirm: bool,
+    offer: Option<String>,
+    wait: Waiting,
+) -> Result<Command, Refused> {
+    let Some(named) = tier else {
+        return Err(Refused::Missing {
+            action: "uninstall".to_owned(),
+            argument: "tier".to_owned(),
+        });
+    };
+    let chosen = Tier::named(&named).ok_or_else(|| Refused::Unrecognised {
+        argument: named,
+        offered: TIERS
+            .iter()
+            .map(|tier| tier.name())
+            .collect::<Vec<_>>()
+            .join(", "),
+    })?;
+    Ok(Command::Uninstall(
+        Removing::surveying(chosen)
+            .confirmed(confirm)
+            .agreeing(offer.filter(|given| !given.trim().is_empty()))
+            .waiting(wait),
+    ))
+}
+
 /// hostable is offered here without anybody remembering to say so.
 fn keeping(action: &str, kept: Option<String>) -> Result<Hostable, Refused> {
     let Some(named) = kept else {

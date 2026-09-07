@@ -30,9 +30,10 @@
 
 mod asked;
 
-use lemonfiber_core::app::{BandwidthAsked, Command, Keeping, QualityAction};
+use lemonfiber_core::app::{BandwidthAsked, Command, Keeping, QualityAction, Removing};
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::uninstall::Tier;
 
 pub(crate) use asked::{Asked, FOLLOW, FORM, SERVICE, TAIL};
 
@@ -103,6 +104,14 @@ pub const STORED: &str = "/api/stored";
 /// this one reaches the command with nothing confirmed.
 pub const SPACE: &str = "/api/space";
 
+/// What taking lemonfiber off this machine would come to, at one of four removals.
+///
+/// A read rather than the action of the same name, and the two answer with the same
+/// document: the listing is what a browser is shown, and what a browser agrees to
+/// afterwards is what the listing named. A read never removes anything, so this one
+/// reaches the command with nothing confirmed.
+pub const UNINSTALL: &str = "/api/uninstall";
+
 /// How the line is shared, what that costs, and whether the clients keep to it.
 ///
 /// A read rather than the action of the same name, and the two answer with the same
@@ -151,7 +160,7 @@ pub const BUNDLE: &str = "/api/bundle/{name}";
 /// arrangement this exists to prevent.
 pub const OFFERED: &[&str] = &[
     VERSION, FORMS, STATUS, SERVICES, CHECKS, STORAGE, REQUESTS, HOSTING, FRONT_DOOR, TRACE, STUCK,
-    CONFIG, QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, SPACE, BANDWIDTH, CLIENTS,
+    CONFIG, QUALITY, EXPLAIN, BACKUPS, OUTBOUND, STORED, UNINSTALL, SPACE, BANDWIDTH, CLIENTS,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -171,6 +180,10 @@ pub const NO_SUCH_GROUP: &str = "There is no group of checks and no check by tha
 
 /// What is said where no read goes by the name that was asked for.
 pub const NO_SUCH_READ: &str = "There is no read by that name.";
+
+/// What is said to a request naming a removal that is none of the four.
+pub const NO_SUCH_REMOVAL: &str =
+    "Which removal must be one of stop, services, configuration or media.";
 
 /// What a read was given, mirroring the flags its command takes.
 ///
@@ -194,6 +207,8 @@ pub struct Wanted {
     pub only: Option<String>,
     /// The word to explain, instead of every word there is to ask about.
     pub word: Option<String>,
+    /// Which of the four removals to read.
+    pub tier: Option<String>,
 }
 
 /// What a read was given, or why the request cannot be read as it stands.
@@ -224,6 +239,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         key,
         only,
         word,
+        tier,
     } = given;
     match read {
         VERSION => Ok(Command::Version),
@@ -253,6 +269,10 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         BACKUPS => Ok(Command::Archives),
         OUTBOUND => Ok(Command::Outbound),
         STORED => Ok(Command::Stored),
+        // Which removal is the one thing this takes, and a name that is none of the
+        // four is refused rather than read as the safest — somebody who typed a word
+        // and meant it must not be given a different removal because of a spelling.
+        UNINSTALL => removing(tier),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an
         // answer to that offer goes.
@@ -264,6 +284,19 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         CLIENTS => Ok(Command::Clients),
         _ => Err(NO_SUCH_READ),
     }
+}
+
+/// The removal a name asks for, read and nothing more.
+///
+/// Naming none reads the one that removes nothing, which is the safe reading and the
+/// one a browser opening the page has not chosen anything by.
+fn removing(tier: Option<String>) -> Result<Command, &'static str> {
+    let Some(named) = tier else {
+        return Ok(Command::Uninstall(Removing::surveying(Tier::Stop)));
+    };
+    Tier::named(&named)
+        .map(|tier| Command::Uninstall(Removing::surveying(tier)))
+        .ok_or(NO_SUCH_REMOVAL)
 }
 
 /// A diagnosis, narrowed or whole.

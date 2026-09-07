@@ -9624,6 +9624,450 @@
         }
       }
     },
+    "uninstall": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Uninstall"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Coming": {
+          "description": "One download still coming down when the removal was asked for.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "What it is, as the client names it.",
+              "type": "string"
+            },
+            "progress": {
+              "description": "How far along, from zero to a hundred.",
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            }
+          },
+          "required": [
+            "name",
+            "progress"
+          ]
+        },
+        "Confidence": {
+          "description": "How much of a manifest was read and how much stood in for what could not be.",
+          "type": "object",
+          "properties": {
+            "complete": {
+              "description": "Whether every source this tier needed answered.",
+              "type": "boolean"
+            },
+            "unread": {
+              "description": "What could not be read, each in the words of whatever refused.\n\nThe point of the field: a manifest that is short says so and says why, rather\nthan reading as a machine with less on it than it has.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "complete",
+            "unread"
+          ]
+        },
+        "Foreign": {
+          "description": "Something beneath the data location that the stack did not put there.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "description": "The directory it is in, relative to the data location — or the file itself,\nwhere it sits directly in the data location.",
+              "type": "string"
+            },
+            "bytes": {
+              "description": "What they occupy.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "files": {
+              "description": "How many files were found under it.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "at",
+            "files",
+            "bytes"
+          ]
+        },
+        "Item": {
+          "description": "One thing a removal reaches, said to be going or said to be kept.",
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "description": "What it occupies, where that is knowable. Absent for a container or a network,\nwhose room is the image's rather than their own.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "kept": {
+              "description": "Why it is being kept rather than removed, where it is being kept.\n\n`None` is the ordinary case: this line is going. A reason here is the whole of\nhow an image shared with another project, or a path this run could not\nconfirm, stays on the list without being taken.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "description": "What it is called — a container name, an image reference, or a full path.",
+              "type": "string"
+            },
+            "secret": {
+              "description": "Whether it holds a credential, so a report can say what destroying it destroys.",
+              "type": "boolean"
+            },
+            "sort": {
+              "description": "Which of the four sorts of thing it is.",
+              "$ref": "#/$defs/Sort"
+            },
+            "what": {
+              "description": "What it is, in the operator's words.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "sort",
+            "what",
+            "secret"
+          ]
+        },
+        "Left": {
+          "description": "Something a removal could not take.",
+          "type": "object",
+          "properties": {
+            "by_hand": {
+              "description": "How to finish it by hand.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What is still there.",
+              "type": "string"
+            },
+            "why": {
+              "description": "What the machine said about it, verbatim.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why",
+            "by_hand"
+          ]
+        },
+        "Manifest": {
+          "description": "What removing would come to, shown before anything is removed.",
+          "type": "object",
+          "properties": {
+            "agreement": {
+              "description": "What this reading names itself, so an answer says which reading it answered.",
+              "type": "string"
+            },
+            "backup": {
+              "description": "Whether a backup was offered before configuration is destroyed, and how.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bytes": {
+              "description": "What the lines that are going occupy, where that is knowable.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "coming": {
+              "description": "What is still coming down, which stopping would interrupt.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Coming"
+              }
+            },
+            "confidence": {
+              "description": "How much of this was read, and what could not be.",
+              "$ref": "#/$defs/Confidence"
+            },
+            "foreign": {
+              "description": "What is beneath the data location that the stack did not put there.\n\nNot a warning. While this is non-empty the data location is never removed as\none tree, and only the stack's own directories beneath it are offered.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Foreign"
+              }
+            },
+            "items": {
+              "description": "Every line it reaches, each said to be going or said to be kept.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Item"
+              }
+            },
+            "keeps": {
+              "description": "What it leaves alone, in the operator's words.",
+              "type": "string"
+            },
+            "outside": {
+              "description": "What lemonfiber cannot remove, each with how to remove it by hand.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Outside"
+              }
+            },
+            "removes": {
+              "description": "What it takes, in the operator's words.",
+              "type": "string"
+            },
+            "tier": {
+              "description": "Which removal this is.",
+              "$ref": "#/$defs/Tier"
+            },
+            "volume": {
+              "description": "Whether the data location is on a network share or a drive that unplugs.\n\nSaid where it is, so removing across a mount an operator forgot was a mount is\nsomething they read before agreeing rather than after.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "tier",
+            "removes",
+            "keeps",
+            "items",
+            "bytes",
+            "foreign",
+            "coming",
+            "outside",
+            "confidence",
+            "agreement"
+          ]
+        },
+        "Outside": {
+          "description": "Something an uninstall leaves behind, and how to remove it by hand.",
+          "type": "object",
+          "properties": {
+            "by_hand": {
+              "description": "How to remove it on this platform, as the operator would type or do it.",
+              "type": "string"
+            },
+            "found": {
+              "description": "Whether this machine was found to have it.\n\nA survey that could not look says nothing was found rather than that nothing\nis there, which is why the entry is listed either way and this field carries\nthe difference.",
+              "type": "boolean"
+            },
+            "what": {
+              "description": "What it is.",
+              "type": "string"
+            },
+            "why": {
+              "description": "Why it is not lemonfiber's to take away.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "why",
+            "by_hand",
+            "found"
+          ]
+        },
+        "Removal": {
+          "description": "Whether anything was removed on this run, and what became of it.\n\nFour states rather than the five a removal passes through. `removing` is the\ninterval between the last two and is said through the narrator as it happens — a\nvalue returned at the end cannot be the state a run is in while it runs, and a\nvariant nothing could ever answer with would be a state that is documentation\npretending to be a value.",
+          "oneOf": [
+            {
+              "description": "Everything is enumerated with its size, and nothing has been removed.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "surveyed"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "The tier and the manifest were agreed to, and this run changes nothing — the\nstate a rehearsal ends in.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "confirmed"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Everything the manifest named as going is gone.",
+              "type": "object",
+              "properties": {
+                "credentials": {
+                  "description": "The credentials this destroyed, said rather than left to be inferred.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "gone": {
+                  "description": "What went, by the name the manifest gave it.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "state": {
+                  "type": "string",
+                  "const": "complete"
+                }
+              },
+              "required": [
+                "state",
+                "gone",
+                "credentials"
+              ]
+            },
+            {
+              "description": "Some of it could not be removed, and each of those is named with how to\nfinish it by hand.",
+              "type": "object",
+              "properties": {
+                "credentials": {
+                  "description": "The credentials this destroyed.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "gone": {
+                  "description": "What went, by the name the manifest gave it.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "left": {
+                  "description": "What is still there, and how to remove it.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Left"
+                  }
+                },
+                "state": {
+                  "type": "string",
+                  "const": "partial"
+                }
+              },
+              "required": [
+                "state",
+                "gone",
+                "credentials",
+                "left"
+              ]
+            }
+          ]
+        },
+        "Sort": {
+          "description": "What sort of thing one line of a manifest is.",
+          "oneOf": [
+            {
+              "description": "A container the engine is holding.",
+              "type": "string",
+              "const": "container"
+            },
+            {
+              "description": "A network the containers were on.",
+              "type": "string",
+              "const": "network"
+            },
+            {
+              "description": "An image that was pulled.",
+              "type": "string",
+              "const": "image"
+            },
+            {
+              "description": "A directory or file on this machine.",
+              "type": "string",
+              "const": "path"
+            }
+          ]
+        },
+        "Tier": {
+          "description": "Which of the four removals was asked for.",
+          "oneOf": [
+            {
+              "description": "Nothing removed. The services are stopped and everything stays where it is.",
+              "type": "string",
+              "const": "stop"
+            },
+            {
+              "description": "The containers, the networks between them, and the images that were pulled.",
+              "type": "string",
+              "const": "services"
+            },
+            {
+              "description": "Each service's own configuration, lemonfiber's own state, and the credentials\nin both.",
+              "type": "string",
+              "const": "configuration"
+            },
+            {
+              "description": "The library and the downloads.",
+              "type": "string",
+              "const": "media"
+            }
+          ]
+        },
+        "Uninstall": {
+          "description": "A removal, before or after it happened.",
+          "type": "object",
+          "properties": {
+            "manifest": {
+              "description": "What removing would come to, or what it came to.",
+              "$ref": "#/$defs/Manifest"
+            },
+            "removal": {
+              "description": "Whether anything was removed on this run.",
+              "$ref": "#/$defs/Removal"
+            }
+          },
+          "required": [
+            "manifest",
+            "removal"
+          ]
+        }
+      }
+    },
     "upgrade": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

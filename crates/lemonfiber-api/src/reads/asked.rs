@@ -24,7 +24,7 @@ use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
 use super::{
     Wanted, BACKUPS, BANDWIDTH, BUNDLE, CHECKS, CLIENTS, CONFIG, EXPLAIN, FORMS, FRONT_DOOR,
     HOSTING, LOGS, OUTBOUND, QUALITY, REQUESTS, SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK,
-    TRACE, VERSION,
+    TRACE, UNINSTALL, VERSION,
 };
 
 /// Raised where a read was given a parameter its answer has nowhere to put.
@@ -63,6 +63,9 @@ const ONLY: &str = "only";
 /// The parameter naming the word to explain.
 const WORD: &str = "word";
 
+/// Which of the four removals to read.
+const TIER: &str = "tier";
+
 /// What each read takes, and nothing else.
 ///
 /// In the order the endpoints declare them, so this reads beside the routes rather
@@ -97,6 +100,7 @@ const TAKEN: &[(&str, &[&str])] = &[
     (OUTBOUND, &[]),
     (CLIENTS, &[]),
     (STORED, &[]),
+    (UNINSTALL, &[TIER]),
     (SPACE, &[]),
     (BANDWIDTH, &[]),
     (BUNDLE, &[]),
@@ -180,6 +184,7 @@ impl Asked {
             key: self.one(KEY).map(str::to_owned),
             only: self.one(ONLY).map(str::to_owned),
             word: self.one(WORD).map(str::to_owned),
+            tier: self.one(TIER).map(str::to_owned),
         }
     }
 }

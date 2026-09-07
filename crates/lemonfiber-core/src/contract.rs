@@ -147,6 +147,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
     describing(kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
     describing(kinds, kind::UNDO, schema_for!(Envelope<Reversal>));
+    describing(
+        kinds,
+        kind::UNINSTALL,
+        schema_for!(Envelope<crate::uninstall::Uninstall>),
+    );
     describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
     describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
     describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
@@ -210,7 +215,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 36;
+    const OUTCOMES: usize = 37;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -393,6 +398,7 @@ mod tests {
                 consequence: Some(crate::space::RATIO_CONSEQUENCE.to_owned()),
             })),
             Outcome::Bandwidth(a_shared_line()),
+            Outcome::Uninstall(a_removal()),
             Outcome::Wizard(a_setup_part_way()),
             Outcome::Archives(crate::app::archives::Listing {
                 archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
@@ -497,6 +503,71 @@ mod tests {
                 }],
             }),
             ..crate::space::reckon(&measured)
+        }
+    }
+
+    /// A removal with every optional half of the shape filled: a line going and a
+    /// line kept, something beside the library, a volume worth a note, a download
+    /// still coming down, something left behind, and a reading that is short.
+    fn a_removal() -> crate::uninstall::Uninstall {
+        use crate::uninstall::{
+            Coming, Confidence, Foreign, Item, Left, Manifest, Outside, Removal, Sort, Tier,
+            Uninstall,
+        };
+
+        Uninstall {
+            manifest: Manifest {
+                tier: Tier::Media,
+                removes: Tier::Media.removes().to_owned(),
+                keeps: Tier::Media.keeps().to_owned(),
+                items: vec![
+                    Item {
+                        name: "/srv/media/downloads".to_owned(),
+                        sort: Sort::Path,
+                        what: "the stack's own downloads".to_owned(),
+                        bytes: Some(90_000_000_000),
+                        kept: None,
+                        secret: true,
+                    },
+                    Item {
+                        name: "lscr.io/linuxserver/sonarr:4.0.15".to_owned(),
+                        sort: Sort::Image,
+                        what: "an image pulled for one of this stack's services".to_owned(),
+                        bytes: None,
+                        kept: Some("another project is standing on it".to_owned()),
+                        secret: false,
+                    },
+                ],
+                bytes: 90_000_000_000,
+                foreign: vec![Foreign {
+                    at: "Photographs".to_owned(),
+                    files: 9_000,
+                    bytes: 40_000_000_000,
+                }],
+                volume: Some("the data location is on a network share".to_owned()),
+                coming: vec![Coming {
+                    name: "A.Release".to_owned(),
+                    progress: 94,
+                }],
+                outside: vec![Outside {
+                    what: "Docker itself".to_owned(),
+                    why: "lemonfiber runs on it and did not install it".to_owned(),
+                    by_hand: "drag Docker to the Bin".to_owned(),
+                    found: true,
+                }],
+                backup: Some("Take a backup first".to_owned()),
+                confidence: Confidence::whole().short("the engine would not answer"),
+                agreement: "deadbeef".to_owned(),
+            },
+            removal: Removal::Partial {
+                gone: vec!["/srv/media/downloads".to_owned()],
+                credentials: vec!["/home/op/.config/lemonfiber/.env".to_owned()],
+                left: vec![Left {
+                    name: "/srv/media/media/tv".to_owned(),
+                    why: "permission denied".to_owned(),
+                    by_hand: "rm -rf '/srv/media/media/tv'".to_owned(),
+                }],
+            },
         }
     }
 

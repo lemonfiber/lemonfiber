@@ -5,6 +5,7 @@
 //! own commands. A flag is added here; what it does is added next door.
 
 mod bandwidth;
+mod removing;
 mod repair;
 mod serving;
 mod setup;
@@ -22,6 +23,7 @@ pub use under::{ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCom
 // flag is declared is this file's business and nobody else's, and moving one would
 // otherwise be a change at every call site that names it.
 pub use bandwidth::RawBandwidth;
+pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
@@ -410,6 +412,20 @@ pub enum Request {
         #[arg(long)]
         confirm: bool,
     },
+    /// Take lemonfiber off this machine, at one of four removals.
+    ///
+    /// `stop` removes nothing and stops the services. `services` removes the
+    /// containers, the network they were on and the images pulled for them.
+    /// `configuration` removes each service's own settings and everything lemonfiber
+    /// keeps, credentials and all. `media` removes your library and your downloads,
+    /// and is never bundled with any of the others.
+    ///
+    /// Naming a removal lists exactly what it would take — every container, image and
+    /// path, with what each occupies — and does nothing. `--confirm` carries it out.
+    /// The one that reaches your library takes no bare yes: the listing prints a name
+    /// for itself and `--agreed` answers that name, so an answer given against one
+    /// reading of your disk cannot be spent on another.
+    Uninstall(RawRemoving),
     /// Account for the disk: where the room went, when it runs out, what can go.
     ///
     /// Says when the disk will be full rather than that it already is, counting what

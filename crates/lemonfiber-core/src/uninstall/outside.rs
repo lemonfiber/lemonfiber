@@ -111,8 +111,9 @@ const fn jellyfin_by_hand(environment: Environment) -> &'static str {
              ~/.local/share/jellyfin — which holds its own library database"
         }
         Environment::Windows => {
-            "Uninstall Jellyfin from Settings › Apps › Installed apps, then remove \
-             %LOCALAPPDATA%\\jellyfin"
+            "Uninstall Jellyfin from Settings › Apps › Installed apps, then remove the \
+             jellyfin folder under your account's local application data, which holds \
+             its own library database"
         }
         Environment::LinuxNative | Environment::LinuxDesktop | Environment::Unsupported => {
             "`sudo apt remove jellyfin` and then remove /var/lib/jellyfin, which holds \

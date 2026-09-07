@@ -69,13 +69,14 @@ mod stored;
 pub mod support;
 mod targets;
 mod trace;
+mod uninstall;
 mod upgrade;
 mod walkthrough;
 pub mod watch;
 
 pub use command::{
     Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
-    QualityAction, HOSTABLE,
+    QualityAction, Removing, HOSTABLE,
 };
 pub use ctx::Ctx;
 pub use setup::SetupAction;
@@ -154,6 +155,8 @@ pub enum Outcome {
     Seed(crate::seed::Report),
     /// What a full reset did, or would do — the operator edits reverted to lemonfiber's.
     Reset(ResetReport),
+    /// What taking lemonfiber off this machine would come to, or came to.
+    Uninstall(crate::uninstall::Uninstall),
     /// Where setup stands, and what it is still asking for.
     Wizard(WizardReport),
     /// Where a backup archive was written, and what it covers.
@@ -204,6 +207,7 @@ impl Outcome {
             Self::Undo(_) => kind::UNDO,
             Self::Seed(_) => kind::SEED,
             Self::Reset(_) => kind::RESET,
+            Self::Uninstall(_) => kind::UNINSTALL,
             Self::Wizard(_) => kind::WIZARD,
             Self::Backup(_) => kind::BACKUP,
             Self::Support(_) => kind::BUNDLE,
@@ -248,6 +252,7 @@ impl serde::Serialize for Outcome {
             Self::Undo(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
             Self::Reset(report) => report.serialize(serializer),
+            Self::Uninstall(report) => report.serialize(serializer),
             Self::Wizard(report) => report.serialize(serializer),
             Self::Backup(report) => report.serialize(serializer),
             Self::Support(report) => report.serialize(serializer),
@@ -509,6 +514,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Walkthrough { item } => walked(ctx, item).await,
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
+        Command::Uninstall(asked) => uninstall::uninstalled(ctx, asked).await,
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
         Command::Setup(action) => setup::setting_up(ctx, action).await.map(Outcome::Wizard),
         Command::Backup { service } => backup::run(ctx, service).await.map(Outcome::Backup),
@@ -2331,6 +2337,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
@@ -2377,6 +2384,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
@@ -3205,6 +3213,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
@@ -4205,6 +4214,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)

@@ -14,9 +14,11 @@ use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
 mod hosting;
 mod household;
+mod uninstall;
 
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
+pub use uninstall::Removing;
 
 /// What an invitation lets the person it is for watch.
 ///
@@ -329,6 +331,14 @@ pub enum Command {
         /// listed and nothing is removed.
         confirm: bool,
     },
+    /// Take lemonfiber off this machine, at one of four removals.
+    ///
+    /// One value rather than a table of fields, because a removal is one decision
+    /// with parts. Unconfirmed it enumerates what would go — every container, image
+    /// and path, with what each occupies — and takes nothing. Confirmed it removes
+    /// exactly that, and the one tier that reaches the operator's own content takes
+    /// nothing without an agreement naming the reading it was given for.
+    Uninstall(Removing),
     /// Account for the disk: where the room went, when it runs out, and what could
     /// be got back.
     ///

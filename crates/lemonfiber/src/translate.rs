@@ -9,7 +9,7 @@ use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
     Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
-    QualityAction,
+    QualityAction, Removing,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -17,12 +17,13 @@ use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
+use lemonfiber_core::uninstall::Tier;
 
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
     Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
-    RawBandwidth, RawUnrated,
+    RawBandwidth, RawRemoval, RawRemoving, RawUnrated,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -301,6 +302,31 @@ pub(crate) fn letting(download: String, offer: Option<String>) -> Command {
         download,
         agreement: offer.filter(|named| !named.trim().is_empty()),
     }
+}
+
+/// Which removal was asked for, and what was answered about it.
+///
+/// The four words are a `ValueEnum` on this surface, so a fifth word is refused by
+/// the parser before anything here runs — which is why this translation cannot fail
+/// and the core's own refusal for an unrecognised removal belongs to the surface that
+/// takes one as free text.
+///
+/// Nothing typed is nothing agreed to, for the reason [`letting`] drops an empty
+/// offer: a flag given empty is an answer to no listing, and carrying it would be a
+/// name the core goes and fails to match.
+pub(crate) fn removing(asked: RawRemoving) -> Command {
+    let tier = match asked.tier {
+        RawRemoval::Stop => Tier::Stop,
+        RawRemoval::Services => Tier::Services,
+        RawRemoval::Configuration => Tier::Configuration,
+        RawRemoval::Media => Tier::Media,
+    };
+    Command::Uninstall(
+        Removing::surveying(tier)
+            .confirmed(asked.confirm)
+            .agreeing(asked.agreed.filter(|named| !named.trim().is_empty()))
+            .waiting(asked.wait.into()),
+    )
 }
 
 /// The diagnosis a plain run asks for, narrowed as it was asked to be.

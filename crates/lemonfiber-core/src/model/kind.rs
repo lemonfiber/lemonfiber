@@ -117,6 +117,8 @@ pub const STUCK: Kind = Kind("stuck");
 pub const TRACE: Kind = Kind("trace");
 /// What putting back the last repair came to.
 pub const UNDO: Kind = Kind("undo");
+/// What taking lemonfiber off this machine would come to, or came to.
+pub const UNINSTALL: Kind = Kind("uninstall");
 /// What upgrading existing content did, or would do.
 pub const UPGRADE: Kind = Kind("upgrade");
 /// The versions in play: the binary, and the stack it operates.
@@ -171,6 +173,7 @@ pub const ALL: &[Kind] = &[
     STUCK,
     TRACE,
     UNDO,
+    UNINSTALL,
     UPGRADE,
     VERSION,
     WALKTHROUGH,

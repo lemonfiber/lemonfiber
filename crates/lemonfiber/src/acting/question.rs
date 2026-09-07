@@ -41,7 +41,7 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
     named, BANDWIDTH, CHECKS, CLIENTS, CONFIG, FORMS, FRONT_DOOR, HOSTING, OUTBOUND, QUALITY,
-    REQUESTS, STORED, STUCK, TRACE, VERSION,
+    REQUESTS, STORED, STUCK, TRACE, UNINSTALL, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -218,6 +218,19 @@ static AFTER: &[Question] = &[
                 narrows: Narrows::Season,
             },
         ]),
+    },
+    // Last, and deliberately: it is the one question here whose answer an operator
+    // reads before deciding to stop using this at all, and a list is read from what
+    // the stack is towards what becomes of it.
+    Question {
+        name: "what removing lemonfiber would take",
+        about: "every container, image and path one of the four removals would take, and \
+                what each occupies",
+        read: UNINSTALL,
+        needs: Needed::Typed(&[Wants {
+            asks: "which removal — stop, services, configuration or media",
+            narrows: Narrows::Removal,
+        }]),
     },
 ];
 
@@ -396,8 +409,11 @@ pub(super) fn waiting(stage: &mut Stage, waiting_on: Stage, press: &Press) -> Wa
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{all, asked_at, every, Narrows, Needed, Question, CONFIG, FORMS, OPENS_ON, TRACE};
-    use lemonfiber_api::reads::{NO_MEMBER, NO_SETTING, NO_TERM, OFFERED as SERVED};
+    use lemonfiber_api::reads::{
+        NO_MEMBER, NO_SETTING, NO_SUCH_REMOVAL, NO_TERM, OFFERED as SERVED,
+    };
     use lemonfiber_core::app::Command;
+    use lemonfiber_core::uninstall::Tier;
     use std::collections::BTreeSet;
 
     /// The whole point of naming the read rather than assembling a command here:
@@ -508,6 +524,29 @@ pub(crate) mod tests {
             Ok(Command::Household {
                 member: Some("The Expanse".to_owned()),
             })
+        );
+        // The one word this question takes names one of four rather than anything
+        // typed, so what it fills is asserted on the removal it comes to.
+        assert!(
+            matches!(
+                asking(called("what removing lemonfiber would take"), &["media"]),
+                Ok(Command::Uninstall(ref asked)) if asked.tier == Tier::Media
+            ),
+            "the word typed did not reach the removal it names"
+        );
+    }
+
+    /// A word that names none of the four is refused by name rather than read as the
+    /// safest of them — somebody who wrote a word and meant it must not be given a
+    /// different removal because of a spelling.
+    #[test]
+    fn a_removal_this_build_does_not_know_is_refused_rather_than_guessed_at() {
+        assert_eq!(
+            asking(
+                called("what removing lemonfiber would take"),
+                &["everything"]
+            ),
+            Err(NO_SUCH_REMOVAL)
         );
     }
 
