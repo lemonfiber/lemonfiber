@@ -40,13 +40,16 @@ pub(crate) fn persisting(unreachable: &crate::ports::http::Unreachable) -> Strin
 /// check the hostname, the port and their own connectivity, none of which is wrong. The
 /// remedy is a different one, so where the transport names a certificate, so does this.
 fn untrusted_certificate(reason: &str) -> bool {
-    const MARKERS: [&str; 6] = [
+    // Every marker names a certificate. A bare handshake failure is deliberately not
+    // one of them: a connection that died mid-handshake says nothing about the
+    // certificate, and naming one would send the operator to fix what was never wrong
+    // — the same mistake, in the other direction, as saying nothing at all.
+    const MARKERS: [&str; 5] = [
         "certificate",
         "unknownissuer",
         "self-signed",
         "self signed",
         "certnotvalidfor",
-        "tls handshake",
     ];
     let said = reason.to_ascii_lowercase();
     MARKERS.iter().any(|marker| said.contains(marker))

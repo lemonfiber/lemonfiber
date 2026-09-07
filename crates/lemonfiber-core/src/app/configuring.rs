@@ -42,6 +42,12 @@ pub(super) fn configuration(
         .flatten()
         .map(|file| port_forward_from_env(&file));
 
+    // Trimmed on the way in, for the same reason setup trims what is pasted into it:
+    // a key copied from a dashboard carries a trailing newline, it authenticates
+    // nowhere, and the file format has no way to mean the whitespace deliberately. The
+    // parser already trims the name; the value was the half still taken literally.
+    let value = value.map(str::trim);
+
     let changed = match (key, value) {
         (Some(key), Some(value)) if !ctx.dry_run => {
             if let Err(err) = store::set(path, key, value) {
@@ -166,6 +172,23 @@ mod tests {
         let ctx = ctx(env_at("unrelated", "VPN_PORT_FORWARDING=off\n"));
         let said = consequence(configuration(&ctx, Some("LEMONFIBER_USENET"), Some("on")));
         assert_eq!(said, None);
+    }
+
+    #[test]
+    fn a_key_pasted_with_a_newline_on_it_is_stored_as_the_key() {
+        // The same paste error setup already absorbs, on the other way in. A key set
+        // here with a newline still on it authenticates nowhere, while reading back
+        // as though it were fine — which is the silent failure, not the loud one.
+        let env = env_at("pasted", "");
+        let ctx = ctx(env.clone());
+        let written = configuration(
+            &ctx,
+            Some(crate::config::INDEXER_APIKEY_KEY),
+            Some("  the-key\n"),
+        );
+        assert!(written.is_ok());
+        let file = crate::config::store::read(&env).unwrap_or_default();
+        assert_eq!(file.get(crate::config::INDEXER_APIKEY_KEY), Some("the-key"));
     }
 
     #[test]
