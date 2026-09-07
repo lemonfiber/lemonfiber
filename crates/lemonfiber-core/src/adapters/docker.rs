@@ -23,7 +23,7 @@ use std::path::Path;
 use async_trait::async_trait;
 use bollard::models::ContainerSummary;
 use bollard::query_parameters::{
-    ListContainersOptionsBuilder, LogsOptionsBuilder, StatsOptionsBuilder,
+    ListContainersOptionsBuilder, ListImagesOptions, LogsOptionsBuilder, StatsOptionsBuilder,
 };
 use bollard::Docker;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -31,9 +31,11 @@ use tokio::sync::OnceCell;
 use tokio_stream::StreamExt as _;
 
 use crate::ports::docker::{
-    Container, Engine, ExecOutput, Failure, Lifecycle, LogLine, LogQuery, Stats, Stream,
+    Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, LogLine, LogQuery, Stats,
+    Stream,
 };
 
+mod images;
 mod translate;
 
 use translate::{describe, sampled, split_timestamp};
@@ -139,6 +141,37 @@ impl Daemon {
             .list_containers(Some(options))
             .await
             .map_err(unreachable)
+    }
+
+    /// Every container on this machine, whatever project it belongs to and whether
+    /// or not it belongs to one.
+    ///
+    /// Unfiltered, unlike [`Self::containers`], because the question it answers is
+    /// about the machine rather than about this stack: an image is shared exactly
+    /// when something outside the project is built on it, and a list narrowed to the
+    /// project could never report that.
+    async fn every_container(&self) -> Result<Vec<ContainerSummary>, Failure> {
+        let options = ListContainersOptionsBuilder::default().all(true).build();
+
+        self.client()
+            .await?
+            .list_containers(Some(options))
+            .await
+            .map_err(unreachable)
+    }
+}
+
+#[async_trait]
+impl Images for Daemon {
+    async fn images(&self) -> Result<Vec<Image>, Failure> {
+        let listed = self
+            .client()
+            .await?
+            .list_images(None::<ListImagesOptions>)
+            .await
+            .map_err(unreachable)?;
+
+        Ok(images::correlate(listed, &self.every_container().await?))
     }
 }
 

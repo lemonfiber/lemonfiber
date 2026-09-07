@@ -39,7 +39,7 @@ pub mod time;
 pub mod trace;
 pub mod withheld;
 
-pub use docker::Engine;
+pub use docker::{Engine, Images};
 pub use filesystem::{Eraser, FileSystem, Volume};
 pub use hosting::Host;
 pub use http::Http;
