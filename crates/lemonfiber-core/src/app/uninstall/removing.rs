@@ -236,10 +236,30 @@ fn by_hand(environment: Environment, at: &Path) -> String {
 mod tests {
     use std::path::Path;
 
-    use super::{by_hand, destroyed, said, Went};
+    use super::{by_hand, destroyed, ran, said, Went};
     use crate::platform::Environment;
     use crate::ports::process::Output;
     use crate::uninstall::{Item, Manifest, Sort, Tier};
+
+    /// Running a program is driven here as well as from `tests/`: this crate is
+    /// compiled twice, and a step reached only from outside is counted by the copy
+    /// that never reached it as never run.
+    #[tokio::test]
+    async fn running_a_program_that_failed_carries_its_sentence_back() {
+        let ctx = crate::test_support::a_context()
+            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
+                crate::ports::process::Output {
+                    status: Some(1),
+                    stdout: String::new(),
+                    stderr: "no such container".to_owned(),
+                },
+            ))))
+            .build();
+        let went = ran(&ctx, &["docker".to_owned(), "rm".to_owned()]).await;
+        // The program's own sentence is what finishes the step by hand, so it is kept
+        // rather than replaced with a code the operator can do nothing with.
+        assert_eq!(went, Err("no such container".to_owned()));
+    }
 
     /// A manifest holding exactly these lines, since nothing else here is read.
     fn holding(items: Vec<Item>) -> Manifest {
