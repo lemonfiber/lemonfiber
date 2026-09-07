@@ -545,8 +545,9 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Allowance, Answer as Ruling, BandwidthAsked, Chosen, Command, Ctx,
-        Decision, Outcome, QualityAction, SetupAction, VersionReport, Waiting,
+        dispatch, pull_progress, Allowance, Answer as Ruling, Asking, BandwidthAsked, Chosen,
+        Command, Ctx, Decision, Outcome, QualityAction, Removing, SetupAction, VersionReport,
+        Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -2282,6 +2283,35 @@ mod tests {
 
     /// Asking about the line arrives at the command that answers about it.
     ///
+    /// Reading what the stack holds reaches the command that answers it.
+    ///
+    /// Dispatched here as well as from `tests/` for the same reason as the line
+    /// below: the arm is a line of each copy of this file, and the copy that never
+    /// dispatched it counts the arm as never run.
+    #[tokio::test]
+    async fn asking_about_the_credentials_reaches_the_command_that_reads_them() {
+        let ctx = a_context().build();
+        let read = dispatch(Command::Credentials(Asking::Read), &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Credentials(_)));
+        assert!(answered, "{read:?}");
+    }
+
+    /// Surveying a removal reaches the command that lists it.
+    ///
+    /// The listing is the read half of an uninstall and takes nothing away, so it is
+    /// the one that can be dispatched here without a stack to remove.
+    #[tokio::test]
+    async fn surveying_a_removal_reaches_the_command_that_lists_it() {
+        let ctx = a_context().build();
+        let listed = dispatch(
+            Command::Uninstall(Removing::surveying(crate::uninstall::Tier::Stop)),
+            &ctx,
+        )
+        .await;
+        let reached = matches!(&listed, Ok(Outcome::Uninstall(_)));
+        assert!(reached, "{listed:?}");
+    }
+
     /// Dispatched here as well as from `tests/`: this file is compiled twice, and
     /// the arm joining a command to its handler is a line of each copy — so the
     /// copy that never dispatched it counts the arm as never run. What the command
