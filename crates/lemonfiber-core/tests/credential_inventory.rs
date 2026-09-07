@@ -109,6 +109,30 @@ fn silent() -> Arc<Fake> {
 /// A Servarr status body, as a healthy service answers `system/status` with.
 const SONARR_STATUS: &str = r#"{"instanceName":"Sonarr","version":"4.0.15.2941"}"#;
 
+/// A credential kept without being proven reads as stale, not active, and says why in
+/// the operator's own terms: they chose it, nothing has checked it since, and nothing
+/// here takes it away from them.
+#[tokio::test]
+async fn a_credential_kept_without_being_proven_is_stale_and_says_so() {
+    let env = env_at(
+        "unproven",
+        &[("INDEXER_APIKEY", "the-key"), ("INDEXER_VALIDATED", "off")],
+    );
+    let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
+    let said = format!(
+        "{:?}",
+        inventory
+            .held
+            .iter()
+            .find(|one| one.name == "Indexer API key")
+    );
+    assert!(said.contains("Stale"), "{said}");
+    assert!(said.contains("kept without being proven"), "{said}");
+    // The advisory is the whole point: an operator who chose this is told it stands,
+    // not that something has quietly undone it.
+    assert!(said.contains("Nothing here expires it"), "{said}");
+}
+
 #[tokio::test]
 async fn the_inventory_names_every_credential_the_operator_supplies_and_every_one_it_mints() {
     let env = env_at("declared", &[]);

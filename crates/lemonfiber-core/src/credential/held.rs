@@ -408,7 +408,11 @@ mod tests {
     fn a_stack_running_neither_still_holds_the_credentials_it_always_needs() {
         let neither = catalogue(Protocols::none());
 
-        assert_eq!(neither.len(), 4, "{:?}", names(&neither));
+        // Bound rather than called in the message: a call inside an assertion's
+        // message only runs when the assertion fails, so the helper would never run
+        // on a passing test and would read as dead code.
+        let listed = names(&neither);
+        assert_eq!(neither.len(), 4, "{listed:?}");
         assert!(neither.iter().all(|entry| entry.needed == Needed::Always));
     }
 

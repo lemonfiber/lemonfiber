@@ -1093,6 +1093,41 @@ mod tests {
         );
     }
 
+    /// Naming one to reveal is an act on that credential, and the confirmation the
+    /// operator gave belongs to it rather than to the reading beside it.
+    ///
+    /// Carried through rather than acted on here: what an unconfirmed reveal answers
+    /// with is a warning written where the value would otherwise be, which is the
+    /// core's to say and not this translation's.
+    #[test]
+    fn a_reveal_carries_the_name_and_whether_it_was_confirmed() {
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: Some("Indexer API key".to_owned()),
+                rotate: None,
+                confirm: true,
+            }),
+            Command::Credentials(Asking::Reveal {
+                credential: "Indexer API key".to_owned(),
+                confirmed: true,
+            })
+        );
+
+        // A reveal wins over a rotation named in the same breath, and an unconfirmed
+        // one still reaches the core, which is where the warning is written.
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: Some("Indexer API key".to_owned()),
+                rotate: Some("Sonarr API key".to_owned()),
+                confirm: false,
+            }),
+            Command::Credentials(Asking::Reveal {
+                credential: "Indexer API key".to_owned(),
+                confirmed: false,
+            })
+        );
+    }
+
     #[test]
     fn a_rotation_carries_the_name_and_nothing_else() {
         assert_eq!(
