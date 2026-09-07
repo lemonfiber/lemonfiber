@@ -131,6 +131,23 @@ async fn a_credential_kept_without_being_proven_is_stale_and_says_so() {
     // The advisory is the whole point: an operator who chose this is told it stands,
     // not that something has quietly undone it.
     assert!(said.contains("Nothing here expires it"), "{said}");
+
+    // And the other side of the same flag: one that was proven is active, with nothing
+    // to advise about. The two arms are one decision, so neither is read alone.
+    let proven = env_at(
+        "proven",
+        &[("INDEXER_APIKEY", "the-key"), ("INDEXER_VALIDATED", "on")],
+    );
+    let inventory = asked(&ctx(proven, Files::empty(), silent()), Asking::Read).await;
+    let said = format!(
+        "{:?}",
+        inventory
+            .held
+            .iter()
+            .find(|one| one.name == "Indexer API key")
+    );
+    assert!(said.contains("Active"), "{said}");
+    assert!(!said.contains("kept without being proven"), "{said}");
 }
 
 #[tokio::test]
@@ -404,6 +421,35 @@ async fn a_proven_replacement_is_recorded_and_every_consumer_is_accounted_for() 
     let now = recorded(&env, QBITTORRENT_PASSWORD_KEY);
     assert!(now.is_some(), "a password is still recorded");
     assert_ne!(now, Some(password), "and it is not the one it was");
+}
+
+/// A rotation the service could not be reached for leaves the existing password in
+/// force, and says which it kept.
+///
+/// The distinction the whole feature turns on: a replacement that was never proven is
+/// not written down, so what was working is still what works. A refusal is one thing
+/// and a service that did not answer is another, and neither may end with the operator
+/// holding a password nothing accepts.
+#[tokio::test]
+async fn a_rotation_that_could_not_reach_the_service_keeps_the_existing_password() {
+    let password = the_torrent_password();
+    let env = env_at("unreachable", &[(QBITTORRENT_PASSWORD_KEY, &password)]);
+    let ctx = ctx(env.clone(), Files::empty(), silent());
+
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "qBittorrent web UI password".to_owned(),
+        },
+    )
+    .await;
+
+    let rotated = inventory.rotated.clone();
+    let kept = rotated.as_ref().is_some_and(Rotation::kept_the_existing);
+    assert!(kept, "{rotated:?}");
+    // Read back from the file rather than from the report: the guarantee is about what
+    // is in force, not about what was said.
+    assert_eq!(recorded(&env, QBITTORRENT_PASSWORD_KEY), Some(password));
 }
 
 /// Without randomness there is nothing to generate, and a guessable password on the
