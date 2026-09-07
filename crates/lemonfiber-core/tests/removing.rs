@@ -21,7 +21,7 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Removing, Waiting};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
-use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
+use lemonfiber_core::ports::filesystem::{Eraser, FsKind, StorageFacts};
 use lemonfiber_core::ports::Narrator;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::uninstall::{Removal, Tier};
@@ -70,6 +70,8 @@ fn ctx(heard: &Arc<Heard>) -> Ctx {
         Source::External(project()),
         Settings {
             project: "lemonfiber".to_owned(),
+            env_file: Some(PathBuf::from("/cfg/lemonfiber/.env")),
+            stack_dir: Some(PathBuf::from("/data/lemonfiber/stack")),
             data_root: Some(PathBuf::from("/srv/media")),
             ..Settings::default()
         },
@@ -148,6 +150,46 @@ async fn a_removal_told_to_wait_says_what_it_is_waiting_for() {
     assert!(
         said.iter().any(|line| line.contains("downloads finished")),
         "{said:?}"
+    );
+}
+
+/// A confirmed removal is carried out from here, and what it could not take comes
+/// back named with the way to finish it.
+///
+/// Driven from outside the crate rather than beside the code, for the reason the
+/// wait above is: the removal is `async` all the way down, and an `async` path
+/// exercised only in-crate has its coverage counted from a copy that never ran — so
+/// the whole of what a removal does would read as reached while one line of it was
+/// not.
+#[tokio::test]
+async fn a_removal_the_platform_refused_comes_back_with_the_way_to_finish_it() {
+    let heard = Arc::new(Heard::default());
+    let eraser = Erasing::refusing("permission denied");
+    let ctx = ctx(&heard).erasing(Arc::clone(&eraser) as Arc<dyn Eraser>);
+    let asked = Removing::surveying(Tier::Configuration).confirmed(true);
+
+    let outcome = dispatch(Command::Uninstall(asked), &ctx).await;
+
+    let left = match outcome {
+        Ok(Outcome::Uninstall(answered)) => match answered.removal {
+            Removal::Partial { left, .. } => left,
+            Removal::Surveyed | Removal::Confirmed | Removal::Complete { .. } => Vec::new(),
+        },
+        Ok(_) | Err(_) => Vec::new(),
+    };
+
+    assert_eq!(left.len(), 2, "{left:?}");
+    let unhelpful: Vec<&lemonfiber_core::uninstall::Left> = left
+        .iter()
+        .filter(|one| one.why != "permission denied" || !one.by_hand.contains("owns it"))
+        .collect();
+    assert!(unhelpful.is_empty(), "{unhelpful:?}");
+    assert_eq!(
+        eraser.asked(),
+        vec![
+            PathBuf::from("/cfg/lemonfiber"),
+            PathBuf::from("/data/lemonfiber")
+        ]
     );
 }
 
