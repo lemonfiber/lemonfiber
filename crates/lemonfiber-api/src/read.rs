@@ -1,4 +1,4 @@
-//! The twenty-three reads: one endpoint per question a command already answers, plus
+//! The twenty-four reads: one endpoint per question a command already answers, plus
 //! the two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
