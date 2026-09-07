@@ -197,7 +197,16 @@ impl Live {
     /// the network itself is down — stated once rather than against each credential.
     fn not_reached(&self, said: &str, reason: &str, elapsed: Duration) -> Validation {
         let network = reading::network_itself(reason);
-        let already = network && self.network_said.swap(true, Ordering::Relaxed);
+        // Said once for one outage, not once for the lifetime of the process. A
+        // validator on a served surface outlives any number of them, and a failure
+        // that reached something is proof the last one ended — so the next is new,
+        // and is explained in full rather than waved at an outage long since over.
+        let already = if network {
+            self.network_said.swap(true, Ordering::Relaxed)
+        } else {
+            self.network_said.store(false, Ordering::Relaxed);
+            false
+        };
         reading::not_reached(said, elapsed, network, already)
     }
 
@@ -333,6 +342,12 @@ impl Validator for Live {
         // every one of them passes. What reads an outcome afterwards — a report that is
         // serialised to a caller, a prompt that prints it to a terminal — is reading text
         // the rule has already been applied to rather than remembering to apply it.
+        // Anything that was answered — proven, refused, or answered and unusable — is
+        // proof the network is back, so an outage after it is a new one to explain in
+        // full rather than the one already reported.
+        if !matches!(came_to, Validation::Unreachable { .. }) {
+            self.network_said.store(false, Ordering::Relaxed);
+        }
         came_to.withheld()
     }
 }
@@ -490,6 +505,41 @@ mod tests {
     /// A transport that fails every attempt with the given reason.
     struct Failing(&'static str);
 
+    /// A transport that answers each attempt in turn: a reason to fail with, or an
+    /// empty one to answer a search successfully.
+    struct InTurn(std::sync::Mutex<std::collections::VecDeque<&'static str>>);
+
+    impl InTurn {
+        fn of(reasons: &[&'static str]) -> Arc<Self> {
+            Arc::new(Self(std::sync::Mutex::new(
+                reasons.iter().copied().collect(),
+            )))
+        }
+    }
+
+    #[async_trait]
+    impl crate::ports::http::Http for InTurn {
+        async fn send(
+            &self,
+            request: &crate::ports::http::Request,
+        ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+            let next = self
+                .0
+                .lock()
+                .ok()
+                .and_then(|mut queued| queued.pop_front())
+                .unwrap_or_default();
+            if next.is_empty() {
+                return Ok(crate::ports::http::Response {
+                    status: 200,
+                    body: "<?xml version=\"1.0\"?><rss><channel><item>a</item></channel></rss>"
+                        .to_owned(),
+                });
+            }
+            Err(crate::ports::http::Unreachable::once(&request.url, next))
+        }
+    }
+
     #[async_trait]
     impl crate::ports::http::Http for Failing {
         async fn send(
@@ -533,6 +583,60 @@ mod tests {
         let second = format!("{:?}", validator.validate(&indexer()).await);
         assert!(second.contains("still down"), "{second}");
         assert!(!second.contains("Nothing on this machine"), "{second}");
+    }
+
+    /// Said once for one outage — not once for the life of the validator.
+    ///
+    /// A served surface holds one validator across any number of outages. Latching the
+    /// flag would mean the first outage of the process is the only one ever explained,
+    /// and every later one — hours apart, with the network long since back and gone
+    /// again — is waved at an outage that ended.
+    #[tokio::test]
+    async fn an_outage_that_ended_is_not_the_outage_reported_before_it() {
+        const DOWN: &str = "dns error: failed to lookup address information";
+        let validator = Live::new(InTurn::of(&[DOWN, DOWN, "", DOWN]));
+
+        let first = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(first.contains("Nothing on this machine"), "{first}");
+
+        let same = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(same.contains("still down"), "{same}");
+
+        // The network answers, so the outage is over.
+        let back = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(back.contains("Valid"), "{back}");
+
+        // A new outage is a new thing to explain, not the one already reported.
+        let again = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(again.contains("Nothing on this machine"), "{again}");
+        assert!(!again.contains("still down"), "{again}");
+    }
+
+    /// A connection that died mid-handshake says nothing about the certificate, and
+    /// naming one sends the operator to fix what was never wrong.
+    #[test]
+    fn a_handshake_that_failed_is_not_reported_as_an_untrusted_certificate() {
+        let broken = crate::ports::http::Unreachable::once("https://indexer", "tls handshake eof");
+        let said = super::persisting(&broken);
+        assert!(said.contains("tls handshake eof"), "{said}");
+        assert!(!said.contains("certificate was not trusted"), "{said}");
+    }
+
+    /// A failure that reached something clears the outage, so the next one is explained
+    /// in full even though nothing succeeded in between.
+    #[tokio::test]
+    async fn a_refusal_between_two_outages_ends_the_first_one() {
+        const DOWN: &str = "dns error: failed to lookup address information";
+        let validator = Live::new(InTurn::of(&[DOWN, "connection refused", DOWN]));
+
+        let first = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(first.contains("Nothing on this machine"), "{first}");
+
+        let reached = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(reached.contains("connection refused"), "{reached}");
+
+        let again = format!("{:?}", validator.validate(&indexer()).await);
+        assert!(again.contains("Nothing on this machine"), "{again}");
     }
 
     /// An indexer refusing a key quotes it back inside its own description, and that
