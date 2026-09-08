@@ -15,7 +15,9 @@ use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::kind;
 use lemonfiber_core::model::Revoked;
-use lemonfiber_core::model::{Disposition, Envelope, ResetReport, Triggered, UpgradeReport};
+use lemonfiber_core::model::{
+    AdoptReport, Disposition, Envelope, ResetReport, Triggered, UpgradeReport,
+};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
@@ -52,6 +54,20 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
 
 /// The exit code an outcome deserves.
 ///
+/// What a run that took over a setup already here exits on.
+///
+/// A refusal is something the operator has to resolve before lemonfiber will act — a
+/// database a later version wrote, or two setups where only they can say which they
+/// meant — so it earns VALIDATION rather than a plain failure. Having adopted, and
+/// having only said what adopting would come to, are both the command doing what it
+/// was asked.
+fn adopting(report: &AdoptReport) -> ExitCode {
+    if report.refused.is_some() {
+        return ExitCode::from(VALIDATION);
+    }
+    ExitCode::SUCCESS
+}
+
 /// Most answers are simply produced, so their success is that they arrived. A
 /// diagnosis is different: a script runs it precisely to learn whether the stack
 /// is healthy, so a broken or undetermined result must exit non-zero — reporting
@@ -69,16 +85,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // will not act on until they resolve it, so it earns VALIDATION; work merely
         // left skipped or failed may complete on a re-run, so it stays FAILURE. A
         // script can then tell "fix your config" from "wait and retry".
-        // A refusal is something the operator has to resolve before lemonfiber will
-        // act — a database a later version wrote, or two setups where only they can
-        // say which they meant — so it earns VALIDATION rather than a plain failure.
-        Outcome::Adoption(report) => {
-            if report.refused.is_some() {
-                ExitCode::from(VALIDATION)
-            } else {
-                ExitCode::SUCCESS
-            }
-        }
+        Outcome::Adoption(report) => adopting(report),
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
         // has mended everything it carried out — which is none of it.
