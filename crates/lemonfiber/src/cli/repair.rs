@@ -59,3 +59,26 @@ pub struct Fixing {
     #[arg(id = "fix-disruptive", long = "fix-disruptive", requires = "fix")]
     pub disruptive: bool,
 }
+
+/// What a diagnosis was asked for, as the command line spells it.
+///
+/// Flattened into one carrier rather than four fields on the request, for the reason
+/// the other carriers here have one: `cli.rs` is the subcommand tree, and the flags of
+/// one branch are a detail of that branch.
+#[derive(Debug, Args)]
+pub struct RawDoctor {
+    /// Run one category of check, such as `vpn`, or one check by the name a
+    /// finding gives it, such as `vpn.killswitch`.
+    #[arg(long, value_name = "CATEGORY_OR_CHECK", conflicts_with = "fix")]
+    pub only: Option<String>,
+    /// Include the checks that disturb the running system.
+    #[arg(long)]
+    pub disruptive: bool,
+    /// Answer a warning about a choice — `vpn.unprotected`, say — so it stops
+    /// leading. Only something this run warns about can be answered.
+    #[arg(long, value_name = "CHECK", conflicts_with = "fix")]
+    pub accept: Option<String>,
+    /// How much putting-right this run was given consent for.
+    #[command(flatten)]
+    pub mending: Mending,
+}

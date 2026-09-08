@@ -8,7 +8,6 @@
 
 use crate::audio::Format;
 use crate::doctor::Narrowing;
-use crate::quality::Preset;
 
 use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
@@ -16,12 +15,14 @@ mod alerts;
 mod credentials;
 mod hosting;
 mod household;
+mod quality;
 mod uninstall;
 
 pub use alerts::AlertAction;
 pub use credentials::Asking;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
+pub use quality::QualityAction;
 pub use uninstall::Removing;
 
 /// What an invitation lets the person it is for watch.
@@ -523,24 +524,4 @@ impl BandwidthAsked {
             || self.exceeded.is_some()
             || self.unrestricted_for.is_some()
     }
-}
-
-/// What a quality command asks for.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QualityAction {
-    /// Show the choice in force and what each preset means and costs.
-    Show,
-    /// Choose a preset — for everything, or for one media type — and record it.
-    Set {
-        /// The preset to choose.
-        preset: Preset,
-        /// The media type it applies to, or the whole library where absent.
-        media_type: Option<String>,
-        /// Whether the operator confirmed a choice this host would have to
-        /// transcode in software, which is otherwise held rather than recorded.
-        confirm: bool,
-    },
-    /// Re-assert the recorded preset over a hand-edited Recyclarr config — the
-    /// explicit consent to let the preset win where a run would preserve the edit.
-    Reapply,
 }

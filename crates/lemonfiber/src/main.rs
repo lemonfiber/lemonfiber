@@ -8,7 +8,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 
@@ -184,18 +184,11 @@ async fn greeted(ctx: Ctx) -> ExitCode {
 /// became of each — not one value from dispatch — so it ends here, and the code it ended
 /// with comes back as the error. A plain run falls through to the diagnosis and changes
 /// nothing.
-async fn doctoring(
-    ctx: &Ctx,
-    only: Option<String>,
-    disruptive: bool,
-    accept: Option<String>,
-    mending: Mending,
-    json: bool,
-) -> Result<Command, ExitCode> {
-    if mending.acts() {
-        return Err(repairing(ctx, mending, json).await);
+async fn doctoring(ctx: &Ctx, asked: RawDoctor, json: bool) -> Result<Command, ExitCode> {
+    if asked.mending.acts() {
+        return Err(repairing(ctx, asked.mending, json).await);
     }
-    diagnosing(only.as_deref(), disruptive, accept).map_err(ExitCode::from)
+    diagnosing(asked.only.as_deref(), asked.disruptive, asked.accept).map_err(ExitCode::from)
 }
 
 #[tokio::main]
@@ -275,12 +268,7 @@ async fn main() -> ExitCode {
             Ok(command) => command,
             Err(code) => return ExitCode::from(code),
         },
-        Request::Doctor {
-            only,
-            disruptive,
-            accept,
-            mending,
-        } => match doctoring(&ctx, only, disruptive, accept, mending, cli.json).await {
+        Request::Doctor(asked) => match doctoring(&ctx, asked, cli.json).await {
             Ok(command) => command,
             Err(code) => return code,
         },
