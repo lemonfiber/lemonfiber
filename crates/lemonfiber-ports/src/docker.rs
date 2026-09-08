@@ -216,6 +216,46 @@ impl Diagnose for Failure {
     }
 }
 
+/// One image this machine has pulled, and what is standing on it.
+///
+/// The projects travel with it because whether an image may be removed is not a
+/// property of the image: one that another Compose project's container is built on
+/// belongs to that project as much as to this one, and nothing downstream can
+/// establish that from a name and a size.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Image {
+    /// Every name it answers to, as the engine reports them.
+    ///
+    /// Empty for an image nothing tags any more, which is still an image taking up
+    /// room and so still worth reporting.
+    pub tags: Vec<String>,
+    /// What it occupies, as the engine reports its size.
+    pub bytes: u64,
+    /// The Compose projects whose containers are built on it.
+    ///
+    /// A container the engine reports under no Compose project contributes an empty
+    /// entry, because for the purposes of removal "something outside Compose is
+    /// standing on this" is the same answer as "another project is".
+    pub projects: Vec<String>,
+}
+
+/// Listing the images an engine has pulled, and who is standing on each.
+///
+/// A trait of its own rather than another method on [`Engine`], for the reason the
+/// volume watch and the eraser are apart from the filesystem: the one command that
+/// asks needs nothing else of an engine, and every other implementation of the wider
+/// trait — five of them are test fakes — would gain a method it never calls.
+#[async_trait]
+pub trait Images: Send + Sync {
+    /// Every image on this machine, with the projects holding containers on it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure::Unreachable`] when the engine cannot be reached, which the
+    /// caller reports as an unknown rather than as no images.
+    async fn images(&self) -> Result<Vec<Image>, Failure>;
+}
+
 /// Reads container state, resource use, logs, and runs commands inside them.
 ///
 /// The `exec` method is what makes the VPN leak test possible: run the same
@@ -266,9 +306,33 @@ pub trait Engine: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::{
-        Container, Diagnose, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Published,
-        Stats, Stream,
+        Container, Diagnose, ExecOutput, Failure, Health, Image, Lifecycle, LogLine, LogQuery,
+        Published, Stats, Stream,
     };
+
+    /// An image carries who is standing on it, because that and not its name is what
+    /// decides whether removing it takes something else with it.
+    #[test]
+    fn an_image_carries_the_projects_standing_on_it() {
+        let image = Image {
+            tags: vec!["linuxserver/sonarr:4.0.15".to_owned()],
+            bytes: 512,
+            projects: vec!["lemonfiber".to_owned(), String::new()],
+        };
+        assert_eq!(image.clone(), image);
+        assert_eq!(image.projects.len(), 2);
+        assert!(
+            image.projects.iter().any(String::is_empty),
+            "a container under no Compose project is reported as one: {image:?}"
+        );
+        assert_ne!(
+            image,
+            Image {
+                projects: vec!["lemonfiber".to_owned()],
+                ..image.clone()
+            }
+        );
+    }
 
     #[test]
     fn an_unreachable_engine_keeps_the_transport_s_own_words() {

@@ -76,6 +76,7 @@ pub(super) fn choosing<T: Listed>(
     let room = rows.saturating_sub(2);
     let mut lines: Vec<Line<'static>> = chooser
         .listed()
+        .skip(from(chooser, room))
         .take(room)
         .map(|(here, choice)| offered(here, choice, across))
         .collect();
@@ -92,6 +93,25 @@ pub(super) fn choosing<T: Listed>(
     lines.push(Line::raw(""));
     lines.push(dimmed(&hint(marks(chooser)), across));
     lines
+}
+
+/// Which entry the visible run of them starts at.
+///
+/// A list longer than the screen used to show its first rows and nothing else, so an
+/// operator pressing down past the last visible one moved a cursor they could not
+/// see, and the entries at the bottom of a long list could not be reached at all on a
+/// short terminal. The window follows the selection instead: it stays at the top
+/// until the selection would leave it, then moves by exactly as much as it must.
+fn from<T: Listed>(chooser: &Chooser<T>, room: usize) -> usize {
+    let counted = chooser.listed().count();
+    if counted <= room || room == 0 {
+        return 0;
+    }
+    let here = chooser
+        .listed()
+        .position(|(here, _)| here)
+        .unwrap_or_default();
+    here.saturating_sub(room - 1).min(counted - room)
 }
 
 /// How many rows are marked, or nothing where this list takes one.

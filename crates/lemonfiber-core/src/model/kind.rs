@@ -48,6 +48,8 @@ pub const BANDWIDTH: Kind = Kind("bandwidth");
 pub const BUNDLE: Kind = Kind("bundle");
 /// The settings asked about, and what a change did to them.
 pub const CONFIG: Kind = Kind("config");
+/// Every credential this stack holds, and what became of acting on one.
+pub const CREDENTIALS: Kind = Kind("credentials");
 /// One moment of what the stack is doing, as the dashboard assembles it.
 pub const DASHBOARD: Kind = Kind("dashboard");
 /// What the diagnostic checks found.
@@ -117,6 +119,8 @@ pub const STUCK: Kind = Kind("stuck");
 pub const TRACE: Kind = Kind("trace");
 /// What putting back the last repair came to.
 pub const UNDO: Kind = Kind("undo");
+/// What taking lemonfiber off this machine would come to, or came to.
+pub const UNINSTALL: Kind = Kind("uninstall");
 /// What upgrading existing content did, or would do.
 pub const UPGRADE: Kind = Kind("upgrade");
 /// The versions in play: the binary, and the stack it operates.
@@ -138,6 +142,7 @@ pub const ALL: &[Kind] = &[
     BANDWIDTH,
     BUNDLE,
     CONFIG,
+    CREDENTIALS,
     DASHBOARD,
     DOCTOR,
     ERROR,
@@ -171,6 +176,7 @@ pub const ALL: &[Kind] = &[
     STUCK,
     TRACE,
     UNDO,
+    UNINSTALL,
     UPGRADE,
     VERSION,
     WALKTHROUGH,

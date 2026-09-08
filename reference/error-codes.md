@@ -32,6 +32,7 @@ what to do about it, is written for operators at
 - `CONFIG-1`
 - `CONFIG-2`
 - `CONFIG-3`
+- `CONFIG-4`
 - `CRED-1`
 - `CRED-2`
 - `CRED-3`
@@ -45,6 +46,8 @@ what to do about it, is written for operators at
 - `FORM-2`
 - `FORM-3`
 - `FORM-4`
+- `GONE-1`
+- `GONE-2`
 - `HOST-1`
 - `HOST-2`
 - `HOST-3`

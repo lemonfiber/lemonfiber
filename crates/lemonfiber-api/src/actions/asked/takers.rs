@@ -106,6 +106,7 @@ pub const TAKES_FORMS: &[&str] = &[
 /// command line drops it there too.
 pub const TAKES_AGREEMENT: &[&str] = &[
     "forget",
+    "uninstall",
     "remove",
     "quality-set",
     "quality-upgrade",
@@ -136,7 +137,7 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 ///
 /// No other action needs one, because no other action shows the operator something
 /// and then acts on what they answered. Everywhere else the reply is the answer.
-pub const TAKES_CONSENT: &[&str] = &["repair", "restore", "stop-seeding"];
+pub const TAKES_CONSENT: &[&str] = &["repair", "restore", "stop-seeding", "uninstall"];
 
 /// The action whose command carries which completed download it is about.
 ///
@@ -240,7 +241,16 @@ pub const TAKES_SERVICES: &[&str] = &["up", "down", "restart"];
 /// are not download clients would hold up a stop for downloads stopping them
 /// cannot interrupt — which is why the two are refused together rather than one of
 /// them being dropped, and why the command line declares them in conflict.
-pub const TAKES_WAITING: &[&str] = &["down"];
+pub const TAKES_WAITING: &[&str] = &["down", "uninstall"];
+
+/// The action whose command carries which of the four removals it is about.
+///
+/// An uninstall and nothing else, and it is required rather than optional: a removal
+/// with none named is a request that has lost the only part of it that decides what
+/// goes. Apart from every other list here because it is a different kind of subject —
+/// not a form, a service, a person or a setting, but which of four separate decisions
+/// about this machine was taken.
+pub const TAKES_TIER: &[&str] = &["uninstall"];
 
 /// The action whose command carries the one service it was given.
 ///
@@ -400,7 +410,7 @@ pub const TAKES_KEPT: &[&str] = &["hosting-install", "hosting-remove"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 41] = [
+    let carried: [(&str, bool, &[&str]); 42] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -442,6 +452,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("days", given.days.is_some(), TAKES_POLICY),
         ("request", given.request.is_some(), TAKES_REQUEST),
         ("reason", given.reason.is_some(), TAKES_REASON),
+        ("tier", given.tier.is_some(), TAKES_TIER),
         ("kept", given.kept.is_some(), TAKES_KEPT),
         ("down", given.down.is_some(), TAKES_SHARING),
         ("up", given.up.is_some(), TAKES_SHARING),

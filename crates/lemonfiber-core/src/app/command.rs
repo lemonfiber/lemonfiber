@@ -12,11 +12,15 @@ use crate::quality::Preset;
 
 use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
+mod credentials;
 mod hosting;
 mod household;
+mod uninstall;
 
+pub use credentials::Asking;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
+pub use uninstall::Removing;
 
 /// What an invitation lets the person it is for watch.
 ///
@@ -311,6 +315,14 @@ pub enum Command {
     /// narrow it by — and an enumeration a surface could narrow would be one an
     /// operator could be shown half of.
     Outbound,
+    /// Say which credentials this stack holds, or act on one of them.
+    ///
+    /// One inventory over every secret in the stack, whoever produced it: what each is,
+    /// what authenticates with it, where the value lives and where it stands — and never
+    /// the value itself. The two things that can be asked of a line of it travel under
+    /// the same word, because an operator reading that a credential has gone stale is
+    /// one keystroke from wanting to replace it.
+    Credentials(Asking),
     /// List what lemonfiber keeps on this machine: what each thing is, where it is,
     /// and why it is kept.
     ///
@@ -329,6 +341,14 @@ pub enum Command {
         /// listed and nothing is removed.
         confirm: bool,
     },
+    /// Take lemonfiber off this machine, at one of four removals.
+    ///
+    /// One value rather than a table of fields, because a removal is one decision
+    /// with parts. Unconfirmed it enumerates what would go — every container, image
+    /// and path, with what each occupies — and takes nothing. Confirmed it removes
+    /// exactly that, and the one tier that reaches the operator's own content takes
+    /// nothing without an agreement naming the reading it was given for.
+    Uninstall(Removing),
     /// Account for the disk: where the room went, when it runs out, and what could
     /// be got back.
     ///

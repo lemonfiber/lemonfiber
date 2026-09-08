@@ -221,6 +221,20 @@ async fn the_checks_refuse_a_misspelled_narrowing_rather_than_running_the_suite(
 }
 
 #[tokio::test]
+async fn a_removal_this_build_does_not_know_is_refused_rather_than_read_as_the_safest() {
+    // Naming a removal that is none of the four is a spelling to correct, not a
+    // request for whichever one this shape happened to default to. On this subject
+    // the default that would hurt is the one that takes the library, so the refusal
+    // is the whole point: a word nobody recognises reaches no removal at all.
+    let seen = asked(world(running(), stack()), "/api/uninstall?tier=everything").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::BAD_REQUEST
+            && !body.contains(r#""kind":"uninstall""#)),
+        "a removal that was misspelled reached one anyway"
+    );
+}
+
+#[tokio::test]
 async fn the_checks_refuse_the_widening_that_would_stop_them_being_a_read() {
     // The disturbing checks are reachable from a browser and not from here. This
     // endpoint answers a `GET`, and a run that took the tunnel away to prove the

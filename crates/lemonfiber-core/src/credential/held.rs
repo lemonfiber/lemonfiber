@@ -1,0 +1,498 @@
+//! Which credentials this stack holds, and who authenticates with each.
+//!
+//! Declared rather than discovered, for the reason the settings list is declared: an
+//! inventory built by looking at what happens to be recorded answers about the file
+//! rather than about the stack, and the credential worth knowing about is the one
+//! that ought to be there and is not.
+//!
+//! **The consumer list is the load-bearing column.** Rotation walks it, and anything
+//! left off it is something a rotation strands without saying so. qBittorrent's
+//! password is the case that proves it: the obvious consumer is qBittorrent, but the
+//! tunnel's forwarded-port push authenticates to the same web UI on every connect and
+//! release, and it reads the password out of the environment at the moment its
+//! container was created. A list naming services rather than consumers would have one
+//! entry there and would be wrong in the way that is hardest to notice — the port
+//! simply stops being applied, and everything reports healthy.
+
+use serde::Serialize;
+
+use super::rotation::{Propagation, Reach};
+use crate::config;
+
+/// One thing that authenticates with a credential, and how a replacement gets to it.
+///
+/// The second half is what makes the consumer list act rather than merely inform. A
+/// rotation reports one of these per consumer, derived from here, so a consumer added
+/// to a credential appears in the next rotation's report without anybody having to
+/// remember a second list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Consumer {
+    /// What it is, as the operator would recognise it.
+    pub name: &'static str,
+    /// How a replacement gets to it.
+    pub reached: Reached,
+}
+
+impl Consumer {
+    /// One consumer at the service the credential is set on.
+    const fn at_the_service(name: &'static str) -> Self {
+        Self {
+            name,
+            reached: Reached::AtTheService,
+        }
+    }
+
+    /// One consumer that reads the value out of its container's environment.
+    const fn from_its_environment(name: &'static str, restart: &'static str) -> Self {
+        Self {
+            name,
+            reached: Reached::FromItsEnvironment { restart },
+        }
+    }
+
+    /// One consumer lemonfiber hands the value to over an API.
+    const fn by_seeding(name: &'static str) -> Self {
+        Self {
+            name,
+            reached: Reached::BySeeding,
+        }
+    }
+
+    /// One consumer that is lemonfiber itself, reading what it recorded.
+    const fn read_by_lemonfiber(name: &'static str) -> Self {
+        Self {
+            name,
+            reached: Reached::WhenLemonfiberReadsIt,
+        }
+    }
+
+    /// How far a landed replacement has reached this consumer.
+    #[must_use]
+    pub fn reached(&self) -> Propagation {
+        Propagation {
+            consumer: self.name.to_owned(),
+            reach: self.reached.reach(),
+        }
+    }
+}
+
+/// How a replacement gets to one consumer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reached {
+    /// It is the service the credential is set on, so setting it is reaching it.
+    AtTheService,
+    /// It reads the value out of its own container's environment, which Compose
+    /// fixed when that container was created. Recording a replacement is half of
+    /// reaching it; the container has to be made again for the other half.
+    FromItsEnvironment {
+        /// The command that makes the container again.
+        restart: &'static str,
+    },
+    /// lemonfiber hands it the value over an API, which is what seeding does.
+    BySeeding,
+    /// It is lemonfiber, reading back what it recorded each time it needs it — so a
+    /// recorded replacement is one it already has.
+    WhenLemonfiberReadsIt,
+}
+
+impl Reached {
+    /// How far a landed replacement has reached a consumer reached this way.
+    #[must_use]
+    pub fn reach(self) -> Reach {
+        match self {
+            Self::AtTheService | Self::WhenLemonfiberReadsIt => Reach::Updated,
+            Self::FromItsEnvironment { restart } => Reach::Pending {
+                detail: restart.to_owned(),
+            },
+            Self::BySeeding => Reach::Pending {
+                detail: "lemonfiber seed".to_owned(),
+            },
+        }
+    }
+}
+
+/// Who produced a credential, which decides what can be done about it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Origin {
+    /// The operator supplied it, from an account they hold somewhere else.
+    Operator,
+    /// The service minted it for itself and wrote it into its own configuration.
+    Service,
+    /// lemonfiber minted it, because the service offers nothing durable to read.
+    Lemonfiber,
+}
+
+impl Origin {
+    /// How the origin is written on a surface.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Operator => "supplied by you",
+            Self::Service => "generated by the service",
+            Self::Lemonfiber => "generated by lemonfiber",
+        }
+    }
+
+    /// Whether lemonfiber can produce a replacement for one of these itself.
+    ///
+    /// It can where it minted the value in the first place. Where the operator's
+    /// provider issued it, a replacement is theirs to obtain — inventing one would
+    /// produce a credential no service has ever heard of.
+    #[must_use]
+    pub const fn mints_its_own(self) -> bool {
+        matches!(self, Self::Lemonfiber)
+    }
+}
+
+/// What has to be running for a credential to be one this stack needs.
+///
+/// A stack that does not torrent needs no VPN key, and reporting one absent there
+/// would be reporting a gap nobody has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Needed {
+    /// Needed whatever this stack runs.
+    Always,
+    /// Needed only where this stack torrents.
+    Torrenting,
+    /// Needed only where this stack downloads over Usenet.
+    OverUsenet,
+}
+
+impl Needed {
+    /// Whether what this stack runs makes the credential one it needs.
+    #[must_use]
+    pub const fn by(self, protocols: config::Protocols) -> bool {
+        match self {
+            Self::Always => true,
+            Self::Torrenting => protocols.torrent,
+            Self::OverUsenet => protocols.usenet,
+        }
+    }
+}
+
+/// One credential this product knows about before it looks at anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Entry {
+    /// What it is, in the operator's words.
+    pub name: &'static str,
+    /// The setting it is recorded under.
+    pub setting: &'static str,
+    /// Everything that authenticates with it, and how a replacement gets to each.
+    pub consumers: &'static [Consumer],
+    /// Who produced it.
+    pub origin: Origin,
+    /// What has to be running for it to be needed.
+    pub needed: Needed,
+    /// The setting that records whether this credential was proven before it was
+    /// kept, where anything records that.
+    ///
+    /// Present only for the two the operator supplies at setup, where proceeding
+    /// without proof is a choice they are offered and one worth reporting back. A
+    /// credential lemonfiber minted was set on its service and confirmed there
+    /// before it was ever written down, so there is nothing separate to record.
+    pub proven_by: Option<&'static str>,
+}
+
+/// The setting the tunnel's private key is recorded under.
+///
+/// Named here rather than in the settings module because nothing in this product
+/// reads it — the tunnel does, out of its own environment. What lemonfiber has to
+/// know is that it exists, so an operator asking what secrets are held is told about
+/// the one with the most to lose.
+pub const VPN_PRIVATE_KEY: &str = "WIREGUARD_PRIVATE_KEY";
+
+/// The tunnel's private key.
+const VPN: Entry = Entry {
+    name: "VPN private key",
+    setting: VPN_PRIVATE_KEY,
+    consumers: &[Consumer::from_its_environment(
+        "Gluetun, the tunnel every torrent leaves through",
+        "lemonfiber restart torrent",
+    )],
+    origin: Origin::Operator,
+    needed: Needed::Torrenting,
+    proven_by: None,
+};
+
+/// The Usenet account's password.
+const USENET: Entry = Entry {
+    name: "Usenet provider password",
+    setting: config::PROVIDER_PASS_KEY,
+    consumers: &[
+        Consumer::at_the_service("SABnzbd, which downloads through the account"),
+        Consumer::read_by_lemonfiber(
+            "lemonfiber's own provider check, which reads what the account has left",
+        ),
+    ],
+    origin: Origin::Operator,
+    needed: Needed::OverUsenet,
+    proven_by: Some(config::PROVIDER_VALIDATED_KEY),
+};
+
+/// The indexer's API key.
+const INDEXER: Entry = Entry {
+    name: "Indexer API key",
+    setting: config::INDEXER_APIKEY_KEY,
+    consumers: &[
+        Consumer::at_the_service("Prowlarr, which searches the indexer on the stack's behalf"),
+        Consumer::read_by_lemonfiber(
+            "lemonfiber's own indexer check, which proves the indexer still answers",
+        ),
+    ],
+    origin: Origin::Operator,
+    needed: Needed::Always,
+    proven_by: Some(config::INDEXER_VALIDATED_KEY),
+};
+
+/// qBittorrent's web UI password, and the reason the consumer column exists.
+const QBITTORRENT: Entry = Entry {
+    name: "qBittorrent web UI password",
+    setting: config::QBITTORRENT_PASSWORD_KEY,
+    consumers: &[
+        Consumer::at_the_service("qBittorrent's own web UI"),
+        Consumer::from_its_environment(
+            "the tunnel's forwarded-port push, which signs in on every connect and release",
+            "lemonfiber restart torrent",
+        ),
+        Consumer::from_its_environment(
+            "the dashboard's transfers panel",
+            "lemonfiber restart dash",
+        ),
+        Consumer::by_seeding("each library service's download-client registration"),
+    ],
+    origin: Origin::Lemonfiber,
+    needed: Needed::Torrenting,
+    proven_by: None,
+};
+
+/// The media server's administrator password.
+const JELLYFIN: Entry = Entry {
+    name: "Jellyfin administrator password",
+    setting: config::JELLYFIN_ADMIN_PASSWORD_KEY,
+    consumers: &[
+        Consumer::at_the_service("Jellyfin's own administrator account"),
+        Consumer::by_seeding(
+            "Seerr, which signs in through Jellyfin to authenticate the household",
+        ),
+    ],
+    origin: Origin::Lemonfiber,
+    needed: Needed::Always,
+    proven_by: None,
+};
+
+/// The listening server's first-account password.
+const AUDIOBOOKSHELF: Entry = Entry {
+    name: "Audiobookshelf account password",
+    setting: config::AUDIOBOOKSHELF_PASSWORD_KEY,
+    consumers: &[
+        Consumer::at_the_service("Audiobookshelf's own first account"),
+        Consumer::read_by_lemonfiber(
+            "the dashboard's listening panel, whose token is derived from it",
+        ),
+    ],
+    origin: Origin::Lemonfiber,
+    needed: Needed::Always,
+    proven_by: None,
+};
+
+/// The book service's API key — minted here and adopted by the service.
+const BINDERY: Entry = Entry {
+    name: "Book library API key",
+    setting: config::BINDERY_API_KEY,
+    consumers: &[
+        Consumer::from_its_environment(
+            "the book library service, which takes this key rather than minting its own",
+            "lemonfiber restart books",
+        ),
+        Consumer::from_its_environment("the dashboard's books panel", "lemonfiber restart dash"),
+    ],
+    origin: Origin::Lemonfiber,
+    needed: Needed::Always,
+    proven_by: None,
+};
+
+/// Every credential named ahead of looking at the stack.
+///
+/// The keys the services mint for themselves are not here: which of them exist is a
+/// question about what this stack runs, and the answer comes from the manifest.
+pub const CATALOGUE: &[Entry] = &[
+    VPN,
+    USENET,
+    INDEXER,
+    QBITTORRENT,
+    JELLYFIN,
+    AUDIOBOOKSHELF,
+    BINDERY,
+];
+
+/// The credentials this stack needs, given what it runs.
+#[must_use]
+pub fn catalogue(protocols: config::Protocols) -> Vec<Entry> {
+    CATALOGUE
+        .iter()
+        .filter(|entry| entry.needed.by(protocols))
+        .copied()
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{catalogue, Consumer, Entry, Needed, Origin, CATALOGUE, QBITTORRENT};
+    use crate::config::Protocols;
+    use crate::credential::Reach;
+
+    #[test]
+    fn every_entry_names_what_it_is_where_it_lives_and_who_uses_it() {
+        assert_eq!(CATALOGUE.len(), 7);
+        for entry in CATALOGUE {
+            assert!(!entry.name.is_empty(), "{}", entry.setting);
+            assert!(!entry.setting.is_empty(), "{}", entry.name);
+            assert!(!entry.consumers.is_empty(), "{}", entry.name);
+        }
+    }
+
+    #[test]
+    fn no_two_entries_are_recorded_under_the_same_setting() {
+        let mut settings: Vec<&str> = CATALOGUE.iter().map(|entry| entry.setting).collect();
+        let held = settings.len();
+        settings.sort_unstable();
+        settings.dedup();
+        assert_eq!(settings.len(), held, "{settings:?}");
+    }
+
+    /// The consumer this list exists for: a rotation reaching qBittorrent alone leaves
+    /// the tunnel unable to apply the port it was granted.
+    #[test]
+    fn the_torrent_password_names_the_port_push_as_well_as_the_client() {
+        let consumers: Vec<&str> = QBITTORRENT.consumers.iter().map(|one| one.name).collect();
+        let consumers = consumers.join("; ");
+
+        assert!(consumers.contains("forwarded-port push"), "{consumers}");
+        assert!(consumers.contains("web UI"), "{consumers}");
+        assert!(QBITTORRENT.consumers.len() >= 4, "{consumers}");
+    }
+
+    #[test]
+    fn a_stack_that_does_not_torrent_is_not_told_it_is_missing_a_tunnel_key() {
+        let usenet_only = catalogue(Protocols {
+            usenet: true,
+            torrent: false,
+        });
+        let named: Vec<&str> = usenet_only.iter().map(|entry| entry.name).collect();
+
+        assert!(!named.is_empty());
+        assert!(!named.iter().any(|name| name.contains("VPN")), "{named:?}");
+        assert!(
+            named.iter().any(|name| name.contains("Usenet")),
+            "{named:?}"
+        );
+    }
+
+    #[test]
+    fn a_stack_that_only_torrents_is_not_asked_for_a_usenet_password() {
+        let torrent_only = catalogue(Protocols {
+            usenet: false,
+            torrent: true,
+        });
+        let named: Vec<&str> = torrent_only.iter().map(|entry| entry.name).collect();
+
+        assert!(named.iter().any(|name| name.contains("VPN")), "{named:?}");
+        assert!(
+            !named.iter().any(|name| name.contains("Usenet")),
+            "{named:?}"
+        );
+    }
+
+    #[test]
+    fn a_stack_running_neither_still_holds_the_credentials_it_always_needs() {
+        let neither = catalogue(Protocols::none());
+
+        // Bound rather than called in the message: a call inside an assertion's
+        // message only runs when the assertion fails, so the helper would never run
+        // on a passing test and would read as dead code.
+        let listed = names(&neither);
+        assert_eq!(neither.len(), 4, "{listed:?}");
+        assert!(neither.iter().all(|entry| entry.needed == Needed::Always));
+    }
+
+    #[test]
+    fn both_protocols_ask_for_every_credential_there_is() {
+        assert_eq!(catalogue(Protocols::both()).len(), CATALOGUE.len());
+    }
+
+    /// Only a credential the operator was offered the chance to keep unproven has
+    /// anything recording whether they took it.
+    #[test]
+    fn what_records_a_proof_is_recorded_only_where_proceeding_unproven_was_a_choice() {
+        let recorded: Vec<&str> = CATALOGUE
+            .iter()
+            .filter(|entry| entry.proven_by.is_some())
+            .map(|entry| entry.setting)
+            .collect();
+
+        assert_eq!(recorded.len(), 2, "{recorded:?}");
+
+        // Counted before anything is said about all of them: an empty set satisfies
+        // every claim, so a catalogue that stopped minting anything would pass this
+        // while proving nothing.
+        let minted: Vec<&str> = CATALOGUE
+            .iter()
+            .filter(|entry| entry.origin.mints_its_own())
+            .map(|entry| entry.setting)
+            .collect();
+        assert_eq!(minted.len(), 4, "{minted:?}");
+        assert!(CATALOGUE
+            .iter()
+            .filter(|entry| entry.origin.mints_its_own())
+            .all(|entry| entry.proven_by.is_none()));
+    }
+
+    #[test]
+    fn only_what_lemonfiber_minted_is_something_it_can_replace_by_itself() {
+        assert!(Origin::Lemonfiber.mints_its_own());
+        assert!(!Origin::Operator.mints_its_own());
+        assert!(!Origin::Service.mints_its_own());
+    }
+
+    /// Each way of reaching a consumer, built and read back.
+    ///
+    /// Built here at run time rather than only in the table above, where every one of
+    /// them is settled while this is being compiled: a constructor reached only from a
+    /// constant runs nowhere, and a rule nothing runs is a rule nothing proves.
+    #[test]
+    fn each_way_of_reaching_a_consumer_carries_what_it_takes_to_get_there() {
+        let at = Consumer::at_the_service("the service itself");
+        let from = Consumer::from_its_environment("a container", "lemonfiber restart torrent");
+        let by = Consumer::by_seeding("a service lemonfiber writes to");
+        let read = Consumer::read_by_lemonfiber("lemonfiber's own check");
+
+        assert_eq!(at.reached().reach, Reach::Updated);
+        assert_eq!(read.reached().reach, Reach::Updated);
+        assert_eq!(
+            from.reached().reach,
+            Reach::Pending {
+                detail: "lemonfiber restart torrent".to_owned()
+            }
+        );
+        assert_eq!(
+            by.reached().reach,
+            Reach::Pending {
+                detail: "lemonfiber seed".to_owned()
+            }
+        );
+        assert_eq!(at.reached().consumer, "the service itself");
+    }
+
+    #[test]
+    fn every_origin_is_written_out_for_a_person_to_read() {
+        for origin in [Origin::Operator, Origin::Service, Origin::Lemonfiber] {
+            assert!(origin.as_str().contains(' '), "{}", origin.as_str());
+        }
+    }
+
+    /// The names in a set, for a failure message that says which set.
+    fn names(entries: &[Entry]) -> Vec<&str> {
+        entries.iter().map(|entry| entry.name).collect()
+    }
+}

@@ -17,6 +17,7 @@ pub(crate) mod fixtures;
 mod archive;
 mod bandwidth;
 mod clients;
+mod credentials;
 mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
@@ -33,6 +34,7 @@ mod space;
 pub(crate) mod stack;
 mod stored;
 mod trace;
+mod uninstall;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
@@ -228,6 +230,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Invited(report) => invitation::invitation(report),
         Outcome::Removed(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
+        Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::Space(report) => space::reckoning(report),
         Outcome::Letting(offer) => space::letting(offer),
@@ -239,6 +242,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Undo(report) => repair::reversed(&report.reversed),
         Outcome::Seed(report) => seed::seeding(report),
         Outcome::Reset(report) => stack::reset(report),
+        Outcome::Uninstall(report) => uninstall::removal(report),
         Outcome::Wizard(report) => standing(report),
         Outcome::Backup(report) => archive::backup(report),
         Outcome::Support(report) => archive::bundle(report),
@@ -704,6 +708,7 @@ mod tests {
                 beside: Vec::new(),
             }),
             Outcome::Lifecycle(a_lifecycle("up", a_plan("media", Vec::new()))),
+            Outcome::Credentials(lemonfiber_core::credential::Inventory::of(Vec::new())),
         ]
     }
 
@@ -799,7 +804,167 @@ mod tests {
             Outcome::Bandwidth(lemonfiber_core::bandwidth::weigh(
                 &lemonfiber_core::bandwidth::Measured::default(),
             )),
+            // A removal that took the whole of what it found, with every paragraph a
+            // manifest can carry present: a line going and a line kept, something
+            // beside the library, a volume worth a note, a download still coming
+            // down, a backup offered, a gap in the reading, and what was left behind.
+            Outcome::Uninstall(a_removal()),
         ]
+    }
+
+    /// A removal carrying every paragraph the renderer can put out, so rendering it
+    /// exercises the whole of them rather than the two a simple case has.
+    fn a_removal() -> lemonfiber_core::uninstall::Uninstall {
+        use lemonfiber_core::uninstall::{
+            Coming, Confidence, Foreign, Item, Left, Manifest, Removal, Sort, Tier, Uninstall,
+        };
+
+        Uninstall {
+            manifest: Manifest {
+                tier: Tier::Media,
+                removes: Tier::Media.removes().to_owned(),
+                keeps: Tier::Media.keeps().to_owned(),
+                items: vec![
+                    Item {
+                        name: "/srv/media/downloads".to_owned(),
+                        sort: Sort::Path,
+                        what: "the stack's own downloads".to_owned(),
+                        bytes: Some(1_000),
+                        kept: None,
+                        secret: true,
+                    },
+                    Item {
+                        name: "/srv/media".to_owned(),
+                        sort: Sort::Path,
+                        what: "the data location".to_owned(),
+                        bytes: Some(1_500),
+                        kept: Some(
+                            "there are files beneath it the stack did not put there".to_owned(),
+                        ),
+                        secret: false,
+                    },
+                ],
+                bytes: 1_000,
+                foreign: vec![
+                    Foreign {
+                        at: "Photographs".to_owned(),
+                        files: 9,
+                        bytes: 500,
+                    },
+                    Foreign {
+                        at: "notes.txt".to_owned(),
+                        files: 1,
+                        bytes: 12,
+                    },
+                ],
+                volume: Some("the data location is on a network share".to_owned()),
+                coming: vec![Coming {
+                    name: "A.Show.S01E01".to_owned(),
+                    progress: 94,
+                }],
+                outside: vec![lemonfiber_core::uninstall::Outside {
+                    what: "Docker itself".to_owned(),
+                    why: "lemonfiber runs on it and did not install it".to_owned(),
+                    by_hand: "drag Docker to the Bin".to_owned(),
+                    found: true,
+                }],
+                backup: Some("Take a backup first".to_owned()),
+                confidence: Confidence::whole().short("the engine would not answer"),
+                agreement: "deadbeef".to_owned(),
+            },
+            removal: Removal::Partial {
+                gone: vec!["/srv/media/downloads".to_owned()],
+                credentials: vec!["/cfg/lemonfiber/.env".to_owned()],
+                left: vec![Left {
+                    name: "/srv/media/media/tv".to_owned(),
+                    why: "permission denied".to_owned(),
+                    by_hand: "rm -rf '/srv/media/media/tv'".to_owned(),
+                }],
+            },
+        }
+    }
+
+    /// Every state a removal can end in renders, which the one above cannot show:
+    /// it is `partial`, and the other three carry different paragraphs.
+    #[test]
+    fn every_state_a_removal_ends_in_renders() {
+        use lemonfiber_core::uninstall::{Removal, Uninstall};
+
+        let one = a_removal();
+        for removal in [
+            Removal::Surveyed,
+            Removal::Confirmed,
+            Removal::Complete {
+                gone: Vec::new(),
+                credentials: Vec::new(),
+            },
+        ] {
+            let rendered = answer(
+                &Outcome::Uninstall(Uninstall {
+                    manifest: one.manifest.clone(),
+                    removal,
+                }),
+                false,
+            )
+            .text();
+            assert!(!rendered.is_empty(), "{rendered}");
+        }
+    }
+
+    /// A removal where every line goes says how many go and nothing about what is
+    /// kept, because there is nothing kept to say anything about.
+    #[test]
+    fn a_removal_that_keeps_none_of_what_it_lists_counts_only_what_goes() {
+        use lemonfiber_core::uninstall::{Item, Manifest, Uninstall};
+
+        let one = a_removal();
+        let whole = Uninstall {
+            manifest: Manifest {
+                items: one
+                    .manifest
+                    .items
+                    .iter()
+                    .map(|item| Item {
+                        kept: None,
+                        ..item.clone()
+                    })
+                    .collect(),
+                ..one.manifest.clone()
+            },
+            removal: one.removal.clone(),
+        };
+
+        let rendered = answer(&Outcome::Uninstall(whole), false).text();
+        assert!(rendered.contains("2 to remove —"), "{rendered}");
+        assert!(!rendered.contains("left where they are"), "{rendered}");
+    }
+
+    /// A reading that found nothing still says so, rather than printing a heading
+    /// over an empty list.
+    #[test]
+    fn a_removal_that_found_nothing_says_so() {
+        use lemonfiber_core::uninstall::{Confidence, Manifest, Removal, Tier, Uninstall};
+
+        let nothing = Uninstall {
+            manifest: Manifest {
+                tier: Tier::Stop,
+                removes: Tier::Stop.removes().to_owned(),
+                keeps: Tier::Stop.keeps().to_owned(),
+                items: Vec::new(),
+                bytes: 0,
+                foreign: Vec::new(),
+                volume: None,
+                coming: Vec::new(),
+                outside: Vec::new(),
+                backup: None,
+                confidence: Confidence::whole(),
+                agreement: "deadbeef".to_owned(),
+            },
+            removal: Removal::Surveyed,
+        };
+
+        let rendered = answer(&Outcome::Uninstall(nothing), false).text();
+        assert!(rendered.contains("Nothing of this was found"), "{rendered}");
     }
 
     #[test]

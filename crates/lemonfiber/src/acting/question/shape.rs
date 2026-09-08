@@ -45,6 +45,12 @@ pub(crate) enum Narrows {
     /// season that is not a number is refused there — so a line typed at this screen
     /// and a query string carrying the same word are answered in one sentence.
     Season,
+    /// Which of the four removals an uninstall is read for.
+    ///
+    /// Typed rather than picked, for the reason a family of checks is: the four are
+    /// four words, and a list to pick one off would be a list this screen has to
+    /// carry a second copy of.
+    Removal,
 }
 
 impl Narrows {
@@ -64,6 +70,7 @@ impl Narrows {
             Self::Form => into.forms = vec![said],
             Self::Family => into.only = Some(said),
             Self::Season => into.season = Some(said),
+            Self::Removal => into.tier = Some(said),
         }
     }
 

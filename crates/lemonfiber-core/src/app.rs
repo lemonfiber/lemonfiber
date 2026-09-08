@@ -33,6 +33,7 @@ pub mod bundle;
 mod command;
 pub mod conditions;
 mod configuring;
+mod credentials;
 mod ctx;
 pub mod dashboard;
 mod door;
@@ -69,13 +70,14 @@ mod stored;
 pub mod support;
 mod targets;
 mod trace;
+mod uninstall;
 mod upgrade;
 mod walkthrough;
 pub mod watch;
 
 pub use command::{
-    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
-    QualityAction, HOSTABLE,
+    Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Hostable,
+    Keeping, QualityAction, Removing, HOSTABLE,
 };
 pub use ctx::Ctx;
 pub use setup::SetupAction;
@@ -134,6 +136,8 @@ pub enum Outcome {
     Removed(crate::model::HouseholdRemoval),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
+    /// Every credential this stack holds, and what became of acting on one.
+    Credentials(crate::credential::Inventory),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
     Stored(crate::stored::Stored),
     /// Where the disk stands, where the room went, and what could be got back.
@@ -154,6 +158,8 @@ pub enum Outcome {
     Seed(crate::seed::Report),
     /// What a full reset did, or would do — the operator edits reverted to lemonfiber's.
     Reset(ResetReport),
+    /// What taking lemonfiber off this machine would come to, or came to.
+    Uninstall(crate::uninstall::Uninstall),
     /// Where setup stands, and what it is still asking for.
     Wizard(WizardReport),
     /// Where a backup archive was written, and what it covers.
@@ -194,6 +200,7 @@ impl Outcome {
             Self::Invited(_) => kind::INVITATION,
             Self::Removed(_) => kind::REMOVAL,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
+            Self::Credentials(_) => crate::model::kind::CREDENTIALS,
             Self::Stored(_) => crate::model::kind::STORED,
             Self::Space(_) => kind::SPACE,
             Self::Letting(_) => kind::STOP_SEEDING,
@@ -204,6 +211,7 @@ impl Outcome {
             Self::Undo(_) => kind::UNDO,
             Self::Seed(_) => kind::SEED,
             Self::Reset(_) => kind::RESET,
+            Self::Uninstall(_) => kind::UNINSTALL,
             Self::Wizard(_) => kind::WIZARD,
             Self::Backup(_) => kind::BACKUP,
             Self::Support(_) => kind::BUNDLE,
@@ -238,6 +246,7 @@ impl serde::Serialize for Outcome {
             Self::Invited(report) => report.serialize(serializer),
             Self::Removed(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
+            Self::Credentials(inventory) => inventory.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
             Self::Space(report) => report.serialize(serializer),
             Self::Letting(offer) => offer.serialize(serializer),
@@ -248,6 +257,7 @@ impl serde::Serialize for Outcome {
             Self::Undo(report) => report.serialize(serializer),
             Self::Seed(report) => report.serialize(serializer),
             Self::Reset(report) => report.serialize(serializer),
+            Self::Uninstall(report) => report.serialize(serializer),
             Self::Wizard(report) => report.serialize(serializer),
             Self::Backup(report) => report.serialize(serializer),
             Self::Support(report) => report.serialize(serializer),
@@ -477,6 +487,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             disruptive,
         } => mended(ctx, &consent, disruptive).await,
         Command::Undo => repair::reversing(ctx).await.map(Outcome::Undo),
+        Command::Credentials(asked) => credentials::answer(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
@@ -509,6 +520,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Walkthrough { item } => walked(ctx, item).await,
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
+        Command::Uninstall(asked) => uninstall::uninstalled(ctx, asked).await,
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
         Command::Setup(action) => setup::setting_up(ctx, action).await.map(Outcome::Wizard),
         Command::Backup { service } => backup::run(ctx, service).await.map(Outcome::Backup),
@@ -533,8 +545,9 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Allowance, Answer as Ruling, BandwidthAsked, Chosen, Command, Ctx,
-        Decision, Outcome, QualityAction, SetupAction, VersionReport, Waiting,
+        dispatch, pull_progress, Allowance, Answer as Ruling, Asking, BandwidthAsked, Chosen,
+        Command, Ctx, Decision, Outcome, QualityAction, Removing, SetupAction, VersionReport,
+        Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -2270,6 +2283,35 @@ mod tests {
 
     /// Asking about the line arrives at the command that answers about it.
     ///
+    /// Reading what the stack holds reaches the command that answers it.
+    ///
+    /// Dispatched here as well as from `tests/` for the same reason as the line
+    /// below: the arm is a line of each copy of this file, and the copy that never
+    /// dispatched it counts the arm as never run.
+    #[tokio::test]
+    async fn asking_about_the_credentials_reaches_the_command_that_reads_them() {
+        let ctx = a_context().build();
+        let read = dispatch(Command::Credentials(Asking::Read), &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Credentials(_)));
+        assert!(answered, "{read:?}");
+    }
+
+    /// Surveying a removal reaches the command that lists it.
+    ///
+    /// The listing is the read half of an uninstall and takes nothing away, so it is
+    /// the one that can be dispatched here without a stack to remove.
+    #[tokio::test]
+    async fn surveying_a_removal_reaches_the_command_that_lists_it() {
+        let ctx = a_context().build();
+        let listed = dispatch(
+            Command::Uninstall(Removing::surveying(crate::uninstall::Tier::Stop)),
+            &ctx,
+        )
+        .await;
+        let reached = matches!(&listed, Ok(Outcome::Uninstall(_)));
+        assert!(reached, "{listed:?}");
+    }
+
     /// Dispatched here as well as from `tests/`: this file is compiled twice, and
     /// the arm joining a command to its handler is a line of each copy — so the
     /// copy that never dispatched it counts the arm as never run. What the command
@@ -2278,8 +2320,12 @@ mod tests {
     async fn asking_about_the_line_reaches_the_command_that_reads_it() {
         let ctx = a_context().build();
         let read = dispatch(Command::Bandwidth(BandwidthAsked::default()), &ctx).await;
+        // Bound rather than asserted inline: a multi-line `matches!` inside an
+        // assertion that carries a message leaves the condition's own line counted as
+        // never run, which the coverage gate reads as dead code.
+        let wrote_nothing = matches!(&read, Ok(Outcome::Bandwidth(shared)) if !shared.applied);
         assert!(
-            matches!(&read, Ok(Outcome::Bandwidth(shared)) if !shared.applied),
+            wrote_nothing,
             "a run that asked for nothing wrote nothing: {read:?}"
         );
     }
@@ -2321,6 +2367,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
@@ -2331,6 +2378,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
@@ -2368,6 +2416,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
@@ -2377,6 +2426,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
@@ -3195,6 +3245,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
@@ -3205,6 +3256,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
@@ -4196,6 +4248,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
@@ -4205,6 +4258,7 @@ mod tests {
                 | Outcome::Undo(_)
                 | Outcome::Seed(_)
                 | Outcome::Reset(_)
+                | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)

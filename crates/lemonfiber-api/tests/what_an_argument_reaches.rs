@@ -18,8 +18,8 @@ mod acting;
 
 use acting::{
     exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CARRIES, DOWNLOAD, FOLLOWED, HOURS, ITEM,
-    KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON, SEASON, SHARE,
-    UNRATED, WAITING, WARNED,
+    KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON, REMOVAL,
+    SEASON, SHARE, UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
@@ -30,6 +30,7 @@ use lemonfiber_core::app::{Command, QualityAction, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::ports::service::Unrated;
+use lemonfiber_core::uninstall::Tier;
 
 /// One form named, which is what most of the rest are asked with.
 fn naming(form: &str) -> Arguments {
@@ -74,7 +75,7 @@ fn carries_wait(command: &Command) -> bool {
             wait: Waiting::ForTheDownloads,
             ..
         }
-    )
+    ) || matches!(command, Command::Uninstall(asked) if asked.waiting == Waiting::ForTheDownloads)
 }
 
 fn carries_services(command: &Command) -> bool {
@@ -135,6 +136,7 @@ fn carries_agreement(command: &Command) -> bool {
                 ..
             }
     ) || carries_a_yes(command)
+        || matches!(command, Command::Uninstall(asked) if asked.confirm)
 }
 
 /// Whether a repairing run was told yes, in either of the two ways of saying it.
@@ -196,8 +198,17 @@ fn carries_offer(command: &Command) -> bool {
             agreement: Some(named),
             ..
         } => named == OFFER,
+        // And the fourth, where the offer's own name is the only yes the removal
+        // that reaches the library takes: dropped, it is a removal nobody could ask
+        // for; kept silently, one nobody read the cost of.
+        Command::Uninstall(asked) => asked.agreement.as_deref() == Some(OFFER),
         _ => false,
     }
+}
+
+/// Whether the command has the removal it was told to read in it.
+fn carries_tier(command: &Command) -> bool {
+    matches!(command, Command::Uninstall(asked) if asked.tier == Tier::Services)
 }
 
 /// Whether the command has the completed download it was told to stop seeding in it.
@@ -557,6 +568,10 @@ fn give_kept(given: &mut Arguments) {
     given.kept = Some(KEPT.to_owned());
 }
 
+fn give_tier(given: &mut Arguments) {
+    given.tier = Some(REMOVAL.to_owned());
+}
+
 // One field each, as every other giver here sets one. The action that takes them was
 // handed both already, so overwriting one leaves the pair complete; an action that
 // takes neither is given one, and is refused for the one it was given rather than for
@@ -587,7 +602,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 40] = [
+const SWEEPS: [Sweep; 41] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -620,6 +635,7 @@ const SWEEPS: [Sweep; 40] = [
     ("days", give_days, carries_limit),
     ("request", give_request, carries_request),
     ("reason", give_reason, carries_reason),
+    ("tier", give_tier, carries_tier),
     ("kept", give_kept, carries_kept),
     ("down", give_down, carries_down),
     ("up", give_up, carries_up),

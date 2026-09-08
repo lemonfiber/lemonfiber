@@ -27,6 +27,7 @@ use crate::app::repair::{Report as RepairReport, Reversal};
 use crate::app::restore::Restoration;
 use crate::app::support::Bundle;
 use crate::clients::Guidance;
+use crate::credential::Inventory;
 use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
@@ -89,6 +90,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::BACKUP, schema_for!(Envelope<BackupReport>));
     describing(kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
     describing(kinds, kind::CONFIG, schema_for!(Envelope<ConfigReport>));
+    describing(kinds, kind::CREDENTIALS, schema_for!(Envelope<Inventory>));
     describing(kinds, kind::DOCTOR, schema_for!(Envelope<DoctorReport>));
     describing(kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
     describing(
@@ -147,6 +149,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
     describing(kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
     describing(kinds, kind::UNDO, schema_for!(Envelope<Reversal>));
+    describing(
+        kinds,
+        kind::UNINSTALL,
+        schema_for!(Envelope<crate::uninstall::Uninstall>),
+    );
     describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
     describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
     describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
@@ -191,7 +198,7 @@ mod tests {
 
     use serde_json::Value;
 
-    use super::{Contract, CONTRACT_PATH};
+    use super::{Contract, Inventory, CONTRACT_PATH};
     use crate::app::Outcome;
     use crate::glossary::{Term, Vocabulary};
     use crate::model::{
@@ -210,7 +217,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 36;
+    const OUTCOMES: usize = 38;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -360,6 +367,36 @@ mod tests {
         ]
     }
 
+    /// An inventory carrying one of each of its optional halves.
+    ///
+    /// The value in the reveal is built rather than written, so nothing scanning this
+    /// source reads it as a credential — which it is not; it is the shape of one.
+    fn a_credential_inventory() -> Inventory {
+        Inventory::of(vec![crate::credential::Held {
+            name: "qBittorrent web UI password".to_owned(),
+            setting: "QBITTORRENT_PASSWORD".to_owned(),
+            consumers: vec!["the tunnel's forwarded-port push".to_owned()],
+            location: "/home/op/.config/lemonfiber/.env".to_owned(),
+            origin: crate::credential::Origin::Lemonfiber,
+            state: crate::credential::State::Active,
+            fingerprint: Some(crate::credential::fingerprint("a")),
+            advisory: None,
+        }])
+        .after(crate::credential::Rotation::landed(
+            "qBittorrent web UI password",
+            "qBittorrent signed in with it",
+            vec![crate::credential::Propagation::pending(
+                "the tunnel's forwarded-port push",
+                "lemonfiber restart torrent",
+            )],
+        ))
+        .showing(crate::credential::Revealed {
+            name: "qBittorrent web UI password".to_owned(),
+            value: Some(format!("{}{}", "the-", "value-itself")),
+            warning: crate::credential::REVEALED.to_owned(),
+        })
+    }
+
     /// The last of them, continuing that order.
     fn the_last_of_them() -> Vec<Outcome> {
         vec![
@@ -385,6 +422,9 @@ mod tests {
                     }],
                 },
             )),
+            // Carrying a rotation and a reveal as well as the inventory, so every
+            // optional half of the shape is compared rather than only the reading.
+            Outcome::Credentials(a_credential_inventory()),
             Outcome::Space(a_reckoning()),
             Outcome::Letting(crate::space::letting::offering(crate::space::Candidate {
                 name: "A.Release".to_owned(),
@@ -393,6 +433,7 @@ mod tests {
                 consequence: Some(crate::space::RATIO_CONSEQUENCE.to_owned()),
             })),
             Outcome::Bandwidth(a_shared_line()),
+            Outcome::Uninstall(a_removal()),
             Outcome::Wizard(a_setup_part_way()),
             Outcome::Archives(crate::app::archives::Listing {
                 archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
@@ -497,6 +538,71 @@ mod tests {
                 }],
             }),
             ..crate::space::reckon(&measured)
+        }
+    }
+
+    /// A removal with every optional half of the shape filled: a line going and a
+    /// line kept, something beside the library, a volume worth a note, a download
+    /// still coming down, something left behind, and a reading that is short.
+    fn a_removal() -> crate::uninstall::Uninstall {
+        use crate::uninstall::{
+            Coming, Confidence, Foreign, Item, Left, Manifest, Outside, Removal, Sort, Tier,
+            Uninstall,
+        };
+
+        Uninstall {
+            manifest: Manifest {
+                tier: Tier::Media,
+                removes: Tier::Media.removes().to_owned(),
+                keeps: Tier::Media.keeps().to_owned(),
+                items: vec![
+                    Item {
+                        name: "/srv/media/downloads".to_owned(),
+                        sort: Sort::Path,
+                        what: "the stack's own downloads".to_owned(),
+                        bytes: Some(90_000_000_000),
+                        kept: None,
+                        secret: true,
+                    },
+                    Item {
+                        name: "lscr.io/linuxserver/sonarr:4.0.15".to_owned(),
+                        sort: Sort::Image,
+                        what: "an image pulled for one of this stack's services".to_owned(),
+                        bytes: None,
+                        kept: Some("another project is standing on it".to_owned()),
+                        secret: false,
+                    },
+                ],
+                bytes: 90_000_000_000,
+                foreign: vec![Foreign {
+                    at: "Photographs".to_owned(),
+                    files: 9_000,
+                    bytes: 40_000_000_000,
+                }],
+                volume: Some("the data location is on a network share".to_owned()),
+                coming: vec![Coming {
+                    name: "A.Release".to_owned(),
+                    progress: 94,
+                }],
+                outside: vec![Outside {
+                    what: "Docker itself".to_owned(),
+                    why: "lemonfiber runs on it and did not install it".to_owned(),
+                    by_hand: "drag Docker to the Bin".to_owned(),
+                    found: true,
+                }],
+                backup: Some("Take a backup first".to_owned()),
+                confidence: Confidence::whole().short("the engine would not answer"),
+                agreement: "deadbeef".to_owned(),
+            },
+            removal: Removal::Partial {
+                gone: vec!["/srv/media/downloads".to_owned()],
+                credentials: vec!["/home/op/.config/lemonfiber/.env".to_owned()],
+                left: vec![Left {
+                    name: "/srv/media/media/tv".to_owned(),
+                    why: "permission denied".to_owned(),
+                    by_hand: "rm -rf '/srv/media/media/tv'".to_owned(),
+                }],
+            },
         }
     }
 

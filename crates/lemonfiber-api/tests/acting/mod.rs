@@ -19,7 +19,7 @@ pub(crate) use lemonfiber_api::actions::{
     TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME,
     TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_SERVICE,
-    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_WAITING,
+    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::guard::Token;
@@ -138,6 +138,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         request: takes(TAKES_REQUEST).then_some(WAITING),
         reason: takes(TAKES_REASON).then(|| REASON.to_owned()),
         kept: takes(TAKES_KEPT).then(|| KEPT.to_owned()),
+        tier: takes(TAKES_TIER).then(|| REMOVAL.to_owned()),
         down: takes(TAKES_SHARING).then(|| SHARE.to_owned()),
         up: takes(TAKES_SHARING).then(|| SHARE.to_owned()),
         active: takes(TAKES_SHARING).then(|| HOURS.to_owned()),
@@ -207,6 +208,13 @@ pub(crate) const POLICY: &str = "within-a-limit";
 /// the forms it stops — so the sweep over `forms` is driven against an action that
 /// genuinely carries them rather than against one that would drop them.
 pub(crate) const KEPT: &str = "watch";
+
+/// The removal an uninstall is asked about here.
+///
+/// The one that reaches the containers rather than the one that reaches the library:
+/// what these sweeps are about is which argument lands where, and naming the library
+/// would put the destructive one in every case that has nothing to do with it.
+pub(crate) const REMOVAL: &str = "services";
 
 /// How many requests a period allows. Not one, so a command carrying it cannot pass
 /// for one carrying a figure anything might have defaulted to.

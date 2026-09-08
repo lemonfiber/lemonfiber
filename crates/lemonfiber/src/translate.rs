@@ -8,8 +8,8 @@
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, BandwidthAsked, Chosen, Command, Decision, Hostable, Keeping,
-    QualityAction,
+    Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Hostable,
+    Keeping, QualityAction, Removing,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -17,12 +17,13 @@ use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
+use lemonfiber_core::uninstall::Tier;
 
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
     Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
-    RawBandwidth, RawUnrated,
+    RawBandwidth, RawCredentials, RawRemoval, RawRemoving, RawUnrated,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -303,6 +304,31 @@ pub(crate) fn letting(download: String, offer: Option<String>) -> Command {
     }
 }
 
+/// Which removal was asked for, and what was answered about it.
+///
+/// The four words are a `ValueEnum` on this surface, so a fifth word is refused by
+/// the parser before anything here runs — which is why this translation cannot fail
+/// and the core's own refusal for an unrecognised removal belongs to the surface that
+/// takes one as free text.
+///
+/// Nothing typed is nothing agreed to, for the reason [`letting`] drops an empty
+/// offer: a flag given empty is an answer to no listing, and carrying it would be a
+/// name the core goes and fails to match.
+pub(crate) fn removing(asked: RawRemoving) -> Command {
+    let tier = match asked.tier {
+        RawRemoval::Stop => Tier::Stop,
+        RawRemoval::Services => Tier::Services,
+        RawRemoval::Configuration => Tier::Configuration,
+        RawRemoval::Media => Tier::Media,
+    };
+    Command::Uninstall(
+        Removing::surveying(tier)
+            .confirmed(asked.confirm)
+            .agreeing(asked.agreed.filter(|named| !named.trim().is_empty()))
+            .waiting(asked.wait.into()),
+    )
+}
+
 /// The diagnosis a plain run asks for, narrowed as it was asked to be.
 ///
 /// Named apart because the arm it came from carries a fork of its own — a run that
@@ -338,6 +364,26 @@ fn narrowed(only: Option<&str>) -> Result<Narrowing, u8> {
     }
 }
 
+/// What is being asked about the credentials this stack holds.
+///
+/// Naming nothing is the reading. Naming one to reveal or one to rotate is an act on
+/// a line of that reading, and the two cannot arrive together — the command line
+/// refuses the pair, so there is no order of precedence here to get wrong.
+///
+/// The confirmation belongs to the reveal and to nothing else. Carried through
+/// rather than acted on here, because what an unconfirmed reveal answers with is a
+/// warning that has to be written once, where the value would otherwise be.
+pub(crate) fn credentials(asked: RawCredentials) -> Command {
+    Command::Credentials(match (asked.reveal, asked.rotate) {
+        (Some(credential), _) => Asking::Reveal {
+            credential,
+            confirmed: asked.confirm,
+        },
+        (None, Some(credential)) => Asking::Rotate { credential },
+        (None, None) => Asking::Read,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::app::{Allowance, Command, QualityAction};
@@ -345,15 +391,15 @@ mod tests {
     use lemonfiber_core::quality::Preset;
 
     use super::{
-        bundling, configuration, hosting, household, invitation, letting, quality, restarting,
-        sharing, traced, Answer, Arranged, Chosen, Decision, Destination, Hostable, Keeping,
-        Policy, Quota, Wanted,
+        bundling, configuration, credentials, hosting, household, invitation, letting, quality,
+        restarting, sharing, traced, Answer, Arranged, Asking, Chosen, Decision, Destination,
+        Hostable, Keeping, Policy, Quota, Wanted,
     };
     use super::{diagnosing, narrowed};
     use crate::exit::USAGE;
     use lemonfiber::cli::{
         Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand, RawAllowance,
-        RawBandwidth, RawUnrated,
+        RawBandwidth, RawCredentials, RawUnrated,
     };
     use lemonfiber_core::app::BandwidthAsked;
     use lemonfiber_core::bundle::Filenames;
@@ -951,6 +997,147 @@ mod tests {
                 narrowing: Narrowing::Check("storage.space".to_owned()),
                 disruptive: true,
                 accept: Some("STORAGE-1".to_owned()),
+            })
+        );
+    }
+
+    /// A removal as the command line accepted it.
+    fn removing_asked(
+        tier: lemonfiber::cli::RawRemoval,
+        agreed: Option<&str>,
+        wait: bool,
+    ) -> lemonfiber::cli::RawRemoving {
+        lemonfiber::cli::RawRemoving {
+            tier,
+            confirm: true,
+            agreed: agreed.map(str::to_owned),
+            wait,
+        }
+    }
+
+    /// Each of the four words reaches the removal it names, and nothing else.
+    ///
+    /// Compared whole rather than field by field: what this is about is that one
+    /// word becomes one command, and a comparison that read only the removal out of
+    /// it would pass on a translation that had dropped everything else.
+    #[test]
+    fn each_word_reaches_the_removal_it_names() {
+        use lemonfiber::cli::RawRemoval;
+        use lemonfiber_core::app::Removing;
+        use lemonfiber_core::uninstall::Tier;
+
+        let pairs = [
+            (RawRemoval::Stop, Tier::Stop),
+            (RawRemoval::Services, Tier::Services),
+            (RawRemoval::Configuration, Tier::Configuration),
+            (RawRemoval::Media, Tier::Media),
+        ];
+        for (written, meant) in pairs {
+            assert_eq!(
+                super::removing(removing_asked(written, None, false)),
+                Command::Uninstall(Removing::surveying(meant).confirmed(true)),
+                "{written:?}"
+            );
+        }
+    }
+
+    /// Nothing typed is nothing agreed to: a flag given empty is an answer to no
+    /// listing, and carrying it would be a name the core goes and fails to match.
+    #[test]
+    fn an_empty_answer_to_a_listing_is_dropped_rather_than_carried() {
+        use lemonfiber::cli::RawRemoval;
+        use lemonfiber_core::app::Removing;
+        use lemonfiber_core::uninstall::Tier;
+
+        let media = || Removing::surveying(Tier::Media).confirmed(true);
+
+        assert_eq!(
+            super::removing(removing_asked(RawRemoval::Media, Some("  "), false)),
+            Command::Uninstall(media())
+        );
+        assert_eq!(
+            super::removing(removing_asked(RawRemoval::Media, Some("deadbeef"), false)),
+            Command::Uninstall(media().agreeing(Some("deadbeef".to_owned())))
+        );
+    }
+
+    /// The wait is carried as the word the core knows it by rather than as a flag.
+    #[test]
+    fn asking_a_removal_to_wait_reaches_it_as_a_wait() {
+        use lemonfiber::cli::RawRemoval;
+        use lemonfiber_core::app::{Removing, Waiting};
+        use lemonfiber_core::uninstall::Tier;
+
+        let stopping = || Removing::surveying(Tier::Stop).confirmed(true);
+
+        assert_eq!(
+            super::removing(removing_asked(RawRemoval::Stop, None, true)),
+            Command::Uninstall(stopping().waiting(Waiting::ForTheDownloads))
+        );
+        assert_eq!(
+            super::removing(removing_asked(RawRemoval::Stop, None, false)),
+            Command::Uninstall(stopping())
+        );
+    }
+
+    /// Naming nothing is the reading, which is what people type.
+    #[test]
+    fn a_credentials_command_with_no_flags_is_the_reading() {
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: None,
+                rotate: None,
+                confirm: false,
+            }),
+            Command::Credentials(Asking::Read)
+        );
+    }
+
+    /// Naming one to reveal is an act on that credential, and the confirmation the
+    /// operator gave belongs to it rather than to the reading beside it.
+    ///
+    /// Carried through rather than acted on here: what an unconfirmed reveal answers
+    /// with is a warning written where the value would otherwise be, which is the
+    /// core's to say and not this translation's.
+    #[test]
+    fn a_reveal_carries_the_name_and_whether_it_was_confirmed() {
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: Some("Indexer API key".to_owned()),
+                rotate: None,
+                confirm: true,
+            }),
+            Command::Credentials(Asking::Reveal {
+                credential: "Indexer API key".to_owned(),
+                confirmed: true,
+            })
+        );
+
+        // A reveal wins over a rotation named in the same breath, and an unconfirmed
+        // one still reaches the core, which is where the warning is written.
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: Some("Indexer API key".to_owned()),
+                rotate: Some("Sonarr API key".to_owned()),
+                confirm: false,
+            }),
+            Command::Credentials(Asking::Reveal {
+                credential: "Indexer API key".to_owned(),
+                confirmed: false,
+            })
+        );
+    }
+
+    #[test]
+    fn a_rotation_carries_the_name_and_nothing_else() {
+        assert_eq!(
+            credentials(RawCredentials {
+                reveal: None,
+                rotate: Some("Indexer API key".to_owned()),
+                confirm: false,
+            }),
+            Command::Credentials(Asking::Rotate {
+                credential: "Indexer API key".to_owned(),
             })
         );
     }

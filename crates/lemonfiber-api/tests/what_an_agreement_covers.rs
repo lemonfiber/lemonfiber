@@ -53,11 +53,12 @@ fn every_action_the_table_names_accepts_the_agreement_it_names_them_for() {
     for action in TAKES_AGREEMENT {
         let given = Arguments {
             confirm: true,
-            // The three that cannot be asked for at all without a subject, so what
+            // The four that cannot be asked for at all without a subject, so what
             // this holds is the agreement rather than the missing one.
             preset: (*action == "quality-set").then(|| Preset::Balanced.label().to_owned()),
             archive: (*action == "restore").then(|| "a-backup.tar.gz".to_owned()),
             name: (*action == "remove").then(|| "ana".to_owned()),
+            tier: (*action == "uninstall").then(|| "services".to_owned()),
             ..Arguments::default()
         };
         assert_eq!(refusal(action, given), None, "{action}");

@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::archive::Archiving;
 use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
-use crate::ports::docker::Engine;
+use crate::ports::docker::{Engine, Images};
 use crate::ports::filesystem::{Eraser, Volume};
 use crate::ports::hosting::Host;
 use crate::ports::http::Http;
@@ -36,6 +36,12 @@ pub struct Ctx {
     pub runner: Arc<dyn Runner>,
     /// How the engine is observed.
     pub engine: Arc<dyn Engine>,
+    /// How the engine is asked what it has pulled, and who is standing on each of
+    /// them.
+    ///
+    /// Apart from the engine because the question is apart: one command asks it, and
+    /// every other reading of the engine asks the rest and never this.
+    pub images: Arc<dyn Images>,
     /// What time it is, for the one rule that depends on it.
     pub clock: Arc<dyn Clock>,
     /// How the filesystem is reached, for the checks that prove what it can do.
@@ -173,6 +179,10 @@ impl Ctx {
             force: false,
             runner,
             engine,
+            // The real one, for the reason the volume below is: a run asked what this
+            // machine has pulled is asking this machine's own engine, and a test that
+            // means something else says so by name.
+            images: Arc::new(crate::adapters::Daemon::local()),
             clock,
             filesystem,
             // The real volume for the same reason the transport is real: the one
@@ -217,6 +227,17 @@ impl Ctx {
     #[must_use]
     pub fn keeping(mut self, archives: Archiving) -> Self {
         self.archives = Some(archives);
+        self
+    }
+
+    /// The same context, listing images through the given seam.
+    ///
+    /// Lets what an uninstall would take be driven against an engine a test wrote
+    /// down, so an image another project is standing on is exercised with one
+    /// daemon and no second project.
+    #[must_use]
+    pub fn with_images(mut self, images: Arc<dyn Images>) -> Self {
+        self.images = images;
         self
     }
 

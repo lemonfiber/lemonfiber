@@ -110,6 +110,12 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // not confirmed is waiting on the operator's say-so, and one that could not
         // take a directory left something behind — a script that read either as
         // success would carry on as though the machine were clean.
+        // Listing the credentials is a question, and asking one is never a failure —
+        // including when the answer is that several have gone stale, which is an
+        // advisory rather than a fault. What is a failure is a replacement that was
+        // asked for and did not happen: a script that read that as success would go on
+        // believing a credential had been rotated when the old one is still in force.
+        Outcome::Credentials(inventory) => rotating(inventory),
         Outcome::Stored(report) => forgetting(&report.removal),
         // Accounting for the disk is a question, and asking one is never a failure —
         // including when the answer is that there is no room, which the report says
@@ -117,6 +123,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // a failure is a cleanup that was agreed to and could not finish.
         Outcome::Space(report) => accounting(report),
         Outcome::Letting(offer) => letting_go(offer),
+        // A reading is a question and asking one is never a failure. A removal that
+        // could not take everything left something behind, and a script that read
+        // that as success would carry on believing the machine was clean.
+        Outcome::Uninstall(report) => removing_it(&report.removal),
         // Accounting for the line is a question too, and one answer to it is a
         // failure a script has to be able to see: a limit that was handed to a
         // client and did not take is a setting the operator believes is in force
@@ -205,6 +215,22 @@ fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// The exit code a question about the credentials earns.
+///
+/// Only a rotation that was asked for and did not land is a failure. A reading is a
+/// question; a reveal either printed or said why it did not; and a rotation that
+/// landed but left a consumer waiting on a restart is reported in words rather than
+/// as a failure, because nothing went wrong — the operator has one more command to
+/// run and the report names it.
+fn rotating(inventory: &lemonfiber_core::credential::Inventory) -> ExitCode {
+    match &inventory.rotated {
+        Some(rotated) if rotated.kept_the_existing() => ExitCode::from(FAILURE),
+        // No rotation was asked for, or one was and it landed. Neither is a fault, so
+        // they answer alike rather than through two arms saying the same thing.
+        None | Some(_) => ExitCode::SUCCESS,
+    }
+}
+
 /// The exit code an accounting of the disk earns.
 fn accounting(report: &lemonfiber_core::space::Reckoning) -> ExitCode {
     match &report.reclaimed {
@@ -226,6 +252,20 @@ fn letting_go(offer: &lemonfiber_core::space::Letting) -> ExitCode {
         ExitCode::SUCCESS
     } else {
         ExitCode::from(VALIDATION)
+    }
+}
+
+/// The exit code an uninstall earns.
+///
+/// A reading and a rehearsal both succeed: neither was asked to remove anything, so
+/// neither has failed to. What earns a failure is the one answer a script must not
+/// read as done — a removal that ran and left something behind.
+fn removing_it(removal: &lemonfiber_core::uninstall::Removal) -> ExitCode {
+    match removal {
+        lemonfiber_core::uninstall::Removal::Surveyed
+        | lemonfiber_core::uninstall::Removal::Confirmed
+        | lemonfiber_core::uninstall::Removal::Complete { .. } => ExitCode::SUCCESS,
+        lemonfiber_core::uninstall::Removal::Partial { .. } => ExitCode::from(FAILURE),
     }
 }
 
@@ -636,6 +676,41 @@ mod tests {
             ..offer
         };
         assert_eq!(format!("{:?}", settled(&Outcome::Letting(gone))), success());
+    }
+
+    /// Listing the credentials is a question; a replacement that was asked for and
+    /// did not happen is the one answer a script has to act on, because the operator
+    /// believes a credential has been rotated and the old one is still the one in
+    /// force. A rotation that landed but left a consumer waiting on a restart is not
+    /// a failure — nothing went wrong, and the report names the command that finishes
+    /// it.
+    #[test]
+    fn listing_the_credentials_is_a_question_and_a_replacement_that_did_not_happen_is_not() {
+        use lemonfiber_core::credential::{Inventory, Propagation, Rotation, Settled};
+
+        let asked = |inventory| format!("{:?}", settled(&Outcome::Credentials(inventory)));
+
+        assert_eq!(asked(Inventory::of(Vec::new())), success());
+        assert_eq!(
+            asked(Inventory::of(Vec::new()).after(Rotation::landed(
+                "qBittorrent web UI password",
+                "it signed in with the replacement",
+                vec![Propagation::pending(
+                    "the push",
+                    "lemonfiber restart torrent"
+                )],
+            ))),
+            success()
+        );
+        assert_ne!(
+            asked(Inventory::of(Vec::new()).after(Rotation::stopped(
+                "qBittorrent web UI password",
+                Settled::Refused {
+                    detail: "it refused the password lemonfiber holds".to_owned(),
+                },
+            ))),
+            success()
+        );
     }
 
     /// Accounting for the disk is a question, however bad the answer is; a cleanup
@@ -1062,6 +1137,61 @@ mod tests {
             stopped: false,
         });
         assert_eq!(shown(settled(&stranded)), success());
+    }
+
+    /// A removal carrying nothing, so a case about its state is about its state.
+    fn a_removal(
+        removal: lemonfiber_core::uninstall::Removal,
+    ) -> lemonfiber_core::uninstall::Uninstall {
+        lemonfiber_core::uninstall::Uninstall {
+            manifest: lemonfiber_core::uninstall::Manifest {
+                tier: lemonfiber_core::uninstall::Tier::Stop,
+                removes: String::new(),
+                keeps: String::new(),
+                items: Vec::new(),
+                bytes: 0,
+                foreign: Vec::new(),
+                volume: None,
+                coming: Vec::new(),
+                outside: Vec::new(),
+                backup: None,
+                confidence: lemonfiber_core::uninstall::Confidence::whole(),
+                agreement: String::new(),
+            },
+            removal,
+        }
+    }
+
+    /// A reading and a rehearsal both succeed: neither was asked to remove anything,
+    /// so neither has failed to. A removal that ran and left something behind is the
+    /// one answer a script must not read as done.
+    #[test]
+    fn only_a_removal_that_left_something_behind_earns_a_failure() {
+        use lemonfiber_core::uninstall::{Left, Removal};
+
+        let code = |removal| super::settled(&Outcome::Uninstall(a_removal(removal)));
+
+        assert_eq!(code(Removal::Surveyed), std::process::ExitCode::SUCCESS);
+        assert_eq!(code(Removal::Confirmed), std::process::ExitCode::SUCCESS);
+        assert_eq!(
+            code(Removal::Complete {
+                gone: vec!["/srv/media".to_owned()],
+                credentials: Vec::new(),
+            }),
+            std::process::ExitCode::SUCCESS
+        );
+        assert_eq!(
+            code(Removal::Partial {
+                gone: Vec::new(),
+                credentials: Vec::new(),
+                left: vec![Left {
+                    name: "/srv/media".to_owned(),
+                    why: "permission denied".to_owned(),
+                    by_hand: "rm -rf '/srv/media'".to_owned(),
+                }],
+            }),
+            std::process::ExitCode::from(super::FAILURE)
+        );
     }
 }
 

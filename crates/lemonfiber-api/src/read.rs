@@ -1,4 +1,4 @@
-//! The twenty-two reads: one endpoint per question a command already answers, plus
+//! The twenty-four reads: one endpoint per question a command already answers, plus
 //! the two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -26,6 +26,7 @@ mod archives;
 mod bandwidth;
 mod chosen;
 mod clients;
+mod credentials;
 mod diagnosis;
 mod door;
 mod glossary;
@@ -35,6 +36,7 @@ mod outbound;
 mod space;
 mod stack;
 mod stored;
+mod uninstall;
 
 use axum::body::Body;
 use axum::http::StatusCode;
@@ -70,6 +72,8 @@ pub fn routes() -> Router<Serving> {
         .merge(clients::routes())
         .merge(outbound::routes())
         .merge(stored::routes())
+        .merge(uninstall::routes())
+        .merge(credentials::routes())
         .merge(space::routes())
         .merge(bandwidth::routes())
         .merge(hosting::routes())

@@ -32,12 +32,14 @@ Commands:
   stuck         List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   front-door    Name the one address to send somebody who lives here
   outbound      List everything that leaves this machine, and what refusing each of it costs
+  credentials   Say which credentials this stack holds, or act on one of them
   stored        List what lemonfiber keeps on this machine, where it is, and why
   clients       Say which app to watch on, for each kind of device somebody in the house has
   invite        Offer somebody in the house an account they can claim
   reissue       Let somebody set a new password, without you choosing or seeing it
   remove        Take somebody out of the household, in both places they have an account
   forget        Remove everything lemonfiber keeps on this machine
+  uninstall     Take lemonfiber off this machine, at one of four removals
   space         Account for the disk: where the room went, when it runs out, what can go
   stop-seeding  Stop seeding one completed download, and let its files go with it
   bandwidth     Account for the line: what it carries, what the stack takes, what that costs
@@ -1237,6 +1239,41 @@ Options:
           Print help (see a summary with '-h')
 ```
 
+## `lemonfiber credentials`
+
+```text
+Say which credentials this stack holds, or act on one of them.
+
+Every secret in the stack in one list, whoever produced it: what each is, what authenticates with it, where the value lives and where it stands — never the value itself — and what keeping them in files does and does not protect against. `--rotate` replaces one, proving the replacement before the existing value stops being in force; `--reveal` prints one, and asks first.
+
+Usage: lemonfiber credentials [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --reveal <NAME>
+          Print one credential's value. Asks for confirmation before it prints
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --rotate <NAME>
+          Replace one credential, proving the replacement against the live service before the existing value stops being the one in force
+
+      --confirm
+          Yes, print it in the clear — having read what that costs
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
 ## `lemonfiber stored`
 
 ```text
@@ -1416,6 +1453,53 @@ Options:
 
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber uninstall`
+
+```text
+Take lemonfiber off this machine, at one of four removals.
+
+`stop` removes nothing and stops the services. `services` removes the containers, the network they were on and the images pulled for them. `configuration` removes each service's own settings and everything lemonfiber keeps, credentials and all. `media` removes your library and your downloads, and is never bundled with any of the others.
+
+Naming a removal lists exactly what it would take — every container, image and path, with what each occupies — and does nothing. `--confirm` carries it out. The one that reaches your library takes no bare yes: the listing prints a name for itself and `--agreed` answers that name, so an answer given against one reading of your disk cannot be spent on another.
+
+Usage: lemonfiber uninstall [OPTIONS] <REMOVAL>
+
+Arguments:
+  <REMOVAL>
+          Which removal: `stop`, `services`, `configuration` or `media`
+
+          Possible values:
+          - stop:          Remove nothing; stop the services
+          - services:      Remove the containers, their network and the images pulled for them
+          - configuration: Remove each service's own settings, everything lemonfiber keeps, and the credentials in both
+          - media:         Remove the library and the downloads
+
+Options:
+      --confirm
+          Go ahead, having read what would go
+
+      --json
+          Print machine-readable output
+
+      --agreed <NAME>
+          The listing being answered, as the run that printed it named it
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --wait
+          Let anything still coming down finish before the services stop
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
