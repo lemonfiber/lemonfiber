@@ -6,18 +6,19 @@
 //! without the routing in the way. The dispatcher lives beside it and matches on
 //! every variant here, so nothing can be added without somewhere to send it.
 
-use crate::alert::Appetite;
 use crate::audio::Format;
 use crate::doctor::Narrowing;
 use crate::quality::Preset;
 
 use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
+mod alerts;
 mod credentials;
 mod hosting;
 mod household;
 mod uninstall;
 
+pub use alerts::AlertAction;
 pub use credentials::Asking;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
@@ -522,15 +523,6 @@ impl BandwidthAsked {
             || self.exceeded.is_some()
             || self.unrestricted_for.is_some()
     }
-}
-
-/// What a notifications command asks for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AlertAction {
-    /// Show the preset in force, what it means, and anything set apart from it.
-    Show,
-    /// Take a preset, leaving the individual exceptions in place.
-    Set(Appetite),
 }
 
 /// What a quality command asks for.
