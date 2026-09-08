@@ -550,9 +550,9 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Allowance, Answer as Ruling, Asking, BandwidthAsked, Chosen,
-        Command, Ctx, Decision, Outcome, QualityAction, Removing, SetupAction, VersionReport,
-        Waiting,
+        dispatch, pull_progress, AlertAction, Allowance, Answer as Ruling, Asking, BandwidthAsked,
+        Chosen, Command, Ctx, Decision, Outcome, QualityAction, Removing, SetupAction,
+        VersionReport, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -2288,6 +2288,18 @@ mod tests {
 
     /// Asking about the line arrives at the command that answers about it.
     ///
+    /// Asking what you are told about reaches the command that answers it.
+    ///
+    /// Dispatched here as well as from `tests/`: the arm is a line of each copy of this
+    /// file, and the copy that never dispatched it counts the arm as never run.
+    #[tokio::test]
+    async fn asking_what_you_are_told_about_reaches_the_command_that_reads_it() {
+        let ctx = a_context().build();
+        let read = dispatch(Command::Alerts(AlertAction::Show), &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Alerts(_)));
+        assert!(answered, "{read:?}");
+    }
+
     /// Reading what the stack holds reaches the command that answers it.
     ///
     /// Dispatched here as well as from `tests/` for the same reason as the line

@@ -338,7 +338,6 @@ fn forms(report: &FormsReport) -> Lines {
     lines
 }
 
-/// What the operator has configured.
 /// What the operator is told about, what that means, and anything set apart from it.
 fn alerts(report: &AlertReport) -> Lines {
     let mut lines = Lines::default();
@@ -369,6 +368,7 @@ fn alerts(report: &AlertReport) -> Lines {
     lines
 }
 
+/// What the operator has configured.
 fn settings(report: &ConfigReport) -> Lines {
     let mut lines = Lines::default();
     for setting in &report.settings {
@@ -495,6 +495,19 @@ mod tests {
         assert!(told.contains("storage.space — always told"), "{told}");
         assert!(told.contains("queue.stalled — never told"), "{told}");
         assert!(told.contains("would save"), "{told}");
+
+        // A reading changes nothing, so it says nothing about saving — the branch the
+        // three assertions above never enter.
+        let read = super::alerts(&AlertReport {
+            preset: "everything".to_owned(),
+            means: "Told about everything.".to_owned(),
+            exceptions: Vec::new(),
+            changed: false,
+            rehearsed: false,
+        })
+        .text();
+        assert!(read.contains("telling you about: everything"), "{read}");
+        assert!(!read.contains("save"), "{read}");
     }
 
     #[test]
