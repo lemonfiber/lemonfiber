@@ -14,7 +14,7 @@ mod setup;
 
 use std::path::PathBuf;
 
-use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand};
 
 mod under;
 
