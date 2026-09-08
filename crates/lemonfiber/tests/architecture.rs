@@ -540,57 +540,71 @@ fn nothing_shipped_reaches_for_a_traffic_shaper() {
 /// was not on anybody's list because it did not exist when the list was written.
 #[test]
 fn nothing_in_a_migration_reaches_what_could_change_what_it_found() {
-    /// The seams a migration may reach whole, by the name they carry on a context.
-    const ALLOWED: [&str; 5] = ["images", "stack", "engine", "settings", "today"];
-
-    /// The one seam it may reach into rather than reach for, and the only call on it
-    /// that is allowed.
-    ///
-    /// Asking what a filesystem *is* — its type, and whether it can hold a hardlink —
-    /// is a read, and the survey cannot say what an existing layout costs without it.
-    /// The rest of that trait writes, erases and links, so the seam is admitted one
-    /// method at a time rather than whole. That the two live on one trait is the thing
-    /// worth fixing: `describe` belongs on a trait of its own, the way the volume watch
-    /// and the eraser are already apart from the filesystem, and then this exception
-    /// disappears into the type system where it belongs.
-    const READ_ONLY: (&str, &str) = ("filesystem", "describe");
-
-    let mut reaching: Vec<String> = Vec::new();
-    for (path, text) in sources() {
-        let named = path.to_string_lossy().replace('\\', "/");
-        if !named.contains("migration") || named.contains("/tests/") {
-            continue;
-        }
-        for line in production(&text).lines() {
-            for (at, _) in line.match_indices("ctx.") {
-                let Some(rest) = line.get(at + "ctx.".len()..) else {
-                    continue;
-                };
-                let seam: String = rest
-                    .chars()
-                    .take_while(|letter| letter.is_alphanumeric() || *letter == '_')
-                    .collect();
-                if seam.is_empty() || ALLOWED.contains(&seam.as_str()) {
-                    continue;
-                }
-                let Some(after) = line.get(at + "ctx.".len() + seam.len()..) else {
-                    continue;
-                };
-                let reading =
-                    seam == READ_ONLY.0 && after.starts_with(&format!(".{}(", READ_ONLY.1));
-                if reading {
-                    continue;
-                }
-                reaching.push(format!("{} reaches ctx.{seam}{after}", path.display()));
-            }
-        }
-    }
+    let reaching: Vec<String> = sources()
+        .iter()
+        .filter(|(path, _)| surveys(path))
+        .flat_map(|(path, text)| {
+            reached(production(text))
+                .into_iter()
+                .map(move |seam| format!("{} reaches ctx.{seam}", path.display()))
+        })
+        .collect();
 
     assert!(
         reaching.is_empty(),
         "a migration surveys and changes nothing, so it may reach only {ALLOWED:?}, \
          and {READ_ONLY:?}: {reaching:?}"
     );
+}
+
+/// The seams a migration may reach whole, by the name they carry on a context.
+const ALLOWED: [&str; 5] = ["images", "stack", "engine", "settings", "today"];
+
+/// The one seam it may reach into rather than reach for, and the only call on it that
+/// is allowed.
+///
+/// Asking what a filesystem *is* — its type, and whether it can hold a hardlink — is a
+/// read, and the survey cannot say what an existing layout costs without it. The rest of
+/// that trait writes, erases and links, so the seam is admitted one method at a time
+/// rather than whole. That the two live on one trait is the thing worth fixing:
+/// `describe` belongs on a trait of its own, the way the volume watch and the eraser are
+/// already apart from the filesystem, and then this exception disappears into the type
+/// system where it belongs.
+const READ_ONLY: (&str, &str) = ("filesystem", "describe");
+
+/// Whether this file is part of the survey rather than a test about it.
+fn surveys(path: &Path) -> bool {
+    let named = path.to_string_lossy().replace('\\', "/");
+    named.contains("migration") && !named.contains("/tests/")
+}
+
+/// Every seam on a context this text reaches that it is not allowed to.
+fn reached(text: &str) -> Vec<String> {
+    text.lines()
+        .flat_map(seams)
+        .filter(|seam| !permitted(seam))
+        .collect()
+}
+
+/// Every `ctx.` seam one line names, each with whatever follows it.
+fn seams(line: &str) -> Vec<String> {
+    line.match_indices("ctx.")
+        .filter_map(|(at, _)| line.get(at + "ctx.".len()..))
+        .map(std::borrow::ToOwned::to_owned)
+        .collect()
+}
+
+/// Whether a seam, with what follows it, is one a survey may reach.
+fn permitted(rest: &str) -> bool {
+    let seam: String = rest
+        .chars()
+        .take_while(|letter| letter.is_alphanumeric() || *letter == '_')
+        .collect();
+    if seam.is_empty() || ALLOWED.contains(&seam.as_str()) {
+        return true;
+    }
+    let after = rest.get(seam.len()..).unwrap_or_default();
+    seam == READ_ONLY.0 && after.starts_with(&format!(".{}(", READ_ONLY.1))
 }
 
 /// Output leaves through one place, and this is what keeps it that way.
