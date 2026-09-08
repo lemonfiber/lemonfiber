@@ -30,7 +30,7 @@ pub use allowance::{RawAllowance, RawUnrated};
 pub use bandwidth::RawBandwidth;
 pub use credentials::RawCredentials;
 pub use removing::{RawRemoval, RawRemoving};
-pub use repair::{Fixing, Mending};
+pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
 
@@ -204,22 +204,7 @@ pub enum Request {
         action: QualityCommand,
     },
     /// Run the checks that prove the stack is doing what it should.
-    Doctor {
-        /// Run one category of check, such as `vpn`, or one check by the name a
-        /// finding gives it, such as `vpn.killswitch`.
-        #[arg(long, value_name = "CATEGORY_OR_CHECK", conflicts_with = "fix")]
-        only: Option<String>,
-        /// Include the checks that disturb the running system.
-        #[arg(long)]
-        disruptive: bool,
-        /// Answer a warning about a choice — `vpn.unprotected`, say — so it stops
-        /// leading. Only something this run warns about can be answered.
-        #[arg(long, value_name = "CHECK", conflicts_with = "fix")]
-        accept: Option<String>,
-        /// How much putting-right this run was given consent for.
-        #[command(flatten)]
-        mending: Mending,
-    },
+    Doctor(RawDoctor),
     /// Guard the data location while forms run, stopping them if it disappears.
     Watch {
         /// The forms to stop if the data location is lost.
@@ -529,11 +514,7 @@ mod tests {
     /// `doctor` run, or that the parser turns away.
     fn doctoring(args: &[&str]) -> Option<(bool, Mending)> {
         match Cli::try_parse_from(args).ok()?.command? {
-            Request::Doctor {
-                disruptive,
-                mending,
-                ..
-            } => Some((disruptive, mending)),
+            Request::Doctor(asked) => Some((asked.disruptive, asked.mending)),
             _ => None,
         }
     }
