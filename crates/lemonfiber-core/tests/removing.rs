@@ -22,14 +22,17 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{Eraser, FsKind, StorageFacts};
-use lemonfiber_core::ports::Narrator;
+use lemonfiber_core::ports::{Narrator, Runner};
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::uninstall::{Removal, Tier};
 use lemonfiber_fixtures::erasing::Erasing;
 use lemonfiber_fixtures::pulled::Pulled;
-use lemonfiber_fixtures::support::{spoke, Reporting, Scripted, SeedFs};
+use lemonfiber_fixtures::support::{spoke, Recording, Reporting, Scripted, SeedFs};
 use lemonfiber_fixtures::walking::Walking;
 use tokio::sync::Mutex;
+
+/// One image this stack declares, named once so a case does not spell the tag twice.
+const SONARR: &str = "lscr.io/linuxserver/sonarr:4.0.15";
 
 /// Everything a run said, in the order it said it.
 #[derive(Default)]
@@ -52,8 +55,18 @@ impl Heard {
 /// A context over the stack this repository carries, with every seam a removal
 /// reaches answered by something a test wrote down.
 fn ctx(heard: &Arc<Heard>) -> Ctx {
+    running(heard, Arc::new(Scripted(Ok(spoke("")))))
+}
+
+/// The same machine, with the programs a removal runs answered by a given runner.
+///
+/// Apart from [`ctx`] because a case whose claim is about a command that ran cannot
+/// make it from what came back: the image removal and the Compose invocation both
+/// answer the same way, so which of them was handed over is only in the argument
+/// vectors.
+fn running(heard: &Arc<Heard>, runner: Arc<dyn Runner>) -> Ctx {
     Ctx::new(
-        Arc::new(Scripted(Ok(spoke("")))),
+        runner,
         Arc::new(Reporting::holding(
             &["sonarr"],
             Lifecycle::Running,
@@ -190,6 +203,51 @@ async fn a_removal_the_platform_refused_comes_back_with_the_way_to_finish_it() {
             PathBuf::from("/cfg/lemonfiber"),
             PathBuf::from("/data/lemonfiber")
         ]
+    );
+}
+
+/// A confirmed removal of the containers hands the engine the image this stack
+/// alone is standing on.
+///
+/// The fourth tier confirmed through the door: the wait above confirms the first,
+/// the refusal above it the third, and the library the fourth. Left out, the one
+/// tier that removes images is reached by nothing an operator can type — and the
+/// arm that reaches it is a line of the copy of this dispatcher that a `tests/`
+/// run compiles, so nothing outside would have counted it as run either.
+#[tokio::test]
+async fn a_confirmed_removal_of_the_containers_hands_the_image_to_the_engine() {
+    let heard = Arc::new(Heard::default());
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx =
+        running(&heard, Arc::clone(&runner) as Arc<dyn Runner>).with_images(Pulled::holding(vec![
+            Pulled::image(SONARR, 400, &["lemonfiber"]),
+        ]));
+    let asked = Removing::surveying(Tier::Services).confirmed(true);
+
+    let outcome = dispatch(Command::Uninstall(asked), &ctx).await;
+
+    let gone = match outcome {
+        Ok(Outcome::Uninstall(answered)) => match answered.removal {
+            Removal::Complete { gone, .. } => gone,
+            Removal::Surveyed | Removal::Confirmed | Removal::Partial { .. } => Vec::new(),
+        },
+        Ok(_) | Err(_) => Vec::new(),
+    };
+
+    assert!(gone.iter().any(|name| name == SONARR), "{gone:?}");
+    let about_the_image: Vec<Vec<String>> = runner
+        .seen()
+        .into_iter()
+        .filter(|argv| argv.iter().any(|word| word == SONARR))
+        .collect();
+    assert_eq!(
+        about_the_image,
+        vec![vec![
+            "docker".to_owned(),
+            "image".to_owned(),
+            "rm".to_owned(),
+            SONARR.to_owned(),
+        ]]
     );
 }
 
