@@ -467,6 +467,36 @@ mod tests {
 
     /// The case this exists for. The container writes the line, the terminal reads
     /// the escape, and the screen stops saying what this product said.
+    /// An event set apart from the preset reads as the answer it was given, and a
+    /// rehearsal says it would save rather than that it did.
+    ///
+    /// Both halves of both branches: a renderer that says "always told" for an event
+    /// switched off, or "saved" for a run that wrote nothing, is wrong in the direction
+    /// the operator has no way to check.
+    #[test]
+    fn an_event_set_apart_reads_as_the_answer_it_was_given() {
+        let told = super::alerts(&AlertReport {
+            preset: "problems-only".to_owned(),
+            means: "Told when something is wrong.".to_owned(),
+            exceptions: vec![
+                ExceptionReport {
+                    kind: "storage.space".to_owned(),
+                    wanted: true,
+                },
+                ExceptionReport {
+                    kind: "queue.stalled".to_owned(),
+                    wanted: false,
+                },
+            ],
+            changed: true,
+            rehearsed: true,
+        })
+        .text();
+        assert!(told.contains("storage.space — always told"), "{told}");
+        assert!(told.contains("queue.stalled — never told"), "{told}");
+        assert!(told.contains("would save"), "{told}");
+    }
+
     #[test]
     fn a_container_cannot_clear_the_screen_through_its_own_log_line() {
         let said = logged("sonarr", "starting\u{1b}[2Jup");

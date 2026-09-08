@@ -110,18 +110,12 @@ mod tests {
         // The whole point: setup asks once, and without this there is no second time.
         let ctx = ctx_at("revised");
         let shown = hearing(&ctx, AlertAction::Show);
-        assert!(
-            said(&shown).contains("preset: \"problems-only\""),
-            "{}",
-            said(&shown)
-        );
+        let text = said(&shown);
+        assert!(text.contains("preset: \"problems-only\""), "{text}");
 
         let set = hearing(&ctx, AlertAction::Set(Appetite::Everything));
-        assert!(
-            said(&set).contains("preset: \"everything\""),
-            "{}",
-            said(&set)
-        );
+        let text = said(&set);
+        assert!(text.contains("preset: \"everything\""), "{text}");
 
         // Kept, rather than reported and lost: the next run reads the same answer.
         assert_eq!(
@@ -140,11 +134,8 @@ mod tests {
         assert!(record(&ctx, &wants).is_ok());
 
         let taken = hearing(&ctx, AlertAction::Set(Appetite::Everything));
-        assert!(
-            said(&taken).contains("preset: \"everything\""),
-            "{}",
-            said(&taken)
-        );
+        let text = said(&taken);
+        assert!(text.contains("preset: \"everything\""), "{text}");
         let kept = recorded(&ctx);
         assert_eq!(kept.exceptions().count(), 1);
     }
@@ -154,11 +145,8 @@ mod tests {
         let mut ctx = ctx_at("rehearsed");
         ctx.dry_run = true;
         let would = hearing(&ctx, AlertAction::Set(Appetite::Everything));
-        assert!(
-            said(&would).contains("preset: \"everything\""),
-            "{}",
-            said(&would)
-        );
+        let text = said(&would);
+        assert!(text.contains("preset: \"everything\""), "{text}");
         // Reported, not written — the next run still reads the quiet default.
         assert_eq!(
             Wants::appetite(&recorded(&ctx)),
