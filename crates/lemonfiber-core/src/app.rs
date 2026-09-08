@@ -2355,6 +2355,7 @@ mod tests {
             Ok(Outcome::Lifecycle(report)) => Some(report),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Config(_)
@@ -2403,6 +2404,7 @@ mod tests {
             Ok(Outcome::Doctor(report)) => Some(report),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -3233,6 +3235,7 @@ mod tests {
             ),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -4235,6 +4238,7 @@ mod tests {
             ),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
