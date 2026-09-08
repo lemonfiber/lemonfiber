@@ -69,6 +69,16 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // will not act on until they resolve it, so it earns VALIDATION; work merely
         // left skipped or failed may complete on a re-run, so it stays FAILURE. A
         // script can then tell "fix your config" from "wait and retry".
+        // A refusal is something the operator has to resolve before lemonfiber will
+        // act — a database a later version wrote, or two setups where only they can
+        // say which they meant — so it earns VALIDATION rather than a plain failure.
+        Outcome::Adoption(report) => {
+            if report.refused.is_some() {
+                ExitCode::from(VALIDATION)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
         // has mended everything it carried out — which is none of it.
@@ -1195,6 +1205,41 @@ mod tests {
                 }],
             }),
             std::process::ExitCode::from(super::FAILURE)
+        );
+    }
+    /// A refusal is something the operator has to resolve, and a script needs to tell
+    /// that from a run that merely failed.
+    #[test]
+    fn a_refused_adoption_exits_on_what_the_operator_must_resolve() {
+        let refused = lemonfiber_core::model::AdoptReport {
+            refused: Some("a database a later version wrote".to_owned()),
+            ..lemonfiber_core::model::AdoptReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Adoption(refused)),
+            std::process::ExitCode::from(super::VALIDATION)
+        );
+    }
+
+    /// Having adopted, and having only said what adopting would come to, are both the
+    /// command doing what it was asked.
+    #[test]
+    fn adopting_and_rehearsing_it_both_exit_successfully() {
+        let adopted = lemonfiber_core::model::AdoptReport {
+            adopted: true,
+            ..lemonfiber_core::model::AdoptReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Adoption(adopted)),
+            std::process::ExitCode::SUCCESS
+        );
+        let rehearsed = lemonfiber_core::model::AdoptReport {
+            rehearsed: true,
+            ..lemonfiber_core::model::AdoptReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Adoption(rehearsed)),
+            std::process::ExitCode::SUCCESS
         );
     }
 }

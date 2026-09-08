@@ -17,6 +17,7 @@ use std::sync::Arc;
 use common::stack::project;
 use lemonfiber_core::app::{dispatch, Command, Ctx, MigrateAction, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::model::AdoptReport;
 use lemonfiber_core::model::MigrationReport;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -225,4 +226,127 @@ async fn a_layout_on_one_filesystem_is_not_reported_at_all() {
     let ctx = over_files(engine, images, Arc::new(one));
     let found = surveyed(&ctx).await.and_then(|report| report.linking);
     assert!(found.is_none(), "{found:?}");
+}
+
+/// A scratch environment file adopting can record its answer in.
+fn scratch(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("lemonfiber-adopt-{}-{name}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let env = dir.join(".env");
+    let _ = std::fs::remove_file(&env);
+    env
+}
+
+/// A machine whose existing project runs a service lemonfiber knows, at a given version.
+fn theirs(version: &str, env: Option<PathBuf>) -> Ctx {
+    let images = Pulled::holding(vec![Pulled::image(
+        &format!("lscr.io/linuxserver/sonarr:{version}"),
+        400,
+        &["media"],
+    )]);
+    let mut ctx = over(somebody_elses(), images, Source::External(project()));
+    ctx.settings.env_file = env;
+    ctx
+}
+
+/// What adopting answered, or nothing where it refused to answer at all.
+async fn adopting(ctx: &Ctx, confirmed: bool) -> Option<AdoptReport> {
+    match dispatch(Command::Migrate(MigrateAction::Adopt { confirmed }), ctx).await {
+        Ok(Outcome::Adoption(report)) => Some(report),
+        _ => None,
+    }
+}
+
+#[tokio::test]
+async fn a_database_a_later_version_wrote_is_refused_rather_than_opened() {
+    let found = adopting(&theirs("9.9.9", None), true).await;
+    let refused = found.as_ref().and_then(|read| read.refused.clone());
+    assert!(
+        refused.is_some_and(|said| said.contains("later version")),
+        "{found:?}"
+    );
+    assert_eq!(found.map(|read| read.adopted), Some(false));
+}
+
+#[tokio::test]
+async fn adopting_unconfirmed_says_what_it_would_do_and_writes_nothing() {
+    let env = scratch("rehearsed");
+    let found = adopting(&theirs("4.0.0", Some(env.clone())), false).await;
+    assert_eq!(
+        found.as_ref().map(|read| (read.rehearsed, read.adopted)),
+        Some((true, false)),
+        "{found:?}"
+    );
+    assert!(!env.exists(), "a rehearsal wrote {}", env.display());
+}
+
+#[tokio::test]
+async fn an_upgrade_names_the_service_and_where_to_back_it_up_before_confirming() {
+    let env = scratch("named");
+    let engine = mounting(somebody_elses(), &["/srv/media"]);
+    let images = Pulled::holding(vec![Pulled::image(
+        "lscr.io/linuxserver/sonarr:4.0.0",
+        400,
+        &["media"],
+    )]);
+    let mut ctx = over(engine, images, Source::External(project()));
+    ctx.settings.env_file = Some(env);
+
+    let found = adopting(&ctx, false).await;
+    let upgrading = found
+        .as_ref()
+        .and_then(|read| read.upgrades.first().map(|one| one.service.clone()));
+    assert_eq!(upgrading, Some("sonarr".to_owned()), "{found:?}");
+    let paths = found.map(|read| read.back_up).unwrap_or_default();
+    assert!(
+        paths.iter().any(|path| path.contains("/srv/media")),
+        "{paths:?}"
+    );
+}
+
+#[tokio::test]
+async fn confirming_records_the_project_lemonfiber_now_manages() {
+    let env = scratch("adopted");
+    let found = adopting(&theirs("4.0.15", Some(env.clone())), true).await;
+    assert_eq!(
+        found
+            .as_ref()
+            .map(|read| (read.adopted, read.project.clone())),
+        Some((true, Some("media".to_owned()))),
+        "{found:?}"
+    );
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    assert!(written.contains("LEMONFIBER_PROJECT=media"), "{written}");
+}
+
+#[tokio::test]
+async fn a_machine_with_nothing_of_ours_on_it_has_nothing_to_adopt() {
+    let images = Pulled::holding(Vec::new());
+    let ctx = over(Reporting::absent(), images, Source::External(project()));
+    let found = adopting(&ctx, true).await;
+    let refused = found.and_then(|read| read.refused);
+    assert!(refused.is_some(), "nothing to take over is a refusal");
+}
+
+/// Adopting is the operator's explicit act, so nowhere to record it is reported rather
+/// than shrugged off — an answer that quietly did not persist would leave them
+/// believing lemonfiber manages a stack it does not.
+#[tokio::test]
+async fn adopting_with_nowhere_to_record_it_says_so_rather_than_claiming_it_worked() {
+    let asked = Command::Migrate(MigrateAction::Adopt { confirmed: true });
+    let refused = dispatch(asked, &theirs("4.0.15", None)).await;
+    assert!(refused.is_err(), "{refused:?}");
+}
+
+/// The same where there is somewhere but it cannot be written: a file standing where
+/// the directory would go.
+#[tokio::test]
+async fn adopting_that_cannot_write_its_answer_reports_the_failure() {
+    let blocked = std::env::temp_dir().join(format!("lemonfiber-blocked-{}", std::process::id()));
+    let _ = std::fs::write(&blocked, "not a directory");
+    let asked = Command::Migrate(MigrateAction::Adopt { confirmed: true });
+    let ctx = theirs("4.0.15", Some(blocked.join(".env")));
+    let refused = dispatch(asked, &ctx).await;
+    let _ = std::fs::remove_file(&blocked);
+    assert!(refused.is_err(), "{refused:?}");
 }

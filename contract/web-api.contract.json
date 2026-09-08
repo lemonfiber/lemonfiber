@@ -48,6 +48,126 @@
         }
       }
     },
+    "adoption": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/AdoptReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "AdoptReport": {
+          "description": "What adopting a setup already here came to, or would come to.",
+          "type": "object",
+          "properties": {
+            "adopted": {
+              "description": "Whether it was actually adopted, as against described.",
+              "type": "boolean"
+            },
+            "back_up": {
+              "description": "The host paths those services keep their data in, so a backup can be taken of\nexactly the right thing.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "project": {
+              "description": "The project lemonfiber would manage, where exactly one could be adopted.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "refused": {
+              "description": "Why it was not, where it was not.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rehearsed": {
+              "description": "Whether this call only said what it would do.",
+              "type": "boolean"
+            },
+            "upgrades": {
+              "description": "The services whose databases a newer version would upgrade, and whose data\ntherefore has to be backed up before anything opens it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CarryingReport"
+              }
+            }
+          },
+          "required": [
+            "adopted",
+            "upgrades",
+            "back_up",
+            "rehearsed"
+          ]
+        },
+        "CarryingReport": {
+          "description": "What adopting one existing service would come to.",
+          "type": "object",
+          "properties": {
+            "backup_first": {
+              "description": "Whether its database must be backed up before lemonfiber opens it.",
+              "type": "boolean"
+            },
+            "because": {
+              "description": "What that means for this service's data, in the operator's terms.",
+              "type": "string"
+            },
+            "existing": {
+              "description": "The version standing here now.",
+              "type": "string"
+            },
+            "ours": {
+              "description": "The version lemonfiber pins.",
+              "type": "string"
+            },
+            "refused": {
+              "description": "Whether lemonfiber will not do this at all.",
+              "type": "boolean"
+            },
+            "service": {
+              "description": "The service, by the name lemonfiber runs it under.",
+              "type": "string"
+            },
+            "verdict": {
+              "description": "Which of the two is the later, in one word.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "existing",
+            "ours",
+            "verdict",
+            "because",
+            "backup_first",
+            "refused"
+          ]
+        }
+      }
+    },
     "alerts": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

@@ -10,7 +10,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
-use lemonfiber_core::app::{dispatch, Command, Ctx, MigrateAction, Outcome, SetupAction, Waiting};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 
 mod acting;
 mod archive;
@@ -260,7 +260,7 @@ async fn main() -> ExitCode {
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
         Request::Ps { forms } => Command::Ps { forms },
         Request::Config { action } => configuration(action),
-        Request::Migrate => Command::Migrate(MigrateAction::Survey),
+        Request::Migrate { action } => Command::Migrate(translate::migrating(action.as_ref())),
         Request::Alerts { action } => match translate::alerts(action) {
             Ok(command) => command,
             Err(code) => return ExitCode::from(code),

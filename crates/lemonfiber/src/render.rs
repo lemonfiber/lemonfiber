@@ -219,6 +219,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Config(report) => settings(report),
         Outcome::Alerts(report) => alerts(report),
         Outcome::Migration(report) => migration::migration(report),
+        Outcome::Adoption(report) => migration::adoption(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
         Outcome::Music(report) => quality::music(report),
@@ -435,11 +436,11 @@ mod tests {
     use lemonfiber_core::migration::carrying::not_carried;
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
-        AlertReport, CarryingReport, ConfigReport, ConflictReport, Disposition, DoctorReport,
-        ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport, MigrationReport,
-        MusicReport, OccupantReport, QualityReport, ResetReport, SettingReport, Standing,
-        StandingReport, StatusReport, StuckReport, UnsupportedReport, UpgradeReport, VersionReport,
-        WizardReport,
+        AdoptReport, AlertReport, CarryingReport, ConfigReport, ConflictReport, Disposition,
+        DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport,
+        MigrationReport, MusicReport, OccupantReport, QualityReport, ResetReport, SettingReport,
+        Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport, UpgradeReport,
+        VersionReport, WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -793,6 +794,11 @@ mod tests {
                 modes: offered(),
                 beside: Vec::new(),
                 linking: None,
+            }),
+            Outcome::Adoption(AdoptReport {
+                project: Some("media".to_owned()),
+                adopted: true,
+                ..AdoptReport::default()
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],

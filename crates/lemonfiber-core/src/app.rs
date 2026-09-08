@@ -14,6 +14,7 @@ use crate::error::{Code, Diagnose, Problem};
 use crate::stack::compose::Action;
 
 pub mod accepted;
+mod adopt;
 pub mod appetite;
 pub mod apply;
 pub mod archives;
@@ -257,7 +258,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::ConfigShow => configuring::configuration(ctx, None, None),
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
         Command::Alerts(action) => appetite::hearing(ctx, action),
-        Command::Migrate(action) => migration::survey(ctx, action).await.map(Outcome::Migration),
+        Command::Migrate(action) => migration::migrating(ctx, action).await,
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace {
             term,
@@ -2120,6 +2121,15 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn asking_to_take_over_what_is_here_reaches_the_command_that_would() {
+        let ctx = a_context().build();
+        let asked = Command::Migrate(MigrateAction::Adopt { confirmed: false });
+        let read = dispatch(asked, &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Adoption(_)));
+        assert!(answered, "{read:?}");
+    }
+
+    #[tokio::test]
     async fn asking_what_you_are_told_about_reaches_the_command_that_reads_it() {
         let ctx = a_context().build();
         let read = dispatch(Command::Alerts(AlertAction::Show), &ctx).await;
@@ -2196,6 +2206,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::Adoption(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Config(_)
@@ -2246,6 +2257,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::Adoption(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -3078,6 +3090,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::Adoption(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -4082,6 +4095,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::Adoption(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)

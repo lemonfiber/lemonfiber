@@ -22,17 +22,17 @@
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{
-    Command, Hostable, Keeping, QualityAction, Removing, Waiting, HOSTABLE,
-};
+use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Waiting, HOSTABLE};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::{Tier, TIERS};
 
+mod choosing;
 mod household;
+mod migrating;
 mod sharing;
 
 use super::asked::{unwanted, Arguments, Disturbing};
-use super::reading::{consent, diagnosing, following, listing, quality, widening};
+use super::reading::{consent, diagnosing, following, listing, widening};
 use super::Refused;
 
 /// Every action this surface offers, in the order they are worth reading.
@@ -52,6 +52,7 @@ pub const OFFERED: &[&str] = &[
     "quality-upgrade",
     "seed",
     "adopt",
+    "migrate-adopt",
     "reset",
     "forget",
     "uninstall",
@@ -166,6 +167,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     if sharing::about_the_line(action) {
         return Ok(sharing::asked_for(given));
     }
+    // And again, twice: one field and nothing to refuse for the first, two fields and
+    // one refusal for the second.
+    if migrating::about_a_setup_already_here(action) {
+        return Ok(migrating::asked_for(&given));
+    }
+    if choosing::about_the_quality(action) {
+        return choosing::asked_for(action, &given);
+    }
     let needs = |argument: &str| Refused::Missing {
         action: action.to_owned(),
         argument: argument.to_owned(),
@@ -177,8 +186,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         service,
         key,
         value,
-        preset,
-        media_type,
         archive,
         repoint,
         write,
@@ -211,12 +218,6 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "restart" => Ok(Command::Restart { forms, services }),
         "pull" => Ok(Command::Pull { forms }),
         "config-set" => setting(key, value),
-        "quality-set" => match preset {
-            Some(preset) => quality(&preset, media_type, confirm),
-            None => Err(needs("preset")),
-        },
-        "quality-reapply" => Ok(Command::Quality(QualityAction::Reapply)),
-        "quality-upgrade" => Ok(Command::QualityUpgrade { confirm }),
         "seed" => Ok(Command::Seed),
         "adopt" => Ok(Command::Adopt),
         "reset" => Ok(Command::Reset { confirm }),

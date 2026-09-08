@@ -138,6 +138,7 @@ pub(crate) fn read_settings() -> Settings {
         .unwrap_or_default();
 
     Settings {
+        project: lemonfiber_core::config::project_from_env(&recorded),
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),

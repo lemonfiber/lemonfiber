@@ -5,4 +5,13 @@
 pub enum MigrateAction {
     /// Report what is here and change nothing.
     Survey,
+    /// Take over the setup already here, so lemonfiber manages it.
+    ///
+    /// Unconfirmed it says what adopting would come to and writes nothing, which is
+    /// how an operator sees which databases a newer version would upgrade before
+    /// agreeing to it happening.
+    Adopt {
+        /// Whether the operator has confirmed, having been told what to back up.
+        confirmed: bool,
+    },
 }

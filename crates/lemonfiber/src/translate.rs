@@ -10,7 +10,7 @@ use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Hostable, Keeping, QualityAction, Removing,
+    Hostable, Keeping, MigrateAction, QualityAction, Removing,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -23,8 +23,9 @@ use lemonfiber_core::uninstall::Tier;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
-    RawAllowance, RawBandwidth, RawCredentials, RawRemoval, RawRemoving, RawUnrated,
+    AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
+    QualityCommand, RawAllowance, RawBandwidth, RawCredentials, RawRemoval, RawRemoving,
+    RawUnrated,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -189,6 +190,20 @@ fn allowing(
 }
 
 /// Which setting the operator is reading or changing.
+/// What a migration command asks for, with nothing named meaning survey.
+///
+/// Surveying is the default because it changes nothing, and because an operator who
+/// typed `migrate` to see what is here should not have taken over their own stack by
+/// doing so.
+pub(crate) fn migrating(action: Option<&MigrateCommand>) -> MigrateAction {
+    match action {
+        None => MigrateAction::Survey,
+        Some(MigrateCommand::Adopt { confirm }) => MigrateAction::Adopt {
+            confirmed: *confirm,
+        },
+    }
+}
+
 pub(crate) fn configuration(action: ConfigAction) -> Command {
     match action {
         ConfigAction::Get { key } => Command::ConfigGet { key },
@@ -1192,6 +1207,31 @@ mod tests {
             Command::Credentials(Asking::Rotate {
                 credential: "Indexer API key".to_owned(),
             })
+        );
+    }
+
+    /// Typing `migrate` to see what is here must not have taken over the stack.
+    #[test]
+    fn naming_nothing_surveys_and_changes_none_of_it() {
+        assert_eq!(
+            super::migrating(None),
+            lemonfiber_core::app::MigrateAction::Survey
+        );
+    }
+
+    /// Confirming is carried through as given: it is the operator saying they have
+    /// backed up what the rehearsal named.
+    #[test]
+    fn adopting_carries_the_confirmation_through_as_it_was_given() {
+        let asked = lemonfiber::cli::MigrateCommand::Adopt { confirm: true };
+        assert_eq!(
+            super::migrating(Some(&asked)),
+            lemonfiber_core::app::MigrateAction::Adopt { confirmed: true }
+        );
+        let unconfirmed = lemonfiber::cli::MigrateCommand::Adopt { confirm: false };
+        assert_eq!(
+            super::migrating(Some(&unconfirmed)),
+            lemonfiber_core::app::MigrateAction::Adopt { confirmed: false }
         );
     }
 }

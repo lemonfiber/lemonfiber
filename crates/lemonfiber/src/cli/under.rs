@@ -78,6 +78,21 @@ pub enum HouseholdCommand {
     },
 }
 
+/// What to do about a setup already on this machine.
+#[derive(Debug, Subcommand)]
+pub enum MigrateCommand {
+    /// Take over the setup already here, so lemonfiber manages it.
+    ///
+    /// Without `--confirm` it says what adopting would come to and writes nothing —
+    /// which databases a newer version would upgrade, and where their data sits so it
+    /// can be backed up first.
+    Adopt {
+        /// Go ahead, having backed up the data named.
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
 /// What to do with what you are told about.
 #[derive(Debug, Subcommand)]
 pub enum AlertCommand {

@@ -10,7 +10,7 @@
 //! bare machine and one of a full stack are the same code taking different turns
 //! rather than one function knowing about every case at once.
 
-use lemonfiber_core::model::{MigrationReport, UnsupportedReport};
+use lemonfiber_core::model::{AdoptReport, MigrationReport, UnsupportedReport};
 
 use super::Lines;
 
@@ -45,6 +45,45 @@ pub(super) fn migration(report: &MigrationReport) -> Lines {
     );
     lines.put(String::new());
     lines.put("nothing was changed".to_owned());
+    lines
+}
+
+/// What adopting a setup already here came to, or would come to.
+///
+/// A refusal is the whole answer where there is one: an operator told they cannot do
+/// this needs the reason, and nothing else on the screen is useful to them.
+pub(super) fn adoption(report: &AdoptReport) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(refused) = &report.refused {
+        lines.put(format!("not adopting: {refused}"));
+        return lines;
+    }
+    let named = report.project.clone().unwrap_or_default();
+    if report.adopted {
+        lines.put(format!("lemonfiber now manages {named}"));
+    } else {
+        lines.put(format!("adopting {named} would:"));
+    }
+
+    for service in &report.upgrades {
+        lines.put(format!(
+            "  upgrade {} from {} to {}, which nothing walks back",
+            service.service, service.existing, service.ours
+        ));
+    }
+    if !report.back_up.is_empty() && !report.adopted {
+        lines.put(String::new());
+        lines.put("back up these before confirming:".to_owned());
+        for path in &report.back_up {
+            lines.put(format!("  {path}"));
+        }
+    }
+    lines.put(String::new());
+    if report.adopted {
+        lines.put("nothing was started, stopped, or moved".to_owned());
+    } else {
+        lines.put("nothing has been changed; add --confirm to go ahead".to_owned());
+    }
     lines
 }
 
@@ -203,11 +242,11 @@ fn listed(items: &[UnsupportedReport], heading: &str, lines: &mut Lines) {
 
 #[cfg(test)]
 mod tests {
-    use super::migration;
+    use super::{adoption, migration};
     use lemonfiber_core::migration::carrying::not_carried;
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
-        CarryingReport, ConflictReport, LinkingReport, MigrationReport, MovedReport,
+        AdoptReport, CarryingReport, ConflictReport, LinkingReport, MigrationReport, MovedReport,
         OccupantReport, StandingReport, UnsupportedReport,
     };
 
@@ -403,6 +442,64 @@ mod tests {
         let text = migration(&quiet).text();
         assert!(
             text.contains("postgres — stopped, no published port"),
+            "{text}"
+        );
+    }
+
+    /// A refusal is the whole answer: an operator told they cannot do this needs the
+    /// reason, and nothing else on the screen helps them.
+    #[test]
+    fn a_refusal_to_adopt_is_the_only_thing_said() {
+        let refused = AdoptReport {
+            refused: Some("a database a later version wrote".to_owned()),
+            project: Some("media".to_owned()),
+            ..AdoptReport::default()
+        };
+        let text = adoption(&refused).text();
+        assert!(text.contains("not adopting:"), "{text}");
+        assert!(!text.contains("would:"), "{text}");
+    }
+
+    /// What it would do, and what to back up, before anything is written.
+    #[test]
+    fn a_rehearsal_names_the_upgrade_and_where_to_back_it_up() {
+        let rehearsed = AdoptReport {
+            project: Some("media".to_owned()),
+            rehearsed: true,
+            upgrades: vec![CarryingReport {
+                service: "sonarr".to_owned(),
+                existing: "4.0.0".to_owned(),
+                ours: "4.0.15".to_owned(),
+                verdict: "upgrade".to_owned(),
+                because: "backed up first".to_owned(),
+                backup_first: true,
+                refused: false,
+            }],
+            back_up: vec!["/srv/media".to_owned()],
+            ..AdoptReport::default()
+        };
+        let text = adoption(&rehearsed).text();
+        assert!(text.contains("adopting media would:"), "{text}");
+        assert!(
+            text.contains("upgrade sonarr from 4.0.0 to 4.0.15"),
+            "{text}"
+        );
+        assert!(text.contains("/srv/media"), "{text}");
+        assert!(text.contains("--confirm"), "{text}");
+    }
+
+    /// Having adopted, the sentence that matters is that nothing of theirs moved.
+    #[test]
+    fn adopting_says_what_it_now_manages_and_that_nothing_moved() {
+        let adopted = AdoptReport {
+            project: Some("media".to_owned()),
+            adopted: true,
+            ..AdoptReport::default()
+        };
+        let text = adoption(&adopted).text();
+        assert!(text.contains("lemonfiber now manages media"), "{text}");
+        assert!(
+            text.contains("nothing was started, stopped, or moved"),
             "{text}"
         );
     }

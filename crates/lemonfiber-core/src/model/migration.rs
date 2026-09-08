@@ -110,6 +110,25 @@ pub struct LinkingReport {
     pub filesystems: Vec<String>,
 }
 
+/// What adopting a setup already here came to, or would come to.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct AdoptReport {
+    /// The project lemonfiber would manage, where exactly one could be adopted.
+    pub project: Option<String>,
+    /// Whether it was actually adopted, as against described.
+    pub adopted: bool,
+    /// Why it was not, where it was not.
+    pub refused: Option<String>,
+    /// The services whose databases a newer version would upgrade, and whose data
+    /// therefore has to be backed up before anything opens it.
+    pub upgrades: Vec<CarryingReport>,
+    /// The host paths those services keep their data in, so a backup can be taken of
+    /// exactly the right thing.
+    pub back_up: Vec<String>,
+    /// Whether this call only said what it would do.
+    pub rehearsed: bool,
+}
+
 /// What is already on this machine, before anything is proposed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MigrationReport {
