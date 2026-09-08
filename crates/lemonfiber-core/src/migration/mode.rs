@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 
 use crate::model::{ModeReport, MovedReport};
 
-use super::Wanted;
+use super::Ours;
 
 /// What to do about a setup already on the machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -112,25 +112,28 @@ pub fn offered() -> Vec<ModeReport> {
 /// A service whose port cannot be moved anywhere is left out rather than given a
 /// number that will not work.
 #[must_use]
-pub fn beside(wanted: &[Wanted], taken: &BTreeSet<u16>) -> Vec<MovedReport> {
-    let ours: BTreeSet<u16> = wanted.iter().map(|want| want.port).collect();
+pub fn beside(ours: &[Ours], taken: &BTreeSet<u16>) -> Vec<MovedReport> {
+    let wanted: BTreeSet<u16> = ours.iter().filter_map(|one| one.port).collect();
     let mut handed: BTreeSet<u16> = BTreeSet::new();
     let mut moved: Vec<MovedReport> = Vec::new();
 
-    let mut order: Vec<&Wanted> = wanted.iter().collect();
-    order.sort_by(|one, two| one.port.cmp(&two.port).then(one.service.cmp(&two.service)));
+    let mut order: Vec<(&str, u16)> = ours
+        .iter()
+        .filter_map(|one| one.port.map(|port| (one.service.as_str(), port)))
+        .collect();
+    order.sort_by(|one, two| one.1.cmp(&two.1).then(one.0.cmp(two.0)));
 
-    for want in order {
-        let Some(free) = (want.port..u16::MAX)
+    for (service, port) in order {
+        let Some(free) = (port..u16::MAX)
             .skip(1)
-            .find(|port| !taken.contains(port) && !ours.contains(port) && !handed.contains(port))
+            .find(|free| !taken.contains(free) && !wanted.contains(free) && !handed.contains(free))
         else {
             continue;
         };
         handed.insert(free);
         moved.push(MovedReport {
-            service: want.service.clone(),
-            from: want.port,
+            service: service.to_owned(),
+            from: port,
             to: free,
         });
     }
@@ -142,15 +145,13 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::{beside, offered, Mode, EVERY};
-    use crate::migration::Wanted;
+    use crate::migration::tests::ours;
+    use crate::migration::Ours;
 
-    fn wanting(services: &[(&str, u16)]) -> Vec<Wanted> {
+    fn wanting(services: &[(&str, u16)]) -> Vec<Ours> {
         services
             .iter()
-            .map(|(service, port)| Wanted {
-                service: (*service).to_owned(),
-                port: *port,
-            })
+            .map(|(service, port)| ours(service, service, "1", Some(*port)))
             .collect()
     }
 
@@ -237,6 +238,12 @@ mod tests {
     fn a_service_with_nowhere_left_to_go_is_left_out_rather_than_given_a_bad_port() {
         let moved = beside(&wanting(&[("sonarr", u16::MAX - 1)]), &BTreeSet::new());
         assert!(moved.is_empty(), "{moved:?}");
+    }
+
+    #[test]
+    fn a_service_with_no_listener_is_not_given_a_port_to_move_to() {
+        let quiet = [ours("recyclarr", "recyclarr", "1", None)];
+        assert!(beside(&quiet, &BTreeSet::new()).is_empty());
     }
 
     #[test]
