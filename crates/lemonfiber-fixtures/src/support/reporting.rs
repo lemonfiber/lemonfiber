@@ -107,6 +107,18 @@ impl Reporting {
         self
     }
 
+    /// The same containers, belonging to somebody else's Compose project.
+    ///
+    /// For the survey that reads what is already on a machine, where what matters is
+    /// precisely that a container is *not* lemonfiber's.
+    #[must_use]
+    pub fn belonging_to(mut self, project: &str) -> Self {
+        for container in &mut self.containers {
+            container.project = project.to_owned();
+        }
+        self
+    }
+
     /// The same engine, unsettled until it has been asked `listings` times.
     #[must_use]
     pub fn settling_after(mut self, listings: usize) -> Self {

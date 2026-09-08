@@ -474,7 +474,8 @@ mod tests {
         some_forms,
     };
     use super::{
-        answer, forms, logged, machine_readable, render, settings, standing, versions, Lines,
+        answer, forms, logged, machine_readable, migration, render, settings, standing, versions,
+        Lines,
     };
     use lemonfiber_core::app::archives::Listing;
     use lemonfiber_core::app::backup::Report as Capture;
@@ -488,9 +489,10 @@ mod tests {
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::glossary::Vocabulary;
     use lemonfiber_core::model::{
-        AlertReport, ConfigReport, Disposition, DoctorReport, ExceptionReport, FormsReport,
-        FrontDoorReport, HouseholdReport, MusicReport, QualityReport, ResetReport, SettingReport,
-        Standing, StatusReport, StuckReport, UpgradeReport, VersionReport, WizardReport,
+        AlertReport, ConfigReport, ConflictReport, Disposition, DoctorReport, ExceptionReport,
+        FormsReport, FrontDoorReport, HouseholdReport, MigrationReport, MusicReport,
+        OccupantReport, QualityReport, ResetReport, SettingReport, Standing, StandingReport,
+        StatusReport, StuckReport, UnsupportedReport, UpgradeReport, VersionReport, WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -675,6 +677,95 @@ mod tests {
         );
     }
 
+    /// One survey with something of every kind in it.
+    fn a_survey() -> MigrationReport {
+        MigrationReport {
+            read: true,
+            standing: vec![StandingReport {
+                project: "media".to_owned(),
+                services: vec![OccupantReport {
+                    service: "sonarr".to_owned(),
+                    running: true,
+                    ports: vec![8989],
+                    adoptable: true,
+                }],
+            }],
+            conflicts: vec![ConflictReport {
+                port: 8989,
+                wanted_by: "sonarr".to_owned(),
+                held_by: "media/sonarr".to_owned(),
+            }],
+            unsupported: vec![UnsupportedReport {
+                what: "media/ombi".to_owned(),
+                because: "lemonfiber does not run this service".to_owned(),
+            }],
+        }
+    }
+
+    /// The whole point of the survey: what is here, what it holds, what cannot be
+    /// taken over, and that none of it was touched.
+    #[test]
+    fn the_survey_names_what_is_here_and_says_it_changed_nothing() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("media:"), "{text}");
+        assert!(text.contains("sonarr — running, 8989"), "{text}");
+        assert!(
+            text.contains("8989 — wanted by sonarr, held by media/sonarr"),
+            "{text}"
+        );
+        assert!(text.contains("media/ombi"), "{text}");
+        assert!(text.contains("nothing was changed"), "{text}");
+    }
+
+    /// An engine that would not answer must not read as an empty machine: the next
+    /// step after "nothing here" is standing a stack up over somebody's library.
+    #[test]
+    fn a_survey_that_could_not_look_says_so_rather_than_saying_nothing_is_here() {
+        let text = migration(&MigrationReport::default()).text();
+        assert!(
+            text.contains("could not read what is on this machine"),
+            "{text}"
+        );
+        assert!(!text.contains("no other setup"), "{text}");
+    }
+
+    /// Having looked and found nothing is an answer, and a blank screen would read as
+    /// a broken command rather than as one.
+    #[test]
+    fn a_survey_that_found_nothing_says_it_looked() {
+        let looked = MigrationReport {
+            read: true,
+            ..MigrationReport::default()
+        };
+        let text = migration(&looked).text();
+        assert!(text.contains("found no other setup"), "{text}");
+        assert!(text.contains("nothing was changed"), "{text}");
+    }
+
+    /// A service with nothing published is still standing there, and saying so is
+    /// what keeps the list a list of what is here rather than of what answers.
+    #[test]
+    fn a_service_publishing_nothing_is_still_reported() {
+        let quiet = MigrationReport {
+            read: true,
+            standing: vec![StandingReport {
+                project: "media".to_owned(),
+                services: vec![OccupantReport {
+                    service: "postgres".to_owned(),
+                    running: false,
+                    ports: Vec::new(),
+                    adoptable: false,
+                }],
+            }],
+            ..MigrationReport::default()
+        };
+        let text = migration(&quiet).text();
+        assert!(
+            text.contains("postgres — stopped, no published port"),
+            "{text}"
+        );
+    }
+
     /// A stack is free to declare none, and a blank screen would read as a broken
     /// command rather than as an answer.
     #[test]
@@ -810,6 +901,27 @@ mod tests {
                 }],
                 changed: true,
                 rehearsed: false,
+            }),
+            Outcome::Migration(MigrationReport {
+                read: true,
+                standing: vec![StandingReport {
+                    project: "media".to_owned(),
+                    services: vec![OccupantReport {
+                        service: "sonarr".to_owned(),
+                        running: true,
+                        ports: vec![8989],
+                        adoptable: true,
+                    }],
+                }],
+                conflicts: vec![ConflictReport {
+                    port: 8989,
+                    wanted_by: "sonarr".to_owned(),
+                    held_by: "media/sonarr".to_owned(),
+                }],
+                unsupported: vec![UnsupportedReport {
+                    what: "media/ombi".to_owned(),
+                    because: "lemonfiber does not run this service".to_owned(),
+                }],
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],

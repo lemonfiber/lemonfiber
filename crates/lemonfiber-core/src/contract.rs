@@ -277,6 +277,7 @@ mod tests {
             }),
             Outcome::Quality(QualityReport::default()),
             Outcome::Alerts(AlertReport::default()),
+            Outcome::Migration(MigrationReport::default()),
             Outcome::Upgrade(UpgradeReport::default()),
             Outcome::Music(MusicReport::default()),
             Outcome::Trace(TraceReport::default()),
