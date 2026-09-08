@@ -21,9 +21,10 @@ use lemonfiber_core::model::MigrationReport;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
+use lemonfiber_core::ports::Runner;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::pulled::Pulled;
-use lemonfiber_fixtures::support::{spoke, Reporting, Scripted, SeedFs};
+use lemonfiber_fixtures::support::{spoke, Recording, Reporting, Scripted, SeedFs};
 
 /// A machine whose engine answers with the given containers and images.
 fn ctx(engine: Reporting, images: Arc<Pulled>) -> Ctx {
@@ -32,8 +33,16 @@ fn ctx(engine: Reporting, images: Arc<Pulled>) -> Ctx {
 
 /// The same machine, reading its stack from somewhere named.
 fn over(engine: Reporting, images: Arc<Pulled>, stack: Source) -> Ctx {
+    driven(engine, images, stack, Arc::new(Scripted(Ok(spoke("")))))
+}
+
+/// The same machine again, with the programs it runs answered by a given runner.
+///
+/// Apart from the others because a claim about what a survey *did not* run cannot be
+/// made from what came back: it has to be asked of the thing that would have run it.
+fn driven(engine: Reporting, images: Arc<Pulled>, stack: Source, runner: Arc<dyn Runner>) -> Ctx {
     Ctx::new(
-        Arc::new(Scripted(Ok(spoke("")))),
+        runner,
         Arc::new(engine),
         lemonfiber_fixtures::ports::Stopped::today(),
         Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
@@ -122,4 +131,26 @@ async fn a_machine_with_nothing_else_on_it_says_it_looked() {
     assert_eq!(read, Some(true), "{found:?}");
     let standing = found.as_ref().map(|report| report.standing.len());
     assert_eq!(standing, Some(0), "{found:?}");
+}
+
+/// A survey is a read. Nothing it does may reach the operator's running stack, because
+/// a migration they abandon halfway has to leave them exactly what they had.
+#[tokio::test]
+async fn a_survey_runs_no_program_at_all() {
+    let watching = Arc::new(Recording::answering(Ok(spoke(""))));
+    let images = Pulled::holding(vec![Pulled::image("sonarr", 400, &["media"])]);
+    let ctx = driven(
+        somebody_elses(),
+        images,
+        Source::External(project()),
+        Arc::clone(&watching) as Arc<dyn Runner>,
+    );
+
+    let found = surveyed(&ctx).await;
+    assert!(found.is_some(), "the survey answered");
+
+    // Everything it was handed, not one word at a time: the invocation a narrower
+    // question forgot to ask about is the one that would have stopped their stack.
+    let ran = watching.seen();
+    assert!(ran.is_empty(), "a survey ran a program: {ran:?}");
 }

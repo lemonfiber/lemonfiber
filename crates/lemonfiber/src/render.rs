@@ -39,7 +39,8 @@ pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::model::{
-    AlertReport, ConfigReport, FormsReport, MigrationReport, VersionReport, WizardReport,
+    AlertReport, ConfigReport, FormsReport, MigrationReport, UnsupportedReport, VersionReport,
+    WizardReport,
 };
 use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
@@ -372,6 +373,11 @@ fn alerts(report: &AlertReport) -> Lines {
 }
 
 /// What is already on this machine, before anything is proposed.
+///
+/// Six sections, each its own function. They are separate because they answer separate
+/// questions — what is here, what collides, what taking it over costs, what is left
+/// alone, what may be done, and where a second copy would listen — and an operator
+/// reads whichever of them their situation put in front of them.
 fn migration(report: &MigrationReport) -> Lines {
     let mut lines = Lines::default();
     if !report.read {
@@ -380,76 +386,159 @@ fn migration(report: &MigrationReport) -> Lines {
         lines.put("could not read what is on this machine, so nothing is ruled out".to_owned());
         return lines;
     }
+    standing_here(report, &mut lines);
+    clashes(report, &mut lines);
+    taking_over(report, &mut lines);
+    choices(report, &mut lines);
+    listed(
+        &report.unsupported,
+        "found, and left exactly as it is:",
+        &mut lines,
+    );
+    listed(
+        &report.not_carried,
+        "no migration carries these across:",
+        &mut lines,
+    );
+    lines.put(String::new());
+    lines.put("nothing was changed".to_owned());
+    lines
+}
+
+/// Every project already standing here, with what each service answers on.
+fn standing_here(report: &MigrationReport, lines: &mut Lines) {
     if report.standing.is_empty() {
         lines.put("found no other setup on this machine".to_owned());
+        return;
     }
     for project in &report.standing {
         lines.put(format!("{}:", project.project));
         for service in &project.services {
-            let ports = if service.ports.is_empty() {
-                "no published port".to_owned()
-            } else {
-                let named: Vec<String> = service.ports.iter().map(u16::to_string).collect();
-                named.join(", ")
-            };
             lines.put(format!(
-                "  {} — {}, {ports}",
+                "  {} — {}, {}",
                 service.service,
                 if service.running {
                     "running"
                 } else {
                     "stopped"
-                }
+                },
+                published(&service.ports)
             ));
         }
     }
-    if !report.conflicts.is_empty() {
-        lines.put(String::new());
-        lines.put("ports lemonfiber would want that are already taken:".to_owned());
-        for clash in &report.conflicts {
-            lines.put(format!(
-                "  {} — wanted by {}, held by {}",
-                clash.port, clash.wanted_by, clash.held_by
-            ));
-        }
+}
+
+/// The ports a service answers on, or that it answers on none.
+fn published(ports: &[u16]) -> String {
+    if ports.is_empty() {
+        return "no published port".to_owned();
     }
-    if !report.unsupported.is_empty() {
-        lines.put(String::new());
-        lines.put("found, and left exactly as it is:".to_owned());
-        for item in &report.unsupported {
-            lines.put(format!("  {} — {}", item.what, item.because));
-        }
-    }
-    if !report.carrying.is_empty() {
-        lines.put(String::new());
-        lines.put("what taking these over would come to:".to_owned());
-        for service in &report.carrying {
-            // The refusal first, because it is the one line that changes what an
-            // operator can do rather than what it would cost them.
-            let mark = if service.refused {
-                "will not"
-            } else if service.backup_first {
-                "backup first"
-            } else {
-                "as it stands"
-            };
-            lines.put(format!(
-                "  {} {} → {} — {mark}",
-                service.service, service.existing, service.ours
-            ));
-            lines.put(format!("    {}", service.because));
-        }
-    }
-    if !report.not_carried.is_empty() {
-        lines.put(String::new());
-        lines.put("no migration carries these across:".to_owned());
-        for item in &report.not_carried {
-            lines.put(format!("  {} — {}", item.what, item.because));
-        }
+    ports
+        .iter()
+        .map(u16::to_string)
+        .collect::<Vec<String>>()
+        .join(", ")
+}
+
+/// Ports lemonfiber would want that something else already holds.
+fn clashes(report: &MigrationReport, lines: &mut Lines) {
+    if report.conflicts.is_empty() {
+        return;
     }
     lines.put(String::new());
-    lines.put("nothing was changed".to_owned());
-    lines
+    lines.put("ports lemonfiber would want that are already taken:".to_owned());
+    for clash in &report.conflicts {
+        lines.put(format!(
+            "  {} — wanted by {}, held by {}",
+            clash.port, clash.wanted_by, clash.held_by
+        ));
+    }
+}
+
+/// What taking each recognised service over would come to.
+fn taking_over(report: &MigrationReport, lines: &mut Lines) {
+    if report.carrying.is_empty() {
+        return;
+    }
+    lines.put(String::new());
+    lines.put("what taking these over would come to:".to_owned());
+    for service in &report.carrying {
+        lines.put(format!(
+            "  {} {} → {} — {}",
+            service.service,
+            service.existing,
+            service.ours,
+            cost(service.refused, service.backup_first)
+        ));
+        lines.put(format!("    {}", service.because));
+    }
+}
+
+/// What taking one service over costs, in the two words that change what can be done.
+///
+/// The refusal outranks the backup: a service lemonfiber will not open is not one an
+/// operator needs to be told to back up first.
+const fn cost(refused: bool, backup_first: bool) -> &'static str {
+    if refused {
+        "will not"
+    } else if backup_first {
+        "backup first"
+    } else {
+        "as it stands"
+    }
+}
+
+/// What may be done about what was found, and where a second copy would listen.
+fn choices(report: &MigrationReport, lines: &mut Lines) {
+    if !report.modes.is_empty() {
+        lines.put(String::new());
+        lines.put("what you can do about it:".to_owned());
+        for mode in &report.modes {
+            lines.put(format!(
+                "  {}{}",
+                mode.mode,
+                marked(mode.preselected, mode.disturbs)
+            ));
+            lines.put(format!("    {}", mode.what));
+        }
+    }
+    if report.beside.is_empty() {
+        return;
+    }
+    lines.put(String::new());
+    lines.put("running side-by-side, lemonfiber would listen on:".to_owned());
+    for moved in &report.beside {
+        lines.put(format!(
+            "  {} — {} instead of {}",
+            moved.service, moved.to, moved.from
+        ));
+    }
+}
+
+/// How a mode is marked in the list.
+///
+/// The default and the destructive one, because those are the two an operator has to
+/// tell apart before reading any further.
+const fn marked(preselected: bool, disturbs: bool) -> &'static str {
+    if preselected {
+        " (default)"
+    } else if disturbs {
+        " (stops what is running)"
+    } else {
+        ""
+    }
+}
+
+/// One list of things found, under a heading, or nothing where there are none.
+fn listed(items: &[UnsupportedReport], heading: &str, lines: &mut Lines) {
+    if items.is_empty() {
+        return;
+    }
+    lines.put(String::new());
+    lines.put(heading.to_owned());
+    for item in items {
+        lines.put(format!("  {} — {}", item.what, item.because));
+    }
 }
 
 /// What the operator has configured.
@@ -515,13 +604,14 @@ mod tests {
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::glossary::Vocabulary;
+    use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::migration::not_carried;
     use lemonfiber_core::model::{
         AlertReport, CarryingReport, ConfigReport, ConflictReport, Disposition, DoctorReport,
         ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport, MigrationReport,
-        MusicReport, OccupantReport, QualityReport, ResetReport, SettingReport, Standing,
-        StandingReport, StatusReport, StuckReport, UnsupportedReport, UpgradeReport, VersionReport,
-        WizardReport,
+        MovedReport, MusicReport, OccupantReport, QualityReport, ResetReport, SettingReport,
+        Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport, UpgradeReport,
+        VersionReport, WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -758,6 +848,12 @@ mod tests {
                 },
             ],
             not_carried: not_carried(),
+            modes: offered(),
+            beside: vec![MovedReport {
+                service: "sonarr".to_owned(),
+                from: 8989,
+                to: 8990,
+            }],
         }
     }
 
@@ -799,6 +895,23 @@ mod tests {
         let text = migration(&a_survey()).text();
         assert!(text.contains("no migration carries these across"), "{text}");
         assert!(text.contains("custom formats"), "{text}");
+    }
+
+    /// Adopting is what an operator finds already chosen, and the one that stops a
+    /// working stack is marked as doing so. Both marks are the point.
+    #[test]
+    fn the_default_is_marked_and_so_is_the_one_that_stops_what_is_running() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("adopt (default)"), "{text}");
+        assert!(text.contains("replace (stops what is running)"), "{text}");
+        assert!(!text.contains("replace (default)"), "{text}");
+    }
+
+    /// Somewhere to actually reach it, or side-by-side is a word rather than an offer.
+    #[test]
+    fn running_beside_says_where_each_service_would_listen() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("sonarr — 8990 instead of 8989"), "{text}");
     }
 
     /// An engine that would not answer must not read as an empty machine: the next
@@ -1016,6 +1129,8 @@ mod tests {
                     refused: false,
                 }],
                 not_carried: not_carried(),
+                modes: offered(),
+                beside: Vec::new(),
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],

@@ -8,7 +8,7 @@
 //! what that amounts to, which is what lets the whole survey be exercised against
 //! arrangements that would take a machine-day to stand up for real.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::model::{
     CarryingReport, ConflictReport, MigrationReport, OccupantReport, StandingReport,
@@ -16,6 +16,7 @@ use crate::model::{
 };
 use crate::ports::docker::{Container, Image, Lifecycle};
 
+pub mod mode;
 pub mod version;
 
 use version::Standing;
@@ -60,12 +61,20 @@ pub fn surveyed(
         })
         .collect();
 
+    let taken: BTreeSet<u16> = standing
+        .iter()
+        .flat_map(|project| project.services.iter())
+        .flat_map(|service| service.ports.iter().copied())
+        .collect();
+
     MigrationReport {
         read: true,
         conflicts: conflicts(wanted, &standing),
         unsupported: unsupported(&standing),
         not_carried: not_carried(),
         carrying: Vec::new(),
+        modes: mode::offered(),
+        beside: mode::beside(wanted, &taken),
         standing,
     }
 }
@@ -341,6 +350,8 @@ pub const fn unread() -> MigrationReport {
         unsupported: Vec::new(),
         carrying: Vec::new(),
         not_carried: Vec::new(),
+        modes: Vec::new(),
+        beside: Vec::new(),
     }
 }
 

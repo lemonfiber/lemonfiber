@@ -6553,6 +6553,13 @@
           "description": "What is already on this machine, before anything is proposed.",
           "type": "object",
           "properties": {
+            "beside": {
+              "description": "Where each service would listen to run beside the existing setup.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MovedReport"
+              }
+            },
             "carrying": {
               "description": "What adopting each recognised service would come to, by service name.",
               "type": "array",
@@ -6565,6 +6572,13 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/ConflictReport"
+              }
+            },
+            "modes": {
+              "description": "What may be done about what was found, least destructive first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ModeReport"
               }
             },
             "not_carried": {
@@ -6599,7 +6613,66 @@
             "conflicts",
             "unsupported",
             "carrying",
-            "not_carried"
+            "not_carried",
+            "modes",
+            "beside"
+          ]
+        },
+        "ModeReport": {
+          "description": "One thing an operator may do about a setup already here.",
+          "type": "object",
+          "properties": {
+            "disturbs": {
+              "description": "Whether carrying it out stops or alters what is already running.",
+              "type": "boolean"
+            },
+            "mode": {
+              "description": "The word an operator types for it.",
+              "type": "string"
+            },
+            "preselected": {
+              "description": "Whether it is offered already chosen. Only adopting is.",
+              "type": "boolean"
+            },
+            "what": {
+              "description": "What choosing it would come to, in the operator's terms.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode",
+            "preselected",
+            "what",
+            "disturbs"
+          ]
+        },
+        "MovedReport": {
+          "description": "Where one service would listen to run beside what is already here.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "The port it would ordinarily take.",
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "service": {
+              "description": "The lemonfiber service being moved.",
+              "type": "string"
+            },
+            "to": {
+              "description": "The port it would take instead.",
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            }
+          },
+          "required": [
+            "service",
+            "from",
+            "to"
           ]
         },
         "OccupantReport": {
