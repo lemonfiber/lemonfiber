@@ -6,9 +6,11 @@
 //! into a CPU fraction. Exercised through the adapter's fake-socket tests
 //! alongside the I/O it sits beside, as the rest of the adapter is.
 
+use std::path::PathBuf;
+
 use bollard::models::{
     ContainerStatsResponse, ContainerSummary, ContainerSummaryHealthStatusEnum,
-    ContainerSummaryStateEnum, PortSummary,
+    ContainerSummaryStateEnum, MountPoint, PortSummary,
 };
 
 use super::{PROJECT_LABEL, SERVICE_LABEL};
@@ -73,12 +75,27 @@ pub(super) fn describe(summary: ContainerSummary) -> Container {
         lifecycle: lifecycle(summary.state),
         health: health(summary.health.and_then(|reported| reported.status)),
         published: published(summary.ports.unwrap_or_default()),
+        mounts: mounted(summary.mounts.unwrap_or_default()),
         exit: exit_code(summary.status.as_deref()),
     }
 }
 
 /// The host addresses a container actually answers on.
 ///
+/// Every host path the engine says is mounted into a container.
+///
+/// A mount with no source on the host is a named volume or an anonymous one, which is
+/// the engine's own storage rather than somewhere in the operator's tree, so it has no
+/// path a hardlink question could be asked about and is left out.
+fn mounted(mounts: Vec<MountPoint>) -> Vec<PathBuf> {
+    mounts
+        .into_iter()
+        .filter_map(|mount| mount.source)
+        .filter(|source| !source.is_empty())
+        .map(PathBuf::from)
+        .collect()
+}
+
 /// A port with no host port is one the container exposes and nothing published, so
 /// there is no host address to have a policy about and it is left out. An address the
 /// engine reports that is not one — which it has never been seen to do — is left out
@@ -177,9 +194,9 @@ pub(super) fn sampled(sample: &ContainerStatsResponse) -> Stats {
 
 #[cfg(test)]
 mod tests {
-    use bollard::models::PortSummary;
+    use bollard::models::{MountPoint, PortSummary};
 
-    use super::published;
+    use super::{mounted, published};
 
     /// One port as the engine reports it.
     fn reported(ip: Option<&str>, public: Option<u16>) -> PortSummary {
@@ -222,5 +239,37 @@ mod tests {
     #[test]
     fn a_word_that_is_not_an_address_is_left_out() {
         assert!(published(vec![reported(Some("somewhere"), Some(8989))]).is_empty());
+    }
+
+    /// One mount as the engine reports it, with the host path it came from.
+    fn point(source: Option<&str>) -> MountPoint {
+        MountPoint {
+            source: source.map(std::borrow::ToOwned::to_owned),
+            ..MountPoint::default()
+        }
+    }
+
+    /// Where a container's data sits on this machine is what the hardlink question is
+    /// asked about, so the host path is what comes back.
+    #[test]
+    fn the_host_path_of_each_mount_is_what_comes_back() {
+        let read = mounted(vec![
+            point(Some("/srv/media")),
+            point(Some("/mnt/downloads")),
+        ]);
+        assert_eq!(
+            read,
+            vec![
+                std::path::PathBuf::from("/srv/media"),
+                std::path::PathBuf::from("/mnt/downloads")
+            ]
+        );
+    }
+
+    /// A named or anonymous volume is the engine's own storage rather than somewhere in
+    /// the operator's tree, so it has no path to ask a hardlink question about.
+    #[test]
+    fn a_mount_with_no_host_path_is_not_somewhere_on_this_machine() {
+        assert!(mounted(vec![point(None), point(Some(""))]).is_empty());
     }
 }

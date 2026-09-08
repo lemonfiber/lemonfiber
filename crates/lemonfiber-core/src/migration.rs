@@ -19,6 +19,7 @@ use crate::ports::docker::{Container, Image};
 
 pub mod carrying;
 pub mod image;
+pub mod linking;
 pub mod mode;
 pub mod standing;
 pub mod version;
@@ -56,6 +57,7 @@ pub fn surveyed(
     seen: &[Container],
     images: &[Image],
     ours: &[Ours],
+    mounted: &[(std::path::PathBuf, crate::ports::filesystem::StorageFacts)],
 ) -> MigrationReport {
     let standing = standing::here(project, seen, ours);
 
@@ -74,6 +76,7 @@ pub fn surveyed(
         modes: mode::offered(),
         not_carried: carrying::not_carried(),
         carrying: carried,
+        linking: linking::linking(mounted),
         unsupported,
         standing,
     }
@@ -94,6 +97,7 @@ pub const fn unread() -> MigrationReport {
         not_carried: Vec::new(),
         modes: Vec::new(),
         beside: Vec::new(),
+        linking: None,
     }
 }
 
@@ -118,6 +122,7 @@ pub(crate) mod tests {
                     port: *port,
                 })
                 .collect(),
+            mounts: Vec::new(),
             exit: None,
         }
     }
@@ -151,7 +156,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_survey_that_looked_and_found_nothing_says_it_looked() {
-        let found = surveyed("lemonfiber", &[], &[], &running());
+        let found = surveyed("lemonfiber", &[], &[], &running(), &[]);
         assert!(found.read);
         assert!(found.standing.is_empty());
     }
@@ -165,7 +170,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_survey_states_what_no_migration_carries_across_whatever_it_found() {
-        let found = surveyed("lemonfiber", &[], &[], &running());
+        let found = surveyed("lemonfiber", &[], &[], &running(), &[]);
         assert!(!found.not_carried.is_empty(), "{found:?}");
         assert!(!found.modes.is_empty(), "{found:?}");
     }
@@ -179,7 +184,7 @@ pub(crate) mod tests {
             container("media", "ombi", &[3579]),
         ];
         let images = [image(&["linuxserver/sonarr:4.0.9"], &["media"])];
-        let found = surveyed("lemonfiber", &seen, &images, &running());
+        let found = surveyed("lemonfiber", &seen, &images, &running(), &[]);
 
         assert!(!found.standing.is_empty(), "what is here");
         assert!(!found.conflicts.is_empty(), "what collides");
@@ -193,7 +198,7 @@ pub(crate) mod tests {
     #[test]
     fn a_second_copy_steps_over_the_ports_the_existing_stack_holds() {
         let seen = [container("media", "sonarr", &[8989, 8990])];
-        let found = surveyed("lemonfiber", &seen, &[], &running());
+        let found = surveyed("lemonfiber", &seen, &[], &running(), &[]);
         let sonarr = found
             .beside
             .iter()

@@ -312,6 +312,7 @@ mod tests {
             lifecycle,
             health,
             published: Vec::new(),
+            mounts: Vec::new(),
             exit: None,
         }
     }

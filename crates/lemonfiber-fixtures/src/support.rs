@@ -254,6 +254,7 @@ pub struct SeedFs {
     /// What a volume describe reports — a zero total by default, which the
     /// dashboard reads as free space unknown.
     facts: lemonfiber_ports::filesystem::StorageFacts,
+    elsewhere: Vec<(&'static str, lemonfiber_ports::filesystem::StorageFacts)>,
 }
 
 impl SeedFs {
@@ -267,6 +268,7 @@ impl SeedFs {
             seerr: None,
             only_prowlarr: false,
             missing: Vec::new(),
+            elsewhere: Vec::new(),
             facts: lemonfiber_ports::filesystem::StorageFacts {
                 point: std::path::PathBuf::new(),
                 kind: lemonfiber_ports::filesystem::FsKind::Linking("test".to_owned()),
@@ -302,6 +304,22 @@ impl SeedFs {
     #[must_use]
     pub fn with_facts(mut self, facts: lemonfiber_ports::filesystem::StorageFacts) -> Self {
         self.facts = facts;
+        self
+    }
+
+    /// The same, answering differently for paths under a named prefix.
+    ///
+    /// A fake that answered the same for every path could not be asked whether two
+    /// paths sit on one filesystem, which is the whole of the hardlink question — so a
+    /// test about a layout that breaks hardlinks would pass against a fake that has
+    /// only ever had one.
+    #[must_use]
+    pub fn with_facts_under(
+        mut self,
+        prefix: &'static str,
+        facts: lemonfiber_ports::filesystem::StorageFacts,
+    ) -> Self {
+        self.elsewhere.push((prefix, facts));
         self
     }
 
@@ -372,11 +390,12 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
     ) -> Option<lemonfiber_ports::filesystem::Ownership> {
         None
     }
-    async fn describe(
-        &self,
-        _path: &std::path::Path,
-    ) -> lemonfiber_ports::filesystem::StorageFacts {
-        self.facts.clone()
+    async fn describe(&self, path: &std::path::Path) -> lemonfiber_ports::filesystem::StorageFacts {
+        let named = path.to_string_lossy().into_owned();
+        self.elsewhere
+            .iter()
+            .find(|(prefix, _)| named.starts_with(prefix))
+            .map_or_else(|| self.facts.clone(), |(_, facts)| facts.clone())
     }
 }
 

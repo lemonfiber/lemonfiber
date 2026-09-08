@@ -36,6 +36,34 @@ fn over(engine: Reporting, images: Arc<Pulled>, stack: Source) -> Ctx {
     driven(engine, images, stack, Arc::new(Scripted(Ok(spoke("")))))
 }
 
+/// A filesystem whose paths under `point` all belong to that one mount.
+fn facts(point: &str) -> StorageFacts {
+    StorageFacts {
+        point: PathBuf::from(point),
+        kind: FsKind::Linking("apfs".to_owned()),
+        removable: false,
+        available: 100,
+        total: 1_000,
+    }
+}
+
+/// The same machine, reading its filesystem through a given fake.
+fn over_files(engine: Reporting, images: Arc<Pulled>, files: Arc<SeedFs>) -> Ctx {
+    Ctx::new(
+        Arc::new(Scripted(Ok(spoke("")))),
+        Arc::new(engine),
+        lemonfiber_fixtures::ports::Stopped::today(),
+        files,
+        Source::External(project()),
+        Settings {
+            project: "lemonfiber".to_owned(),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_images(images)
+}
+
 /// The same machine again, with the programs it runs answered by a given runner.
 ///
 /// Apart from the others because a claim about what a survey *did not* run cannot be
@@ -68,6 +96,11 @@ async fn surveyed(ctx: &Ctx) -> Option<MigrationReport> {
         Ok(Outcome::Migration(report)) => Some(report),
         _ => None,
     }
+}
+
+/// The same engine, with the given host paths mounted into its containers.
+fn mounting(engine: Reporting, paths: &[&str]) -> Reporting {
+    engine.mounting(&paths.iter().map(PathBuf::from).collect::<Vec<_>>())
 }
 
 /// An engine holding one service, under a project that is not lemonfiber's.
@@ -153,4 +186,43 @@ async fn a_survey_runs_no_program_at_all() {
     // question forgot to ask about is the one that would have stopped their stack.
     let ran = watching.seen();
     assert!(ran.is_empty(), "a survey ran a program: {ran:?}");
+}
+
+/// A layout whose data sits on two filesystems cannot hardlink between them, and the
+/// survey has to say so from what the engine actually reported being mounted.
+#[tokio::test]
+async fn a_layout_across_two_filesystems_is_reported_with_its_cost_and_a_remedy() {
+    let images = Pulled::holding(vec![Pulled::image("sonarr", 400, &["media"])]);
+    let engine = mounting(somebody_elses(), &["/srv/media", "/mnt/downloads"]);
+
+    let split = SeedFs::keyed(None, None)
+        .with_facts(facts("/srv"))
+        .with_facts_under("/mnt", facts("/mnt"));
+
+    let ctx = over_files(engine, images, Arc::new(split));
+    let found = surveyed(&ctx).await.and_then(|report| report.linking);
+    assert_eq!(
+        found.as_ref().map(|read| (read.links, read.forced)),
+        Some((false, false)),
+        "two filesystems is a finding the operator decides about: {found:?}"
+    );
+    let said = found
+        .as_ref()
+        .map(|read| read.because.clone())
+        .unwrap_or_default();
+    assert!(said.contains("/mnt") && said.contains("/srv"), "{said}");
+    let remedy = found.map(|read| read.remedy).unwrap_or_default();
+    assert!(!remedy.is_empty(), "a remedy is offered");
+}
+
+/// One filesystem is the ordinary case and is not worth telling anybody about.
+#[tokio::test]
+async fn a_layout_on_one_filesystem_is_not_reported_at_all() {
+    let images = Pulled::holding(vec![Pulled::image("sonarr", 400, &["media"])]);
+    let engine = mounting(somebody_elses(), &["/srv/media", "/srv/downloads"]);
+    let one = SeedFs::keyed(None, None).with_facts(facts("/srv"));
+
+    let ctx = over_files(engine, images, Arc::new(one));
+    let found = surveyed(&ctx).await.and_then(|report| report.linking);
+    assert!(found.is_none(), "{found:?}");
 }

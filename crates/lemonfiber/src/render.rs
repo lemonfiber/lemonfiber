@@ -792,6 +792,7 @@ mod tests {
                 not_carried: not_carried(),
                 modes: offered(),
                 beside: Vec::new(),
+                linking: None,
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],
