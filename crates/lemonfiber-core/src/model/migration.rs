@@ -48,6 +48,25 @@ pub struct UnsupportedReport {
     pub because: String,
 }
 
+/// What adopting one existing service would come to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct CarryingReport {
+    /// The service, by the name lemonfiber runs it under.
+    pub service: String,
+    /// The version standing here now.
+    pub existing: String,
+    /// The version lemonfiber pins.
+    pub ours: String,
+    /// Which of the two is the later, in one word.
+    pub verdict: String,
+    /// What that means for this service's data, in the operator's terms.
+    pub because: String,
+    /// Whether its database must be backed up before lemonfiber opens it.
+    pub backup_first: bool,
+    /// Whether lemonfiber will not do this at all.
+    pub refused: bool,
+}
+
 /// What is already on this machine, before anything is proposed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MigrationReport {
@@ -63,4 +82,8 @@ pub struct MigrationReport {
     pub conflicts: Vec<ConflictReport>,
     /// What was found and cannot be adopted.
     pub unsupported: Vec<UnsupportedReport>,
+    /// What adopting each recognised service would come to, by service name.
+    pub carrying: Vec<CarryingReport>,
+    /// What no migration carries across, whatever mode it runs in.
+    pub not_carried: Vec<UnsupportedReport>,
 }

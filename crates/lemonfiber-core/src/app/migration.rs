@@ -10,7 +10,7 @@
 use std::collections::BTreeSet;
 
 use crate::error::Problem;
-use crate::migration::{outside_compose, surveyed, unread, Wanted};
+use crate::migration::{carrying, outside_compose, surveyed, unread, Pinned, Wanted};
 use crate::model::MigrationReport;
 use crate::ports::docker::Container;
 
@@ -79,7 +79,22 @@ async fn looked(ctx: &Ctx) -> MigrationReport {
         .map(|service| service.image.clone())
         .collect();
 
+    let pinned: Vec<Pinned> = manifest
+        .services
+        .iter()
+        .map(|service| Pinned {
+            service: service.id.clone(),
+            image: service.image.clone(),
+            tag: service.tag.clone(),
+        })
+        .collect();
+
     let mut report = surveyed(&ctx.settings.project, &seen, &wanted, &known);
     report.unsupported.extend(outside_compose(&images, &pulled));
+    for standing in &report.standing {
+        report
+            .carrying
+            .extend(carrying(&images, &standing.project, &pinned));
+    }
     report
 }

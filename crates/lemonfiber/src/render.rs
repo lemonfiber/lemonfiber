@@ -420,6 +420,33 @@ fn migration(report: &MigrationReport) -> Lines {
             lines.put(format!("  {} — {}", item.what, item.because));
         }
     }
+    if !report.carrying.is_empty() {
+        lines.put(String::new());
+        lines.put("what taking these over would come to:".to_owned());
+        for service in &report.carrying {
+            // The refusal first, because it is the one line that changes what an
+            // operator can do rather than what it would cost them.
+            let mark = if service.refused {
+                "will not"
+            } else if service.backup_first {
+                "backup first"
+            } else {
+                "as it stands"
+            };
+            lines.put(format!(
+                "  {} {} → {} — {mark}",
+                service.service, service.existing, service.ours
+            ));
+            lines.put(format!("    {}", service.because));
+        }
+    }
+    if !report.not_carried.is_empty() {
+        lines.put(String::new());
+        lines.put("no migration carries these across:".to_owned());
+        for item in &report.not_carried {
+            lines.put(format!("  {} — {}", item.what, item.because));
+        }
+    }
     lines.put(String::new());
     lines.put("nothing was changed".to_owned());
     lines
@@ -488,11 +515,13 @@ mod tests {
     use lemonfiber_core::docker::Condition;
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::glossary::Vocabulary;
+    use lemonfiber_core::migration::not_carried;
     use lemonfiber_core::model::{
-        AlertReport, ConfigReport, ConflictReport, Disposition, DoctorReport, ExceptionReport,
-        FormsReport, FrontDoorReport, HouseholdReport, MigrationReport, MusicReport,
-        OccupantReport, QualityReport, ResetReport, SettingReport, Standing, StandingReport,
-        StatusReport, StuckReport, UnsupportedReport, UpgradeReport, VersionReport, WizardReport,
+        AlertReport, CarryingReport, ConfigReport, ConflictReport, Disposition, DoctorReport,
+        ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport, MigrationReport,
+        MusicReport, OccupantReport, QualityReport, ResetReport, SettingReport, Standing,
+        StandingReport, StatusReport, StuckReport, UnsupportedReport, UpgradeReport, VersionReport,
+        WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -699,6 +728,36 @@ mod tests {
                 what: "media/ombi".to_owned(),
                 because: "lemonfiber does not run this service".to_owned(),
             }],
+            carrying: vec![
+                CarryingReport {
+                    service: "sonarr".to_owned(),
+                    existing: "4.0.1".to_owned(),
+                    ours: "4.0.2".to_owned(),
+                    verdict: "upgrade".to_owned(),
+                    because: "backed up before anything opens it".to_owned(),
+                    backup_first: true,
+                    refused: false,
+                },
+                CarryingReport {
+                    service: "radarr".to_owned(),
+                    existing: "5.9.0".to_owned(),
+                    ours: "5.0.1".to_owned(),
+                    verdict: "downgrade".to_owned(),
+                    because: "cannot open it afterwards".to_owned(),
+                    backup_first: false,
+                    refused: true,
+                },
+                CarryingReport {
+                    service: "prowlarr".to_owned(),
+                    existing: "1.0.0".to_owned(),
+                    ours: "1.0.0".to_owned(),
+                    verdict: "same".to_owned(),
+                    because: "opened exactly as it stands".to_owned(),
+                    backup_first: false,
+                    refused: false,
+                },
+            ],
+            not_carried: not_carried(),
         }
     }
 
@@ -715,6 +774,31 @@ mod tests {
         );
         assert!(text.contains("media/ombi"), "{text}");
         assert!(text.contains("nothing was changed"), "{text}");
+    }
+
+    /// The three verdicts read differently at a glance, because what an operator can
+    /// do about each of them differs.
+    #[test]
+    fn what_taking_a_service_over_would_come_to_is_marked_by_what_it_costs() {
+        let text = migration(&a_survey()).text();
+        assert!(
+            text.contains("sonarr 4.0.1 → 4.0.2 — backup first"),
+            "{text}"
+        );
+        assert!(text.contains("radarr 5.9.0 → 5.0.1 — will not"), "{text}");
+        assert!(
+            text.contains("prowlarr 1.0.0 → 1.0.0 — as it stands"),
+            "{text}"
+        );
+    }
+
+    /// Named rather than left to be discovered weeks later, when nothing connects the
+    /// gap back to the day the migration ran.
+    #[test]
+    fn what_no_migration_carries_across_is_stated_in_the_survey() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("no migration carries these across"), "{text}");
+        assert!(text.contains("custom formats"), "{text}");
     }
 
     /// An engine that would not answer must not read as an empty machine: the next
@@ -922,6 +1006,16 @@ mod tests {
                     what: "media/ombi".to_owned(),
                     because: "lemonfiber does not run this service".to_owned(),
                 }],
+                carrying: vec![CarryingReport {
+                    service: "sonarr".to_owned(),
+                    existing: "4.0.1".to_owned(),
+                    ours: "4.0.2".to_owned(),
+                    verdict: "upgrade".to_owned(),
+                    because: "backed up before anything opens it".to_owned(),
+                    backup_first: true,
+                    refused: false,
+                }],
+                not_carried: not_carried(),
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],
