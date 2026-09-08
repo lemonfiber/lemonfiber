@@ -8,11 +8,13 @@
 //! facts, and only one of them makes it safe to stand a stack up here.
 
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use crate::error::Problem;
 use crate::migration::{surveyed, unread, Ours};
 use crate::model::MigrationReport;
 use crate::ports::docker::Container;
+use crate::ports::filesystem::StorageFacts;
 
 use super::{Ctx, MigrateAction};
 
@@ -27,6 +29,25 @@ pub async fn survey(ctx: &Ctx, action: MigrateAction) -> Result<MigrationReport,
     match action {
         MigrateAction::Survey => Ok(looked(ctx).await),
     }
+}
+
+/// What filesystem each path the existing setup mounts actually sits on.
+///
+/// Asked of every distinct host path once. `describe` is a read — it says what a
+/// filesystem is, not what is in it — and it is the only thing a survey asks of that
+/// seam, which the architecture guard holds it to.
+async fn mounted(ctx: &Ctx, seen: &[Container]) -> Vec<(PathBuf, StorageFacts)> {
+    let paths: BTreeSet<&PathBuf> = seen
+        .iter()
+        .filter(|container| container.project != ctx.settings.project)
+        .flat_map(|container| container.mounts.iter())
+        .collect();
+
+    let mut found = Vec::new();
+    for path in paths {
+        found.push((path.clone(), ctx.filesystem.describe(path).await));
+    }
+    found
 }
 
 /// What the engine and the manifest together say is here.
@@ -68,5 +89,11 @@ async fn looked(ctx: &Ctx) -> MigrationReport {
         })
         .collect();
 
-    surveyed(&ctx.settings.project, &seen, &images, &ours)
+    surveyed(
+        &ctx.settings.project,
+        &seen,
+        &images,
+        &ours,
+        &mounted(ctx, &seen).await,
+    )
 }

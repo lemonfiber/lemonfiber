@@ -91,6 +91,25 @@ pub struct MovedReport {
     pub to: u16,
 }
 
+/// What an existing layout costs, where it cannot hold a hardlink.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct LinkingReport {
+    /// Whether imports can be hardlinks across this layout. False whenever this is
+    /// reported at all, since a layout that links is not reported.
+    pub links: bool,
+    /// Why they cannot, naming the filesystems it is about.
+    pub because: String,
+    /// What that costs, in room rather than in adjectives.
+    pub cost: String,
+    /// What would fix it, offered.
+    pub remedy: String,
+    /// Whether lemonfiber will do it. Always false: the layout and the library in it
+    /// are the operator's, and correctness does not outrank their data.
+    pub forced: bool,
+    /// The filesystems the existing setup keeps its data on.
+    pub filesystems: Vec<String>,
+}
+
 /// What is already on this machine, before anything is proposed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MigrationReport {
@@ -114,4 +133,7 @@ pub struct MigrationReport {
     pub modes: Vec<ModeReport>,
     /// Where each service would listen to run beside the existing setup.
     pub beside: Vec<MovedReport>,
+    /// What the existing layout costs where it cannot hold a hardlink, absent where
+    /// it can.
+    pub linking: Option<LinkingReport>,
 }

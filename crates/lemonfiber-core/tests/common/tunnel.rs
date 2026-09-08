@@ -232,6 +232,7 @@ impl Engine for Fake {
                 },
                 health: Health::None,
                 published: Vec::new(),
+                mounts: Vec::new(),
                 exit: None,
             })
             .collect())

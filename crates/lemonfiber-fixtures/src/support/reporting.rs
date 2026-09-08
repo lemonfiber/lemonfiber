@@ -74,6 +74,7 @@ impl Reporting {
                     lifecycle,
                     health,
                     published: Vec::new(),
+                    mounts: Vec::new(),
                     exit: None,
                 })
                 .collect(),
@@ -115,6 +116,18 @@ impl Reporting {
     pub fn belonging_to(mut self, project: &str) -> Self {
         for container in &mut self.containers {
             project.clone_into(&mut container.project);
+        }
+        self
+    }
+
+    /// The same containers, with the given host paths mounted into each.
+    ///
+    /// For the survey that asks where an existing setup keeps its data, which is the
+    /// only way to tell whether a hardlink could reach between two of its directories.
+    #[must_use]
+    pub fn mounting(mut self, paths: &[std::path::PathBuf]) -> Self {
+        for container in &mut self.containers {
+            container.mounts = paths.to_vec();
         }
         self
     }

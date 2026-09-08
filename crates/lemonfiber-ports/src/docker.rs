@@ -87,6 +87,13 @@ pub struct Container {
     /// Read from the engine rather than from what asked for it, so a check about
     /// where things listen is asking what is listening.
     pub published: Vec<Published>,
+    /// Every host path mounted into it.
+    ///
+    /// Where the container's data actually lives on this machine, which is the only
+    /// way to tell whether an existing setup keeps its downloads and its library
+    /// somewhere a hardlink can reach between. Read from the engine rather than from
+    /// a compose file, because what is mounted is what the container got.
+    pub mounts: Vec<std::path::PathBuf>,
     /// How it exited, where it has exited and the engine still remembers.
     ///
     /// Present because stopping on purpose and falling over are the same
@@ -371,6 +378,7 @@ mod tests {
             service: "sonarr".to_owned(),
             lifecycle: Lifecycle::Running,
             health: Health::Healthy,
+            mounts: Vec::new(),
             exit: None,
         };
         assert_eq!(container.clone(), container);

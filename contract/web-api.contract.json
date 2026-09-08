@@ -6549,6 +6549,47 @@
             "held_by"
           ]
         },
+        "LinkingReport": {
+          "description": "What an existing layout costs, where it cannot hold a hardlink.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why they cannot, naming the filesystems it is about.",
+              "type": "string"
+            },
+            "cost": {
+              "description": "What that costs, in room rather than in adjectives.",
+              "type": "string"
+            },
+            "filesystems": {
+              "description": "The filesystems the existing setup keeps its data on.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "forced": {
+              "description": "Whether lemonfiber will do it. Always false: the layout and the library in it\nare the operator's, and correctness does not outrank their data.",
+              "type": "boolean"
+            },
+            "links": {
+              "description": "Whether imports can be hardlinks across this layout. False whenever this is\nreported at all, since a layout that links is not reported.",
+              "type": "boolean"
+            },
+            "remedy": {
+              "description": "What would fix it, offered.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "links",
+            "because",
+            "cost",
+            "remedy",
+            "forced",
+            "filesystems"
+          ]
+        },
         "MigrationReport": {
           "description": "What is already on this machine, before anything is proposed.",
           "type": "object",
@@ -6573,6 +6614,17 @@
               "items": {
                 "$ref": "#/$defs/ConflictReport"
               }
+            },
+            "linking": {
+              "description": "What the existing layout costs where it cannot hold a hardlink, absent where\nit can.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LinkingReport"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "modes": {
               "description": "What may be done about what was found, least destructive first.",

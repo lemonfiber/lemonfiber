@@ -30,6 +30,7 @@ pub(super) fn migration(report: &MigrationReport) -> Lines {
     }
     standing_here(report, &mut lines);
     clashes(report, &mut lines);
+    layout(report, &mut lines);
     taking_over(report, &mut lines);
     choices(report, &mut lines);
     listed(
@@ -95,6 +96,23 @@ fn clashes(report: &MigrationReport, lines: &mut Lines) {
             clash.port, clash.wanted_by, clash.held_by
         ));
     }
+}
+
+/// What the existing layout costs, where it cannot hold a hardlink.
+///
+/// The remedy is put beside the cost and marked as theirs to take. A layout that
+/// breaks hardlinks is somebody's years of library sitting where they put it, and a
+/// survey that read as an instruction would be telling them to move it.
+fn layout(report: &MigrationReport, lines: &mut Lines) {
+    let Some(linking) = &report.linking else {
+        return;
+    };
+    lines.put(String::new());
+    lines.put("this layout cannot hardlink:".to_owned());
+    lines.put(format!("  {}", linking.because));
+    lines.put(format!("  {}", linking.cost));
+    lines.put(format!("  you could: {}", linking.remedy));
+    lines.put("  lemonfiber will not move anything to do it".to_owned());
 }
 
 /// What taking each recognised service over would come to.
@@ -189,8 +207,8 @@ mod tests {
     use lemonfiber_core::migration::carrying::not_carried;
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
-        CarryingReport, ConflictReport, MigrationReport, MovedReport, OccupantReport,
-        StandingReport, UnsupportedReport,
+        CarryingReport, ConflictReport, LinkingReport, MigrationReport, MovedReport,
+        OccupantReport, StandingReport, UnsupportedReport,
     };
 
     /// One survey with something of every kind in it.
@@ -245,6 +263,14 @@ mod tests {
                 },
             ],
             not_carried: not_carried(),
+            linking: Some(LinkingReport {
+                links: false,
+                because: "this setup keeps its data on 2 separate filesystems".to_owned(),
+                cost: "every import copies the file instead of naming it twice".to_owned(),
+                remedy: "keeping downloads and the library under one filesystem".to_owned(),
+                forced: false,
+                filesystems: vec!["apfs".to_owned(), "ext4".to_owned()],
+            }),
             modes: offered(),
             beside: vec![MovedReport {
                 service: "sonarr".to_owned(),
@@ -309,6 +335,27 @@ mod tests {
     fn running_beside_says_where_each_service_would_listen() {
         let text = migration(&a_survey()).text();
         assert!(text.contains("sonarr — 8990 instead of 8989"), "{text}");
+    }
+
+    /// The cost is stated in room, and the remedy is marked as theirs to take.
+    #[test]
+    fn a_layout_that_cannot_hardlink_says_what_it_costs_and_offers_a_way_out() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("this layout cannot hardlink"), "{text}");
+        assert!(text.contains("2 separate filesystems"), "{text}");
+        assert!(text.contains("you could:"), "{text}");
+        assert!(text.contains("lemonfiber will not move anything"), "{text}");
+    }
+
+    /// A layout that links is not worth a paragraph telling somebody so.
+    #[test]
+    fn a_layout_that_links_is_not_mentioned_at_all() {
+        let fine = MigrationReport {
+            read: true,
+            ..MigrationReport::default()
+        };
+        let text = migration(&fine).text();
+        assert!(!text.contains("hardlink"), "{text}");
     }
 
     /// An engine that would not answer must not read as an empty machine: the next
