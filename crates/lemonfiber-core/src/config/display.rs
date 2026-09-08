@@ -57,6 +57,11 @@ pub const SHOWN: &[(&str, &str)] = &[
         "the address the leak check asks each container for its public address",
     ),
     (
+        super::PROJECT_KEY,
+        "the Compose project lemonfiber manages, which is its own unless a setup that \
+         was already here was adopted",
+    ),
+    (
         super::EXPLANATIONS_KEY,
         "whether the plain-language explanations are on, which is a display choice",
     ),

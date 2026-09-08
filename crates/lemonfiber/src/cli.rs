@@ -20,7 +20,8 @@ mod under;
 
 use include_dir::{include_dir, Dir};
 pub use under::{
-    AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
+    AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
+    QualityCommand,
 };
 
 // Re-exported rather than reached for through the module they now live in: where a
@@ -114,12 +115,16 @@ pub enum Request {
         /// The forms to describe; none lists them all.
         forms: Vec<String>,
     },
-    /// See what is already on this machine, without changing any of it.
+    /// See what is already on this machine, and take it over if you choose to.
     ///
-    /// Reports the stacks already standing here, the ports they hold that lemonfiber
-    /// would want, and anything it could not take over as it stands. Nothing is
-    /// started, stopped, moved, or written.
-    Migrate,
+    /// With nothing named it surveys: the stacks already standing here, the ports they
+    /// hold that lemonfiber would want, and anything it could not take over as it
+    /// stands. Nothing is started, stopped, moved, or written.
+    Migrate {
+        /// What to do about what was found; nothing surveys and changes none of it.
+        #[command(subcommand)]
+        action: Option<MigrateCommand>,
+    },
     /// Start a form, or the union of several.
     Up {
         /// The forms to start; none starts everything the stack declares.

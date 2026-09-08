@@ -22,8 +22,8 @@ pub mod store;
 // would otherwise be a change at every call site that asks.
 pub use reading::{
     data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
-    indexer_from_env, ip_echo_from_env, port_forward_from_env, provider_host_from_env,
-    reads_as_off, reads_as_on, service_user_from_env, PortForward,
+    indexer_from_env, ip_echo_from_env, port_forward_from_env, project_from_env,
+    provider_host_from_env, reads_as_off, reads_as_on, service_user_from_env, PortForward,
 };
 
 use std::path::PathBuf;
@@ -89,6 +89,13 @@ pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 /// look for, and somebody who finds the explanations patronising knows exactly what
 /// they want to stop.
 pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
+
+/// The Compose project lemonfiber manages.
+///
+/// Its own by default. Set only by adopting a setup that was already here, which is
+/// what makes lemonfiber a control surface over somebody else's stack rather than a
+/// second stack beside it.
+pub const PROJECT_KEY: &str = "LEMONFIBER_PROJECT";
 
 /// The admin services the operator has said out loud they meant to expose.
 ///
@@ -271,6 +278,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_USENET_KEY,
     REACH_HOUSEHOLD_KEY,
     EXPLANATIONS_KEY,
+    PROJECT_KEY,
     EXPOSED_KEY,
     DATA_ROOT_KEY,
     PUID_KEY,

@@ -594,17 +594,56 @@ fn seams(line: &str) -> Vec<String> {
         .collect()
 }
 
+/// The seam a `ctx.` reach names, without whatever follows it.
+fn named(rest: &str) -> String {
+    rest.chars()
+        .take_while(|letter| letter.is_alphanumeric() || *letter == '_')
+        .collect()
+}
+
 /// Whether a seam, with what follows it, is one a survey may reach.
 fn permitted(rest: &str) -> bool {
-    let seam: String = rest
-        .chars()
-        .take_while(|letter| letter.is_alphanumeric() || *letter == '_')
-        .collect();
+    let seam = named(rest);
     if seam.is_empty() || ALLOWED.contains(&seam.as_str()) {
         return true;
     }
     let after = rest.get(seam.len()..).unwrap_or_default();
     seam == READ_ONLY.0 && after.starts_with(&format!(".{}(", READ_ONLY.1))
+}
+
+/// Adopting writes one line of lemonfiber's own configuration and nothing else.
+///
+/// The acting half of migration is where the risk actually is, so it is held to a rule
+/// of its own rather than left to review. It may write settings — that is the whole of
+/// what adopting *is* — but it may not reach the seams that stop a container, delete a
+/// directory, or run a program against somebody's stack. A migration that failed or was
+/// abandoned has to leave the operator exactly the setup they had, and the only way to
+/// guarantee that is for the code to have no way of touching it.
+#[test]
+fn adopting_cannot_stop_delete_or_run_anything() {
+    /// The seams that reach the operator's running stack.
+    const UNTOUCHABLE: [&str; 3] = ["eraser", "volume", "runner"];
+
+    let reaching: Vec<String> = sources()
+        .iter()
+        .filter(|(path, _)| {
+            let named = path.to_string_lossy().replace('\\', "/");
+            named.ends_with("app/adopt.rs")
+        })
+        .flat_map(|(path, text)| {
+            production(text)
+                .lines()
+                .flat_map(seams)
+                .filter(|rest| UNTOUCHABLE.contains(&named(rest).as_str()))
+                .map(move |rest| format!("{} reaches ctx.{rest}", path.display()))
+        })
+        .collect();
+
+    assert!(
+        reaching.is_empty(),
+        "adopting records what lemonfiber manages and touches nothing else, so it may \
+         not reach {UNTOUCHABLE:?}: {reaching:?}"
+    );
 }
 
 /// Output leaves through one place, and this is what keeps it that way.

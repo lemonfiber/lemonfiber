@@ -100,6 +100,19 @@ pub fn provider_host_from_env(file: &env::EnvFile) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The Compose project lemonfiber manages.
+///
+/// Its own unless a setup already on the machine was adopted, which is what makes
+/// lemonfiber a control surface over somebody else's stack rather than a second stack
+/// standing beside it. Blank reads as unset, the way every other recorded value does.
+#[must_use]
+pub fn project_from_env(file: &env::EnvFile) -> String {
+    file.get(super::PROJECT_KEY)
+        .map(str::trim)
+        .filter(|named| !named.is_empty())
+        .map_or_else(|| crate::PRODUCT.to_owned(), str::to_owned)
+}
+
 /// Where the operator chose to keep downloads and media, if they have chosen.
 ///
 /// Absent until setup writes it, and an empty value is read as absent rather
@@ -232,4 +245,34 @@ pub fn exposed_from_env(file: &env::EnvFile) -> Vec<(String, String)> {
         .map(|(service, why)| (service.trim().to_owned(), why.trim().to_owned()))
         .filter(|(service, why)| !service.is_empty() && why.split_whitespace().count() >= A_REASON)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::env;
+
+    /// Unset is lemonfiber's own project, which is what a machine with nothing adopted
+    /// on it has.
+    #[test]
+    fn no_project_recorded_is_lemonfibers_own() {
+        assert_eq!(
+            super::project_from_env(&env::EnvFile::parse("")),
+            crate::PRODUCT
+        );
+    }
+
+    /// Adopting is the only thing that writes it, and what it wrote is what runs.
+    #[test]
+    fn a_recorded_project_is_the_one_that_is_managed() {
+        let read = super::project_from_env(&env::EnvFile::parse("LEMONFIBER_PROJECT=media\n"));
+        assert_eq!(read, "media");
+    }
+
+    /// Blank reads as unset the way every other recorded value does, rather than as a
+    /// project with no name — which would correlate no container to any service.
+    #[test]
+    fn a_blank_project_is_read_as_none_recorded() {
+        let read = super::project_from_env(&env::EnvFile::parse("LEMONFIBER_PROJECT=   \n"));
+        assert_eq!(read, crate::PRODUCT);
+    }
 }

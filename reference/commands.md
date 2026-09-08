@@ -13,7 +13,7 @@ Commands:
   setup         Set up the stack by answering a few questions
   version       Report the versions in play
   forms         List the forms this stack has, and what each one is for
-  migrate       See what is already on this machine, without changing any of it
+  migrate       See what is already on this machine, and take it over if you choose to
   up            Start a form, or the union of several
   down          Stop and remove what a form started
   switch        Make these forms the active set, leaving shared services running
@@ -218,13 +218,46 @@ Options:
 ## `lemonfiber migrate`
 
 ```text
-See what is already on this machine, without changing any of it.
+See what is already on this machine, and take it over if you choose to.
 
-Reports the stacks already standing here, the ports they hold that lemonfiber would want, and anything it could not take over as it stands. Nothing is started, stopped, moved, or written.
+With nothing named it surveys: the stacks already standing here, the ports they hold that lemonfiber would want, and anything it could not take over as it stands. Nothing is started, stopped, moved, or written.
 
-Usage: lemonfiber migrate [OPTIONS]
+Usage: lemonfiber migrate [OPTIONS] [COMMAND]
+
+Commands:
+  adopt  Take over the setup already here, so lemonfiber manages it
+  help   Print this message or the help of the given subcommand(s)
 
 Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber migrate adopt`
+
+```text
+Take over the setup already here, so lemonfiber manages it.
+
+Without `--confirm` it says what adopting would come to and writes nothing — which databases a newer version would upgrade, and where their data sits so it can be backed up first.
+
+Usage: lemonfiber migrate adopt [OPTIONS]
+
+Options:
+      --confirm
+          Go ahead, having backed up the data named
+
       --json
           Print machine-readable output
 

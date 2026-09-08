@@ -16,7 +16,7 @@ use crate::model::MigrationReport;
 use crate::ports::docker::Container;
 use crate::ports::filesystem::StorageFacts;
 
-use super::{Ctx, MigrateAction};
+use super::{Ctx, MigrateAction, Outcome};
 
 /// Answer what is already here.
 ///
@@ -25,9 +25,12 @@ use super::{Ctx, MigrateAction};
 /// Never in practice: a survey that cannot look reports that it could not, rather than
 /// refusing. The result carries the failure so the caller stays uniform with the other
 /// reads.
-pub async fn survey(ctx: &Ctx, action: MigrateAction) -> Result<MigrationReport, Box<Problem>> {
+pub async fn migrating(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<Problem>> {
     match action {
-        MigrateAction::Survey => Ok(looked(ctx).await),
+        MigrateAction::Survey => Ok(Outcome::Migration(looked_with_mounts(ctx).await.0)),
+        MigrateAction::Adopt { confirmed } => super::adopt::taking(ctx, confirmed)
+            .await
+            .map(Outcome::Adoption),
     }
 }
 
@@ -50,13 +53,17 @@ async fn mounted(ctx: &Ctx, seen: &[Container]) -> Vec<(PathBuf, StorageFacts)> 
     found
 }
 
-/// What the engine and the manifest together say is here.
-async fn looked(ctx: &Ctx) -> MigrationReport {
+/// What the engine and the manifest together say is here, and where its data sits.
+///
+/// The paths come back beside the survey because adopting needs them to say what to
+/// back up, and reading the engine twice would be two answers to what is on this
+/// machine.
+pub(super) async fn looked_with_mounts(ctx: &Ctx) -> (MigrationReport, Vec<String>) {
     let Ok(images) = ctx.images.images().await else {
-        return unread();
+        return (unread(), Vec::new());
     };
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
-        return unread();
+        return (unread(), Vec::new());
     };
 
     let mut projects: BTreeSet<&str> = BTreeSet::new();
@@ -73,7 +80,7 @@ async fn looked(ctx: &Ctx) -> MigrationReport {
     let mut seen: Vec<Container> = Vec::new();
     for project in projects {
         let Ok(containers) = ctx.engine.list(project).await else {
-            return unread();
+            return (unread(), Vec::new());
         };
         seen.extend(containers);
     }
@@ -89,11 +96,14 @@ async fn looked(ctx: &Ctx) -> MigrationReport {
         })
         .collect();
 
-    surveyed(
-        &ctx.settings.project,
-        &seen,
-        &images,
-        &ours,
-        &mounted(ctx, &seen).await,
+    let mounted = mounted(ctx, &seen).await;
+    let paths = mounted
+        .iter()
+        .map(|(path, _)| path.display().to_string())
+        .collect();
+
+    (
+        surveyed(&ctx.settings.project, &seen, &images, &ours, &mounted),
+        paths,
     )
 }
