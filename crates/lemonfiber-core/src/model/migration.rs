@@ -48,6 +48,49 @@ pub struct UnsupportedReport {
     pub because: String,
 }
 
+/// What adopting one existing service would come to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct CarryingReport {
+    /// The service, by the name lemonfiber runs it under.
+    pub service: String,
+    /// The version standing here now.
+    pub existing: String,
+    /// The version lemonfiber pins.
+    pub ours: String,
+    /// Which of the two is the later, in one word.
+    pub verdict: String,
+    /// What that means for this service's data, in the operator's terms.
+    pub because: String,
+    /// Whether its database must be backed up before lemonfiber opens it.
+    pub backup_first: bool,
+    /// Whether lemonfiber will not do this at all.
+    pub refused: bool,
+}
+
+/// One thing an operator may do about a setup already here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct ModeReport {
+    /// The word an operator types for it.
+    pub mode: String,
+    /// Whether it is offered already chosen. Only adopting is.
+    pub preselected: bool,
+    /// What choosing it would come to, in the operator's terms.
+    pub what: String,
+    /// Whether carrying it out stops or alters what is already running.
+    pub disturbs: bool,
+}
+
+/// Where one service would listen to run beside what is already here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct MovedReport {
+    /// The lemonfiber service being moved.
+    pub service: String,
+    /// The port it would ordinarily take.
+    pub from: u16,
+    /// The port it would take instead.
+    pub to: u16,
+}
+
 /// What is already on this machine, before anything is proposed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MigrationReport {
@@ -63,4 +106,12 @@ pub struct MigrationReport {
     pub conflicts: Vec<ConflictReport>,
     /// What was found and cannot be adopted.
     pub unsupported: Vec<UnsupportedReport>,
+    /// What adopting each recognised service would come to, by service name.
+    pub carrying: Vec<CarryingReport>,
+    /// What no migration carries across, whatever mode it runs in.
+    pub not_carried: Vec<UnsupportedReport>,
+    /// What may be done about what was found, least destructive first.
+    pub modes: Vec<ModeReport>,
+    /// Where each service would listen to run beside the existing setup.
+    pub beside: Vec<MovedReport>,
 }

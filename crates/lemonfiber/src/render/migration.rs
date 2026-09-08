@@ -1,0 +1,362 @@
+//! What is already on this machine, on a terminal.
+//!
+//! The survey reads in the order somebody decides in: what is here, then what is in
+//! the way, then what taking it over would cost, then what may be done about it. The
+//! sentence that nothing was changed comes last, because it is what they are left
+//! holding.
+//!
+//! Each section is its own function. They answer separate questions and an operator
+//! reads whichever of them their own machine put in front of them, so a survey of a
+//! bare machine and one of a full stack are the same code taking different turns
+//! rather than one function knowing about every case at once.
+
+use lemonfiber_core::model::{MigrationReport, UnsupportedReport};
+
+use super::Lines;
+
+/// What is already on this machine, before anything is proposed.
+///
+/// Six sections, each its own function. They are separate because they answer separate
+/// questions — what is here, what collides, what taking it over costs, what is left
+/// alone, what may be done, and where a second copy would listen — and an operator
+/// reads whichever of them their situation put in front of them.
+pub(super) fn migration(report: &MigrationReport) -> Lines {
+    let mut lines = Lines::default();
+    if !report.read {
+        // Could not look, which is not the same as found nothing, and the difference
+        // decides whether it is safe to stand anything up here.
+        lines.put("could not read what is on this machine, so nothing is ruled out".to_owned());
+        return lines;
+    }
+    standing_here(report, &mut lines);
+    clashes(report, &mut lines);
+    taking_over(report, &mut lines);
+    choices(report, &mut lines);
+    listed(
+        &report.unsupported,
+        "found, and left exactly as it is:",
+        &mut lines,
+    );
+    listed(
+        &report.not_carried,
+        "no migration carries these across:",
+        &mut lines,
+    );
+    lines.put(String::new());
+    lines.put("nothing was changed".to_owned());
+    lines
+}
+
+/// Every project already standing here, with what each service answers on.
+fn standing_here(report: &MigrationReport, lines: &mut Lines) {
+    if report.standing.is_empty() {
+        lines.put("found no other setup on this machine".to_owned());
+        return;
+    }
+    for project in &report.standing {
+        lines.put(format!("{}:", project.project));
+        for service in &project.services {
+            lines.put(format!(
+                "  {} — {}, {}",
+                service.service,
+                if service.running {
+                    "running"
+                } else {
+                    "stopped"
+                },
+                published(&service.ports)
+            ));
+        }
+    }
+}
+
+/// The ports a service answers on, or that it answers on none.
+fn published(ports: &[u16]) -> String {
+    if ports.is_empty() {
+        return "no published port".to_owned();
+    }
+    ports
+        .iter()
+        .map(u16::to_string)
+        .collect::<Vec<String>>()
+        .join(", ")
+}
+
+/// Ports lemonfiber would want that something else already holds.
+fn clashes(report: &MigrationReport, lines: &mut Lines) {
+    if report.conflicts.is_empty() {
+        return;
+    }
+    lines.put(String::new());
+    lines.put("ports lemonfiber would want that are already taken:".to_owned());
+    for clash in &report.conflicts {
+        lines.put(format!(
+            "  {} — wanted by {}, held by {}",
+            clash.port, clash.wanted_by, clash.held_by
+        ));
+    }
+}
+
+/// What taking each recognised service over would come to.
+fn taking_over(report: &MigrationReport, lines: &mut Lines) {
+    if report.carrying.is_empty() {
+        return;
+    }
+    lines.put(String::new());
+    lines.put("what taking these over would come to:".to_owned());
+    for service in &report.carrying {
+        lines.put(format!(
+            "  {} {} → {} — {}",
+            service.service,
+            service.existing,
+            service.ours,
+            cost(service.refused, service.backup_first)
+        ));
+        lines.put(format!("    {}", service.because));
+    }
+}
+
+/// What taking one service over costs, in the two words that change what can be done.
+///
+/// The refusal outranks the backup: a service lemonfiber will not open is not one an
+/// operator needs to be told to back up first.
+const fn cost(refused: bool, backup_first: bool) -> &'static str {
+    if refused {
+        "will not"
+    } else if backup_first {
+        "backup first"
+    } else {
+        "as it stands"
+    }
+}
+
+/// What may be done about what was found, and where a second copy would listen.
+fn choices(report: &MigrationReport, lines: &mut Lines) {
+    if !report.modes.is_empty() {
+        lines.put(String::new());
+        lines.put("what you can do about it:".to_owned());
+        for mode in &report.modes {
+            lines.put(format!(
+                "  {}{}",
+                mode.mode,
+                marked(mode.preselected, mode.disturbs)
+            ));
+            lines.put(format!("    {}", mode.what));
+        }
+    }
+    if report.beside.is_empty() {
+        return;
+    }
+    lines.put(String::new());
+    lines.put("running side-by-side, lemonfiber would listen on:".to_owned());
+    for moved in &report.beside {
+        lines.put(format!(
+            "  {} — {} instead of {}",
+            moved.service, moved.to, moved.from
+        ));
+    }
+}
+
+/// How a mode is marked in the list.
+///
+/// The default and the destructive one, because those are the two an operator has to
+/// tell apart before reading any further.
+const fn marked(preselected: bool, disturbs: bool) -> &'static str {
+    if preselected {
+        " (default)"
+    } else if disturbs {
+        " (stops what is running)"
+    } else {
+        ""
+    }
+}
+
+/// One list of things found, under a heading, or nothing where there are none.
+fn listed(items: &[UnsupportedReport], heading: &str, lines: &mut Lines) {
+    if items.is_empty() {
+        return;
+    }
+    lines.put(String::new());
+    lines.put(heading.to_owned());
+    for item in items {
+        lines.put(format!("  {} — {}", item.what, item.because));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::migration;
+    use lemonfiber_core::migration::carrying::not_carried;
+    use lemonfiber_core::migration::mode::offered;
+    use lemonfiber_core::model::{
+        CarryingReport, ConflictReport, MigrationReport, MovedReport, OccupantReport,
+        StandingReport, UnsupportedReport,
+    };
+
+    /// One survey with something of every kind in it.
+    fn a_survey() -> MigrationReport {
+        MigrationReport {
+            read: true,
+            standing: vec![StandingReport {
+                project: "media".to_owned(),
+                services: vec![OccupantReport {
+                    service: "sonarr".to_owned(),
+                    running: true,
+                    ports: vec![8989],
+                    adoptable: true,
+                }],
+            }],
+            conflicts: vec![ConflictReport {
+                port: 8989,
+                wanted_by: "sonarr".to_owned(),
+                held_by: "media/sonarr".to_owned(),
+            }],
+            unsupported: vec![UnsupportedReport {
+                what: "media/ombi".to_owned(),
+                because: "lemonfiber does not run this service".to_owned(),
+            }],
+            carrying: vec![
+                CarryingReport {
+                    service: "sonarr".to_owned(),
+                    existing: "4.0.1".to_owned(),
+                    ours: "4.0.2".to_owned(),
+                    verdict: "upgrade".to_owned(),
+                    because: "backed up before anything opens it".to_owned(),
+                    backup_first: true,
+                    refused: false,
+                },
+                CarryingReport {
+                    service: "radarr".to_owned(),
+                    existing: "5.9.0".to_owned(),
+                    ours: "5.0.1".to_owned(),
+                    verdict: "downgrade".to_owned(),
+                    because: "cannot open it afterwards".to_owned(),
+                    backup_first: false,
+                    refused: true,
+                },
+                CarryingReport {
+                    service: "prowlarr".to_owned(),
+                    existing: "1.0.0".to_owned(),
+                    ours: "1.0.0".to_owned(),
+                    verdict: "same".to_owned(),
+                    because: "opened exactly as it stands".to_owned(),
+                    backup_first: false,
+                    refused: false,
+                },
+            ],
+            not_carried: not_carried(),
+            modes: offered(),
+            beside: vec![MovedReport {
+                service: "sonarr".to_owned(),
+                from: 8989,
+                to: 8990,
+            }],
+        }
+    }
+
+    /// The whole point of the survey: what is here, what it holds, what cannot be
+    /// taken over, and that none of it was touched.
+    #[test]
+    fn the_survey_names_what_is_here_and_says_it_changed_nothing() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("media:"), "{text}");
+        assert!(text.contains("sonarr — running, 8989"), "{text}");
+        assert!(
+            text.contains("8989 — wanted by sonarr, held by media/sonarr"),
+            "{text}"
+        );
+        assert!(text.contains("media/ombi"), "{text}");
+        assert!(text.contains("nothing was changed"), "{text}");
+    }
+
+    /// The three verdicts read differently at a glance, because what an operator can
+    /// do about each of them differs.
+    #[test]
+    fn what_taking_a_service_over_would_come_to_is_marked_by_what_it_costs() {
+        let text = migration(&a_survey()).text();
+        assert!(
+            text.contains("sonarr 4.0.1 → 4.0.2 — backup first"),
+            "{text}"
+        );
+        assert!(text.contains("radarr 5.9.0 → 5.0.1 — will not"), "{text}");
+        assert!(
+            text.contains("prowlarr 1.0.0 → 1.0.0 — as it stands"),
+            "{text}"
+        );
+    }
+
+    /// Named rather than left to be discovered weeks later, when nothing connects the
+    /// gap back to the day the migration ran.
+    #[test]
+    fn what_no_migration_carries_across_is_stated_in_the_survey() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("no migration carries these across"), "{text}");
+        assert!(text.contains("custom formats"), "{text}");
+    }
+
+    /// Adopting is what an operator finds already chosen, and the one that stops a
+    /// working stack is marked as doing so. Both marks are the point.
+    #[test]
+    fn the_default_is_marked_and_so_is_the_one_that_stops_what_is_running() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("adopt (default)"), "{text}");
+        assert!(text.contains("replace (stops what is running)"), "{text}");
+        assert!(!text.contains("replace (default)"), "{text}");
+    }
+
+    /// Somewhere to actually reach it, or side-by-side is a word rather than an offer.
+    #[test]
+    fn running_beside_says_where_each_service_would_listen() {
+        let text = migration(&a_survey()).text();
+        assert!(text.contains("sonarr — 8990 instead of 8989"), "{text}");
+    }
+
+    /// An engine that would not answer must not read as an empty machine: the next
+    /// step after "nothing here" is standing a stack up over somebody's library.
+    #[test]
+    fn a_survey_that_could_not_look_says_so_rather_than_saying_nothing_is_here() {
+        let text = migration(&MigrationReport::default()).text();
+        assert!(
+            text.contains("could not read what is on this machine"),
+            "{text}"
+        );
+        assert!(!text.contains("no other setup"), "{text}");
+    }
+
+    /// Having looked and found nothing is an answer, and a blank screen would read as
+    /// a broken command rather than as one.
+    #[test]
+    fn a_survey_that_found_nothing_says_it_looked() {
+        let looked = MigrationReport {
+            read: true,
+            ..MigrationReport::default()
+        };
+        let text = migration(&looked).text();
+        assert!(text.contains("found no other setup"), "{text}");
+        assert!(text.contains("nothing was changed"), "{text}");
+    }
+
+    /// A service with nothing published is still standing there, and saying so is
+    /// what keeps the list a list of what is here rather than of what answers.
+    #[test]
+    fn a_service_publishing_nothing_is_still_reported() {
+        let quiet = MigrationReport {
+            read: true,
+            standing: vec![StandingReport {
+                project: "media".to_owned(),
+                services: vec![OccupantReport {
+                    service: "postgres".to_owned(),
+                    running: false,
+                    ports: Vec::new(),
+                    adoptable: false,
+                }],
+            }],
+            ..MigrationReport::default()
+        };
+        let text = migration(&quiet).text();
+        assert!(
+            text.contains("postgres — stopped, no published port"),
+            "{text}"
+        );
+    }
+}
