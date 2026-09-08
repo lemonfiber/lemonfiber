@@ -114,7 +114,7 @@ impl Reporting {
     #[must_use]
     pub fn belonging_to(mut self, project: &str) -> Self {
         for container in &mut self.containers {
-            container.project = project.to_owned();
+            project.clone_into(&mut container.project);
         }
         self
     }

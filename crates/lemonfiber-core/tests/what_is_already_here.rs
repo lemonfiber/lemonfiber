@@ -11,7 +11,7 @@
 
 mod common;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use common::stack::project;
@@ -27,6 +27,11 @@ use lemonfiber_fixtures::support::{spoke, Reporting, Scripted, SeedFs};
 
 /// A machine whose engine answers with the given containers and images.
 fn ctx(engine: Reporting, images: Arc<Pulled>) -> Ctx {
+    over(engine, images, Source::External(project()))
+}
+
+/// The same machine, reading its stack from somewhere named.
+fn over(engine: Reporting, images: Arc<Pulled>, stack: Source) -> Ctx {
     Ctx::new(
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(engine),
@@ -38,7 +43,7 @@ fn ctx(engine: Reporting, images: Arc<Pulled>) -> Ctx {
             available: 100,
             total: 1_000,
         })),
-        Source::External(project()),
+        stack,
         Settings {
             project: "lemonfiber".to_owned(),
             ..Settings::default()
@@ -97,6 +102,15 @@ async fn an_engine_that_will_not_list_reports_it_could_not_look() {
 async fn an_engine_that_will_not_say_what_it_pulled_reports_it_could_not_look() {
     let refused = Pulled::unreachable("no daemon here");
     let found = surveyed(&ctx(somebody_elses(), refused)).await;
+    let read = found.as_ref().map(|report| report.read);
+    assert_eq!(read, Some(false), "{found:?}");
+}
+
+#[tokio::test]
+async fn a_stack_whose_manifest_cannot_be_read_reports_it_could_not_look() {
+    let images = Pulled::holding(vec![Pulled::image("sonarr", 400, &["media"])]);
+    let nowhere = Source::External(Path::new("/nowhere-at-all"));
+    let found = surveyed(&over(somebody_elses(), images, nowhere)).await;
     let read = found.as_ref().map(|report| report.read);
     assert_eq!(read, Some(false), "{found:?}");
 }

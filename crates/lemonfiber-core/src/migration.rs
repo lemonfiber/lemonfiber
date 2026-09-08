@@ -275,6 +275,38 @@ mod tests {
     }
 
     #[test]
+    fn conflicts_read_lowest_port_first_whoever_holds_them() {
+        let seen = [
+            container("media", "sonarr", &[8989]),
+            container("shop", "postgres", &[7878]),
+        ];
+        let want = [
+            Wanted {
+                service: "sonarr".to_owned(),
+                port: 8989,
+            },
+            Wanted {
+                service: "radarr".to_owned(),
+                port: 7878,
+            },
+        ];
+        let found = surveyed("lemonfiber", &seen, &want, &known());
+        let order: Vec<u16> = found.conflicts.iter().map(|clash| clash.port).collect();
+        assert_eq!(order, vec![7878, 8989], "{:?}", found.conflicts);
+    }
+
+    #[test]
+    fn what_was_started_outside_compose_reads_in_a_settled_order() {
+        let images = [image(&["sonarr:1"], &[""]), image(&["plex:latest"], &[""])];
+        let known = ["sonarr".to_owned(), "plex".to_owned()];
+        let named: Vec<String> = outside_compose(&images, &known)
+            .into_iter()
+            .map(|item| item.what)
+            .collect();
+        assert_eq!(named, vec!["plex:latest".to_owned(), "sonarr:1".to_owned()]);
+    }
+
+    #[test]
     fn a_port_nobody_else_holds_is_not_a_conflict() {
         let seen = [container("media", "sonarr", &[8989])];
         let want = [Wanted {
@@ -341,6 +373,26 @@ mod tests {
         let images = [image(&["plex:latest"], &["media"])];
         let named = outside_compose(&images, &pulled());
         assert!(named.is_empty(), "{named:?}");
+    }
+
+    #[test]
+    fn an_image_named_without_a_version_is_still_recognised() {
+        let images = [image(&["plex"], &[""])];
+        let named = outside_compose(&images, &pulled());
+        let what = named.first().map(|item| item.what.clone());
+        assert_eq!(what, Some("plex".to_owned()), "{named:?}");
+    }
+
+    #[test]
+    fn a_registry_carrying_its_own_port_is_not_read_as_a_version() {
+        let images = [image(&["example.test:5000/plex:1.2"], &[""])];
+        let named = outside_compose(&images, &["example.test:5000/plex".to_owned()]);
+        let what = named.first().map(|item| item.what.clone());
+        assert_eq!(
+            what,
+            Some("example.test:5000/plex:1.2".to_owned()),
+            "{named:?}"
+        );
     }
 
     #[test]
