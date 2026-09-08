@@ -48,6 +48,89 @@
         }
       }
     },
+    "alerts": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/AlertReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "AlertReport": {
+          "description": "What the operator will be told about, and what changing it came to.",
+          "type": "object",
+          "properties": {
+            "changed": {
+              "description": "Whether this call changed the answer.",
+              "type": "boolean"
+            },
+            "exceptions": {
+              "description": "Events set apart from the preset, quietest name first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionReport"
+              }
+            },
+            "means": {
+              "description": "What that preset means, in the operator's terms.",
+              "type": "string"
+            },
+            "preset": {
+              "description": "The preset in force for events with no exception of their own.",
+              "type": "string"
+            },
+            "rehearsed": {
+              "description": "Whether it only reported what it would have written.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "preset",
+            "means",
+            "exceptions",
+            "changed",
+            "rehearsed"
+          ]
+        },
+        "ExceptionReport": {
+          "description": "One event kind the operator set apart from the preset.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "description": "The kind of event, by the name a finding gives it.",
+              "type": "string"
+            },
+            "wanted": {
+              "description": "Whether it is heard about, whatever the preset would say.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "wanted"
+          ]
+        }
+      }
+    },
     "archives": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

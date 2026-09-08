@@ -16,8 +16,9 @@ use std::path::PathBuf;
 use crate::alert::Wants;
 use crate::config::store;
 use crate::error::{Diagnose, Problem};
+use crate::model::{AlertReport, ExceptionReport};
 
-use super::Ctx;
+use super::{AlertAction, Ctx, Outcome};
 
 /// What the operator asked to hear about, or the quiet default where they have not
 /// said and where the answer cannot be read.
@@ -41,6 +42,49 @@ pub fn record(ctx: &Ctx, wants: &Wants) -> Result<(), Box<Problem>> {
         .map_err(|failure| Box::new(failure.problem()))
 }
 
+/// Show what the operator will be told about, or change it.
+///
+/// The preset is an answer setup asks for once. Without this it could not be revised at
+/// all — the file is written when setup applies and read whenever a digest is built, and
+/// nothing in between could change it. A decision made once and then unchangeable is a
+/// trap, whatever its default.
+///
+/// Taking a preset leaves the individual exceptions in place: a broader answer is not a
+/// reason to discard the specific ones already given.
+///
+/// # Errors
+///
+/// Where there is nowhere configured to keep the answer, or it cannot be written.
+pub fn hearing(ctx: &Ctx, action: AlertAction) -> Result<Outcome, Box<Problem>> {
+    let mut wants = recorded(ctx);
+    let changed = match action {
+        AlertAction::Show => false,
+        AlertAction::Set(preset) => {
+            wants.choose(preset);
+            // A rehearsal reports the answer it would have kept without keeping it,
+            // which is what `--dry-run` means everywhere.
+            if !ctx.dry_run {
+                record(ctx, &wants)?;
+            }
+            !ctx.dry_run
+        }
+    };
+    let preset = Wants::appetite(&wants);
+    Ok(Outcome::Alerts(AlertReport {
+        preset: preset.written().to_owned(),
+        means: preset.describe().to_owned(),
+        exceptions: wants
+            .exceptions()
+            .map(|(kind, wanted)| ExceptionReport {
+                kind: kind.to_owned(),
+                wanted,
+            })
+            .collect(),
+        changed,
+        rehearsed: ctx.dry_run,
+    }))
+}
+
 /// Where the answer is kept: beside the environment file, in the configuration
 /// directory a backup captures, or nowhere when nothing is configured. Equal to
 /// [`crate::config::paths::Paths::notifications`].
@@ -50,9 +94,74 @@ fn path(ctx: &Ctx) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{record, recorded};
+    use super::{hearing, record, recorded};
     use crate::alert::{Appetite, Wants};
+    use crate::app::{AlertAction, Outcome};
     use crate::test_support::a_context;
+
+    /// The whole outcome as text, so a test can assert on the words in it without a
+    /// branch for the shape it never has.
+    fn said(outcome: &Result<Outcome, Box<crate::error::Problem>>) -> String {
+        format!("{outcome:?}")
+    }
+
+    #[tokio::test]
+    async fn the_preset_setup_chose_can_be_taken_again_afterwards() {
+        // The whole point: setup asks once, and without this there is no second time.
+        let ctx = ctx_at("revised");
+        let shown = hearing(&ctx, AlertAction::Show);
+        let text = said(&shown);
+        assert!(text.contains("preset: \"problems-only\""), "{text}");
+
+        let set = hearing(&ctx, AlertAction::Set(Appetite::Everything));
+        let text = said(&set);
+        assert!(text.contains("preset: \"everything\""), "{text}");
+
+        // Kept, rather than reported and lost: the next run reads the same answer.
+        assert_eq!(
+            Wants::appetite(&recorded(&ctx)),
+            Appetite::Everything,
+            "the answer did not survive the call that made it"
+        );
+    }
+
+    #[tokio::test]
+    async fn taking_a_preset_leaves_the_exceptions_set_apart_from_it() {
+        // A broader answer is not a reason to discard the specific ones already given.
+        let ctx = ctx_at("exceptions");
+        let mut wants = Wants::preset(Appetite::ProblemsOnly);
+        wants.set("storage.space", true);
+        assert!(record(&ctx, &wants).is_ok());
+
+        let taken = hearing(&ctx, AlertAction::Set(Appetite::Everything));
+        let text = said(&taken);
+        assert!(text.contains("preset: \"everything\""), "{text}");
+        let kept = recorded(&ctx);
+        assert_eq!(kept.exceptions().count(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_rehearsal_reports_the_answer_it_would_keep_without_keeping_it() {
+        let mut ctx = ctx_at("rehearsed");
+        ctx.dry_run = true;
+        let would = hearing(&ctx, AlertAction::Set(Appetite::Everything));
+        let text = said(&would);
+        assert!(text.contains("preset: \"everything\""), "{text}");
+        // Reported, not written — the next run still reads the quiet default.
+        assert_eq!(
+            Wants::appetite(&recorded(&ctx)),
+            Appetite::default_appetite()
+        );
+    }
+
+    #[tokio::test]
+    async fn with_nowhere_to_keep_it_a_change_says_so_rather_than_seeming_to_work() {
+        let ctx = ctx_with(None);
+        assert!(hearing(&ctx, AlertAction::Set(Appetite::Everything)).is_err());
+        // Reading still answers: the quiet default is a safe thing to fall back to,
+        // where silently losing a change the operator made is not.
+        assert!(hearing(&ctx, AlertAction::Show).is_ok());
+    }
 
     /// Where a test's scratch answer lives. Naming it does not touch it.
     fn scratch(name: &str) -> std::path::PathBuf {

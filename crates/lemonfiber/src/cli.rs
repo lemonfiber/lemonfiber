@@ -4,6 +4,7 @@
 //! dispatcher that routes them and the translation that turns them into the core's
 //! own commands. A flag is added here; what it does is added next door.
 
+mod allowance;
 mod bandwidth;
 mod credentials;
 mod removing;
@@ -13,16 +14,19 @@ mod setup;
 
 use std::path::PathBuf;
 
-use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand};
 
 mod under;
 
 use include_dir::{include_dir, Dir};
-pub use under::{ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand};
+pub use under::{
+    AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
+};
 
 // Re-exported rather than reached for through the module they now live in: where a
 // flag is declared is this file's business and nobody else's, and moving one would
 // otherwise be a change at every call site that names it.
+pub use allowance::{RawAllowance, RawUnrated};
 pub use bandwidth::RawBandwidth;
 pub use credentials::RawCredentials;
 pub use removing::{RawRemoval, RawRemoving};
@@ -81,41 +85,6 @@ pub struct Cli {
 #[must_use]
 pub fn help() -> String {
     Cli::command().render_long_help().to_string()
-}
-
-/// What an invitation lets the person it is for watch, as the command line spells it.
-///
-/// Flattened rather than sat on the request as three fields, because they are one
-/// decision taken at one moment and the core carries them as one value — and three
-/// fields here would be a request the translation next door had to put back together.
-#[derive(Debug, Args)]
-pub struct RawAllowance {
-    /// Let them watch only these libraries, named as the media server names them;
-    /// none lets them watch all of them.
-    #[arg(long = "library", value_name = "NAME")]
-    pub libraries: Vec<String>,
-    /// Hold back anything the media server rates above this age — 0, 7, 12, 15 and
-    /// 18 are the steps offered; none sets no limit at all.
-    #[arg(long, value_name = "AGE")]
-    pub age_limit: Option<u32>,
-    /// What to do about content the media server has no rating for; anybody being
-    /// narrowed has it held back unless this says otherwise.
-    #[arg(long, value_name = "CHOICE")]
-    pub unrated: Option<RawUnrated>,
-}
-
-/// What is to happen to content the media server has no rating for.
-///
-/// Offered as two words rather than as a switch, because a switch has a default the
-/// operator cannot see and this choice has a cost either way: holding it back makes
-/// legitimate content invisible, and letting it through lets through the one thing
-/// nobody rated.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum RawUnrated {
-    /// Hold it back.
-    Block,
-    /// Let it through.
-    Allow,
 }
 
 /// What the operator asked for.
@@ -221,6 +190,12 @@ pub enum Request {
         /// Which of the three things to do with a setting.
         #[command(subcommand)]
         action: ConfigAction,
+    },
+    /// Choose how much lemonfiber tells you about, in plain language.
+    Alerts {
+        /// Show what you are told about, or change it.
+        #[command(subcommand)]
+        action: AlertCommand,
     },
     /// Choose how good your media should look, in plain language.
     Quality {

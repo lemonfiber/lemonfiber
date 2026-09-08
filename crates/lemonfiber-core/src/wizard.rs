@@ -726,6 +726,60 @@ mod tests {
         assert_eq!(setting(&plan, "JELLYFIN_MODE"), Some("docker"));
     }
 
+    /// Every answer setup writes has a row saying what changing it costs.
+    ///
+    /// What holds the catalogue to the wizard. A setting setup starts writing without
+    /// one is a decision the operator can make and cannot be told the price of, which
+    /// is the trap A4 exists to close — and it would be closed silently, since nothing
+    /// else notices a missing row.
+    #[test]
+    fn every_answer_setup_writes_is_catalogued_as_a_decision() {
+        // Not decisions: nobody chooses these. They record what proving the credential
+        // came to, so there is no cost to state for changing one.
+        const RECORDED_RATHER_THAN_CHOSEN: [&str; 2] = [
+            crate::config::INDEXER_VALIDATED_KEY,
+            crate::config::PROVIDER_VALIDATED_KEY,
+        ];
+
+        let mut wizard = on_native_linux();
+        answer_all(&mut wizard);
+        wizard
+            .answer(Answer::Credentials(Some(super::Indexer {
+                url: "http://indexer.test/api".to_owned(),
+                key: "the-key".to_owned(),
+                validated: true,
+            })))
+            .unwrap_or(());
+        wizard
+            .answer(Answer::Provider(Some(super::Provider {
+                host: "news.provider.test".to_owned(),
+                port: 563,
+                user: "person".to_owned(),
+                pass: "the-login".to_owned(),
+                tls: true,
+                validated: true,
+            })))
+            .unwrap_or(());
+
+        let plan = wizard.plan();
+        let unpriced: Vec<&str> = plan
+            .settings()
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .filter(|name| !RECORDED_RATHER_THAN_CHOSEN.contains(name))
+            .filter(|name| crate::reconfigure::decision(name).is_none())
+            .collect();
+        assert!(
+            unpriced.is_empty(),
+            "setup writes these and nothing says what changing them costs: {unpriced:?}"
+        );
+        // An empty plan would pass the filter above without proving anything.
+        assert!(
+            plan.settings().len() > 10,
+            "a plan this small is not exercising the writer"
+        );
+    }
+
     #[test]
     fn every_setting_a_plan_writes_is_one_lemonfiber_declares() {
         // What holds the writer to `config::SETTINGS`. That list is what the guard on

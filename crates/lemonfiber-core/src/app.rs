@@ -13,10 +13,10 @@ use crate::doctor::Narrowing;
 use crate::error::{Code, Diagnose, Problem};
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
-    kind, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport, HostingReport,
-    HouseholdReport, LifecycleReport, MusicReport, QualityReport, ResetReport, StatusReport,
-    StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
-    WizardReport,
+    kind, AlertReport, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport,
+    HostingReport, HouseholdReport, LifecycleReport, MusicReport, QualityReport, ResetReport,
+    StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
+    WalkthroughReport, WizardReport,
 };
 use crate::stack::closure::Plan;
 use crate::stack::compose::Action;
@@ -76,8 +76,8 @@ mod walkthrough;
 pub mod watch;
 
 pub use command::{
-    Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Hostable,
-    Keeping, QualityAction, Removing, HOSTABLE,
+    AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
+    Hostable, Keeping, QualityAction, Removing, HOSTABLE,
 };
 pub use ctx::Ctx;
 pub use setup::SetupAction;
@@ -110,6 +110,8 @@ pub enum Outcome {
     Config(ConfigReport),
     /// The quality choice, what it means, and what a command did with it.
     Quality(QualityReport),
+    /// What the operator is told about, and what changing it came to.
+    Alerts(AlertReport),
     /// What upgrading existing content did, or would do, and its stated cost.
     Upgrade(UpgradeReport),
     /// The music format chosen, and what became of applying it.
@@ -187,6 +189,7 @@ impl Outcome {
             Self::Lifecycle(_) => crate::model::kind::LIFECYCLE,
             Self::Config(_) => crate::model::kind::CONFIG,
             Self::Quality(_) => kind::QUALITY,
+            Self::Alerts(_) => kind::ALERTS,
             Self::Upgrade(_) => kind::UPGRADE,
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
@@ -233,6 +236,7 @@ impl serde::Serialize for Outcome {
             Self::Lifecycle(report) => report.serialize(serializer),
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
+            Self::Alerts(report) => report.serialize(serializer),
             Self::Upgrade(report) => report.serialize(serializer),
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),
@@ -435,6 +439,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         }
         Command::ConfigShow => configuring::configuration(ctx, None, None),
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
+        Command::Alerts(action) => appetite::hearing(ctx, action),
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace {
             term,
@@ -545,9 +550,9 @@ mod tests {
     use crate::doctor::Narrowing;
 
     use super::{
-        dispatch, pull_progress, Allowance, Answer as Ruling, Asking, BandwidthAsked, Chosen,
-        Command, Ctx, Decision, Outcome, QualityAction, Removing, SetupAction, VersionReport,
-        Waiting,
+        dispatch, pull_progress, AlertAction, Allowance, Answer as Ruling, Asking, BandwidthAsked,
+        Chosen, Command, Ctx, Decision, Outcome, QualityAction, Removing, SetupAction,
+        VersionReport, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -2283,6 +2288,18 @@ mod tests {
 
     /// Asking about the line arrives at the command that answers about it.
     ///
+    /// Asking what you are told about reaches the command that answers it.
+    ///
+    /// Dispatched here as well as from `tests/`: the arm is a line of each copy of this
+    /// file, and the copy that never dispatched it counts the arm as never run.
+    #[tokio::test]
+    async fn asking_what_you_are_told_about_reaches_the_command_that_reads_it() {
+        let ctx = a_context().build();
+        let read = dispatch(Command::Alerts(AlertAction::Show), &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Alerts(_)));
+        assert!(answered, "{read:?}");
+    }
+
     /// Reading what the stack holds reaches the command that answers it.
     ///
     /// Dispatched here as well as from `tests/` for the same reason as the line
@@ -2350,6 +2367,7 @@ mod tests {
             Ok(Outcome::Lifecycle(report)) => Some(report),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Config(_)
@@ -2398,6 +2416,7 @@ mod tests {
             Ok(Outcome::Doctor(report)) => Some(report),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -3228,6 +3247,7 @@ mod tests {
             ),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -4230,6 +4250,7 @@ mod tests {
             ),
             Ok(
                 Outcome::Version(_)
+                | Outcome::Alerts(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)

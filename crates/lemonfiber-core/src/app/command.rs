@@ -12,11 +12,13 @@ use crate::quality::Preset;
 
 use super::{bundle, repair, restore, setup::SetupAction, support, Waiting};
 
+mod alerts;
 mod credentials;
 mod hosting;
 mod household;
 mod uninstall;
 
+pub use alerts::AlertAction;
 pub use credentials::Asking;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
@@ -173,6 +175,9 @@ pub enum Command {
     /// Show or change the quality preset — how good media should look, and how
     /// much disk it should cost — in plain language.
     Quality(QualityAction),
+    /// Show or change what the operator is told about, which setup asks for once
+    /// and nothing else could revise.
+    Alerts(AlertAction),
     /// Upgrade existing content to the chosen preset — a separate, explicit action
     /// whose bandwidth cost is stated, and which does nothing until confirmed. Its
     /// own command rather than a quality action because it reaches the services

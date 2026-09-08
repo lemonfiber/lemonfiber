@@ -21,6 +21,7 @@ Commands:
   ps            Report what each service is actually doing
   logs          Show what services are saying
   config        Read or change one setting
+  alerts        Choose how much lemonfiber tells you about, in plain language
   quality       Choose how good your media should look, in plain language
   doctor        Run the checks that prove the stack is doing what it should
   watch         Guard the data location while forms run, stopping them if it disappears
@@ -537,6 +538,87 @@ Options:
 Show every setting, with credentials withheld
 
 Usage: lemonfiber config show [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help
+```
+
+## `lemonfiber alerts`
+
+```text
+Choose how much lemonfiber tells you about, in plain language
+
+Usage: lemonfiber alerts [OPTIONS] <COMMAND>
+
+Commands:
+  show  Show what you are told about, and what else you could be
+  set   Choose how much to be told
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help
+```
+
+## `lemonfiber alerts show`
+
+```text
+Show what you are told about, and what else you could be
+
+Usage: lemonfiber alerts show [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help
+```
+
+## `lemonfiber alerts set`
+
+```text
+Choose how much to be told
+
+Usage: lemonfiber alerts set [OPTIONS] <PRESET>
+
+Arguments:
+  <PRESET>
+          How much to hear: problems-only, with-completions, or everything
 
 Options:
       --json

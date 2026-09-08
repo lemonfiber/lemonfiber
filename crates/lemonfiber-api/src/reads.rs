@@ -30,7 +30,9 @@
 
 mod asked;
 
-use lemonfiber_core::app::{Asking, BandwidthAsked, Command, Keeping, QualityAction, Removing};
+use lemonfiber_core::app::{
+    AlertAction, Asking, BandwidthAsked, Command, Keeping, QualityAction, Removing,
+};
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::uninstall::Tier;
@@ -104,6 +106,12 @@ pub const STORED: &str = "/api/stored";
 /// whatever is caching in between, which is exactly the disclosure the inventory
 /// itself is shaped to make impossible.
 pub const CREDENTIALS: &str = "/api/credentials";
+
+/// What the operator is told about, and what each preset means.
+///
+/// The reading only. Changing it is an act on what reaches somebody, so it belongs
+/// behind a named action rather than a door a browser opens by asking.
+pub const ALERTS: &str = "/api/alerts";
 
 /// Where the disk stands, where the room went, and what could be got back.
 ///
@@ -189,6 +197,7 @@ pub const OFFERED: &[&str] = &[
     SPACE,
     BANDWIDTH,
     CLIENTS,
+    ALERTS,
     CREDENTIALS,
 ];
 
@@ -305,6 +314,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // The reading and nothing else. What is asked here is fixed rather than taken
         // from the request, so no caller can turn this door into the one that prints a
         // credential.
+        ALERTS => Ok(Command::Alerts(AlertAction::Show)),
         CREDENTIALS => Ok(Command::Credentials(Asking::Read)),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an

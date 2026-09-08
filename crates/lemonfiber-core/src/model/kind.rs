@@ -38,6 +38,8 @@ impl std::fmt::Display for Kind {
 
 /// A session opened by proving the operator's password.
 pub const ADMISSION: Kind = Kind("admission");
+/// What the operator will be told about, and what changing it came to.
+pub const ALERTS: Kind = Kind("alerts");
 /// The backup archives this machine has kept.
 pub const ARCHIVES: Kind = Kind("archives");
 /// Where a backup archive was written, and what it covers.
@@ -137,6 +139,7 @@ pub const WORD: Kind = Kind("word");
 /// Every kind, so the contract cannot describe one that is never emitted.
 pub const ALL: &[Kind] = &[
     ADMISSION,
+    ALERTS,
     ARCHIVES,
     BACKUP,
     BANDWIDTH,

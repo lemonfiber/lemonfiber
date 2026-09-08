@@ -38,7 +38,7 @@ mod uninstall;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{ConfigReport, FormsReport, VersionReport, WizardReport};
+use lemonfiber_core::model::{AlertReport, ConfigReport, FormsReport, VersionReport, WizardReport};
 use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
@@ -216,6 +216,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Forms(report) => forms(report),
         Outcome::Preview(plan) => stack::preview(plan),
         Outcome::Config(report) => settings(report),
+        Outcome::Alerts(report) => alerts(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
         Outcome::Music(report) => quality::music(report),
@@ -337,6 +338,36 @@ fn forms(report: &FormsReport) -> Lines {
     lines
 }
 
+/// What the operator is told about, what that means, and anything set apart from it.
+fn alerts(report: &AlertReport) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("telling you about: {}", report.preset));
+    lines.put(report.means.clone());
+    for exception in &report.exceptions {
+        // Named apart from the preset, so the operator can see why one kind does not
+        // follow the answer they just read.
+        lines.put(format!(
+            "  {} — {}",
+            exception.kind,
+            if exception.wanted {
+                "always told"
+            } else {
+                "never told"
+            }
+        ));
+    }
+    if report.changed {
+        lines.put(String::new());
+        // A rehearsal reports what it would do, so it must not claim it saved.
+        lines.put(if report.rehearsed {
+            "would save"
+        } else {
+            "saved"
+        });
+    }
+    lines
+}
+
 /// What the operator has configured.
 fn settings(report: &ConfigReport) -> Lines {
     let mut lines = Lines::default();
@@ -400,9 +431,9 @@ mod tests {
     use lemonfiber_core::doctor::Overall;
     use lemonfiber_core::glossary::Vocabulary;
     use lemonfiber_core::model::{
-        ConfigReport, Disposition, DoctorReport, FormsReport, FrontDoorReport, HouseholdReport,
-        MusicReport, QualityReport, ResetReport, SettingReport, Standing, StatusReport,
-        StuckReport, UpgradeReport, VersionReport, WizardReport,
+        AlertReport, ConfigReport, Disposition, DoctorReport, ExceptionReport, FormsReport,
+        FrontDoorReport, HouseholdReport, MusicReport, QualityReport, ResetReport, SettingReport,
+        Standing, StatusReport, StuckReport, UpgradeReport, VersionReport, WizardReport,
     };
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -436,6 +467,49 @@ mod tests {
 
     /// The case this exists for. The container writes the line, the terminal reads
     /// the escape, and the screen stops saying what this product said.
+    /// An event set apart from the preset reads as the answer it was given, and a
+    /// rehearsal says it would save rather than that it did.
+    ///
+    /// Both halves of both branches: a renderer that says "always told" for an event
+    /// switched off, or "saved" for a run that wrote nothing, is wrong in the direction
+    /// the operator has no way to check.
+    #[test]
+    fn an_event_set_apart_reads_as_the_answer_it_was_given() {
+        let told = super::alerts(&AlertReport {
+            preset: "problems-only".to_owned(),
+            means: "Told when something is wrong.".to_owned(),
+            exceptions: vec![
+                ExceptionReport {
+                    kind: "storage.space".to_owned(),
+                    wanted: true,
+                },
+                ExceptionReport {
+                    kind: "queue.stalled".to_owned(),
+                    wanted: false,
+                },
+            ],
+            changed: true,
+            rehearsed: true,
+        })
+        .text();
+        assert!(told.contains("storage.space — always told"), "{told}");
+        assert!(told.contains("queue.stalled — never told"), "{told}");
+        assert!(told.contains("would save"), "{told}");
+
+        // A reading changes nothing, so it says nothing about saving — the branch the
+        // three assertions above never enter.
+        let read = super::alerts(&AlertReport {
+            preset: "everything".to_owned(),
+            means: "Told about everything.".to_owned(),
+            exceptions: Vec::new(),
+            changed: false,
+            rehearsed: false,
+        })
+        .text();
+        assert!(read.contains("telling you about: everything"), "{read}");
+        assert!(!read.contains("save"), "{read}");
+    }
+
     #[test]
     fn a_container_cannot_clear_the_screen_through_its_own_log_line() {
         let said = logged("sonarr", "starting\u{1b}[2Jup");
@@ -669,6 +743,16 @@ mod tests {
                 changed: false,
                 rehearsed: false,
                 consequence: None,
+            }),
+            Outcome::Alerts(AlertReport {
+                preset: "problems-only".to_owned(),
+                means: "Told when something is wrong. Silence means healthy.".to_owned(),
+                exceptions: vec![ExceptionReport {
+                    kind: "storage.space".to_owned(),
+                    wanted: true,
+                }],
+                changed: true,
+                rehearsed: false,
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],

@@ -104,6 +104,13 @@ fn stated(
     if key == Some(crate::config::FRONT_DOOR_KEY) {
         return Some(crate::door::KEPT.to_owned());
     }
+    // Every answer setup wrote says what changing it affects, and the catalogue is the
+    // one place that knows. A surface that writes a setting cannot then state a cost
+    // the rest of the product disagrees with, and a decision nobody catalogued says
+    // nothing rather than a guess.
+    if let Some(entry) = key.and_then(crate::reconfigure::decision) {
+        return Some(format!("changing this affects {}", entry.affects));
+    }
     before
         .and_then(|before| super::seeding::on_change(before, &port_forward_from_env(file)))
         .filter(|_| ctx.settings.protocols.torrent)
@@ -170,8 +177,43 @@ mod tests {
         // attached to a change that did not touch it reads as a warning nobody
         // caused, which is how operators learn to ignore them.
         let ctx = ctx(env_at("unrelated", "VPN_PORT_FORWARDING=off\n"));
-        let said = consequence(configuration(&ctx, Some("LEMONFIBER_USENET"), Some("on")));
-        assert_eq!(said, None);
+        let said = consequence(configuration(&ctx, Some("LEMONFIBER_USENET"), Some("on")))
+            .unwrap_or_default();
+        // Turning Usenet on has a consequence of its own — what it opens and what it
+        // takes away — and the sentence is that one rather than the seeding sentence
+        // sitting next to it.
+        assert!(said.contains("whether Usenet runs"), "{said}");
+        assert!(!said.contains(crate::app::seeding::COST), "{said}");
+    }
+
+    #[test]
+    fn moving_the_data_location_says_what_it_affects_as_it_is_written() {
+        // The sharpest change in the product: every *arr holds absolute paths to its
+        // root folders, and an operator told this afterwards has already lost the
+        // library the telling was for.
+        let ctx = ctx(env_at("moved", "DATA_ROOT=/srv/old\n"));
+        let said = consequence(configuration(
+            &ctx,
+            Some(crate::config::DATA_ROOT_KEY),
+            Some("/srv/new"),
+        ))
+        .unwrap_or_default();
+        assert!(said.contains("points at nothing"), "{said}");
+    }
+
+    #[test]
+    fn a_setting_setup_never_asked_about_says_nothing_it_cannot_stand_behind() {
+        // A cost invented for a setting whose consequences nobody worked out is worse
+        // than silence: it teaches the operator to dismiss the ones that mean something.
+        let ctx = ctx(env_at("unasked", ""));
+        assert_eq!(
+            consequence(configuration(
+                &ctx,
+                Some("LEMONFIBER_EXPLANATIONS"),
+                Some("on")
+            )),
+            None
+        );
     }
 
     #[test]
