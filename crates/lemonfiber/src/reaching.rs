@@ -173,6 +173,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/alerts",
     },
     Reach {
+        request: "migrate",
+        through: "/api/migration",
+    },
+    Reach {
         request: "credentials",
         through: "/api/credentials",
     },

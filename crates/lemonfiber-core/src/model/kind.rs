@@ -82,6 +82,8 @@ pub const JOB: Kind = Kind("job");
 pub const LIFECYCLE: Kind = Kind("lifecycle");
 /// One line of a service's log.
 pub const LOG: Kind = Kind("log");
+/// What is already on this machine, before anything is proposed.
+pub const MIGRATION: Kind = Kind("migration");
 /// The music format chosen, and what became of applying it.
 pub const MUSIC: Kind = Kind("music");
 /// Everything that leaves this machine, and what the stack's own services reach.
@@ -160,6 +162,7 @@ pub const ALL: &[Kind] = &[
     JOB,
     LIFECYCLE,
     LOG,
+    MIGRATION,
     MUSIC,
     OUTBOUND,
     PREVIEW,

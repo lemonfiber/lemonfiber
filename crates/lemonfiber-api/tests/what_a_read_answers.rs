@@ -778,3 +778,14 @@ async fn where_the_disk_went_carries_the_volume_and_takes_nothing() {
         "the account a browser is served, with nothing taken"
     );
 }
+
+/// The survey a migration opens with, reachable without asking for anything to change.
+#[tokio::test]
+async fn what_is_already_here_is_answered_under_its_own_kind() {
+    let seen = asked(world(running(), stack()), "/api/migration").await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"migration","data":{"read":"#)),
+        "what is already on this machine, under the migration kind"
+    );
+}

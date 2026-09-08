@@ -13,6 +13,7 @@ Commands:
   setup         Set up the stack by answering a few questions
   version       Report the versions in play
   forms         List the forms this stack has, and what each one is for
+  migrate       See what is already on this machine, without changing any of it
   up            Start a form, or the union of several
   down          Stop and remove what a form started
   switch        Make these forms the active set, leaving shared services running
@@ -196,6 +197,32 @@ Usage: lemonfiber forms [OPTIONS] [FORMS]...
 Arguments:
   [FORMS]...
           The forms to describe; none lists them all
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber migrate`
+
+```text
+See what is already on this machine, without changing any of it.
+
+Reports the stacks already standing here, the ports they hold that lemonfiber would want, and anything it could not take over as it stands. Nothing is started, stopped, moved, or written.
+
+Usage: lemonfiber migrate [OPTIONS]
 
 Options:
       --json
