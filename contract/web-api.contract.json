@@ -6453,6 +6453,171 @@
         }
       }
     },
+    "migration": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/MigrationReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "ConflictReport": {
+          "description": "A port lemonfiber wants for a service that something else already answers on.",
+          "type": "object",
+          "properties": {
+            "held_by": {
+              "description": "The project already holding it.",
+              "type": "string"
+            },
+            "port": {
+              "description": "The host port both want.",
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "wanted_by": {
+              "description": "The lemonfiber service that would publish it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "port",
+            "wanted_by",
+            "held_by"
+          ]
+        },
+        "MigrationReport": {
+          "description": "What is already on this machine, before anything is proposed.",
+          "type": "object",
+          "properties": {
+            "conflicts": {
+              "description": "Ports wanted by lemonfiber that an existing service already holds.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ConflictReport"
+              }
+            },
+            "read": {
+              "description": "Whether the engine answered at all.\n\nFalse means the survey found nothing because it could not look, which is a\ndifferent answer from finding nothing, and the only one that must never be\nread as an empty machine.",
+              "type": "boolean"
+            },
+            "standing": {
+              "description": "Existing projects, by project name.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StandingReport"
+              }
+            },
+            "unsupported": {
+              "description": "What was found and cannot be adopted.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/UnsupportedReport"
+              }
+            }
+          },
+          "required": [
+            "read",
+            "standing",
+            "conflicts",
+            "unsupported"
+          ]
+        },
+        "OccupantReport": {
+          "description": "One container of somebody else's stack, as the engine reports it.",
+          "type": "object",
+          "properties": {
+            "adoptable": {
+              "description": "Whether lemonfiber knows this service and could take it over as it stands.",
+              "type": "boolean"
+            },
+            "ports": {
+              "description": "Every host port it publishes, lowest first.",
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0
+              }
+            },
+            "running": {
+              "description": "Whether it is running now, as against present but stopped.",
+              "type": "boolean"
+            },
+            "service": {
+              "description": "The Compose service name it answers to.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "running",
+            "ports",
+            "adoptable"
+          ]
+        },
+        "StandingReport": {
+          "description": "One Compose project on this machine that is not lemonfiber's.",
+          "type": "object",
+          "properties": {
+            "project": {
+              "description": "The Compose project name.",
+              "type": "string"
+            },
+            "services": {
+              "description": "Its containers, by service name.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OccupantReport"
+              }
+            }
+          },
+          "required": [
+            "project",
+            "services"
+          ]
+        },
+        "UnsupportedReport": {
+          "description": "Something found that lemonfiber cannot take over, named rather than passed over.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why it cannot be adopted, in the operator's terms.",
+              "type": "string"
+            },
+            "what": {
+              "description": "What was found, by the name the engine gives it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "because"
+          ]
+        }
+      }
+    },
     "music": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

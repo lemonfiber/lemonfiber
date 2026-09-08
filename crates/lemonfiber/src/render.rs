@@ -38,7 +38,9 @@ mod uninstall;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{AlertReport, ConfigReport, FormsReport, VersionReport, WizardReport};
+use lemonfiber_core::model::{
+    AlertReport, ConfigReport, FormsReport, MigrationReport, VersionReport, WizardReport,
+};
 use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
@@ -217,6 +219,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Preview(plan) => stack::preview(plan),
         Outcome::Config(report) => settings(report),
         Outcome::Alerts(report) => alerts(report),
+        Outcome::Migration(report) => migration(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
         Outcome::Music(report) => quality::music(report),
@@ -365,6 +368,60 @@ fn alerts(report: &AlertReport) -> Lines {
             "saved"
         });
     }
+    lines
+}
+
+/// What is already on this machine, before anything is proposed.
+fn migration(report: &MigrationReport) -> Lines {
+    let mut lines = Lines::default();
+    if !report.read {
+        // Could not look, which is not the same as found nothing, and the difference
+        // decides whether it is safe to stand anything up here.
+        lines.put("could not read what is on this machine, so nothing is ruled out".to_owned());
+        return lines;
+    }
+    if report.standing.is_empty() {
+        lines.put("found no other setup on this machine".to_owned());
+    }
+    for project in &report.standing {
+        lines.put(format!("{}:", project.project));
+        for service in &project.services {
+            let ports = if service.ports.is_empty() {
+                "no published port".to_owned()
+            } else {
+                let named: Vec<String> = service.ports.iter().map(u16::to_string).collect();
+                named.join(", ")
+            };
+            lines.put(format!(
+                "  {} — {}, {ports}",
+                service.service,
+                if service.running {
+                    "running"
+                } else {
+                    "stopped"
+                }
+            ));
+        }
+    }
+    if !report.conflicts.is_empty() {
+        lines.put(String::new());
+        lines.put("ports lemonfiber would want that are already taken:".to_owned());
+        for clash in &report.conflicts {
+            lines.put(format!(
+                "  {} — wanted by {}, held by {}",
+                clash.port, clash.wanted_by, clash.held_by
+            ));
+        }
+    }
+    if !report.unsupported.is_empty() {
+        lines.put(String::new());
+        lines.put("found, and left exactly as it is:".to_owned());
+        for item in &report.unsupported {
+            lines.put(format!("  {} — {}", item.what, item.because));
+        }
+    }
+    lines.put(String::new());
+    lines.put("nothing was changed".to_owned());
     lines
 }
 

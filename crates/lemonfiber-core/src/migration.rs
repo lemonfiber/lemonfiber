@@ -1,0 +1,412 @@
+//! What is already on this machine, read before anything is proposed.
+//!
+//! Migration opens as a survey. lemonfiber looks for an existing setup and states what it
+//! found; nothing here writes, and nothing here chooses. Reading is kept apart from
+//! acting so that looking can never be the step that breaks a working stack.
+//!
+//! Nothing in this module can reach an engine. It is given what was read and returns
+//! what that amounts to, which is what lets the whole survey be exercised against
+//! arrangements that would take a machine-day to stand up for real.
+
+use std::collections::BTreeMap;
+
+use crate::model::{
+    ConflictReport, MigrationReport, OccupantReport, StandingReport, UnsupportedReport,
+};
+use crate::ports::docker::{Container, Image, Lifecycle};
+
+/// A port lemonfiber's own stack would publish, and the service that would publish it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Wanted {
+    /// The lemonfiber service, by its manifest id.
+    pub service: String,
+    /// The host port it would answer on.
+    pub port: u16,
+}
+
+/// What is already here, given what the engine reported.
+///
+/// `ours` is lemonfiber's own Compose project, which is excluded: the survey is about
+/// what somebody else built. `known` is every service lemonfiber can stand up, which is
+/// what decides whether an existing container could be taken over as it stands.
+#[must_use]
+pub fn surveyed(
+    ours: &str,
+    seen: &[Container],
+    wanted: &[Wanted],
+    known: &[String],
+) -> MigrationReport {
+    let mut projects: BTreeMap<&str, Vec<OccupantReport>> = BTreeMap::new();
+    for container in seen.iter().filter(|found| found.project != ours) {
+        projects
+            .entry(&container.project)
+            .or_default()
+            .push(occupant(container, known));
+    }
+
+    let standing: Vec<StandingReport> = projects
+        .into_iter()
+        .map(|(project, mut services)| {
+            services.sort_by(|one, two| one.service.cmp(&two.service));
+            StandingReport {
+                project: project.to_owned(),
+                services,
+            }
+        })
+        .collect();
+
+    MigrationReport {
+        read: true,
+        conflicts: conflicts(wanted, &standing),
+        unsupported: unsupported(&standing),
+        standing,
+    }
+}
+
+/// Every service of a recognisable setup that lemonfiber could not take over.
+///
+/// Only of a project already holding at least one service lemonfiber runs. A project
+/// with none of them is somebody's unrelated work rather than a stack being migrated,
+/// and naming its every service unsupported would say lemonfiber had weighed adopting a
+/// database it was never asked about. Such a project is still reported as standing here,
+/// because the ports it holds are just as taken either way.
+fn unsupported(standing: &[StandingReport]) -> Vec<UnsupportedReport> {
+    standing
+        .iter()
+        .filter(|project| project.services.iter().any(|service| service.adoptable))
+        .flat_map(|project| {
+            project
+                .services
+                .iter()
+                .filter(|service| !service.adoptable)
+                .map(move |service| UnsupportedReport {
+                    what: format!("{}/{}", project.project, service.service),
+                    because: "lemonfiber does not run this service, so it would be left \
+                              exactly as it is rather than taken over"
+                        .to_owned(),
+                })
+        })
+        .collect()
+}
+
+/// One existing container, as it appears in the survey.
+fn occupant(container: &Container, known: &[String]) -> OccupantReport {
+    let mut ports: Vec<u16> = container
+        .published
+        .iter()
+        .map(|published| published.port)
+        .collect();
+    ports.sort_unstable();
+    ports.dedup();
+
+    OccupantReport {
+        service: container.service.clone(),
+        running: container.lifecycle == Lifecycle::Running,
+        ports,
+        adoptable: known.iter().any(|service| service == &container.service),
+    }
+}
+
+/// Every port lemonfiber wants that an existing service already answers on.
+///
+/// Reported before a plan rather than discovered while applying one, because a port
+/// already taken is the ordinary way a second stack fails to start, and finding it then
+/// leaves the operator with two half-running setups.
+fn conflicts(wanted: &[Wanted], standing: &[StandingReport]) -> Vec<ConflictReport> {
+    let mut found: Vec<ConflictReport> = wanted
+        .iter()
+        .flat_map(|want| {
+            standing.iter().flat_map(move |project| {
+                project
+                    .services
+                    .iter()
+                    .filter(move |occupant| occupant.ports.contains(&want.port))
+                    .map(move |occupant| ConflictReport {
+                        port: want.port,
+                        wanted_by: want.service.clone(),
+                        held_by: format!("{}/{}", project.project, occupant.service),
+                    })
+            })
+        })
+        .collect();
+    found.sort_by(|one, two| one.port.cmp(&two.port).then(one.held_by.cmp(&two.held_by)));
+    found
+}
+
+/// The repository part of an image tag, with any version dropped.
+///
+/// A registry may itself carry a port, so only a final segment holding no path
+/// separator is a tag rather than part of the address.
+fn repository(tag: &str) -> &str {
+    match tag.rsplit_once(':') {
+        Some((repository, version)) if !version.contains('/') => repository,
+        _ => tag,
+    }
+}
+
+/// Every service lemonfiber knows that is running outside Compose.
+///
+/// A container started by hand carries no project for the engine to report, so it
+/// cannot be listed the way a project can, and it is named from the image beneath it
+/// instead. Narrowed to images lemonfiber runs: a machine has databases and build tools
+/// standing on it that have nothing to do with a media stack, and naming those under a
+/// migration survey would bury the one line that matters — a Jellyfin nobody can adopt
+/// because there is no project description to adopt it from.
+#[must_use]
+pub fn outside_compose(images: &[Image], known: &[String]) -> Vec<UnsupportedReport> {
+    let mut named: Vec<UnsupportedReport> = images
+        .iter()
+        .filter(|image| image.projects.iter().any(String::is_empty))
+        .filter_map(|image| {
+            image
+                .tags
+                .iter()
+                .find(|tag| known.iter().any(|ours| ours == repository(tag)))
+                .cloned()
+        })
+        .map(|what| UnsupportedReport {
+            what,
+            because: "it was started outside Compose, so there is no project description \
+                      to take it over from"
+                .to_owned(),
+        })
+        .collect();
+    named.sort_by(|one, two| one.what.cmp(&two.what));
+    named
+}
+
+/// What the survey answers when the engine would not say.
+///
+/// Empty, and saying so. A survey that reported no existing setup because it could not
+/// look would invite a replacement over the top of a library that is still there.
+#[must_use]
+pub const fn unread() -> MigrationReport {
+    MigrationReport {
+        read: false,
+        standing: Vec::new(),
+        conflicts: Vec::new(),
+        unsupported: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
+    use super::{outside_compose, surveyed, unread, Wanted};
+    use crate::ports::docker::{Container, Health, Image, Lifecycle, Published};
+
+    fn image(tags: &[&str], projects: &[&str]) -> Image {
+        Image {
+            tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
+            bytes: 1,
+            projects: projects.iter().map(|name| (*name).to_owned()).collect(),
+        }
+    }
+
+    fn container(project: &str, service: &str, ports: &[u16]) -> Container {
+        Container {
+            id: format!("{project}-{service}"),
+            project: project.to_owned(),
+            service: service.to_owned(),
+            lifecycle: Lifecycle::Running,
+            health: Health::None,
+            published: ports
+                .iter()
+                .map(|port| Published {
+                    address: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    port: *port,
+                })
+                .collect(),
+            exit: None,
+        }
+    }
+
+    fn known() -> Vec<String> {
+        vec!["sonarr".to_owned(), "radarr".to_owned()]
+    }
+
+    fn pulled() -> Vec<String> {
+        vec!["plex".to_owned()]
+    }
+
+    #[test]
+    fn our_own_project_is_not_somebody_elses_setup() {
+        let seen = [container("lemonfiber", "sonarr", &[8989])];
+        let found = surveyed("lemonfiber", &seen, &[], &known());
+        assert!(found.standing.is_empty(), "{:?}", found.standing);
+    }
+
+    #[test]
+    fn an_existing_project_is_reported_with_the_ports_it_answers_on() {
+        let seen = [container("media", "sonarr", &[8989])];
+        let found = surveyed("lemonfiber", &seen, &[], &known());
+        let one = found
+            .standing
+            .first()
+            .map(|project| project.project.clone());
+        assert_eq!(one, Some("media".to_owned()), "{:?}", found.standing);
+        let ports = found
+            .standing
+            .first()
+            .and_then(|project| project.services.first())
+            .map(|service| service.ports.clone());
+        assert_eq!(ports, Some(vec![8989]), "{:?}", found.standing);
+    }
+
+    #[test]
+    fn a_port_we_want_that_something_else_holds_is_named_on_both_sides() {
+        let seen = [container("media", "sonarr", &[8989])];
+        let want = [Wanted {
+            service: "sonarr".to_owned(),
+            port: 8989,
+        }];
+        let found = surveyed("lemonfiber", &seen, &want, &known());
+        let held = found
+            .conflicts
+            .first()
+            .map(|clash| (clash.port, clash.wanted_by.clone(), clash.held_by.clone()));
+        assert_eq!(
+            held,
+            Some((8989, "sonarr".to_owned(), "media/sonarr".to_owned())),
+            "{:?}",
+            found.conflicts
+        );
+    }
+
+    #[test]
+    fn a_port_nobody_else_holds_is_not_a_conflict() {
+        let seen = [container("media", "sonarr", &[8989])];
+        let want = [Wanted {
+            service: "radarr".to_owned(),
+            port: 7878,
+        }];
+        let found = surveyed("lemonfiber", &seen, &want, &known());
+        assert!(found.conflicts.is_empty(), "{:?}", found.conflicts);
+    }
+
+    #[test]
+    fn a_service_we_do_not_run_beside_one_we_do_is_named_rather_than_passed_over() {
+        let seen = [
+            container("media", "sonarr", &[8989]),
+            container("media", "ombi", &[3579]),
+        ];
+        let found = surveyed("lemonfiber", &seen, &[], &known());
+        let named = found.unsupported.first().map(|item| item.what.clone());
+        assert_eq!(
+            named,
+            Some("media/ombi".to_owned()),
+            "{:?}",
+            found.unsupported
+        );
+    }
+
+    #[test]
+    fn somebody_elses_unrelated_project_is_not_a_stack_we_failed_to_adopt() {
+        let seen = [
+            container("shop", "postgres", &[5432]),
+            container("shop", "redis", &[6379]),
+        ];
+        let found = surveyed("lemonfiber", &seen, &[], &known());
+        assert!(found.unsupported.is_empty(), "{:?}", found.unsupported);
+    }
+
+    #[test]
+    fn an_unrelated_project_still_holds_the_ports_it_holds() {
+        let seen = [container("shop", "postgres", &[8989])];
+        let want = [Wanted {
+            service: "sonarr".to_owned(),
+            port: 8989,
+        }];
+        let found = surveyed("lemonfiber", &seen, &want, &known());
+        let held = found.conflicts.first().map(|clash| clash.held_by.clone());
+        assert_eq!(
+            held,
+            Some("shop/postgres".to_owned()),
+            "{:?}",
+            found.conflicts
+        );
+    }
+
+    #[test]
+    fn a_container_started_by_hand_is_named_from_the_image_beneath_it() {
+        let images = [image(&["plex:latest"], &[""])];
+        let named = outside_compose(&images, &pulled());
+        let what = named.first().map(|item| item.what.clone());
+        assert_eq!(what, Some("plex:latest".to_owned()), "{named:?}");
+    }
+
+    #[test]
+    fn an_image_only_projects_stand_on_is_not_named_as_unsupported() {
+        let images = [image(&["plex:latest"], &["media"])];
+        let named = outside_compose(&images, &pulled());
+        assert!(named.is_empty(), "{named:?}");
+    }
+
+    #[test]
+    fn an_image_we_do_not_run_is_not_a_migration_finding() {
+        let images = [image(&["a-database:17"], &[""])];
+        let named = outside_compose(&images, &pulled());
+        assert!(named.is_empty(), "{named:?}");
+    }
+
+    #[test]
+    fn a_stopped_container_is_still_found_and_says_it_is_not_running() {
+        let mut stopped = container("media", "sonarr", &[8989]);
+        stopped.lifecycle = Lifecycle::Exited;
+        let found = surveyed("lemonfiber", &[stopped], &[], &known());
+        let running = found
+            .standing
+            .first()
+            .and_then(|project| project.services.first())
+            .map(|service| service.running);
+        assert_eq!(running, Some(false), "{:?}", found.standing);
+    }
+
+    #[test]
+    fn services_of_one_project_read_in_a_settled_order() {
+        let seen = [
+            container("media", "sonarr", &[8989]),
+            container("media", "radarr", &[7878]),
+        ];
+        let found = surveyed("lemonfiber", &seen, &[], &known());
+        let order: Vec<String> = found
+            .standing
+            .first()
+            .map(|project| {
+                project
+                    .services
+                    .iter()
+                    .map(|service| service.service.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert_eq!(order, vec!["radarr".to_owned(), "sonarr".to_owned()]);
+    }
+
+    #[test]
+    fn a_repeated_port_is_reported_once() {
+        let seen = [container("media", "sonarr", &[8989, 8989])];
+        let found = surveyed("lemonfiber", &seen, &[], &known());
+        let ports = found
+            .standing
+            .first()
+            .and_then(|project| project.services.first())
+            .map(|service| service.ports.clone());
+        assert_eq!(ports, Some(vec![8989]), "{:?}", found.standing);
+    }
+
+    #[test]
+    fn an_engine_that_would_not_say_is_unread_rather_than_empty() {
+        let refused = unread();
+        assert!(!refused.read);
+        assert!(refused.standing.is_empty());
+    }
+
+    #[test]
+    fn a_survey_that_looked_and_found_nothing_says_it_looked() {
+        let found = surveyed("lemonfiber", &[], &[], &known());
+        assert!(found.read);
+        assert!(found.standing.is_empty());
+    }
+}

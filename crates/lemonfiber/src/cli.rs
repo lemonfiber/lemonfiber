@@ -114,6 +114,12 @@ pub enum Request {
         /// The forms to describe; none lists them all.
         forms: Vec<String>,
     },
+    /// See what is already on this machine, without changing any of it.
+    ///
+    /// Reports the stacks already standing here, the ports they hold that lemonfiber
+    /// would want, and anything it could not take over as it stands. Nothing is
+    /// started, stopped, moved, or written.
+    Migrate,
     /// Start a form, or the union of several.
     Up {
         /// The forms to start; none starts everything the stack declares.

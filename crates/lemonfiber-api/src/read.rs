@@ -33,6 +33,7 @@ mod door;
 mod glossary;
 mod hosting;
 mod items;
+mod migration;
 mod outbound;
 mod space;
 mod stack;
@@ -75,6 +76,7 @@ pub fn routes() -> Router<Serving> {
         .merge(stored::routes())
         .merge(uninstall::routes())
         .merge(alerts::routes())
+        .merge(migration::routes())
         .merge(credentials::routes())
         .merge(space::routes())
         .merge(bandwidth::routes())

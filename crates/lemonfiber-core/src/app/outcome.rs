@@ -15,9 +15,9 @@ use super::{archives, backup, repair, restore, support};
 
 use crate::model::{
     kind, AlertReport, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport,
-    HostingReport, HouseholdReport, LifecycleReport, MusicReport, QualityReport, ResetReport,
-    StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
-    WalkthroughReport, WizardReport,
+    HostingReport, HouseholdReport, LifecycleReport, MigrationReport, MusicReport, QualityReport,
+    ResetReport, StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport,
+    VersionReport, WalkthroughReport, WizardReport,
 };
 
 /// What dispatching produced.
@@ -37,6 +37,8 @@ pub enum Outcome {
     Quality(QualityReport),
     /// What the operator is told about, and what changing it came to.
     Alerts(AlertReport),
+    /// What is already on this machine, before anything is proposed.
+    Migration(MigrationReport),
     /// What upgrading existing content did, or would do, and its stated cost.
     Upgrade(UpgradeReport),
     /// The music format chosen, and what became of applying it.
@@ -115,6 +117,7 @@ impl Outcome {
             Self::Config(_) => crate::model::kind::CONFIG,
             Self::Quality(_) => kind::QUALITY,
             Self::Alerts(_) => kind::ALERTS,
+            Self::Migration(_) => kind::MIGRATION,
             Self::Upgrade(_) => kind::UPGRADE,
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
@@ -162,6 +165,7 @@ impl serde::Serialize for Outcome {
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
             Self::Alerts(report) => report.serialize(serializer),
+            Self::Migration(report) => report.serialize(serializer),
             Self::Upgrade(report) => report.serialize(serializer),
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),

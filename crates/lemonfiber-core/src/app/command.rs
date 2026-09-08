@@ -15,6 +15,7 @@ mod alerts;
 mod credentials;
 mod hosting;
 mod household;
+mod migrate;
 mod quality;
 mod uninstall;
 
@@ -22,6 +23,7 @@ pub use alerts::AlertAction;
 pub use credentials::Asking;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
+pub use migrate::MigrateAction;
 pub use quality::QualityAction;
 pub use uninstall::Removing;
 
@@ -179,6 +181,9 @@ pub enum Command {
     /// Show or change what the operator is told about, which setup asks for once
     /// and nothing else could revise.
     Alerts(AlertAction),
+    /// Report what is already on this machine, so an operator with a setup of their
+    /// own can see what lemonfiber found before deciding anything.
+    Migrate(MigrateAction),
     /// Upgrade existing content to the chosen preset — a separate, explicit action
     /// whose bandwidth cost is stated, and which does nothing until confirmed. Its
     /// own command rather than a quality action because it reaches the services

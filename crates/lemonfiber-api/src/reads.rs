@@ -31,7 +31,7 @@
 mod asked;
 
 use lemonfiber_core::app::{
-    AlertAction, Asking, BandwidthAsked, Command, Keeping, QualityAction, Removing,
+    AlertAction, Asking, BandwidthAsked, Command, Keeping, MigrateAction, QualityAction, Removing,
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
@@ -112,6 +112,12 @@ pub const CREDENTIALS: &str = "/api/credentials";
 /// The reading only. Changing it is an act on what reaches somebody, so it belongs
 /// behind a named action rather than a door a browser opens by asking.
 pub const ALERTS: &str = "/api/alerts";
+
+/// What is already on this machine, before anything is proposed.
+///
+/// The survey only. Adopting, standing beside, or replacing an existing setup are acts
+/// on somebody's own stack, so each belongs behind a named action rather than a door.
+pub const MIGRATION: &str = "/api/migration";
 
 /// Where the disk stands, where the room went, and what could be got back.
 ///
@@ -199,6 +205,7 @@ pub const OFFERED: &[&str] = &[
     CLIENTS,
     ALERTS,
     CREDENTIALS,
+    MIGRATION,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -315,6 +322,9 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // from the request, so no caller can turn this door into the one that prints a
         // credential.
         ALERTS => Ok(Command::Alerts(AlertAction::Show)),
+        // The survey and nothing else, which is the only part of migration that changes
+        // nothing.
+        MIGRATION => Ok(Command::Migrate(MigrateAction::Survey)),
         CREDENTIALS => Ok(Command::Credentials(Asking::Read)),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an

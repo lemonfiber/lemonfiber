@@ -33,9 +33,10 @@ use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind::{self, Kind},
     Admitted, AlertReport, ConfigReport, DoctorReport, Envelope, FormsReport, FrontDoorReport,
-    HostingReport, HouseholdRemoval, HouseholdReport, Invitation, LifecycleReport, MusicReport,
-    QualityReport, ResetReport, SetupReport, Started, StatusReport, StuckReport, SupervisionReport,
-    TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport, API_VERSION,
+    HostingReport, HouseholdRemoval, HouseholdReport, Invitation, LifecycleReport, MigrationReport,
+    MusicReport, QualityReport, ResetReport, SetupReport, Started, StatusReport, StuckReport,
+    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
+    API_VERSION,
 };
 use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
@@ -117,6 +118,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         kinds,
         kind::LIFECYCLE,
         schema_for!(Envelope<LifecycleReport>),
+    );
+    describing(
+        kinds,
+        kind::MIGRATION,
+        schema_for!(Envelope<MigrationReport>),
     );
     describing(kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
     describing(kinds, kind::OUTBOUND, schema_for!(Envelope<Leaving>));
@@ -204,8 +210,8 @@ mod tests {
     use crate::glossary::{Term, Vocabulary};
     use crate::model::{
         AlertReport, ConfigReport, DoctorReport, FormsReport, FrontDoorReport, HostingReport,
-        HouseholdReport, LifecycleReport, MusicReport, QualityReport, ResetReport, StatusReport,
-        StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
+        HouseholdReport, LifecycleReport, MigrationReport, MusicReport, QualityReport, ResetReport,
+        StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
         WalkthroughReport, WizardReport,
     };
     use crate::stack::closure::Plan;
@@ -218,7 +224,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 39;
+    const OUTCOMES: usize = 40;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {

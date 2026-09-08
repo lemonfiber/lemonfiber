@@ -79,6 +79,7 @@ pub mod journal;
 pub mod lidarr;
 pub mod logs;
 pub mod materialised;
+pub mod migration;
 pub mod model;
 pub mod notify;
 pub mod outbound;

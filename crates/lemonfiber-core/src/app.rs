@@ -39,6 +39,7 @@ mod household;
 mod invite;
 mod letting;
 mod materialise;
+mod migration;
 mod music;
 mod notify;
 mod outbox;
@@ -69,7 +70,7 @@ pub mod watch;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Hostable, Keeping, QualityAction, Removing, HOSTABLE,
+    Hostable, Keeping, MigrateAction, QualityAction, Removing, HOSTABLE,
 };
 mod outcome;
 pub use ctx::Ctx;
@@ -256,6 +257,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::ConfigShow => configuring::configuration(ctx, None, None),
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
         Command::Alerts(action) => appetite::hearing(ctx, action),
+        Command::Migrate(action) => migration::survey(ctx, action).await.map(Outcome::Migration),
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace {
             term,
@@ -367,7 +369,8 @@ mod tests {
 
     use super::{
         dispatch, pull_progress, AlertAction, Allowance, Answer as Ruling, Asking, BandwidthAsked,
-        Chosen, Command, Ctx, Decision, Outcome, QualityAction, Removing, SetupAction, Waiting,
+        Chosen, Command, Ctx, Decision, MigrateAction, Outcome, QualityAction, Removing,
+        SetupAction, Waiting,
     };
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
@@ -2109,6 +2112,14 @@ mod tests {
     /// Dispatched here as well as from `tests/`: the arm is a line of each copy of this
     /// file, and the copy that never dispatched it counts the arm as never run.
     #[tokio::test]
+    async fn asking_what_is_already_here_reaches_the_command_that_surveys_it() {
+        let ctx = a_context().build();
+        let read = dispatch(Command::Migrate(MigrateAction::Survey), &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Migration(_)));
+        assert!(answered, "{read:?}");
+    }
+
+    #[tokio::test]
     async fn asking_what_you_are_told_about_reaches_the_command_that_reads_it() {
         let ctx = a_context().build();
         let read = dispatch(Command::Alerts(AlertAction::Show), &ctx).await;
@@ -2184,6 +2195,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
+                | Outcome::Migration(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Config(_)
@@ -2233,6 +2245,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
+                | Outcome::Migration(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -3064,6 +3077,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
+                | Outcome::Migration(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -4067,6 +4081,7 @@ mod tests {
             Ok(
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
+                | Outcome::Migration(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
