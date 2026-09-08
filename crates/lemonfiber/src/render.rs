@@ -729,38 +729,15 @@ mod tests {
     /// In two halves only because one list of them outgrew what a function may hold.
     fn every_outcome() -> Vec<Outcome> {
         let mut every = the_first_of_them();
+        every.extend(the_migrations());
         every.extend(the_rest_of_them());
         every
     }
 
-    /// The first half of the list above.
-    fn the_first_of_them() -> Vec<Outcome> {
+    /// The two a migration answers with, which are their own family and grew the list
+    /// past what one function may hold.
+    fn the_migrations() -> Vec<Outcome> {
         vec![
-            Outcome::Version(a_version()),
-            Outcome::Forms(some_forms()),
-            Outcome::Preview(a_plan("media", Vec::new())),
-            // A setting to list: an empty, unchanged config renders nothing at all,
-            // which is correct and is covered by its own test.
-            Outcome::Config(ConfigReport {
-                settings: vec![SettingReport {
-                    key: "DATA_ROOT".to_owned(),
-                    value: "/data".to_owned(),
-                    secret: false,
-                }],
-                changed: false,
-                rehearsed: false,
-                consequence: None,
-            }),
-            Outcome::Alerts(AlertReport {
-                preset: "problems-only".to_owned(),
-                means: "Told when something is wrong. Silence means healthy.".to_owned(),
-                exceptions: vec![ExceptionReport {
-                    kind: "storage.space".to_owned(),
-                    wanted: true,
-                }],
-                changed: true,
-                rehearsed: false,
-            }),
             Outcome::Migration(MigrationReport {
                 read: true,
                 standing: vec![StandingReport {
@@ -799,6 +776,37 @@ mod tests {
                 project: Some("media".to_owned()),
                 adopted: true,
                 ..AdoptReport::default()
+            }),
+        ]
+    }
+
+    /// The first half of the list above.
+    fn the_first_of_them() -> Vec<Outcome> {
+        vec![
+            Outcome::Version(a_version()),
+            Outcome::Forms(some_forms()),
+            Outcome::Preview(a_plan("media", Vec::new())),
+            // A setting to list: an empty, unchanged config renders nothing at all,
+            // which is correct and is covered by its own test.
+            Outcome::Config(ConfigReport {
+                settings: vec![SettingReport {
+                    key: "DATA_ROOT".to_owned(),
+                    value: "/data".to_owned(),
+                    secret: false,
+                }],
+                changed: false,
+                rehearsed: false,
+                consequence: None,
+            }),
+            Outcome::Alerts(AlertReport {
+                preset: "problems-only".to_owned(),
+                means: "Told when something is wrong. Silence means healthy.".to_owned(),
+                exceptions: vec![ExceptionReport {
+                    kind: "storage.space".to_owned(),
+                    wanted: true,
+                }],
+                changed: true,
+                rehearsed: false,
             }),
             Outcome::Quality(QualityReport {
                 choices: vec![preset(false)],
