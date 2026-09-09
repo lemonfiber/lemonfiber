@@ -171,7 +171,7 @@ pub(super) fn record(ctx: &Ctx, key: &str, value: &str) {
 mod tests {
     use super::{assessed, edited, record, recorded, refusal, Edited, Findings, SETTINGS};
     use crate::config::{Settings, DATA_ROOT_KEY, PROVIDER_PASS_KEY};
-    use crate::test_support::{a_context, env_at};
+    use crate::test_support::{a_context, env_without_password};
 
     /// A context over a given environment file, so the baseline this writes is read
     /// back from where this run put it.
@@ -186,7 +186,7 @@ mod tests {
 
     /// A context whose configuration directory is a scratch one of its own.
     fn ctx(name: &str) -> crate::app::Ctx {
-        over(env_at(name, ""))
+        over(env_without_password(name))
     }
 
     #[test]
@@ -283,7 +283,7 @@ mod tests {
         // The gathering and the deciding together, driven the way the write path
         // drives them: what was found is carried on the proposal, and the proposal
         // itself is the thing that has been turned away.
-        let env = env_at("assessed", "");
+        let env = env_without_password("assessed");
         let ctx = over(env.clone());
         wrote(&ctx, DATA_ROOT_KEY, "/srv/old");
         let file = crate::config::env::EnvFile::parse("DATA_ROOT=/mnt/theirs\n");
@@ -308,7 +308,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_proposal_nothing_stands_in_front_of_comes_back_as_it_went_in() {
-        let env = env_at("assessed-clear", "");
+        let env = env_without_password("assessed-clear");
         let ctx = over(env);
         let file = crate::config::env::EnvFile::parse("DATA_ROOT=/srv/old\n");
         let proposed = crate::reconfigure::Review::proposed(
@@ -416,7 +416,7 @@ mod tests {
         // cannot tell an edit from lemonfiber's own value, and re-forming it around
         // whatever the file happens to hold would silently throw away whatever it
         // was about to say.
-        let env = env_at("lost", "");
+        let env = env_without_password("lost");
         let path = env.with_file_name("baseline.json");
         let _ = std::fs::write(&path, "not json at all");
         let ctx = over(env);
