@@ -225,9 +225,10 @@ With nothing named it surveys: the stacks already standing here, the ports they 
 Usage: lemonfiber migrate [OPTIONS] [COMMAND]
 
 Commands:
-  adopt   Take over the setup already here, so lemonfiber manages it
-  beside  Run alongside the setup already here, on ports nothing else is using
-  help    Print this message or the help of the given subcommand(s)
+  adopt    Take over the setup already here, so lemonfiber manages it
+  beside   Run alongside the setup already here, on ports nothing else is using
+  replace  Stand in place of the setup already here, stopping it and deleting none of it
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --json
@@ -287,6 +288,35 @@ Usage: lemonfiber migrate beside [OPTIONS]
 Options:
       --confirm
           Go ahead, having seen where each service would listen
+
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber migrate replace`
+
+```text
+Stand in place of the setup already here, stopping it and deleting none of it.
+
+Without `--confirm` it names what it would stop and stops nothing. Nothing is deleted either way, so the old stack can be started again.
+
+Usage: lemonfiber migrate replace [OPTIONS]
+
+Options:
+      --confirm
+          Go ahead, having seen what would stop
 
       --json
           Print machine-readable output

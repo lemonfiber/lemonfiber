@@ -27,13 +27,19 @@ use super::{Ctx, MigrateAction, Outcome};
 /// reads.
 pub async fn migrating(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<Problem>> {
     match action {
-        MigrateAction::Survey => Ok(Outcome::Migration(looked_with_mounts(ctx).await.0)),
+        MigrateAction::Survey => Ok(Outcome::Migration(looked(ctx).await.survey)),
         MigrateAction::Adopt { confirmed } => super::adopt::taking(ctx, confirmed)
             .await
             .map(Outcome::Adoption),
+        MigrateAction::Replace { confirmed } => {
+            let found = looked(ctx).await;
+            super::replace::instead(ctx, &found.survey, &found.running, confirmed)
+                .await
+                .map(Outcome::Replacement)
+        }
         MigrateAction::Beside { confirmed } => {
-            let (survey, _) = looked_with_mounts(ctx).await;
-            super::beside::stand(ctx, &survey, confirmed)
+            let found = looked(ctx).await;
+            super::beside::stand(ctx, &found.survey, confirmed)
                 .await
                 .map(Outcome::Beside)
         }
@@ -59,17 +65,27 @@ async fn mounted(ctx: &Ctx, seen: &[Container]) -> Vec<(PathBuf, StorageFacts)> 
     found
 }
 
-/// What the engine and the manifest together say is here, and where its data sits.
+/// Everything one look at this machine found.
 ///
-/// The paths come back beside the survey because adopting needs them to say what to
-/// back up, and reading the engine twice would be two answers to what is on this
-/// machine.
-pub(super) async fn looked_with_mounts(ctx: &Ctx) -> (MigrationReport, Vec<String>) {
+/// One struct rather than a tuple that grew: the mounts are what adopting names to back
+/// up, the containers are what standing in place of it stops, and reading the engine
+/// once is what keeps them the same answer.
+pub(super) struct Looked {
+    /// What the survey amounts to.
+    pub survey: MigrationReport,
+    /// Every host path the existing setup mounts.
+    pub mounts: Vec<String>,
+    /// Every container of every project that is not lemonfiber's.
+    pub running: Vec<Container>,
+}
+
+/// What the engine and the manifest together say is here.
+pub(super) async fn looked(ctx: &Ctx) -> Looked {
     let Ok(images) = ctx.images.images().await else {
-        return (unread(), Vec::new());
+        return Looked::nothing();
     };
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
-        return (unread(), Vec::new());
+        return Looked::nothing();
     };
 
     let mut projects: BTreeSet<&str> = BTreeSet::new();
@@ -86,7 +102,7 @@ pub(super) async fn looked_with_mounts(ctx: &Ctx) -> (MigrationReport, Vec<Strin
     let mut seen: Vec<Container> = Vec::new();
     for project in projects {
         let Ok(containers) = ctx.engine.list(project).await else {
-            return (unread(), Vec::new());
+            return Looked::nothing();
         };
         seen.extend(containers);
     }
@@ -108,8 +124,20 @@ pub(super) async fn looked_with_mounts(ctx: &Ctx) -> (MigrationReport, Vec<Strin
         .map(|(path, _)| path.display().to_string())
         .collect();
 
-    (
-        surveyed(&ctx.settings.project, &seen, &images, &ours, &mounted),
-        paths,
-    )
+    Looked {
+        survey: surveyed(&ctx.settings.project, &seen, &images, &ours, &mounted),
+        mounts: paths,
+        running: seen,
+    }
+}
+
+impl Looked {
+    /// What a look that could not look answers with.
+    fn nothing() -> Self {
+        Self {
+            survey: unread(),
+            mounts: Vec::new(),
+            running: Vec::new(),
+        }
+    }
 }

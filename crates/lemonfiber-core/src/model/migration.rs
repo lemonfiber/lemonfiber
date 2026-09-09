@@ -144,6 +144,25 @@ pub struct BesideReport {
     pub rehearsed: bool,
 }
 
+/// What standing in place of a setup already here came to, or would come to.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct ReplaceReport {
+    /// The project that would be stood in place of.
+    pub project: Option<String>,
+    /// The services that would be stopped, by name.
+    pub would_stop: Vec<String>,
+    /// The services that were stopped.
+    pub stopped: Vec<String>,
+    /// The services that would not stop and are still up.
+    pub still_running: Vec<String>,
+    /// Whether anything was actually stopped, as against described.
+    pub applied: bool,
+    /// Why nothing was, where nothing was.
+    pub refused: Option<String>,
+    /// Whether this call only said what it would do.
+    pub rehearsed: bool,
+}
+
 /// What is already on this machine, before anything is proposed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MigrationReport {

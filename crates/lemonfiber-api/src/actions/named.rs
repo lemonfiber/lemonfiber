@@ -54,6 +54,7 @@ pub const OFFERED: &[&str] = &[
     "adopt",
     "migrate-adopt",
     "migrate-beside",
+    "migrate-replace",
     "reset",
     "forget",
     "uninstall",

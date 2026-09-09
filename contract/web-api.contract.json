@@ -8188,6 +8188,91 @@
         }
       }
     },
+    "replacement": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/ReplaceReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "ReplaceReport": {
+          "description": "What standing in place of a setup already here came to, or would come to.",
+          "type": "object",
+          "properties": {
+            "applied": {
+              "description": "Whether anything was actually stopped, as against described.",
+              "type": "boolean"
+            },
+            "project": {
+              "description": "The project that would be stood in place of.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "refused": {
+              "description": "Why nothing was, where nothing was.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rehearsed": {
+              "description": "Whether this call only said what it would do.",
+              "type": "boolean"
+            },
+            "still_running": {
+              "description": "The services that would not stop and are still up.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stopped": {
+              "description": "The services that were stopped.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "would_stop": {
+              "description": "The services that would be stopped, by name.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "would_stop",
+            "stopped",
+            "still_running",
+            "applied",
+            "rehearsed"
+          ]
+        }
+      }
+    },
     "reset": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

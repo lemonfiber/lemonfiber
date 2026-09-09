@@ -54,6 +54,18 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
 
 /// The exit code an outcome deserves.
 ///
+/// What a run that stood in place of a setup already here exits on.
+///
+/// A refusal is the operator's to resolve. So is a stack left half up: a script that
+/// read success from a run which stopped four of six services would go on to start
+/// lemonfiber against ports still answered by the other two.
+fn replacing(report: &lemonfiber_core::model::ReplaceReport) -> ExitCode {
+    if report.refused.is_some() || !report.still_running.is_empty() {
+        return ExitCode::from(VALIDATION);
+    }
+    ExitCode::SUCCESS
+}
+
 /// What a run that stood beside a setup already here exits on.
 ///
 /// A refusal is something the operator has to resolve — nowhere left for a service to
@@ -99,6 +111,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // script can then tell "fix your config" from "wait and retry".
         Outcome::Adoption(report) => adopting(report),
         Outcome::Beside(report) => standing(report),
+        Outcome::Replacement(report) => replacing(report),
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
         // has mended everything it carried out — which is none of it.
@@ -1227,6 +1240,28 @@ mod tests {
             std::process::ExitCode::from(super::FAILURE)
         );
     }
+    /// A stack left half up is the operator's to finish, not a success.
+    #[test]
+    fn a_replacement_that_left_something_running_is_not_a_success() {
+        let partial = lemonfiber_core::model::ReplaceReport {
+            applied: true,
+            still_running: vec!["radarr".to_owned()],
+            ..lemonfiber_core::model::ReplaceReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Replacement(partial)),
+            std::process::ExitCode::from(super::VALIDATION)
+        );
+        let whole = lemonfiber_core::model::ReplaceReport {
+            applied: true,
+            ..lemonfiber_core::model::ReplaceReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Replacement(whole)),
+            std::process::ExitCode::SUCCESS
+        );
+    }
+
     /// The same for standing beside: nowhere left to listen is something the operator
     /// resolves, not a run that fell over.
     #[test]

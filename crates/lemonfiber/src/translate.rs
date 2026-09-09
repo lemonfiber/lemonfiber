@@ -204,6 +204,9 @@ pub(crate) fn migrating(action: Option<&MigrateCommand>) -> MigrateAction {
         Some(MigrateCommand::Beside { confirm }) => MigrateAction::Beside {
             confirmed: *confirm,
         },
+        Some(MigrateCommand::Replace { confirm }) => MigrateAction::Replace {
+            confirmed: *confirm,
+        },
     }
 }
 
@@ -1244,6 +1247,16 @@ mod tests {
         assert_eq!(
             super::migrating(None),
             lemonfiber_core::app::MigrateAction::Survey
+        );
+    }
+
+    /// Standing in place of it carries its confirmation through the same way.
+    #[test]
+    fn standing_in_place_carries_its_confirmation_through() {
+        let asked = lemonfiber::cli::MigrateCommand::Replace { confirm: true };
+        assert_eq!(
+            super::migrating(Some(&asked)),
+            lemonfiber_core::app::MigrateAction::Replace { confirmed: true }
         );
     }
 

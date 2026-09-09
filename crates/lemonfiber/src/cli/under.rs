@@ -100,6 +100,15 @@ pub enum MigrateCommand {
         #[arg(long)]
         confirm: bool,
     },
+    /// Stand in place of the setup already here, stopping it and deleting none of it.
+    ///
+    /// Without `--confirm` it names what it would stop and stops nothing. Nothing is
+    /// deleted either way, so the old stack can be started again.
+    Replace {
+        /// Go ahead, having seen what would stop.
+        #[arg(long)]
+        confirm: bool,
+    },
 }
 
 /// What to do with what you are told about.
