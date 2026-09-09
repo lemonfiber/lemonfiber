@@ -11,7 +11,7 @@
 use crate::glossary::{Term, Vocabulary};
 use crate::stack::closure::Plan;
 
-use super::{archives, backup, repair, restore, support};
+use super::{archives, backup, repair, restore, support, update};
 
 use crate::model::{
     kind, AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, Envelope,
@@ -104,6 +104,8 @@ pub enum Outcome {
     Uninstall(crate::uninstall::Uninstall),
     /// Where setup stands, and what it is still asking for.
     Wizard(WizardReport),
+    /// What moving the stack onto this build's pins would change, or came to.
+    Update(update::Report),
     /// Where a backup archive was written, and what it covers.
     Backup(backup::Report),
     /// What a support bundle would hold, or where one went.
@@ -163,6 +165,7 @@ impl Outcome {
             Self::Reset(_) => kind::RESET,
             Self::Uninstall(_) => kind::UNINSTALL,
             Self::Wizard(_) => kind::WIZARD,
+            Self::Update(_) => kind::UPDATE,
             Self::Backup(_) => kind::BACKUP,
             Self::Support(_) => kind::BUNDLE,
             Self::Archives(_) => kind::ARCHIVES,
@@ -217,6 +220,7 @@ impl serde::Serialize for Outcome {
             Self::Reset(report) => report.serialize(serializer),
             Self::Uninstall(report) => report.serialize(serializer),
             Self::Wizard(report) => report.serialize(serializer),
+            Self::Update(report) => report.serialize(serializer),
             Self::Backup(report) => report.serialize(serializer),
             Self::Support(report) => report.serialize(serializer),
             Self::Archives(listing) => listing.serialize(serializer),

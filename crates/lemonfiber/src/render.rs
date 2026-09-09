@@ -39,6 +39,7 @@ pub(crate) mod stack;
 mod stored;
 mod trace;
 mod uninstall;
+mod update;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
@@ -257,6 +258,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Reset(report) => stack::reset(report),
         Outcome::Uninstall(report) => uninstall::removal(report),
         Outcome::Wizard(report) => standing(report),
+        Outcome::Update(report) => update::update(report),
         Outcome::Backup(report) => archive::backup(report),
         Outcome::Support(report) => archive::bundle(report),
         Outcome::Archives(listing) => archive::kept(listing),

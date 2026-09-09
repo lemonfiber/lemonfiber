@@ -26,6 +26,7 @@ use crate::app::backup::Report as BackupReport;
 use crate::app::repair::{Report as RepairReport, Reversal};
 use crate::app::restore::Restoration;
 use crate::app::support::Bundle;
+use crate::app::update::Report as StackUpdate;
 use crate::clients::Guidance;
 use crate::credential::Inventory;
 use crate::dashboard::Snapshot;
@@ -176,6 +177,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         kind::SELF_UPDATE,
         schema_for!(Envelope<UpdateReport>),
     );
+    describing(kinds, kind::UPDATE, schema_for!(Envelope<StackUpdate>));
     describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
     describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
     describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
@@ -240,7 +242,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 46;
+    const OUTCOMES: usize = 47;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -353,6 +355,7 @@ mod tests {
                 sensitive: true,
                 pruned: Vec::new(),
             }),
+            Outcome::Update(an_update()),
             Outcome::Support(crate::app::support::Bundle {
                 contents: crate::bundle::Contents::default(),
                 bytes: 0,
@@ -396,6 +399,40 @@ mod tests {
                 findings: Vec::new(),
             }),
         ]
+    }
+
+    /// A run of an update carrying one of everything it can report.
+    ///
+    /// Written out rather than defaulted, because the two lists are where its shape
+    /// actually is: a report with no change and no service moved would describe half
+    /// the document this kind writes.
+    fn an_update() -> crate::app::update::Report {
+        let change = crate::update::Change {
+            service: "sonarr".to_owned(),
+            current: "4.0.15".to_owned(),
+            target: "4.1.0".to_owned(),
+            jump: crate::migration::version::Jump::Minor,
+            irreversible: true,
+            refused: false,
+            because: "it migrates its state on first start".to_owned(),
+        };
+        crate::app::update::Report {
+            state: crate::update::State::Partial,
+            applied: vec![crate::update::Applied::ended(
+                &change,
+                crate::update::Ending::NotStarted,
+                Some("it did not finish starting".to_owned()),
+            )],
+            changes: vec![change],
+            in_flight: vec!["Ubuntu.iso (94%)".to_owned()],
+            confirmed: true,
+            backup: Some("/home/op/.local/share/lemonfiber/backups/one.tar.gz".to_owned()),
+            stack_edits: vec![crate::model::StackEdit {
+                path: "compose.yml".to_owned(),
+                diff: "-yours\n+ours".to_owned(),
+            }],
+            halted: Some("sonarr did not come back".to_owned()),
+        }
     }
 
     /// An inventory carrying one of each of its optional halves.

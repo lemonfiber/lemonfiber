@@ -12118,6 +12118,295 @@
         }
       }
     },
+    "update": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Report"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Applied": {
+          "description": "What one service's update came to.",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "description": "What went wrong, where anything did.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ending": {
+              "description": "How it ended.",
+              "$ref": "#/$defs/Ending"
+            },
+            "from": {
+              "description": "The version it was standing on before the run.",
+              "type": "string"
+            },
+            "reversal": {
+              "description": "How it could be put back, given how it ended.",
+              "$ref": "#/$defs/Reversal"
+            },
+            "service": {
+              "description": "The service it is about.",
+              "type": "string"
+            },
+            "to": {
+              "description": "The version the run was moving it to.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "from",
+            "to",
+            "ending",
+            "reversal"
+          ]
+        },
+        "Change": {
+          "description": "What updating one service would change.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "What the step means, in the words an operator decides on.",
+              "type": "string"
+            },
+            "current": {
+              "description": "The version it is standing on now.",
+              "type": "string"
+            },
+            "irreversible": {
+              "description": "Whether taking it is a step nothing walks back.",
+              "type": "boolean"
+            },
+            "jump": {
+              "description": "How large the step between them is.",
+              "$ref": "#/$defs/Jump"
+            },
+            "refused": {
+              "description": "Whether lemonfiber refuses to take it at all.",
+              "type": "boolean"
+            },
+            "service": {
+              "description": "The service, by its manifest id, which is also its Compose service name.",
+              "type": "string"
+            },
+            "target": {
+              "description": "The version this build pins for it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "current",
+            "target",
+            "jump",
+            "irreversible",
+            "refused",
+            "because"
+          ]
+        },
+        "Ending": {
+          "description": "How one service's update ended.",
+          "oneOf": [
+            {
+              "description": "Updated, and answering again afterwards.",
+              "type": "string",
+              "const": "updated"
+            },
+            {
+              "description": "The newer image was never fetched, so nothing about this service changed.",
+              "type": "string",
+              "const": "not-fetched"
+            },
+            {
+              "description": "It was started on the newer image and did not come back.",
+              "type": "string",
+              "const": "not-started"
+            },
+            {
+              "description": "The run halted before reaching it, so it is standing where it was.",
+              "type": "string",
+              "const": "not-reached"
+            }
+          ]
+        },
+        "Jump": {
+          "description": "How large a step from one version to another is.\n\nNamed after the part of the version that moved rather than after a size, because\nthat is the fact an operator weighs: a first-number change is where a project puts\nthe work that breaks configurations, and the two behind it are where it puts the\nwork that does not.",
+          "oneOf": [
+            {
+              "description": "The first number moved.",
+              "type": "string",
+              "const": "major"
+            },
+            {
+              "description": "The second number moved, and the first did not.",
+              "type": "string",
+              "const": "minor"
+            },
+            {
+              "description": "Nothing before the third number moved.",
+              "type": "string",
+              "const": "patch"
+            },
+            {
+              "description": "One of the tags is not a run of numbers, so the size of the step is unknown.",
+              "type": "string",
+              "const": "untellable"
+            }
+          ]
+        },
+        "Report": {
+          "description": "What updating the stack would change, or what a run of it came to.",
+          "type": "object",
+          "properties": {
+            "applied": {
+              "description": "What became of each service the run reached, in the order it reached them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Applied"
+              }
+            },
+            "backup": {
+              "description": "Where the backup taken before anything moved was written.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "changes": {
+              "description": "What would move, and what taking each step means.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Change"
+              }
+            },
+            "confirmed": {
+              "description": "Whether the steps were agreed to, or only shown.",
+              "type": "boolean"
+            },
+            "halted": {
+              "description": "Why the run stopped where it did, where it stopped early.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "in_flight": {
+              "description": "What the download clients are still working on, named so an operator can\ntell whether the thing they have been waiting for is among them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stack_edits": {
+              "description": "Stack files the operator had edited, left as they set them rather than\noverwritten with this build's own, each with the change that was held back.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StackEdit"
+              }
+            },
+            "state": {
+              "description": "The one word the run comes to.",
+              "$ref": "#/$defs/State"
+            }
+          },
+          "required": [
+            "state",
+            "changes",
+            "in_flight",
+            "confirmed",
+            "stack_edits",
+            "applied"
+          ]
+        },
+        "Reversal": {
+          "description": "How a service could be put back the way it was.\n\nThe distinction is the whole of why this is reported rather than left to be\nworked out: pinning the previous image again is a minute's work, and restoring a\nbackup is an evening. Offering the first where only the second can succeed is\nworse than offering nothing, because it is acted on.",
+          "oneOf": [
+            {
+              "description": "Nothing opened its state on the newer image, so the previous one runs again\nexactly as it did.",
+              "type": "string",
+              "const": "rollback"
+            },
+            {
+              "description": "The newer image was started, so its state may already have been migrated and\nthe backup is the only way back.",
+              "type": "string",
+              "const": "restore"
+            }
+          ]
+        },
+        "StackEdit": {
+          "description": "A stack file the operator edited, preserved rather than overwritten, with the\nchange an upgrade would make shown against it.",
+          "type": "object",
+          "properties": {
+            "diff": {
+              "description": "The lines that differ between the operator's file and what lemonfiber would\nwrite — theirs marked `-`, lemonfiber's `+`, the matching head and tail left\nout. Empty where the two differ only in ways `lines` does not see.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file's path within the stack directory.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "diff"
+          ]
+        },
+        "State": {
+          "description": "Where the stack stands against the versions this build pins.\n\nExactly one of these is true of a run at a time. A surface that had to say\n\"updates available, and also partly applied\" would be reporting the question\nrather than the answer.",
+          "oneOf": [
+            {
+              "description": "Every service is standing on the version pinned for it.",
+              "type": "string",
+              "const": "current"
+            },
+            {
+              "description": "Newer versions are pinned than what is running, and nothing has been applied.",
+              "type": "string",
+              "const": "updates-available"
+            },
+            {
+              "description": "Everything that had an update took it.",
+              "type": "string",
+              "const": "updated"
+            },
+            {
+              "description": "Some were updated and one was not; the run stopped there.",
+              "type": "string",
+              "const": "partial"
+            },
+            {
+              "description": "Nothing was updated, and the run stopped where it did.",
+              "type": "string",
+              "const": "failed"
+            }
+          ]
+        }
+      }
+    },
     "upgrade": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

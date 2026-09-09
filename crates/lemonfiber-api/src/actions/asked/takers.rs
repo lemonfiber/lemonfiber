@@ -44,26 +44,30 @@ pub const TAKES_FORMS: &[&str] = &[
 
 /// The actions whose command carries the operator's agreement.
 ///
-/// Six, and no others. Each names something that cannot be taken back once it is
+/// Each of them names something that cannot be taken back once it is
 /// done: quality this host would have to transcode in software, bandwidth spent
 /// re-fetching a library that is already here, hand-edits to the stack files
 /// discarded, a configuration overwritten by an archive, a credential printed
-/// into a file people post in public, and a machine changed under an operator who
-/// only asked what was wrong with it.
+/// into a file people post in public, a service database migrated by a newer
+/// binary that the older one will not open again, and a machine changed under an
+/// operator who only asked what was wrong with it.
 ///
-/// What the six do **not** share is a shape. This is the list of actions whose
+/// What they do **not** share is a shape. This is the list of actions whose
 /// command has a field for the agreement, and nothing more: "unconfirmed, it says
 /// what it would do and changes nothing" is true of four of them and false of the
 /// other two. Said here rather than left to be found, because a surface that read
 /// the list as the rule would put an account of what is about to happen in front of
 /// a run that has already happened.
 ///
-/// Three of them are the fork the reading suggests. Unconfirmed, `reset`,
-/// `restore` and `quality-upgrade` each report what it would cost and change
-/// nothing, so the agreement is inside the command rather than a gate in front of
-/// it.
+/// Four of them are the fork the reading suggests. Unconfirmed, `reset`,
+/// `restore`, `quality-upgrade` and `update` each report what it would cost and
+/// change nothing, so the agreement is inside the command rather than a gate in
+/// front of it. The update is the one whose unconfirmed half a surface most needs
+/// to put in front of somebody: it names the version each service is leaving, the
+/// version it is moving to, and which of the steps migrate state and so cannot be
+/// walked back.
 ///
-/// A repair is the fourth, and the one where it is the whole of the design rather
+/// A repair is the fifth, and the one where it is the whole of the design rather
 /// than a guard in front of it. Unconfirmed it *is* the offer — each repair with
 /// what it would do and what else changes if it does — and the yes that follows
 /// names the offer it was read in through [`TAKES_CONSENT`]. Given alone it is the
@@ -125,6 +129,7 @@ pub const TAKES_AGREEMENT: &[&str] = &[
     "restore",
     "space",
     "support",
+    "update",
 ];
 
 /// The actions whose command carries what the operator read before answering.
@@ -255,7 +260,7 @@ pub const TAKES_SERVICES: &[&str] = &["up", "down", "restart"];
 /// while something may be in the middle of arriving, exactly as a teardown does, and
 /// the wait is the offer it makes rather than a way past it — so it is answered with
 /// the same word, and the wait happens inside the change for the same reason.
-pub const TAKES_WAITING: &[&str] = &["config-set", "down", "uninstall"];
+pub const TAKES_WAITING: &[&str] = &["config-set", "down", "uninstall", "update"];
 
 /// The action whose command carries which of the four removals it is about.
 ///
@@ -266,14 +271,14 @@ pub const TAKES_WAITING: &[&str] = &["config-set", "down", "uninstall"];
 /// about this machine was taken.
 pub const TAKES_TIER: &[&str] = &["uninstall"];
 
-/// The action whose command carries the one service it was given.
+/// The actions whose command carries the one service it was given.
 ///
-/// A capture of one service's configuration is the whole of what the command line
-/// declares `--service` for, and it is one name rather than a list because the
-/// scope recorded in an archive is one scope. Apart from [`TAKES_SERVICES`] for the
-/// same reason the command line spells them differently: those narrow what a
-/// lifecycle command touches, and this decides what an archive covers.
-pub const TAKES_SERVICE: &[&str] = &["backup"];
+/// Two, and each takes one name rather than a list because what it decides is one
+/// thing: the scope recorded in an archive is one scope, and an update narrowed to a
+/// service is narrowed to a service. Apart from [`TAKES_SERVICES`] for the same
+/// reason the command line spells them differently: those narrow what a lifecycle
+/// command touches, and neither of these is a lifecycle command.
+pub const TAKES_SERVICE: &[&str] = &["backup", "update"];
 
 /// The action whose command carries the setting it was given.
 ///

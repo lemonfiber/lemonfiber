@@ -50,6 +50,7 @@ Commands:
   seed          Wire the stack's services to each other, idempotently
   adopt         Adopt your current edits as lemonfiber's expected state
   reset         Put the stack back to lemonfiber's own state, reverting every edit you made
+  update        Move the stack onto the image versions this build of lemonfiber pins
   backup        Back up your configuration to an archive, so it stops being precious
   support       Gather everything a person helping you would ask for, with every value not named safe replaced by a stand-in
   ui            Serve the web interface, for as long as you leave it running
@@ -2007,6 +2008,41 @@ Options:
 
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber update`
+
+```text
+Move the stack onto the image versions this build of lemonfiber pins.
+
+A bare run changes nothing. It says which services would move, from which version to which, how large each step is, and which of them migrate state and so cannot be walked back. Run it again with `--confirm` to take the steps: a backup is taken first, and the services move one at a time with each proven to be answering before the next is touched.
+
+Usage: lemonfiber update [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --service <SERVICE>
+          Move one service instead of every one that has an update
+
+      --confirm
+          Go ahead and move them, having seen what each step costs
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --wait
+          Let anything still downloading finish before the services are stopped
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one

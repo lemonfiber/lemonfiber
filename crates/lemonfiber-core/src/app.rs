@@ -74,6 +74,7 @@ pub mod support;
 mod targets;
 mod trace;
 mod uninstall;
+pub mod update;
 mod upgrade;
 mod walkthrough;
 pub mod watch;
@@ -95,6 +96,10 @@ pub use engine::{
 };
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
+// Named at the import rather than at the arm: every other command in the dispatch
+// below is one line, and the module and the variant behind this one are together long
+// enough that spelling it out there is three.
+use self_update::standing as stands;
 
 // The data-location watch is a self-contained feature in its own module; these
 // are the names the rest of the crate and the binary reach it by.
@@ -324,9 +329,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.
-        Command::SelfUpdate { to } => Ok(Outcome::SelfUpdate(
-            self_update::standing(ctx, to.as_deref()).await,
-        )),
+        Command::SelfUpdate { to } => Ok(Outcome::SelfUpdate(stands(ctx, to.as_deref()).await)),
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
         Command::Forget { confirm } => stored::forgetting(ctx, confirm).await.map(Outcome::Stored),
@@ -361,6 +364,9 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Uninstall(asked) => uninstall::uninstalled(ctx, asked).await,
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
         Command::Setup(action) => setup::setting_up(ctx, action).await.map(Outcome::Wizard),
+        // Unconfirmed it says what moving onto this build's pins would change, and
+        // touches nothing; confirmed it takes those steps behind a backup.
+        Command::Update(asked) => update::update(ctx, asked).await.map(Outcome::Update),
         Command::Backup { service } => backup::run(ctx, service).await.map(Outcome::Backup),
         Command::Support {
             write,
@@ -1523,6 +1529,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dispatched_update_serialises_under_its_own_kind() {
+        // Unconfirmed against an engine that has pulled nothing, so it answers with a
+        // stack already on its pins and touches nothing — which is still the whole of
+        // the dispatch, envelope and serialise arms.
+        let ctx = a_context()
+            .build()
+            .with_images(lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()));
+        let json = dispatch(
+            Command::Update(crate::app::update::Asked {
+                service: None,
+                confirm: false,
+                wait: Waiting::Never,
+            }),
+            &ctx,
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(json.contains(r#""kind":"update""#), "{json}");
+        assert!(json.contains(r#""state":"current""#), "{json}");
+    }
+
+    #[tokio::test]
     async fn a_dispatched_backup_serialises_under_its_own_kind() {
         let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
         let json = dispatch(Command::Backup { service: None }, &keeping_archives(&vault))
@@ -2369,6 +2399,7 @@ mod tests {
                 | Outcome::Reset(_)
                 | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
+                | Outcome::Update(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
                 | Outcome::Archives(_)
@@ -2425,6 +2456,7 @@ mod tests {
                 | Outcome::Reset(_)
                 | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
+                | Outcome::Update(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
                 | Outcome::Archives(_)
@@ -3263,6 +3295,7 @@ mod tests {
                 | Outcome::Reset(_)
                 | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
+                | Outcome::Update(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
                 | Outcome::Archives(_)
@@ -4255,6 +4288,7 @@ mod tests {
                 | Outcome::Reset(_)
                 | Outcome::Uninstall(_)
                 | Outcome::Wizard(_)
+                | Outcome::Update(_)
                 | Outcome::Backup(_)
                 | Outcome::Support(_)
                 | Outcome::Archives(_)

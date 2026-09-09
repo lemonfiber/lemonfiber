@@ -114,6 +114,7 @@ mod test_support;
 pub mod text;
 pub mod transcoding;
 pub mod uninstall;
+pub mod update;
 pub mod validate;
 pub mod walkthrough;
 pub mod within;

@@ -932,11 +932,11 @@ fn nothing_leaves_this_binary_without_passing_through_a_treatment() {
 /// into its output would be broken in a way nothing else here would catch.
 #[test]
 fn a_failure_is_reported_on_stderr_and_never_on_stdout() {
-    let exit = std::fs::read_to_string("src/exit.rs").unwrap_or_default();
+    let exit = std::fs::read_to_string("src/exit/reporting.rs").unwrap_or_default();
     let complain = body_of(&exit, "pub(crate) fn complain");
-    // The lines themselves are built next door now, so the per-line checks below
-    // have to follow them there. A guard that kept reading only the two-line caller
-    // would pass on anything.
+    // The lines themselves are built beside it rather than inside it, so the per-line
+    // checks below take both. A guard that kept reading only the two-line caller would
+    // pass on anything.
     let built = body_of(&exit, "\npub(crate) fn reported");
     let reporter = format!("{complain}\n{built}");
 

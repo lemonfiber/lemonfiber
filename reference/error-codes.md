@@ -157,6 +157,9 @@ what to do about it, is written for operators at
 - `STORAGE-6`
 - `TELLING-1`
 - `TUI-1`
+- `UPDATE-1`
+- `UPDATE-2`
+- `UPDATE-3`
 - `VPN-1`
 - `VPN-2`
 - `VPN-3`

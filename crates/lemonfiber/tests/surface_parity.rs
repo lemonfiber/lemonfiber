@@ -338,7 +338,7 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
 
 /// A number as the page writes it, since it writes them as words.
 fn spelled(number: usize) -> String {
-    const WORDS: [&str; 45] = [
+    const WORDS: [&str; 46] = [
         "zero",
         "one",
         "two",
@@ -384,6 +384,7 @@ fn spelled(number: usize) -> String {
         "forty-two",
         "forty-three",
         "forty-four",
+        "forty-five",
     ];
     WORDS
         .get(number)
