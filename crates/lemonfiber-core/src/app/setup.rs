@@ -468,7 +468,9 @@ mod tests {
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::platform::Environment;
-    use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
+    use crate::ports::filesystem::{
+        Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
+    };
     use crate::prerequisites::PrerequisiteMap;
     use crate::stack::Source;
     use crate::validate::{Validation, Validator};
@@ -606,6 +608,10 @@ mod tests {
         async fn ownership(&self, _path: &Path) -> Option<Ownership> {
             None
         }
+    }
+
+    #[async_trait]
+    impl Storage for ProbeFs {
         async fn describe(&self, _path: &Path) -> StorageFacts {
             StorageFacts {
                 point: std::path::PathBuf::new(),

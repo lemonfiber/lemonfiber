@@ -259,7 +259,7 @@ pub fn pick(mounts: &[Mount], path: &Path) -> StorageFacts {
 /// above the port and stays testable. What a method could not do it reports as a
 /// [`Fault`]; the caller decides what that means at the step it happened.
 #[async_trait]
-pub trait FileSystem: Send + Sync {
+pub trait FileSystem: Storage + Send + Sync {
     /// Resolve a path to its real location, following symlinks, so a probe runs
     /// against the filesystem the data actually lives on rather than a link's.
     ///
@@ -341,7 +341,18 @@ pub trait FileSystem: Send + Sync {
     /// Who owns a path and how it may be accessed, or `None` where the platform
     /// does not report it — which is every platform but Unix.
     async fn ownership(&self, path: &Path) -> Option<Ownership>;
+}
 
+/// What a filesystem *is*, which is a question about it rather than a change to it.
+///
+/// A trait of its own, and a supertrait of [`FileSystem`] rather than a method on it,
+/// for the reason the volume watch and the eraser are apart from it: a caller that only
+/// needs to know whether a path can hold a hardlink has no business holding one that
+/// can also erase the directory. A migration survey is exactly that caller, and holding
+/// it to a read is the difference between reporting what somebody's layout costs and
+/// being able to rearrange it.
+#[async_trait]
+pub trait Storage: Send + Sync {
     /// What the platform reports about the filesystem behind a path.
     async fn describe(&self, path: &Path) -> StorageFacts;
 }

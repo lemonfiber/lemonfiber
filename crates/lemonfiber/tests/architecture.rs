@@ -552,25 +552,18 @@ fn nothing_in_a_migration_reaches_what_could_change_what_it_found() {
 
     assert!(
         reaching.is_empty(),
-        "a migration surveys and changes nothing, so it may reach only {ALLOWED:?}, \
-         and {READ_ONLY:?}: {reaching:?}"
+        "a migration surveys and changes nothing, so it may reach only {ALLOWED:?}: \
+         {reaching:?}"
     );
 }
 
-/// The seams a migration may reach whole, by the name they carry on a context.
-const ALLOWED: [&str; 5] = ["images", "stack", "engine", "settings", "today"];
-
-/// The one seam it may reach into rather than reach for, and the only call on it that
-/// is allowed.
+/// The seams a migration may reach, by the name they carry on a context.
 ///
-/// Asking what a filesystem *is* — its type, and whether it can hold a hardlink — is a
-/// read, and the survey cannot say what an existing layout costs without it. The rest of
-/// that trait writes, erases and links, so the seam is admitted one method at a time
-/// rather than whole. That the two live on one trait is the thing worth fixing:
-/// `describe` belongs on a trait of its own, the way the volume watch and the eraser are
-/// already apart from the filesystem, and then this exception disappears into the type
-/// system where it belongs.
-const READ_ONLY: (&str, &str) = ("filesystem", "describe");
+/// `storage` is the filesystem held as the narrower trait: it answers what a filesystem
+/// *is* and offers no way to write, remove, or link anything. It is on this list rather
+/// than admitted as an exception because the type system is what stops the survey
+/// writing, and a rule that repeated that in prose would be the weaker of the two.
+const ALLOWED: [&str; 6] = ["images", "stack", "engine", "settings", "today", "storage"];
 
 /// Whether this file is part of the survey rather than a test about it.
 fn surveys(path: &Path) -> bool {
@@ -604,11 +597,7 @@ fn named(rest: &str) -> String {
 /// Whether a seam, with what follows it, is one a survey may reach.
 fn permitted(rest: &str) -> bool {
     let seam = named(rest);
-    if seam.is_empty() || ALLOWED.contains(&seam.as_str()) {
-        return true;
-    }
-    let after = rest.get(seam.len()..).unwrap_or_default();
-    seam == READ_ONLY.0 && after.starts_with(&format!(".{}(", READ_ONLY.1))
+    seam.is_empty() || ALLOWED.contains(&seam.as_str())
 }
 
 /// Adopting writes one line of lemonfiber's own configuration and nothing else.

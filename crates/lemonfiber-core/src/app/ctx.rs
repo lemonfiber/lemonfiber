@@ -14,7 +14,7 @@ use crate::archive::Archiving;
 use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
 use crate::ports::docker::{Engine, Images};
-use crate::ports::filesystem::{Eraser, Volume};
+use crate::ports::filesystem::{Eraser, Storage, Volume};
 use crate::ports::hosting::Host;
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
@@ -150,6 +150,16 @@ fn live(http: &Arc<dyn Http>, reaching: Reaching) -> Arc<dyn Validator> {
 }
 
 impl Ctx {
+    /// The filesystem as something that can only be asked what it *is*.
+    ///
+    /// The same object, held as the narrower trait. A caller that needs to know whether
+    /// a path can hold a hardlink gets exactly that and no way to write, remove, or link
+    /// anything — which is what lets a migration survey report what somebody's layout
+    /// costs without being able to rearrange it.
+    #[must_use]
+    pub fn storage(&self) -> Arc<dyn Storage> {
+        Arc::clone(&self.filesystem) as Arc<dyn Storage>
+    }
     /// A context that runs programs for real, against a given stack.
     #[must_use]
     pub fn new(

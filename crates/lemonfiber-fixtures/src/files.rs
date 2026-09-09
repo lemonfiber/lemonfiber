@@ -22,7 +22,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
+use lemonfiber_ports::filesystem::{
+    Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
+};
 
 /// What the filesystem holds, and how a path finds it.
 pub enum Held {
@@ -155,7 +157,10 @@ impl FileSystem for Files {
                 mode: *mode,
             })
     }
+}
 
+#[async_trait]
+impl Storage for Files {
     async fn describe(&self, _path: &Path) -> StorageFacts {
         StorageFacts {
             point: PathBuf::new(),

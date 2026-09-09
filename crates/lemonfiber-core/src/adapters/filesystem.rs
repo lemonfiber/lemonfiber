@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 
 use crate::ports::filesystem::{
-    Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, StorageFacts, Volume,
+    Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, Storage, StorageFacts, Volume,
 };
 
 /// The filesystem on this machine, reached through the standard library.
@@ -83,7 +83,10 @@ impl FileSystem for Disk {
     async fn ownership(&self, path: &Path) -> Option<Ownership> {
         ownership_of(path)
     }
+}
 
+#[async_trait]
+impl Storage for Disk {
     async fn describe(&self, path: &Path) -> StorageFacts {
         let disks = sysinfo::Disks::new_with_refreshed_list();
         let mounts: Vec<Mount> = disks
@@ -221,6 +224,7 @@ pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
 
 #[cfg(test)]
 mod tests {
+    use crate::ports::filesystem::Storage;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
 
