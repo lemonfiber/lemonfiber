@@ -13,47 +13,13 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Where the reads are declared, relative to this crate.
-const READS: &str = "../lemonfiber-api/src/read";
+mod spelling;
 
 /// The file whose number is the sum of the others.
 const ROOT: &str = "../lemonfiber-api/src/read.rs";
 
-/// The spelled numbers a module doc may open with.
-const SPELLED: [(&str, usize); 28] = [
-    ("one", 1),
-    ("two", 2),
-    ("three", 3),
-    ("four", 4),
-    ("five", 5),
-    ("six", 6),
-    ("seven", 7),
-    ("eight", 8),
-    ("nine", 9),
-    ("ten", 10),
-    ("eleven", 11),
-    ("twelve", 12),
-    ("thirteen", 13),
-    ("fourteen", 14),
-    ("fifteen", 15),
-    ("sixteen", 16),
-    ("seventeen", 17),
-    ("eighteen", 18),
-    ("nineteen", 19),
-    ("twenty", 20),
-    // Written without their hyphens, because the reader below replaces every
-    // character that is not a letter with a space before it looks: a `twenty-one`
-    // here would be a word no sanitised doc could ever hold, which is a row that
-    // exempts the module it was added for.
-    ("twenty one", 21),
-    ("twenty two", 22),
-    ("twenty three", 23),
-    ("twenty four", 24),
-    ("twenty five", 25),
-    ("twenty six", 26),
-    ("twenty seven", 27),
-    ("twenty eight", 28),
-];
+/// Where the reads are declared, relative to this crate.
+const READS: &str = "../lemonfiber-api/src/read";
 
 /// The fewest modules this surface has ever declared its reads across.
 ///
@@ -66,47 +32,6 @@ const FEWEST: usize = 4;
 /// How many routes a file declares.
 fn routes(text: &str) -> usize {
     text.matches(".route(").count()
-}
-
-/// The number a module doc states about its own reads, where it states one.
-///
-/// The number must be the one counting the reads — `four reads`, not `cut four
-/// ways`, which is what `stack.rs` says about how a reading is divided and is not
-/// a claim about endpoints at all. Read from the `//!` block only, so prose
-/// further down naming a number is not mistaken for the module's own count.
-fn stated(text: &str) -> Option<usize> {
-    let said: String = text
-        .lines()
-        .take_while(|line| line.starts_with("//!") || line.is_empty())
-        .collect::<Vec<&str>>()
-        .join(" ")
-        .to_lowercase();
-
-    // Punctuation carries the count as often as a space does — "the thirteen
-    // reads:" is the opening line — so the words are separated before they are
-    // asked about, and the padding lets the first and last word match too.
-    let mut doc = String::from(" ");
-    doc.extend(said.chars().map(|letter| {
-        if letter.is_ascii_alphabetic() {
-            letter
-        } else {
-            ' '
-        }
-    }));
-    doc.push(' ');
-
-    // The longest match rather than the first, because a compound number contains a
-    // shorter one: with the hyphen replaced above, `the twenty-one reads` reads as
-    // `twenty one reads`, which holds `one reads`. Taking the first match found
-    // would have read a surface of twenty-one as a surface of one — and the failure
-    // would have named the file that was right.
-    SPELLED
-        .iter()
-        .filter(|(word, _)| {
-            doc.contains(&format!(" {word} read ")) || doc.contains(&format!(" {word} reads "))
-        })
-        .max_by_key(|(word, _)| word.len())
-        .map(|(_, count)| *count)
 }
 
 /// Every module the reads are declared in, with what it says and what it holds.
@@ -122,7 +47,7 @@ fn modules() -> BTreeMap<String, (Option<usize>, usize)> {
                 .file_name()
                 .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
             let text = fs::read_to_string(&path).unwrap_or_default();
-            found.insert(name, (stated(&text), routes(&text)));
+            found.insert(name, (spelling::stated_about(&text, "read"), routes(&text)));
         }
     }
     found
@@ -171,7 +96,7 @@ fn the_number_the_reads_open_with_is_every_route_beneath_them() {
     let modules = modules();
     let held: usize = modules.values().map(|(_, has)| has).sum();
     let root = fs::read_to_string(Path::new(ROOT)).unwrap_or_default();
-    let said = stated(&root);
+    let said = spelling::stated_about(&root, "read");
 
     assert_eq!(
         said,
