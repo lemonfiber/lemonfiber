@@ -34,22 +34,12 @@ pub async fn instead(
         return Ok(refused(survey));
     };
 
+    // Every container of that project, which is never empty: the project is standing
+    // here precisely because these containers were read from the engine.
     let theirs: Vec<&Container> = running
         .iter()
         .filter(|container| container.project == project)
         .collect();
-
-    if theirs.is_empty() {
-        return Ok(ReplaceReport {
-            project: Some(project),
-            refused: Some(
-                "nothing of that setup is running, so there is nothing to stand in place \
-                 of — start lemonfiber and it is already the only thing here"
-                    .to_owned(),
-            ),
-            ..ReplaceReport::default()
-        });
-    }
 
     let mut names: Vec<String> = theirs
         .iter()

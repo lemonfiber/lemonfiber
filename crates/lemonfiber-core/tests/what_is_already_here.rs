@@ -25,7 +25,7 @@ use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
 use lemonfiber_core::ports::Runner;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::pulled::Pulled;
-use lemonfiber_fixtures::support::{spoke, Recording, Reporting, Scripted, SeedFs};
+use lemonfiber_fixtures::support::{refused, spoke, Recording, Reporting, Scripted, SeedFs};
 
 /// A machine whose engine answers with the given containers and images.
 fn ctx(engine: Reporting, images: Arc<Pulled>) -> Ctx {
@@ -525,4 +525,28 @@ async fn an_unrelated_project_is_not_stood_in_place_of() {
     let found = replacing(&ctx, true).await;
     let refused = found.and_then(|read| read.refused);
     assert!(refused.is_some(), "somebody else's work is not replaced");
+}
+
+/// A container that would not stop leaves the stack half up, and a script has to be
+/// able to tell that from a clean replacement.
+#[tokio::test]
+async fn a_container_that_would_not_stop_is_reported_as_still_running() {
+    let stubborn = Arc::new(Recording::answering(Ok(refused("no such container"))));
+    let images = Pulled::holding(vec![Pulled::image(
+        "lscr.io/linuxserver/sonarr:4.0.15",
+        400,
+        &["media"],
+    )]);
+    let ctx = driven(
+        somebody_elses(),
+        images,
+        Source::External(project()),
+        Arc::clone(&stubborn) as Arc<dyn Runner>,
+    );
+
+    let found = replacing(&ctx, true).await;
+    let still = found.as_ref().map(|read| read.still_running.clone());
+    assert_eq!(still, Some(vec!["sonarr".to_owned()]), "{found:?}");
+    let stopped = found.map(|read| read.stopped).unwrap_or_default();
+    assert!(stopped.is_empty(), "{stopped:?}");
 }
