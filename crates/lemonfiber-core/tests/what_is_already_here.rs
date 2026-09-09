@@ -25,6 +25,7 @@ use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::Runner;
+use lemonfiber_core::reconfigure::Stance;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::pulled::Pulled;
 use lemonfiber_fixtures::support::{refused, spoke, Recording, Reporting, Scripted, SeedFs};
@@ -270,12 +271,16 @@ async fn adopting(ctx: &Ctx, confirmed: bool) -> Option<AdoptReport> {
 #[tokio::test]
 async fn a_database_a_later_version_wrote_is_refused_rather_than_opened() {
     let found = adopting(&theirs("9.9.9", None), true).await;
-    let refused = found.as_ref().and_then(|read| read.refused.clone());
+    let refused = found.as_ref().and_then(|read| read.refusal.clone());
     assert!(
         refused.is_some_and(|said| said.contains("later version")),
         "{found:?}"
     );
-    assert_eq!(found.map(|read| read.adopted), Some(false));
+    assert_eq!(
+        found.map(|read| read.stance),
+        Some(Stance::Blocked),
+        "refused rather than done"
+    );
 }
 
 #[tokio::test]
@@ -283,8 +288,8 @@ async fn adopting_unconfirmed_says_what_it_would_do_and_writes_nothing() {
     let env = scratch("rehearsed");
     let found = adopting(&theirs("4.0.0", Some(env.clone())), false).await;
     assert_eq!(
-        found.as_ref().map(|read| (read.rehearsed, read.adopted)),
-        Some((true, false)),
+        found.as_ref().map(|read| read.stance),
+        Some(Stance::Pending),
         "{found:?}"
     );
     assert!(!env.exists(), "a rehearsal wrote {}", env.display());
@@ -321,8 +326,8 @@ async fn confirming_records_the_project_lemonfiber_now_manages() {
     assert_eq!(
         found
             .as_ref()
-            .map(|read| (read.adopted, read.project.clone())),
-        Some((true, Some("media".to_owned()))),
+            .map(|read| (read.stance, read.project.clone())),
+        Some((Stance::Applied, Some("media".to_owned()))),
         "{found:?}"
     );
     let written = std::fs::read_to_string(&env).unwrap_or_default();
@@ -334,7 +339,7 @@ async fn a_machine_with_nothing_of_ours_on_it_has_nothing_to_adopt() {
     let images = Pulled::holding(Vec::new());
     let ctx = over(Reporting::absent(), images, Source::External(project()));
     let found = adopting(&ctx, true).await;
-    let refused = found.and_then(|read| read.refused);
+    let refused = found.and_then(|read| read.refusal);
     assert!(refused.is_some(), "nothing to take over is a refusal");
 }
 
@@ -388,8 +393,8 @@ async fn standing_beside_unconfirmed_says_where_it_would_listen_and_writes_nothi
     let env = scratch("beside-rehearsed");
     let found = standing(&theirs("4.0.15", Some(env.clone())), false).await;
     assert_eq!(
-        found.as_ref().map(|read| (read.rehearsed, read.applied)),
-        Some((true, false)),
+        found.as_ref().map(|read| read.stance),
+        Some(Stance::Pending),
         "{found:?}"
     );
     let moved = found.map(|read| read.ports.len()).unwrap_or_default();
@@ -411,8 +416,8 @@ async fn confirming_writes_the_layered_file_and_records_where_it_is() {
 
     let found = standing(&ctx, true).await;
     assert_eq!(
-        found.as_ref().map(|read| read.applied),
-        Some(true),
+        found.as_ref().map(|read| read.stance),
+        Some(Stance::Applied),
         "{found:?}"
     );
 
@@ -436,7 +441,7 @@ async fn standing_beside_what_could_not_be_read_is_refused() {
     let images = Pulled::unreachable("no daemon here");
     let ctx = over(somebody_elses(), images, Source::External(project()));
     let found = standing(&ctx, true).await;
-    let refused = found.and_then(|read| read.refused);
+    let refused = found.and_then(|read| read.refusal);
     assert!(
         refused.is_some_and(|said| said.contains("could not be read")),
         "refused"
@@ -503,8 +508,8 @@ async fn standing_in_place_unconfirmed_names_what_would_stop_and_stops_nothing()
 
     let found = replacing(&ctx, false).await;
     assert_eq!(
-        found.as_ref().map(|read| (read.rehearsed, read.applied)),
-        Some((true, false)),
+        found.as_ref().map(|read| read.stance),
+        Some(Stance::Pending),
         "{found:?}"
     );
     let named = found.map(|read| read.would_stop).unwrap_or_default();
@@ -533,8 +538,8 @@ async fn confirming_stops_what_was_named_and_deletes_none_of_it() {
 
     let found = replacing(&ctx, true).await;
     assert_eq!(
-        found.as_ref().map(|read| read.applied),
-        Some(true),
+        found.as_ref().map(|read| read.stance),
+        Some(Stance::Applied),
         "{found:?}"
     );
 
@@ -561,7 +566,7 @@ async fn an_unrelated_project_is_not_stood_in_place_of() {
         Reporting::holding(&["postgres"], Lifecycle::Running, Health::Healthy).belonging_to("shop");
     let ctx = over(engine, images, Source::External(project()));
     let found = replacing(&ctx, true).await;
-    let refused = found.and_then(|read| read.refused);
+    let refused = found.and_then(|read| read.refusal);
     assert!(refused.is_some(), "somebody else's work is not replaced");
 }
 
@@ -768,7 +773,7 @@ async fn carrying_out_of_a_machine_that_could_not_be_read_carries_nothing() {
     let nowhere = Source::External(Path::new("/nowhere-at-all"));
     let ctx = importing_over(engine, nowhere, two_stacks());
     let found = carrying(&ctx, true).await;
-    let refused = found.and_then(|read| read.refused);
+    let refused = found.and_then(|read| read.refusal);
     assert!(refused.is_some(), "refused rather than silently empty");
 }
 
@@ -945,7 +950,7 @@ async fn carrying_from_a_machine_that_could_not_be_looked_at_says_so() {
     let refused = Pulled::unreachable("no daemon here");
     let ctx = over(somebody_elses(), refused, Source::External(project()));
     let found = carrying(&ctx, true).await;
-    let said = found.and_then(|read| read.refused).unwrap_or_default();
+    let said = found.and_then(|read| read.refusal).unwrap_or_default();
     assert!(said.contains("could not be read"), "{said}");
 }
 
@@ -959,7 +964,49 @@ async fn carrying_from_a_machine_holding_nothing_of_ours_says_there_is_no_setup(
     let ctx = over(engine, images, Source::External(project()));
     let said = carrying(&ctx, true)
         .await
-        .and_then(|read| read.refused)
+        .and_then(|read| read.refusal)
         .unwrap_or_default();
     assert!(said.contains("no single setup here"), "{said}");
+}
+
+/// Two stacks already holding the same records is a state of its own: nothing was
+/// carried because there was nothing to carry, which is not the same as an import that
+/// carried nothing because something went wrong.
+#[tokio::test]
+async fn two_stacks_that_already_agree_come_to_nothing_changing() {
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    let held = r#"[{"id":5,"title":"Taskmaster","qualityProfileId":1}]"#;
+    let agreeing = Fake::by_route(vec![
+        (
+            Method::Get,
+            "18989/api/v3/qualityprofile",
+            Answer::reply(200, r#"[{"id":1,"name":"HD"}]"#),
+        ),
+        (Method::Get, "18989/api/v3/series", Answer::reply(200, held)),
+        (
+            Method::Get,
+            "18989/api/v3/indexer",
+            Answer::reply(200, "[]"),
+        ),
+        (
+            Method::Get,
+            ":8989/api/v3/qualityprofile",
+            Answer::reply(200, r#"[{"id":7,"name":"HD"}]"#),
+        ),
+        (Method::Get, ":8989/api/v3/series", Answer::reply(200, held)),
+        (
+            Method::Get,
+            ":8989/api/v3/indexer",
+            Answer::reply(200, "[]"),
+        ),
+    ]);
+    let (engine, _) = both_stacks();
+    let ctx = importing_over(engine, Source::External(project()), agreeing);
+
+    let found = carrying(&ctx, true).await;
+    assert_eq!(
+        found.as_ref().map(|read| read.stance),
+        Some(Stance::Unchanged),
+        "{found:?}"
+    );
 }

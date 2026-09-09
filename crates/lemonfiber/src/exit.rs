@@ -60,7 +60,7 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
 /// carried is one they still have on the old stack and do not have on the new, and a
 /// script that read success would go on as though the library were whole.
 fn carrying(report: &lemonfiber_core::model::ImportReport) -> ExitCode {
-    if report.refused.is_some() || !report.not_carried.is_empty() {
+    if report.refusal.is_some() || !report.not_carried.is_empty() {
         return ExitCode::from(VALIDATION);
     }
     ExitCode::SUCCESS
@@ -72,7 +72,7 @@ fn carrying(report: &lemonfiber_core::model::ImportReport) -> ExitCode {
 /// read success from a run which stopped four of six services would go on to start
 /// lemonfiber against ports still answered by the other two.
 fn replacing(report: &lemonfiber_core::model::ReplaceReport) -> ExitCode {
-    if report.refused.is_some() || !report.still_running.is_empty() {
+    if report.refusal.is_some() || !report.still_running.is_empty() {
         return ExitCode::from(VALIDATION);
     }
     ExitCode::SUCCESS
@@ -84,7 +84,7 @@ fn replacing(report: &lemonfiber_core::model::ReplaceReport) -> ExitCode {
 /// listen, or a machine that could not be read — so it earns VALIDATION rather than a
 /// plain failure.
 fn standing(report: &lemonfiber_core::model::BesideReport) -> ExitCode {
-    if report.refused.is_some() {
+    if report.refusal.is_some() {
         return ExitCode::from(VALIDATION);
     }
     ExitCode::SUCCESS
@@ -98,7 +98,7 @@ fn standing(report: &lemonfiber_core::model::BesideReport) -> ExitCode {
 /// having only said what adopting would come to, are both the command doing what it
 /// was asked.
 fn adopting(report: &AdoptReport) -> ExitCode {
-    if report.refused.is_some() {
+    if report.refusal.is_some() {
         return ExitCode::from(VALIDATION);
     }
     ExitCode::SUCCESS
@@ -547,6 +547,7 @@ mod tests {
         ResetReport, StackEdit, StatusReport, Triggered, UpgradeMedia, UpgradeReport,
         VersionReport,
     };
+    use lemonfiber_core::reconfigure::Stance;
     use lemonfiber_core::seed::{
         Assessment, Report as SeedReport, Severity as SeedSeverity, State as SeedState, Wiring,
     };
@@ -1257,7 +1258,7 @@ mod tests {
     #[test]
     fn an_import_that_left_a_record_behind_is_not_a_success() {
         let partial = lemonfiber_core::model::ImportReport {
-            applied: true,
+            stance: Stance::Applied,
             not_carried: vec![lemonfiber_core::model::UnsupportedReport {
                 what: "Bake Off".to_owned(),
                 because: "no such profile here".to_owned(),
@@ -1269,7 +1270,7 @@ mod tests {
             std::process::ExitCode::from(super::VALIDATION)
         );
         let whole = lemonfiber_core::model::ImportReport {
-            applied: true,
+            stance: Stance::Applied,
             ..lemonfiber_core::model::ImportReport::default()
         };
         assert_eq!(
@@ -1282,7 +1283,7 @@ mod tests {
     #[test]
     fn a_replacement_that_left_something_running_is_not_a_success() {
         let partial = lemonfiber_core::model::ReplaceReport {
-            applied: true,
+            stance: Stance::Applied,
             still_running: vec!["radarr".to_owned()],
             ..lemonfiber_core::model::ReplaceReport::default()
         };
@@ -1291,7 +1292,7 @@ mod tests {
             std::process::ExitCode::from(super::VALIDATION)
         );
         let whole = lemonfiber_core::model::ReplaceReport {
-            applied: true,
+            stance: Stance::Applied,
             ..lemonfiber_core::model::ReplaceReport::default()
         };
         assert_eq!(
@@ -1305,7 +1306,7 @@ mod tests {
     #[test]
     fn standing_beside_exits_on_whether_it_could() {
         let refused = lemonfiber_core::model::BesideReport {
-            refused: Some("nowhere left to listen".to_owned()),
+            refusal: Some("nowhere left to listen".to_owned()),
             ..lemonfiber_core::model::BesideReport::default()
         };
         assert_eq!(
@@ -1313,7 +1314,7 @@ mod tests {
             std::process::ExitCode::from(super::VALIDATION)
         );
         let stood = lemonfiber_core::model::BesideReport {
-            applied: true,
+            stance: Stance::Applied,
             ..lemonfiber_core::model::BesideReport::default()
         };
         assert_eq!(
@@ -1327,7 +1328,7 @@ mod tests {
     #[test]
     fn a_refused_adoption_exits_on_what_the_operator_must_resolve() {
         let refused = lemonfiber_core::model::AdoptReport {
-            refused: Some("a database a later version wrote".to_owned()),
+            refusal: Some("a database a later version wrote".to_owned()),
             ..lemonfiber_core::model::AdoptReport::default()
         };
         assert_eq!(
@@ -1341,7 +1342,7 @@ mod tests {
     #[test]
     fn adopting_and_rehearsing_it_both_exit_successfully() {
         let adopted = lemonfiber_core::model::AdoptReport {
-            adopted: true,
+            stance: Stance::Applied,
             ..lemonfiber_core::model::AdoptReport::default()
         };
         assert_eq!(
@@ -1349,7 +1350,7 @@ mod tests {
             std::process::ExitCode::SUCCESS
         );
         let rehearsed = lemonfiber_core::model::AdoptReport {
-            rehearsed: true,
+            stance: Stance::Pending,
             ..lemonfiber_core::model::AdoptReport::default()
         };
         assert_eq!(

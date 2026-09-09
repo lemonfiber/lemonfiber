@@ -25,7 +25,7 @@ use crate::config::store::showing;
 use crate::validate::Validation;
 
 /// Where a proposed change stands once it has been read against what is in force.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Stance {
     /// The setting already holds what was asked for. Nothing to apply, nothing to
@@ -34,6 +34,10 @@ pub enum Stance {
     Unchanged,
     /// Staged and not applied: nothing has been written. Either it is consequential
     /// and nobody has said yes to it yet, or it was rehearsed.
+    ///
+    /// The default, because nothing having happened yet is what every act starts as,
+    /// and a report built and not filled in should say that rather than claim it acted.
+    #[default]
     Pending,
     /// Turned away. It cannot be applied safely, the file is exactly as it was, and
     /// the refusal says why.

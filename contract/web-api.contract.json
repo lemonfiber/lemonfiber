@@ -79,10 +79,6 @@
           "description": "What adopting a setup already here came to, or would come to.",
           "type": "object",
           "properties": {
-            "adopted": {
-              "description": "Whether it was actually adopted, as against described.",
-              "type": "boolean"
-            },
             "back_up": {
               "description": "The host paths those services keep their data in, so a backup can be taken of\nexactly the right thing.",
               "type": "array",
@@ -97,16 +93,16 @@
                 "null"
               ]
             },
-            "refused": {
-              "description": "Why it was not, where it was not.",
+            "refusal": {
+              "description": "Why nothing was done, where nothing was.",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "rehearsed": {
-              "description": "Whether this call only said what it would do.",
-              "type": "boolean"
+            "stance": {
+              "description": "Where the act stands.",
+              "$ref": "#/$defs/Stance"
             },
             "upgrades": {
               "description": "The services whose databases a newer version would upgrade, and whose data\ntherefore has to be backed up before anything opens it.",
@@ -117,10 +113,9 @@
             }
           },
           "required": [
-            "adopted",
+            "stance",
             "upgrades",
-            "back_up",
-            "rehearsed"
+            "back_up"
           ]
         },
         "CarryingReport": {
@@ -164,6 +159,31 @@
             "because",
             "backup_first",
             "refused"
+          ]
+        },
+        "Stance": {
+          "description": "Where a proposed change stands once it has been read against what is in force.",
+          "oneOf": [
+            {
+              "description": "The setting already holds what was asked for. Nothing to apply, nothing to\nconfirm, and the file is not touched — a write of the same value would move\nthe file's own timestamp and read afterwards as an edit somebody made.",
+              "type": "string",
+              "const": "unchanged"
+            },
+            {
+              "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.\n\nThe default, because nothing having happened yet is what every act starts as,\nand a report built and not filled in should say that rather than claim it acted.",
+              "type": "string",
+              "const": "pending"
+            },
+            {
+              "description": "Turned away. It cannot be applied safely, the file is exactly as it was, and\nthe refusal says why.",
+              "type": "string",
+              "const": "blocked"
+            },
+            {
+              "description": "Written.",
+              "type": "string",
+              "const": "applied"
+            }
           ]
         }
       }
@@ -1181,10 +1201,6 @@
           "description": "What standing lemonfiber beside an existing setup came to, or would come to.",
           "type": "object",
           "properties": {
-            "applied": {
-              "description": "Whether it was actually written, as against described.",
-              "type": "boolean"
-            },
             "ports": {
               "description": "Where each service would listen instead, lowest original port first.",
               "type": "array",
@@ -1192,16 +1208,16 @@
                 "$ref": "#/$defs/MovedReport"
               }
             },
-            "refused": {
-              "description": "Why it was not, where it was not.",
+            "refusal": {
+              "description": "Why nothing was written, where nothing was.",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "rehearsed": {
-              "description": "Whether this call only said what it would do.",
-              "type": "boolean"
+            "stance": {
+              "description": "Where the act stands.",
+              "$ref": "#/$defs/Stance"
             },
             "written": {
               "description": "Where the Compose file that says so was written.",
@@ -1213,8 +1229,7 @@
           },
           "required": [
             "ports",
-            "applied",
-            "rehearsed"
+            "stance"
           ]
         },
         "MovedReport": {
@@ -1244,6 +1259,31 @@
             "service",
             "from",
             "to"
+          ]
+        },
+        "Stance": {
+          "description": "Where a proposed change stands once it has been read against what is in force.",
+          "oneOf": [
+            {
+              "description": "The setting already holds what was asked for. Nothing to apply, nothing to\nconfirm, and the file is not touched — a write of the same value would move\nthe file's own timestamp and read afterwards as an edit somebody made.",
+              "type": "string",
+              "const": "unchanged"
+            },
+            {
+              "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.\n\nThe default, because nothing having happened yet is what every act starts as,\nand a report built and not filled in should say that rather than claim it acted.",
+              "type": "string",
+              "const": "pending"
+            },
+            {
+              "description": "Turned away. It cannot be applied safely, the file is exactly as it was, and\nthe refusal says why.",
+              "type": "string",
+              "const": "blocked"
+            },
+            {
+              "description": "Written.",
+              "type": "string",
+              "const": "applied"
+            }
           ]
         }
       }
@@ -1975,7 +2015,7 @@
               "const": "unchanged"
             },
             {
-              "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.",
+              "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.\n\nThe default, because nothing having happened yet is what every act starts as,\nand a report built and not filled in should say that rather than claim it acted.",
               "type": "string",
               "const": "pending"
             },
@@ -6361,10 +6401,6 @@
           "description": "What copying an operator's own records across came to, or would come to.",
           "type": "object",
           "properties": {
-            "applied": {
-              "description": "Whether anything was actually carried, as against described.",
-              "type": "boolean"
-            },
             "carried": {
               "description": "What was carried across.",
               "type": "array",
@@ -6386,16 +6422,16 @@
                 "null"
               ]
             },
-            "refused": {
-              "description": "Why nothing was, where nothing was.",
+            "refusal": {
+              "description": "Why nothing was carried, where nothing was.",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "rehearsed": {
-              "description": "Whether this call only said what it would do.",
-              "type": "boolean"
+            "stance": {
+              "description": "Where the act stands.",
+              "$ref": "#/$defs/Stance"
             },
             "would_carry": {
               "description": "What would be, where nothing has been yet.",
@@ -6409,8 +6445,7 @@
             "carried",
             "would_carry",
             "not_carried",
-            "applied",
-            "rehearsed"
+            "stance"
           ]
         },
         "RecordReport": {
@@ -6434,6 +6469,31 @@
             "service",
             "kind",
             "name"
+          ]
+        },
+        "Stance": {
+          "description": "Where a proposed change stands once it has been read against what is in force.",
+          "oneOf": [
+            {
+              "description": "The setting already holds what was asked for. Nothing to apply, nothing to\nconfirm, and the file is not touched — a write of the same value would move\nthe file's own timestamp and read afterwards as an edit somebody made.",
+              "type": "string",
+              "const": "unchanged"
+            },
+            {
+              "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.\n\nThe default, because nothing having happened yet is what every act starts as,\nand a report built and not filled in should say that rather than claim it acted.",
+              "type": "string",
+              "const": "pending"
+            },
+            {
+              "description": "Turned away. It cannot be applied safely, the file is exactly as it was, and\nthe refusal says why.",
+              "type": "string",
+              "const": "blocked"
+            },
+            {
+              "description": "Written.",
+              "type": "string",
+              "const": "applied"
+            }
           ]
         },
         "UnsupportedReport": {
@@ -8524,10 +8584,6 @@
           "description": "What standing in place of a setup already here came to, or would come to.",
           "type": "object",
           "properties": {
-            "applied": {
-              "description": "Whether anything was actually stopped, as against described.",
-              "type": "boolean"
-            },
             "project": {
               "description": "The project that would be stood in place of.",
               "type": [
@@ -8535,16 +8591,16 @@
                 "null"
               ]
             },
-            "refused": {
-              "description": "Why nothing was, where nothing was.",
+            "refusal": {
+              "description": "Why nothing was stopped, where nothing was.",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "rehearsed": {
-              "description": "Whether this call only said what it would do.",
-              "type": "boolean"
+            "stance": {
+              "description": "Where the act stands.",
+              "$ref": "#/$defs/Stance"
             },
             "still_running": {
               "description": "The services that would not stop and are still up.",
@@ -8572,8 +8628,32 @@
             "would_stop",
             "stopped",
             "still_running",
-            "applied",
-            "rehearsed"
+            "stance"
+          ]
+        },
+        "Stance": {
+          "description": "Where a proposed change stands once it has been read against what is in force.",
+          "oneOf": [
+            {
+              "description": "The setting already holds what was asked for. Nothing to apply, nothing to\nconfirm, and the file is not touched — a write of the same value would move\nthe file's own timestamp and read afterwards as an edit somebody made.",
+              "type": "string",
+              "const": "unchanged"
+            },
+            {
+              "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.\n\nThe default, because nothing having happened yet is what every act starts as,\nand a report built and not filled in should say that rather than claim it acted.",
+              "type": "string",
+              "const": "pending"
+            },
+            {
+              "description": "Turned away. It cannot be applied safely, the file is exactly as it was, and\nthe refusal says why.",
+              "type": "string",
+              "const": "blocked"
+            },
+            {
+              "description": "Written.",
+              "type": "string",
+              "const": "applied"
+            }
           ]
         }
       }
