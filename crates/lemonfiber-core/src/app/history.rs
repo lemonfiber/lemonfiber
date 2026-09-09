@@ -7,18 +7,11 @@
 //!
 //! Reading only. Nothing here puts a change back.
 
-use crate::journal::{Change, Kind};
+use crate::journal::{horizon, Change, Kind};
 use crate::model::{ChangeReport, HistoryReport};
 use crate::rollback::{standing, together, Reversal};
 
 use super::Ctx;
-
-/// How far back the record goes.
-///
-/// The journal is written by apply and never trimmed, so the horizon is the whole of it.
-/// Stated anyway, because a record that has been trimmed and one that has always been
-/// short look identical from the entries alone.
-const HORIZON: &str = "every change since this machine was set up; nothing is trimmed";
 
 /// Everything lemonfiber changed, newest first.
 ///
@@ -27,7 +20,7 @@ const HORIZON: &str = "every change since this machine was set up; nothing is tr
 pub fn history(ctx: &Ctx) -> HistoryReport {
     let Some(paths) = super::targets::layout(ctx) else {
         return HistoryReport {
-            horizon: HORIZON.to_owned(),
+            horizon: horizon(&[]),
             ..HistoryReport::default()
         };
     };
@@ -60,7 +53,7 @@ pub fn history(ctx: &Ctx) -> HistoryReport {
 
     HistoryReport {
         changes: read,
-        horizon: HORIZON.to_owned(),
+        horizon: horizon(changes),
     }
 }
 
