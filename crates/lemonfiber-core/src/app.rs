@@ -381,6 +381,7 @@ mod tests {
     use crate::config::Settings;
     use crate::docker::{Condition, State as ServiceState};
     use crate::doctor::Category;
+    use crate::migration::mode::Mode;
     use crate::model::InvitationStanding;
     use crate::model::VersionReport;
     use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
@@ -2128,7 +2129,10 @@ mod tests {
     #[tokio::test]
     async fn asking_to_carry_records_across_reaches_the_command_that_would() {
         let ctx = a_context().build();
-        let asked = Command::Migrate(MigrateAction::Import { confirmed: false });
+        let asked = Command::Migrate(MigrateAction::Act {
+            mode: Mode::Import,
+            confirmed: false,
+        });
         let read = dispatch(asked, &ctx).await;
         let answered = matches!(&read, Ok(Outcome::Import(_)));
         assert!(answered, "{read:?}");
@@ -2137,7 +2141,10 @@ mod tests {
     #[tokio::test]
     async fn asking_to_stand_in_place_of_what_is_here_reaches_the_command_that_would() {
         let ctx = a_context().build();
-        let asked = Command::Migrate(MigrateAction::Replace { confirmed: false });
+        let asked = Command::Migrate(MigrateAction::Act {
+            mode: Mode::Replace,
+            confirmed: false,
+        });
         let read = dispatch(asked, &ctx).await;
         let answered = matches!(&read, Ok(Outcome::Replacement(_)));
         assert!(answered, "{read:?}");
@@ -2146,7 +2153,10 @@ mod tests {
     #[tokio::test]
     async fn asking_to_stand_beside_what_is_here_reaches_the_command_that_would() {
         let ctx = a_context().build();
-        let asked = Command::Migrate(MigrateAction::Beside { confirmed: false });
+        let asked = Command::Migrate(MigrateAction::Act {
+            mode: Mode::Beside,
+            confirmed: false,
+        });
         let read = dispatch(asked, &ctx).await;
         let answered = matches!(&read, Ok(Outcome::Beside(_)));
         assert!(answered, "{read:?}");
@@ -2155,7 +2165,10 @@ mod tests {
     #[tokio::test]
     async fn asking_to_take_over_what_is_here_reaches_the_command_that_would() {
         let ctx = a_context().build();
-        let asked = Command::Migrate(MigrateAction::Adopt { confirmed: false });
+        let asked = Command::Migrate(MigrateAction::Act {
+            mode: Mode::Adopt,
+            confirmed: false,
+        });
         let read = dispatch(asked, &ctx).await;
         let answered = matches!(&read, Ok(Outcome::Adoption(_)));
         assert!(answered, "{read:?}");

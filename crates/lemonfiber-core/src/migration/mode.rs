@@ -30,6 +30,18 @@ pub enum Mode {
 }
 
 impl Mode {
+    /// The one word this mode is named by where a name has to be a single token — a
+    /// web action, a subcommand — as against the words a person reads.
+    #[must_use]
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Self::Adopt => "adopt",
+            Self::Import => "import",
+            Self::Replace => "replace",
+            Self::Beside => "beside",
+        }
+    }
+
     /// The word an operator types for this mode.
     #[must_use]
     pub const fn word(self) -> &'static str {

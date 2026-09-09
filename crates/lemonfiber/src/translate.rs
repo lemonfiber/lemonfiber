@@ -15,6 +15,7 @@ use lemonfiber_core::app::{
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
+use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
@@ -196,21 +197,16 @@ fn allowing(
 /// typed `migrate` to see what is here should not have taken over their own stack by
 /// doing so.
 pub(crate) fn migrating(action: Option<&MigrateCommand>) -> MigrateAction {
-    match action {
-        None => MigrateAction::Survey,
-        Some(MigrateCommand::Adopt { confirm }) => MigrateAction::Adopt {
-            confirmed: *confirm,
-        },
-        Some(MigrateCommand::Beside { confirm }) => MigrateAction::Beside {
-            confirmed: *confirm,
-        },
-        Some(MigrateCommand::Import { confirm }) => MigrateAction::Import {
-            confirmed: *confirm,
-        },
-        Some(MigrateCommand::Replace { confirm }) => MigrateAction::Replace {
-            confirmed: *confirm,
-        },
-    }
+    let Some(asked) = action else {
+        return MigrateAction::Survey;
+    };
+    let (mode, confirmed) = match asked {
+        MigrateCommand::Adopt { confirm } => (Mode::Adopt, *confirm),
+        MigrateCommand::Import { confirm } => (Mode::Import, *confirm),
+        MigrateCommand::Beside { confirm } => (Mode::Beside, *confirm),
+        MigrateCommand::Replace { confirm } => (Mode::Replace, *confirm),
+    };
+    MigrateAction::Act { mode, confirmed }
 }
 
 pub(crate) fn configuration(action: ConfigAction) -> Command {
@@ -1267,7 +1263,10 @@ mod tests {
         let asked = lemonfiber::cli::MigrateCommand::Import { confirm: true };
         assert_eq!(
             super::migrating(Some(&asked)),
-            lemonfiber_core::app::MigrateAction::Import { confirmed: true }
+            lemonfiber_core::app::MigrateAction::Act {
+                mode: lemonfiber_core::migration::mode::Mode::Import,
+                confirmed: true,
+            }
         );
     }
 
@@ -1277,7 +1276,10 @@ mod tests {
         let asked = lemonfiber::cli::MigrateCommand::Replace { confirm: true };
         assert_eq!(
             super::migrating(Some(&asked)),
-            lemonfiber_core::app::MigrateAction::Replace { confirmed: true }
+            lemonfiber_core::app::MigrateAction::Act {
+                mode: lemonfiber_core::migration::mode::Mode::Replace,
+                confirmed: true,
+            }
         );
     }
 
@@ -1287,7 +1289,10 @@ mod tests {
         let asked = lemonfiber::cli::MigrateCommand::Beside { confirm: true };
         assert_eq!(
             super::migrating(Some(&asked)),
-            lemonfiber_core::app::MigrateAction::Beside { confirmed: true }
+            lemonfiber_core::app::MigrateAction::Act {
+                mode: lemonfiber_core::migration::mode::Mode::Beside,
+                confirmed: true,
+            }
         );
     }
 
@@ -1298,12 +1303,18 @@ mod tests {
         let asked = lemonfiber::cli::MigrateCommand::Adopt { confirm: true };
         assert_eq!(
             super::migrating(Some(&asked)),
-            lemonfiber_core::app::MigrateAction::Adopt { confirmed: true }
+            lemonfiber_core::app::MigrateAction::Act {
+                mode: lemonfiber_core::migration::mode::Mode::Adopt,
+                confirmed: true,
+            }
         );
         let unconfirmed = lemonfiber::cli::MigrateCommand::Adopt { confirm: false };
         assert_eq!(
             super::migrating(Some(&unconfirmed)),
-            lemonfiber_core::app::MigrateAction::Adopt { confirmed: false }
+            lemonfiber_core::app::MigrateAction::Act {
+                mode: lemonfiber_core::migration::mode::Mode::Adopt,
+                confirmed: false,
+            }
         );
     }
 }
