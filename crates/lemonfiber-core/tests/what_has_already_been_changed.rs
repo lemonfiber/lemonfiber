@@ -22,6 +22,7 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::model::HistoryReport;
 use lemonfiber_core::platform::Environment;
+use lemonfiber_core::ports::seams::Seams;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 
@@ -41,10 +42,13 @@ fn paths(root: &Path) -> Paths {
 /// from disk rather than answered by a fake.
 fn ctx(root: &Path) -> Ctx {
     Ctx::new(
-        Arc::new(lemonfiber_core::adapters::Local),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Files::ending(vec![]),
+        Arc::new(lemonfiber_adapters::Local),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
+        Seams {
+            filesystem: Files::ending(vec![]),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             env_file: Some(paths(root).env_file()),
