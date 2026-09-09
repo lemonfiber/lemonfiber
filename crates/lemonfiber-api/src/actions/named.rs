@@ -87,18 +87,26 @@ pub const OFFERED: &[&str] = &[
 /// refuses all four the same way.
 const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 
-/// The setting a change names, and what to change it to.
+/// The setting a change names, what to change it to, and whether it was agreed to.
 ///
 /// Named apart from the table for the reason the household three are: both halves are
 /// required, each is refused by its own name, and a reading that can refuse belongs
 /// beside its refusals rather than inside a list of arms.
-fn setting(key: Option<String>, value: Option<String>) -> Result<Command, Refused> {
+///
+/// Unconfirmed it is the review — the difference between what the setting holds and
+/// what it would hold, and what changing it affects — for every change that costs
+/// something, so what a browser agrees to is what it was shown.
+fn setting(key: Option<String>, value: Option<String>, confirm: bool) -> Result<Command, Refused> {
     let missing = |argument: &str| Refused::Missing {
         action: "config-set".to_owned(),
         argument: argument.to_owned(),
     };
     match (key, value) {
-        (Some(key), Some(value)) => Ok(Command::ConfigSet { key, value }),
+        (Some(key), Some(value)) => Ok(Command::ConfigSet {
+            key,
+            value,
+            confirmed: confirm,
+        }),
         (None, _) => Err(missing("key")),
         (_, None) => Err(missing("value")),
     }
@@ -217,7 +225,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "switch" => Ok(Command::Switch { forms }),
         "restart" => Ok(Command::Restart { forms, services }),
         "pull" => Ok(Command::Pull { forms }),
-        "config-set" => setting(key, value),
+        "config-set" => setting(key, value, confirm),
         "seed" => Ok(Command::Seed),
         "adopt" => Ok(Command::Adopt),
         "reset" => Ok(Command::Reset { confirm }),

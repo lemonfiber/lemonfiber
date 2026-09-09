@@ -564,7 +564,9 @@ Options:
 ## `lemonfiber config set`
 
 ```text
-Change one setting
+Change one setting.
+
+Shows the difference between what the setting holds and what it would hold, and what changing it affects. A change setup catalogued as consequential — the data location, the download protocols, the user the services run as — is staged rather than applied until `--confirm`. A replacement credential is proven against its live service before the one it replaces is discarded.
 
 Usage: lemonfiber config set [OPTIONS] <KEY> <VALUE>
 
@@ -576,6 +578,11 @@ Arguments:
           What to change it to
 
 Options:
+      --confirm
+          Go ahead, having read what the change affects.
+
+          Also stores a replacement credential that nothing could be reached to prove — for a machine that is offline, or a provider it cannot see.
+
       --json
           Print machine-readable output
 
@@ -589,7 +596,7 @@ Options:
           Operate a stack directory of your own instead of the built-in one
 
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 ```
 
 ## `lemonfiber config show`

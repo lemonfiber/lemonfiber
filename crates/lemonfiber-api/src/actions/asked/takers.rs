@@ -101,10 +101,20 @@ pub const TAKES_FORMS: &[&str] = &[
 /// a download in flight finish, which is answered by waiting rather than by
 /// agreeing, and a machine-readable run is never asked it at all.
 ///
+/// Changing a setting is a fork on the changes that cost something and not on the
+/// rest. Unconfirmed it is the review — the difference between what the setting holds
+/// and what it would hold — and for a decision setup catalogued as consequential that
+/// review is all it is; for a cheap one the change is simply made, because a
+/// confirmation invented for a setting whose cost is nothing teaches an operator to
+/// dismiss the ones that mean something. The same word answers the other thing that
+/// stops a change: a replacement credential no service could be reached to prove is
+/// held back until somebody says to store it unproven.
+///
 /// Choosing for music is inside `quality-set` and drops the agreement, because
 /// picking an audio format is not a choice this host has to transcode for. The
 /// command line drops it there too.
 pub const TAKES_AGREEMENT: &[&str] = &[
+    "config-set",
     "forget",
     "uninstall",
     "remove",

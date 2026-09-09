@@ -12,6 +12,10 @@
 use crate::doctor::Narrowing;
 use crate::error::{Code, Diagnose, Problem};
 use crate::stack::compose::Action;
+// The one function named rather than reached through its module below. The three
+// settings arms are the longest in the dispatcher, and the module prefix on each of
+// them is what pushed it past the length a function may be.
+use self::configuring::configuration;
 
 pub mod accepted;
 mod adopt;
@@ -251,11 +255,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             acting(ctx, &forms, Action::Restart(services)).await
         }
         Command::Pull { forms } => engine::lifecycle(ctx, &forms, &Action::Pull).await,
-        Command::ConfigGet { key } => configuring::configuration(ctx, Some(&key), None),
-        Command::ConfigSet { key, value } => {
-            configuring::configuration(ctx, Some(&key), Some(&value))
-        }
-        Command::ConfigShow => configuring::configuration(ctx, None, None),
+        Command::ConfigGet { key } => configuration(ctx, Some(&key), None, false).await,
+        Command::ConfigSet {
+            key,
+            value,
+            confirmed,
+        } => configuration(ctx, Some(&key), Some(&value), confirmed).await,
+        Command::ConfigShow => configuration(ctx, None, None, false).await,
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
         Command::Alerts(action) => appetite::hearing(ctx, action),
         Command::Migrate(action) => migration::migrating(ctx, action).await,
@@ -3141,6 +3147,7 @@ mod tests {
             Command::ConfigSet {
                 key: "LEMONFIBER_USENET".to_owned(),
                 value: "on".to_owned(),
+                confirmed: true,
             },
             &ctx,
         )
@@ -3174,6 +3181,7 @@ mod tests {
             Command::ConfigSet {
                 key: "LEMONFIBER_TORRENT".to_owned(),
                 value: "on".to_owned(),
+                confirmed: true,
             },
             &ctx,
         )
@@ -3549,6 +3557,7 @@ mod tests {
                 Command::ConfigSet {
                     key: key.to_owned(),
                     value: value.to_owned(),
+                    confirmed: true,
                 },
                 &ctx,
             )
@@ -3578,6 +3587,7 @@ mod tests {
             Command::ConfigSet {
                 key: "DATA_ROOT".to_owned(),
                 value: "/media".to_owned(),
+                confirmed: true,
             },
             &ctx,
         )
@@ -3622,6 +3632,7 @@ mod tests {
             Command::ConfigSet {
                 key: "A".to_owned(),
                 value: "1".to_owned(),
+                confirmed: false,
             },
             &ctx,
         )

@@ -148,11 +148,23 @@ pub enum ConfigAction {
         key: String,
     },
     /// Change one setting.
+    ///
+    /// Shows the difference between what the setting holds and what it would hold,
+    /// and what changing it affects. A change setup catalogued as consequential —
+    /// the data location, the download protocols, the user the services run as —
+    /// is staged rather than applied until `--confirm`. A replacement credential is
+    /// proven against its live service before the one it replaces is discarded.
     Set {
         /// The setting to change.
         key: String,
         /// What to change it to.
         value: String,
+        /// Go ahead, having read what the change affects.
+        ///
+        /// Also stores a replacement credential that nothing could be reached to
+        /// prove — for a machine that is offline, or a provider it cannot see.
+        #[arg(long)]
+        confirm: bool,
     },
     /// Show every setting, with credentials withheld.
     Show,

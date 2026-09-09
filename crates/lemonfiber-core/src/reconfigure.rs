@@ -11,8 +11,13 @@
 //! at nothing, and an operator told that afterwards has already lost the thing the
 //! telling was for.
 //!
-//! Nothing here reads a file or reaches a service. It is the catalogue, and the
-//! surfaces that write settings consult it.
+//! Beside the catalogue is the shape of one revision: what a setting holds, what it
+//! would hold, what that costs, and whether the proposal cleared everything standing
+//! between it and the file. A change is a thing that can be read and decided on before
+//! it happens, rather than a value that has already been written.
+//!
+//! Nothing here reads a file or reaches a service. It is the catalogue and the shape of
+//! a proposal against it, and the surfaces that write settings consult both.
 
 use crate::config::{
     DATA_ROOT_KEY, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, JELLYFIN_MODE_KEY,
@@ -20,8 +25,13 @@ use crate::config::{
     PROVIDER_USER_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_PROVIDER_KEY,
 };
 
+mod review;
+
+pub use review::{Change, Consent, Review, Stance};
+
 /// What changing a decision costs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum Cost {
     /// Applied with a restart of the services it affects, and nothing else moves.
     Cheap,
@@ -136,15 +146,21 @@ pub fn decision(key: &str) -> Option<&'static Decision> {
     DECISIONS.iter().find(|decision| decision.key == key)
 }
 
-/// Whether changing `key` is consequential enough to be confirmed first.
+/// What changing `key` costs.
 ///
 /// A setting nobody asked about during setup is not a decision this catalogue speaks
-/// for, and is treated as cheap: the operator reaching for it by name has gone looking
-/// for it, and inventing a confirmation for a setting whose cost is unknown would
-/// teach them to dismiss the ones that mean something.
+/// for, and is cheap: the operator reaching for it by name has gone looking for it, and
+/// inventing a cost for a setting whose consequences nobody worked out would teach them
+/// to dismiss the ones that mean something.
+#[must_use]
+pub fn cost(key: &str) -> Cost {
+    decision(key).map_or(Cost::Cheap, |decision| decision.cost)
+}
+
+/// Whether changing `key` is consequential enough to be confirmed first.
 #[must_use]
 pub fn consequential(key: &str) -> bool {
-    decision(key).is_some_and(|decision| decision.cost == Cost::Consequential)
+    cost(key) == Cost::Consequential
 }
 
 #[cfg(test)]
