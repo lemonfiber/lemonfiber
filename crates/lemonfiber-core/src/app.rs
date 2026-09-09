@@ -39,6 +39,7 @@ mod expiring;
 #[cfg(test)]
 mod fixtures;
 pub mod forwarding;
+mod history;
 mod hosting;
 mod household;
 mod import;
@@ -263,6 +264,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::ConfigShow => configuring::reading(ctx, None).await,
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
         Command::Alerts(action) => appetite::hearing(ctx, action),
+        Command::History => Ok(Outcome::History(history::history(ctx))),
         Command::Migrate(action) => migration::migrating(ctx, action).await,
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace {
@@ -1828,6 +1830,27 @@ mod tests {
         assert!(listed.contains("\"words\":[{"), "{listed}");
     }
 
+    /// The record answers on a machine that has changed nothing, rather than refusing
+    /// for want of somewhere to keep a journal.
+    ///
+    /// Dispatched here as well as beside the crate because the dispatcher is compiled
+    /// twice, and an arm exercised in only one copy has its coverage counted from the
+    /// other.
+    #[tokio::test]
+    async fn the_record_answers_on_a_machine_that_has_changed_nothing() {
+        let ctx = ctx(Ok(spoke("")));
+
+        let said = dispatch(Command::History, &ctx)
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+
+        assert!(said.contains("\"kind\":\"history\""), "{said}");
+        assert!(said.contains("\"changes\":[]"), "{said}");
+        assert!(said.contains("\"horizon\":\""), "{said}");
+    }
+
     /// Which app to watch on needs no stack and no engine either, for the same
     /// reason: the client landscape belongs to the platforms rather than to this
     /// machine, so it answers before anything is set up.
@@ -2251,6 +2274,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::History(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)
@@ -2305,6 +2329,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::History(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)
@@ -3141,6 +3166,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::History(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)
@@ -4131,6 +4157,7 @@ mod tests {
                 Outcome::Version(_)
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
+                | Outcome::History(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)

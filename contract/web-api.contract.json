@@ -5563,6 +5563,110 @@
         }
       }
     },
+    "history": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/HistoryReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "ChangeReport": {
+          "description": "One change lemonfiber made, and whether it could be put back.",
+          "type": "object",
+          "properties": {
+            "alongside": {
+              "description": "How many changes that one operation made, this one among them.\n\nAn operation is the unit an operator agreed to, and undoing half of one leaves a\nmachine in a state nobody chose — so what a single line would take with it is on\nthe line rather than left to be counted off the list.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "at": {
+              "description": "When it was made.",
+              "type": "string"
+            },
+            "because": {
+              "description": "Why it could not go further, where it could not.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "did": {
+              "description": "What it did, in the operator's terms.",
+              "type": "string"
+            },
+            "instead": {
+              "description": "What to do instead, where there is something.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation": {
+              "description": "The operation that made it — a seed, a reconfigure, an applied fix — so a\nhistory reads as what happened rather than as bare diffs.",
+              "type": "string"
+            },
+            "reversal": {
+              "description": "How far it could be put back: `whole`, `partial`, or `none`.",
+              "type": "string"
+            },
+            "target": {
+              "description": "What it was made to.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "operation",
+            "target",
+            "did",
+            "reversal",
+            "alongside"
+          ]
+        },
+        "HistoryReport": {
+          "description": "Everything lemonfiber changed, most recent first.",
+          "type": "object",
+          "properties": {
+            "changes": {
+              "description": "The changes, newest first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ChangeReport"
+              }
+            },
+            "horizon": {
+              "description": "How far back the record goes, in the operator's terms.\n\nStated rather than left to be inferred from the oldest entry: a record that has\nbeen trimmed and one that has always been short look identical from the entries\nalone, and only one of them means something is missing.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "changes",
+            "horizon"
+          ]
+        }
+      }
+    },
     "hosting": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

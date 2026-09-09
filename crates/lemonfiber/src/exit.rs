@@ -226,6 +226,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // not happen already comes back as a problem.
         | Outcome::Alerts(_)
         | Outcome::Migration(_)
+        // The record arrived. That a change on it cannot be put back is what the read
+        // was asked, not a failure to answer.
+        | Outcome::History(_)
         | Outcome::Trace(_)
         | Outcome::Household(_)
         // What is hosted is a reading, and an install or a removal that could not be
