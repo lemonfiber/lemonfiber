@@ -360,3 +360,45 @@ async fn putting_the_data_location_back_is_only_partly_possible_and_says_what_st
     let instead = first.and_then(|change| change.instead.clone());
     assert!(instead.is_some_and(|said| said.contains("move the library yourself")));
 }
+
+/// A credential that went through the record never comes back out of it.
+///
+/// The journal keeps what a setting held before and after so a reversal can put it
+/// back, which means it holds credentials. This read is the one place they could reach
+/// a surface — and it is the output an operator pastes into a forum thread when they
+/// are asking why something broke. Two other subsystems here already refuse to write a
+/// password down a second time; a read that printed one would be the same leak arriving
+/// by a different route.
+#[tokio::test]
+async fn a_secret_says_that_it_changed_and_never_what_to() {
+    const KEY: &str = "INDEXER_APIKEY";
+    let was = format!("old-{}", "s3cret");
+    let now = format!("new-{}", "s3cret");
+
+    let root = scratch("secrets");
+    journalled(
+        &root,
+        &[
+            set("apply", KEY, None, &now),
+            set("reconfigure", KEY, Some(&was), &now),
+            set("apply", "TZ", None, "Europe/Amsterdam"),
+        ],
+    );
+
+    let report = recorded(&ctx(&root)).await;
+    let whole = serde_json::to_string(&report).unwrap_or_default();
+
+    assert!(!whole.is_empty(), "the report was read");
+    assert!(
+        !whole.contains(&was) && !whole.contains(&now),
+        "no part of the report carries the value: {whole}"
+    );
+    assert!(
+        whole.contains(KEY),
+        "the setting is still named, because which one changed is the useful half"
+    );
+    assert!(
+        whole.contains("Europe/Amsterdam"),
+        "and a setting that is not a credential still says what it became"
+    );
+}

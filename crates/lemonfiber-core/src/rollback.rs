@@ -10,6 +10,7 @@
 //! returns what a reversal would come to, so every arrangement can be exercised without a
 //! disk.
 
+use crate::config::store::is_secret;
 use crate::journal::{Change, Kind};
 
 /// How far a change can be put back.
@@ -114,10 +115,18 @@ pub fn standing(
 ) -> Standing {
     if let Some(key) = setting(change) {
         if let Some(edited) = drifted(change, holds) {
+            // A secret says that it differs and never what it now is. The value here is
+            // read live off the environment file, so printing it would put a credential
+            // into a refusal — which travels further than the file it came from.
+            let holding = if is_secret(key) {
+                format!("{key} now holds something else")
+            } else {
+                format!("{key} now holds {edited}")
+            };
             return Standing::refused(
                 &format!(
-                    "{key} now holds {edited}, which is not what this change left — somebody \
-                     has set it since, and putting this back would discard their edit"
+                    "{holding}, which is not what this change left — somebody has set it \
+                     since, and putting this back would discard their edit"
                 ),
                 Some("set it yourself if the older value is the one you want"),
             );
@@ -249,6 +258,35 @@ mod tests {
 
     /// The rule that matters most: somebody's own edit is not something to discard while
     /// claiming to put a change back.
+    /// A drifted credential says it differs and never what it now holds.
+    ///
+    /// The value compared here is read live off the environment file, so a refusal that
+    /// printed it would put a credential into a sentence that travels further than the
+    /// file it came from.
+    #[test]
+    fn a_drifted_secret_refuses_without_saying_what_it_now_holds() {
+        let live = format!("live-{}", "s3cret");
+        let held = live.clone();
+        let holds = move |_: &str| Some(held.clone());
+        let change = set("apply", "INDEXER_APIKEY", None, "what-apply-left");
+
+        let standing = standing(&change, &[], &holds);
+        let said = standing
+            .refusal
+            .map(|why| format!("{} {}", why.because, why.instead.unwrap_or_default()))
+            .unwrap_or_default();
+
+        assert!(!said.is_empty(), "it refused, and said why");
+        assert!(
+            !said.contains(&live),
+            "and the refusal does not carry the value: {said}"
+        );
+        assert!(
+            said.contains("INDEXER_APIKEY") && said.contains("something else"),
+            "it still names the setting and says it differs: {said}"
+        );
+    }
+
     #[test]
     fn a_setting_edited_by_hand_since_is_drift_and_is_refused() {
         let change = set("reconfigure", "PUID", Some("1000"), "1001");
