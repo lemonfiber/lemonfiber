@@ -16,6 +16,12 @@
 //! between it and the file. A change is a thing that can be read and decided on before
 //! it happens, rather than a value that has already been written.
 //!
+//! And beside that, what the revision comes to on the machine it is made on: what
+//! adding or dropping a way of downloading opens and keeps, what moving the data
+//! location does to the library paths the services already hold, and whether the file
+//! was edited by hand since lemonfiber last wrote to it. Each is decided here from
+//! what somebody else went and read.
+//!
 //! Nothing here reads a file or reaches a service. It is the catalogue and the shape of
 //! a proposal against it, and the surfaces that write settings consult both.
 
@@ -25,8 +31,17 @@ use crate::config::{
     PROVIDER_USER_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_PROVIDER_KEY,
 };
 
+// Reached by their own names rather than flattened up here. Three questions about
+// one change read better spelled as the questions they are — `protocols::opened`,
+// `relocating::moving`, `edits::standing` — than as a dozen verbs in one namespace
+// where nothing would say which of them belong together.
+pub mod edits;
+mod findings;
+pub mod protocols;
+pub mod relocating;
 mod review;
 
+pub use findings::{Active, Edited, Findings, LibraryPath, Opening};
 pub use review::{Change, Consent, Review, Stance};
 
 /// What changing a decision costs.

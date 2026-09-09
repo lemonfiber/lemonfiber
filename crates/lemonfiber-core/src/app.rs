@@ -15,7 +15,6 @@ use crate::stack::compose::Action;
 // The one function named rather than reached through its module below. The three
 // settings arms are the longest in the dispatcher, and the module prefix on each of
 // them is what pushed it past the length a function may be.
-use self::configuring::configuration;
 
 pub mod accepted;
 mod adopt;
@@ -53,6 +52,7 @@ mod outbox;
 mod quality;
 pub mod queue;
 mod quiesced;
+mod reconfiguring;
 mod record;
 pub mod recover;
 mod refusals;
@@ -78,7 +78,7 @@ pub mod watch;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Hostable, Keeping, MigrateAction, QualityAction, Removing, HOSTABLE,
+    Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
 };
 mod outcome;
 pub use ctx::Ctx;
@@ -258,13 +258,9 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             acting(ctx, &forms, Action::Restart(services)).await
         }
         Command::Pull { forms } => engine::lifecycle(ctx, &forms, &Action::Pull).await,
-        Command::ConfigGet { key } => configuration(ctx, Some(&key), None, false).await,
-        Command::ConfigSet {
-            key,
-            value,
-            confirmed,
-        } => configuration(ctx, Some(&key), Some(&value), confirmed).await,
-        Command::ConfigShow => configuration(ctx, None, None, false).await,
+        Command::ConfigGet { key } => configuring::reading(ctx, Some(&key)).await,
+        Command::ConfigSet(change) => configuring::configuration(ctx, change).await,
+        Command::ConfigShow => configuring::reading(ctx, None).await,
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
         Command::Alerts(action) => appetite::hearing(ctx, action),
         Command::Migrate(action) => migration::migrating(ctx, action).await,
@@ -379,7 +375,7 @@ mod tests {
 
     use super::{
         dispatch, pull_progress, AlertAction, Allowance, Answer as Ruling, Asking, BandwidthAsked,
-        Chosen, Command, Ctx, Decision, MigrateAction, Outcome, QualityAction, Removing,
+        Chosen, Command, Ctx, Decision, MigrateAction, Outcome, QualityAction, Removing, Setting,
         SetupAction, Waiting,
     };
     use crate::config::Settings;
@@ -3183,11 +3179,7 @@ mod tests {
         let ctx = with_config(&path);
 
         let written = dispatch(
-            Command::ConfigSet {
-                key: "LEMONFIBER_USENET".to_owned(),
-                value: "on".to_owned(),
-                confirmed: true,
-            },
+            Command::ConfigSet(Setting::to("LEMONFIBER_USENET", "on").agreed(true)),
             &ctx,
         )
         .await;
@@ -3217,11 +3209,7 @@ mod tests {
         let ctx = with_config(&path).rehearsing();
 
         let outcome = dispatch(
-            Command::ConfigSet {
-                key: "LEMONFIBER_TORRENT".to_owned(),
-                value: "on".to_owned(),
-                confirmed: true,
-            },
+            Command::ConfigSet(Setting::to("LEMONFIBER_TORRENT", "on").agreed(true)),
             &ctx,
         )
         .await;
@@ -3593,11 +3581,7 @@ mod tests {
         let ctx = with_config(&path);
         for (key, value) in [("DATA_ROOT", "/media"), ("WIREGUARD_PRIVATE_KEY", "abc123")] {
             let _ = dispatch(
-                Command::ConfigSet {
-                    key: key.to_owned(),
-                    value: value.to_owned(),
-                    confirmed: true,
-                },
+                Command::ConfigSet(Setting::to(key, value).agreed(true)),
                 &ctx,
             )
             .await;
@@ -3623,11 +3607,7 @@ mod tests {
         let path = config_scratch("envelope");
         let ctx = with_config(&path);
         let _ = dispatch(
-            Command::ConfigSet {
-                key: "DATA_ROOT".to_owned(),
-                value: "/media".to_owned(),
-                confirmed: true,
-            },
+            Command::ConfigSet(Setting::to("DATA_ROOT", "/media").agreed(true)),
             &ctx,
         )
         .await;
@@ -3667,17 +3647,10 @@ mod tests {
         let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500));
 
         let ctx = with_config(&dir.join(".env"));
-        let refusal = dispatch(
-            Command::ConfigSet {
-                key: "A".to_owned(),
-                value: "1".to_owned(),
-                confirmed: false,
-            },
-            &ctx,
-        )
-        .await
-        .err()
-        .map(|problem| problem.code);
+        let refusal = dispatch(Command::ConfigSet(Setting::to("A", "1")), &ctx)
+            .await
+            .err()
+            .map(|problem| problem.code);
         assert_eq!(refusal, Some(crate::config::store::CONFIG_NOT_WRITTEN));
 
         let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));

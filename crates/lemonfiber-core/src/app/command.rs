@@ -17,6 +17,7 @@ mod hosting;
 mod household;
 mod migrate;
 mod quality;
+mod setting;
 mod uninstall;
 
 pub use alerts::AlertAction;
@@ -25,6 +26,7 @@ pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
 pub use migrate::MigrateAction;
 pub use quality::QualityAction;
+pub use setting::Setting;
 pub use uninstall::Removing;
 
 /// What an invitation lets the person it is for watch.
@@ -135,18 +137,7 @@ pub enum Command {
     /// Read twice where the change costs something. Unconfirmed it shows the
     /// difference between what the setting holds and what it would hold, says what
     /// changing it affects, and writes nothing; confirmed it applies what was read.
-    ConfigSet {
-        /// The setting to change.
-        key: String,
-        /// What to change it to.
-        value: String,
-        /// Whether the operator has agreed to what the change costs.
-        ///
-        /// Answers two things, and they are one decision: a change setup catalogued
-        /// as consequential is not applied without it, and a replacement credential
-        /// no service could be reached to prove is not stored without it.
-        confirmed: bool,
-    },
+    ConfigSet(Setting),
     /// Show every setting, with credentials withheld.
     ConfigShow,
     /// Report what each service is actually doing.

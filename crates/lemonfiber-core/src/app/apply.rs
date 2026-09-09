@@ -22,12 +22,14 @@
 use std::path::{Path, PathBuf};
 
 use crate::alert::{Appetite, Wants};
+use crate::app::reconfiguring::SETTINGS;
+use crate::baseline::Baseline;
 use crate::config::paths::Paths;
-use crate::config::store;
+use crate::config::store::{self, is_secret};
 use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Change, Journal, Kind};
 use crate::stack::{self, Source};
-use crate::wizard::{Phase, Wizard};
+use crate::wizard::{Phase, Plan, Wizard};
 
 /// Write a reviewed setup to disk, driving the lifecycle and recording each
 /// reversible write so an interrupted run can be unwound.
@@ -163,6 +165,12 @@ fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Res
         store::set(&env_file, key, value).map_err(Fault::Store)?;
     }
 
+    // What lemonfiber wrote, recorded as the expected state a later change compares
+    // against. Without it, the first change made to a setting cannot tell an
+    // operator's hand-edit from the value setup itself put there, and would
+    // overwrite one without saying so.
+    remembered(paths, &plan, stamp);
+
     // The notification appetite is its own file rather than an environment
     // setting, because it grows: the preset chosen here is one answer, and the
     // individual events switched on or off later live beside it. Written before
@@ -185,6 +193,33 @@ fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Res
     // resume, which keeps the writes, rather than trusting a half-written stack.
     wizard.transition(Phase::Applied);
     store::write(&progress, &rendered(wizard)).map_err(Fault::Store)
+}
+
+/// Record the settings this apply wrote, as what lemonfiber last put in the file.
+///
+/// Merged into whatever record is already there rather than written over it, so an
+/// apply beside an already-seeded stack does not take the services' records with it.
+/// A record that is there but unreadable is left alone for the reason seeding leaves
+/// one: it may hold what a later run needs, and silently replacing it is worse than
+/// not adding to it.
+///
+/// Credentials are deliberately left out — a second file holding a password would be
+/// a second file to leak one — and best-effort, like every other record kept beside
+/// the settings: an apply that could not write it still applied.
+fn remembered(paths: &Paths, plan: &Plan, stamp: &str) {
+    let path = paths.baseline();
+    let mut baseline = match std::fs::read_to_string(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Baseline::new(),
+        Err(_) => return,
+        Ok(text) => match serde_json::from_str(&text) {
+            Ok(baseline) => baseline,
+            Err(_) => return,
+        },
+    };
+    for (key, value) in plan.settings().iter().filter(|(key, _)| !is_secret(key)) {
+        baseline.record(SETTINGS, key, value, stamp);
+    }
+    let _ = store::write(&path, &serde_json::to_string(&baseline).unwrap_or_default());
 }
 
 /// The data location the operator chose, where they chose one.
@@ -265,7 +300,7 @@ mod tests {
     use crate::test_support::a_fresh_write;
     use std::path::{Path, PathBuf};
 
-    use super::apply;
+    use super::{apply, Baseline, SETTINGS};
     use crate::alert::{Appetite, Wants};
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
@@ -364,6 +399,83 @@ mod tests {
         );
         assert!(root.is_dir(), "the data directory was made");
         assert_eq!(wizard.phase(), Phase::Applied);
+    }
+
+    /// The record beside the settings, as a later change reads it back.
+    fn remembering(paths: &Paths) -> Baseline {
+        let text = std::fs::read_to_string(paths.baseline()).unwrap_or_default();
+        serde_json::from_str(&text).unwrap_or_default()
+    }
+
+    #[test]
+    fn what_setup_wrote_is_remembered_so_a_later_hand_edit_can_be_told_from_it() {
+        // Without this, the first change made to any setting has no third value to
+        // judge against: an edit made outside lemonfiber and the value setup itself
+        // wrote look identical, and the change would take the edit with it.
+        let dir = scratch("remembered");
+        let paths = layout(&dir);
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+
+        assert_eq!(
+            remembering(&paths)
+                .entry(SETTINGS, "LEMONFIBER_USENET")
+                .map(|record| record.value.clone()),
+            Some("on".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_record_beside_the_settings_keeps_what_seeding_put_there() {
+        // An apply beside an already-seeded stack must add to the record rather than
+        // write over it: the services' own values are what a later seed compares
+        // against, and losing them makes every one of them read as unmanaged.
+        let dir = scratch("merged");
+        let paths = layout(&dir);
+        let mut seeded = Baseline::new();
+        seeded.record("sonarr", "rootfolder", "/data/media/tv", "t");
+        let _ = store::write(
+            &paths.baseline(),
+            &serde_json::to_string(&seeded).unwrap_or_default(),
+        );
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+
+        let held = remembering(&paths);
+        assert!(held.entry("sonarr", "rootfolder").is_some());
+        assert!(held.entry(SETTINGS, "DATA_ROOT").is_some());
+    }
+
+    #[test]
+    fn a_record_that_cannot_be_opened_at_all_stops_nothing_and_is_left_alone() {
+        // A directory where the record should be: not there in the sense a first run
+        // means, and not something to write over either. The apply is what matters
+        // here and it still finishes; the record is best-effort by design.
+        let dir = scratch("blocked");
+        let paths = layout(&dir);
+        let _ = std::fs::create_dir_all(paths.baseline());
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+
+        assert!(paths.baseline().is_dir(), "left exactly as it was");
+    }
+
+    #[test]
+    fn a_record_that_cannot_be_read_is_left_where_it_is() {
+        // The same line seeding holds: a record that may be there but unreadable is
+        // safer left for the operator to re-form than silently replaced.
+        let dir = scratch("unreadable");
+        let paths = layout(&dir);
+        let _ = store::write(&paths.baseline(), "not json at all");
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+
+        let text = std::fs::read_to_string(paths.baseline()).unwrap_or_default();
+        assert_eq!(text, "not json at all");
     }
 
     #[test]

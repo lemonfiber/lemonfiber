@@ -28,6 +28,7 @@ mod migration;
 mod outbound;
 mod qr;
 mod quality;
+mod reconfigure;
 mod removal;
 pub(crate) mod repair;
 mod seed;
@@ -392,6 +393,9 @@ fn settings(report: &ConfigReport) -> Lines {
         for line in verdict(review, report.rehearsed) {
             lines.put(line);
         }
+        // What the change comes to on this machine, under the verdict rather than
+        // over it: the operator reads whether it landed first and why second.
+        lines.extend(reconfigure::found(&review.findings));
     }
     // Said at the moment the choice is being made, and only then — the checks
     // deliberately do not raise it again on every run afterwards.
@@ -480,7 +484,7 @@ mod tests {
         SettingReport, Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport,
         UpgradeReport, VersionReport, WizardReport,
     };
-    use lemonfiber_core::reconfigure::{Change, Cost, Review, Stance};
+    use lemonfiber_core::reconfigure::{Change, Cost, Findings, Review, Stance};
     use lemonfiber_core::wizard::{Phase, Step};
 
     /// An archive's own account of itself, holding nothing.
@@ -700,6 +704,7 @@ mod tests {
             refusal: matches!(stance, Stance::Blocked)
                 .then(|| "the replacement could not be proven".to_owned()),
             proof: None,
+            findings: Findings::default(),
         }
     }
 

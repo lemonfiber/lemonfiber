@@ -9,7 +9,7 @@ use crate::config::store;
 
 /// How the expected-state record read: genuinely absent, read, or there but
 /// unreadable.
-pub(super) enum Loaded {
+pub(in crate::app) enum Loaded {
     /// No record was found — a first seed, or none ever formed, or nothing
     /// configured. An empty baseline stands in and drift is assessed against it.
     Fresh,
@@ -33,7 +33,7 @@ pub(super) enum Loaded {
 /// loss rather than a first seed: the conservative direction, since a record that may
 /// be there but unreadable is safer surfaced for the operator to re-baseline than
 /// silently treated as one that never existed.
-pub(super) fn load_baseline(ctx: &Ctx) -> Loaded {
+pub(in crate::app) fn load_baseline(ctx: &Ctx) -> Loaded {
     let Some(path) = baseline_path(ctx) else {
         return Loaded::Fresh;
     };
@@ -51,7 +51,7 @@ pub(super) fn load_baseline(ctx: &Ctx) -> Loaded {
 /// records seeding keeps: a run that cannot persist it still wired the stack, and
 /// the worst a lost write costs is the next run re-reading current state as the
 /// baseline rather than the prior one.
-pub(super) fn save_baseline(ctx: &Ctx, baseline: &crate::baseline::Baseline) {
+pub(in crate::app) fn save_baseline(ctx: &Ctx, baseline: &crate::baseline::Baseline) {
     if let Some(path) = baseline_path(ctx) {
         let _ = store::write(&path, &serde_json::to_string(baseline).unwrap_or_default());
     }
@@ -122,7 +122,11 @@ pub(super) async fn escalate_broken_roots(
 /// Where the operator's data location is mounted inside every service: the tree a
 /// root folder must sit within, so the service files where the downloads are
 /// hardlinked and the rest of the stack can see them.
-pub(super) const DATA_ROOT: &str = "/data";
+///
+/// The same mount reconfiguration reasons about when the data location moves, so
+/// the two read one constant rather than each holding a path the other could
+/// change out from under.
+pub(super) use crate::reconfigure::relocating::MOUNT as DATA_ROOT;
 
 /// The root folders an \*arr wants, one per media type it manages, each under the
 /// media directory of the mounted data root. Shared by the seed pass and the

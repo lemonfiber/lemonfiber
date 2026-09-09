@@ -251,7 +251,11 @@ pub const TAKES_SERVICES: &[&str] = &["up", "down", "restart"];
 /// are not download clients would hold up a stop for downloads stopping them
 /// cannot interrupt — which is why the two are refused together rather than one of
 /// them being dropped, and why the command line declares them in conflict.
-pub const TAKES_WAITING: &[&str] = &["down", "uninstall"];
+/// Dropping a way of downloading is the third. It takes the download client away
+/// while something may be in the middle of arriving, exactly as a teardown does, and
+/// the wait is the offer it makes rather than a way past it — so it is answered with
+/// the same word, and the wait happens inside the change for the same reason.
+pub const TAKES_WAITING: &[&str] = &["config-set", "down", "uninstall"];
 
 /// The action whose command carries which of the four removals it is about.
 ///

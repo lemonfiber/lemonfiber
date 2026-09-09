@@ -11,15 +11,15 @@ use crate::ports::service::Client;
 /// A Servarr application that files media: its identity and address (as the
 /// credential check resolves them) and the media types it manages, which give
 /// the root folders it needs.
-pub(super) struct Arr {
-    pub(super) target: crate::doctor::credentials::Target,
-    pub(super) media_types: Vec<String>,
+pub(in crate::app) struct Arr {
+    pub(in crate::app) target: crate::doctor::credentials::Target,
+    pub(in crate::app) media_types: Vec<String>,
 }
 
 /// The Servarr applications that file media — Sonarr, Radarr, Lidarr — resolved
 /// with their media types. Prowlarr shares the shape but manages no media, so it
 /// declares no media types and is left out.
-pub(super) fn servarr_arrs(
+pub(in crate::app) fn servarr_arrs(
     services: &[lemonfiber_manifest::Service],
     project: Option<&Path>,
 ) -> Vec<Arr> {

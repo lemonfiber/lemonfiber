@@ -22,7 +22,33 @@ use crate::validate::{Credential, Validation};
 
 use proving::Proving;
 
-use super::{Ctx, Outcome};
+use super::{Ctx, Outcome, Setting, Waiting};
+
+/// What the operator said about this change beyond what the change is.
+///
+/// Two words a surface already has — a `--confirm` on a command line and a `confirm`
+/// in a request body are one word, and so are the two `wait`s — carried together
+/// because they are answers to the same question: something stands between this
+/// change and the file, and here is what to do about it. One says go ahead anyway;
+/// the other says let what is in flight finish first, which is the offer a reduction
+/// makes rather than a way past it.
+#[derive(Clone, Copy)]
+struct Asked {
+    /// Whether the operator has agreed to what the change costs.
+    confirmed: bool,
+    /// Whether they asked for what is still coming down to finish first.
+    waiting: Waiting,
+}
+
+impl Asked {
+    /// What the request said, taken off it.
+    const fn of(change: &Setting) -> Self {
+        Self {
+            confirmed: change.confirmed,
+            waiting: change.waiting,
+        }
+    }
+}
 
 /// Read or change settings.
 ///
@@ -36,21 +62,39 @@ use super::{Ctx, Outcome};
 ///
 /// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
 /// settings file that could not be read or written.
-pub(super) async fn configuration(
-    ctx: &Ctx,
-    key: Option<&str>,
-    value: Option<&str>,
-    confirmed: bool,
-) -> Result<Outcome, Box<Problem>> {
-    let Some(path) = ctx.settings.env_file.as_deref() else {
-        return Err(Box::new(store::Failure::Nowhere.problem()));
-    };
-
+pub(super) async fn configuration(ctx: &Ctx, change: Setting) -> Result<Outcome, Box<Problem>> {
     // Trimmed on the way in, for the same reason setup trims what is pasted into it:
     // a key copied from a dashboard carries a trailing newline, it authenticates
     // nowhere, and the file format has no way to mean the whitespace deliberately. The
     // parser already trims the name; the value was the half still taken literally.
-    let value = value.map(str::trim);
+    let change = Setting {
+        value: change.value.trim().to_owned(),
+        ..change
+    };
+    settings(ctx, Some(&change.key), Some(&change)).await
+}
+
+/// Read one setting, or all of them.
+///
+/// A read decides nothing, so there is no proposal to weigh and nothing to write.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
+/// settings file that could not be read.
+pub(super) async fn reading(ctx: &Ctx, key: Option<&str>) -> Result<Outcome, Box<Problem>> {
+    settings(ctx, key, None).await
+}
+
+/// Both halves: the settings as they stand, and what a change to one comes to.
+async fn settings(
+    ctx: &Ctx,
+    key: Option<&str>,
+    change: Option<&Setting>,
+) -> Result<Outcome, Box<Problem>> {
+    let Some(path) = ctx.settings.env_file.as_deref() else {
+        return Err(Box::new(store::Failure::Nowhere.problem()));
+    };
 
     // Read before anything is decided rather than after the write, because the diff an
     // operator is shown is the difference between this file and the one proposed, and a
@@ -60,9 +104,10 @@ pub(super) async fn configuration(
         Err(err) => return Err(Box::new(err.problem())),
     };
 
-    let (file, changed, consequence, review) = match (key, value) {
-        (Some(key), Some(value)) => {
-            let proposal = applying(ctx, path, held, key, value, confirmed).await?;
+    let (file, changed, consequence, review) = match change {
+        Some(change) => {
+            let asked = Asked::of(change);
+            let proposal = applying(ctx, path, held, (&change.key, &change.value), asked).await?;
             (
                 proposal.file,
                 proposal.review.differs(),
@@ -70,7 +115,7 @@ pub(super) async fn configuration(
                 Some(proposal.review),
             )
         }
-        _ => (held, false, None, None),
+        None => (held, false, None, None),
     };
     let settings = store::shown(&file)
         .into_iter()
@@ -113,11 +158,22 @@ async fn applying(
     ctx: &Ctx,
     path: &std::path::Path,
     held: EnvFile,
-    key: &str,
-    value: &str,
-    confirmed: bool,
+    change: (&str, &str),
+    asked: Asked,
 ) -> Result<Proposal, Box<Problem>> {
-    let review = weighed(ctx, &held, key, value, confirmed).await;
+    let (key, value) = change;
+    // The offer to wait, taken up. It runs before anything is weighed, so what the
+    // proposal then finds in flight is what is still in flight after the wait — and
+    // only for a change that takes something away, since a wait asked of one that
+    // does not would sit in front of every download on the machine for nothing.
+    if asked.waiting == Waiting::ForTheDownloads
+        && !ctx.dry_run
+        && super::reconfiguring::waits_for_downloads(ctx, key, value)
+    {
+        super::engine::drained(ctx, &[]).await;
+    }
+
+    let review = weighed(ctx, &held, key, value, asked.confirmed).await;
     let consequence = stated(ctx, &review, &held, key, value);
     let mut file = held;
     if review.writes() {
@@ -125,6 +181,10 @@ async fn applying(
             return Err(Box::new(err.problem()));
         }
         file.set(key, value);
+        // Recorded as what lemonfiber last wrote here, so the next change can tell an
+        // operator's edit from lemonfiber's own value rather than overwriting one
+        // without saying so.
+        super::reconfiguring::record(ctx, key, value);
     }
     Ok(Proposal {
         review,
@@ -149,6 +209,15 @@ async fn weighed(ctx: &Ctx, held: &EnvFile, key: &str, value: &str, confirmed: b
             rehearsing: ctx.dry_run,
         },
     );
+    if !review.differs() {
+        return review;
+    }
+    // What the change comes to on this machine — where the library would land, what
+    // is still coming down, what was edited underneath, what it opens and keeps —
+    // worked out for a staged proposal as well as one about to land. A review that
+    // withheld this until after the yes was given would be asking for a yes to
+    // something unstated.
+    let review = super::reconfiguring::assessed(ctx, review, held, (key, value), confirmed).await;
     if !review.writes() {
         return review;
     }
@@ -243,8 +312,8 @@ fn stated(ctx: &Ctx, review: &Review, held: &EnvFile, key: &str, value: &str) ->
 mod tests {
     use std::sync::Arc;
 
-    use super::configuration;
-    use crate::app::{Ctx, Outcome};
+    use super::{configuration, reading, Setting};
+    use crate::app::{Ctx, Outcome, Waiting};
     use crate::config::{
         store, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, PROVIDER_PORT_KEY,
         PROVIDER_TLS_KEY, VPN_PORT_FORWARDING_KEY,
@@ -329,9 +398,8 @@ mod tests {
         // The moment it is decided is the only moment worth saying it: afterwards
         // the check goes quiet, deliberately, because there is nothing to fix.
         let ctx = ctx(env_at("off", "VPN_PORT_FORWARDING=on\n"));
-        let said = consequence(
-            &configuration(&ctx, Some(VPN_PORT_FORWARDING_KEY), Some("off"), false).await,
-        );
+        let said =
+            consequence(&configuration(&ctx, Setting::to(VPN_PORT_FORWARDING_KEY, "off")).await);
         assert_eq!(said.as_deref(), Some(crate::app::seeding::COST));
     }
 
@@ -341,9 +409,8 @@ mod tests {
         // attached to a change that did not touch it reads as a warning nobody
         // caused, which is how operators learn to ignore them.
         let ctx = ctx(env_at("unrelated", "VPN_PORT_FORWARDING=off\n"));
-        let said =
-            consequence(&configuration(&ctx, Some("LEMONFIBER_USENET"), Some("on"), false).await)
-                .unwrap_or_default();
+        let said = consequence(&configuration(&ctx, Setting::to("LEMONFIBER_USENET", "on")).await)
+            .unwrap_or_default();
         // Turning Usenet on has a consequence of its own — what it opens and what it
         // takes away — and the sentence is that one rather than the seeding sentence
         // sitting next to it.
@@ -359,13 +426,8 @@ mod tests {
         // is still the one on disk.
         let path = env_at("moved", "DATA_ROOT=/srv/old\n");
         let ctx = ctx(path.clone());
-        let staged = configuration(
-            &ctx,
-            Some(crate::config::DATA_ROOT_KEY),
-            Some("/srv/new"),
-            false,
-        )
-        .await;
+        let staged =
+            configuration(&ctx, Setting::to(crate::config::DATA_ROOT_KEY, "/srv/new")).await;
 
         let said = consequence(&staged).unwrap_or_default();
         assert!(said.contains("points at nothing"), "{said}");
@@ -383,9 +445,7 @@ mod tests {
         let ctx = ctx(path.clone());
         let applied = configuration(
             &ctx,
-            Some(crate::config::DATA_ROOT_KEY),
-            Some("/srv/new"),
-            true,
+            Setting::to(crate::config::DATA_ROOT_KEY, "/srv/new").agreed(true),
         )
         .await;
 
@@ -397,6 +457,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_change_asked_to_wait_lets_what_is_coming_down_finish_before_it_weighs_anything() {
+        // The clients cannot be reached here, so the wait is over as soon as it begins.
+        // What is proven is that a reduction asked to wait goes *through* the wait
+        // rather than around it — a fixture that never drained would only prove that a
+        // test can hang.
+        let path = env_at("waited", "LEMONFIBER_TORRENT=on\n");
+        let ctx = ctx(path.clone());
+        let outcome = configuration(
+            &ctx,
+            Setting::to(crate::config::TORRENT_KEY, "off")
+                .agreed(true)
+                .waiting(Waiting::ForTheDownloads),
+        )
+        .await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Applied));
+        assert_eq!(
+            on_disk(&path, crate::config::TORRENT_KEY).as_deref(),
+            Some("off")
+        );
+    }
+
+    #[tokio::test]
     async fn a_setting_already_holding_what_was_asked_for_has_nothing_to_do() {
         // Writing it again would move the file's own timestamp, which afterwards
         // reads as an edit somebody made outside lemonfiber.
@@ -404,16 +487,16 @@ mod tests {
         let ctx = ctx(path);
         let outcome = configuration(
             &ctx,
-            Some(crate::config::DATA_ROOT_KEY),
-            Some("/srv/media"),
-            false,
+            Setting::to(crate::config::DATA_ROOT_KEY, "/srv/media"),
         )
         .await;
 
         assert_eq!(stance(&outcome), Some(Stance::Unchanged));
         assert_eq!(consequence(&outcome), None);
-        let unchanged = matches!(&outcome, Ok(Outcome::Config(report)) if !report.changed);
-        assert!(unchanged, "a change that changes nothing reported one");
+        assert!(
+            reviewed(&outcome).is_some_and(|review| !review.differs()),
+            "a change that changes nothing reported one"
+        );
     }
 
     #[tokio::test]
@@ -422,9 +505,7 @@ mod tests {
         // than silence: it teaches the operator to dismiss the ones that mean something.
         let ctx = ctx(env_at("unasked", ""));
         assert_eq!(
-            consequence(
-                &configuration(&ctx, Some("LEMONFIBER_EXPLANATIONS"), Some("on"), false).await
-            ),
+            consequence(&configuration(&ctx, Setting::to("LEMONFIBER_EXPLANATIONS", "on")).await),
             None
         );
     }
@@ -436,8 +517,7 @@ mod tests {
         // as though it were fine — which is the silent failure, not the loud one.
         let env = env_at("pasted", "");
         let ctx = ctx(env.clone());
-        let written =
-            configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("  the-key\n"), false).await;
+        let written = configuration(&ctx, Setting::to(INDEXER_APIKEY_KEY, "  the-key\n")).await;
         assert!(written.is_ok());
         assert_eq!(
             on_disk(&env, INDEXER_APIKEY_KEY).as_deref(),
@@ -450,15 +530,14 @@ mod tests {
         // The operator is choosing to stop lemonfiber keeping this answer right, and
         // the moment they choose it is the only moment they are weighing it.
         let ctx = ctx(env_at("door", ""));
-        let said =
-            consequence(&configuration(&ctx, Some(FRONT_DOOR_KEY), Some("jellyfin"), false).await);
+        let said = consequence(&configuration(&ctx, Setting::to(FRONT_DOOR_KEY, "jellyfin")).await);
         assert_eq!(said.as_deref(), Some(crate::door::KEPT));
     }
 
     #[tokio::test]
     async fn reading_a_setting_is_never_a_decision() {
         let ctx = ctx(env_at("reading", "VPN_PORT_FORWARDING=off\n"));
-        let read = configuration(&ctx, Some(VPN_PORT_FORWARDING_KEY), None, false).await;
+        let read = reading(&ctx, Some(VPN_PORT_FORWARDING_KEY)).await;
         assert_eq!(consequence(&read), None);
         assert_eq!(reviewed(&read), None);
     }
@@ -470,13 +549,7 @@ mod tests {
         let path = env_at("rehearsal", "VPN_PORT_FORWARDING=on\n");
         let mut rehearsing = ctx(path.clone());
         rehearsing.dry_run = true;
-        let said = configuration(
-            &rehearsing,
-            Some(VPN_PORT_FORWARDING_KEY),
-            Some("off"),
-            false,
-        )
-        .await;
+        let said = configuration(&rehearsing, Setting::to(VPN_PORT_FORWARDING_KEY, "off")).await;
 
         assert_eq!(
             consequence(&said).as_deref(),
@@ -517,7 +590,7 @@ mod tests {
             "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
         );
         let ctx = reaching(path.clone(), Answer::reply(200, ANSWERED));
-        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("new-key"), false).await;
+        let outcome = configuration(&ctx, Setting::to(INDEXER_APIKEY_KEY, "new-key")).await;
 
         assert_eq!(stance(&outcome), Some(Stance::Applied));
         assert_eq!(
@@ -541,7 +614,7 @@ mod tests {
             "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
         );
         let ctx = reaching(path.clone(), Answer::reply(401, ""));
-        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("mistyped"), false).await;
+        let outcome = configuration(&ctx, Setting::to(INDEXER_APIKEY_KEY, "mistyped")).await;
 
         assert_eq!(stance(&outcome), Some(Stance::Blocked));
         assert_eq!(
@@ -564,7 +637,11 @@ mod tests {
             "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
         );
         let ctx = reaching(path.clone(), Answer::reply(401, ""));
-        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("mistyped"), true).await;
+        let outcome = configuration(
+            &ctx,
+            Setting::to(INDEXER_APIKEY_KEY, "mistyped").agreed(true),
+        )
+        .await;
 
         assert_eq!(stance(&outcome), Some(Stance::Blocked));
         assert_eq!(
@@ -583,7 +660,7 @@ mod tests {
         );
         let limited = r#"<error code="500" description="Request limit reached"/>"#;
         let ctx = reaching(path.clone(), Answer::reply(200, limited));
-        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("new-key"), false).await;
+        let outcome = configuration(&ctx, Setting::to(INDEXER_APIKEY_KEY, "new-key")).await;
 
         assert_eq!(stance(&outcome), Some(Stance::Applied));
         assert_eq!(
@@ -600,9 +677,7 @@ mod tests {
         let ctx = ctx(path.clone());
         let outcome = configuration(
             &ctx,
-            Some(INDEXER_URL_KEY),
-            Some("https://indexer.example/api"),
-            false,
+            Setting::to(INDEXER_URL_KEY, "https://indexer.example/api"),
         )
         .await;
 
@@ -617,7 +692,7 @@ mod tests {
     async fn a_replacement_nothing_could_prove_is_held_until_it_is_confirmed() {
         let path = env_at("tls-off", A_LOGIN);
         let ctx = ctx(path.clone());
-        let held = configuration(&ctx, Some(PROVIDER_TLS_KEY), Some("off"), false).await;
+        let held = configuration(&ctx, Setting::to(PROVIDER_TLS_KEY, "off")).await;
 
         assert_eq!(stance(&held), Some(Stance::Blocked));
         assert_eq!(on_disk(&path, PROVIDER_TLS_KEY).as_deref(), Some("on"));
@@ -627,7 +702,8 @@ mod tests {
             "the refusal says nothing about the way past it"
         );
 
-        let confirmed = configuration(&ctx, Some(PROVIDER_TLS_KEY), Some("off"), true).await;
+        let confirmed =
+            configuration(&ctx, Setting::to(PROVIDER_TLS_KEY, "off").agreed(true)).await;
         assert_eq!(stance(&confirmed), Some(Stance::Applied));
         assert_eq!(on_disk(&path, PROVIDER_TLS_KEY).as_deref(), Some("off"));
     }
@@ -638,8 +714,11 @@ mod tests {
     async fn a_replacement_the_product_cannot_read_leaves_the_file_alone() {
         let path = env_at("port-bad", A_LOGIN);
         let ctx = ctx(path.clone());
-        let outcome =
-            configuration(&ctx, Some(PROVIDER_PORT_KEY), Some("five-six-three"), true).await;
+        let outcome = configuration(
+            &ctx,
+            Setting::to(PROVIDER_PORT_KEY, "five-six-three").agreed(true),
+        )
+        .await;
 
         assert_eq!(stance(&outcome), Some(Stance::Blocked));
         assert_eq!(on_disk(&path, PROVIDER_PORT_KEY).as_deref(), Some("563"));
@@ -657,7 +736,7 @@ mod tests {
             "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
         );
         let ctx = reaching(path, Answer::reply(200, ANSWERED));
-        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("new-key"), false).await;
+        let outcome = configuration(&ctx, Setting::to(INDEXER_APIKEY_KEY, "new-key")).await;
 
         let change = reviewed(&outcome).map(|review| review.change);
         assert_eq!(

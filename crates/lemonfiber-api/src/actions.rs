@@ -35,7 +35,7 @@ use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
 use lemonfiber_core::app::restore::Consent as RestoreConsent;
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Setting, Waiting};
 
 use crate::jobs::{accepted, Job};
 use crate::read::carried_out;
@@ -73,10 +73,18 @@ pub enum Answering {
 /// nothing, which is the listing an operator is owed *before* deciding — so it
 /// arrives now, because a listing behind a job name is a listing that arrives after
 /// the moment it exists for.
+///
+/// A settings change is both too, on the one word that says whether it waits. Weighing
+/// it reads the services, which is a moment; asked to let what is still coming down
+/// finish first, it is an hour, and a request held open for an hour is a request that
+/// has already failed.
 #[must_use]
 pub const fn answering(command: &Command) -> Answering {
     match command {
-        Command::ConfigSet { .. }
+        Command::ConfigSet(Setting {
+            waiting: Waiting::Never,
+            ..
+        })
         | Command::Quality(_)
         | Command::Setup(_)
         // Handing a command to this machine's service manager reaches neither the

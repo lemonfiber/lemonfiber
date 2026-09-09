@@ -4,6 +4,11 @@
 //! would reject is never gathered.
 
 use super::Answers;
+use crate::config::{
+    Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, JELLYFIN_MODE_KEY, PGID_KEY,
+    PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY, PROVIDER_TLS_KEY, PROVIDER_USER_KEY,
+    PUID_KEY, TORRENT_KEY, USENET_KEY,
+};
 use serde::{Deserialize, Serialize};
 
 /// A step of setup, in the order the operator meets it.
@@ -119,6 +124,57 @@ impl Step {
         }
     }
 
+    /// Whether a machine set up for these protocols is asked this step at all.
+    ///
+    /// The three protocol-gated steps and nothing else: credentials are for the
+    /// download services, so a library-only run has none to give; a Usenet provider
+    /// is only for a Usenet run; and only torrents expose the home address to peers,
+    /// so only a torrent run has a tunnel worth asking about.
+    ///
+    /// Read by the walk to decide what to put next, and by reconfiguration to work
+    /// out what adding a way of downloading newly asks for — one answer to "what
+    /// does this protocol need", rather than the walk's answer and a second list
+    /// beside it that could disagree.
+    #[must_use]
+    pub const fn wanted_by(self, protocols: Protocols) -> bool {
+        match self {
+            Self::Credentials => protocols.any(),
+            Self::Provider => protocols.usenet,
+            Self::Vpn => protocols.torrent,
+            _ => true,
+        }
+    }
+
+    /// The settings this step's answer is written to, where it is written to any.
+    ///
+    /// The keys alone — what goes in them is the plan's business. This is what a
+    /// change to the protocols has to name: turning one on opens exactly the
+    /// credentials its own steps carry, and naming them from here is what keeps that
+    /// list from drifting from the questions setup actually asks.
+    ///
+    /// The tunnel names none. Its step asks *whether* a VPN carries the torrents and
+    /// records that; which provider carries them is set afterwards, so listing it here
+    /// would name a setting no answer of this step ever writes. What a torrent run has
+    /// to go and obtain is a prerequisite rather than a credential, and is said as one.
+    #[must_use]
+    pub const fn settings(self) -> &'static [&'static str] {
+        match self {
+            Self::Protocols => &[USENET_KEY, TORRENT_KEY],
+            Self::DataLocation => &[DATA_ROOT_KEY],
+            Self::Credentials => &[INDEXER_URL_KEY, INDEXER_APIKEY_KEY],
+            Self::Provider => &[
+                PROVIDER_HOST_KEY,
+                PROVIDER_PORT_KEY,
+                PROVIDER_USER_KEY,
+                PROVIDER_PASS_KEY,
+                PROVIDER_TLS_KEY,
+            ],
+            Self::ServiceUser => &[PUID_KEY, PGID_KEY],
+            Self::Library => &[JELLYFIN_MODE_KEY],
+            _ => &[],
+        }
+    }
+
     /// Whether this step asks a question, as opposed to only informing.
     ///
     /// The distinction is what the non-interactive guard reports on: an informing
@@ -139,6 +195,21 @@ impl Step {
                 | Self::Autostart
         )
     }
+}
+
+/// The steps a machine set up for `after` is asked that one set up for `before`
+/// is not.
+///
+/// What adding a way of downloading opens, in the walk's own terms: the questions
+/// setup would now put and no others. A reduction opens nothing, and comes back
+/// empty rather than as the reverse list — what closing costs is what is *kept*,
+/// which is a different sentence entirely.
+#[must_use]
+pub fn opened_by(before: Protocols, after: Protocols) -> Vec<Step> {
+    Step::ORDER
+        .into_iter()
+        .filter(|step| step.wanted_by(after) && !step.wanted_by(before))
+        .collect()
 }
 
 /// Which way [`Wizard::neighbour`] looks.
