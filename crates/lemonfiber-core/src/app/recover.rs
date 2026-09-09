@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
-use crate::journal::{Action, Change, Journal, Undo};
+use crate::journal::{kept, Action, Change, Journal, Undo};
 use crate::ports::service::Client as _;
 use crate::repair;
 
@@ -36,12 +36,18 @@ pub fn journal_at(path: &Path) -> Journal {
     Journal::replay(changes)
 }
 
-/// Add what a change made to the journal a reversal reads, keeping what is already there.
+/// Add what a change made to the journal a reversal reads, keeping what is already there
+/// and dropping what has fallen outside the bound.
 ///
-/// Appended rather than rewritten, because the journal is shared: the first-run wizard
-/// wrote what it applied, seeding wrote what it wired, and a repair adding its own must not
-/// take either away. Each entry is one line, so a stop part way through costs at most the
-/// line being written — which [`journal_at`] then drops as torn.
+/// What is already there is read back and written out again beneath the new entries,
+/// because the journal is shared: the first-run wizard wrote what it applied, seeding
+/// wrote what it wired, and a repair adding its own must not take either away. The read
+/// is [`journal_at`]'s, so a torn final line — a crash caught mid-write — is dropped here
+/// rather than carried forward for ever.
+///
+/// The bound is applied on the way out, so the file itself stays inside it rather than
+/// only the reading of it: a record trimmed on read would go on growing on disk, and the
+/// horizon would be a claim about what is shown instead of about what is kept.
 ///
 /// Written through the same seam every other record lemonfiber keeps goes through, so the
 /// journal is created private to its owner. It holds what a value was before it changed,
@@ -55,16 +61,16 @@ pub fn journalled(path: &Path, changes: &[Change]) {
     if changes.is_empty() {
         return;
     }
-    let mut written = std::fs::read_to_string(path).unwrap_or_default();
-    if !written.is_empty() && !written.ends_with('\n') {
-        written.push('\n');
-    }
-    for change in changes {
-        if let Ok(line) = serde_json::to_string(change) {
-            written.push_str(&line);
-            written.push('\n');
-        }
-    }
+    let mut held: Vec<Change> = journal_at(path).changes().to_vec();
+    held.extend(changes.iter().cloned());
+    let written = kept(&held)
+        .iter()
+        .filter_map(|change| serde_json::to_string(change).ok())
+        .fold(String::new(), |mut lines, line| {
+            lines.push_str(&line);
+            lines.push('\n');
+            lines
+        });
     let _ = store::write(path, &written);
 }
 
@@ -401,6 +407,39 @@ mod tests {
                 a_fresh_write("USENET", "on"),
                 a_fresh_write("TORRENT", "on")
             ]
+        );
+    }
+
+    /// The file itself stays inside the bound, not merely the reading of it. A record
+    /// trimmed on the way in would go on growing on disk, and the horizon would be a
+    /// claim about what is shown rather than about what is kept.
+    #[test]
+    fn a_record_written_past_the_bound_leaves_the_bound_on_disk() {
+        let dir = scratch("journal-bound");
+        let path = dir.join("journal.jsonl");
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+
+        // One run per stamp, written one run at a time the way a machine accumulates them.
+        for stamp in 0..=crate::journal::RUNS_KEPT {
+            super::journalled(
+                &path,
+                &[crate::journal::Change {
+                    at: stamp.to_string(),
+                    ..a_fresh_write("PUID", "1000")
+                }],
+            );
+        }
+
+        let held = super::journal_at(&path);
+        assert_eq!(
+            crate::journal::runs(held.changes()),
+            crate::journal::RUNS_KEPT,
+            "the bound is what the file holds"
+        );
+        assert_eq!(
+            held.changes().first().map(|change| change.at.as_str()),
+            Some("1"),
+            "and the oldest run went, rather than the newest"
         );
     }
 
