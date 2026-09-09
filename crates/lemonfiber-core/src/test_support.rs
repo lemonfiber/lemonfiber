@@ -36,6 +36,7 @@ pub(crate) fn nowhere() -> Source {
 pub(crate) struct Context {
     runner: std::sync::Arc<dyn crate::ports::process::Runner>,
     engine: std::sync::Arc<dyn crate::ports::docker::Engine>,
+    clock: std::sync::Arc<dyn crate::ports::Clock>,
     stack: Source,
     settings: crate::config::Settings,
     environment: crate::platform::Environment,
@@ -46,6 +47,7 @@ impl Default for Context {
         Self {
             runner: std::sync::Arc::new(Scripted(Ok(spoke("")))),
             engine: std::sync::Arc::new(Reporting::absent()),
+            clock: lemonfiber_fixtures::ports::Stopped::today(),
             stack: stack(),
             settings: crate::config::Settings::default(),
             environment: crate::platform::Environment::MacOs,
@@ -93,11 +95,21 @@ impl Context {
     }
 
     /// The context itself, ready for [`Ctx`]'s own `with_*` chain.
+    /// The same context, stopped at a named instant.
+    ///
+    /// For the one rule that depends on the time of day rather than on an ordering: a
+    /// window an operator asked not to be woken in is only testable against a clock a
+    /// test chose.
+    pub(crate) fn clock(mut self, clock: std::sync::Arc<dyn crate::ports::Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     pub(crate) fn build(self) -> crate::app::Ctx {
         crate::app::Ctx::new(
             self.runner,
             self.engine,
-            std::sync::Arc::new(crate::adapters::System),
+            self.clock,
             std::sync::Arc::new(crate::adapters::Disk),
             self.stack,
             self.settings,

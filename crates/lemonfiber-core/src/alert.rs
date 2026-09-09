@@ -21,6 +21,8 @@ mod digest;
 mod kind;
 mod moment;
 mod outbox;
+mod quiet;
+pub use quiet::Quiet;
 
 pub use appetite::{Appetite, Wants};
 pub use class::Class;

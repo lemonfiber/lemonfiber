@@ -139,6 +139,7 @@ pub(crate) fn read_settings() -> Settings {
 
     Settings {
         project: lemonfiber_core::config::project_from_env(&recorded),
+        quiet: lemonfiber_core::config::quiet_from_env(&recorded),
         overlays: lemonfiber_core::config::overlay_from_env(&recorded),
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),

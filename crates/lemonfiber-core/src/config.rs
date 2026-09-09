@@ -23,7 +23,8 @@ pub mod store;
 pub use reading::{
     data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
     indexer_from_env, ip_echo_from_env, overlay_from_env, port_forward_from_env, project_from_env,
-    provider_host_from_env, reads_as_off, reads_as_on, service_user_from_env, PortForward,
+    provider_host_from_env, quiet_from_env, reads_as_off, reads_as_on, service_user_from_env,
+    PortForward,
 };
 
 use std::path::PathBuf;
@@ -89,6 +90,25 @@ pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 /// look for, and somebody who finds the explanations patronising knows exactly what
 /// they want to stop.
 pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
+
+/// The hours the operator does not want waking for, as `HH:MM-HH:MM`.
+///
+/// Read in the zone `TZ` names, which is the same zone the stack hands every container,
+/// so the window lands on the household's own evening rather than on UTC's.
+pub const QUIET_HOURS_KEY: &str = "LEMONFIBER_QUIET_HOURS";
+
+/// The zone the stack runs in.
+///
+/// Not lemonfiber's own setting — it is the stack's, handed to every container by the
+/// compose file, and read here so a window means the same hour inside and out.
+pub const ZONE_KEY: &str = "TZ";
+
+/// The zone the stack's compose file falls back to when nothing names one.
+///
+/// Kept the same as `_common.yml`'s `${TZ:-Europe/Amsterdam}` deliberately: a window
+/// read in a different zone from the containers it is about would be quiet at the
+/// wrong hour and agree with nothing.
+pub const DEFAULT_ZONE: &str = "Europe/Amsterdam";
 
 /// A Compose file layered over the stack's own.
 ///
@@ -287,6 +307,7 @@ pub const SETTINGS: &[&str] = &[
     EXPLANATIONS_KEY,
     PROJECT_KEY,
     OVERLAY_KEY,
+    QUIET_HOURS_KEY,
     EXPOSED_KEY,
     DATA_ROOT_KEY,
     PUID_KEY,
@@ -361,6 +382,8 @@ pub struct Settings {
     /// The Compose project name, which is also how containers are correlated
     /// back to the services that declared them.
     pub project: String,
+    /// The hours the operator does not want waking for, where they have said.
+    pub quiet: Option<crate::alert::Quiet>,
     /// The environment file handed to Compose, where one has been written.
     pub env_file: Option<PathBuf>,
     /// Compose files layered over the stack's own, such as a storage overlay.
@@ -469,6 +492,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             project: crate::PRODUCT.to_owned(),
+            quiet: None,
             env_file: None,
             overlays: Vec::new(),
             stack_dir: None,

@@ -39,6 +39,11 @@ pub struct Notified {
     pub digest: Digest,
     /// The channels that would not take it, by name.
     pub refused: Vec<String>,
+    /// Whether it was held back for the hours the operator asked not to be woken in.
+    ///
+    /// Held, not dropped: the outbox has it either way, so a held alert is one they
+    /// find when they next look rather than one nobody ever sees.
+    pub held: bool,
 }
 
 impl Notified {
@@ -47,6 +52,17 @@ impl Notified {
     pub fn is_quiet(&self) -> bool {
         self.digest.is_empty()
     }
+}
+
+/// Whether the hour holds this digest back.
+///
+/// False whenever anything in it overrides a quiet period, so a critical alert is never
+/// the thing a window swallows — which is the whole of what the window has to get right.
+fn held(ctx: &Ctx, digest: &Digest) -> bool {
+    let Some(window) = &ctx.settings.quiet else {
+        return false;
+    };
+    !digest.overrides_quiet() && window.holds(ctx.clock.now())
 }
 
 /// Say whatever the conditions now warrant, through every channel given.
@@ -76,8 +92,20 @@ pub async fn notify(
     }
 
     // Written down before anything is attempted. From here the operator can find
-    // it whatever the channels do.
+    // it whatever the channels do — including when the hour holds it back.
     outbox.owe(digest.alerts.clone());
+
+    // The one window this product holds against a time of day, and the only thing that
+    // carries an alert through it is the alert being loud enough to warrant it. A held
+    // digest is not split: delivering the emergency now and its context in the morning
+    // would be an emergency arriving without what it is about.
+    if held(ctx, &digest) {
+        return Notified {
+            digest,
+            held: true,
+            ..Notified::default()
+        };
+    }
 
     let mut refused = Vec::new();
     for channel in channels {
@@ -107,7 +135,11 @@ pub async fn notify(
             .map_or(0, |condition| condition.recurrences)
     });
 
-    Notified { digest, refused }
+    Notified {
+        digest,
+        refused,
+        held: false,
+    }
 }
 
 #[cfg(test)]
@@ -414,5 +446,126 @@ mod tests {
         assert!(said.is_quiet());
         assert_eq!(channel.delivered(), 0);
         assert!(!outbox.owes_anything());
+    }
+
+    /// 2026-01-15 at the given UTC hour — deep winter, so a northern zone is one hour
+    /// ahead and the two do not agree about what time it is.
+    fn winter(hour: u64) -> std::sync::Arc<lemonfiber_fixtures::ports::Stopped> {
+        lemonfiber_fixtures::ports::Stopped::at(1_768_435_200 + hour * 3_600)
+    }
+
+    /// A context whose operator asked not to be woken between ten and seven.
+    fn asleep_at(hour: u64) -> crate::app::Ctx {
+        let settings = crate::config::Settings {
+            quiet: crate::alert::Quiet::parse("22:00-07:00", "UTC"),
+            ..crate::config::Settings::default()
+        };
+        a_context()
+            .runner(std::sync::Arc::new(ScriptedRunner(Ok(spoke("")))))
+            .engine(std::sync::Arc::new(Reporting::absent()))
+            .clock(winter(hour))
+            .settings(settings)
+            .build()
+    }
+
+    /// A store with one thing badly wrong.
+    fn critical() -> Conditions {
+        let mut conditions = Conditions::new();
+        conditions.observe(
+            "vpn.leak",
+            Some(&Fault::new(
+                "vpn.leak",
+                Severity::Critical,
+                "traffic left outside the tunnel",
+                "stop the client",
+            )),
+            "1",
+        );
+        conditions
+    }
+
+    /// The hours nobody wants waking for hold what can wait.
+    #[tokio::test]
+    async fn a_warning_inside_the_window_is_held_rather_than_sent() {
+        let channel = Scripted::taking("phone");
+        let said = notify(
+            &asleep_at(3),
+            Reach::Running,
+            &mut stalled(),
+            &mut Outbox::default(),
+            &[&channel],
+        )
+        .await;
+
+        assert!(said.held, "held");
+        assert_eq!(channel.delivered(), 0, "nothing was delivered");
+    }
+
+    /// Held is not dropped: the operator finds it when they next look.
+    #[tokio::test]
+    async fn a_held_alert_is_still_written_down() {
+        let mut outbox = Outbox::default();
+        let channel = Scripted::taking("phone");
+        let _ = notify(
+            &asleep_at(3),
+            Reach::Running,
+            &mut stalled(),
+            &mut outbox,
+            &[&channel],
+        )
+        .await;
+
+        assert!(outbox.owes_anything(), "the outbox has it");
+    }
+
+    /// The requirement itself: a quiet hour is never what swallows an emergency.
+    #[tokio::test]
+    async fn a_critical_alert_inside_the_window_is_sent_anyway() {
+        let channel = Scripted::taking("phone");
+        let said = notify(
+            &asleep_at(3),
+            Reach::Running,
+            &mut critical(),
+            &mut Outbox::default(),
+            &[&channel],
+        )
+        .await;
+
+        assert!(!said.held, "not held");
+        assert_eq!(channel.delivered(), 1, "delivered");
+    }
+
+    /// Outside the window nothing is held at all.
+    #[tokio::test]
+    async fn a_warning_outside_the_window_is_sent() {
+        let channel = Scripted::taking("phone");
+        let said = notify(
+            &asleep_at(12),
+            Reach::Running,
+            &mut stalled(),
+            &mut Outbox::default(),
+            &[&channel],
+        )
+        .await;
+
+        assert!(!said.held, "not held");
+        assert_eq!(channel.delivered(), 1, "delivered");
+    }
+
+    /// And an operator who asked for no window is woken as before.
+    #[tokio::test]
+    async fn no_window_holds_nothing() {
+        let channel = Scripted::taking("phone");
+        let said = notify(
+            &plain_ctx(),
+            Reach::Running,
+            &mut stalled(),
+            &mut Outbox::default(),
+            &[&channel],
+        )
+        .await;
+
+        assert!(!said.held, "not held");
+        assert_eq!(channel.delivered(), 1, "delivered");
     }
 }

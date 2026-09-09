@@ -20,6 +20,7 @@ lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 lemonfiber-ports = { path = "../lemonfiber-ports" }
 argon2 = { workspace = true }
 async-trait = { workspace = true }
+jiff = { workspace = true }
 bollard = { workspace = true }
 crc32fast = "1"
 getrandom = { workspace = true }
