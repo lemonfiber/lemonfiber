@@ -181,36 +181,34 @@ mod tests {
             },
         );
         let named = settings(&opens);
-        let held = named.len();
         assert!(
             named.contains(&"USENET_HOST".to_owned()),
-            "USENET_HOST is settled, of {held} settings"
+            "USENET_HOST is settled"
         );
         assert!(
             named.contains(&"USENET_PASS".to_owned()),
-            "USENET_PASS is settled, of {held} settings"
+            "USENET_PASS is settled"
         );
         assert!(
             named.contains(&"INDEXER_URL".to_owned()),
-            "INDEXER_URL is settled, of {held} settings"
+            "INDEXER_URL is settled"
         );
         assert!(
             !named.contains(&"VPN_PROVIDER".to_owned()),
-            "VPN_PROVIDER is settled, of {held} settings"
+            "VPN_PROVIDER is settled"
         );
         let accounts: Vec<&str> = opens
             .iter()
             .filter(|open| open.setting.is_none())
             .map(|open| open.what.as_str())
             .collect();
-        let held = accounts.len();
         assert!(
             accounts.contains(&"Usenet provider"),
-            "the provider is asked for, of {held} accounts"
+            "the provider is asked for"
         );
         assert!(
             !accounts.iter().any(|what| what.contains("VPN")),
-            "no tunnel is asked for, of {held} accounts"
+            "no tunnel is asked for"
         );
     }
 
@@ -227,24 +225,22 @@ mod tests {
             },
         );
         let named = settings(&opens);
-        let held = named.len();
         assert!(
             !named.contains(&"USENET_HOST".to_owned()),
-            "the provider is not asked for again, of {held} settings"
+            "the provider is not asked for again"
         );
         let accounts: Vec<&str> = opens
             .iter()
             .filter(|open| open.setting.is_none())
             .map(|open| open.what.as_str())
             .collect();
-        let held = accounts.len();
         assert!(
             accounts.iter().any(|what| what.contains("VPN")),
-            "the tunnel is asked for, of {held} accounts"
+            "the tunnel is asked for"
         );
         assert!(
             !accounts.contains(&"Usenet provider"),
-            "the provider is not asked for again, of {held} accounts"
+            "the provider is not asked for again"
         );
     }
 
@@ -261,14 +257,13 @@ mod tests {
             Protocols::both(),
         );
         let named = settings(&opens);
-        let held = named.len();
         assert!(
             !named.contains(&"INDEXER_URL".to_owned()),
-            "the indexer is not asked for again, of {held} settings"
+            "the indexer is not asked for again"
         );
         assert!(
             !named.contains(&"USENET_HOST".to_owned()),
-            "USENET_HOST is settled, of {held} settings"
+            "USENET_HOST is settled"
         );
         // What it does open is what torrents need and Usenet did not: an indexer that
         // carries them, and a tunnel.
@@ -277,11 +272,10 @@ mod tests {
             .filter(|open| open.setting.is_none())
             .map(|open| open.what.as_str())
             .collect();
-        let held = accounts.len();
         assert!(!accounts.is_empty(), "something is asked for");
         assert!(
             !accounts.contains(&"Usenet provider"),
-            "the provider is not asked for again, of {held} accounts"
+            "the provider is not asked for again"
         );
     }
 
