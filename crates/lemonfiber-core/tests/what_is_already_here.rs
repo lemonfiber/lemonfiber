@@ -418,3 +418,24 @@ async fn standing_beside_what_could_not_be_read_is_refused() {
         "refused"
     );
 }
+
+/// Standing beside is the operator's explicit act, so nowhere to write it is reported
+/// rather than shrugged off.
+#[tokio::test]
+async fn standing_beside_with_nowhere_to_write_says_so() {
+    let asked = Command::Migrate(MigrateAction::Beside { confirmed: true });
+    let refused = dispatch(asked, &theirs("4.0.15", None)).await;
+    assert!(refused.is_err(), "{refused:?}");
+}
+
+/// And where there is somewhere but it cannot be written to.
+#[tokio::test]
+async fn standing_beside_that_cannot_record_where_it_wrote_reports_the_failure() {
+    let blocked = std::env::temp_dir().join(format!("lemonfiber-beside-{}", std::process::id()));
+    let _ = std::fs::write(&blocked, "not a directory");
+    let asked = Command::Migrate(MigrateAction::Beside { confirmed: true });
+    let ctx = theirs("4.0.15", Some(blocked.join(".env")));
+    let refused = dispatch(asked, &ctx).await;
+    let _ = std::fs::remove_file(&blocked);
+    assert!(refused.is_err(), "{refused:?}");
+}

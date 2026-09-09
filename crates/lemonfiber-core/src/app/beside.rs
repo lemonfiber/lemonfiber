@@ -29,17 +29,8 @@ pub async fn stand(
     survey: &MigrationReport,
     confirmed: bool,
 ) -> Result<BesideReport, Box<Problem>> {
-    if !survey.read {
-        return Ok(refused(
-            "what is on this machine could not be read, and standing beside a setup that \
-             could not be looked at would be guessing which ports are free",
-        ));
-    }
-    if survey.beside.is_empty() {
-        return Ok(refused(
-            "no service lemonfiber runs has anywhere else to listen, so there is no way \
-             to stand beside what is here",
-        ));
+    if let Some(refused) = blocked(survey) {
+        return Ok(refused);
     }
 
     if !confirmed {
@@ -50,21 +41,15 @@ pub async fn stand(
         });
     }
 
-    let Some(path) = ctx.settings.env_file.as_ref().map(|env| {
-        env.parent()
-            .map_or_else(|| std::path::PathBuf::from(FILE), |dir| dir.join(FILE))
-    }) else {
+    let Some(recorded) = ctx.settings.env_file.clone() else {
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };
+    // Beside the configuration it belongs to, so the two travel together and a backup
+    // that takes one takes the other.
+    let path = recorded.with_file_name(FILE);
 
     ctx.filesystem.write(&path, &layered(&survey.beside)).await;
-
-    let recorded = ctx
-        .settings
-        .env_file
-        .as_ref()
-        .ok_or_else(|| Box::new(store::Failure::Nowhere.problem()))?;
-    store::set(recorded, OVERLAY_KEY, &path.display().to_string())
+    store::set(&recorded, OVERLAY_KEY, &path.display().to_string())
         .map_err(|failure| Box::new(failure.problem()))?;
 
     Ok(BesideReport {
@@ -75,12 +60,25 @@ pub async fn stand(
     })
 }
 
-/// What is answered where standing beside cannot happen.
-fn refused(why: &str) -> BesideReport {
-    BesideReport {
+/// What stops standing beside, where anything does.
+///
+/// Apart from the act so it can be asked without a machine: both answers are about what
+/// the survey found and nothing else.
+fn blocked(survey: &MigrationReport) -> Option<BesideReport> {
+    let why = if survey.read {
+        if !survey.beside.is_empty() {
+            return None;
+        }
+        "no service lemonfiber runs has anywhere else to listen, so there is no way to \
+         stand beside what is here"
+    } else {
+        "what is on this machine could not be read, and standing beside a setup that \
+         could not be looked at would be guessing which ports are free"
+    };
+    Some(BesideReport {
         refused: Some(why.to_owned()),
         ..BesideReport::default()
-    }
+    })
 }
 
 /// The Compose file that says where each service listens instead.
@@ -102,8 +100,8 @@ fn layered(moved: &[MovedReport]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::layered;
-    use crate::model::MovedReport;
+    use super::{blocked, layered};
+    use crate::model::{MigrationReport, MovedReport};
 
     fn moved(service: &str, from: u16, to: u16) -> MovedReport {
         MovedReport {
@@ -137,5 +135,38 @@ mod tests {
         let written = layered(&[moved("sonarr", 8989, 8990)]);
         assert!(!written.contains("image"), "{written}");
         assert!(!written.contains("volumes"), "{written}");
+    }
+
+    /// A machine it could not read is one whose free ports it would be guessing at.
+    #[test]
+    fn a_survey_that_could_not_look_stops_it() {
+        let said = blocked(&MigrationReport::default())
+            .and_then(|read| read.refused)
+            .unwrap_or_default();
+        assert!(said.contains("could not be read"), "{said}");
+    }
+
+    /// Nowhere left to listen is a refusal rather than an empty file.
+    #[test]
+    fn nowhere_left_to_listen_stops_it() {
+        let looked = MigrationReport {
+            read: true,
+            ..MigrationReport::default()
+        };
+        let said = blocked(&looked)
+            .and_then(|read| read.refused)
+            .unwrap_or_default();
+        assert!(said.contains("anywhere else to listen"), "{said}");
+    }
+
+    /// Somewhere to go is what lets it proceed.
+    #[test]
+    fn somewhere_to_listen_stops_nothing() {
+        let looked = MigrationReport {
+            read: true,
+            beside: vec![moved("sonarr", 8989, 8990)],
+            ..MigrationReport::default()
+        };
+        assert!(blocked(&looked).is_none());
     }
 }

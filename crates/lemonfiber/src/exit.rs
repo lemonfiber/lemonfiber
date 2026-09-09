@@ -1227,6 +1227,28 @@ mod tests {
             std::process::ExitCode::from(super::FAILURE)
         );
     }
+    /// The same for standing beside: nowhere left to listen is something the operator
+    /// resolves, not a run that fell over.
+    #[test]
+    fn standing_beside_exits_on_whether_it_could() {
+        let refused = lemonfiber_core::model::BesideReport {
+            refused: Some("nowhere left to listen".to_owned()),
+            ..lemonfiber_core::model::BesideReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Beside(refused)),
+            std::process::ExitCode::from(super::VALIDATION)
+        );
+        let stood = lemonfiber_core::model::BesideReport {
+            applied: true,
+            ..lemonfiber_core::model::BesideReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Beside(stood)),
+            std::process::ExitCode::SUCCESS
+        );
+    }
+
     /// A refusal is something the operator has to resolve, and a script needs to tell
     /// that from a run that merely failed.
     #[test]

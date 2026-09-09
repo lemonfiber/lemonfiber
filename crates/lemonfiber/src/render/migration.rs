@@ -270,12 +270,12 @@ fn listed(items: &[UnsupportedReport], heading: &str, lines: &mut Lines) {
 
 #[cfg(test)]
 mod tests {
-    use super::{adoption, migration};
+    use super::{adoption, beside, migration};
     use lemonfiber_core::migration::carrying::not_carried;
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
-        AdoptReport, CarryingReport, ConflictReport, LinkingReport, MigrationReport, MovedReport,
-        OccupantReport, StandingReport, UnsupportedReport,
+        AdoptReport, BesideReport, CarryingReport, ConflictReport, LinkingReport, MigrationReport,
+        MovedReport, OccupantReport, StandingReport, UnsupportedReport,
     };
 
     /// One survey with something of every kind in it.
@@ -530,5 +530,59 @@ mod tests {
             text.contains("nothing was started, stopped, or moved"),
             "{text}"
         );
+    }
+
+    /// One service moved, as standing beside reports it.
+    fn moved() -> Vec<MovedReport> {
+        vec![MovedReport {
+            service: "sonarr".to_owned(),
+            from: 8989,
+            to: 8990,
+        }]
+    }
+
+    /// Somewhere to actually reach it, and the sentence that theirs was left alone.
+    #[test]
+    fn a_rehearsal_says_where_it_would_listen_and_that_nothing_was_written() {
+        let rehearsed = BesideReport {
+            ports: moved(),
+            rehearsed: true,
+            ..BesideReport::default()
+        };
+        let text = beside(&rehearsed).text();
+        assert!(text.contains("would listen on"), "{text}");
+        assert!(text.contains("sonarr — 8990 instead of 8989"), "{text}");
+        assert!(text.contains("--confirm"), "{text}");
+        assert!(
+            text.contains("nothing of the setup already here was touched"),
+            "{text}"
+        );
+    }
+
+    /// Having stood beside, where the file went is what an operator needs next.
+    #[test]
+    fn standing_beside_names_where_the_layered_file_went() {
+        let applied = BesideReport {
+            ports: moved(),
+            written: Some("/cfg/beside.yml".to_owned()),
+            applied: true,
+            ..BesideReport::default()
+        };
+        let text = beside(&applied).text();
+        assert!(text.contains("now listens beside"), "{text}");
+        assert!(text.contains("written to /cfg/beside.yml"), "{text}");
+    }
+
+    /// A refusal is the whole answer, as it is for adopting.
+    #[test]
+    fn a_refusal_to_stand_beside_is_the_only_thing_said() {
+        let refused = BesideReport {
+            refused: Some("nowhere left to listen".to_owned()),
+            ports: moved(),
+            ..BesideReport::default()
+        };
+        let text = beside(&refused).text();
+        assert!(text.contains("not standing beside:"), "{text}");
+        assert!(!text.contains("8990"), "{text}");
     }
 }

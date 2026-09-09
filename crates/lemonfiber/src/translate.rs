@@ -1247,6 +1247,16 @@ mod tests {
         );
     }
 
+    /// Standing beside carries its confirmation through the same way.
+    #[test]
+    fn standing_beside_carries_its_confirmation_through() {
+        let asked = lemonfiber::cli::MigrateCommand::Beside { confirm: true };
+        assert_eq!(
+            super::migrating(Some(&asked)),
+            lemonfiber_core::app::MigrateAction::Beside { confirmed: true }
+        );
+    }
+
     /// Confirming is carried through as given: it is the operator saying they have
     /// backed up what the rehearsal named.
     #[test]

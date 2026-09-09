@@ -472,11 +472,11 @@ mod tests {
     use lemonfiber_core::migration::carrying::not_carried;
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
-        AdoptReport, AlertReport, CarryingReport, ConfigReport, ConflictReport, Disposition,
-        DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport,
-        MigrationReport, MusicReport, OccupantReport, QualityReport, ResetReport, SettingReport,
-        Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport, UpgradeReport,
-        VersionReport, WizardReport,
+        AdoptReport, AlertReport, BesideReport, CarryingReport, ConfigReport, ConflictReport,
+        Disposition, DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport,
+        MigrationReport, MovedReport, MusicReport, OccupantReport, QualityReport, ResetReport,
+        SettingReport, Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport,
+        UpgradeReport, VersionReport, WizardReport,
     };
     use lemonfiber_core::reconfigure::{Change, Cost, Review, Stance};
     use lemonfiber_core::wizard::{Phase, Step};
@@ -874,6 +874,16 @@ mod tests {
                 project: Some("media".to_owned()),
                 adopted: true,
                 ..AdoptReport::default()
+            }),
+            Outcome::Beside(BesideReport {
+                ports: vec![MovedReport {
+                    service: "sonarr".to_owned(),
+                    from: 8989,
+                    to: 8990,
+                }],
+                written: Some("/cfg/beside.yml".to_owned()),
+                applied: true,
+                ..BesideReport::default()
             }),
         ]
     }
