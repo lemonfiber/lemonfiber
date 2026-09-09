@@ -11,7 +11,8 @@
 //! rather than one function knowing about every case at once.
 
 use lemonfiber_core::model::{
-    AdoptReport, BesideReport, MigrationReport, ReplaceReport, UnsupportedReport,
+    AdoptReport, BesideReport, ImportReport, MigrationReport, RecordReport, ReplaceReport,
+    UnsupportedReport,
 };
 
 use super::Lines;
@@ -156,6 +157,48 @@ pub(super) fn replacement(report: &ReplaceReport) -> Lines {
         lines.put("nothing has been stopped; add --confirm to go ahead".to_owned());
     }
     lines
+}
+
+/// What copying an operator's own records across came to, or would come to.
+///
+/// What did not travel leads. A record still on the old stack and not on the new is the
+/// thing an operator has to do something about; what arrived safely needs no action.
+pub(super) fn carried(report: &ImportReport) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(refused) = &report.refused {
+        lines.put(format!("not carrying anything across: {refused}"));
+        return lines;
+    }
+
+    listed(&report.not_carried, "could not be carried:", &mut lines);
+
+    let (records, heading) = if report.applied {
+        (&report.carried, "carried across:")
+    } else {
+        (&report.would_carry, "would carry across:")
+    };
+    if !records.is_empty() {
+        lines.put(String::new());
+        lines.put(heading.to_owned());
+        for record in records {
+            lines.put(counted(record));
+        }
+    } else if report.not_carried.is_empty() {
+        lines.put("nothing to carry across; the two hold the same records".to_owned());
+    }
+
+    lines.put(String::new());
+    if report.applied {
+        lines.put("the setup already here was only read from".to_owned());
+    } else {
+        lines.put("nothing has been carried; add --confirm to go ahead".to_owned());
+    }
+    lines
+}
+
+/// One record, as a line an operator reads.
+fn counted(record: &RecordReport) -> String {
+    format!("  {} — {} ({})", record.name, record.service, record.kind)
 }
 
 /// Every project already standing here, with what each service answers on.
@@ -313,12 +356,13 @@ fn listed(items: &[UnsupportedReport], heading: &str, lines: &mut Lines) {
 
 #[cfg(test)]
 mod tests {
-    use super::{adoption, beside, migration, replacement};
+    use super::{adoption, beside, carried, migration, replacement};
     use lemonfiber_core::migration::carrying::not_carried;
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
-        AdoptReport, BesideReport, CarryingReport, ConflictReport, LinkingReport, MigrationReport,
-        MovedReport, OccupantReport, ReplaceReport, StandingReport, UnsupportedReport,
+        AdoptReport, BesideReport, CarryingReport, ConflictReport, ImportReport, LinkingReport,
+        MigrationReport, MovedReport, OccupantReport, RecordReport, ReplaceReport, StandingReport,
+        UnsupportedReport,
     };
 
     /// One survey with something of every kind in it.
@@ -689,5 +733,71 @@ mod tests {
         let text = replacement(&refused).text();
         assert!(text.contains("not standing in place of it:"), "{text}");
         assert!(!text.contains("sonarr"), "{text}");
+    }
+
+    /// One record, as an import reports it.
+    fn record(name: &str) -> RecordReport {
+        RecordReport {
+            service: "sonarr".to_owned(),
+            kind: "series".to_owned(),
+            name: name.to_owned(),
+        }
+    }
+
+    /// What it would take, before it takes anything.
+    #[test]
+    fn a_rehearsal_names_what_would_travel_and_says_nothing_was_carried() {
+        let rehearsed = ImportReport {
+            would_carry: vec![record("Taskmaster")],
+            rehearsed: true,
+            ..ImportReport::default()
+        };
+        let text = carried(&rehearsed).text();
+        assert!(text.contains("would carry across:"), "{text}");
+        assert!(text.contains("Taskmaster — sonarr (series)"), "{text}");
+        assert!(text.contains("--confirm"), "{text}");
+    }
+
+    /// What did not travel leads: it is the thing an operator has to act on.
+    #[test]
+    fn what_could_not_be_carried_is_said_before_what_was() {
+        let partial = ImportReport {
+            carried: vec![record("Taskmaster")],
+            not_carried: vec![UnsupportedReport {
+                what: "Bake Off".to_owned(),
+                because: "it follows a profile this stack does not have".to_owned(),
+            }],
+            applied: true,
+            ..ImportReport::default()
+        };
+        let text = carried(&partial).text();
+        let missing = text.find("could not be carried").unwrap_or(usize::MAX);
+        let took = text.find("carried across:").unwrap_or(0);
+        assert!(missing < took, "{text}");
+        assert!(text.contains("only read from"), "{text}");
+    }
+
+    /// Two stacks holding the same records is an answer, not a blank screen.
+    #[test]
+    fn two_stacks_that_already_agree_are_said_to_agree() {
+        let nothing = ImportReport {
+            applied: true,
+            ..ImportReport::default()
+        };
+        let text = carried(&nothing).text();
+        assert!(text.contains("hold the same records"), "{text}");
+    }
+
+    /// A refusal is the whole answer, as it is for the other three.
+    #[test]
+    fn a_refusal_to_carry_anything_is_the_only_thing_said() {
+        let refused = ImportReport {
+            refused: Some("no single setup here".to_owned()),
+            would_carry: vec![record("Taskmaster")],
+            ..ImportReport::default()
+        };
+        let text = carried(&refused).text();
+        assert!(text.contains("not carrying anything across:"), "{text}");
+        assert!(!text.contains("Taskmaster"), "{text}");
     }
 }

@@ -100,6 +100,15 @@ pub enum MigrateCommand {
         #[arg(long)]
         confirm: bool,
     },
+    /// Copy what the setup already here holds into lemonfiber's own services.
+    ///
+    /// Without `--confirm` it names what it would carry and carries nothing. Nothing of
+    /// the existing setup is written to either way.
+    Import {
+        /// Go ahead, having seen what would be carried.
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Stand in place of the setup already here, stopping it and deleting none of it.
     ///
     /// Without `--confirm` it names what it would stop and stops nothing. Nothing is

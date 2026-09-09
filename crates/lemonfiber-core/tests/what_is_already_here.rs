@@ -22,6 +22,7 @@ use lemonfiber_core::model::{AdoptReport, BesideReport, ReplaceReport};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
+use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::Runner;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::pulled::Pulled;
@@ -549,4 +550,371 @@ async fn a_container_that_would_not_stop_is_reported_as_still_running() {
     assert_eq!(still, Some(vec!["sonarr".to_owned()]), "{found:?}");
     let stopped = found.map(|read| read.stopped).unwrap_or_default();
     assert!(stopped.is_empty(), "{stopped:?}");
+}
+
+/// Their sonarr, on a port of its own so the two stacks can be told apart.
+fn both_stacks() -> (Reporting, Arc<Pulled>) {
+    let engine = Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
+        .belonging_to("media")
+        .publishing(&[("sonarr", "127.0.0.1", 18989)])
+        .mounting(&[PathBuf::from("/their/sonarr")]);
+    let images = Pulled::holding(vec![Pulled::image(
+        "lscr.io/linuxserver/sonarr:4.0.15",
+        400,
+        &["media"],
+    )]);
+    (engine, images)
+}
+
+/// A transport answering as two stacks at once, told apart by the port asked.
+fn two_stacks() -> Arc<lemonfiber_fixtures::http::Fake> {
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    Fake::by_route(vec![
+        // Theirs: one series, following a profile it numbered 1.
+        (
+            Method::Get,
+            "18989/api/v3/qualityprofile",
+            Answer::reply(200, r#"[{"id":1,"name":"HD"}]"#),
+        ),
+        (
+            Method::Get,
+            "18989/api/v3/series",
+            Answer::reply(
+                200,
+                r#"[{"id":5,"title":"Taskmaster","qualityProfileId":1,"rootFolderPath":"/data/tv"}]"#,
+            ),
+        ),
+        (
+            Method::Get,
+            "18989/api/v3/indexer",
+            Answer::reply(200, "[]"),
+        ),
+        // Ours: the same profile, numbered differently, and nothing followed yet.
+        (
+            Method::Get,
+            ":8989/api/v3/qualityprofile",
+            Answer::reply(200, r#"[{"id":7,"name":"HD"}]"#),
+        ),
+        (Method::Get, ":8989/api/v3/series", Answer::reply(200, "[]")),
+        (
+            Method::Get,
+            ":8989/api/v3/indexer",
+            Answer::reply(200, "[]"),
+        ),
+        (
+            Method::Post,
+            ":8989/api/v3/series",
+            Answer::reply(201, "{}"),
+        ),
+    ])
+}
+
+/// A machine holding both stacks, reached through the given transport.
+fn importing(http: Arc<lemonfiber_fixtures::http::Fake>) -> Ctx {
+    let (engine, images) = both_stacks();
+    Ctx::new(
+        Arc::new(Scripted(Ok(spoke("")))),
+        Arc::new(engine),
+        lemonfiber_fixtures::ports::Stopped::today(),
+        Arc::new(SeedFs::keyed(
+            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
+            None,
+        )),
+        Source::External(project()),
+        Settings {
+            project: "lemonfiber".to_owned(),
+            stack_dir: Some(PathBuf::from("/srv/lemonfiber")),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_images(images)
+    .with_http(http)
+}
+
+/// What carrying answered.
+async fn carrying(ctx: &Ctx, confirmed: bool) -> Option<lemonfiber_core::model::ImportReport> {
+    match dispatch(Command::Migrate(MigrateAction::Import { confirmed }), ctx).await {
+        Ok(Outcome::Import(report)) => Some(report),
+        _ => None,
+    }
+}
+
+#[tokio::test]
+async fn carrying_unconfirmed_names_what_would_travel_and_writes_nothing() {
+    let http = two_stacks();
+    let found = carrying(&importing(Arc::clone(&http)), false).await;
+    let named: Vec<String> = found
+        .map(|read| read.would_carry.into_iter().map(|one| one.name).collect())
+        .unwrap_or_default();
+    assert_eq!(named, vec!["Taskmaster".to_owned()], "what would travel");
+
+    let posted = http
+        .requests()
+        .into_iter()
+        .any(|request| request.method == Method::Post);
+    assert!(!posted, "a rehearsal wrote to a service");
+}
+
+/// The assertion the whole design turns on: two stacks number their own profiles, so a
+/// record carried with the old number would follow whatever happened to be first here.
+#[tokio::test]
+async fn a_carried_record_follows_this_stacks_own_profile_not_the_number_it_had() {
+    let http = two_stacks();
+    let found = carrying(&importing(Arc::clone(&http)), true).await;
+    let carried: Vec<String> = found
+        .map(|read| read.carried.into_iter().map(|one| one.name).collect())
+        .unwrap_or_default();
+    assert_eq!(carried, vec!["Taskmaster".to_owned()], "what travelled");
+
+    let body = http
+        .requests()
+        .into_iter()
+        .find(|request| request.method == Method::Post)
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    assert!(body.contains("\"qualityProfileId\":7"), "remapped: {body}");
+    assert!(
+        !body.contains("\"qualityProfileId\":1"),
+        "not theirs: {body}"
+    );
+    assert!(
+        !body.contains("\"id\":5"),
+        "its id there is not its id here: {body}"
+    );
+}
+
+/// A machine holding both stacks, with the pieces a caller wants to vary.
+fn importing_over(
+    engine: Reporting,
+    stack: Source,
+    http: Arc<lemonfiber_fixtures::http::Fake>,
+) -> Ctx {
+    let images = Pulled::holding(vec![Pulled::image(
+        "lscr.io/linuxserver/sonarr:4.0.15",
+        400,
+        &["media"],
+    )]);
+    Ctx::new(
+        Arc::new(Scripted(Ok(spoke("")))),
+        Arc::new(engine),
+        lemonfiber_fixtures::ports::Stopped::today(),
+        Arc::new(SeedFs::keyed(
+            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
+            None,
+        )),
+        stack,
+        Settings {
+            project: "lemonfiber".to_owned(),
+            stack_dir: Some(PathBuf::from("/srv/lemonfiber")),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_images(images)
+    .with_http(http)
+}
+
+/// A stack that could not be read is one the survey has already refused, so nothing is
+/// carried and nothing is claimed.
+#[tokio::test]
+async fn carrying_out_of_a_machine_that_could_not_be_read_carries_nothing() {
+    let (engine, _) = both_stacks();
+    let nowhere = Source::External(Path::new("/nowhere-at-all"));
+    let ctx = importing_over(engine, nowhere, two_stacks());
+    let found = carrying(&ctx, true).await;
+    let refused = found.and_then(|read| read.refused);
+    assert!(refused.is_some(), "refused rather than silently empty");
+}
+
+/// A service publishing nothing is one there is no way to reach a copy of.
+#[tokio::test]
+async fn a_service_with_no_way_in_is_named_rather_than_passed_over() {
+    let unreachable = Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
+        .belonging_to("media")
+        .mounting(&[PathBuf::from("/their/sonarr")]);
+    let ctx = importing_over(unreachable, Source::External(project()), two_stacks());
+    let found = carrying(&ctx, false).await;
+    let named = found.map_or_else(Vec::new, |read| {
+        read.not_carried.into_iter().map(|one| one.what).collect()
+    });
+    assert_eq!(
+        named,
+        vec!["sonarr".to_owned()],
+        "named rather than dropped"
+    );
+}
+
+/// A service lemonfiber does not run holds nothing this knows how to carry.
+#[tokio::test]
+async fn a_service_we_do_not_run_holds_nothing_to_carry() {
+    let engine = Reporting::holding(&["sonarr", "ombi"], Lifecycle::Running, Health::Healthy)
+        .belonging_to("media")
+        .publishing(&[("sonarr", "127.0.0.1", 18989)])
+        .mounting(&[PathBuf::from("/their/sonarr")]);
+    let ctx = importing_over(engine, Source::External(project()), two_stacks());
+    let found = carrying(&ctx, false).await;
+    let named: Vec<String> = found
+        .map(|read| read.would_carry.into_iter().map(|one| one.name).collect())
+        .unwrap_or_default();
+    assert_eq!(named, vec!["Taskmaster".to_owned()], "only what we run");
+}
+
+/// A service that will not take a record says so, rather than the import claiming it.
+#[tokio::test]
+async fn a_record_the_service_refuses_is_reported_rather_than_counted() {
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    let refusing = Fake::by_route(vec![
+        (
+            Method::Get,
+            "18989/api/v3/qualityprofile",
+            Answer::reply(200, r#"[{"id":1,"name":"HD"}]"#),
+        ),
+        (
+            Method::Get,
+            "18989/api/v3/series",
+            Answer::reply(
+                200,
+                r#"[{"id":5,"title":"Taskmaster","qualityProfileId":1}]"#,
+            ),
+        ),
+        (
+            Method::Get,
+            "18989/api/v3/indexer",
+            Answer::reply(200, "[]"),
+        ),
+        (
+            Method::Get,
+            ":8989/api/v3/qualityprofile",
+            Answer::reply(200, r#"[{"id":7,"name":"HD"}]"#),
+        ),
+        (Method::Get, ":8989/api/v3/series", Answer::reply(200, "[]")),
+        (
+            Method::Get,
+            ":8989/api/v3/indexer",
+            Answer::reply(200, "[]"),
+        ),
+        (
+            Method::Post,
+            ":8989/api/v3/series",
+            Answer::reply(500, "no"),
+        ),
+    ]);
+    let (engine, _) = both_stacks();
+    let ctx = importing_over(engine, Source::External(project()), refusing);
+
+    let found = carrying(&ctx, true).await;
+    let carried = found
+        .as_ref()
+        .map(|read| read.carried.len())
+        .unwrap_or_default();
+    assert_eq!(carried, 0, "nothing was counted as carried");
+    let named = found.map_or_else(Vec::new, |read| {
+        read.not_carried.into_iter().map(|one| one.what).collect()
+    });
+    assert_eq!(named, vec!["Taskmaster".to_owned()], "named as not carried");
+}
+
+/// Neither copy answering is a service nothing was carried out of.
+#[tokio::test]
+async fn a_service_neither_copy_answers_for_is_named() {
+    let (engine, _) = both_stacks();
+    let silent = lemonfiber_fixtures::http::Fake::silent();
+    let ctx = importing_over(engine, Source::External(project()), silent);
+    let found = carrying(&ctx, false).await;
+    let named = found.map_or_else(Vec::new, |read| {
+        read.not_carried.into_iter().map(|one| one.what).collect()
+    });
+    assert_eq!(named, vec!["sonarr".to_owned()], "named rather than silent");
+}
+
+/// A machine holding both stacks, with a filesystem the caller chooses.
+fn importing_with(files: Arc<SeedFs>, http: Arc<lemonfiber_fixtures::http::Fake>) -> Ctx {
+    let (engine, images) = both_stacks();
+    Ctx::new(
+        Arc::new(Scripted(Ok(spoke("")))),
+        Arc::new(engine),
+        lemonfiber_fixtures::ports::Stopped::today(),
+        files,
+        Source::External(project()),
+        Settings {
+            project: "lemonfiber".to_owned(),
+            stack_dir: Some(PathBuf::from("/srv/lemonfiber")),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_images(images)
+    .with_http(http)
+}
+
+/// A service that has written no key yet is one neither copy can be opened for.
+#[tokio::test]
+async fn a_service_whose_key_cannot_be_read_is_named_rather_than_carried_from() {
+    let keyless = Arc::new(SeedFs::keyed(None, None));
+    let ctx = importing_with(keyless, two_stacks());
+    let found = carrying(&ctx, false).await;
+    let said = found.map_or_else(String::new, |read| {
+        read.not_carried
+            .first()
+            .map(|one| one.because.clone())
+            .unwrap_or_default()
+    });
+    assert!(said.contains("could not be reached"), "{said}");
+}
+
+/// Profiles that read and records that do not is a service half-answering, and the
+/// import says which half.
+#[tokio::test]
+async fn a_service_whose_records_will_not_read_is_named_for_that() {
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    let partial = Fake::by_route(vec![
+        (
+            Method::Get,
+            "/api/v3/qualityprofile",
+            Answer::reply(200, r#"[{"id":7,"name":"HD"}]"#),
+        ),
+        (Method::Get, "/api/v3/indexer", Answer::reply(500, "no")),
+    ]);
+    let ctx = importing_with(
+        Arc::new(SeedFs::keyed(
+            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
+            None,
+        )),
+        partial,
+    );
+    let found = carrying(&ctx, false).await;
+    let said = found.map_or_else(String::new, |read| {
+        read.not_carried
+            .first()
+            .map(|one| one.because.clone())
+            .unwrap_or_default()
+    });
+    assert!(said.contains("could not be read"), "{said}");
+}
+
+/// A machine that could not be looked at is one there is nothing to carry out of, and
+/// saying so is different from saying the two stacks agree.
+#[tokio::test]
+async fn carrying_from_a_machine_that_could_not_be_looked_at_says_so() {
+    let refused = Pulled::unreachable("no daemon here");
+    let ctx = over(somebody_elses(), refused, Source::External(project()));
+    let found = carrying(&ctx, true).await;
+    let said = found.and_then(|read| read.refused).unwrap_or_default();
+    assert!(said.contains("could not be read"), "{said}");
+}
+
+/// Having looked and found no stack of ours is a different answer from not having
+/// looked, and an import says which.
+#[tokio::test]
+async fn carrying_from_a_machine_holding_nothing_of_ours_says_there_is_no_setup() {
+    let images = Pulled::holding(vec![Pulled::image("a-database:17", 400, &["shop"])]);
+    let engine =
+        Reporting::holding(&["postgres"], Lifecycle::Running, Health::Healthy).belonging_to("shop");
+    let ctx = over(engine, images, Source::External(project()));
+    let said = carrying(&ctx, true)
+        .await
+        .and_then(|read| read.refused)
+        .unwrap_or_default();
+    assert!(said.contains("no single setup here"), "{said}");
 }

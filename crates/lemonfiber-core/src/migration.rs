@@ -19,6 +19,7 @@ use crate::ports::docker::{Container, Image};
 
 pub mod carrying;
 pub mod image;
+pub mod importing;
 pub mod linking;
 pub mod mode;
 pub mod standing;
@@ -80,6 +81,29 @@ pub fn surveyed(
         unsupported,
         standing,
     }
+}
+
+/// The one setup here that lemonfiber could act on, where there is exactly one.
+///
+/// Exactly one, because adopting, standing beside and standing in place of are all
+/// choices about *which* stack, and a machine holding two is one where only the operator
+/// can say which they meant.
+///
+/// It has to hold something lemonfiber runs. A project of somebody's own — a database, a
+/// cache, the app they are writing — is not a media stack any of these acts is about, and
+/// acting on it because it happened to be the only thing here is the most expensive
+/// misreading in this family.
+#[must_use]
+pub fn one_setup(survey: &MigrationReport) -> Option<String> {
+    let mut candidates = survey
+        .standing
+        .iter()
+        .filter(|project| project.services.iter().any(|service| service.adoptable));
+    let first = candidates.next()?;
+    if candidates.next().is_some() {
+        return None;
+    }
+    Some(first.project.clone())
 }
 
 /// What the survey answers when the engine would not say.
@@ -152,6 +176,44 @@ pub(crate) mod tests {
             ours("sonarr", "linuxserver/sonarr", "4.0.1", Some(8989)),
             ours("radarr", "linuxserver/radarr", "5.0.1", Some(7878)),
         ]
+    }
+
+    /// One setup holding something lemonfiber runs is the one acted on.
+    #[test]
+    fn the_one_setup_holding_our_services_is_the_one_acted_on() {
+        let seen = [container("media", "sonarr", &[8989])];
+        let found = surveyed("lemonfiber", &seen, &[], &running(), &[]);
+        assert_eq!(super::one_setup(&found), Some("media".to_owned()));
+    }
+
+    /// Somebody's own work is not a media stack any of these acts is about.
+    #[test]
+    fn a_project_holding_nothing_of_ours_is_not_acted_on() {
+        let seen = [container("shop", "postgres", &[5432])];
+        let found = surveyed("lemonfiber", &seen, &[], &running(), &[]);
+        assert_eq!(super::one_setup(&found), None);
+    }
+
+    /// Two of them is a question only the operator can answer.
+    #[test]
+    fn two_setups_holding_our_services_is_not_a_choice_lemonfiber_makes() {
+        let seen = [
+            container("media", "sonarr", &[8989]),
+            container("archive", "radarr", &[7878]),
+        ];
+        let found = surveyed("lemonfiber", &seen, &[], &running(), &[]);
+        assert_eq!(super::one_setup(&found), None);
+    }
+
+    /// An unrelated project beside ours still leaves exactly one candidate.
+    #[test]
+    fn an_unrelated_project_beside_one_of_ours_does_not_make_it_ambiguous() {
+        let seen = [
+            container("media", "sonarr", &[8989]),
+            container("shop", "redis", &[6379]),
+        ];
+        let found = surveyed("lemonfiber", &seen, &[], &running(), &[]);
+        assert_eq!(super::one_setup(&found), Some("media".to_owned()));
     }
 
     #[test]

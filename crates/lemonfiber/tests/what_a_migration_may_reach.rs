@@ -108,7 +108,9 @@ fn acting_on_a_migration_cannot_stop_delete_or_run_anything() {
         .iter()
         .filter(|(path, _)| {
             let named = path.to_string_lossy().replace('\\', "/");
-            named.ends_with("app/adopt.rs") || named.ends_with("app/beside.rs")
+            named.ends_with("app/adopt.rs")
+                || named.ends_with("app/beside.rs")
+                || named.ends_with("app/import.rs")
         })
         .flat_map(|(path, text)| {
             production(text)

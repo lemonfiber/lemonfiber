@@ -62,6 +62,11 @@ pub(crate) struct Endpoint {
 
 impl Endpoint {
     /// An endpoint for `service`, reached at `base` over `http`.
+    /// The service this endpoint speaks to, for a failure that has to name it.
+    pub(crate) fn service(&self) -> &str {
+        &self.service
+    }
+
     pub(crate) fn new(
         http: Arc<dyn Http>,
         base: impl Into<String>,

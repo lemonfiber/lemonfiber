@@ -223,6 +223,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Adoption(report) => migration::adoption(report),
         Outcome::Beside(report) => migration::beside(report),
         Outcome::Replacement(report) => migration::replacement(report),
+        Outcome::Import(report) => migration::carried(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
         Outcome::Music(report) => quality::music(report),
@@ -875,6 +876,15 @@ mod tests {
                 project: Some("media".to_owned()),
                 adopted: true,
                 ..AdoptReport::default()
+            }),
+            Outcome::Import(lemonfiber_core::model::ImportReport {
+                carried: vec![lemonfiber_core::model::RecordReport {
+                    service: "sonarr".to_owned(),
+                    kind: "series".to_owned(),
+                    name: "Taskmaster".to_owned(),
+                }],
+                applied: true,
+                ..lemonfiber_core::model::ImportReport::default()
             }),
             Outcome::Replacement(lemonfiber_core::model::ReplaceReport {
                 project: Some("media".to_owned()),

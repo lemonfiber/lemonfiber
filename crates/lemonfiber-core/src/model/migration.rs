@@ -163,6 +163,36 @@ pub struct ReplaceReport {
     pub rehearsed: bool,
 }
 
+/// One record carried across, or that would be.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct RecordReport {
+    /// The service it belongs to.
+    pub service: String,
+    /// What kind of record it is, in the plural a person reads.
+    pub kind: String,
+    /// What it is called.
+    pub name: String,
+}
+
+/// What copying an operator's own records across came to, or would come to.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct ImportReport {
+    /// The project the records were read from.
+    pub project: Option<String>,
+    /// What was carried across.
+    pub carried: Vec<RecordReport>,
+    /// What would be, where nothing has been yet.
+    pub would_carry: Vec<RecordReport>,
+    /// What could not be carried, and why.
+    pub not_carried: Vec<UnsupportedReport>,
+    /// Whether anything was actually carried, as against described.
+    pub applied: bool,
+    /// Why nothing was, where nothing was.
+    pub refused: Option<String>,
+    /// Whether this call only said what it would do.
+    pub rehearsed: bool,
+}
+
 /// What is already on this machine, before anything is proposed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MigrationReport {

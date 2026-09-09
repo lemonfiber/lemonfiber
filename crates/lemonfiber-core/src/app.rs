@@ -42,6 +42,7 @@ mod fixtures;
 pub mod forwarding;
 mod hosting;
 mod household;
+mod import;
 mod invite;
 mod letting;
 mod materialise;
@@ -2129,6 +2130,15 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn asking_to_carry_records_across_reaches_the_command_that_would() {
+        let ctx = a_context().build();
+        let asked = Command::Migrate(MigrateAction::Import { confirmed: false });
+        let read = dispatch(asked, &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Import(_)));
+        assert!(answered, "{read:?}");
+    }
+
+    #[tokio::test]
     async fn asking_to_stand_in_place_of_what_is_here_reaches_the_command_that_would() {
         let ctx = a_context().build();
         let asked = Command::Migrate(MigrateAction::Replace { confirmed: false });
@@ -2235,6 +2245,7 @@ mod tests {
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)
+                | Outcome::Import(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Config(_)
@@ -2288,6 +2299,7 @@ mod tests {
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)
+                | Outcome::Import(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -3123,6 +3135,7 @@ mod tests {
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)
+                | Outcome::Import(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -4135,6 +4148,7 @@ mod tests {
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
                 | Outcome::Replacement(_)
+                | Outcome::Import(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
