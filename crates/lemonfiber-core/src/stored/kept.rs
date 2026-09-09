@@ -77,6 +77,16 @@ pub const EVERY: &[Entry] = &[
         at: Paths::outbound,
     },
     Entry {
+        accessor: "updates",
+        what: "what the release list last said",
+        why: "When lemonfiber last asked which version of itself is newest, what the answer \
+              was, and how many of those asks went unanswered — which is what keeps a machine \
+              with no route out from reaching for the network on every run. Nothing about you \
+              and nothing about this machine ever goes the other way.",
+        secret: false,
+        at: Paths::updates,
+    },
+    Entry {
         accessor: "bandwidth",
         what: "what the line was declared to carry",
         why: "The share of the connection the stack was told to keep to, the hours it keeps \

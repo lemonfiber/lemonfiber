@@ -101,6 +101,22 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     ctx
 }
 
+/// This operator's home directory, where the platform will say.
+///
+/// Its own function rather than a line in the settings, because the strategy it asks
+/// has to be brought into scope and doing that inside the record would import a name
+/// for the whole of it.
+fn home_directory() -> Option<PathBuf> {
+    use etcetera::BaseStrategy as _;
+
+    Some(
+        etcetera::choose_base_strategy()
+            .ok()?
+            .home_dir()
+            .to_path_buf(),
+    )
+}
+
 /// This machine's own service manager, reached where it keeps its definitions.
 ///
 /// The directories are the platforms' own rather than lemonfiber's: a launch agent
@@ -159,6 +175,9 @@ pub(crate) fn read_settings() -> Settings {
         // than installing a service against a guessed path.
         program: std::env::current_exe().ok(),
         hosted: here().map(|paths| paths.hosted()),
+        // Where the tools that install programs leave a record of having done so,
+        // which is the only thing this is read for.
+        home: home_directory(),
         // On unless it is explicitly turned off: somebody meeting this vocabulary
         // does not know there is a setting to look for, and somebody who wants the
         // explanations gone knows exactly what they want to stop.

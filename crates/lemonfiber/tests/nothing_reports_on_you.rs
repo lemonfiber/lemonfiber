@@ -73,6 +73,14 @@ enum Reach {
 /// whoever is in a hurry.
 const NAMED: &[(&str, Reach, &str)] = &[
     (
+        "api.github.com",
+        Reach::Asked,
+        "where this project's own releases are listed, asked at most once a day to find out \
+         whether a newer lemonfiber exists; the request is unauthenticated and carries no \
+         identifier, no configuration and not even the version running, and one setting \
+         stops it entirely",
+    ),
+    (
         "api.pushbullet.com",
         Reach::Asked,
         "the second of the two places a household member may already receive what the request \

@@ -73,6 +73,7 @@ pub mod support;
 mod targets;
 mod trace;
 mod uninstall;
+mod update;
 mod upgrade;
 mod walkthrough;
 pub mod watch;
@@ -320,6 +321,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         Command::Undo => repair::reversing(ctx).await.map(Outcome::Undo),
         Command::Credentials(asked) => credentials::answer(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
+        // The one read here that cannot fail, and the requirement is that it cannot:
+        // an availability check another command could be blocked by would be one this
+        // product had made a precondition of itself.
+        Command::Update { to } => Ok(Outcome::Update(update::standing(ctx, to.as_deref()).await)),
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
         Command::Forget { confirm } => stored::forgetting(ctx, confirm).await.map(Outcome::Stored),
@@ -1428,6 +1433,58 @@ mod tests {
         assert!(invited(&refused).is_none(), "a refusal carried one anyway");
     }
 
+    /// Where this copy stands, asked for here as well as from the integration test
+    /// beside it — the arm is reached from two compilations of this file and has to
+    /// run in both.
+    ///
+    /// A machine that will not say where its own binary is, with the release list
+    /// switched off, which is the shortest route through the arm and the one that
+    /// shows nothing about it can refuse.
+    #[tokio::test]
+    async fn a_dispatched_update_check_serialises_under_its_own_kind() {
+        let ctx = a_context()
+            .settings(Settings {
+                reaching: crate::config::Reaching::without(crate::config::REACH_UPDATES_KEY),
+                ..Settings::default()
+            })
+            .build();
+        let json = dispatch(Command::Update { to: None }, &ctx)
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+
+        assert!(json.contains(r#""kind":"update""#), "{json}");
+        assert!(json.contains(r#""standing":"check-failed""#), "{json}");
+        assert!(json.contains(r#""installed":"untellable""#), "{json}");
+    }
+
+    /// And the other half of the same word: naming a version asks about that one,
+    /// which is how going back is asked for.
+    #[tokio::test]
+    async fn naming_a_version_asks_about_that_one_and_says_what_it_reads() {
+        let ctx = a_context()
+            .settings(Settings {
+                reaching: crate::config::Reaching::none(),
+                ..Settings::default()
+            })
+            .build();
+        let asked = dispatch(
+            Command::Update {
+                to: Some("0.9.0".to_owned()),
+            },
+            &ctx,
+        )
+        .await;
+
+        let named = matches!(
+            &asked,
+            Ok(Outcome::Update(report))
+                if report.asked.as_deref() == Some("0.9.0") && report.configuration.is_some()
+        );
+        assert!(named, "a named version was not asked about: {asked:?}");
+    }
+
     /// What this machine keeps, asked for here as well as from the integration test
     /// beside it — the arms are reached from two compilations of this file and have
     /// to run in both.
@@ -2298,6 +2355,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
+                | Outcome::Update(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)
@@ -2354,6 +2412,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
+                | Outcome::Update(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)
@@ -3190,6 +3249,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
+                | Outcome::Update(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)
@@ -4182,6 +4242,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
+                | Outcome::Update(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)

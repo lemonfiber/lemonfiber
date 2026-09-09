@@ -104,6 +104,11 @@ pub const SHOWN: &[(&str, &str)] = &[
          asked, which decides whether passing it on is yours to do by hand",
     ),
     (
+        super::REACH_UPDATES_KEY,
+        "whether the list of releases may be asked which version is newest, which explains \
+         a report that says it could not tell",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

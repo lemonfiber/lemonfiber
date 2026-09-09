@@ -21,7 +21,7 @@ use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::{
     Reaching, Settings, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
-    REACH_REGISTRY_KEY, REACH_USENET_KEY, SWITCHES,
+    REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY, SWITCHES,
 };
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::stack::Source;
@@ -57,7 +57,7 @@ async fn listed(settings: Settings) -> lemonfiber_core::outbound::Leaving {
 async fn every_request_this_product_makes_is_listed_with_a_way_to_stop_it() {
     let report = listed(Settings::default()).await;
 
-    assert_eq!(report.ours.len(), 6);
+    assert_eq!(report.ours.len(), 7);
     let switches: Vec<&str> = report
         .ours
         .iter()
@@ -69,6 +69,7 @@ async fn every_request_this_product_makes_is_listed_with_a_way_to_stop_it() {
         REACH_INDEXER_KEY,
         REACH_USENET_KEY,
         REACH_HOUSEHOLD_KEY,
+        REACH_UPDATES_KEY,
     ] {
         assert!(switches.contains(&key), "{key} switches nothing off");
     }

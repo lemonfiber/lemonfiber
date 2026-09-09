@@ -135,6 +135,8 @@ pub const TRACE: Kind = Kind("trace");
 pub const UNDO: Kind = Kind("undo");
 /// What taking lemonfiber off this machine would come to, or came to.
 pub const UNINSTALL: Kind = Kind("uninstall");
+/// Where this copy of lemonfiber stands, and what moving it would come to.
+pub const UPDATE: Kind = Kind("update");
 /// What upgrading existing content did, or would do.
 pub const UPGRADE: Kind = Kind("upgrade");
 /// The versions in play: the binary, and the stack it operates.
@@ -198,6 +200,7 @@ pub const ALL: &[Kind] = &[
     TRACE,
     UNDO,
     UNINSTALL,
+    UPDATE,
     UPGRADE,
     VERSION,
     WALKTHROUGH,

@@ -303,6 +303,10 @@ async fn main() -> ExitCode {
         Request::Outbound => Command::Outbound,
         Request::Credentials(asked) => translate::credentials(asked),
         Request::Stored => Command::Stored,
+        // Naming a version asks about that one, and naming none asks about whatever is
+        // newest — the same fork the forms listing takes, on a word that replaces
+        // nothing either way.
+        Request::Update { to } => Command::Update { to },
         Request::Clients => Command::Clients,
         Request::Invite { name, allowance } => invitation(name, allowance),
         Request::Reissue { name } => Command::Reissue { name },

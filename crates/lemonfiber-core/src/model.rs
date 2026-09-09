@@ -29,6 +29,7 @@ mod queue;
 mod running;
 mod settings;
 mod trace;
+mod update;
 mod upgrade;
 mod walkthrough;
 
@@ -49,6 +50,7 @@ pub use queue::*;
 pub use running::*;
 pub use settings::*;
 pub use trace::*;
+pub use update::*;
 pub use upgrade::*;
 pub use walkthrough::*;
 
