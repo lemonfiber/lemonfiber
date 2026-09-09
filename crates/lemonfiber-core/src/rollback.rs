@@ -160,15 +160,20 @@ fn depended_on(key: &str, later: &[Change]) -> bool {
         .any(|touched| touched == key)
 }
 
-/// Every change of one operation, which rolls back as one unit or not at all.
+/// Every change of one run of an operation, which rolls back as one unit or not at all.
 ///
 /// An operation is the unit an operator agreed to — a seed, a reconfigure — and undoing
 /// half of one leaves a machine in a state nobody chose.
+///
+/// A run is the operation and the stamp together, never the operation alone. The name
+/// says the kind of run and is reused by every run of that kind, so matching on it would
+/// gather every apply this machine has ever made into one unit; the surface stamps one
+/// time for a whole run, so the pair is what tells two of them apart.
 #[must_use]
-pub fn together<'a>(changes: &'a [Change], operation: &str) -> Vec<&'a Change> {
+pub fn together<'a>(changes: &'a [Change], operation: &str, at: &str) -> Vec<&'a Change> {
     changes
         .iter()
-        .filter(|change| change.operation == operation)
+        .filter(|change| change.operation == operation && change.at == at)
         .collect()
 }
 
@@ -275,17 +280,27 @@ mod tests {
 
     /// An operation is the unit somebody agreed to, so it goes back as one.
     #[test]
-    fn the_changes_of_one_operation_are_gathered_together() {
+    fn the_changes_of_one_run_are_gathered_and_an_earlier_run_of_the_same_kind_is_not() {
+        let earlier = |key: &str| Change {
+            at: "0".to_owned(),
+            ..set("apply", key, None, "1000")
+        };
         let changes = [
-            set("apply", "PUID", None, "1000"),
-            set("reconfigure", "PGID", None, "1000"),
-            set("apply", "TZ", None, "UTC"),
+            earlier("PUID"),
+            set("apply", "PGID", None, "1000"),
+            set("reconfigure", "TZ", None, "UTC"),
+            set("apply", "UMASK", None, "022"),
         ];
-        let gathered = together(&changes, "apply");
-        assert_eq!(gathered.len(), 2, "both of the apply's changes");
-        assert!(
-            gathered.iter().all(|change| change.operation == "apply"),
-            "and nothing else"
+        let gathered = together(&changes, "apply", "1");
+        assert_eq!(gathered.len(), 2, "both changes of the run asked about");
+        let keys: Vec<_> = gathered
+            .iter()
+            .filter_map(|change| setting(change))
+            .collect();
+        assert_eq!(
+            keys,
+            ["PGID", "UMASK"],
+            "and neither the other operation nor the earlier apply"
         );
     }
 }

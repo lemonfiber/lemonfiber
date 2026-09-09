@@ -174,9 +174,18 @@ async fn a_setting_still_holding_what_it_was_left_can_go_back() {
 #[tokio::test]
 async fn a_change_says_how_many_went_with_it() {
     let root = scratch("together");
+    // An earlier seed of the same machine, under the same name and a different stamp.
+    // Without it a count that gathered every seed ever made would read the same as one
+    // that gathered this run's, and this test would pass on both.
+    let earlier = |key: &str| Change {
+        at: "1000".to_owned(),
+        ..set("seed", key, None, "1000")
+    };
     journalled(
         &root,
         &[
+            earlier("OLD_PUID"),
+            earlier("OLD_PGID"),
             set("seed", "PUID", None, "1000"),
             set("seed", "PGID", None, "1000"),
             set("reconfigure", "TZ", None, "UTC"),
@@ -191,11 +200,16 @@ async fn a_change_says_how_many_went_with_it() {
         .map(|change| change.alongside);
     let seeded = changes
         .iter()
-        .find(|change| change.did.contains("PUID"))
+        .find(|change| change.did.contains(" PUID"))
         .map(|change| change.alongside);
 
+    assert_eq!(changes.len(), 5, "every change is on the record");
     assert_eq!(alone, Some(1), "the lone reconfigure took nothing with it");
-    assert_eq!(seeded, Some(2), "the seed wrote two");
+    assert_eq!(
+        seeded,
+        Some(2),
+        "this seed wrote two, and the earlier seed is a run of its own"
+    );
 }
 
 /// A machine that has changed nothing answers with an empty record rather than a

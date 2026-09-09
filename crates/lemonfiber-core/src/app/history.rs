@@ -52,7 +52,7 @@ pub fn history(ctx: &Ctx) -> HistoryReport {
             told(
                 change,
                 standing(change, later, &holds),
-                together(changes, &change.operation).len(),
+                together(changes, &change.operation, &change.at).len(),
             )
         })
         .collect();
